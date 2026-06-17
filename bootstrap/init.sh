@@ -67,13 +67,13 @@ done < <(find "$SKELETON_DIR" -type f -print0)
 
 sha=$(git -C "$SCRIPT_DIR/.." rev-parse HEAD 2>/dev/null || echo unknown)
 cat > "$ROOT/.harness-version" <<EOF
-version=0.2.0
+version=0.2.1
 skeleton_commit=$sha
 rendered_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
 git add .
-git commit -m "Install AI Harness skeleton v0.2" || true
+git commit -m "Install AI Harness skeleton v0.2.1" || true
 cat <<EOF
 
 AI Harness installed on branch $branch.

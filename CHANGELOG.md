@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Added Bash-native Husky-style Git hooks for pre-commit, commit-msg, pre-push, pre-rebase, and post-merge guardrails.
+- Propagated the hook entrypoints and shared runner into the skeleton for future bootstrapped projects.
+- Documented `core.hooksPath` adoption and upgrade steps for existing projects.
+
 ## 0.2.0
 
 - Initial local skeleton implementing the v0.2 build-plan structure.
