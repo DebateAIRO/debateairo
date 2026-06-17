@@ -54,41 +54,50 @@ export function AuthGate({ children }: { children: (token: string) => React.Reac
 
   if (checking) {
     return (
-      <main className="page">
-        <p className="muted">Checking token...</p>
-      </main>
+      <div className="screen scroll">
+        <div className="screenInner narrow">
+          <p className="muted">Checking token…</p>
+        </div>
+      </div>
     );
   }
 
   if (!token) {
     return (
-      <main className="page">
-        <div className="pageHeader">
-          <div>
-            <h1>Bearer Token</h1>
-            <p className="muted">Enter the user token printed by the coordinator on first boot.</p>
-          </div>
+      <div className="screen scroll">
+        <div className="screenInner narrow">
+          <div className="eyebrow">Authentication</div>
+          <h1 className="display sm" style={{ marginTop: 12 }}>
+            Enter your user token
+          </h1>
+          <p className="lede" style={{ marginTop: 8 }}>
+            Paste the user token the coordinator printed on first boot to unlock creating and editing debates.
+          </p>
+          <form onSubmit={submit} style={{ marginTop: 24, maxWidth: 420 }}>
+            {error ? (
+              <div className="error" style={{ marginBottom: 14 }}>
+                {error}
+              </div>
+            ) : null}
+            <div className="fieldGroup" style={{ marginTop: 0 }}>
+              <label htmlFor="token">User token</label>
+              <input
+                id="token"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                type="password"
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
+            <div className="formActions">
+              <button type="submit" className={`startBtn${draft.trim() ? " ready" : ""}`} disabled={submitting}>
+                {submitting ? "Checking…" : "Unlock"} <span aria-hidden>→</span>
+              </button>
+            </div>
+          </form>
         </div>
-        <form className="formPanel" onSubmit={submit}>
-          {error ? <div className="error">{error}</div> : null}
-          <div className="field">
-            <label htmlFor="token">User token</label>
-            <input
-              id="token"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              type="password"
-              autoComplete="off"
-              autoFocus
-            />
-          </div>
-          <div className="toolbar">
-            <button type="submit" disabled={submitting}>
-              {submitting ? "Checking..." : "Unlock"}
-            </button>
-          </div>
-        </form>
-      </main>
+      </div>
     );
   }
 

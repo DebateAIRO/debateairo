@@ -864,4 +864,7 @@ def test_new_page_starts_orchestration_mode_not_single_shot() -> None:
     text = source.read_text(encoding="utf-8")
 
     assert '{ mode: "single_shot" }' not in text
-    assert "Pro/Con debate tree" in text
+    # Orchestration mode is signalled by sending tree-shaping config (depth/branching),
+    # which the single-shot path never does.
+    assert "max_depth" in text
+    assert "branching" in text

@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { modelMeta } from "@/lib/models";
 
 type SettingsPayload = {
   routing: unknown;
@@ -14,16 +15,43 @@ type SettingsPayload = {
   model_monthly_spend_usd?: Record<string, number>;
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  decomposer: "Decomposer",
+  proposer: "Proposer",
+  opponent: "Opponent",
+  synthesizer: "Synthesizer",
+  analyzer: "Analyzer"
+};
+
+/** Derive the roles a model plays from the routing config (role -> model list). */
+function rolesForModel(routing: unknown, model: string): string[] {
+  if (!routing || typeof routing !== "object") return [];
+  const roles: string[] = [];
+  for (const [role, value] of Object.entries(routing as Record<string, unknown>)) {
+    const list = Array.isArray(value)
+      ? value
+      : value && typeof value === "object"
+        ? Object.values(value as Record<string, unknown>).flat()
+        : [value];
+    if (list.some((entry) => typeof entry === "string" && entry === model)) {
+      roles.push(ROLE_LABELS[role] ?? role);
+    }
+  }
+  return roles;
+}
+
 export default function SettingsPage() {
   return <AuthGate>{(token) => <SettingsForm token={token} />}</AuthGate>;
 }
 
 function SettingsForm({ token }: { token: string }) {
   const [routing, setRouting] = useState("");
+  const [routingParsed, setRoutingParsed] = useState<unknown>(null);
   const [modelCaps, setModelCaps] = useState<Record<string, string>>({});
   const [modelSpend, setModelSpend] = useState<Record<string, number>>({});
   const [configuredModels, setConfiguredModels] = useState<string[]>([]);
   const [enabledModels, setEnabledModels] = useState<Set<string>>(new Set());
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +60,7 @@ function SettingsForm({ token }: { token: string }) {
     const caps = payload.model_monthly_caps_usd ?? { "grok-4": payload.grok_monthly_cap_usd };
     const spendByModel = payload.model_monthly_spend_usd ?? { "grok-4": payload.grok_monthly_spend_usd };
     setRouting(JSON.stringify(payload.routing, null, 2));
+    setRoutingParsed(payload.routing);
     setModelCaps(
       Object.fromEntries(
         models.map((model) => {
@@ -46,19 +75,23 @@ function SettingsForm({ token }: { token: string }) {
   }
 
   useEffect(() => {
-    apiFetch<SettingsPayload>("/api/settings", {}, token).then(syncSettings).catch((exc) => {
-      setError(exc instanceof Error ? exc.message : "Unable to load settings");
-    });
+    apiFetch<SettingsPayload>("/api/settings", {}, token)
+      .then(syncSettings)
+      .catch((exc) => setError(exc instanceof Error ? exc.message : "Unable to load settings"));
   }, [token]);
+
+  const maxCap = useMemo(() => {
+    const caps = Object.values(modelCaps)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    return caps.length ? Math.max(...caps) : null;
+  }, [modelCaps]);
 
   function toggleModel(model: string) {
     setEnabledModels((current) => {
       const next = new Set(current);
-      if (next.has(model)) {
-        next.delete(model);
-      } else {
-        next.add(model);
-      }
+      if (next.has(model)) next.delete(model);
+      else next.add(model);
       return next;
     });
   }
@@ -82,9 +115,7 @@ function SettingsForm({ token }: { token: string }) {
     const monthlyCaps: Record<string, number> = {};
     for (const model of configuredModels) {
       const value = modelCaps[model]?.trim() ?? "";
-      if (!value) {
-        continue;
-      }
+      if (!value) continue;
       const cap = Number(value);
       if (!Number.isFinite(cap) || cap < 0) {
         setError(`Invalid cap for ${model}`);
@@ -106,7 +137,11 @@ function SettingsForm({ token }: { token: string }) {
       payload.grok_monthly_cap_usd = monthlyCaps["grok-4"];
     }
     try {
-      const saved = await apiFetch<SettingsPayload>("/api/settings", { method: "PUT", body: JSON.stringify(payload) }, token);
+      const saved = await apiFetch<SettingsPayload>(
+        "/api/settings",
+        { method: "PUT", body: JSON.stringify(payload) },
+        token
+      );
       syncSettings(saved);
       setMessage("Saved");
     } catch (exc) {
@@ -115,55 +150,123 @@ function SettingsForm({ token }: { token: string }) {
   }
 
   return (
-    <main className="page">
-      <div className="pageHeader">
-        <div>
-          <h1>Settings</h1>
-          <p className="muted">Routing pools, enabled models, and monthly caps.</p>
-        </div>
-      </div>
-      <form className="formPanel" onSubmit={submit}>
-        {error ? <div className="error">{error}</div> : null}
-        {message ? <div className="statusPill">{message}</div> : null}
-        <div className="field">
-          <label>Enabled models</label>
-          <div className="modelToggleGrid">
-            {configuredModels.map((model) => (
-              <label className="modelToggle" key={model}>
-                <input type="checkbox" checked={enabledModels.has(model)} onChange={() => toggleModel(model)} />
-                <span>{model}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <label>Backend spend</label>
-          <div className="spendGrid">
-            {configuredModels.map((model) => (
-              <div className="spendRow" key={model}>
-                <span className="spendModel">{model}</span>
-                <span className="spendValue">${(modelSpend[model] ?? 0).toFixed(4)}</span>
-                <input
-                  aria-label={`${model} monthly cap USD`}
-                  type="number"
-                  value={modelCaps[model] ?? ""}
-                  min={0}
-                  step="0.01"
-                  placeholder="No cap"
-                  onChange={(event) => updateModelCap(model, event.target.value)}
-                />
+    <div className="screen scroll">
+      <div className="screenInner medium">
+        <h1 className="display sm">Settings</h1>
+        <p className="lede" style={{ marginTop: 6 }}>
+          Toggle each model, see the roles it plays, and cap spend. Model diversity is the point — keep at least one on
+          each side.
+        </p>
+
+        <form onSubmit={submit}>
+          {error ? (
+            <div className="error" style={{ marginTop: 24 }}>
+              {error}
+            </div>
+          ) : null}
+          {message ? (
+            <div className="pill pillOk" style={{ marginTop: 24 }}>
+              <span className="dot" />
+              {message}
+            </div>
+          ) : null}
+
+          <div className="settingsLabel">Models &amp; roles</div>
+          <div className="modelTable">
+            {configuredModels.map((model) => {
+              const meta = modelMeta(model);
+              const on = enabledModels.has(model);
+              const roles = rolesForModel(routingParsed, model);
+              return (
+                <div key={model} className={`modelRow${on ? "" : " off"}`}>
+                  <span className="modelDot" style={{ ["--dot" as string]: meta.dot }} />
+                  <div className="modelName">{model}</div>
+                  <div className="roleChips">
+                    {roles.length ? (
+                      roles.map((role) => (
+                        <span key={role} className="roleChip">
+                          {role}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="roleChip" style={{ opacity: 0.6 }}>
+                        unassigned
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    className="capInput"
+                    aria-label={`${model} monthly cap USD`}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="No cap"
+                    value={modelCaps[model] ?? ""}
+                    onChange={(event) => updateModelCap(model, event.target.value)}
+                  />
+                  <span className="modelSpend">${(modelSpend[model] ?? 0).toFixed(2)}</span>
+                  <button
+                    type="button"
+                    className="switch"
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={`Toggle ${model}`}
+                    onClick={() => toggleModel(model)}
+                  >
+                    <span className="knob" />
+                  </button>
+                </div>
+              );
+            })}
+            {configuredModels.length === 0 ? (
+              <div className="modelRow">
+                <span className="muted">No models configured.</span>
               </div>
-            ))}
+            ) : null}
           </div>
-        </div>
-        <div className="field">
-          <label htmlFor="routing">Role routing JSON</label>
-          <textarea id="routing" value={routing} onChange={(event) => setRouting(event.target.value)} />
-        </div>
-        <div className="toolbar">
-          <button type="submit">Save</button>
-        </div>
-      </form>
-    </main>
+
+          <div className="cardRow">
+            <div className="miniCard">
+              <h3>Spend cap</h3>
+              <span className="optionHint">Highest monthly ceiling across models</span>
+              <div className="big">
+                {maxCap !== null ? `$${maxCap.toFixed(2)}` : "—"} <small>ceiling</small>
+              </div>
+            </div>
+            <div className="miniCard">
+              <h3>Role routing</h3>
+              <span className="optionHint">Which model fills each role</span>
+              <button
+                type="button"
+                className="btn"
+                style={{ marginTop: 4 }}
+                onClick={() => setAdvancedOpen((value) => !value)}
+              >
+                {advancedOpen ? "Hide routing JSON" : "Edit routing JSON"}
+              </button>
+            </div>
+          </div>
+
+          {advancedOpen ? (
+            <div className="fieldGroup">
+              <label htmlFor="routing">Role routing JSON</label>
+              <textarea
+                id="routing"
+                value={routing}
+                onChange={(event) => setRouting(event.target.value)}
+                spellCheck={false}
+                style={{ minHeight: 200 }}
+              />
+            </div>
+          ) : null}
+
+          <div className="formActions">
+            <button type="submit" className="startBtn ready">
+              Save changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

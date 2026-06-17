@@ -1,11 +1,23 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { API_BASE, clearStoredToken, getDebate, getStoredToken, setStoredToken, validateUserToken } from "@/lib/api";
 import type { DebateDetail, DebateNode, SingleShotResult } from "@/lib/types";
-import { DebateTree } from "@/components/DebateTree";
-import { ArgumentFocusView } from "@/components/ArgumentFocusView";
-import { findNodeById, findNodePathById, initialFocusedNodeId, nearestExistingNodeId } from "@/lib/debateTreeUtils";
+import { BrandMark } from "@/components/TopBar";
+import { DebateCanvas } from "@/components/DebateCanvas";
+import { DebateOutline } from "@/components/DebateOutline";
+import { SynthesisPanel } from "@/components/SynthesisPanel";
+import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
+import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
+import { ChallengePopover } from "@/components/ChallengePopover";
+import { InvestigationDrawer } from "@/components/InvestigationDrawer";
+import { GuideModal } from "@/components/GuideModal";
+import { Toast } from "@/components/Toast";
+import { computeLean, countNodes, renderStateOf, treeDepth } from "@/lib/debatePresentation";
+import type { PopoverState } from "@/lib/scrutiny";
+import { isComplete, statusLabel } from "@/lib/format";
 
 type SynthesisDraft = {
   model_id?: string;
@@ -77,11 +89,9 @@ function activeSynthesisDraft(debate: DebateDetail | null): SynthesisDraft | nul
   };
 }
 
-function provenanceLabel(provenance: Record<string, unknown>): string {
-  const model = typeof provenance.model_id === "string" ? provenance.model_id : "";
-  const worker = typeof provenance.worker_id === "string" ? provenance.worker_id : "";
-  const prompt = typeof provenance.prompt_id === "string" ? provenance.prompt_id : "";
-  return [model, worker, prompt].filter(Boolean).join(" - ");
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function isSingleShotResult(value: unknown): value is SingleShotResult {
@@ -146,6 +156,16 @@ function beginNodeStream(
   return { ...node, children: node.children.map((child) => beginNodeStream(child, payload)) };
 }
 
+function findNode(root: DebateNode | null, id: string | null): DebateNode | null {
+  if (!root || !id) return null;
+  if (root.id === id) return root;
+  for (const child of root.children || []) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 export default function DebatePageClient({
   id,
   initialDebate,
@@ -164,10 +184,22 @@ export default function DebatePageClient({
   const [actionToken, setActionToken] = useState<string | null>(null);
   const [tokenDraft, setTokenDraft] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
-  const [fullTreeOpen, setFullTreeOpen] = useState(false);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() =>
-    initialDebate?.tree ? initialFocusedNodeId(initialDebate.tree) : null
+
+  const [view, setView] = useState<"tree" | "outline">("tree");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+  const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [investigation, setInvestigation] = useState<{ nodeId: string; status: string; flagged: string } | null>(
+    null
   );
+  const [scrutiny, setScrutiny] = useState<Record<string, string>>({});
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [tokenBarOpen, setTokenBarOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  const canvasElRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -187,10 +219,6 @@ export default function DebatePageClient({
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    setSelectedNodeId((current) => (debate?.tree ? nearestExistingNodeId(debate.tree, current) : null));
-  }, [debate?.tree]);
 
   useEffect(() => {
     let active = true;
@@ -309,41 +337,104 @@ export default function DebatePageClient({
     return () => {
       stopped = true;
       events?.close();
-      if (timer) {
-        window.clearTimeout(timer);
-      }
+      if (timer) window.clearTimeout(timer);
     };
   }, [id, refresh]);
 
   const exportUrl = useMemo(() => `${API_BASE}/api/debates/${id}/export.md`, [id]);
-  const selectedPath = useMemo(
-    () => (debate?.tree && selectedNodeId ? findNodePathById(debate.tree, selectedNodeId) : []),
-    [debate?.tree, selectedNodeId]
-  );
-  const selectedNode = useMemo(
-    () => (debate?.tree && selectedNodeId ? findNodeById(debate.tree, selectedNodeId) : null),
-    [debate?.tree, selectedNodeId]
-  );
+  const synthesisRaw = synthesisDraft?.raw || "";
   const strongestPro =
-    debate?.synthesis?.strongest_pro || partialJsonField(synthesisDraft?.raw || "", "strongest_pro") || "Pending";
-  const strongestCon =
-    debate?.synthesis?.strongest_con || partialJsonField(synthesisDraft?.raw || "", "strongest_con") || "Pending";
-  const verdict = debate?.synthesis?.verdict || partialJsonField(synthesisDraft?.raw || "", "verdict") || "Pending";
+    debate?.synthesis?.strongest_pro || partialJsonField(synthesisRaw, "strongest_pro") || partialJsonField(synthesisRaw, "title") || "";
+  const strongestCon = debate?.synthesis?.strongest_con || partialJsonField(synthesisRaw, "strongest_con") || "";
+  const verdict =
+    debate?.synthesis?.verdict || partialJsonField(synthesisRaw, "verdict") || partialJsonField(synthesisRaw, "content") || "";
   const synthesisStreaming = Boolean(synthesisDraft && !debate?.synthesis);
+  const synthesisProvenance = debate?.synthesis?.provenance || {};
+  const synthesisSections = [
+    { title: "Agreements", items: stringList(synthesisProvenance.agreements) },
+    { title: "Tensions", items: stringList(synthesisProvenance.tensions) },
+    { title: "Evidence Gaps", items: stringList(synthesisProvenance.evidence_gaps) },
+    { title: "Key Takeaways", items: stringList(synthesisProvenance.key_takeaways) }
+  ].filter((section) => section.items.length > 0);
+  const leanRaw = synthesisProvenance.lean as { pct?: unknown; label?: unknown } | undefined;
+  const lean =
+    leanRaw && typeof leanRaw.pct === "number" && typeof leanRaw.label === "string"
+      ? { pct: leanRaw.pct, label: leanRaw.label }
+      : debate?.synthesis
+        ? computeLean(debate.tree)
+        : null;
+  const synthesisMeta = synthesisDraft?.model_id
+    ? `${synthesisDraft.model_id}${synthesisDraft.worker_id ? ` · ${synthesisDraft.worker_id}` : ""}`
+    : debate?.synthesis
+      ? `${debate.synthesis.model_id}${debate.synthesis.worker_name ? ` · ${debate.synthesis.worker_name}` : ""}`
+      : "";
+
   const singleShotResult = isSingleShotResult(debate?.config?.single_shot_result)
     ? debate.config.single_shot_result
     : null;
-  const singleShotCreatedAt = singleShotResult ? new Date(singleShotResult.created_at) : null;
-  const singleShotCreatedLabel =
-    singleShotCreatedAt && !Number.isNaN(singleShotCreatedAt.getTime())
-      ? singleShotCreatedAt.toLocaleString()
-      : singleShotResult?.created_at;
-  const streamLabel =
-    streamState.status === "live"
-      ? "Live stream connected"
-      : streamState.status === "reconnecting"
-        ? `Reconnecting in ${Math.ceil((streamState.retryInMs || 0) / 1000)}s`
-        : "Connecting stream";
+
+  const complete = debate ? isComplete(debate.status) : false;
+  const generating = debate ? !complete && (debate.status || "").toLowerCase() !== "failed" : false;
+  const hasTree = Boolean(debate?.tree);
+
+  const progress = useMemo(() => {
+    if (!debate) return { pct: 0, label: "", count: "" };
+    if (!hasTree) return { pct: 6, label: "Decomposing claim", count: "" };
+    let total = 0;
+    let done = 0;
+    const walk = (node: DebateNode) => {
+      if (node.node_type !== "ROOT_CLAIM") {
+        total += 1;
+        const state = renderStateOf(node);
+        if (state === "done" || state === "empty") done += 1;
+      }
+      (node.children || []).forEach(walk);
+    };
+    if (debate.tree) walk(debate.tree);
+    const pct = total ? Math.round((done / total) * 100) : complete ? 100 : 40;
+    return { pct, label: "Models arguing", count: `${pct}%` };
+  }, [debate, hasTree, complete]);
+
+  const hasArtifacts = Boolean(
+    debate &&
+      (singleShotResult ||
+        debate.analyzer_runs.length ||
+        debate.selected_skills.length ||
+        debate.selected_agents.length ||
+        debate.agent_runs.length)
+  );
+
+  const detailNode = findNode(debate?.tree ?? null, detailNodeId);
+
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }
+
+  function toggleExpand(nodeId: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }
+
+  function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
+    const rect = anchor.getBoundingClientRect();
+    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
+  }
+
+  function onProseSelect(node: DebateNode, _event: MouseEvent) {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (!text || text.length < 4) return;
+    const range = selection?.getRangeAt(0);
+    const rect = range?.getBoundingClientRect();
+    if (!rect) return;
+    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
+  }
 
   async function unlockActions(event: FormEvent) {
     event.preventDefault();
@@ -356,6 +447,7 @@ export default function DebatePageClient({
       setStoredToken(value);
       setActionToken(value);
       setTokenDraft("");
+      setTokenBarOpen(false);
     } catch {
       clearStoredToken();
       setActionToken(null);
@@ -378,225 +470,271 @@ export default function DebatePageClient({
 
   if (error && !debate) {
     return (
-      <main className="page">
-        <div className="error">{error}</div>
-      </main>
+      <div className="screen scroll">
+        <div className="screenInner narrow">
+          <div className="error">{error}</div>
+          <Link className="btn" href="/" style={{ marginTop: 16 }}>
+            ← Back to library
+          </Link>
+        </div>
+      </div>
     );
   }
   if (!debate) {
     return (
-      <main className="page">
-        <p className="muted">Loading...</p>
-      </main>
+      <div className="screen scroll">
+        <div className="screenInner narrow">
+          <p className="muted">Loading…</p>
+        </div>
+      </div>
     );
   }
 
+  const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
+
   return (
-    <main className="page">
-      <div className="pageHeader">
-        <div>
-          <h1>{debate.topic}</h1>
-          <div className="toolbar">
-            <span className="statusPill">{debate.status}</span>
-            <span className="statusPill">{debate.node_count} nodes</span>
-            <span className={`statusPill ${streamState.status === "live" ? "statusOnline" : "statusDegraded"}`}>
-              {streamLabel}
+    <div className="debateView">
+      {/* ---- top bar ---- */}
+      <header className="debateTopBar">
+        <BrandMark />
+        <div className="debateTopCenter">
+          <span className="topBarDivider" aria-hidden />
+          <Link className="btnGhost" href="/">
+            ← Library
+          </Link>
+          <div className="debateTopClaim">
+            <span className="debateTopTitle">{debate.topic}</span>
+            <span className={`pill ${statusKind}`}>
+              <span className="dot" />
+              {statusLabel(debate.status)}
             </span>
-            {debate.models.map((model) => (
-              <span key={model} className="badge">
-                {model}
-              </span>
-            ))}
           </div>
         </div>
-        <a className="secondaryButton" href={exportUrl}>
-          Export Markdown
-        </a>
-      </div>
-      <div className="actionAuthBar">
-        {actionToken ? (
-          <button className="secondary" type="button" onClick={lockActions}>
-            Lock Actions
+        <div className="debateTopActions">
+          {hasTree ? (
+            <div className="segment" role="group" aria-label="View">
+              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+                Tree
+              </button>
+              <button type="button" aria-pressed={view === "outline"} onClick={() => setView("outline")}>
+                Outline
+              </button>
+            </div>
+          ) : null}
+          {hasArtifacts ? (
+            <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
+              ◫ Workspace
+            </button>
+          ) : null}
+          <a className="btn" href={exportUrl} onClick={() => showToast("Exported debate.md")}>
+            ↓ Export
+          </a>
+          <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
+            ?
           </button>
+          <Link className="iconBtn" href="/settings" aria-label="Settings">
+            ⚙
+          </Link>
+        </div>
+      </header>
+
+      {/* ---- generation progress strip ---- */}
+      {generating ? (
+        <div className="progressStrip">
+          <span className="progressLabel">{progress.label}</span>
+          <div className="progressTrack">
+            <div className="progressFill" style={{ width: `${progress.pct}%` }} />
+          </div>
+          <span className="progressCount">{progress.count}</span>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="debateError">
+          <div className="error">{error}</div>
+        </div>
+      ) : null}
+
+      {/* ---- main split ---- */}
+      <div className="debateMain">
+        {view === "tree" && hasTree && debate.tree ? (
+          <DebateCanvas
+            root={debate.tree}
+            expanded={expanded}
+            selectedNodeId={selectedNodeId}
+            scrutiny={scrutiny}
+            meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
+            canvasRef={(el) => {
+              canvasElRef.current = el;
+            }}
+            onOpenNode={(nodeId) => {
+              setSelectedNodeId(nodeId);
+              setDetailNodeId(nodeId);
+            }}
+            onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+            onToggleExpand={toggleExpand}
+            onProseSelect={onProseSelect}
+          />
+        ) : view === "outline" && hasTree && debate.tree ? (
+          <DebateOutline root={debate.tree} />
+        ) : singleShotResult ? (
+          <SingleShotMain result={singleShotResult} />
         ) : (
-          <form className="inlineAuthForm" onSubmit={unlockActions}>
-            <label className="srOnly" htmlFor="debate-action-token">
-              User token
-            </label>
+          <div className="canvasEmpty">
+            <p className="muted">
+              {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
+            </p>
+          </div>
+        )}
+
+        <SynthesisPanel
+          ready={complete}
+          pending={generating}
+          streaming={synthesisStreaming}
+          structured={Boolean(debate?.synthesis && !strongestCon.trim() && synthesisSections.length > 0)}
+          proClaim={strongestPro}
+          conClaim={strongestCon}
+          verdict={verdict}
+          meta={synthesisMeta}
+          lean={lean}
+          sections={synthesisSections}
+        />
+      </div>
+
+      {/* ---- overlays ---- */}
+      {detailNode ? (
+        <NodeDetailDrawer
+          node={detailNode}
+          token={actionToken}
+          onClose={() => setDetailNodeId(null)}
+          onChallenge={(anchor, text) => openChallenge(detailNode, anchor, text)}
+          onQueued={() => {
+            showToast("Regeneration queued");
+            refresh();
+          }}
+          onError={(message) => setError(message)}
+          onAuthRejected={rejectActionToken}
+        />
+      ) : null}
+
+      {popover ? (
+        <ChallengePopover
+          state={popover}
+          onClose={() => setPopover(null)}
+          onChoose={() => {
+            setScrutiny((current) => ({ ...current, [popover.nodeId]: "working" }));
+            setInvestigation({ nodeId: popover.nodeId, status: "working", flagged: popover.text });
+            setDetailNodeId(null);
+            setPopover(null);
+          }}
+        />
+      ) : null}
+
+      {investigation ? (
+        <InvestigationDrawer
+          node={findNode(debate.tree, investigation.nodeId)}
+          status={investigation.status}
+          flagged={investigation.flagged}
+          onClose={() => setInvestigation(null)}
+          onResolve={(status) => {
+            setScrutiny((current) => ({ ...current, [investigation.nodeId]: status }));
+            setInvestigation((current) => (current ? { ...current, status } : current));
+          }}
+          onClear={() => {
+            setScrutiny((current) => {
+              const next = { ...current };
+              delete next[investigation.nodeId];
+              return next;
+            });
+            setInvestigation(null);
+          }}
+        />
+      ) : null}
+
+      {workspaceOpen ? (
+        <DebateWorkspaceDrawer debate={debate} singleShot={singleShotResult} onClose={() => setWorkspaceOpen(false)} />
+      ) : null}
+
+      {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
+
+      {toast ? <Toast message={toast} /> : null}
+
+      {/* ---- action token (subtle, bottom-left) ---- */}
+      <div className="tokenDock">
+        {actionToken ? (
+          <button type="button" className="btn" onClick={lockActions}>
+            🔓 Actions unlocked
+          </button>
+        ) : tokenBarOpen ? (
+          <form className="tokenForm" onSubmit={unlockActions}>
             <input
-              id="debate-action-token"
+              className="tokenInput"
               value={tokenDraft}
               onChange={(event) => setTokenDraft(event.target.value)}
               type="password"
               autoComplete="off"
               placeholder="User token"
+              aria-label="User token"
             />
-            <button className="secondary" type="submit" disabled={tokenBusy}>
-              {tokenBusy ? "Checking..." : "Unlock Actions"}
+            <button className="btn btnDark" type="submit" disabled={tokenBusy}>
+              {tokenBusy ? "…" : "Unlock"}
             </button>
           </form>
+        ) : (
+          <button type="button" className="btn" onClick={() => setTokenBarOpen(true)}>
+            🔒 Unlock actions
+          </button>
         )}
       </div>
-      {error ? <div className="error">{error}</div> : null}
-      {singleShotResult ? (
-        <div className="singleShotPanel" aria-label="Single-shot result">
-          <section className="singleShotFinal">
-            <div className="singleShotHeader">
-              <h2>Single-Shot Result</h2>
-              <span className="statusPill">Winner: {singleShotResult.global_winner.side}</span>
-            </div>
-            <p>{singleShotResult.final_text}</p>
-            <p className="muted">{singleShotResult.global_winner.reason}</p>
-            <div className="singleShotStrongest">
-              <div>
-                <h3>Strongest Pro</h3>
-                <blockquote>{singleShotResult.strongest_pro}</blockquote>
-              </div>
-              <div>
-                <h3>Strongest Con</h3>
-                <blockquote>{singleShotResult.strongest_con}</blockquote>
-              </div>
-            </div>
-            <div className="singleShotMeta" aria-label="Single-shot metadata">
-              <span>{singleShotResult.model_id}</span>
-              <span>{singleShotResult.tokens_in} tokens in</span>
-              <span>{singleShotResult.tokens_out} tokens out</span>
-              <span>{singleShotCreatedLabel}</span>
-            </div>
+    </div>
+  );
+}
+
+function SingleShotMain({ result }: { result: SingleShotResult }) {
+  return (
+    <div className="singleShot scroll">
+      <div className="singleShotInner">
+        <div className="nodeEyebrow">Single-shot result</div>
+        <h1 className="display sm" style={{ marginTop: 8 }}>
+          {result.final_text}
+        </h1>
+        <p className="lede" style={{ marginTop: 10 }}>
+          {result.global_winner.reason}
+        </p>
+        <div className="singleShotGrid">
+          <section className="synthCard synthPro">
+            <div className="synthCardLabel pro">↑ Strongest Pro</div>
+            <div className="synthCardClaim">{result.strongest_pro}</div>
           </section>
+          <section className="synthCard synthCon">
+            <div className="synthCardLabel con">↓ Strongest Con</div>
+            <div className="synthCardClaim">{result.strongest_con}</div>
+          </section>
+        </div>
+        <div className="singleShotColumns">
           <section>
-            <h2>Pros ({singleShotResult.pros.length})</h2>
-            <ul className="singleShotList">
-              {singleShotResult.pros.map((argument, index) => (
-                <li key={`${index}-${argument}`}>{argument}</li>
+            <div className="synthSectionTitle">Pros ({result.pros.length})</div>
+            <ul className="synthSectionList">
+              {result.pros.map((item, index) => (
+                <li key={`${index}-${item}`}>{item}</li>
               ))}
             </ul>
           </section>
           <section>
-            <h2>Cons ({singleShotResult.cons.length})</h2>
-            <ul className="singleShotList">
-              {singleShotResult.cons.map((argument, index) => (
-                <li key={`${index}-${argument}`}>{argument}</li>
+            <div className="synthSectionTitle">Cons ({result.cons.length})</div>
+            <ul className="synthSectionList">
+              {result.cons.map((item, index) => (
+                <li key={`${index}-${item}`}>{item}</li>
               ))}
             </ul>
           </section>
         </div>
-      ) : null}
-      {debate.analyzer_runs.length ||
-      debate.selected_skills.length ||
-      debate.selected_agents.length ||
-      debate.agent_runs.length ? (
-        <div className="singleShotPanel" aria-label="Dialectical workspace artifacts">
-          <section>
-            <h2>Analyzers</h2>
-            <div className="artifactGrid">
-              {debate.analyzer_runs.map((run) => (
-                <article key={run.id} className="artifactItem">
-                  <div className="artifactHeader">
-                    <h3>{run.analyzer_type}</h3>
-                    <span className="statusPill">{run.status}</span>
-                  </div>
-                  <p>{run.output.findings?.[0] || "No finding recorded."}</p>
-                  <p className="muted">{provenanceLabel(run.provenance)}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-          <section>
-            <h2>Agent Breakdown</h2>
-            {debate.agent_runs.map((run) => (
-              <article key={run.id} className="artifactItem agentOutputPanel">
-                <div className="artifactHeader">
-                  <h3>{run.agent_name || run.role || run.id}</h3>
-                  <span className="statusPill">{run.status}</span>
-                </div>
-                <p>{run.summary || run.agent.description || "No summary recorded."}</p>
-                {run.skills_used.length ? (
-                  <p className="muted">
-                    Skills: {run.skills_used.map((skill) => skill.name || skill.id).join(", ")}
-                  </p>
-                ) : null}
-                <div className="argumentColumns">
-                  <div>
-                    <h4>Pros ({run.pros.length})</h4>
-                    <ol>
-                      {run.pros.map((argument) => (
-                        <li key={argument}>{argument}</li>
-                      ))}
-                    </ol>
-                  </div>
-                  <div>
-                    <h4>Cons ({run.cons.length})</h4>
-                    <ol>
-                      {run.cons.map((argument) => (
-                        <li key={argument}>{argument}</li>
-                      ))}
-                    </ol>
-                  </div>
-                </div>
-                <p className="muted">{provenanceLabel(run.provenance)}</p>
-              </article>
-            ))}
-          </section>
+        <div className="singleShotMeta">
+          <span className="pill">{result.model_id}</span>
+          <span className="pill">{result.tokens_in} in</span>
+          <span className="pill">{result.tokens_out} out</span>
         </div>
-      ) : null}
-      {debate.tree && selectedNode && selectedPath.length > 0 ? (
-        <ArgumentFocusView
-          rootNode={debate.tree}
-          selectedNode={selectedNode}
-          selectedPath={selectedPath}
-          token={actionToken}
-          onQueued={refresh}
-          onError={setError}
-          onAuthRejected={rejectActionToken}
-          onSelectNode={setSelectedNodeId}
-        />
-      ) : null}
-      {debate.tree ? (
-        <section className="fullTreePanel" aria-label="Full recursive debate tree">
-          <button
-            className="secondary fullTreeToggle"
-            type="button"
-            aria-expanded={fullTreeOpen}
-            onClick={() => setFullTreeOpen((current) => !current)}
-          >
-            {fullTreeOpen ? "Hide full tree" : "Show full tree"}
-          </button>
-          {fullTreeOpen ? (
-            <div className="treeViewport treeViewportSubordinate">
-              <DebateTree
-                node={debate.tree}
-                token={actionToken}
-                onQueued={refresh}
-                onError={setError}
-                onAuthRejected={rejectActionToken}
-                onSelectNode={setSelectedNodeId}
-                selectedNodeId={selectedNodeId}
-              />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-      <div className="synthesisPanel">
-        <section className="synthesisVerdict">
-          <h2>Verdict</h2>
-          <p className={synthesisStreaming ? "cursor" : undefined}>{verdict}</p>
-          {synthesisDraft?.model_id ? (
-            <div className="synthesisMeta">
-              {synthesisDraft.model_id}
-              {synthesisDraft.worker_id ? ` - ${synthesisDraft.worker_id}` : ""}
-            </div>
-          ) : null}
-        </section>
-        <section className="synthesisSupport synthesisSupportPro">
-          <h2>Strongest Pro</h2>
-          <p className={synthesisStreaming ? "cursor" : undefined}>{strongestPro}</p>
-        </section>
-        <section className="synthesisSupport synthesisSupportCon">
-          <h2>Strongest Con</h2>
-          <p className={synthesisStreaming ? "cursor" : undefined}>{strongestCon}</p>
-        </section>
       </div>
-    </main>
+    </div>
   );
 }

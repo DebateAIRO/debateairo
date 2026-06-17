@@ -99,6 +99,41 @@ def test_mock_orchestration_completes_and_exports(db) -> None:
     assert "Cleaner transport." in exported
 
 
+def test_markdown_export_formats_structured_v2_synthesis(db) -> None:
+    debate = complete_mock_debate(db)
+    synthesis = db.get(Synthesis, debate.synthesis_id)
+    assert synthesis is not None
+    synthesis.strongest_pro = "Synthesis"
+    synthesis.strongest_con = ""
+    synthesis.verdict = "Structured summary."
+    synthesis.model_id = "codex-gpt-5.5"
+    synthesis.provenance = {
+        "model_id": "codex-gpt-5.5",
+        "worker_id": synthesis.worker_id,
+        "prompt_id": "prompt",
+        "job_id": "job",
+        "agreements": ["Agreement one."],
+        "tensions": ["Tension one."],
+        "evidence_gaps": ["Evidence gap one."],
+        "key_takeaways": ["Takeaway one."],
+    }
+    db.commit()
+
+    exported = markdown_export(db, debate)
+
+    assert "### Synthesis" in exported
+    assert "Structured summary." in exported
+    assert "### Agreements" in exported
+    assert "- Agreement one." in exported
+    assert "### Tensions" in exported
+    assert "- Tension one." in exported
+    assert "### Evidence Gaps" in exported
+    assert "- Evidence gap one." in exported
+    assert "### Key Takeaways" in exported
+    assert "- Takeaway one." in exported
+    assert "**Strongest Con**" not in exported
+
+
 def real_single_shot_result() -> DebateGenerationResult:
     return DebateGenerationResult(
         root_claim="Should cities ban cars downtown?",

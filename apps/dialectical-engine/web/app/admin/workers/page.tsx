@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { backendStatus } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { relativeTime } from "@/lib/format";
 import type { WorkerStatus } from "@/lib/types";
 
 export default function WorkersPage() {
@@ -36,112 +37,90 @@ function WorkersView() {
     };
   }, []);
 
-  const onlineWorkers = workers.filter((worker) => worker.status === "online");
-  const degradedWorkers = workers.filter((worker) => worker.status === "degraded");
-  const offlineWorkers = workers.filter((worker) => worker.status === "offline");
-  const workerB = workers.find(isWorkerB);
-  const workerBState = workerB?.status ?? "missing";
-  const capabilities = Array.from(new Set(workers.flatMap((worker) => worker.capabilities))).sort();
-  const topologyLabel = deploymentTopology(onlineWorkers.length, workerBState);
+  const online = workers.filter((worker) => worker.status === "online").length;
+  const degraded = workers.filter((worker) => worker.status === "degraded").length;
+  const offline = workers.filter((worker) => worker.status === "offline").length;
+  const capabilities = Array.from(new Set(workers.flatMap((worker) => worker.capabilities))).length;
+
+  const metrics: { label: string; value: string }[] = [
+    { label: "Online", value: String(online) },
+    { label: "Degraded", value: String(degraded) },
+    { label: "Offline", value: String(offline) },
+    { label: "Capabilities", value: String(capabilities) },
+    { label: "Refreshed", value: lastUpdated ? lastUpdated.toLocaleTimeString() : "—" }
+  ];
 
   return (
-    <main className="page">
-      <div className="pageHeader">
-        <div>
-          <h1>Workers</h1>
-          <p className="muted">Live status, capabilities, current job, and heartbeat time.</p>
+    <div className="screen scroll">
+      <div className="screenInner wide">
+        <div className="eyebrow">Infrastructure</div>
+        <h1 className="display sm" style={{ marginTop: 12 }}>
+          Workers
+        </h1>
+        <p className="lede" style={{ marginTop: 6 }}>
+          Live status, capabilities, current job, and heartbeat for every connected worker.
+        </p>
+
+        <div className="workerMetrics">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="miniCard">
+              <span className="optionHint">{metric.label}</span>
+              <div className="big" style={{ fontSize: 20, marginTop: 4 }}>
+                {metric.value}
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-      <div className="workerSummary" aria-label="Worker deployment summary">
-        <div className="workerMetric">
-          <span>Topology</span>
-          <strong>{topologyLabel}</strong>
+
+        {error ? (
+          <div className="error" style={{ marginTop: 18 }}>
+            {error}
+          </div>
+        ) : null}
+
+        <div className="sectionHead">
+          <h2>Connected workers</h2>
+          <span className="count">{workers.length} total</span>
         </div>
-        <div className="workerMetric">
-          <span>Online</span>
-          <strong>{onlineWorkers.length}</strong>
-        </div>
-        <div className="workerMetric">
-          <span>Degraded</span>
-          <strong>{degradedWorkers.length}</strong>
-        </div>
-        <div className="workerMetric">
-          <span>Offline</span>
-          <strong>{offlineWorkers.length}</strong>
-        </div>
-        <div className="workerMetric">
-          <span>Worker B</span>
-          <strong>{workerBState}</strong>
-        </div>
-        <div className="workerMetric">
-          <span>Capabilities</span>
-          <strong>{capabilities.length}</strong>
-        </div>
-        <div className="workerMetric">
-          <span>Refreshed</span>
-          <strong>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Pending"}</strong>
-        </div>
-      </div>
-      {error ? <div className="error">{error}</div> : null}
-      <div className="workersTableWrap">
-        <table className="workersTable">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Current Job</th>
-              <th>Last Seen</th>
-              <th>Capabilities</th>
-            </tr>
-          </thead>
-          <tbody>
-            {workers.length === 0 ? (
-              <tr>
-                <td colSpan={5}>No workers registered.</td>
-              </tr>
-            ) : (
-              workers.map((worker) => (
-                <tr key={worker.id}>
-                  <td>{worker.name}</td>
-                  <td>
-                    <span className={`statusPill ${workerStatusClass(worker.status)}`}>{worker.status}</span>
-                  </td>
-                  <td>{worker.current_job_id || "Idle"}</td>
-                  <td>{new Date(worker.last_seen).toLocaleString()}</td>
-                  <td>
-                    <div className="capabilities">
-                      {worker.capabilities.map((capability) => (
-                        <span className="badge" key={capability}>
-                          {capability}
-                        </span>
-                      ))}
+
+        <div className="recentList">
+          {workers.length === 0 ? (
+            <div className="emptyState">No workers registered.</div>
+          ) : (
+            workers.map((worker) => {
+              const pillClass =
+                worker.status === "online" ? "pillOk" : worker.status === "offline" ? "pillBad" : "pillGen";
+              return (
+                <div key={worker.id} className="debateCard" style={{ cursor: "default" }}>
+                  <div className="debateCardBody">
+                    <div className="debateCardClaim" style={{ fontSize: 15 }}>
+                      {worker.name}
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    <div className="debateCardMeta">
+                      <span>{worker.current_job_id ? `Job ${worker.current_job_id}` : "Idle"}</span>
+                      <span className="sep">·</span>
+                      <span>seen {relativeTime(worker.last_seen)}</span>
+                    </div>
+                    {worker.capabilities.length ? (
+                      <div className="roleChips" style={{ marginTop: 10 }}>
+                        {worker.capabilities.map((capability) => (
+                          <span key={capability} className="roleChip">
+                            {capability}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className={`pill ${pillClass}`}>
+                    <span className="dot" />
+                    {worker.status}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
-}
-
-function isWorkerB(worker: WorkerStatus): boolean {
-  const name = worker.name.toLowerCase();
-  return name.includes("adesso") || name.includes("worker-b") || name.includes("worker b");
-}
-
-function deploymentTopology(onlineWorkers: number, workerBState: string): string {
-  if (onlineWorkers >= 2 && workerBState === "online") return "Two-worker topology online";
-  if (onlineWorkers >= 2) return "Two workers online";
-  if (onlineWorkers === 1) return "Single-worker mode";
-  return "No workers online";
-}
-
-function workerStatusClass(status: string): string {
-  if (status === "online") return "statusOnline";
-  if (status === "degraded") return "statusDegraded";
-  if (status === "offline") return "statusOffline";
-  return "";
 }

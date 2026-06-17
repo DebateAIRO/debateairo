@@ -155,14 +155,14 @@ def run_smoke(report_path: Path, timeout: float) -> dict[str, Any]:
                 wait_for(
                     "Next upstream",
                     deadline,
-                    lambda: "Debates" in fetch_text(f"http://127.0.0.1:{next_port}/", accept="text/html")
-                    or (_ for _ in ()).throw(RuntimeError("Next home missing Debates marker")),
+                    lambda: "What should we debate" in fetch_text(f"http://127.0.0.1:{next_port}/", accept="text/html")
+                    or (_ for _ in ()).throw(RuntimeError("Next home missing 'What should we debate' marker")),
                 )
                 wait_for(
                     "web proxy",
                     deadline,
-                    lambda: "Debates" in fetch_text(f"http://127.0.0.1:{web_port}/", accept="text/html")
-                    or (_ for _ in ()).throw(RuntimeError("web home missing Debates marker")),
+                    lambda: "What should we debate" in fetch_text(f"http://127.0.0.1:{web_port}/", accept="text/html")
+                    or (_ for _ in ()).throw(RuntimeError("web home missing 'What should we debate' marker")),
                 )
                 worker_payload = wait_for(
                     "Worker A registration",
