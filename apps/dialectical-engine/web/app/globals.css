@@ -2142,3 +2142,658 @@ a:focus-visible {
     width: 100vw;
   }
 }
+
+/* ============================================================
+   Thread view (vertical indented spine)
+   ============================================================ */
+
+.thread {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: radial-gradient(oklch(0.945 0.005 80) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.threadInner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 30px 30px 80px;
+}
+.threadRoot {
+  background: var(--surface);
+  border: 1.5px solid oklch(0.8 0.012 70);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+.threadRootClaim {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 21px;
+  line-height: 1.28;
+  color: var(--text-strong);
+  letter-spacing: -0.008em;
+  overflow-wrap: anywhere;
+}
+.threadStub {
+  position: relative;
+  height: 14px;
+  margin-left: 14px;
+}
+.threadStub::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: -1px;
+  width: 2px;
+  background: oklch(0.88 0.006 80);
+}
+.threadRow {
+  display: flex;
+  align-items: stretch;
+  padding-bottom: 14px;
+  position: relative;
+}
+.threadLane {
+  flex: 0 0 30px;
+  width: 30px;
+  position: relative;
+}
+.threadLaneLine {
+  position: absolute;
+  left: 14px;
+  top: -14px;
+  bottom: 0;
+  width: 2px;
+  background: oklch(0.88 0.006 80);
+}
+.threadElbow {
+  flex: 0 0 30px;
+  width: 30px;
+  position: relative;
+}
+.threadElbowShape {
+  position: absolute;
+  left: 14px;
+  top: -14px;
+  width: 15px;
+  height: 42px;
+  border-left: 2px solid;
+  border-bottom: 2px solid;
+  border-bottom-left-radius: 9px;
+}
+.threadElbowContinue {
+  position: absolute;
+  left: 14px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: oklch(0.88 0.006 80);
+}
+.threadCardWrap {
+  flex: 1;
+  min-width: 0;
+  padding-top: 10px;
+}
+.threadCard {
+  border: 1.5px solid var(--line-2);
+  border-left-width: 3px;
+  border-radius: 10px;
+  box-shadow: 0 2px 11px -8px oklch(0.3 0.02 70 / 0.3);
+  padding: 13px 16px;
+  position: relative;
+  transition: box-shadow 0.2s;
+}
+.threadCard[role="button"] {
+  cursor: pointer;
+}
+.threadCard[role="button"]:hover {
+  box-shadow: 0 9px 24px -13px oklch(0.3 0.02 70 / 0.34);
+}
+.threadClaim {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.34;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+  overflow-wrap: anywhere;
+}
+.threadBody {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+  margin-top: 7px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.threadBody.open {
+  -webkit-line-clamp: unset;
+}
+.threadCollapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 3px 9px;
+  border-radius: 14px;
+}
+.threadCollapse:hover {
+  background: oklch(0.95 0.005 80);
+}
+.threadCollapseSign {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ============================================================
+   Split view (two facing columns)
+   ============================================================ */
+
+.split {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: radial-gradient(oklch(0.945 0.005 80) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.splitInner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 26px 90px;
+}
+.splitPath {
+  max-width: 680px;
+  margin: 0 auto 13px;
+}
+.splitPathHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted-2);
+  margin-bottom: 8px;
+}
+.splitPathRule {
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+.splitChip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.splitChipArrow {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: oklch(0.72 0.01 70);
+}
+.splitChipBtn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-left: 3px solid;
+  border-radius: 8px;
+  padding: 6px 11px;
+}
+.splitChipBtn:disabled {
+  cursor: default;
+}
+.splitChipBtn:not(:disabled):hover {
+  background: oklch(0.96 0.005 80);
+}
+.splitChipRole {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.splitChipClaim {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.splitFocusRoot {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+  background: var(--surface);
+  border: 1.5px solid oklch(0.8 0.012 70);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px 24px;
+}
+.splitFocusRootClaim {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  letter-spacing: -0.008em;
+}
+.splitFocusMain {
+  max-width: 680px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  border-left-width: 4px;
+  border-radius: var(--r-card);
+  box-shadow: 0 10px 30px -14px oklch(0.3 0.02 70 / 0.34);
+  padding: 17px 20px;
+}
+.splitFocusHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+.splitFocusClaim {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  letter-spacing: -0.007em;
+  overflow-wrap: anywhere;
+}
+.splitFocusBody {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+  margin-top: 9px;
+}
+.splitMeter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 760px;
+  margin: 18px auto 4px;
+}
+.splitMeterSide {
+  flex: 0 0 130px;
+}
+.splitMeterSide.right {
+  text-align: right;
+}
+.splitMeterSide.left {
+  text-align: left;
+}
+.splitMeterLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.splitMeterLabel.pro {
+  color: var(--pro-text);
+}
+.splitMeterLabel.con {
+  color: var(--con-text);
+}
+.splitMeterCount {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.splitMeterBar {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px oklch(0.85 0.01 80 / 0.5);
+}
+.splitMeterNote {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.splitPerspectives {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-width: 760px;
+  margin: 14px auto 0;
+}
+.splitPerspective {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-panel);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.splitPerspective:hover {
+  border-color: oklch(0.8 0.012 70);
+  box-shadow: 0 6px 20px -12px oklch(0.3 0.02 70 / 0.3);
+}
+.splitPerspectiveBadge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+.splitPerspectiveClaim {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.splitPerspectiveMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.splitColumns {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  position: relative;
+  margin-top: 8px;
+}
+.splitBattleLine {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 0;
+  width: 0;
+  border-left: 1.5px dashed oklch(0.86 0.01 75);
+  transform: translateX(-0.75px);
+}
+.splitColumn {
+  flex: 1;
+  min-width: 0;
+}
+.splitColumn.pro {
+  padding-right: 22px;
+}
+.splitColumn.con {
+  padding-left: 22px;
+}
+.splitColumnHead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: 7px 4px 9px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px solid;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.splitColumnHead.pro {
+  border-bottom-color: oklch(0.66 0.07 172);
+  color: var(--pro-text);
+}
+.splitColumnHead.con {
+  border-bottom-color: oklch(0.7 0.09 55);
+  color: var(--con-text);
+}
+.splitColumnIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.splitColumnIcon.pro {
+  background: oklch(0.93 0.05 168);
+  color: oklch(0.45 0.09 168);
+}
+.splitColumnIcon.con {
+  background: oklch(0.94 0.05 70);
+  color: oklch(0.55 0.11 50);
+}
+.splitColumnEmpty {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--text-3);
+  padding: 6px 2px;
+}
+.splitCardWrap {
+  margin-bottom: 11px;
+}
+.splitCard {
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  border-left-width: 3px;
+  border-radius: 10px;
+  box-shadow: 0 2px 11px -8px oklch(0.3 0.02 70 / 0.3);
+  padding: 12px 14px;
+  position: relative;
+}
+.splitCardClaim {
+  display: block;
+  text-align: left;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.34;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.splitCardClaim:hover {
+  color: oklch(0.42 0.09 250);
+}
+.splitRebuttals {
+  margin: 7px 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.splitRebuttal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-left: 3px solid;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.splitRebuttal:hover {
+  background: oklch(0.96 0.005 80);
+}
+.splitRebuttalRel {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.splitRebuttalClaim {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.splitLeaf {
+  max-width: 560px;
+  margin: 20px auto 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-3);
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-panel);
+}
+
+.nodeCtrl.focus {
+  color: oklch(0.45 0.09 250);
+  font-weight: 700;
+}
+.nodeCtrl.focus:hover {
+  background: oklch(0.95 0.04 250);
+}
+.nodeCtrl.link {
+  color: var(--link);
+}
+.nodeCtrl.link:hover {
+  background: oklch(0.95 0.03 250);
+}
+
+/* ============================================================
+   Map view (radial sunburst navigator)
+   ============================================================ */
+
+.map {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--surface-sunken);
+}
+.mapInner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 24px 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mapLegend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.mapLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mapLegendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.mapLegendHint {
+  opacity: 0.7;
+}
+.mapStage {
+  width: 100%;
+  max-width: 560px;
+}
+.mapReadout {
+  width: 100%;
+  max-width: 600px;
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  border-left-width: 4px;
+  border-radius: var(--r-panel);
+  box-shadow: 0 4px 16px -10px oklch(0.3 0.02 70 / 0.3);
+  padding: 14px 17px;
+}
+.mapReadoutHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 7px;
+}
+.mapReadoutClaim {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.mapReadoutHint {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted-2);
+  margin-top: 9px;
+}
+
+@media (max-width: 760px) {
+  .splitColumns {
+    flex-direction: column;
+  }
+  .splitColumn.pro,
+  .splitColumn.con {
+    padding: 0;
+  }
+  .splitBattleLine {
+    display: none;
+  }
+  .splitPerspectives {
+    grid-template-columns: 1fr;
+  }
+}

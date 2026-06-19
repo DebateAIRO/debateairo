@@ -7,7 +7,9 @@ import { API_BASE, clearStoredToken, getDebate, getStoredToken, setStoredToken, 
 import type { DebateDetail, DebateNode, SingleShotResult } from "@/lib/types";
 import { BrandMark } from "@/components/TopBar";
 import { DebateCanvas } from "@/components/DebateCanvas";
-import { DebateOutline } from "@/components/DebateOutline";
+import { DebateThread } from "@/components/DebateThread";
+import { DebateSplit } from "@/components/DebateSplit";
+import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
@@ -29,6 +31,8 @@ type StreamState = {
   status: "connecting" | "live" | "reconnecting";
   retryInMs?: number;
 };
+
+type DebateView = "thread" | "split" | "tree" | "map";
 
 function parseEventData(event: Event): Record<string, unknown> | null {
   const data = (event as MessageEvent).data;
@@ -185,8 +189,11 @@ export default function DebatePageClient({
   const [tokenDraft, setTokenDraft] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
 
-  const [view, setView] = useState<"tree" | "outline">("tree");
+  const [view, setView] = useState<DebateView>("tree");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [replayNonce, setReplayNonce] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverState | null>(null);
@@ -421,6 +428,25 @@ export default function DebatePageClient({
     });
   }
 
+  function toggleCollapse(nodeId: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }
+
+  function openInSplit(nodeId: string) {
+    setFocusNodeId(nodeId);
+    setView("split");
+  }
+
+  function replayGeneration() {
+    setReplayNonce((nonce) => nonce + 1);
+    showToast("Replaying generation");
+  }
+
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
     const rect = anchor.getBoundingClientRect();
     setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
@@ -512,14 +538,25 @@ export default function DebatePageClient({
         </div>
         <div className="debateTopActions">
           {hasTree ? (
-            <div className="segment" role="group" aria-label="View">
-              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                Tree
+            <>
+              <div className="segment" role="group" aria-label="View">
+                <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+                  Thread
+                </button>
+                <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+                  Split
+                </button>
+                <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+                  Tree
+                </button>
+                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+                  Map
+                </button>
+              </div>
+              <button type="button" className="btn" onClick={replayGeneration} title="Replay generation">
+                ↻ Replay
               </button>
-              <button type="button" aria-pressed={view === "outline"} onClick={() => setView("outline")}>
-                Outline
-              </button>
-            </div>
+            </>
           ) : null}
           {hasArtifacts ? (
             <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
@@ -557,35 +594,70 @@ export default function DebatePageClient({
 
       {/* ---- main split ---- */}
       <div className="debateMain">
-        {view === "tree" && hasTree && debate.tree ? (
-          <DebateCanvas
-            root={debate.tree}
-            expanded={expanded}
-            selectedNodeId={selectedNodeId}
-            scrutiny={scrutiny}
-            meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
-            canvasRef={(el) => {
-              canvasElRef.current = el;
-            }}
-            onOpenNode={(nodeId) => {
-              setSelectedNodeId(nodeId);
-              setDetailNodeId(nodeId);
-            }}
-            onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
-            onToggleExpand={toggleExpand}
-            onProseSelect={onProseSelect}
-          />
-        ) : view === "outline" && hasTree && debate.tree ? (
-          <DebateOutline root={debate.tree} />
-        ) : singleShotResult ? (
-          <SingleShotMain result={singleShotResult} />
-        ) : (
-          <div className="canvasEmpty">
-            <p className="muted">
-              {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
-            </p>
-          </div>
-        )}
+        <div key={`${view}-${replayNonce}`} className="fadeup" style={{ flex: 1, minWidth: 0, display: "flex" }}>
+          {hasTree && debate.tree ? (
+            view === "thread" ? (
+              <DebateThread
+                root={debate.tree}
+                expanded={expanded}
+                collapsed={collapsed}
+                scrutiny={scrutiny}
+                meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onToggleCollapse={toggleCollapse}
+                onProseSelect={onProseSelect}
+              />
+            ) : view === "split" ? (
+              <DebateSplit
+                root={debate.tree}
+                focusNodeId={focusNodeId}
+                expanded={expanded}
+                scrutiny={scrutiny}
+                onFocus={setFocusNodeId}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onProseSelect={onProseSelect}
+              />
+            ) : view === "map" ? (
+              <DebateMap root={debate.tree} onOpenSplit={openInSplit} />
+            ) : (
+              <DebateCanvas
+                root={debate.tree}
+                expanded={expanded}
+                selectedNodeId={selectedNodeId}
+                scrutiny={scrutiny}
+                meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
+                canvasRef={(el) => {
+                  canvasElRef.current = el;
+                }}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onProseSelect={onProseSelect}
+              />
+            )
+          ) : singleShotResult ? (
+            <SingleShotMain result={singleShotResult} />
+          ) : (
+            <div className="canvasEmpty">
+              <p className="muted">
+                {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
+              </p>
+            </div>
+          )}
+        </div>
 
         <SynthesisPanel
           ready={complete}
