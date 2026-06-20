@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V4/apps/dialectical-engine/web' && exec pnpm dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
