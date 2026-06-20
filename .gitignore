@@ -17,6 +17,12 @@ apps/dialectical-engine/web/.next-dev*/
 apps/dialectical-engine/web/node_modules/
 apps/dialectical-engine/web/out/
 
+# TypeScript incremental build cache
+**/*.tsbuildinfo
+
+# Design reference assets (comps + screenshots, not part of the app)
+Design specifications summary*
+
 # Legacy local runtime artifacts left behind after the app moved under apps/.
 dialectical-engine/.venv*/
 dialectical-engine/.dialectical-dev/
