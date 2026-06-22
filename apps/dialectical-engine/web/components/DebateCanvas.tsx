@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
-import type { DebateNode } from "@/lib/types";
+import type { DebateNode, NodeScoringError, NodeScoringPayload } from "@/lib/types";
 import {
   CARD_W,
   ROLE_PALETTES,
@@ -15,6 +15,8 @@ import {
 } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
+import { formatScoreBadgeLabel, formatScorePercent } from "@/lib/scoringFormat";
+import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
@@ -29,6 +31,9 @@ type DebateCanvasProps = CanvasCallbacks & {
   expanded: Set<string>;
   selectedNodeId: string | null;
   scrutiny?: Record<string, string>;
+  scoringByNodeId?: Map<string, NodeScoringPayload>;
+  scoringErrorsByNodeId?: Map<string, NodeScoringError>;
+  scoreFilterNodeIds?: Set<string> | null;
   meta: { nodes: number; depth: number; decomposer?: string };
   canvasRef?: (el: HTMLDivElement | null) => void;
 };
@@ -38,6 +43,9 @@ export function DebateCanvas({
   expanded,
   selectedNodeId,
   scrutiny = {},
+  scoringByNodeId,
+  scoringErrorsByNodeId,
+  scoreFilterNodeIds,
   meta,
   onOpenNode,
   onChallengeNode,
@@ -107,6 +115,9 @@ export function DebateCanvas({
             expanded={expanded.has(placed.id)}
             selected={selectedNodeId === placed.id}
             scrutinyStatus={scrutiny[placed.id]}
+            scoring={scoringByNodeId?.get(placed.id)}
+            scoringError={scoringErrorsByNodeId?.get(placed.id)}
+            scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
             meta={meta}
             registerRef={(el) => {
               cardRefs.current[placed.id] = el;
@@ -128,6 +139,9 @@ type CanvasCardProps = CanvasCallbacks & {
   expanded: boolean;
   selected: boolean;
   scrutinyStatus?: string;
+  scoring?: NodeScoringPayload;
+  scoringError?: NodeScoringError;
+  scoreFilterMatch: boolean;
   meta: { nodes: number; depth: number; decomposer?: string };
   registerRef: (el: HTMLDivElement | null) => void;
 };
@@ -137,6 +151,9 @@ function CanvasCard({
   expanded,
   selected,
   scrutinyStatus,
+  scoring,
+  scoringError,
+  scoreFilterMatch,
   meta,
   registerRef,
   onOpenNode,
@@ -154,7 +171,8 @@ function CanvasCard({
   const cardStyle: CSSProperties = {
     left: placed.x,
     top: placed.y,
-    width: CARD_W
+    width: CARD_W,
+    opacity: scoreFilterMatch ? 1 : 0.38
   };
 
   const innerStyle: CSSProperties = scrutiny
@@ -187,8 +205,9 @@ function CanvasCard({
     <div className="nodeWrap" style={cardStyle}>
       <div
         ref={registerRef}
-        className={`node${selected ? " selected" : ""}`}
+        className={`node${selected ? " selected" : ""}${scoreFilterMatch ? "" : " scoreFilteredOut"}`}
         style={innerStyle}
+        data-score-filter-match={scoreFilterMatch ? "true" : "false"}
         role={state === "done" ? "button" : undefined}
         tabIndex={state === "done" ? 0 : undefined}
         onClick={openIfDone}
@@ -249,6 +268,15 @@ function CanvasCard({
                   {model.name}
                 </span>
               ) : null}
+              <ScoringErrorBoundary>
+                {scoring ? (
+                  <ScoreBadges node={node} scoring={scoring} openIfDone={openIfDone} />
+                ) : scoringError ? (
+                  <span className="scoreBadge unavailable" aria-label={`Scoring unavailable: ${scoringError.reason}`}>
+                    SCORING N/A
+                  </span>
+                ) : null}
+              </ScoringErrorBoundary>
             </div>
 
             {state === "pending" ? (
@@ -314,4 +342,76 @@ function CanvasCard({
       </div>
     </div>
   );
+}
+
+function ScoreBadges({
+  node,
+  scoring,
+  openIfDone
+}: {
+  node: DebateNode;
+  scoring: NodeScoringPayload;
+  openIfDone: () => void;
+}) {
+  const strength = formatScorePercent(scoring.scores.strength);
+  const uncertainty = formatScorePercent(scoring.scores.uncertainty);
+  const impact = formatScorePercent(scoring.scores.impact);
+  const issueSummary = summarizeCardScoringIssues(scoring);
+
+  return (
+    <button
+      type="button"
+      className="scoreBadgeButton"
+      aria-label={`Open scoring explanation for ${node.claim}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        openIfDone();
+      }}
+    >
+      <span className="scoreBadge strength" aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}>
+        STR {strength.value}
+      </span>
+      <span className="scoreBadge uncertainty" aria-label={formatScoreBadgeLabel("Uncertainty", scoring.labels.uncertainty_label, uncertainty)}>
+        UNC {uncertainty.value}
+      </span>
+      <span className="scoreBadge impact" aria-label={formatScoreBadgeLabel("Impact", scoring.labels.impact_label, impact)}>
+        IMP {impact.value}
+      </span>
+      {issueSummary ? (
+        <span className="scoreBadge issue" aria-label={issueSummary.ariaLabel}>
+          {issueSummary.label}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function summarizeCardScoringIssues(scoring: NodeScoringPayload) {
+  const highPriorityHoles = scoring.holes.filter(
+    (hole) => hole.severity === "high" && hole.description.trim()
+  );
+  const fatalFlags = scoring.fatal_flags.filter((flag) => flag.description.trim());
+  const issueCount = highPriorityHoles.length + fatalFlags.length;
+
+  if (issueCount === 0) return null;
+
+  const label =
+    fatalFlags.length > 0 && highPriorityHoles.length > 0
+      ? `ISS ${issueCount}`
+      : fatalFlags.length > 0
+        ? `FLAG ${fatalFlags.length}`
+        : `HOLE ${highPriorityHoles.length}`;
+  const parts = [
+    fatalFlags.length > 0
+      ? `${fatalFlags.length} fatal ${fatalFlags.length === 1 ? "flag" : "flags"}`
+      : null,
+    highPriorityHoles.length > 0
+      ? `${highPriorityHoles.length} high-priority ${highPriorityHoles.length === 1 ? "hole" : "holes"}`
+      : null
+  ].filter(Boolean);
+
+  return {
+    label,
+    ariaLabel: `Scoring issues: ${parts.join(" and ")}`
+  };
 }

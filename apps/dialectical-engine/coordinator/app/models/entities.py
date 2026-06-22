@@ -255,3 +255,32 @@ class ProvenanceRecord(Base):
     job_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class NodeScoringResult(Base):
+    __tablename__ = "node_scoring_results"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    debate_id: Mapped[str] = mapped_column(ForeignKey("debates.id"), index=True)
+    node_id: Mapped[str] = mapped_column(ForeignKey("nodes.id"), index=True)
+    input_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    judge_role: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(120), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    provider_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(24), default="unavailable", index=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+
+Index(
+    "ux_node_scoring_results_cache_identity",
+    NodeScoringResult.debate_id,
+    NodeScoringResult.node_id,
+    NodeScoringResult.input_hash,
+    NodeScoringResult.judge_role,
+    NodeScoringResult.provider,
+    NodeScoringResult.model,
+    unique=True,
+)

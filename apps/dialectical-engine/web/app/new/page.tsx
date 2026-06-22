@@ -5,6 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createDebate } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 
+type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
+
+const depthModeOptions: Array<{ value: AdaptiveDepthMode; label: string }> = [
+  { value: "fixed", label: "Fixed" },
+  { value: "manual", label: "Manual" },
+  { value: "recommended", label: "Recommended" },
+  { value: "adaptive", label: "Adaptive" }
+];
+
 export default function NewDebatePage() {
   return (
     <Suspense fallback={null}>
@@ -18,6 +27,7 @@ function NewDebateForm({ token }: { token: string }) {
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [depth, setDepth] = useState(3);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
@@ -86,6 +96,28 @@ function NewDebateForm({ token }: { token: string }) {
 
           {optionsOpen ? (
             <div className="optionsPanel">
+              <div className="optionRow">
+                <div>
+                  <label className="optionLabel" htmlFor="depthMode">
+                    Depth mode
+                  </label>
+                  <div className="optionHint">Selection strategy</div>
+                </div>
+                <div className="optionControl">
+                  <select
+                    id="depthMode"
+                    value={depthMode}
+                    onChange={(event) => setDepthMode(event.target.value as AdaptiveDepthMode)}
+                    aria-label="Depth mode"
+                  >
+                    {depthModeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <SliderRow
                 label="Tree depth"
                 hint="How many levels of rebuttal"

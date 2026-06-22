@@ -2,8 +2,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from dataclasses import dataclass
 
 from app.providers.base import LLMResponse, ProviderError
+
+
+@dataclass(frozen=True)
+class ProviderAvailability:
+    provider: str
+    available: bool
+    reason: str | None = None
 
 
 class CodexCliProvider:
@@ -12,6 +20,15 @@ class CodexCliProvider:
     def __init__(self, executable: str = "codex", timeout_seconds: int = 120) -> None:
         self.executable = executable
         self.timeout_seconds = timeout_seconds
+
+    def availability(self) -> ProviderAvailability:
+        if shutil.which(self.executable) is None:
+            return ProviderAvailability(
+                provider=self.name,
+                available=False,
+                reason=f"Codex executable not found: {self.executable}",
+            )
+        return ProviderAvailability(provider=self.name, available=True)
 
     def command(
         self,

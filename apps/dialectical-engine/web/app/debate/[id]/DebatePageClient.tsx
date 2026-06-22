@@ -3,11 +3,35 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import { API_BASE, clearStoredToken, getDebate, getStoredToken, setStoredToken, validateUserToken } from "@/lib/api";
-import type { DebateDetail, DebateNode, SingleShotResult } from "@/lib/types";
+import {
+  API_BASE,
+  approveDebateAdaptiveDepthExpansion,
+  clearStoredToken,
+  getDebate,
+  getDebateAdaptiveDepthDryRun,
+  getDebateScoring,
+  getDebateScoringJobStatus,
+  getStoredToken,
+  setStoredToken,
+  startDebateScoringRefresh,
+  validateUserToken
+} from "@/lib/api";
+import type {
+  AdaptiveDepthDryRunItem,
+  DebateAdaptiveDepthDryRunResponse,
+  DebateDetail,
+  DebateNode,
+  DebateScoringResponse,
+  DepthPressure,
+  InvestigationAction,
+  NodeScoringPayload,
+  RecommendedInvestigation,
+  SingleShotResult
+} from "@/lib/types";
 import { BrandMark } from "@/components/TopBar";
 import { DebateCanvas } from "@/components/DebateCanvas";
 import { DebateOutline } from "@/components/DebateOutline";
+import { RecommendedInvestigations } from "@/components/RecommendedInvestigations";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
@@ -15,9 +39,22 @@ import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { Toast } from "@/components/Toast";
+import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import { computeLean, countNodes, renderStateOf, treeDepth } from "@/lib/debatePresentation";
 import type { PopoverState } from "@/lib/scrutiny";
 import { isComplete, statusLabel } from "@/lib/format";
+import {
+  indexScoringResponse,
+  selectStrongestUnresolvedScoringIssue,
+  summarizeScoringFatalFlags,
+  summarizeScoringHoles
+} from "@/lib/scoringResponse";
+import type {
+  DebateScoringFatalFlagSummary,
+  DebateScoringHoleSummary,
+  DebateScoringUnresolvedIssue
+} from "@/lib/scoringResponse";
+import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scoringStatusCopy";
 
 type SynthesisDraft = {
   model_id?: string;
@@ -29,6 +66,43 @@ type StreamState = {
   status: "connecting" | "live" | "reconnecting";
   retryInMs?: number;
 };
+
+type ScoringAsyncState =
+  | { status: "idle"; data: null; error: null }
+  | { status: "loading"; data: DebateScoringResponse | null; error: null }
+  | { status: "loaded"; data: DebateScoringResponse; error: null }
+  | { status: "unavailable"; data: DebateScoringResponse; error: null }
+  | { status: "error"; data: DebateScoringResponse | null; error: string };
+
+type ScoringRefreshState =
+  | { status: "idle"; jobId: null; error: null }
+  | { status: "starting"; jobId: null; error: null }
+  | { status: "polling"; jobId: string; error: null }
+  | { status: "error"; jobId: string | null; error: string };
+
+type AdaptiveDepthDryRunAsyncState =
+  | { status: "idle"; data: null; error: null }
+  | { status: "loading"; data: DebateAdaptiveDepthDryRunResponse | null; error: null }
+  | { status: "loaded"; data: DebateAdaptiveDepthDryRunResponse; error: null }
+  | { status: "unavailable"; data: DebateAdaptiveDepthDryRunResponse | null; error: string | null }
+  | { status: "error"; data: DebateAdaptiveDepthDryRunResponse | null; error: string };
+
+type AdaptiveDepthApprovalState =
+  | { status: "idle"; error: null }
+  | { status: "starting"; error: null }
+  | { status: "queued"; error: null }
+  | { status: "unavailable"; error: string }
+  | { status: "error"; error: string };
+
+const SCORE_AWARE_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "issues", label: "Issues" },
+  { id: "weak_uncertain", label: "Weak/uncertain" },
+  { id: "decisive", label: "Decisive" },
+  { id: "unavailable", label: "Unavailable" }
+] as const;
+
+type ScoreAwareFilter = (typeof SCORE_AWARE_FILTERS)[number]["id"];
 
 function parseEventData(event: Event): Record<string, unknown> | null {
   const data = (event as MessageEvent).data;
@@ -166,6 +240,74 @@ function findNode(root: DebateNode | null, id: string | null): DebateNode | null
   return null;
 }
 
+function findPathToNode(root: DebateNode | null, id: string | null): string[] {
+  if (!root || !id) return [];
+  if (root.id === id) return [root.id];
+  for (const child of root.children || []) {
+    const childPath = findPathToNode(child, id);
+    if (childPath.length > 0) return [root.id, ...childPath];
+  }
+  return [];
+}
+
+function hasHighPriorityScoringIssue(scoring: NodeScoringPayload): boolean {
+  const highImpact = scoring.scores.impact >= 0.7;
+  return (
+    scoring.fatal_flags.some((flag) => flag.description.trim().length > 0) ||
+    scoring.holes.some(
+      (hole) => (hole.severity === "high" || highImpact) && hole.description.trim().length > 0
+    )
+  );
+}
+
+function matchesScoreAwareFilter(scoring: NodeScoringPayload, filter: ScoreAwareFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "issues") return hasHighPriorityScoringIssue(scoring);
+  if (filter === "weak_uncertain") {
+    return scoring.scores.strength <= 0.45 || scoring.scores.uncertainty >= 0.65;
+  }
+  if (filter === "decisive") {
+    return scoring.scores.impact >= 0.7 && scoring.scores.uncertainty <= 0.45;
+  }
+  if (filter === "unavailable") return false;
+  return true;
+}
+
+function collectRecommendedInvestigations(response: DebateScoringResponse | null): RecommendedInvestigation[] {
+  return (response?.items ?? []).flatMap((item) => item.recommended_investigations ?? []);
+}
+
+function formatAdaptiveDepthAction(action: InvestigationAction | null): string {
+  if (!action) return "Review";
+  return action.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatAdaptiveDepthReason(reason: string): string {
+  return reason.replace(/_/g, " ");
+}
+
+function formatAdaptiveDepthPressure(pressure: DepthPressure): string {
+  return pressure.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatAdaptiveDepthScore(score: number): string {
+  const percent = Math.max(0, Math.min(100, Math.round(score * 100)));
+  return `${percent}%`;
+}
+
+function adaptiveDepthDryRunStateFromPayload(
+  payload: DebateAdaptiveDepthDryRunResponse
+): AdaptiveDepthDryRunAsyncState {
+  if (payload.status === "unavailable") {
+    return {
+      status: "unavailable",
+      data: payload,
+      error: payload.reason || "Adaptive depth dry-run unavailable."
+    };
+  }
+  return { status: "loaded", data: payload, error: null };
+}
+
 export default function DebatePageClient({
   id,
   initialDebate,
@@ -181,6 +323,23 @@ export default function DebatePageClient({
   );
   const [error, setError] = useState<string | null>(initialError);
   const [streamState, setStreamState] = useState<StreamState>({ status: "connecting" });
+  const [scoringState, setScoringState] = useState<ScoringAsyncState>({ status: "idle", data: null, error: null });
+  const [scoringRefreshState, setScoringRefreshState] = useState<ScoringRefreshState>({
+    status: "idle",
+    jobId: null,
+    error: null
+  });
+  const [adaptiveDepthDryRunState, setAdaptiveDepthDryRunState] = useState<AdaptiveDepthDryRunAsyncState>({
+    status: "idle",
+    data: null,
+    error: null
+  });
+  const [adaptiveDepthApprovalState, setAdaptiveDepthApprovalState] = useState<AdaptiveDepthApprovalState>({
+    status: "idle",
+    error: null
+  });
+  const [scoringEnabled, setScoringEnabled] = useState(false);
+  const [scoreAwareFilter, setScoreAwareFilter] = useState<ScoreAwareFilter>("all");
   const [actionToken, setActionToken] = useState<string | null>(null);
   const [tokenDraft, setTokenDraft] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
@@ -196,6 +355,7 @@ export default function DebatePageClient({
   const [scrutiny, setScrutiny] = useState<Record<string, string>>({});
   const [guideOpen, setGuideOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [scoringDiagnosticsOpen, setScoringDiagnosticsOpen] = useState(false);
   const [tokenBarOpen, setTokenBarOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -219,6 +379,68 @@ export default function DebatePageClient({
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setScoringState({ status: "idle", data: null, error: null });
+    setScoringRefreshState({ status: "idle", jobId: null, error: null });
+    setAdaptiveDepthDryRunState({ status: "idle", data: null, error: null });
+    setAdaptiveDepthApprovalState({ status: "idle", error: null });
+  }, [id]);
+
+  useEffect(() => {
+    if (!scoringEnabled) setScoringState({ status: "idle", data: null, error: null });
+    if (!scoringEnabled) setAdaptiveDepthDryRunState({ status: "idle", data: null, error: null });
+    if (!scoringEnabled) setAdaptiveDepthApprovalState({ status: "idle", error: null });
+    if (!scoringEnabled) setScoreAwareFilter("all");
+  }, [scoringEnabled]);
+
+  useEffect(() => {
+    if (!scoringEnabled) return;
+    let active = true;
+    setScoringState((current) => ({ status: "loading", data: current.data, error: null }));
+    getDebateScoring(id)
+      .then((payload) => {
+        if (!active) return;
+        setScoringState({
+          status: payload.status === "unavailable" ? "unavailable" : "loaded",
+          data: payload,
+          error: null
+        });
+      })
+      .catch((exc) => {
+        if (!active) return;
+        setScoringState((current) => ({
+          status: "error",
+          data: current.data,
+          error: exc instanceof Error ? exc.message : "Unable to load scoring"
+        }));
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, scoringEnabled]);
+
+  useEffect(() => {
+    if (!scoringEnabled) return;
+    let active = true;
+    setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
+    getDebateAdaptiveDepthDryRun(id)
+      .then((payload) => {
+        if (!active) return;
+        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(payload));
+      })
+      .catch((exc) => {
+        if (!active) return;
+        setAdaptiveDepthDryRunState((current) => ({
+          status: "error",
+          data: current.data,
+          error: exc instanceof Error ? exc.message : "Unable to load adaptive depth dry-run"
+        }));
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, scoringEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -405,6 +627,41 @@ export default function DebatePageClient({
   );
 
   const detailNode = findNode(debate?.tree ?? null, detailNodeId);
+  const { scoringByNodeId, scoringErrorsByNodeId } = useMemo(
+    () => indexScoringResponse(scoringState.data),
+    [scoringState.data]
+  );
+  const scoreAwareFilterNodeIds = useMemo(() => {
+    if (scoreAwareFilter === "all") return null;
+    if (scoreAwareFilter === "unavailable") {
+      return new Set(Array.from(scoringErrorsByNodeId.keys()));
+    }
+    return new Set(
+      Array.from(scoringByNodeId.values())
+        .filter((scoring) => matchesScoreAwareFilter(scoring, scoreAwareFilter))
+        .map((scoring) => scoring.node_id)
+    );
+  }, [scoreAwareFilter, scoringByNodeId, scoringErrorsByNodeId]);
+  const selectedPathNodeIds = useMemo(
+    () => new Set(findPathToNode(debate?.tree ?? null, selectedNodeId)),
+    [debate?.tree, selectedNodeId]
+  );
+  const debateRecommendations = useMemo(
+    () => collectRecommendedInvestigations(scoringState.data),
+    [scoringState.data]
+  );
+  const scoringHolesSummary = useMemo(
+    () => summarizeScoringHoles(scoringState.data),
+    [scoringState.data]
+  );
+  const scoringFatalFlagsSummary = useMemo(
+    () => summarizeScoringFatalFlags(scoringState.data),
+    [scoringState.data]
+  );
+  const strongestUnresolvedScoringIssue = useMemo(
+    () => selectStrongestUnresolvedScoringIssue(scoringState.data),
+    [scoringState.data]
+  );
 
   function showToast(message: string) {
     setToast(message);
@@ -434,6 +691,21 @@ export default function DebatePageClient({
     const rect = range?.getBoundingClientRect();
     if (!rect) return;
     setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
+  }
+
+  function canFocusRecommendationNode(targetNodeId: string): boolean {
+    return Boolean(findNode(debate?.tree ?? null, targetNodeId));
+  }
+
+  function focusRecommendationNode(targetNodeId: string): boolean {
+    if (!findNode(debate?.tree ?? null, targetNodeId)) {
+      showToast("Recommendation target is no longer visible.");
+      return false;
+    }
+    setView("tree");
+    setSelectedNodeId(targetNodeId);
+    setDetailNodeId(targetNodeId);
+    return true;
   }
 
   async function unlockActions(event: FormEvent) {
@@ -468,6 +740,120 @@ export default function DebatePageClient({
     setActionToken(null);
   }
 
+  function scoringStatusMessage(): string | null {
+    return formatScoringStatusCopy({
+      enabled: scoringEnabled,
+      scoringStatus: scoringState.status,
+      refreshStatus: scoringRefreshState.status,
+      responseStatus: scoringState.data?.status,
+      reason: scoringState.data?.reason,
+      error: scoringRefreshState.error || scoringState.error,
+      cacheHit: scoringState.data?.cache?.hit,
+      staleReason: scoringState.data?.cache?.stale?.reason,
+      checkedAt: scoringState.data?.model_metadata?.checked_at,
+      provider: scoringState.data?.model_metadata?.provider,
+      model: scoringState.data?.model_metadata?.model
+    });
+  }
+
+  async function refreshScoringFromJob() {
+    if (!actionToken || scoringRefreshState.status === "starting" || scoringRefreshState.status === "polling") return;
+    setScoringEnabled(true);
+    setScoringRefreshState({ status: "starting", jobId: null, error: null });
+    setScoringState((current) => ({ status: "loading", data: current.data, error: null }));
+    setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
+    try {
+      const started = await startDebateScoringRefresh(id, actionToken);
+      let job = started;
+      setScoringRefreshState({ status: "polling", jobId: started.job_id, error: null });
+      for (let attempt = 0; attempt < 30 && (job.status === "queued" || job.status === "running"); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        job = await getDebateScoringJobStatus(id, started.job_id);
+      }
+      if (job.status === "queued" || job.status === "running") {
+        throw new Error("Scoring refresh is still running.");
+      }
+      if (job.status === "failed") {
+        throw new Error(job.error || "Scoring refresh failed.");
+      }
+      const payload = await getDebateScoring(id);
+      setScoringState({
+        status: payload.status === "unavailable" ? "unavailable" : "loaded",
+        data: payload,
+        error: null
+      });
+      try {
+        const dryRunPayload = await getDebateAdaptiveDepthDryRun(id);
+        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(dryRunPayload));
+      } catch (exc) {
+        setAdaptiveDepthDryRunState((current) => ({
+          status: "error",
+          data: current.data,
+          error: exc instanceof Error ? exc.message : "Unable to load adaptive depth dry-run"
+        }));
+      }
+      setScoringRefreshState({ status: "idle", jobId: null, error: null });
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : "Unable to refresh scoring";
+      setScoringState((current) => ({
+        status: "error",
+        data: current.data,
+        error: message
+      }));
+      setScoringRefreshState((current) => ({
+        status: "error",
+        jobId: current.jobId,
+        error: message
+      }));
+      setAdaptiveDepthDryRunState((current) => ({
+        status: "error",
+        data: current.data,
+        error: message
+      }));
+    }
+  }
+
+  async function approveAdaptiveDepthExpansion(selectedNodeIds: string[]) {
+    if (!actionToken || selectedNodeIds.length === 0 || adaptiveDepthApprovalState.status === "starting") return;
+    setAdaptiveDepthApprovalState({ status: "starting", error: null });
+    try {
+      const result = await approveDebateAdaptiveDepthExpansion(
+        id,
+        {
+          debate_id: id,
+          selected_node_ids: selectedNodeIds,
+          approval_reason: "User approved adaptive depth expansion from dry-run recommendations."
+        },
+        actionToken
+      );
+      if (result.status === "unavailable") {
+        setAdaptiveDepthApprovalState({
+          status: "unavailable",
+          error: result.reason || "Selected adaptive depth expansions are unavailable."
+        });
+        return;
+      }
+      setAdaptiveDepthApprovalState({ status: "queued", error: null });
+      showToast(`Queued ${result.queued_node_ids.length} adaptive expansion${result.queued_node_ids.length === 1 ? "" : "s"}`);
+      await refresh();
+      try {
+        const dryRunPayload = await getDebateAdaptiveDepthDryRun(id);
+        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(dryRunPayload));
+      } catch (exc) {
+        setAdaptiveDepthDryRunState((current) => ({
+          status: "error",
+          data: current.data,
+          error: exc instanceof Error ? exc.message : "Unable to load adaptive depth dry-run"
+        }));
+      }
+    } catch (exc) {
+      setAdaptiveDepthApprovalState({
+        status: "error",
+        error: exc instanceof Error ? exc.message : "Unable to approve adaptive depth expansion"
+      });
+    }
+  }
+
   if (error && !debate) {
     return (
       <div className="screen scroll">
@@ -491,9 +877,18 @@ export default function DebatePageClient({
   }
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
-
+  const scoringRefreshBusy = scoringRefreshState.status === "starting" || scoringRefreshState.status === "polling";
+  const scoringRefreshDisabled = !hasTree || !actionToken || scoringState.status === "loading" || scoringRefreshBusy;
+  const scoringStatusText = scoringStatusMessage();
+  const scoringConfidenceText = scoringEnabled ? formatScoringConfidenceCopy() : null;
   return (
-    <div className="debateView">
+    <div
+      className="debateView"
+      data-scoring-state={scoringState.status}
+      data-scoring-enabled={scoringEnabled}
+      data-scoring-node-count={scoringByNodeId.size}
+      data-adaptive-depth-dry-run-state={adaptiveDepthDryRunState.status}
+    >
       {/* ---- top bar ---- */}
       <header className="debateTopBar">
         <BrandMark />
@@ -511,6 +906,40 @@ export default function DebatePageClient({
           </div>
         </div>
         <div className="debateTopActions">
+          <ScoringErrorBoundary>
+            <div className="topSwitch">
+              <span>Scoring</span>
+              <button
+                type="button"
+                className="switch"
+                role="switch"
+                aria-checked={scoringEnabled}
+                aria-label="Toggle scoring"
+                onClick={() => setScoringEnabled((current) => !current)}
+              >
+                <span className="knob" />
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={scoringRefreshDisabled}
+                onClick={refreshScoringFromJob}
+              >
+                {scoringRefreshBusy ? "Refreshing" : "Refresh scoring"}
+              </button>
+              {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
+              {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
+              <button
+                type="button"
+                className="iconBtn"
+                aria-label="Open scoring diagnostics"
+                title="Scoring diagnostics"
+                onClick={() => setScoringDiagnosticsOpen(true)}
+              >
+                i
+              </button>
+            </div>
+          </ScoringErrorBoundary>
           {hasTree ? (
             <div className="segment" role="group" aria-label="View">
               <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
@@ -538,6 +967,40 @@ export default function DebatePageClient({
         </div>
       </header>
 
+      <ScoringErrorBoundary>
+        <ScoringHolesSummaryPanel
+          enabled={scoringEnabled}
+          state={scoringState}
+          holesSummary={scoringHolesSummary}
+          fatalFlagsSummary={scoringFatalFlagsSummary}
+          strongestIssue={strongestUnresolvedScoringIssue}
+        />
+        <ScoreAwareFilterPanel
+          enabled={scoringEnabled}
+          filter={scoreAwareFilter}
+          matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
+          scoredCount={scoringByNodeId.size}
+          onChange={setScoreAwareFilter}
+        />
+        <RecommendedInvestigations
+          recommendations={scoringEnabled ? debateRecommendations : []}
+          canOpenTarget={canFocusRecommendationNode}
+          onOpenTarget={focusRecommendationNode}
+          emptyMessage={
+            scoringEnabled
+              ? "No recommended investigations are available from the current scoring data."
+              : "Enable scoring to surface recommended investigations from scored nodes."
+          }
+        />
+        <AdaptiveDepthDryRunPanel
+          enabled={scoringEnabled}
+          state={adaptiveDepthDryRunState}
+          actionToken={actionToken}
+          approvalState={adaptiveDepthApprovalState}
+          onApprove={approveAdaptiveDepthExpansion}
+        />
+      </ScoringErrorBoundary>
+
       {/* ---- generation progress strip ---- */}
       {generating ? (
         <div className="progressStrip">
@@ -563,6 +1026,9 @@ export default function DebatePageClient({
             expanded={expanded}
             selectedNodeId={selectedNodeId}
             scrutiny={scrutiny}
+            scoringByNodeId={scoringByNodeId}
+            scoringErrorsByNodeId={scoringErrorsByNodeId}
+            scoreFilterNodeIds={scoringEnabled ? scoreAwareFilterNodeIds : null}
             meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
             canvasRef={(el) => {
               canvasElRef.current = el;
@@ -576,7 +1042,13 @@ export default function DebatePageClient({
             onProseSelect={onProseSelect}
           />
         ) : view === "outline" && hasTree && debate.tree ? (
-          <DebateOutline root={debate.tree} />
+          <DebateOutline
+            root={debate.tree}
+            selectedNodeId={selectedNodeId}
+            selectedPathNodeIds={selectedPathNodeIds}
+            scoringByNodeId={scoringByNodeId}
+            scoringErrorsByNodeId={scoringErrorsByNodeId}
+          />
         ) : singleShotResult ? (
           <SingleShotMain result={singleShotResult} />
         ) : (
@@ -605,9 +1077,13 @@ export default function DebatePageClient({
       {detailNode ? (
         <NodeDetailDrawer
           node={detailNode}
+          scoring={scoringByNodeId.get(detailNode.id)}
+          scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           token={actionToken}
           onClose={() => setDetailNodeId(null)}
           onChallenge={(anchor, text) => openChallenge(detailNode, anchor, text)}
+          onFocusRecommendationNode={focusRecommendationNode}
+          canFocusRecommendationNode={canFocusRecommendationNode}
           onQueued={() => {
             showToast("Regeneration queued");
             refresh();
@@ -655,6 +1131,14 @@ export default function DebatePageClient({
         <DebateWorkspaceDrawer debate={debate} singleShot={singleShotResult} onClose={() => setWorkspaceOpen(false)} />
       ) : null}
 
+      {scoringDiagnosticsOpen ? (
+        <ScoringDiagnosticsDrawer
+          scoringState={scoringState}
+          refreshState={scoringRefreshState}
+          onClose={() => setScoringDiagnosticsOpen(false)}
+        />
+      ) : null}
+
       {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
 
       {toast ? <Toast message={toast} /> : null}
@@ -686,6 +1170,395 @@ export default function DebatePageClient({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function formatDebugValue(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "Unavailable";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
+function formatCacheDebug(cache: DebateScoringResponse["cache"]): string {
+  if (!cache) return "Unavailable";
+  const base = cache.hit ? "Hit" : "Miss";
+  const staleReason = cache.stale?.reason;
+  if (!staleReason) return base;
+  return `${base}; stale: ${staleReason}`;
+}
+
+function ScoreAwareFilterPanel({
+  enabled,
+  filter,
+  matchCount,
+  scoredCount,
+  onChange
+}: {
+  enabled: boolean;
+  filter: ScoreAwareFilter;
+  matchCount: number;
+  scoredCount: number;
+  onChange: (filter: ScoreAwareFilter) => void;
+}) {
+  return (
+    <section className="progressStrip" aria-label="Score-aware navigation filters">
+      <span className="progressLabel">Score-aware navigation</span>
+      <div className="segment" role="group" aria-label="Score-aware filter">
+        {SCORE_AWARE_FILTERS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={filter === item.id}
+            disabled={!enabled}
+            onClick={() => onChange(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <span className="progressCount">
+        {enabled
+          ? `${matchCount} of ${scoredCount} scored nodes match`
+          : "Enable scoring to filter by scored node signals."}
+      </span>
+    </section>
+  );
+}
+
+function ScoringHolesSummaryPanel({
+  enabled,
+  state,
+  holesSummary,
+  fatalFlagsSummary,
+  strongestIssue
+}: {
+  enabled: boolean;
+  state: ScoringAsyncState;
+  holesSummary: DebateScoringHoleSummary;
+  fatalFlagsSummary: DebateScoringFatalFlagSummary;
+  strongestIssue: DebateScoringUnresolvedIssue | null;
+}) {
+  const reason = state.error || state.data?.reason;
+
+  if (!enabled) {
+    return (
+      <section className="progressStrip" aria-label="Scoring issue summary">
+        <span className="progressLabel">Scoring issue summary unavailable</span>
+        <span className="progressCount">Enable scoring to summarize unresolved holes and fatal flags from scored nodes.</span>
+      </section>
+    );
+  }
+
+  if (state.status === "loading") {
+    return (
+      <section className="progressStrip" aria-label="Scoring issue summary">
+        <span className="progressLabel">Loading scoring issue summary</span>
+        <span className="progressCount">Waiting for scored nodes.</span>
+      </section>
+    );
+  }
+
+  if (state.status === "error" || state.status === "unavailable") {
+    return (
+      <section className="progressStrip" aria-label="Scoring issue summary">
+        <span className="progressLabel">Scoring issue summary unavailable</span>
+        <span className="progressCount">{reason || "No scoring payload is available."}</span>
+      </section>
+    );
+  }
+
+  if (!state.data) return null;
+
+  if (holesSummary.total === 0 && fatalFlagsSummary.total === 0) {
+    return (
+      <section className="progressStrip" aria-label="Scoring issue summary">
+        <span className="progressLabel">Scoring issue summary</span>
+        <span className="progressCount">No unresolved scoring holes or fatal flags were returned by the current scoring payload.</span>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="progressStrip"
+      aria-label="Scoring issue summary"
+      style={{ alignItems: "flex-start", gap: 12, minHeight: "auto", paddingTop: 8, paddingBottom: 8 }}
+    >
+      <div style={{ minWidth: 190 }}>
+        <span className="progressLabel">Scoring issue summary</span>
+        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+          {holesSummary.total} unresolved holes / {fatalFlagsSummary.total} fatal flags from {state.data.items.length} scored nodes
+        </div>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {strongestIssue ? (
+          <div className="pill" title={`${strongestIssue.claim}: ${strongestIssue.description}`}>
+            <span>Strongest unresolved issue</span>
+            <span>{strongestIssue.kind === "fatal_flag" ? "fatal" : "hole"}</span>
+            <span>{strongestIssue.severity}</span>
+            <span>{strongestIssue.type}</span>
+            <span>{strongestIssue.nodeId}</span>
+          </div>
+        ) : null}
+        <div className="pill" title="Severity counts from scoring payload holes">
+          <span>Holes</span>
+          <span>{holesSummary.bySeverity.high} high</span>
+          <span>{holesSummary.bySeverity.medium} medium</span>
+          <span>{holesSummary.bySeverity.low} low</span>
+        </div>
+        <div className="pill" title="Severity counts from scoring payload fatal flags">
+          <span>Fatal flags</span>
+          <span>{fatalFlagsSummary.bySeverity.high} high</span>
+          <span>{fatalFlagsSummary.bySeverity.medium} medium</span>
+          <span>{fatalFlagsSummary.bySeverity.low} low</span>
+        </div>
+        {fatalFlagsSummary.items.slice(0, 4).map((flag, index) => (
+          <div
+            key={`${flag.nodeId}-${flag.type}-${index}`}
+            className="pill"
+            title={`${flag.claim}: ${flag.description}`}
+          >
+            <span>fatal</span>
+            <span>{flag.severity}</span>
+            <span>{flag.type}</span>
+            <span>{flag.nodeId}</span>
+          </div>
+        ))}
+        {holesSummary.items.slice(0, 4).map((hole, index) => (
+          <div
+            key={`${hole.nodeId}-${hole.type}-${index}`}
+            className="pill"
+            title={`${hole.claim}: ${hole.description}`}
+          >
+            <span>{hole.severity}</span>
+            <span>{hole.type}</span>
+            <span>{hole.nodeId}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ScoringDiagnosticsDrawer({
+  scoringState,
+  refreshState,
+  onClose
+}: {
+  scoringState: ScoringAsyncState;
+  refreshState: ScoringRefreshState;
+  onClose: () => void;
+}) {
+  const data = scoringState.data;
+  const error = refreshState.error || scoringState.error || data?.reason || "No scoring error reported.";
+  const rows: Array<[string, string | number | boolean | null | undefined]> = [
+    ["Frontend state", scoringState.status],
+    ["Refresh state", refreshState.status],
+    ["Backend status", data?.status],
+    ["Provider", data?.model_metadata?.provider],
+    ["Model", data?.model_metadata?.model],
+    ["Checked at", data?.model_metadata?.checked_at],
+    ["Generated at", data?.generated_at],
+    ["Producer", data?.producer],
+    ["Cache", formatCacheDebug(data?.cache)],
+    ["Scored nodes", data?.scored_node_count],
+    ["Skipped nodes", data?.skipped_node_count],
+    ["Truncated", data?.truncated],
+    ["Call count", "Not exposed by scoring API"],
+    ["Latency", "Not exposed by scoring API"],
+    ["Error", error]
+  ];
+
+  return (
+    <>
+      <div className="drawerScrim" onClick={onClose} />
+      <aside className="drawer scroll" role="dialog" aria-modal aria-label="Scoring diagnostics">
+        <div className="drawerHead">
+          <div className="drawerHeadMeta">
+            <div className="nodeEyebrow">Developer diagnostics</div>
+            <h2>Scoring diagnostics</h2>
+          </div>
+          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+            x
+          </button>
+        </div>
+        <div className="drawerBody">
+          <div className="drawerHintMuted">Only fields present in the frontend scoring payload are shown.</div>
+          <ul className="drawerFindingList">
+            {rows.map(([label, value]) => (
+              <li key={label} className="drawerFindingItem">
+                <div className="drawerFindingMeta">
+                  <span>{label}</span>
+                </div>
+                <div className="drawerFindingText">{formatDebugValue(value)}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function AdaptiveDepthDryRunPanel({
+  enabled,
+  state,
+  actionToken,
+  approvalState,
+  onApprove
+}: {
+  enabled: boolean;
+  state: AdaptiveDepthDryRunAsyncState;
+  actionToken: string | null;
+  approvalState: AdaptiveDepthApprovalState;
+  onApprove: (selectedNodeIds: string[]) => void;
+}) {
+  const reason =
+    state.error ||
+    state.data?.reason ||
+    (!enabled ? "Enable scoring to inspect the adaptive depth dry-run plan." : null);
+
+  if (!enabled) {
+    return (
+      <section className="progressStrip" aria-label="Adaptive depth dry-run">
+        <span className="progressLabel">Adaptive depth dry-run unavailable</span>
+        <span className="progressCount">{reason}</span>
+      </section>
+    );
+  }
+
+  if (state.status === "loading") {
+    return (
+      <section className="progressStrip" aria-label="Adaptive depth dry-run">
+        <span className="progressLabel">Loading adaptive depth dry-run</span>
+        <span className="progressCount">Read-only plan</span>
+      </section>
+    );
+  }
+
+  if (state.status === "error" || state.status === "unavailable") {
+    return (
+      <section className="progressStrip" aria-label="Adaptive depth dry-run">
+        <span className="progressLabel">Adaptive depth dry-run unavailable</span>
+        <span className="progressCount">{reason || "No dry-run plan is available."}</span>
+      </section>
+    );
+  }
+
+  if (!state.data) return null;
+
+  const items = state.data.plan.items;
+  const actionableItems = items.filter((item) => item.expansion_hint === "expand");
+  const actionLocked = !actionToken;
+  const actionBusy = approvalState.status === "starting";
+  const actionDisabled = actionLocked || actionBusy || actionableItems.length === 0;
+  const actionMessage = actionLocked
+    ? "Unlock actions to approve adaptive expansion."
+    : actionableItems.length === 0
+      ? "No selected expand recommendations are available."
+      : approvalState.status === "queued"
+        ? "Adaptive expansion jobs queued."
+        : approvalState.status === "unavailable" || approvalState.status === "error"
+          ? approvalState.error
+          : null;
+  return (
+    <section
+      className="progressStrip"
+      aria-label="Adaptive depth dry-run"
+      style={{ alignItems: "flex-start", gap: 12, minHeight: "auto", paddingTop: 8, paddingBottom: 8 }}
+    >
+      <div style={{ minWidth: 190 }}>
+        <span className="progressLabel">Adaptive depth dry-run</span>
+        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+          {state.data.plan.expansion_count} expansions from {state.data.plan.candidate_count} scored candidates
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <span className="progressCount">No adaptive depth expansions are recommended from the current scoring data.</span>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {items.map((item) => (
+            <AdaptiveDepthDryRunChip key={item.node_id} item={item} />
+          ))}
+        </div>
+      )}
+      <div style={{ display: "grid", gap: 4, marginLeft: "auto", minWidth: 190 }}>
+        <button
+          type="button"
+          className="btn btnDark"
+          disabled={actionDisabled}
+          onClick={() => onApprove(actionableItems.map((item) => item.node_id))}
+        >
+          {actionBusy ? "Starting expansions" : "Approve and run selected expansions"}
+        </button>
+        {actionMessage ? (
+          <span className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
+            {actionMessage}
+          </span>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
+  const reasons = item.reasons.map(formatAdaptiveDepthReason);
+  const recommendedDepthLabel =
+    item.expansion_hint === "expand" ? "Recommended depth: expand" : "Recommended depth: review";
+
+  return (
+    <div
+      title={reasons.join(", ") || "No listed reasons"}
+      style={{
+        display: "grid",
+        gap: 6,
+        width: 220,
+        padding: "8px 10px",
+        border: "1px solid oklch(0.88 0.03 75)",
+        borderRadius: 6,
+        background: item.expansion_hint === "expand" ? "oklch(0.97 0.03 118)" : "oklch(0.98 0.01 75)"
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span className="progressLabel">{formatAdaptiveDepthPressure(item.pressure)} pressure</span>
+        <span className="progressCount">{formatAdaptiveDepthScore(item.score)}</span>
+      </div>
+      <div
+        className="adaptiveDepthMeter"
+        aria-label={`Adaptive depth score ${formatAdaptiveDepthScore(item.score)}`}
+        style={{
+          height: 5,
+          overflow: "hidden",
+          borderRadius: 4,
+          background: "oklch(0.9 0.01 75)"
+        }}
+      >
+        <div
+          style={{
+            width: formatAdaptiveDepthScore(item.score),
+            height: "100%",
+            borderRadius: 4,
+            background:
+              item.pressure === "high"
+                ? "oklch(0.62 0.15 32)"
+                : item.pressure === "medium"
+                  ? "oklch(0.66 0.12 80)"
+                  : "oklch(0.62 0.09 165)"
+          }}
+        />
+      </div>
+      <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
+        {recommendedDepthLabel} for {formatAdaptiveDepthAction(item.recommended_action).toLowerCase()}
+      </div>
+      <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
+        {item.hole_count} holes, {item.recommended_investigation_count} investigations, node {item.node_id}
+      </div>
+      {reasons.length > 0 ? (
+        <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
+          {reasons.join("; ")}
+        </div>
+      ) : null}
     </div>
   );
 }

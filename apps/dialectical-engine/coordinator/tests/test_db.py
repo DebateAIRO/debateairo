@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 
@@ -151,6 +154,68 @@ def test_init_db_backfills_v2_capability_columns_for_existing_tables(db) -> None
 
     columns = {column["name"] for column in inspect(db.bind).get_columns("skills")}
     assert {"definition", "status", "quality_score", "reuse_count", "last_used_at", "created_at"} <= columns
+
+
+def test_node_scoring_results_schema_is_initialized(db) -> None:
+    inspector = inspect(db.bind)
+
+    assert "node_scoring_results" in set(inspector.get_table_names())
+
+    columns = {column["name"] for column in inspector.get_columns("node_scoring_results")}
+    assert {
+        "id",
+        "debate_id",
+        "node_id",
+        "input_hash",
+        "judge_role",
+        "provider",
+        "model",
+        "provider_metadata",
+        "status",
+        "result",
+        "created_at",
+        "updated_at",
+    } <= columns
+
+    indexes = {index["name"] for index in inspector.get_indexes("node_scoring_results")}
+    assert {
+        "ix_node_scoring_results_debate_id",
+        "ix_node_scoring_results_node_id",
+        "ix_node_scoring_results_status",
+        "ux_node_scoring_results_cache_identity",
+    } <= indexes
+
+
+def test_scoring_cache_migration_applies_cleanly_to_empty_database(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "migration.sqlite3"
+    coordinator_dir = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("DIALECTICAL_HOME", str(tmp_path))
+    monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{db_path}")
+
+    config = Config(str(coordinator_dir / "alembic.ini"))
+    config.set_main_option("script_location", str(coordinator_dir / "migrations"))
+    command.upgrade(config, "head")
+
+    from sqlalchemy import create_engine
+
+    migrated_engine = create_engine(f"sqlite:///{db_path}", future=True)
+    try:
+        inspector = inspect(migrated_engine)
+        assert "node_scoring_results" in set(inspector.get_table_names())
+        columns = {column["name"] for column in inspector.get_columns("node_scoring_results")}
+        assert {
+            "debate_id",
+            "node_id",
+            "input_hash",
+            "provider_metadata",
+            "status",
+            "created_at",
+            "updated_at",
+        } <= columns
+        indexes = {index["name"] for index in inspector.get_indexes("node_scoring_results")}
+        assert "ux_node_scoring_results_cache_identity" in indexes
+    finally:
+        migrated_engine.dispose()
 
 
 def test_init_db_rebuilds_legacy_capability_tables_before_v2_debate_creation(db) -> None:

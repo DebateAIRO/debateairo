@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel
 
 from app.core.config import load_settings
 from app.providers.base import LLMProvider, LLMResponse
@@ -18,6 +19,14 @@ class AgentConfig:
     model: str
     temperature: float = 0.0
     max_tokens: int | None = None
+
+
+class ScoringProviderConfigStatus(BaseModel):
+    available: bool
+    role: str
+    provider: str | None = None
+    model: str | None = None
+    reason: str | None = None
 
 
 def default_agents_path() -> Path:
@@ -50,6 +59,50 @@ def load_agent_configs(path: Path | None = None) -> dict[str, AgentConfig]:
             ),
         )
     return configs
+
+
+def detect_codex_scoring_config(
+    agents: dict[str, AgentConfig] | None = None,
+    *,
+    role: str = "judge",
+) -> ScoringProviderConfigStatus:
+    configs = agents if agents is not None else load_agent_configs()
+    config = configs.get(role)
+    if config is None:
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            reason=f"No {role} agent is configured for scoring.",
+        )
+    if config.provider != "codex":
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            provider=config.provider,
+            model=config.model,
+            reason=f"Configured {role} provider is not codex.",
+        )
+    if not config.model.strip():
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            provider=config.provider,
+            reason=f"Configured {role} model is empty.",
+        )
+    return ScoringProviderConfigStatus(
+        available=True,
+        role=role,
+        provider=config.provider,
+        model=config.model,
+    )
+
+
+def detect_scoring_provider_config(
+    agents: dict[str, AgentConfig] | None = None,
+    *,
+    role: str = "judge",
+) -> ScoringProviderConfigStatus:
+    return detect_codex_scoring_config(agents, role=role)
 
 
 class ProviderRegistry:

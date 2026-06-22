@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
-import type { DebateNode, Generation } from "@/lib/types";
+import type { DebateNode, Generation, NodeScoringError, NodeScoringPayload } from "@/lib/types";
 import { ROLE_PALETTES, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
+import {
+  formatRecommendationAction,
+  manualInvestigationActionState,
+  recommendationTargetNodeId,
+  selectAdditionalRecommendations,
+  selectTopRecommendation
+} from "@/lib/recommendation";
+import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
 function looksAuthRelated(message: string): boolean {
   const lower = message.toLowerCase();
@@ -14,17 +22,25 @@ function looksAuthRelated(message: string): boolean {
 
 export function NodeDetailDrawer({
   node,
+  scoring,
+  scoringError,
   token,
   onClose,
   onChallenge,
+  onFocusRecommendationNode,
+  canFocusRecommendationNode,
   onQueued,
   onError,
   onAuthRejected
 }: {
   node: DebateNode;
+  scoring?: NodeScoringPayload;
+  scoringError?: NodeScoringError;
   token: string | null;
   onClose: () => void;
   onChallenge: (anchor: HTMLElement, text: string) => void;
+  onFocusRecommendationNode: (targetNodeId: string) => boolean;
+  canFocusRecommendationNode: (targetNodeId: string) => boolean;
   onQueued: () => void;
   onError: (message: string) => void;
   onAuthRejected: () => void;
@@ -38,6 +54,7 @@ export function NodeDetailDrawer({
   const [selectedVersion, setSelectedVersion] = useState(0);
   const [compareOn, setCompareOn] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [focusFailedTargetNodeId, setFocusFailedTargetNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -56,6 +73,10 @@ export function NodeDetailDrawer({
       active = false;
     };
   }, [node.id, token]);
+
+  useEffect(() => {
+    setFocusFailedTargetNodeId(null);
+  }, [node.id, scoring]);
 
   async function regenerate(modelId?: string) {
     if (!token || busy) return;
@@ -78,6 +99,41 @@ export function NodeDetailDrawer({
     const text = selection?.toString().trim();
     if (!text || text.length < 4) return;
     onChallenge(event.currentTarget as HTMLElement, text);
+  }
+
+  function recommendationTargetButton(recommendation: NodeScoringPayload["recommended_investigations"][number]) {
+    const targetNodeId = recommendationTargetNodeId(recommendation);
+    const canFocusTarget = Boolean(targetNodeId && canFocusRecommendationNode(targetNodeId));
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+        <button
+          type="button"
+          className="linkBtn"
+          disabled={!targetNodeId || !canFocusTarget}
+          aria-label={canFocusTarget ? "Open recommended target node" : "Recommended target node unavailable"}
+          onClick={() => {
+            if (!targetNodeId || !canFocusTarget) return;
+            if (onFocusRecommendationNode(targetNodeId) === false) {
+              setFocusFailedTargetNodeId(targetNodeId);
+            } else {
+              setFocusFailedTargetNodeId(null);
+            }
+          }}
+        >
+          {canFocusTarget ? "Open target" : "Target unavailable"}
+        </button>
+        {targetNodeId && !canFocusTarget ? (
+          <span className="muted" role="status">
+            This recommendation references a node that is not visible in the current debate tree.
+          </span>
+        ) : null}
+        {targetNodeId && focusFailedTargetNodeId === targetNodeId ? (
+          <span className="muted" role="status">
+            Unable to focus that recommendation target because it is no longer visible.
+          </span>
+        ) : null}
+      </span>
+    );
   }
 
   const current = history[selectedVersion];
@@ -118,6 +174,14 @@ export function NodeDetailDrawer({
           {generation?.argument ? (
             <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
           ) : null}
+
+          <ScoringErrorBoundary>
+            <NodeScoringDetails
+              scoring={scoring}
+              scoringError={scoringError}
+              recommendationTargetButton={recommendationTargetButton}
+            />
+          </ScoringErrorBoundary>
 
           <div className="drawerActions">
             <button
@@ -201,6 +265,146 @@ export function NodeDetailDrawer({
           </div>
         </div>
       </aside>
+    </>
+  );
+}
+
+function NodeScoringDetails({
+  scoring,
+  scoringError,
+  recommendationTargetButton
+}: {
+  scoring?: NodeScoringPayload;
+  scoringError?: NodeScoringError;
+  recommendationTargetButton: (
+    recommendation: NodeScoringPayload["recommended_investigations"][number]
+  ) => ReactNode;
+}) {
+  const rationaleShort = scoring?.rationale?.short?.trim();
+  const holes = scoring?.holes.filter((hole) => hole.description.trim()) ?? [];
+  const fatalFlags = scoring?.fatal_flags.filter((flag) => flag.description.trim()) ?? [];
+  const hasScoringFindings = holes.length > 0 || fatalFlags.length > 0;
+  const topRecommendation = selectTopRecommendation(scoring?.recommended_investigations);
+  const additionalRecommendations = selectAdditionalRecommendations(scoring?.recommended_investigations);
+
+  function manualInvestigationButton(recommendation: NodeScoringPayload["recommended_investigations"][number]) {
+    const manualInvestigationState = manualInvestigationActionState(recommendation.action, { runFlowWired: false });
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+        <button
+          type="button"
+          className="linkBtn"
+          disabled={manualInvestigationState.disabled}
+          aria-label={manualInvestigationState.label}
+        >
+          {manualInvestigationState.label}
+        </button>
+        {manualInvestigationState.status === "unavailable" && manualInvestigationState.reason ? (
+          <span className="muted" role="status">
+            {manualInvestigationState.reason}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      {scoringError ? (
+        <section className="drawerScoringUnavailable" aria-label="Scoring unavailable">
+          <div className="drawerSectionTitle">Scoring unavailable</div>
+          <p>{scoringError.reason}</p>
+        </section>
+      ) : null}
+
+      {rationaleShort ? (
+        <section className="drawerScoringRationale" aria-label="Scoring rationale">
+          <div className="drawerSectionTitle">Scoring rationale</div>
+          <p>{rationaleShort}</p>
+        </section>
+      ) : null}
+
+      {hasScoringFindings ? (
+        <section className="drawerScoringFindings" aria-label="Scoring holes and fatal flags">
+          <div className="drawerSectionTitle">Holes and fatal flags</div>
+          {fatalFlags.length > 0 ? (
+            <div className="drawerFindingGroup">
+              <div className="drawerFindingGroupTitle">Fatal flags</div>
+              <ul className="drawerFindingList">
+                {fatalFlags.map((flag, index) => (
+                  <li key={`${flag.type}-${index}`} className="drawerFindingItem fatal">
+                    <div className="drawerFindingMeta">
+                      <span>{flag.severity}</span>
+                      <span>{flag.type}</span>
+                    </div>
+                    <div className="drawerFindingText">{flag.description}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {holes.length > 0 ? (
+            <div className="drawerFindingGroup">
+              <div className="drawerFindingGroupTitle">Holes</div>
+              <ul className="drawerFindingList">
+                {holes.map((hole, index) => (
+                  <li key={`${hole.type}-${index}`} className="drawerFindingItem">
+                    <div className="drawerFindingMeta">
+                      <span>{hole.severity}</span>
+                      <span>{hole.type}</span>
+                      {hole.source ? <span>{hole.source}</span> : null}
+                    </div>
+                    <div className="drawerFindingText">{hole.description}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {scoring ? (
+        <section className="drawerScoringRecommendation" aria-label="Top recommendation">
+          <div className="drawerSectionTitle">Top recommendation</div>
+          {topRecommendation ? (
+            <>
+              <div className="drawerFindingMeta">
+                <span>{formatRecommendationAction(topRecommendation.action)}</span>
+                <span>priority {topRecommendation.priority}</span>
+                {recommendationTargetButton(topRecommendation)}
+                {manualInvestigationButton(topRecommendation)}
+              </div>
+              <p>{topRecommendation.reason}</p>
+              {additionalRecommendations.length > 0 ? (
+                <details>
+                  <summary className="linkBtn">
+                    {additionalRecommendations.length} more recommendation
+                    {additionalRecommendations.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="drawerFindingList">
+                    {additionalRecommendations.map((recommendation, index) => (
+                      <li
+                        key={`${recommendation.action}-${recommendation.priority}-${index}`}
+                        className="drawerFindingItem"
+                      >
+                        <div className="drawerFindingMeta">
+                          <span>{formatRecommendationAction(recommendation.action)}</span>
+                          <span>priority {recommendation.priority}</span>
+                          {recommendationTargetButton(recommendation)}
+                          {manualInvestigationButton(recommendation)}
+                        </div>
+                        <div className="drawerFindingText">{recommendation.reason}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </>
+          ) : (
+            <p>No scoring recommendation is available for this argument.</p>
+          )}
+        </section>
+      ) : null}
     </>
   );
 }

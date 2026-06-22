@@ -218,6 +218,19 @@ def backfill_existing_schema() -> None:
             "metadata": "JSON",
             "created_at": "DATETIME",
         },
+        "node_scoring_results": {
+            "debate_id": "VARCHAR(36)",
+            "node_id": "VARCHAR(36)",
+            "input_hash": "VARCHAR(128)",
+            "judge_role": "VARCHAR(64)",
+            "provider": "VARCHAR(120)",
+            "model": "VARCHAR(120)",
+            "provider_metadata": "JSON",
+            "status": "VARCHAR(24)",
+            "result": "JSON",
+            "created_at": "DATETIME",
+            "updated_at": "DATETIME",
+        },
     }
     with engine.connect() as connection:
         sqlite_rebuild = engine.dialect.name == "sqlite"

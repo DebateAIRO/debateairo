@@ -104,6 +104,14 @@ def test_makefile_exposes_source_snapshot_target() -> None:
     assert 'scripts/export_source_snapshot.py --output "$(SOURCE_SNAPSHOT)" --report-path "$(SOURCE_SNAPSHOT_REPORT)"' in makefile
 
 
+def test_makefile_exposes_manual_real_codex_scoring_smoke_target() -> None:
+    makefile = (ROOT / "Makefile").read_text()
+
+    assert "SCORING_SMOKE_FLAGS ?=" in makefile
+    assert "real-codex-scoring-smoke:" in makefile
+    assert 'scripts/real_codex_scoring_smoke.py $(SCORING_SMOKE_FLAGS)' in makefile
+
+
 def test_makefile_exposes_handoff_production_gate_targets() -> None:
     makefile = (ROOT / "Makefile").read_text()
 
