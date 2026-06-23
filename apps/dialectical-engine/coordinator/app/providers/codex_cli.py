@@ -72,16 +72,21 @@ class CodexCliProvider:
             max_tokens=max_tokens,
             response_format=response_format,
         )
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=self.timeout_seconds,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError(f"Codex command timed out after {self.timeout_seconds} seconds.") from exc
+        except OSError as exc:
+            raise ProviderError(f"Codex command failed to start: {exc}") from exc
         if completed.returncode != 0:
-            error = completed.stderr.strip() or completed.stdout.strip() or "Codex command failed"
-            raise ProviderError(error[:2_000])
+            error = self.compact_error(completed.stderr, completed.stdout)
+            raise ProviderError(f"Codex command exited with code {completed.returncode}: {error}"[:2_000])
         return LLMResponse(
             text=completed.stdout.strip(),
             raw={"provider": self.name, "returncode": completed.returncode, "stderr": completed.stderr},
@@ -96,3 +101,16 @@ class CodexCliProvider:
             content = str(message.get("content", ""))
             parts.append(f"{role.upper()}:\n{content}")
         return "\n\n".join(parts)
+
+    @staticmethod
+    def compact_error(stderr: str, stdout: str) -> str:
+        output = stderr.strip() or stdout.strip()
+        if not output:
+            return "Codex command failed"
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        for line in reversed(lines):
+            if line.startswith("ERROR: Reconnecting"):
+                continue
+            if line.startswith("ERROR:"):
+                return line.removeprefix("ERROR:").strip() or "Codex command failed"
+        return lines[-1][:500]

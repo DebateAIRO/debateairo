@@ -117,6 +117,14 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         "node_ids": node_ids,
         "items": validated_items,
     }
+    output_errors = output.get("errors")
+    if isinstance(output_errors, list):
+        public_errors = _public_scoring_errors(output_errors)
+        if public_errors:
+            payload["errors"] = public_errors
+    reason = _public_metadata_text(output.get("reason"))
+    if reason:
+        payload["reason"] = reason
     model_metadata = _public_model_metadata(output.get("model_metadata"))
     if model_metadata is not None:
         payload["model_metadata"] = model_metadata
@@ -222,12 +230,16 @@ def score_node_with_provider(
             provider_call_latencies_ms.append(provider_latency_ms)
     except TimeoutError:
         return _unavailable_payload(debate.id, reason="Scoring judge call timed out.", node_ids=node_ids)
-    except ProviderError:
-        return _unavailable_payload(debate.id, reason="Scoring judge call failed.", node_ids=node_ids)
-    except Exception:
+    except ProviderError as exc:
         return _unavailable_payload(
             debate.id,
-            reason="Scoring judge call failed unexpectedly.",
+            reason=_provider_error_reason(exc, "Scoring judge call failed."),
+            node_ids=node_ids,
+        )
+    except Exception as exc:
+        return _unavailable_payload(
+            debate.id,
+            reason=_provider_error_reason(exc, "Scoring judge call failed unexpectedly."),
             node_ids=node_ids,
         )
     parsed = parse_judge_json(result.raw_output)
@@ -504,7 +516,7 @@ def scoring_result_payload(
         default_reason = None
     else:
         status = "unavailable"
-        default_reason = "No scoring judge outputs are available for this debate."
+        default_reason = _unavailable_result_reason(errors)
     payload = {
         "debate_id": debate_id,
         "status": status,
@@ -550,6 +562,35 @@ def _public_scoring_item(item: object) -> dict:
     return payload
 
 
+def _public_scoring_errors(errors: list[object]) -> list[dict]:
+    public_errors: list[dict] = []
+    for error in errors:
+        try:
+            node_error = NodeScoringError.model_validate(error)
+        except ValidationError:
+            continue
+        reason = _public_metadata_text(node_error.reason)
+        if reason is None:
+            continue
+        public_errors.append(
+            NodeScoringError(
+                node_id=node_error.node_id,
+                status=node_error.status,
+                reason=reason,
+            ).model_dump(mode="json")
+        )
+    return public_errors
+
+
+def _unavailable_result_reason(errors: list[NodeScoringError]) -> str:
+    for error in errors:
+        if error.reason != "Scoring node limit reached.":
+            return error.reason
+    if errors:
+        return errors[0].reason
+    return "No scoring judge outputs are available for this debate."
+
+
 def _unavailable_payload(
     debate_id: str,
     *,
@@ -567,6 +608,13 @@ def _unavailable_payload(
     if model_metadata is not None:
         payload["model_metadata"] = model_metadata
     return payload
+
+
+def _provider_error_reason(exc: Exception, fallback: str) -> str:
+    public_reason = _public_metadata_text(str(exc))
+    if public_reason:
+        return f"{fallback.rstrip('.')}: {public_reason}"
+    return fallback
 
 
 def get_debate_scoring(db: Session, debate_id: str) -> dict | None:

@@ -2425,6 +2425,34 @@ def test_scoring_result_payload_returns_partial_with_node_errors() -> None:
     assert all(item["node_id"] != "node-2" for item in payload["items"])
 
 
+def test_scoring_result_payload_returns_honest_unavailable_reason_from_node_errors() -> None:
+    payload = scoring_result_payload(
+        debate_id="debate-1",
+        node_ids=["node-1", "node-2"],
+        items=[],
+        errors=[
+            NodeScoringError(
+                node_id="node-2",
+                status="unavailable",
+                reason="Scoring node limit reached.",
+            ),
+            NodeScoringError(
+                node_id="node-1",
+                status="unavailable",
+                reason="Scoring judge call failed: Codex command failed to start: [WinError 5] Access is denied",
+            ),
+        ],
+    )
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert (
+        payload["reason"]
+        == "Scoring judge call failed: Codex command failed to start: [WinError 5] Access is denied"
+    )
+    assert len(payload["errors"]) == 2
+
+
 def test_controlled_provider_mixed_success_failure_returns_partial_without_fake_scores(db) -> None:
     class SuccessfulProvider:
         provider = "test-provider"
@@ -2756,7 +2784,7 @@ def test_score_debate_with_provider_registry_reports_unavailable_for_invalid_pro
 
     assert payload["status"] == "unavailable"
     assert payload["items"] == []
-    assert payload["reason"] == "No scoring judge outputs are available for this debate."
+    assert payload["reason"] == "Judge output was not valid JSON."
     assert payload["errors"][0]["status"] == "unavailable"
     assert payload["errors"][0]["reason"] == "Judge output was not valid JSON."
 
@@ -3504,6 +3532,36 @@ def test_score_one_node_with_provider_maps_provider_error_to_unavailable(db) -> 
         "items": [],
     }
     assert "secret-token" not in payload["reason"]
+
+
+def test_score_one_node_with_provider_exposes_public_provider_error(db) -> None:
+    class FailingProvider:
+        def judge_node(self, request):
+            raise ProviderError("Codex command failed to start: [WinError 5] Access is denied")
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.commit()
+
+    payload = score_one_node_with_provider(db, debate, FailingProvider())
+
+    assert payload == {
+        "debate_id": debate.id,
+        "status": "unavailable",
+        "reason": "Scoring judge call failed: Codex command failed to start: [WinError 5] Access is denied",
+        "node_ids": [node.id],
+        "items": [],
+    }
 
 
 def test_score_one_node_with_provider_maps_unexpected_error_to_unavailable(db) -> None:

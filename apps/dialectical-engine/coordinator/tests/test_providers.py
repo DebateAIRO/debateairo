@@ -9,6 +9,7 @@ from app.providers import (
     CodexCliProvider,
     FakeProvider,
     LLMResponse,
+    ProviderError,
     ProviderRegistry,
     detect_codex_scoring_config,
     detect_scoring_provider_config,
@@ -55,6 +56,14 @@ def test_registry_uses_fake_provider_without_changing_call_path() -> None:
         raw={"provider": "fake", "model": "fake-model", "role": "judge"},
         usage={"tokens_out": 1},
     )
+
+
+def test_registry_uses_configured_codex_command(monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex.cmd")
+
+    registry = ProviderRegistry(agents={})
+
+    assert registry.providers["codex"].executable == "codex.cmd"
 
 
 def test_registry_rejects_unknown_role() -> None:
@@ -161,6 +170,33 @@ def test_codex_provider_reports_missing_cli_without_generation(monkeypatch) -> N
     assert status.provider == "codex"
     assert status.reason == "Codex executable not found: missing-codex"
     assert run_called is False
+
+
+def test_codex_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
+    provider = CodexCliProvider(executable="codex.cmd")
+
+    class Completed:
+        returncode = 1
+        stdout = ""
+        stderr = "\n".join(
+            [
+                "2026-06-23T15:06:21Z WARN noisy setup detail",
+                "ERROR: Reconnecting... 5/5",
+                "ERROR: stream disconnected before completion: error sending request for url (https://api.openai.com/v1/responses)",
+            ]
+        )
+
+    monkeypatch.setattr("app.providers.codex_cli.shutil.which", lambda executable: executable)
+    monkeypatch.setattr("app.providers.codex_cli.subprocess.run", lambda *args, **kwargs: Completed())
+
+    with pytest.raises(
+        ProviderError,
+        match=(
+            "Codex command exited with code 1: stream disconnected before completion: "
+            "error sending request"
+        ),
+    ):
+        provider.generate([{"role": "user", "content": "score"}], model="codex-gpt-5.5")
 
 
 def test_proposal_engine_modules_outside_providers_do_not_reference_vendors() -> None:

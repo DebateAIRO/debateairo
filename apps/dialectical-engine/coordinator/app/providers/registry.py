@@ -143,7 +143,12 @@ class ProviderRegistry:
         providers: dict[str, LLMProvider] | None = None,
     ) -> None:
         self.agents = agents if agents is not None else load_agent_configs()
-        self.providers = providers if providers is not None else {"codex": CodexCliProvider()}
+        settings = load_settings()
+        self.providers = (
+            providers
+            if providers is not None
+            else {"codex": CodexCliProvider(executable=settings.codex_command)}
+        )
 
     def generate_for_role(
         self,
