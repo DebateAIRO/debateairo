@@ -111,6 +111,21 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
     "The refresh action should stay gated until a real user token exists and loading has finished"
   );
   assert.match(
+    debatePageSource,
+    /function scoringRefreshDisabledReason\(\)[\s\S]*?Refresh scoring unavailable: unlock actions with a user token to run manual scoring refresh\.[\s\S]*?Refresh scoring unavailable: waiting for persisted scoring state before starting another refresh\./,
+    "The refresh action should explain the exact disabled reason, especially when no action token is available"
+  );
+  assert.match(
+    debatePageSource,
+    /const scoringRefreshDisabledReasonText = scoringRefreshDisabled \? scoringRefreshDisabledReason\(\) : null;[\s\S]*\{scoringRefreshDisabledReasonText \? <span className="topSwitchStatus">\{scoringRefreshDisabledReasonText\}<\/span> : null\}/,
+    "The disabled refresh reason should be visible next to the refresh control"
+  );
+  assert.match(
+    debatePageSource,
+    /const job = await startDebateScoringRefresh\(id, actionToken\);[\s\S]*?if \(job\.status === "failed"\)[\s\S]*?if \(job\.status !== "complete"\)[\s\S]*?const payload = await getDebateScoring\(id\);/,
+    "Manual refresh should POST the Option B scoring job and then GET persisted scoring after complete"
+  );
+  assert.match(
     apiSource,
     /export async function getDebateScoring\(id: string\): Promise<DebateScoringResponse> \{[\s\S]*?apiFetch<DebateScoringResponse>\(`\/api\/debates\/\$\{id\}\/scoring`\)/,
     "The enabled path should use the real scoring endpoint so tests can control API responses"

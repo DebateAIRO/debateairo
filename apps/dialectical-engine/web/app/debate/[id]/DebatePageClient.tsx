@@ -768,6 +768,16 @@ export default function DebatePageClient({
     });
   }
 
+  function scoringRefreshDisabledReason(): string | null {
+    if (!hasTree) return "Refresh scoring unavailable: this debate has no generated argument tree yet.";
+    if (!actionToken) return "Refresh scoring unavailable: unlock actions with a user token to run manual scoring refresh.";
+    if (scoringState.status === "loading") {
+      return "Refresh scoring unavailable: waiting for persisted scoring state before starting another refresh.";
+    }
+    if (scoringRefreshBusy) return "Refresh scoring is already running.";
+    return null;
+  }
+
   async function refreshScoringFromJob() {
     if (!actionToken || scoringRefreshState.status === "starting") return;
     setScoringEnabled(true);
@@ -885,6 +895,7 @@ export default function DebatePageClient({
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
   const scoringRefreshBusy = scoringRefreshState.status === "starting";
   const scoringRefreshDisabled = !hasTree || !actionToken || scoringState.status === "loading" || scoringRefreshBusy;
+  const scoringRefreshDisabledReasonText = scoringRefreshDisabled ? scoringRefreshDisabledReason() : null;
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = scoringEnabled ? formatScoringConfidenceCopy() : null;
   return (
@@ -934,6 +945,7 @@ export default function DebatePageClient({
               >
                 {scoringRefreshBusy ? "Refreshing" : "Refresh scoring"}
               </button>
+              {scoringRefreshDisabledReasonText ? <span className="topSwitchStatus">{scoringRefreshDisabledReasonText}</span> : null}
               {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
               {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
               <button
