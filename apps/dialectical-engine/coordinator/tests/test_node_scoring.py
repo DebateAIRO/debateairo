@@ -4695,6 +4695,67 @@ def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_jo
     assert scoring_payload["items"][0]["node_id"] == root.id
 
 
+def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable(db, monkeypatch) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    def fail_scoring_refresh(*args, **kwargs):
+        raise ProviderError("Scoring provider timed out.")
+
+    monkeypatch.setattr(scoring_api, "scoring_provider_registry_dependency", lambda: registry)
+    monkeypatch.setattr(scoring_api, "score_debate_with_provider_registry", fail_scoring_refresh)
+
+    response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["debate_id"] == debate.id
+    assert body["status"] == "failed"
+    assert body["error"] == "Scoring provider timed out."
+
+    db.expire_all()
+    job = db.get(Job, body["job_id"])
+    assert job is not None
+    assert job.status == "failed"
+    assert job.error == "Scoring provider timed out."
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+
+    scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+    assert scoring_response.status_code == 200
+    scoring_payload = scoring_response.json()
+    assert scoring_payload["status"] == "unavailable"
+    assert scoring_payload["items"] == []
+    assert scoring_payload["reason"] == "No scoring judge outputs are available for this debate."
+
+
 def test_scoring_api_force_refresh_scores_real_stored_debate_generation_path(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
