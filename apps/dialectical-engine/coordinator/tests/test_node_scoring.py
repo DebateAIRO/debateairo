@@ -4987,7 +4987,9 @@ def test_scoring_api_docs_gate_cache_work_on_real_producer_contract() -> None:
     assert "force_refresh: true" in docs
     assert "must not fabricate scores when no real provider is\navailable" in docs
     assert "not durable completed\nanalyzer-run records" in docs
-    assert "User-triggered real model scoring refreshes should use an async queued job/status flow" in docs
-    assert "keep `GET /api/debates/{id}/scoring`\nas a synchronous read path" in docs
+    assert "Option B is the active contract for this refactor" in docs
+    assert "synchronous transitional refresh rather than a real background worker job" in docs
+    assert "`GET /api/debates/{id}/scoring` remains a read path" in docs
+    assert "Real async worker scoring is explicitly deferred to a later milestone" in docs
     assert "scoring_source: \"judge_outputs\"" in docs
     assert "must not create or\ncache fake runtime scores" in docs

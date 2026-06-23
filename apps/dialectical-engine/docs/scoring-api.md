@@ -7,6 +7,12 @@ Returns the public node-scoring state for a non-archived debate.
 `404` means the debate does not exist or is archived. Default public reads do
 not require a bearer token.
 
+For the scoring refactor currently in flight, Option B is authoritative:
+`POST /api/debates/{id}/scoring/jobs` performs a synchronous transitional
+refresh and returns a terminal `complete` or `failed` status. Real async worker
+scoring is deferred to a later milestone; no runtime path should preserve fake
+queued-job behavior for scoring refreshes.
+
 By default this endpoint is a stored-output read path. Passing
 `force_refresh=true` bypasses matching node-scoring cache entries and performs a
 controlled provider-backed scoring check through the configured `judge`
@@ -265,14 +271,17 @@ be replaced with fabricated scores.
 
 ## Sync vs Async Decision
 
-User-triggered real model scoring refreshes should use an async queued job/status flow
-aligned with the existing worker job architecture; keep `GET /api/debates/{id}/scoring`
-as a synchronous read path for stored, cached, partial, or unavailable public scoring
-state. Normal page loads must not block on real model calls.
+Option B is the active contract for this refactor. User-triggered scoring
+refreshes go through `POST /api/debates/{id}/scoring/jobs`, but that route is a
+synchronous transitional refresh rather than a real background worker job: it
+runs the scoring refresh inline, persists the resulting scoring output when
+available, and returns a terminal `complete` or `failed` response.
 
-The authenticated `force_refresh=true` path is a transitional/manual
-compatibility path for provider-backed cache refreshes. It should not be
-expanded into the long-term user refresh contract. Future refresh actions should
-queue scoring work, expose `queued`/`running`/`complete`/`failed` run status, and
-let clients poll a scoring job/status endpoint rather than waiting for multiple
-blocking provider calls in the request path.
+`GET /api/debates/{id}/scoring` remains a read path. It reads persisted scoring
+output and returns either validated public scoring data or an honest
+`unavailable` state with a reason. Normal page loads must not fabricate queued
+job progress, placeholder scores, or scaffolded scoring output.
+
+Real async worker scoring is explicitly deferred to a later milestone. That
+future milestone may introduce durable queued/running job progress and polling,
+but this refactor must not preserve fake async-job theater.
