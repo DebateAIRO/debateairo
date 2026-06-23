@@ -4813,6 +4813,70 @@ def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable
     assert scoring_payload["reason"] == "No scoring judge outputs are available for this debate."
 
 
+def test_scoring_jobs_api_persisted_refresh_keeps_public_payload_sanitized(db, monkeypatch) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, root])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+    scoring_item = explicit_depth_pressure_payload(node_id=root.id).model_dump(mode="json")
+    scoring_item["debug"] = {
+        "reducer_version": "node-scoring-reducer-v1",
+        "rubric_version": "debateai-rubric-v1",
+        "judge_outputs": {"raw": "secret-token private judge trace"},
+    }
+    internal_payload = scoring_result_payload(
+        debate_id=debate.id,
+        node_ids=[root.id],
+        items=[scoring_item],
+        errors=[],
+        model_metadata={
+            "provider": "codex --api-key secret-token",
+            "model": "gpt-5.4 OPENAI_API_KEY=secret-token",
+            "checked_at": "2026-06-18T10:15:30+00:00",
+            "status": "available",
+            "command": ["codex", "--api-key", "secret-token"],
+        },
+    )
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    monkeypatch.setattr(scoring_api, "scoring_provider_registry_dependency", lambda: registry)
+    monkeypatch.setattr(scoring_api, "score_debate_with_provider_registry", lambda *args, **kwargs: internal_payload)
+
+    response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "complete"
+    scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+    assert scoring_response.status_code == 200
+    body = scoring_response.json()
+    assert body["status"] == "available"
+    assert body["items"][0]["debug"] == {
+        "reducer_version": "node-scoring-reducer-v1",
+        "rubric_version": "debateai-rubric-v1",
+    }
+    assert body["model_metadata"] == {
+        "checked_at": "2026-06-18T10:15:30+00:00",
+        "status": "available",
+    }
+    assert "judge_outputs" not in str(body)
+    assert "secret-token" not in str(body)
+    assert "--api-key" not in str(body)
+
+
 def test_scoring_api_force_refresh_scores_real_stored_debate_generation_path(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
