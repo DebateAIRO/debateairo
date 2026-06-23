@@ -4634,6 +4634,67 @@ def test_scoring_api_authenticated_force_refresh_bypasses_cache_and_calls_provid
     }
 
 
+def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_job(db, monkeypatch) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    fake_provider = FakeProvider(
+        responses={
+            "judge": json.dumps(base_assessment(node_id=root.id).model_dump(mode="json")),
+        }
+    )
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": fake_provider},
+    )
+    monkeypatch.setattr(scoring_api, "scoring_provider_registry_dependency", lambda: registry)
+
+    response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["debate_id"] == debate.id
+    assert body["status"] == "complete"
+    assert len(fake_provider.calls) == 1
+
+    db.expire_all()
+    job = db.get(Job, body["job_id"])
+    assert job is not None
+    assert job.job_type == "score_debate"
+    assert job.required_role == "judge"
+    assert job.status == "complete"
+    assert job.error is None
+
+    scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+    assert scoring_response.status_code == 200
+    scoring_payload = scoring_response.json()
+    assert scoring_payload["status"] == "available"
+    assert scoring_payload["items"][0]["node_id"] == root.id
+
+
 def test_scoring_api_force_refresh_scores_real_stored_debate_generation_path(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
@@ -4859,7 +4920,7 @@ def test_scoring_job_start_requires_user_auth(db) -> None:
     assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
 
 
-def test_scoring_job_start_queues_real_score_debate_job(db) -> None:
+def test_scoring_job_start_completes_inline_score_debate_job(db) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
     db.add(debate)
     db.commit()
@@ -4869,7 +4930,7 @@ def test_scoring_job_start_queues_real_score_debate_job(db) -> None:
     assert response.status_code == 202
     body = response.json()
     assert body["debate_id"] == debate.id
-    assert body["status"] == "queued"
+    assert body["status"] == "complete"
     assert set(body) == {"debate_id", "job_id", "status"}
     db.expire_all()
     job = db.get(Job, body["job_id"])
@@ -4879,8 +4940,8 @@ def test_scoring_job_start_queues_real_score_debate_job(db) -> None:
     assert job.required_role == "judge"
     assert job.required_model == "codex-gpt-5.5"
     assert job.node_id is None
-    assert job.status == "pending"
-    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+    assert job.status == "complete"
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 

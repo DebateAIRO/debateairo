@@ -4,12 +4,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth import bearer_token, require_user_token
 from app.core.db import get_db
 from app.core.write_lock import commit_write
-from app.models.entities import Debate, Job, Node
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
 from app.scoring import get_adaptive_depth_dry_run as get_adaptive_depth_dry_run_payload
@@ -18,6 +19,7 @@ from app.scoring import queue_scoring_job
 from app.scoring import record_approved_adaptive_expansion
 from app.scoring import score_debate_with_provider_registry
 from app.scoring.models import ManualInvestigationRequest, ManualInvestigationResponse
+from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
 from app.services.orchestrator import regenerate_node
 
 router = APIRouter(prefix="/api/debates", tags=["scoring"])
@@ -43,6 +45,21 @@ def public_scoring_job_status(status: str) -> str:
     if status in {"complete", "failed"}:
         return status
     return "failed"
+
+
+def _current_scoring_branch(db: Session, debate: Debate) -> DebateBranch:
+    branch = db.scalars(
+        select(DebateBranch)
+        .where(DebateBranch.debate_id == debate.id)
+        .order_by(DebateBranch.created_at.desc(), DebateBranch.id.desc())
+        .limit(1)
+    ).first()
+    if branch is not None:
+        return branch
+    branch = DebateBranch(debate_id=debate.id, root_node_id=debate.root_node_id, status="active")
+    db.add(branch)
+    db.flush()
+    return branch
 
 
 @router.get("/{debate_id}/scoring/jobs/{job_id}")
@@ -82,12 +99,39 @@ def start_scoring_job(
     if not scoring_config.available or scoring_config.model is None:
         raise HTTPException(status_code=503, detail=scoring_config.reason or "No scoring provider is configured")
     job = queue_scoring_job(db, debate, model_id=scoring_config.model)
+    # Transitional path: scoring refreshes are exposed as jobs in the UI, but the
+    # background worker route is not yet wired end-to-end for `score_debate`.
+    # Run the refresh synchronously here so the current UX still produces judge
+    # outputs instead of enqueueing a job that can never render/complete.
+    job.status = "running"
     commit_write(db)
-    return {
+    try:
+        scoring_payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
+        branch = _current_scoring_branch(db, debate)
+        db.add(
+            AnalyzerRun(
+                debate_id=debate.id,
+                branch_id=branch.id,
+                analyzer_type=SCORING_ANALYZER_TYPE,
+                status="complete",
+                output=scoring_payload,
+                provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+            )
+        )
+        job.status = "complete"
+        job.error = None
+    except Exception as exc:
+        job.status = "failed"
+        job.error = str(exc)
+    commit_write(db)
+    payload = {
         "debate_id": debate.id,
         "job_id": job.id,
         "status": public_scoring_job_status(job.status),
     }
+    if job.status == "failed" and job.error:
+        payload["error"] = job.error
+    return payload
 
 
 @router.get("/{debate_id}/scoring", response_model=DebateScoringResponse, response_model_exclude_none=True)
