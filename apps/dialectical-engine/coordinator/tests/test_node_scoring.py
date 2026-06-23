@@ -64,6 +64,7 @@ from app.scoring import (
     reduce_assessments,
     record_approved_adaptive_expansion,
     render_single_node_judge_prompt,
+    score_debate_with_provider_registry,
     score_node_with_provider,
     score_nodes_with_provider,
     score_one_node_with_provider,
@@ -2702,6 +2703,62 @@ def test_score_nodes_with_provider_records_failed_audit_entry_when_no_node_score
     }
     assert isinstance(records_by_event["failed"].metadata_json["latency_ms"], int)
     assert 0 <= records_by_event["failed"].metadata_json["latency_ms"] <= 5000
+
+
+def test_score_debate_with_provider_registry_reports_unavailable_for_missing_registered_provider(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    db.add(debate)
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="missing", model="missing-model", temperature=0.0)},
+        providers={"fake": FakeProvider()},
+    )
+
+    payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["reason"] == "Configured judge provider is not registered: missing."
+
+
+def test_score_debate_with_provider_registry_reports_unavailable_for_invalid_provider_output(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="fake", model="fake-model", temperature=0.0)},
+        providers={"fake": FakeProvider({"judge": "not json"})},
+    )
+
+    payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["reason"] == "No scoring judge outputs are available for this debate."
+    assert payload["errors"][0]["status"] == "unavailable"
+    assert payload["errors"][0]["reason"] == "Judge output was not valid JSON."
 
 
 def test_score_nodes_with_provider_audit_counts_only_model_calls_made(db) -> None:
