@@ -167,11 +167,16 @@ cache-hit value. The flag must not fabricate scores when no real provider is
 available, and the endpoint must not silently convert `force_refresh` into fake
 runtime scoring.
 
-No public route, queued job, or worker completion path currently persists a new
-real scoring `AnalyzerRun` for this endpoint. Force-refresh route responses are
-live provider-check responses plus cache updates, not durable completed
-analyzer-run records. Any future queued job, worker adapter, or durable
-persistence wiring must preserve these boundaries:
+The Option B user refresh path,
+`POST /api/debates/{id}/scoring/jobs`, validates the configured `judge`
+provider, runs the scoring refresh inline, writes a completed scoring
+`AnalyzerRun` when the provider succeeds, and returns a terminal `complete` or
+`failed` job response. The authenticated `force_refresh=true` read-route
+compatibility path remains a live provider-check response plus cache updates,
+not durable completed
+analyzer-run records and not the durable user refresh contract. Any future
+queued job, worker adapter, or durable persistence wiring must preserve these
+boundaries:
 
 - Provider-specific details stay behind the provider adapter; scoring semantics
   continue to depend only on the `ScoringProvider` protocol.
@@ -238,12 +243,14 @@ contract stable and wire the replacement at the provider boundary:
 
 The current API entrypoints that exercise this seam are:
 
-- `POST /api/debates/{id}/scoring/jobs`, which validates the configured judge
-  model and queues a `score_debate` job. The worker-side durable scoring
-  producer is not documented here as complete.
+- `POST /api/debates/{id}/scoring/jobs`, which requires a valid user bearer
+  token, validates the configured judge provider/model, runs a synchronous
+  transitional scoring refresh, persists completed scoring output when the
+  provider succeeds, and returns `complete` or `failed`.
 - `GET /api/debates/{id}/scoring?force_refresh=true`, which is an authenticated
   transitional/manual path that instantiates `ProviderRegistry` and runs the
-  provider-backed scorer synchronously.
+  provider-backed scorer synchronously without replacing the stored-output read
+  contract.
 - `make real-codex-scoring-smoke`, which is dry-run by default and only calls
   the configured Codex provider when `--run-real-codex` is explicitly supplied.
 
