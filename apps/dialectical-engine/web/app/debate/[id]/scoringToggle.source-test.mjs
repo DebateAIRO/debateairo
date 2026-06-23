@@ -6,6 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const debatePagePath = join(root, "app", "debate", "[id]", "DebatePageClient.tsx");
 const apiPath = join(root, "lib", "api.ts");
+const responsePath = join(root, "lib", "scoringResponse.ts");
 const statusCopyPath = join(root, "lib", "scoringStatusCopy.ts");
 
 test("DebatePageClient enables scoring through the real toggle and controlled scoring responses", () => {
@@ -48,6 +49,27 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
     /formatScoringStatusCopy\(\{[\s\S]*?enabled: scoringEnabled,[\s\S]*?scoringStatus: scoringState\.status,[\s\S]*?responseStatus: scoringState\.data\?\.status,[\s\S]*?reason: scoringState\.data\?\.reason,[\s\S]*?error: scoringRefreshState\.error \|\| scoringState\.error/,
     "Status text should be computed from the real async state and response reason/error"
   );
+  assert.match(
+    debatePageSource,
+    /formatScoringVisibilityState\(\{[\s\S]*?enabled: scoringEnabled,[\s\S]*?hasActionToken: Boolean\(actionToken\),[\s\S]*?scoringStatus: scoringState\.status,[\s\S]*?refreshStatus: scoringRefreshState\.status,[\s\S]*?response: scoringState\.data,[\s\S]*?error: scoringRefreshState\.error \|\| scoringState\.error/,
+    "Visible scoring state should be computed from the real toggle, token, async, refresh, and response state"
+  );
+  assert.match(
+    debatePageSource,
+    /data-scoring-visibility=\{scoringVisibility\.kind\}[\s\S]*?<ScoringVisibilityPanel state=\{scoringVisibility\} \/>/,
+    "The page should expose and render the visible scoring state for off, token-required, unavailable, refreshing, and scored states"
+  );
+  const responseSource = readFileSync(responsePath, "utf8");
+  for (const label of [
+    "Scoring off",
+    "User token required",
+    "Scoring provider required",
+    "Scoring unavailable",
+    "Refreshing scoring",
+    "Real scores displayed",
+  ]) {
+    assert.match(responseSource, new RegExp(label), `Scoring visibility copy should include ${label}`);
+  }
   assert.match(
     statusCopySource,
     /if \(!input\.enabled\) return withMetadata\("Scores unchecked", input\)/,

@@ -44,6 +44,7 @@ import { computeLean, countNodes, renderStateOf, treeDepth } from "@/lib/debateP
 import type { PopoverState } from "@/lib/scrutiny";
 import { isComplete, statusLabel } from "@/lib/format";
 import {
+  formatScoringVisibilityState,
   indexScoringResponse,
   selectStrongestUnresolvedScoringIssue,
   summarizeScoringFatalFlags,
@@ -52,7 +53,8 @@ import {
 import type {
   DebateScoringFatalFlagSummary,
   DebateScoringHoleSummary,
-  DebateScoringUnresolvedIssue
+  DebateScoringUnresolvedIssue,
+  ScoringVisibilityState
 } from "@/lib/scoringResponse";
 import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scoringStatusCopy";
 
@@ -662,6 +664,18 @@ export default function DebatePageClient({
     () => selectStrongestUnresolvedScoringIssue(scoringState.data),
     [scoringState.data]
   );
+  const scoringVisibility = useMemo(
+    () =>
+      formatScoringVisibilityState({
+        enabled: scoringEnabled,
+        hasActionToken: Boolean(actionToken),
+        scoringStatus: scoringState.status,
+        refreshStatus: scoringRefreshState.status,
+        response: scoringState.data,
+        error: scoringRefreshState.error || scoringState.error
+      }),
+    [actionToken, scoringEnabled, scoringRefreshState.error, scoringRefreshState.status, scoringState]
+  );
 
   function showToast(message: string) {
     setToast(message);
@@ -886,6 +900,7 @@ export default function DebatePageClient({
       className="debateView"
       data-scoring-state={scoringState.status}
       data-scoring-enabled={scoringEnabled}
+      data-scoring-visibility={scoringVisibility.kind}
       data-scoring-node-count={scoringByNodeId.size}
       data-adaptive-depth-dry-run-state={adaptiveDepthDryRunState.status}
     >
@@ -968,6 +983,7 @@ export default function DebatePageClient({
       </header>
 
       <ScoringErrorBoundary>
+        <ScoringVisibilityPanel state={scoringVisibility} />
         <ScoringHolesSummaryPanel
           enabled={scoringEnabled}
           state={scoringState}
@@ -1222,6 +1238,15 @@ function ScoreAwareFilterPanel({
           ? `${matchCount} of ${scoredCount} scored nodes match`
           : "Enable scoring to filter by scored node signals."}
       </span>
+    </section>
+  );
+}
+
+function ScoringVisibilityPanel({ state }: { state: ScoringVisibilityState }) {
+  return (
+    <section className="progressStrip" aria-label="Scoring visibility state" data-scoring-visibility-kind={state.kind}>
+      <span className="progressLabel">{state.title}</span>
+      <span className="progressCount">{state.detail}</span>
     </section>
   );
 }

@@ -80,6 +80,101 @@ test("indexScoringResponse returns empty maps for absent scoring data", async ()
   assert.equal(indexed.scoringErrorsByNodeId.size, 0);
 });
 
+test("formatScoringVisibilityState names off, token/provider required, unavailable, refreshing, and scored states", async () => {
+  const { formatScoringVisibilityState } = await loadHelper();
+
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: false,
+      hasActionToken: false,
+      scoringStatus: "idle",
+      refreshStatus: "idle",
+      response: null,
+      error: null,
+    }),
+    {
+      kind: "off",
+      title: "Scoring off",
+      detail: "Scoring is disabled for this view; no score data is being shown.",
+    }
+  );
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: false,
+      scoringStatus: "loaded",
+      refreshStatus: "idle",
+      response: { status: "available", items: [{ node_id: "n1" }, { node_id: "n2" }] },
+      error: null,
+    }),
+    {
+      kind: "token_required",
+      title: "User token required",
+      detail: "Unlock actions with a user token to refresh scoring. Showing 2 persisted scored nodes.",
+    }
+  );
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "unavailable",
+      refreshStatus: "idle",
+      response: { status: "unavailable", items: [], reason: "Configure a scoring provider before running scoring." },
+      error: null,
+    }),
+    {
+      kind: "provider_required",
+      title: "Scoring provider required",
+      detail: "Configure a scoring provider before running scoring.",
+    }
+  );
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "error",
+      refreshStatus: "idle",
+      response: null,
+      error: "Scoring refresh failed.",
+    }),
+    {
+      kind: "unavailable",
+      title: "Scoring unavailable",
+      detail: "Scoring refresh failed.",
+    }
+  );
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "loaded",
+      refreshStatus: "starting",
+      response: { status: "available", items: [{ node_id: "n1" }] },
+      error: null,
+    }),
+    {
+      kind: "refreshing",
+      title: "Refreshing scoring",
+      detail: "Running the synchronous scoring refresh now. Showing 1 persisted scored node while it completes.",
+    }
+  );
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "loaded",
+      refreshStatus: "idle",
+      response: { status: "available", items: [{ node_id: "n1" }, { node_id: "n2" }, { node_id: "n3" }] },
+      error: null,
+    }),
+    {
+      kind: "scores",
+      title: "Real scores displayed",
+      detail: "Showing 3 persisted scored nodes from the scoring response.",
+    }
+  );
+});
+
 test("summarizeScoringHoles aggregates only real payload holes with node context", async () => {
   const { summarizeScoringHoles } = await loadHelper();
   const summary = summarizeScoringHoles({

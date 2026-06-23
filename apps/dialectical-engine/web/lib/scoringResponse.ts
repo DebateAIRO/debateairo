@@ -53,6 +53,29 @@ export type DebateScoringUnresolvedIssue =
       source: string;
     };
 
+export type ScoringVisibilityKind =
+  | "off"
+  | "token_required"
+  | "provider_required"
+  | "unavailable"
+  | "refreshing"
+  | "scores";
+
+export type ScoringVisibilityState = {
+  kind: ScoringVisibilityKind;
+  title: string;
+  detail: string;
+};
+
+export type ScoringVisibilityInput = {
+  enabled: boolean;
+  hasActionToken: boolean;
+  scoringStatus: "idle" | "loading" | "loaded" | "unavailable" | "error";
+  refreshStatus: "idle" | "starting" | "polling" | "error";
+  response: DebateScoringResponse | null;
+  error?: string | null;
+};
+
 const severityRank: Record<Severity, number> = {
   high: 0,
   medium: 1,
@@ -77,6 +100,34 @@ function scoreValue(value: number | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function scoredNodeDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "No persisted scored nodes are available.";
+  return `Showing ${pluralize(count, "persisted scored node")} from the scoring response.`;
+}
+
+function retainedScoreDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "No persisted scored nodes are available yet.";
+  return `Showing ${pluralize(count, "persisted scored node")} while it completes.`;
+}
+
+function looksProviderOrTokenRequired(value: string | null | undefined): boolean {
+  const lower = (value || "").toLowerCase();
+  return (
+    lower.includes("provider") ||
+    lower.includes("model") ||
+    lower.includes("token") ||
+    lower.includes("credential") ||
+    lower.includes("auth") ||
+    lower.includes("api key")
+  );
+}
+
 function compareRankedIssues(left: RankedScoringIssue, right: RankedScoringIssue): number {
   return (
     severityRank[left.issue.severity] - severityRank[right.issue.severity] ||
@@ -97,6 +148,63 @@ export function indexScoringResponse(response: DebateScoringResponse | null): In
     scoringErrorsByNodeId: new Map<string, NodeScoringError>(
       (response?.errors ?? []).map((error) => [error.node_id, error])
     ),
+  };
+}
+
+export function formatScoringVisibilityState(input: ScoringVisibilityInput): ScoringVisibilityState {
+  const reason = input.error || input.response?.reason || null;
+
+  if (!input.enabled) {
+    return {
+      kind: "off",
+      title: "Scoring off",
+      detail: "Scoring is disabled for this view; no score data is being shown.",
+    };
+  }
+
+  if (input.refreshStatus === "starting" || input.refreshStatus === "polling" || input.scoringStatus === "loading") {
+    return {
+      kind: "refreshing",
+      title: input.scoringStatus === "loading" && input.refreshStatus === "idle" ? "Loading scoring" : "Refreshing scoring",
+      detail:
+        input.refreshStatus === "idle"
+          ? "Reading persisted scoring state for this debate."
+          : `Running the synchronous scoring refresh now. ${retainedScoreDetail(input.response)}`,
+    };
+  }
+
+  if (reason && looksProviderOrTokenRequired(reason)) {
+    return {
+      kind: "provider_required",
+      title: "Scoring provider required",
+      detail: reason,
+    };
+  }
+
+  if (input.scoringStatus === "error" || input.scoringStatus === "unavailable") {
+    return {
+      kind: "unavailable",
+      title: "Scoring unavailable",
+      detail: reason || "No scoring payload is available.",
+    };
+  }
+
+  if (!input.hasActionToken) {
+    const count = input.response?.scored_node_count ?? input.response?.items?.length ?? 0;
+    return {
+      kind: "token_required",
+      title: "User token required",
+      detail:
+        count > 0
+          ? `Unlock actions with a user token to refresh scoring. Showing ${pluralize(count, "persisted scored node")}.`
+          : "Unlock actions with a user token to refresh scoring. No persisted scored nodes are available.",
+    };
+  }
+
+  return {
+    kind: "scores",
+    title: "Real scores displayed",
+    detail: scoredNodeDetail(input.response),
   };
 }
 
