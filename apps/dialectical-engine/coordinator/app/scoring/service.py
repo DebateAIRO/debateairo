@@ -421,7 +421,11 @@ def score_nodes_with_provider(
 
 class RegistryScoringProvider:
     def __init__(self, registry: ProviderRegistry, *, judge_role: str = "judge") -> None:
-        status = detect_scoring_provider_config(registry.agents, role=judge_role)
+        status = detect_scoring_provider_config(
+            registry.agents,
+            role=judge_role,
+            providers=registry.providers,
+        )
         if not status.available or status.provider is None or status.model is None:
             raise ProviderError(status.reason or "No scoring provider is configured.")
         self.registry = registry

@@ -101,8 +101,38 @@ def detect_scoring_provider_config(
     agents: dict[str, AgentConfig] | None = None,
     *,
     role: str = "judge",
+    providers: dict[str, LLMProvider] | None = None,
 ) -> ScoringProviderConfigStatus:
-    return detect_codex_scoring_config(agents, role=role)
+    configs = agents if agents is not None else load_agent_configs()
+    registered_providers = providers if providers is not None else {"codex": CodexCliProvider()}
+    config = configs.get(role)
+    if config is None:
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            reason=f"No {role} agent is configured for scoring.",
+        )
+    if not config.model.strip():
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            provider=config.provider,
+            reason=f"Configured {role} model is empty.",
+        )
+    if config.provider not in registered_providers:
+        return ScoringProviderConfigStatus(
+            available=False,
+            role=role,
+            provider=config.provider,
+            model=config.model,
+            reason=f"Configured {role} provider is not registered: {config.provider}.",
+        )
+    return ScoringProviderConfigStatus(
+        available=True,
+        role=role,
+        provider=config.provider,
+        model=config.model,
+    )
 
 
 class ProviderRegistry:

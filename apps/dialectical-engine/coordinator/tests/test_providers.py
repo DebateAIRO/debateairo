@@ -11,6 +11,7 @@ from app.providers import (
     LLMResponse,
     ProviderRegistry,
     detect_codex_scoring_config,
+    detect_scoring_provider_config,
     load_agent_configs,
 )
 
@@ -96,6 +97,33 @@ def test_codex_scoring_config_detection_reports_non_codex_provider_as_unavailabl
     assert status.provider == "fake"
     assert status.model == "fake-model"
     assert status.reason == "Configured judge provider is not codex."
+
+
+def test_scoring_provider_config_detection_accepts_registered_non_codex_provider() -> None:
+    status = detect_scoring_provider_config(
+        {"judge": AgentConfig(provider="fake", model="fake-model", temperature=0.0)},
+        providers={"fake": FakeProvider()},
+    )
+
+    assert status.model_dump() == {
+        "available": True,
+        "role": "judge",
+        "provider": "fake",
+        "model": "fake-model",
+        "reason": None,
+    }
+
+
+def test_scoring_provider_config_detection_reports_unregistered_provider() -> None:
+    status = detect_scoring_provider_config(
+        {"judge": AgentConfig(provider="missing", model="missing-model", temperature=0.0)},
+        providers={"fake": FakeProvider()},
+    )
+
+    assert status.available is False
+    assert status.provider == "missing"
+    assert status.model == "missing-model"
+    assert status.reason == "Configured judge provider is not registered: missing."
 
 
 def test_codex_provider_builds_cli_command_without_live_call() -> None:
