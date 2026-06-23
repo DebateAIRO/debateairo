@@ -10,7 +10,6 @@ import {
   getDebate,
   getDebateAdaptiveDepthDryRun,
   getDebateScoring,
-  getDebateScoringJobStatus,
   getStoredToken,
   setStoredToken,
   startDebateScoringRefresh,
@@ -79,7 +78,6 @@ type ScoringAsyncState =
 type ScoringRefreshState =
   | { status: "idle"; jobId: null; error: null }
   | { status: "starting"; jobId: null; error: null }
-  | { status: "polling"; jobId: string; error: null }
   | { status: "error"; jobId: string | null; error: string };
 
 type AdaptiveDepthDryRunAsyncState =
@@ -771,24 +769,18 @@ export default function DebatePageClient({
   }
 
   async function refreshScoringFromJob() {
-    if (!actionToken || scoringRefreshState.status === "starting" || scoringRefreshState.status === "polling") return;
+    if (!actionToken || scoringRefreshState.status === "starting") return;
     setScoringEnabled(true);
     setScoringRefreshState({ status: "starting", jobId: null, error: null });
     setScoringState((current) => ({ status: "loading", data: current.data, error: null }));
     setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
     try {
-      const started = await startDebateScoringRefresh(id, actionToken);
-      let job = started;
-      setScoringRefreshState({ status: "polling", jobId: started.job_id, error: null });
-      for (let attempt = 0; attempt < 30 && (job.status === "queued" || job.status === "running"); attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        job = await getDebateScoringJobStatus(id, started.job_id);
-      }
-      if (job.status === "queued" || job.status === "running") {
-        throw new Error("Scoring refresh is still running.");
-      }
+      const job = await startDebateScoringRefresh(id, actionToken);
       if (job.status === "failed") {
         throw new Error(job.error || "Scoring refresh failed.");
+      }
+      if (job.status !== "complete") {
+        throw new Error(`Scoring refresh returned unexpected status: ${job.status}.`);
       }
       const payload = await getDebateScoring(id);
       setScoringState({
@@ -891,7 +883,7 @@ export default function DebatePageClient({
   }
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
-  const scoringRefreshBusy = scoringRefreshState.status === "starting" || scoringRefreshState.status === "polling";
+  const scoringRefreshBusy = scoringRefreshState.status === "starting";
   const scoringRefreshDisabled = !hasTree || !actionToken || scoringState.status === "loading" || scoringRefreshBusy;
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = scoringEnabled ? formatScoringConfidenceCopy() : null;

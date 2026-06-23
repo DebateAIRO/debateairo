@@ -71,7 +71,7 @@ export type ScoringVisibilityInput = {
   enabled: boolean;
   hasActionToken: boolean;
   scoringStatus: "idle" | "loading" | "loaded" | "unavailable" | "error";
-  refreshStatus: "idle" | "starting" | "polling" | "error";
+  refreshStatus: "idle" | "starting" | "error";
   response: DebateScoringResponse | null;
   error?: string | null;
 };
@@ -162,7 +162,7 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
     };
   }
 
-  if (input.refreshStatus === "starting" || input.refreshStatus === "polling" || input.scoringStatus === "loading") {
+  if (input.refreshStatus === "starting" || input.scoringStatus === "loading") {
     return {
       kind: "refreshing",
       title: input.scoringStatus === "loading" && input.refreshStatus === "idle" ? "Loading scoring" : "Refreshing scoring",
