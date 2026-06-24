@@ -2417,7 +2417,8 @@ a:focus-visible {
 
 .tokenDock {
   position: fixed;
-  left: 18px;
+  left: auto;
+  right: 18px;
   bottom: 18px;
   z-index: 40;
   max-width: min(360px, calc(100vw - 36px));
