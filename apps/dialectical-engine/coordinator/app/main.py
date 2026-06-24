@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import debates, jobs, nodes, qbaf, settings, workers
+from app.api import debates, jobs, nodes, qbaf, scoring, settings, workers
 from app.core.auth import ensure_user_token
 from app.core.config import load_settings
 from app.core.db import SessionLocal, init_db
@@ -30,6 +30,7 @@ app.include_router(workers.router)
 app.include_router(jobs.router)
 app.include_router(settings.router)
 app.include_router(qbaf.router)
+app.include_router(scoring.router)
 
 _public_hits: dict[str, deque[float]] = defaultdict(deque)
 
@@ -52,7 +53,7 @@ def is_public_read_path(path: str) -> bool:
         return True
     if not path.startswith("/api/debates/"):
         return False
-    return path.endswith("/events") or path.endswith("/export.md") or path.count("/") == 3
+    return path.endswith("/events") or path.endswith("/export.md") or path.endswith("/scoring") or path.count("/") == 3
 
 
 def prune_public_hits(now: float) -> None:

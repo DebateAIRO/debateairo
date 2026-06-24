@@ -63,6 +63,7 @@ def test_public_rate_limit_covers_all_public_read_routes(db) -> None:
         "/api/debates/example-id",
         "/api/debates/example-id/events",
         "/api/debates/example-id/export.md",
+        "/api/debates/example-id/scoring",
     ]
     try:
         for index, path in enumerate(public_paths, start=20):
