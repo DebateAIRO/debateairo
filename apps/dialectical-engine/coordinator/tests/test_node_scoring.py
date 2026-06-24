@@ -4792,7 +4792,7 @@ def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_jo
     assert response.status_code == 202
     body = response.json()
     assert body["debate_id"] == debate.id
-    assert body["status"] == "complete"
+    assert body["status"] == "queued"
     assert len(fake_provider.calls) == 1
 
     db.expire_all()
@@ -4853,8 +4853,8 @@ def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable
     assert response.status_code == 202
     body = response.json()
     assert body["debate_id"] == debate.id
-    assert body["status"] == "failed"
-    assert body["error"] == "Scoring provider timed out."
+    assert body["status"] == "queued"
+    assert set(body) == {"debate_id", "job_id", "status"}
 
     db.expire_all()
     job = db.get(Job, body["job_id"])
@@ -4917,7 +4917,7 @@ def test_scoring_jobs_api_persisted_refresh_keeps_public_payload_sanitized(db, m
     response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
 
     assert response.status_code == 202
-    assert response.json()["status"] == "complete"
+    assert response.json()["status"] == "queued"
     scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
     assert scoring_response.status_code == 200
     body = scoring_response.json()
@@ -5160,7 +5160,7 @@ def test_scoring_job_start_requires_user_auth(db) -> None:
     assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
 
 
-def test_scoring_job_start_completes_inline_score_debate_job(db) -> None:
+def test_scoring_job_start_queues_and_completes_score_debate_job(db) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
     db.add(debate)
     db.commit()
@@ -5170,7 +5170,7 @@ def test_scoring_job_start_completes_inline_score_debate_job(db) -> None:
     assert response.status_code == 202
     body = response.json()
     assert body["debate_id"] == debate.id
-    assert body["status"] == "complete"
+    assert body["status"] == "queued"
     assert set(body) == {"debate_id", "job_id", "status"}
     db.expire_all()
     job = db.get(Job, body["job_id"])

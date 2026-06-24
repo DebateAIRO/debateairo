@@ -10,6 +10,7 @@ import {
   getDebate,
   getDebateAdaptiveDepthDryRun,
   getDebateScoring,
+  getDebateScoringJobStatus,
   getStoredToken,
   setStoredToken,
   startDebateScoringRefresh,
@@ -77,7 +78,7 @@ type ScoringAsyncState =
 
 type ScoringRefreshState =
   | { status: "idle"; jobId: null; error: null }
-  | { status: "starting"; jobId: null; error: null }
+  | { status: "starting"; jobId: string | null; error: null }
   | { status: "error"; jobId: string | null; error: string };
 
 type AdaptiveDepthDryRunAsyncState =
@@ -786,11 +787,10 @@ export default function DebatePageClient({
     setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
     try {
       const job = await startDebateScoringRefresh(id, actionToken);
-      if (job.status === "failed") {
-        throw new Error(job.error || "Scoring refresh failed.");
-      }
-      if (job.status !== "complete") {
-        throw new Error(`Scoring refresh returned unexpected status: ${job.status}.`);
+      setScoringRefreshState({ status: "starting", jobId: job.job_id, error: null });
+      const completedJob = await waitForScoringJobCompletion(job.job_id);
+      if (completedJob.status === "failed") {
+        throw new Error(completedJob.error || "Scoring refresh failed.");
       }
       const payload = await getDebateScoring(id);
       setScoringState({
@@ -827,6 +827,16 @@ export default function DebatePageClient({
         error: message
       }));
     }
+  }
+
+  async function waitForScoringJobCompletion(jobId: string) {
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const status = await getDebateScoringJobStatus(id, jobId);
+      if (status.status === "complete" || status.status === "failed") return status;
+      await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+    }
+    throw new Error("Scoring refresh is still running after 10 minutes.");
   }
 
   async function approveAdaptiveDepthExpansion(selectedNodeIds: string[]) {

@@ -122,8 +122,13 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   );
   assert.match(
     debatePageSource,
-    /const job = await startDebateScoringRefresh\(id, actionToken\);[\s\S]*?if \(job\.status === "failed"\)[\s\S]*?if \(job\.status !== "complete"\)[\s\S]*?const payload = await getDebateScoring\(id\);/,
-    "Manual refresh should POST the Option B scoring job and then GET persisted scoring after complete"
+    /const job = await startDebateScoringRefresh\(id, actionToken\);[\s\S]*?const completedJob = await waitForScoringJobCompletion\(job\.job_id\);[\s\S]*?if \(completedJob\.status === "failed"\)[\s\S]*?const payload = await getDebateScoring\(id\);/,
+    "Manual refresh should POST the Option B scoring job, poll the public job status, and then GET persisted scoring after complete"
+  );
+  assert.match(
+    debatePageSource,
+    /async function waitForScoringJobCompletion\(jobId: string\)[\s\S]*?getDebateScoringJobStatus\(id, jobId\)[\s\S]*?status\.status === "complete"/,
+    "Long-running scoring refreshes should poll job status instead of waiting for a synchronous POST response"
   );
   assert.match(
     apiSource,

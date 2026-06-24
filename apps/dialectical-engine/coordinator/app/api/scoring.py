@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth import bearer_token, require_user_token
-from app.core.db import get_db
+from app.core.db import SessionLocal, get_db
 from app.core.write_lock import commit_write
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node
 from app.providers import ProviderRegistry, detect_codex_scoring_config
@@ -87,6 +87,7 @@ def get_scoring_job_status(
 @router.post("/{debate_id}/scoring/jobs", status_code=status.HTTP_202_ACCEPTED)
 def start_scoring_job(
     debate_id: str,
+    background_tasks: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> dict:
@@ -99,31 +100,8 @@ def start_scoring_job(
     if not scoring_config.available or scoring_config.model is None:
         raise HTTPException(status_code=503, detail=scoring_config.reason or "No scoring provider is configured")
     job = queue_scoring_job(db, debate, model_id=scoring_config.model)
-    # Transitional path: scoring refreshes are exposed as jobs in the UI, but the
-    # background worker route is not yet wired end-to-end for `score_debate`.
-    # Run the refresh synchronously here so the current UX still produces judge
-    # outputs instead of enqueueing a job that can never render/complete.
-    job.status = "running"
     commit_write(db)
-    try:
-        scoring_payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
-        branch = _current_scoring_branch(db, debate)
-        db.add(
-            AnalyzerRun(
-                debate_id=debate.id,
-                branch_id=branch.id,
-                analyzer_type=SCORING_ANALYZER_TYPE,
-                status="complete",
-                output=scoring_payload,
-                provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
-            )
-        )
-        job.status = "complete"
-        job.error = None
-    except Exception as exc:
-        job.status = "failed"
-        job.error = str(exc)
-    commit_write(db)
+    background_tasks.add_task(_run_scoring_job_background, job.id, debate.id)
     payload = {
         "debate_id": debate.id,
         "job_id": job.id,
@@ -132,6 +110,37 @@ def start_scoring_job(
     if job.status == "failed" and job.error:
         payload["error"] = job.error
     return payload
+
+
+def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        debate = db.get(Debate, debate_id)
+        if not job or not debate or debate.status == "archived":
+            return
+        registry = scoring_provider_registry_dependency()
+        job.status = "running"
+        job.error = None
+        commit_write(db)
+        try:
+            scoring_payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
+            branch = _current_scoring_branch(db, debate)
+            db.add(
+                AnalyzerRun(
+                    debate_id=debate.id,
+                    branch_id=branch.id,
+                    analyzer_type=SCORING_ANALYZER_TYPE,
+                    status="complete",
+                    output=scoring_payload,
+                    provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+                )
+            )
+            job.status = "complete"
+            job.error = None
+        except Exception as exc:
+            job.status = "failed"
+            job.error = str(exc)
+        commit_write(db)
 
 
 @router.get("/{debate_id}/scoring", response_model=DebateScoringResponse, response_model_exclude_none=True)
