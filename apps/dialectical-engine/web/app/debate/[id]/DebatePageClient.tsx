@@ -1182,6 +1182,8 @@ export default function DebatePageClient({
         ) : tokenBarOpen ? (
           <form className="tokenForm" onSubmit={unlockActions}>
             <input
+              id="action-user-token"
+              name="action-user-token"
               className="tokenInput"
               value={tokenDraft}
               onChange={(event) => setTokenDraft(event.target.value)}
