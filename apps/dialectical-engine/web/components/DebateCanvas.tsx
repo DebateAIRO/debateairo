@@ -201,6 +201,8 @@ function CanvasCard({
     if (state === "done") onOpenNode(node.id);
   }
 
+  const openNodeDetails = () => onOpenNode(node.id);
+
   return (
     <div className="nodeWrap" style={cardStyle}>
       <div
@@ -208,15 +210,7 @@ function CanvasCard({
         className={`node${selected ? " selected" : ""}${scoreFilterMatch ? "" : " scoreFilteredOut"}`}
         style={innerStyle}
         data-score-filter-match={scoreFilterMatch ? "true" : "false"}
-        role={state === "done" ? "button" : undefined}
-        tabIndex={state === "done" ? 0 : undefined}
         onClick={openIfDone}
-        onKeyDown={(event) => {
-          if (state === "done" && (event.key === "Enter" || event.key === " ")) {
-            event.preventDefault();
-            openIfDone();
-          }
-        }}
       >
         {scrutiny ? (
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
@@ -270,7 +264,7 @@ function CanvasCard({
               ) : null}
               <ScoringErrorBoundary>
                 {scoring ? (
-                  <ScoreBadges node={node} scoring={scoring} openIfDone={openIfDone} />
+                  <ScoreBadges node={node} scoring={scoring} openNodeDetails={openNodeDetails} />
                 ) : scoringError ? (
                   <span className="scoreBadge unavailable" aria-label={`Scoring unavailable: ${scoringError.reason}`}>
                     SCORING N/A
@@ -347,11 +341,11 @@ function CanvasCard({
 function ScoreBadges({
   node,
   scoring,
-  openIfDone
+  openNodeDetails
 }: {
   node: DebateNode;
   scoring: NodeScoringPayload;
-  openIfDone: () => void;
+  openNodeDetails: () => void;
 }) {
   const strength = formatScorePercent(scoring.scores.strength);
   const uncertainty = formatScorePercent(scoring.scores.uncertainty);
@@ -365,7 +359,7 @@ function ScoreBadges({
       aria-label={`Open scoring explanation for ${node.claim}`}
       onClick={(event) => {
         event.stopPropagation();
-        openIfDone();
+        openNodeDetails();
       }}
     >
       <span className="scoreBadge strength" aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}>

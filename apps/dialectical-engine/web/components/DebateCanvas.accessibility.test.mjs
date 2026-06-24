@@ -8,5 +8,10 @@ const source = readFileSync(join(process.cwd(), "components", "DebateCanvas.tsx"
 test("scored node badges expose a keyboard-operable details control", () => {
   assert.match(source, /<button\s+type="button"\s+className="scoreBadgeButton"/);
   assert.match(source, /aria-label=\{`Open scoring explanation for \$\{node\.claim\}`\}/);
-  assert.match(source, /event\.stopPropagation\(\);\s*openIfDone\(\);/s);
+  assert.match(source, /event\.stopPropagation\(\);\s*openNodeDetails\(\);/s);
+  assert.doesNotMatch(
+    source,
+    /role=\{state === "done" \? "button" : undefined\}[\s\S]*<button\s+type="button"\s+className="scoreBadgeButton"/,
+    "Scored cards must not nest score buttons inside a card-level button role"
+  );
 });
