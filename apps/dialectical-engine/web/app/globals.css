@@ -992,6 +992,8 @@ a:focus-visible {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
+  padding-bottom: 58px;
 }
 
 .debateTopBar {
@@ -1051,7 +1053,7 @@ a:focus-visible {
   font-family: var(--font-mono);
   font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
@@ -1107,6 +1109,64 @@ a:focus-visible {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: oklch(0.5 0.04 60);
+}
+
+.scoringIssueStrip,
+.adaptiveDepthStrip {
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 58px;
+  height: auto;
+  padding-top: 9px;
+  padding-bottom: 10px;
+}
+
+.scoringIssueIntro {
+  flex: 0 0 210px;
+  min-width: 0;
+}
+
+.scoringIssueSubcopy {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scoringIssuePills,
+.adaptiveDepthChips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scoringIssuePill {
+  max-width: min(100%, 420px);
+  min-height: 24px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.scoringIssuePill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adaptiveDepthActions {
+  display: grid;
+  gap: 5px;
+  margin-left: auto;
+  min-width: 210px;
+  max-width: 280px;
+}
+
+.adaptiveDepthActionMessage {
+  white-space: normal;
+  line-height: 1.35;
 }
 
 .debateError {
@@ -1795,6 +1855,97 @@ a:focus-visible {
   line-height: 1.45;
   color: var(--text-2);
 }
+
+.recommendationsPanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px 22px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid oklch(0.9 0.02 75);
+}
+
+.recommendationsHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendationsEyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: oklch(0.46 0.06 64);
+}
+
+.recommendationsCount {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.recommendationsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.recommendationItem {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  padding: 11px 12px;
+}
+
+.recommendationMeta,
+.recommendationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recommendationMeta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recommendationReason {
+  color: var(--text-2);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.recommendationsPanel p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+}
+
 .drawerDivider {
   height: 1px;
   background: var(--line);
@@ -2208,7 +2359,7 @@ a:focus-visible {
 
 .toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 78px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
@@ -2269,9 +2420,11 @@ a:focus-visible {
   left: 18px;
   bottom: 18px;
   z-index: 40;
+  max-width: min(360px, calc(100vw - 36px));
 }
 .tokenForm {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .tokenInput {
@@ -2313,5 +2466,32 @@ a:focus-visible {
   }
   .drawer {
     width: 100vw;
+  }
+  .scoringIssueStrip,
+  .adaptiveDepthStrip {
+    flex-direction: column;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .scoringIssueIntro,
+  .adaptiveDepthActions {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  .recommendationsPanel {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .recommendationsList {
+    grid-template-columns: 1fr;
+  }
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 76px;
+    transform: none;
+    justify-content: center;
   }
 }

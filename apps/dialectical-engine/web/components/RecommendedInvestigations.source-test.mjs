@@ -24,6 +24,12 @@ test("RecommendedInvestigations is a presentational real-recommendation list", (
   assert.match(source, /topRecommendation \? \[topRecommendation, \.\.\.additionalRecommendations\] : \[\]/);
 
   assert.match(source, /aria-label="Recommended investigations"/);
+  assert.match(source, /className="recommendationsPanel"/);
+  assert.match(source, /className="recommendationsList"/);
+  assert.match(source, /className="recommendationItem"/);
+  assert.match(source, /className="recommendationMeta"/);
+  assert.match(source, /className="recommendationReason"/);
+  assert.match(source, /className="recommendationActions"/);
   assert.match(source, /No recommended investigations are available from the current scoring data\./);
   assert.match(source, /Recommendation #\{index \+ 1\}/);
   assert.match(source, /priority \{recommendation\.priority\}/);

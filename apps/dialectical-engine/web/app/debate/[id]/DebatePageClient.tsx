@@ -296,6 +296,10 @@ function formatAdaptiveDepthScore(score: number): string {
   return `${percent}%`;
 }
 
+function compactNodeId(nodeId: string): string {
+  return nodeId.length > 13 ? `${nodeId.slice(0, 8)}...` : nodeId;
+}
+
 function adaptiveDepthDryRunStateFromPayload(
   payload: DebateAdaptiveDepthDryRunResponse
 ): AdaptiveDepthDryRunAsyncState {
@@ -1322,33 +1326,32 @@ function ScoringHolesSummaryPanel({
 
   return (
     <section
-      className="progressStrip"
+      className="progressStrip scoringIssueStrip"
       aria-label="Scoring issue summary"
-      style={{ alignItems: "flex-start", gap: 12, minHeight: "auto", paddingTop: 8, paddingBottom: 8 }}
     >
-      <div style={{ minWidth: 190 }}>
+      <div className="scoringIssueIntro">
         <span className="progressLabel">Scoring issue summary</span>
-        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+        <div className="scoringIssueSubcopy">
           {holesSummary.total} unresolved holes / {fatalFlagsSummary.total} fatal flags from {state.data.items.length} scored nodes
         </div>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div className="scoringIssuePills">
         {strongestIssue ? (
-          <div className="pill" title={`${strongestIssue.claim}: ${strongestIssue.description}`}>
+          <div className="pill scoringIssuePill" title={`${strongestIssue.claim}: ${strongestIssue.description}`}>
             <span>Strongest unresolved issue</span>
             <span>{strongestIssue.kind === "fatal_flag" ? "fatal" : "hole"}</span>
             <span>{strongestIssue.severity}</span>
             <span>{strongestIssue.type}</span>
-            <span>{strongestIssue.nodeId}</span>
+            <span title={strongestIssue.nodeId}>{compactNodeId(strongestIssue.nodeId)}</span>
           </div>
         ) : null}
-        <div className="pill" title="Severity counts from scoring payload holes">
+        <div className="pill scoringIssuePill" title="Severity counts from scoring payload holes">
           <span>Holes</span>
           <span>{holesSummary.bySeverity.high} high</span>
           <span>{holesSummary.bySeverity.medium} medium</span>
           <span>{holesSummary.bySeverity.low} low</span>
         </div>
-        <div className="pill" title="Severity counts from scoring payload fatal flags">
+        <div className="pill scoringIssuePill" title="Severity counts from scoring payload fatal flags">
           <span>Fatal flags</span>
           <span>{fatalFlagsSummary.bySeverity.high} high</span>
           <span>{fatalFlagsSummary.bySeverity.medium} medium</span>
@@ -1357,24 +1360,24 @@ function ScoringHolesSummaryPanel({
         {fatalFlagsSummary.items.slice(0, 4).map((flag, index) => (
           <div
             key={`${flag.nodeId}-${flag.type}-${index}`}
-            className="pill"
+            className="pill scoringIssuePill"
             title={`${flag.claim}: ${flag.description}`}
           >
             <span>fatal</span>
             <span>{flag.severity}</span>
             <span>{flag.type}</span>
-            <span>{flag.nodeId}</span>
+            <span title={flag.nodeId}>{compactNodeId(flag.nodeId)}</span>
           </div>
         ))}
         {holesSummary.items.slice(0, 4).map((hole, index) => (
           <div
             key={`${hole.nodeId}-${hole.type}-${index}`}
-            className="pill"
+            className="pill scoringIssuePill"
             title={`${hole.claim}: ${hole.description}`}
           >
             <span>{hole.severity}</span>
             <span>{hole.type}</span>
-            <span>{hole.nodeId}</span>
+            <span title={hole.nodeId}>{compactNodeId(hole.nodeId)}</span>
           </div>
         ))}
       </div>
@@ -1505,26 +1508,25 @@ function AdaptiveDepthDryRunPanel({
           : null;
   return (
     <section
-      className="progressStrip"
+      className="progressStrip adaptiveDepthStrip"
       aria-label="Adaptive depth dry-run"
-      style={{ alignItems: "flex-start", gap: 12, minHeight: "auto", paddingTop: 8, paddingBottom: 8 }}
     >
-      <div style={{ minWidth: 190 }}>
+      <div className="scoringIssueIntro">
         <span className="progressLabel">Adaptive depth dry-run</span>
-        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+        <div className="scoringIssueSubcopy">
           {state.data.plan.expansion_count} expansions from {state.data.plan.candidate_count} scored candidates
         </div>
       </div>
       {items.length === 0 ? (
         <span className="progressCount">No adaptive depth expansions are recommended from the current scoring data.</span>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="adaptiveDepthChips">
           {items.map((item) => (
             <AdaptiveDepthDryRunChip key={item.node_id} item={item} />
           ))}
         </div>
       )}
-      <div style={{ display: "grid", gap: 4, marginLeft: "auto", minWidth: 190 }}>
+      <div className="adaptiveDepthActions">
         <button
           type="button"
           className="btn btnDark"
@@ -1534,7 +1536,7 @@ function AdaptiveDepthDryRunPanel({
           {actionBusy ? "Starting expansions" : "Approve and run selected expansions"}
         </button>
         {actionMessage ? (
-          <span className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
+          <span className="progressCount adaptiveDepthActionMessage">
             {actionMessage}
           </span>
         ) : null}
@@ -1593,7 +1595,7 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
         {recommendedDepthLabel} for {formatAdaptiveDepthAction(item.recommended_action).toLowerCase()}
       </div>
       <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
-        {item.hole_count} holes, {item.recommended_investigation_count} investigations, node {item.node_id}
+        {item.hole_count} holes, {item.recommended_investigation_count} investigations, node {compactNodeId(item.node_id)}
       </div>
       {reasons.length > 0 ? (
         <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
