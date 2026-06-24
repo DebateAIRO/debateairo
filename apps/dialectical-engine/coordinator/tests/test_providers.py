@@ -35,6 +35,16 @@ def test_agent_config_loads_defaults_and_openai_model_from_settings(monkeypatch)
     assert configs["estimator"].temperature == 0.0
 
 
+def test_agent_config_pins_scoring_judge_to_supported_codex_cli_model(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_MODEL", "codex-gpt-5.5")
+
+    configs = load_agent_configs(ENGINE_ROOT / "config" / "agents.yaml")
+
+    assert configs["proponent"].model == "codex-gpt-5.5"
+    assert configs["judge"].provider == "codex"
+    assert configs["judge"].model == "gpt-5.5"
+
+
 def test_registry_uses_fake_provider_without_changing_call_path() -> None:
     registry = ProviderRegistry(
         agents={
@@ -145,7 +155,9 @@ def test_codex_provider_builds_cli_command_without_live_call() -> None:
         response_format="json",
     )
 
-    assert command[:5] == ["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write"]
+    assert command[:3] == ["codex", "exec", "--skip-git-repo-check"]
+    assert "--ignore-rules" in command
+    assert command[command.index("--sandbox") + 1] == "read-only"
     assert "--model" in command
     assert "gpt-5.5" in command
     assert "Return only valid JSON." in command[-1]
@@ -170,6 +182,56 @@ def test_codex_provider_reports_missing_cli_without_generation(monkeypatch) -> N
     assert status.provider == "codex"
     assert status.reason == "Codex executable not found: missing-codex"
     assert run_called is False
+
+
+def test_codex_provider_uses_resolved_cli_path_for_generation(monkeypatch) -> None:
+    provider = CodexCliProvider(executable="codex")
+    captured: dict[str, object] = {}
+
+    class Completed:
+        returncode = 0
+        stdout = '{"status":"unavailable","reason":"fixture"}'
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        captured["command"] = command
+        return Completed()
+
+    monkeypatch.setattr("app.providers.codex_cli.shutil.which", lambda executable: "C:\\Users\\vladm\\AppData\\Roaming\\npm\\codex.CMD")
+    monkeypatch.setattr("app.providers.codex_cli.subprocess.run", fake_run)
+
+    provider.generate([{"role": "user", "content": "score"}], model="gpt-5.5")
+
+    assert captured["command"][0] == "C:\\Users\\vladm\\AppData\\Roaming\\npm\\codex.CMD"
+
+
+def test_codex_provider_reads_clean_last_message_output(monkeypatch) -> None:
+    provider = CodexCliProvider(executable="codex")
+    captured: dict[str, object] = {}
+
+    class Completed:
+        returncode = 0
+        stdout = "noisy transcript"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        captured["command"] = command
+        captured["input"] = kwargs.get("input")
+        output_path = command[command.index("--output-last-message") + 1]
+        Path(output_path).write_text('{"status":"unavailable","reason":"fixture"}', encoding="utf-8")
+        return Completed()
+
+    monkeypatch.setattr("app.providers.codex_cli.shutil.which", lambda executable: "codex.cmd")
+    monkeypatch.setattr("app.providers.codex_cli.subprocess.run", fake_run)
+
+    response = provider.generate([{"role": "user", "content": "score"}], model="gpt-5.5")
+
+    assert response.text == '{"status":"unavailable","reason":"fixture"}'
+    assert response.raw["stdout"] == "noisy transcript"
+    assert "--cd" in captured["command"]
+    assert captured["command"][captured["command"].index("--cd") + 1]
+    assert captured["command"][-1] == "-"
+    assert captured["input"] == "USER:\nscore"
 
 
 def test_codex_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.providers.base import LLMResponse, ProviderError
 
@@ -47,8 +49,9 @@ class CodexCliProvider:
             self.executable,
             "exec",
             "--skip-git-repo-check",
+            "--ignore-rules",
             "--sandbox",
-            "workspace-write",
+            "read-only",
             "--model",
             model,
             prompt,
@@ -64,7 +67,8 @@ class CodexCliProvider:
         response_format: str | None = None,
         role: str | None = None,
     ) -> LLMResponse:
-        if shutil.which(self.executable) is None:
+        resolved_executable = shutil.which(self.executable)
+        if resolved_executable is None:
             raise ProviderError(f"Codex executable not found: {self.executable}")
         command = self.command(
             messages,
@@ -72,24 +76,39 @@ class CodexCliProvider:
             max_tokens=max_tokens,
             response_format=response_format,
         )
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise TimeoutError(f"Codex command timed out after {self.timeout_seconds} seconds.") from exc
-        except OSError as exc:
-            raise ProviderError(f"Codex command failed to start: {exc}") from exc
+        command[0] = resolved_executable
+        prompt = command[-1]
+        command[-1] = "-"
+        with tempfile.TemporaryDirectory(prefix="dialectical-codex-") as tempdir:
+            output_path = Path(tempdir) / "last-message.txt"
+            command[-1:-1] = ["--cd", tempdir, "--output-last-message", str(output_path)]
+            try:
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    input=prompt,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=self.timeout_seconds,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise TimeoutError(f"Codex command timed out after {self.timeout_seconds} seconds.") from exc
+            except OSError as exc:
+                raise ProviderError(f"Codex command failed to start: {exc}") from exc
+            final_text = output_path.read_text(encoding="utf-8").strip() if output_path.exists() else ""
         if completed.returncode != 0:
             error = self.compact_error(completed.stderr, completed.stdout)
             raise ProviderError(f"Codex command exited with code {completed.returncode}: {error}"[:2_000])
         return LLMResponse(
-            text=completed.stdout.strip(),
-            raw={"provider": self.name, "returncode": completed.returncode, "stderr": completed.stderr},
+            text=final_text or completed.stdout.strip(),
+            raw={
+                "provider": self.name,
+                "returncode": completed.returncode,
+                "stderr": completed.stderr,
+                "stdout": completed.stdout,
+            },
             usage=None,
         )
 
