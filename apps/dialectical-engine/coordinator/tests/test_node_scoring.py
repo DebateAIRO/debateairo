@@ -2284,6 +2284,64 @@ def test_score_node_with_provider_writes_successful_result_to_cache(db) -> None:
     assert cached.result == {key: value for key, value in payload.items() if key != "cache"}
 
 
+def test_score_node_with_provider_does_not_invent_evidence_refs(db) -> None:
+    class OptimisticEvidenceProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        evidence=EvidenceAssessment(
+                            evidence_quality=0.9,
+                            evidence_relevance=0.9,
+                            evidence_sufficiency=0.9,
+                            source_reliability=0.9,
+                            freshness=0.9,
+                            support_status="verified",
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, OptimisticEvidenceProvider())
+
+    assert payload["status"] == "available"
+    assert payload["items"][0]["claim"]["evidence_refs"] == []
+    assert payload["items"][0]["scores"]["evidence_quality"] == 0.9
+    assert "stored-judge-output" not in payload["items"][0]["claim"]["evidence_refs"]
+
+
 def test_score_node_with_provider_scores_requested_current_node(db) -> None:
     class CapturingProvider:
         provider = "test-provider"
