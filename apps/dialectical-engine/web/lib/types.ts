@@ -36,6 +36,237 @@ export type DebateNode = {
   active_generation_id: string | null;
   active_generation: Generation | null;
   children: DebateNode[];
+  score?: NodeScore | null;
+};
+
+export type ScoringStatus = "available" | "partial" | "unavailable";
+export type ScoringModelMetadata = {
+  provider?: string | null;
+  model?: string | null;
+  checked_at?: string | null;
+  status: ScoringStatus;
+};
+export type ScoringCacheMetadata = {
+  hit: boolean;
+  stale?: {
+    reason?: "input_hash_mismatch" | string | null;
+    refresh_available?: boolean | null;
+  } | null;
+};
+export type ClaimType =
+  | "empirical"
+  | "causal"
+  | "normative"
+  | "definitional"
+  | "prediction"
+  | "comparative"
+  | "mixed"
+  | "unknown";
+export type Severity = "low" | "medium" | "high";
+export type InvestigationAction = "challenge" | "support" | "find_evidence" | "decompose" | "ask_user";
+
+export type ScoringScope = {
+  population?: string | null;
+  timeframe?: string | null;
+  geography?: string | null;
+  domain?: string | null;
+};
+
+export type NormalizedClaim = {
+  node_id: string;
+  raw_text: string;
+  core_claim: string;
+  claim_type: ClaimType;
+  scope: ScoringScope;
+  implied_assumptions: string[];
+  evidence_refs: string[];
+  ambiguity_flags: string[];
+  key_terms: string[];
+};
+
+export type NodeScores = {
+  strength: number;
+  uncertainty: number;
+  impact: number;
+  evidence_quality: number;
+  relevance: number;
+  logical_validity: number;
+  assumption_risk: number;
+  counter_resilience: number;
+};
+
+export type ScoreLabels = {
+  strength_label: "weak" | "mixed" | "strong";
+  uncertainty_label: "low" | "medium" | "high";
+  impact_label: "low" | "medium" | "high";
+};
+
+export type ScoringHole = {
+  type: string;
+  severity: Severity;
+  description: string;
+  source: string;
+};
+
+export type FatalFlag = {
+  type: string;
+  severity: Severity;
+  description: string;
+};
+
+export type ScoreCap = {
+  score: string;
+  cap_value: number;
+  reason: string;
+  triggered_by: string;
+};
+
+export type JudgeDisagreement = {
+  judges: string[];
+  type: string;
+  severity: Severity;
+  description: string;
+};
+
+export type RecommendedInvestigation = {
+  action: InvestigationAction;
+  reason: string;
+  priority: number;
+  target_node_id?: string | null;
+};
+
+export type ManualInvestigationStatus = "queued" | "unavailable";
+
+export type ManualInvestigationRequest = {
+  debate_id: string;
+  node_id: string;
+  action: InvestigationAction;
+  hole: ScoringHole;
+  reason?: string | null;
+};
+
+export type ManualInvestigationResponse = {
+  debate_id: string;
+  node_id: string;
+  action: InvestigationAction;
+  status: ManualInvestigationStatus;
+  job_id?: string | null;
+  reason?: string | null;
+};
+
+export type ScoreRationale = {
+  short: string;
+  why_not_higher: string;
+  why_not_lower: string;
+  weakest_link: string;
+};
+
+export type ScoringDebug = {
+  reducer_version: string;
+  rubric_version: string;
+  judge_outputs?: Record<string, unknown> | null;
+};
+
+export type NodeScoringPayload = {
+  node_id: string;
+  claim: NormalizedClaim;
+  scores: NodeScores;
+  labels: ScoreLabels;
+  holes: ScoringHole[];
+  fatal_flags: FatalFlag[];
+  score_caps: ScoreCap[];
+  judge_disagreements: JudgeDisagreement[];
+  recommended_investigations: RecommendedInvestigation[];
+  rationale: ScoreRationale;
+  debug?: ScoringDebug | null;
+};
+
+export type NodeScoringError = {
+  node_id: string;
+  status: "unavailable";
+  reason: string;
+};
+
+export type DebateScoringResponse = {
+  debate_id: string;
+  status: ScoringStatus;
+  node_ids: string[];
+  items: NodeScoringPayload[];
+  errors?: NodeScoringError[] | null;
+  max_nodes?: number | null;
+  scored_node_count?: number | null;
+  skipped_node_count?: number | null;
+  truncated?: boolean | null;
+  reason?: string;
+  producer?: string;
+  generated_at?: string;
+  model_metadata?: ScoringModelMetadata | null;
+  cache?: ScoringCacheMetadata | null;
+};
+
+export type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
+export type DepthPressure = "low" | "medium" | "high";
+export type AdaptiveDepthExpansionHint = "expand" | "review_for_expansion";
+
+export type AdaptiveDepthPolicy = {
+  mode: AdaptiveDepthMode;
+  target_depth?: number | null;
+  reason?: string | null;
+};
+
+export type AdaptiveDepthDryRunItem = {
+  node_id: string;
+  pressure: DepthPressure;
+  score: number;
+  recommended_action: InvestigationAction | null;
+  expansion_hint: AdaptiveDepthExpansionHint;
+  reasons: string[];
+  hole_count: number;
+  recommended_investigation_count: number;
+};
+
+export type AdaptiveDepthDryRunPlan = {
+  policy: AdaptiveDepthPolicy;
+  candidate_count: number;
+  expansion_count: number;
+  items: AdaptiveDepthDryRunItem[];
+};
+
+export type DebateAdaptiveDepthDryRunResponse = {
+  debate_id: string;
+  status: ScoringStatus;
+  reason?: string;
+  plan: AdaptiveDepthDryRunPlan;
+};
+
+export type DebateAdaptiveDepthApprovalRequest = {
+  debate_id: string;
+  selected_node_ids: string[];
+  approval_reason?: string | null;
+};
+
+export type DebateAdaptiveDepthApprovalResponse = {
+  debate_id: string;
+  status: "queued" | "partial" | "unavailable";
+  selected_node_ids: string[];
+  queued_node_ids: string[];
+  unavailable_node_ids: string[];
+  jobs: { node_id: string; job_id: string; status: ScoringJobStatus }[];
+  audit_record_id?: string | null;
+  reason?: string | null;
+};
+
+export type NodeScore = NodeScoringPayload;
+export type DebateScoreSummary = DebateScoringResponse;
+
+export type ScoringJobStatus = "queued" | "running" | "complete" | "failed";
+
+export type DebateScoringJobStatus = {
+  debate_id: string;
+  job_id: string;
+  status: ScoringJobStatus;
+  error?: string;
+  detail?: string;
 };
 
 export type Synthesis = {
@@ -204,6 +435,7 @@ export type DebateDetail = {
   created_at: string;
   completed_at: string | null;
   tree: DebateNode | null;
+  scoring?: DebateScoreSummary | null;
   synthesis: Synthesis | null;
   active_synthesis: ActiveSynthesis | null;
   branch_lineage: DebateBranch[];

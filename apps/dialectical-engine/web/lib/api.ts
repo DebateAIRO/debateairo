@@ -1,4 +1,14 @@
-import type { DebateDetail, DebateSummary, Generation, WorkerStatus } from "./types";
+import type {
+  DebateAdaptiveDepthApprovalRequest,
+  DebateAdaptiveDepthApprovalResponse,
+  DebateAdaptiveDepthDryRunResponse,
+  DebateDetail,
+  DebateScoringJobStatus,
+  DebateScoringResponse,
+  DebateSummary,
+  Generation,
+  WorkerStatus
+} from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
@@ -39,6 +49,43 @@ export async function listDebates(): Promise<DebateSummary[]> {
 
 export async function getDebate(id: string): Promise<DebateDetail> {
   return apiFetch<DebateDetail>(`/api/debates/${id}`);
+}
+
+export async function getDebateScoring(id: string): Promise<DebateScoringResponse> {
+  return apiFetch<DebateScoringResponse>(`/api/debates/${id}/scoring`);
+}
+
+export async function getDebateAdaptiveDepthDryRun(id: string): Promise<DebateAdaptiveDepthDryRunResponse> {
+  return apiFetch<DebateAdaptiveDepthDryRunResponse>(`/api/debates/${id}/scoring/adaptive-depth/dry-run`);
+}
+
+export async function approveDebateAdaptiveDepthExpansion(
+  id: string,
+  payload: DebateAdaptiveDepthApprovalRequest,
+  token: string
+): Promise<DebateAdaptiveDepthApprovalResponse> {
+  return apiFetch<DebateAdaptiveDepthApprovalResponse>(
+    `/api/debates/${id}/scoring/adaptive-depth/approvals`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    token
+  );
+}
+
+export async function startDebateScoringRefresh(id: string, token: string): Promise<DebateScoringJobStatus> {
+  return apiFetch<DebateScoringJobStatus>(
+    `/api/debates/${id}/scoring/jobs`,
+    {
+      method: "POST"
+    },
+    token
+  );
+}
+
+export async function getDebateScoringJobStatus(id: string, jobId: string): Promise<DebateScoringJobStatus> {
+  return apiFetch<DebateScoringJobStatus>(`/api/debates/${id}/scoring/jobs/${jobId}`);
 }
 
 export async function createDebate(topic: string, config: Record<string, unknown>, token: string): Promise<DebateDetail> {

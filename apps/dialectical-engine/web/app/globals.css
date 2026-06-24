@@ -53,6 +53,17 @@
   --gen-bg: oklch(0.97 0.03 75);
   --gen-border: oklch(0.88 0.05 75);
 
+  /* score bands */
+  --score-strength-border: oklch(0.7 0.06 145);
+  --score-strength-bg: oklch(0.96 0.025 145);
+  --score-strength-text: oklch(0.224 0.08 145);
+  --score-uncertainty-border: oklch(0.72 0.055 75);
+  --score-uncertainty-bg: oklch(0.965 0.026 75);
+  --score-uncertainty-text: oklch(0.238 0.075 75);
+  --score-impact-border: oklch(0.68 0.065 245);
+  --score-impact-bg: oklch(0.965 0.024 245);
+  --score-impact-text: oklch(0.23 0.085 245);
+
   /* model dots */
   --m-claude: oklch(0.64 0.13 40);
   --m-gpt: oklch(0.52 0.07 200);
@@ -981,6 +992,8 @@ a:focus-visible {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
+  padding-bottom: 58px;
 }
 
 .debateTopBar {
@@ -1030,6 +1043,96 @@ a:focus-visible {
   flex: 0 0 auto;
 }
 
+.topSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.topSwitchStatus {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: oklch(0.48 0.04 70);
+  text-transform: none;
+}
+[data-scoring-state="loading"] .topSwitchStatus {
+  color: var(--muted);
+}
+[data-scoring-state="error"] .topSwitchStatus {
+  color: oklch(0.52 0.14 28);
+}
+[data-scoring-state="unavailable"] .topSwitchStatus {
+  color: oklch(0.48 0.08 70);
+}
+
+.scoringInsightsPanel {
+  flex: 0 0 auto;
+  border-bottom: 1px solid oklch(0.91 0.02 75);
+  background: oklch(0.97 0.01 75);
+}
+
+.scoringInsightsSummary {
+  position: relative;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.scoringInsightsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.scoringInsightsSummary::after {
+  content: "Open";
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.scoringInsightsPanel[open] .scoringInsightsSummary::after {
+  content: "Close";
+}
+
+.scoringInsightsDetail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scoringInsightsBody {
+  max-height: min(36vh, 360px);
+  overflow: auto;
+  border-top: 1px solid oklch(0.91 0.02 75);
+  background: var(--surface);
+}
+
+.scoringInsightsBody .progressStrip,
+.scoringInsightsBody .recommendationsPanel {
+  border-bottom: 1px solid oklch(0.91 0.02 75);
+}
+
+.scoringInsightsBody > :last-child {
+  border-bottom: 0;
+}
+
 /* progress strip */
 .progressStrip {
   flex: 0 0 auto;
@@ -1065,6 +1168,64 @@ a:focus-visible {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: oklch(0.5 0.04 60);
+}
+
+.scoringIssueStrip,
+.adaptiveDepthStrip {
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 58px;
+  height: auto;
+  padding-top: 9px;
+  padding-bottom: 10px;
+}
+
+.scoringIssueIntro {
+  flex: 0 0 210px;
+  min-width: 0;
+}
+
+.scoringIssueSubcopy {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scoringIssuePills,
+.adaptiveDepthChips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scoringIssuePill {
+  max-width: min(100%, 420px);
+  min-height: 24px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.scoringIssuePill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adaptiveDepthActions {
+  display: grid;
+  gap: 5px;
+  margin-left: auto;
+  min-width: 210px;
+  max-width: 280px;
+}
+
+.adaptiveDepthActionMessage {
+  white-space: normal;
+  line-height: 1.35;
 }
 
 .debateError {
@@ -1176,6 +1337,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 9px;
 }
@@ -1193,6 +1355,59 @@ a:focus-visible {
   padding: 2px 8px;
   border-radius: 5px;
   white-space: nowrap;
+}
+
+.scoreBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--surface-sunken);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.scoreBadgeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.scoreBadgeButton:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.scoreBadge.strength {
+  border-color: var(--score-strength-border);
+  background: var(--score-strength-bg);
+  color: var(--score-strength-text);
+}
+.scoreBadge.uncertainty {
+  border-color: var(--score-uncertainty-border);
+  background: var(--score-uncertainty-bg);
+  color: var(--score-uncertainty-text);
+}
+.scoreBadge.impact {
+  border-color: var(--score-impact-border);
+  background: var(--score-impact-bg);
+  color: var(--score-impact-text);
+}
+.scoreBadge.unavailable {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+  color: var(--muted);
 }
 
 .nodePending {
@@ -1622,6 +1837,174 @@ a:focus-visible {
   color: var(--muted);
   margin-top: 8px;
 }
+.drawerScoringUnavailable,
+.drawerScoringRationale {
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 12px 13px;
+  margin-top: 16px;
+}
+.drawerSectionTitle {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.drawerScoringUnavailable p,
+.drawerScoringRationale p {
+  margin: 7px 0 0;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.drawerScoringFindings {
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 12px 13px;
+  margin-top: 12px;
+}
+.drawerFindingGroup {
+  margin-top: 11px;
+}
+.drawerFindingGroupTitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.drawerFindingList {
+  list-style: none;
+  padding: 0;
+  margin: 7px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.drawerFindingItem {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 9px;
+}
+.drawerFindingItem.fatal {
+  border-left-color: oklch(0.54 0.18 28);
+}
+.drawerFindingMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.drawerFindingMeta span:not(:last-child)::after {
+  content: "/";
+  margin-left: 5px;
+  color: var(--line-strong);
+}
+.drawerFindingText {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.recommendationsPanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px 22px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid oklch(0.9 0.02 75);
+}
+
+.recommendationsHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendationsEyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: oklch(0.46 0.06 64);
+}
+
+.recommendationsCount {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.recommendationsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.recommendationItem {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  padding: 11px 12px;
+}
+
+.recommendationMeta,
+.recommendationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recommendationMeta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recommendationReason {
+  color: var(--text-2);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.recommendationsPanel p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+}
+
 .drawerDivider {
   height: 1px;
   background: var(--line);
@@ -2035,7 +2418,7 @@ a:focus-visible {
 
 .toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 78px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
@@ -2093,12 +2476,15 @@ a:focus-visible {
 
 .tokenDock {
   position: fixed;
-  left: 18px;
+  left: auto;
+  right: 18px;
   bottom: 18px;
   z-index: 40;
+  max-width: min(360px, calc(100vw - 36px));
 }
 .tokenForm {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .tokenInput {
@@ -2140,5 +2526,52 @@ a:focus-visible {
   }
   .drawer {
     width: 100vw;
+  }
+  .scoringIssueStrip,
+  .adaptiveDepthStrip {
+    flex-direction: column;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .scoringIssueIntro,
+  .adaptiveDepthActions {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  .scoringInsightsSummary {
+    min-height: 44px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 14px;
+  }
+  .scoringInsightsSummary::after {
+    position: absolute;
+    right: 14px;
+    top: 10px;
+  }
+  .scoringInsightsDetail {
+    max-width: calc(100% - 64px);
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .scoringInsightsBody {
+    max-height: 34vh;
+  }
+  .recommendationsPanel {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .recommendationsList {
+    grid-template-columns: 1fr;
+  }
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 76px;
+    transform: none;
+    justify-content: center;
   }
 }

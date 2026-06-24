@@ -9,10 +9,11 @@ const outDir = join(process.cwd(), ".tmp-debate-tree-utils-test");
 
 function compileHelper() {
   rmSync(outDir, { recursive: true, force: true });
-  const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  const tscCommand =
+    process.platform === "win32"
+      ? join(process.cwd(), "node_modules", ".bin", "tsc.cmd")
+      : join(process.cwd(), "node_modules", ".bin", "tsc");
   const tscArgs = [
-    "exec",
-    "tsc",
     "lib/debateTreeUtils.ts",
     "--target",
     "ES2022",
@@ -29,14 +30,14 @@ function compileHelper() {
   ];
 
   if (process.platform === "win32") {
-    execFileSync("cmd.exe", ["/d", "/s", "/c", pnpmCommand, ...tscArgs], {
+    execFileSync("cmd.exe", ["/d", "/s", "/c", tscCommand, ...tscArgs], {
       cwd: process.cwd(),
       stdio: "pipe",
     });
     return;
   }
 
-  execFileSync(pnpmCommand, tscArgs, { cwd: process.cwd(), stdio: "pipe" });
+  execFileSync(tscCommand, tscArgs, { cwd: process.cwd(), stdio: "pipe" });
 }
 
 after(() => {
