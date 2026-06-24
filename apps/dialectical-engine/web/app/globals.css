@@ -1002,6 +1002,7 @@ a:focus-visible {
   gap: 18px;
   height: 60px;
   flex: 0 0 60px;
+  min-width: 0;
   padding: 0 22px;
   border-bottom: 1px solid var(--line);
   background: var(--surface-2);
@@ -1040,13 +1041,17 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .topSwitch {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 1 min(52vw, 680px);
+  min-width: 0;
+  max-width: min(52vw, 680px);
   min-height: 34px;
   padding: 0 8px;
   color: var(--muted);
@@ -1057,8 +1062,17 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.topSwitch > span:first-child,
+.topSwitch .switch,
+.topSwitch .btn,
+.topSwitch .iconBtn {
+  flex: 0 0 auto;
+}
+
 .topSwitchStatus {
-  max-width: 220px;
+  flex: 1 1 88px;
+  min-width: 0;
+  max-width: clamp(88px, 12vw, 180px);
   overflow: hidden;
   text-overflow: ellipsis;
   color: oklch(0.48 0.04 70);
