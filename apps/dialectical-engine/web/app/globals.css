@@ -1956,6 +1956,47 @@ a:focus-visible {
   gap: 10px;
 }
 
+.recommendationsPrimary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.recommendationsDetails {
+  display: grid;
+  gap: 10px;
+}
+
+.recommendationsSummary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.recommendationsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.recommendationsSummary::after {
+  content: "Open";
+  margin-left: 8px;
+  color: var(--muted-2);
+}
+
+.recommendationsDetails[open] .recommendationsSummary::after {
+  content: "Close";
+}
+
 .recommendationItem {
   display: grid;
   gap: 8px;
