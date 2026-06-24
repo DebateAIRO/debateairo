@@ -1001,38 +1001,47 @@ export default function DebatePageClient({
       </header>
 
       <ScoringErrorBoundary>
-        <ScoringVisibilityPanel state={scoringVisibility} />
-        <ScoringHolesSummaryPanel
-          enabled={scoringEnabled}
-          state={scoringState}
-          holesSummary={scoringHolesSummary}
-          fatalFlagsSummary={scoringFatalFlagsSummary}
-          strongestIssue={strongestUnresolvedScoringIssue}
-        />
-        <ScoreAwareFilterPanel
-          enabled={scoringEnabled}
-          filter={scoreAwareFilter}
-          matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
-          scoredCount={scoringByNodeId.size}
-          onChange={setScoreAwareFilter}
-        />
-        <RecommendedInvestigations
-          recommendations={scoringEnabled ? debateRecommendations : []}
-          canOpenTarget={canFocusRecommendationNode}
-          onOpenTarget={focusRecommendationNode}
-          emptyMessage={
-            scoringEnabled
-              ? "No recommended investigations are available from the current scoring data."
-              : "Enable scoring to surface recommended investigations from scored nodes."
-          }
-        />
-        <AdaptiveDepthDryRunPanel
-          enabled={scoringEnabled}
-          state={adaptiveDepthDryRunState}
-          actionToken={actionToken}
-          approvalState={adaptiveDepthApprovalState}
-          onApprove={approveAdaptiveDepthExpansion}
-        />
+        <details className="scoringInsightsPanel">
+          <summary className="scoringInsightsSummary">
+            <span className="progressLabel">Scoring insights</span>
+            <span className="progressCount">{scoringVisibility.title}</span>
+            <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+          </summary>
+          <div className="scoringInsightsBody scroll">
+            <ScoringVisibilityPanel state={scoringVisibility} />
+            <ScoringHolesSummaryPanel
+              enabled={scoringEnabled}
+              state={scoringState}
+              holesSummary={scoringHolesSummary}
+              fatalFlagsSummary={scoringFatalFlagsSummary}
+              strongestIssue={strongestUnresolvedScoringIssue}
+            />
+            <ScoreAwareFilterPanel
+              enabled={scoringEnabled}
+              filter={scoreAwareFilter}
+              matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
+              scoredCount={scoringByNodeId.size}
+              onChange={setScoreAwareFilter}
+            />
+            <RecommendedInvestigations
+              recommendations={scoringEnabled ? debateRecommendations : []}
+              canOpenTarget={canFocusRecommendationNode}
+              onOpenTarget={focusRecommendationNode}
+              emptyMessage={
+                scoringEnabled
+                  ? "No recommended investigations are available from the current scoring data."
+                  : "Enable scoring to surface recommended investigations from scored nodes."
+              }
+            />
+            <AdaptiveDepthDryRunPanel
+              enabled={scoringEnabled}
+              state={adaptiveDepthDryRunState}
+              actionToken={actionToken}
+              approvalState={adaptiveDepthApprovalState}
+              onApprove={approveAdaptiveDepthExpansion}
+            />
+          </div>
+        </details>
       </ScoringErrorBoundary>
 
       {/* ---- generation progress strip ---- */}
