@@ -506,3 +506,208 @@ test("selectStrongestUnresolvedScoringIssue returns null when no real issue is p
     null
   );
 });
+
+test("recordSuspiciousScoringResponse logs successful empty scoring output once", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = {
+    suspicious(event, payload) {
+      events.push({ event, payload });
+    },
+  };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "available",
+      node_ids: ["node-a"],
+      items: [],
+      scored_node_count: 0,
+      model_metadata: { provider: "codex", model: "model-a", checked_at: "2026-06-25T00:00:00Z" },
+      cache: { hit: false },
+    },
+    { runId: "run-1", requestId: "request-1", operation: "refresh-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, [
+    {
+      event: "scoring.empty_output",
+      payload: {
+        source: "scoring-response",
+        message: "Successful scoring response contained no scored items.",
+        debateId: "debate-1",
+        runId: "run-1",
+        requestId: "request-1",
+        operation: "refresh-scoring",
+        status: "available",
+        itemCount: 0,
+        nodeIdCount: 1,
+        errorCount: 0,
+        scoredNodeCount: 0,
+      },
+    },
+  ]);
+});
+
+test("recordSuspiciousScoringResponse logs successful missing artifact chain once", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = {
+    async suspicious(event, payload) {
+      events.push({ event, payload });
+    },
+  };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "available",
+      node_ids: ["node-a"],
+      items: [
+        {
+          node_id: "node-a",
+          claim: { core_claim: "Claim A" },
+          scores: { strength: 0.7, uncertainty: 0.2, impact: 0.5 },
+          labels: { strength: "strong", uncertainty: "low", impact: "medium" },
+          holes: [],
+          fatal_flags: [],
+          score_caps: [],
+          judge_disagreements: [],
+          recommended_investigations: [],
+          rationale: {
+            short: "Short rationale.",
+            why_not_higher: "Reason.",
+            why_not_lower: "Reason.",
+            weakest_link: "None.",
+          },
+        },
+      ],
+      scored_node_count: 1,
+    },
+    { operation: "load-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, [
+    {
+      event: "scoring.missing_artifact_chain",
+      payload: {
+        source: "scoring-response",
+        message: "Successful scoring response is missing artifact chain metadata.",
+        debateId: "debate-1",
+        operation: "load-scoring",
+        status: "available",
+        missingFields: ["model_metadata", "cache"],
+        artifactChainExpectation: "current-scoring-producers-emit-model-metadata-and-cache",
+        itemCount: 1,
+        nodeIdCount: 1,
+        errorCount: 0,
+        scoredNodeCount: 1,
+      },
+    },
+  ]);
+});
+
+test("recordSuspiciousScoringResponse logs success with missing required fields once", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = {
+    suspicious(event, payload) {
+      events.push({ event, payload });
+    },
+  };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "available",
+      node_ids: ["node-a"],
+      items: [
+        {
+          node_id: "node-a",
+          claim: { core_claim: "Claim A" },
+          labels: { strength: "strong", uncertainty: "low", impact: "medium" },
+          holes: [],
+          fatal_flags: [],
+          score_caps: [],
+          judge_disagreements: [],
+          recommended_investigations: [],
+          rationale: {
+            short: "Short rationale.",
+            why_not_higher: "Reason.",
+            why_not_lower: "Reason.",
+            weakest_link: "None.",
+          },
+        },
+      ],
+      scored_node_count: 1,
+      model_metadata: { provider: "codex", model: "model-a", checked_at: "2026-06-25T00:00:00Z" },
+      cache: { hit: false },
+    },
+    { operation: "refresh-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, [
+    {
+      event: "scoring.success_missing_required_fields",
+      payload: {
+        source: "scoring-response",
+        message: "Successful scoring response is missing required fields.",
+        debateId: "debate-1",
+        operation: "refresh-scoring",
+        status: "available",
+        missingFields: ["items[0].scores"],
+        itemCount: 1,
+        nodeIdCount: 1,
+        errorCount: 0,
+        scoredNodeCount: 1,
+      },
+    },
+  ]);
+});
+
+test("recordSuspiciousScoringResponse does not log complete normal scoring output", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = {
+    suspicious(event, payload) {
+      events.push({ event, payload });
+    },
+  };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "available",
+      node_ids: ["node-a"],
+      items: [
+        {
+          node_id: "node-a",
+          claim: { core_claim: "Claim A" },
+          scores: { strength: 0.7, uncertainty: 0.2, impact: 0.5 },
+          labels: { strength: "strong", uncertainty: "low", impact: "medium" },
+          holes: [],
+          fatal_flags: [],
+          score_caps: [],
+          judge_disagreements: [],
+          recommended_investigations: [],
+          rationale: {
+            short: "Short rationale.",
+            why_not_higher: "Reason.",
+            why_not_lower: "Reason.",
+            weakest_link: "None.",
+          },
+        },
+      ],
+      scored_node_count: 1,
+      model_metadata: { provider: "codex", model: "model-a", checked_at: "2026-06-25T00:00:00Z" },
+      cache: { hit: false },
+    },
+    { operation: "refresh-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, []);
+});
