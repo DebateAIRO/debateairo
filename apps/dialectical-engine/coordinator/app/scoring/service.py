@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
-from app.core.write_lock import flush_write
+from app.core.write_lock import commit_write, flush_write
 from app.models.entities import AnalyzerRun, Debate, Generation, Node, ProvenanceRecord, now_utc, uuid_str
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
 from app.scoring.cache import (
@@ -336,6 +336,7 @@ def score_nodes_with_provider(
             max_nodes=max_nodes,
             model_call_count=0,
         )
+        commit_write(db)
     items: list[dict] = []
     errors: list[NodeScoringError] = [
         NodeScoringError(
@@ -370,6 +371,7 @@ def score_nodes_with_provider(
                 force_refresh=force_refresh,
                 provider_call_latencies_ms=provider_call_latencies_ms,
             )
+            commit_write(db)
         except asyncio.CancelledError:
             errors.append(
                 NodeScoringError(

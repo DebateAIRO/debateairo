@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Response, status
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import bearer_token, require_user_token
 from app.core.db import SessionLocal, get_db
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
 from app.scoring import get_adaptive_depth_dry_run as get_adaptive_depth_dry_run_payload
@@ -25,6 +26,7 @@ from app.services.orchestrator import regenerate_node
 router = APIRouter(prefix="/api/debates", tags=["scoring"])
 
 MAX_ADAPTIVE_DEPTH_APPROVAL_EXPANSIONS = 3
+SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
 
 
 class AdaptiveDepthApprovalRequest(BaseModel):
@@ -120,6 +122,7 @@ def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
             return
         registry = scoring_provider_registry_dependency()
         job.status = "running"
+        job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
         job.error = None
         commit_write(db)
         try:
