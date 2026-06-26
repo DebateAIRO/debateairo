@@ -62,10 +62,11 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   const responseSource = readFileSync(responsePath, "utf8");
   for (const label of [
     "Scoring off",
+    "No scoring run yet",
     "User token required",
     "Scoring provider required",
     "Scoring unavailable",
-    "Refreshing scoring",
+    "Scoring in progress",
     "Real scores displayed",
   ]) {
     assert.match(responseSource, new RegExp(label), `Scoring visibility copy should include ${label}`);

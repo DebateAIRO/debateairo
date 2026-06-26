@@ -154,8 +154,8 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
     }),
     {
       kind: "refreshing",
-      title: "Refreshing scoring",
-      detail: "Running the synchronous scoring refresh now. Showing 1 persisted scored node while it completes.",
+      title: "Scoring in progress",
+      detail: "Judge outputs are being generated. Showing 1 persisted scored node while it completes.",
     }
   );
   assert.deepEqual(
@@ -171,6 +171,85 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
       kind: "scores",
       title: "Real scores displayed",
       detail: "Showing 3 persisted scored nodes from the scoring response.",
+    }
+  );
+});
+
+test("formatScoringVisibilityState treats missing judge output as a no-run empty state", async () => {
+  const { formatScoringVisibilityState } = await loadHelper();
+
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "unavailable",
+      refreshStatus: "idle",
+      response: {
+        debate_id: "debate-1",
+        status: "unavailable",
+        node_ids: ["node-a"],
+        items: [],
+        reason: "No scoring judge outputs are available for this debate.",
+      },
+      error: null,
+    }),
+    {
+      kind: "empty",
+      title: "No scoring run yet",
+      detail: "Refresh scoring to generate judge outputs.",
+    }
+  );
+});
+
+test("formatScoringVisibilityState reports refreshes as in progress without implying failure", async () => {
+  const { formatScoringVisibilityState } = await loadHelper();
+
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "unavailable",
+      refreshStatus: "starting",
+      response: {
+        debate_id: "debate-1",
+        status: "unavailable",
+        node_ids: ["node-a"],
+        items: [],
+        reason: "No scoring judge outputs are available for this debate.",
+      },
+      error: null,
+    }),
+    {
+      kind: "refreshing",
+      title: "Scoring in progress",
+      detail: "Judge outputs are being generated.",
+    }
+  );
+});
+
+test("formatScoringVisibilityState reports partial scoring counts", async () => {
+  const { formatScoringVisibilityState } = await loadHelper();
+
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "loaded",
+      refreshStatus: "idle",
+      response: {
+        debate_id: "debate-1",
+        status: "partial",
+        node_ids: ["node-a", "node-b", "node-c"],
+        items: [{ node_id: "node-a" }, { node_id: "node-b" }],
+        errors: [{ node_id: "node-c", status: "unavailable", reason: "Scoring node limit reached." }],
+        scored_node_count: 2,
+      },
+      error: null,
+    }),
+    {
+      kind: "scores",
+      title: "Scores partially checked",
+      detail: "Showing 2 persisted scored nodes; 1 unavailable node.",
     }
   );
 });
