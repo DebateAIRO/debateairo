@@ -1,4 +1,9 @@
 import type { DebateScoringResponse, NodeScoringError, NodeScoringPayload, Severity } from "./types";
+import {
+  recordSuspiciousScoringEvents,
+  type SuspiciousScoringContext,
+  type SuspiciousScoringLogger,
+} from "./observability/suspiciousScoring";
 
 export type IndexedScoringResponse = {
   scoringByNodeId: Map<string, NodeScoringPayload>;
@@ -149,6 +154,14 @@ export function indexScoringResponse(response: DebateScoringResponse | null): In
       (response?.errors ?? []).map((error) => [error.node_id, error])
     ),
   };
+}
+
+export async function recordSuspiciousScoringResponse(
+  response: DebateScoringResponse | null,
+  context: SuspiciousScoringContext,
+  logger: SuspiciousScoringLogger
+): Promise<void> {
+  await recordSuspiciousScoringEvents(response, context, logger);
 }
 
 export function formatScoringVisibilityState(input: ScoringVisibilityInput): ScoringVisibilityState {
