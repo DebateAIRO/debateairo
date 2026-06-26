@@ -64,7 +64,8 @@ async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
 
     adapters: dict[str, ModelClient] = {}
     for adapter in candidates:
-        if allowed_models and adapter.model_id not in allowed_models:
+        model_ids = adapter_model_ids(adapter)
+        if allowed_models and not allowed_models.intersection(model_ids):
             continue
         if adapter.model_id in adapters:
             continue
@@ -73,5 +74,17 @@ async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
         except Exception:
             healthy = False
         if healthy:
-            adapters[adapter.model_id] = adapter
+            for model_id in model_ids:
+                if allowed_models and model_id not in allowed_models and adapter.model_id not in allowed_models:
+                    continue
+                adapters.setdefault(model_id, adapter)
     return adapters
+
+
+def adapter_model_ids(adapter: ModelClient) -> list[str]:
+    model_ids: list[str] = []
+    for candidate in (adapter.model_id, *getattr(adapter, "capability_aliases", ())):
+        model_id = str(candidate).strip()
+        if model_id and model_id not in model_ids:
+            model_ids.append(model_id)
+    return model_ids

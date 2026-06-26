@@ -23,6 +23,9 @@ export function formatScoringStatusCopy(input: ScoringStatusCopyInput): string {
     return withMetadata(appendDetail("Scoring check failed", input.error), input);
   }
   if (input.scoringStatus === "unavailable") {
+    if (isMissingJudgeOutputReason(input.reason)) {
+      return withMetadata("No scoring run yet - refresh scoring", input);
+    }
     return withMetadata(appendDetail("Scoring check failed", input.reason), input);
   }
   if (isStaleInputHashMismatch(input)) {
@@ -43,6 +46,10 @@ export function formatScoringConfidenceCopy(): string {
 
 function appendDetail(label: string, detail?: string | null): string {
   return detail ? `${label}: ${detail}` : label;
+}
+
+function isMissingJudgeOutputReason(reason?: string | null): boolean {
+  return (reason || "").trim().toLowerCase() === "no scoring judge outputs are available for this debate.";
 }
 
 function isStaleInputHashMismatch(input: ScoringStatusCopyInput): boolean {
