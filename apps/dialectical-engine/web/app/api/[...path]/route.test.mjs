@@ -121,7 +121,8 @@ test("logs upstream non-2xx responses without consuming the response body", asyn
 });
 
 test("logs thrown upstream fetch errors and rethrows them", async () => {
-  const fetchError = new Error("coordinator unavailable");
+  const fetchError = new Error("coordinator unavailable for api_key=secret");
+  fetchError.code = "ECONNREFUSED";
   globalThis.fetch = async () => {
     throw fetchError;
   };
@@ -129,9 +130,17 @@ test("logs thrown upstream fetch errors and rethrows them", async () => {
 
   await assert.rejects(
     () =>
-      GET(new Request("http://web.local/api/workers?api_key=secret"), {
-        params: Promise.resolve({ path: ["workers"] })
-      }),
+      GET(
+        new Request("http://web.local/api/debates/debate-123/scoring?api_key=secret", {
+          headers: {
+            "x-request-id": "request-123",
+            "x-trace-id": "trace-456"
+          }
+        }),
+        {
+          params: Promise.resolve({ path: ["debates", "debate-123", "scoring"] })
+        }
+      ),
     fetchError
   );
 
@@ -142,6 +151,68 @@ test("logs thrown upstream fetch errors and rethrows them", async () => {
   assert.equal(events[0].context.method, "GET");
   assert.equal(events[0].context.path, "[REDACTED]");
   assert.equal(events[0].context.upstream, "[REDACTED]");
+  assert.equal(events[0].context.requestId, "request-123");
+  assert.equal(events[0].context.debateId, "debate-123");
+  assert.equal(events[0].context.traceId, "trace-456");
+  assert.equal(events[0].context.error, "[REDACTED]");
+  assert.equal(events[0].context.code, "ECONNREFUSED");
+  assert.equal(events[0].context.stack, "[REDACTED]");
+});
+
+test("does not let proxy fetch logging failures mask the original exception", async () => {
+  const fetchError = new Error("coordinator unavailable");
+  globalThis.fetch = async () => {
+    throw fetchError;
+  };
+  const { GET } = await loadRoute();
+  const loggerModuleUrl = pathToFileURL(join(outDir, "lib", "observability", "logger.js")).href;
+  const { Logger } = await import(loggerModuleUrl);
+  const originalError = Logger.error;
+  Logger.error = () => {
+    throw new Error("logger failed");
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        GET(new Request("http://web.local/api/workers"), {
+          params: Promise.resolve({ path: ["workers"] })
+        }),
+      fetchError
+    );
+  } finally {
+    Logger.error = originalError;
+  }
+
+  const events = readLogEvents();
+  assert.deepEqual(events, []);
+});
+
+test("generates a request id for upstream fetch errors when no request id is provided", async () => {
+  const fetchError = new Error("coordinator unavailable");
+  globalThis.fetch = async () => {
+    throw fetchError;
+  };
+  const { GET } = await loadRoute();
+
+  await assert.rejects(
+    () =>
+      GET(new Request("http://web.local/api/workers"), {
+        params: Promise.resolve({ path: ["workers"] })
+      }),
+    fetchError
+  );
+
+  const events = readLogEvents();
+  assert.equal(events.length, 1);
+  assert.equal(events[0].level, "error");
+  assert.equal(events[0].event, "api.proxy.fetch_failed");
+  assert.equal(events[0].context.method, "GET");
+  assert.equal(events[0].context.path, "/api/workers");
+  assert.equal(events[0].context.upstream, "http://coordinator.local:8000/api/workers");
+  assert.match(events[0].context.requestId, /^[0-9a-f-]{36}$/i);
+  assert.equal(events[0].context.debateId, undefined);
+  assert.equal(events[0].context.traceId, undefined);
   assert.equal(events[0].context.error, "coordinator unavailable");
   assert.match(events[0].context.stack, /coordinator unavailable/);
 });

@@ -9,10 +9,14 @@ type ProxyLogPayload = {
   path: string;
   upstream: string;
   upstreamPath: string;
+  requestId: string;
+  debateId?: string;
+  traceId?: string;
   status?: number;
   statusText?: string;
   responseSnippet?: string;
   error?: string;
+  code?: string;
   stack?: string;
 };
 
@@ -43,8 +47,12 @@ function safeUrlParts(url: URL) {
 
 function normalizeError(error: unknown) {
   if (error instanceof Error) {
+    const errorWithCode = error as Error & { code?: unknown };
+    const code = typeof errorWithCode.code === "string" ? errorWithCode.code : undefined;
+
     return {
       error: error.message,
+      code,
       stack: error.stack,
     };
   }
@@ -80,11 +88,15 @@ async function logProxyError(payload: ProxyLogPayload) {
     return;
   }
 
-  Logger.error("api.proxy.fetch_failed", {
-    source: "api-proxy",
-    message: "Upstream API proxy fetch failed.",
-    context: payload,
-  });
+  try {
+    Logger.error("api.proxy.fetch_failed", {
+      source: "api-proxy",
+      message: "Upstream API proxy fetch failed.",
+      context: payload,
+    });
+  } catch {
+    // Logging failures must never replace the original fetch exception.
+  }
 }
 
 async function readSafeResponseSnippet(response: Response) {
@@ -114,12 +126,25 @@ async function recordSuspiciousScoringProxyResponse(response: Response, path: st
   }
 }
 
+function getRequestCorrelation(request: Request, path: string[]) {
+  const requestId = request.headers.get("x-request-id") || request.headers.get("request-id") || crypto.randomUUID();
+  const traceId = request.headers.get("x-trace-id") || request.headers.get("traceparent") || undefined;
+  const debateId = path.length >= 2 && path[0] === "debates" ? path[1] : undefined;
+
+  return {
+    requestId,
+    ...(debateId ? { debateId } : {}),
+    ...(traceId ? { traceId } : {}),
+  };
+}
+
 async function proxyApi(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   const sourceUrl = new URL(request.url);
   const targetUrl = new URL(`/api/${path.join("/")}${sourceUrl.search}`, COORDINATOR_URL);
   const proxiedPath = safeUrlParts(new URL(`/api/${path.join("/")}${sourceUrl.search}`, sourceUrl.origin)).upstreamPath;
   const { upstream, upstreamPath } = safeUrlParts(targetUrl);
+  const correlation = getRequestCorrelation(request, path);
   const headers = new Headers(request.headers);
   headers.delete("host");
 
@@ -138,6 +163,7 @@ async function proxyApi(request: Request, { params }: { params: Promise<{ path: 
       path: proxiedPath,
       upstream,
       upstreamPath,
+      ...correlation,
       ...normalizeError(error),
     });
     throw error;
@@ -149,6 +175,7 @@ async function proxyApi(request: Request, { params }: { params: Promise<{ path: 
       path: proxiedPath,
       upstream,
       upstreamPath,
+      ...correlation,
       status: response.status,
       statusText: response.statusText,
       responseSnippet: await readSafeResponseSnippet(response),
