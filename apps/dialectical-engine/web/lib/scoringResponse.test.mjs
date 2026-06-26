@@ -641,6 +641,7 @@ test("recordSuspiciousScoringResponse logs successful empty scoring output once"
     {
       event: "scoring.empty_output",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response contained no scored items.",
         debateId: "debate-1",
@@ -700,6 +701,7 @@ test("recordSuspiciousScoringResponse logs successful missing artifact chain onc
     {
       event: "scoring.missing_artifact_chain",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response is missing artifact chain metadata.",
         debateId: "debate-1",
@@ -760,6 +762,7 @@ test("recordSuspiciousScoringResponse logs success with missing required fields 
     {
       event: "scoring.success_missing_required_fields",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response is missing required fields.",
         debateId: "debate-1",
