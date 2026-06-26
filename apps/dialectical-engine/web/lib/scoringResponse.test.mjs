@@ -886,6 +886,48 @@ test("recordSuspiciousScoringResponse logs success with missing required fields 
   ]);
 });
 
+test("recordSuspiciousScoringResponse does not propagate synchronous logger exceptions", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const throwingLogger = {
+    suspicious() { throw new Error("Logger infrastructure failure"); },
+  };
+
+  await assert.doesNotReject(() =>
+    recordSuspiciousScoringResponse(
+      {
+        debate_id: "debate-1",
+        status: "available",
+        node_ids: ["node-a"],
+        items: [],
+        scored_node_count: 0,
+      },
+      { operation: "load-scoring" },
+      throwingLogger
+    )
+  );
+});
+
+test("recordSuspiciousScoringResponse does not propagate async logger rejections", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const rejectingLogger = {
+    async suspicious() { throw new Error("Async logger infrastructure failure"); },
+  };
+
+  await assert.doesNotReject(() =>
+    recordSuspiciousScoringResponse(
+      {
+        debate_id: "debate-1",
+        status: "available",
+        node_ids: ["node-a"],
+        items: [],
+        scored_node_count: 0,
+      },
+      { operation: "load-scoring" },
+      rejectingLogger
+    )
+  );
+});
+
 test("recordSuspiciousScoringResponse does not log complete normal scoring output", async () => {
   const { recordSuspiciousScoringResponse } = await loadHelper();
   const events = [];
