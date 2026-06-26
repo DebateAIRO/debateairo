@@ -37,6 +37,20 @@ def enabled_env(environ: dict[str, str], name: str, default: bool) -> bool:
     return raw.strip().lower() not in {"0", "false", "no"}
 
 
+def real_worker_command(python: str, root: Path, environ: dict[str, str]) -> list[str]:
+    if not enabled_env(environ, "DIALECTICAL_DEV_WORKER_RELOAD", True):
+        return [python, "-m", "app.main"]
+    return [
+        python,
+        "-m",
+        "watchfiles",
+        "--filter",
+        "python",
+        f'"{python}" -m app.main',
+        str(root / "worker" / "app"),
+    ]
+
+
 def build_process_specs(
     *,
     root: Path = ROOT,
@@ -55,7 +69,7 @@ def build_process_specs(
     coordinator_args = [python, "-m", "uvicorn", "app.main:app", "--port", str(coordinator_port)]
     if enabled_env(environ, "DIALECTICAL_DEV_RELOAD", True):
         coordinator_args.insert(4, "--reload")
-    return [
+    specs = [
         ProcessSpec(
             "coordinator",
             coordinator_args,
@@ -100,6 +114,21 @@ def build_process_specs(
             {},
         ),
     ]
+    real_worker_config = environ.get("DIALECTICAL_DEV_REAL_WORKER_CONFIG", "").strip()
+    if real_worker_config:
+        specs.insert(
+            2,
+            ProcessSpec(
+                "worker-real",
+                real_worker_command(python, root, environ),
+                root / "worker",
+                {
+                    "DIALECTICAL_WORKER_CONFIG": str(Path(real_worker_config).expanduser()),
+                    "DIALECTICAL_COORDINATOR_URL": coordinator_url,
+                },
+            ),
+        )
+    return specs
 
 
 def start(spec: ProcessSpec) -> subprocess.Popen:
