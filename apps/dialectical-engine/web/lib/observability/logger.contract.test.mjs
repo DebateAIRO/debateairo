@@ -11,10 +11,9 @@ const envKeys = ["DEV_OBSERVABILITY", "DEV_OBSERVABILITY_LOG_PATH", "NODE_ENV"];
 
 function compileHelper() {
   rmSync(outDir, { recursive: true, force: true });
-  const tscCommand =
-    process.platform === "win32"
+  const tscCommand = process.env.TSC_BIN ?? (process.platform === "win32"
       ? join(process.cwd(), "node_modules", ".bin", "tsc.cmd")
-      : join(process.cwd(), "node_modules", ".bin", "tsc");
+      : join(process.cwd(), "node_modules", ".bin", "tsc"));
   const tscArgs = [
     "lib/observability/logger.ts",
     "lib/observability/index.ts",
@@ -81,6 +80,7 @@ test("suspicious logger method records an ordered warning severity", async () =>
 
   const event = JSON.parse(readFileSync(logPath, "utf8").trim());
   assert.equal(event.level, "warn");
+  assert.equal(event.category, "suspicious");
   assert.equal(event.event, "scoring.empty_output");
   assert.deepEqual(event.rootHint, {
     suspectedLayer: "artifact",

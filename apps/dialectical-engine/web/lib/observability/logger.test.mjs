@@ -11,10 +11,9 @@ const envKeys = ["DEV_OBSERVABILITY", "DEV_OBSERVABILITY_LOG_PATH", "NODE_ENV"];
 
 function compileHelper() {
   rmSync(outDir, { recursive: true, force: true });
-  const tscCommand =
-    process.platform === "win32"
+  const tscCommand = process.env.TSC_BIN ?? (process.platform === "win32"
       ? join(process.cwd(), "node_modules", ".bin", "tsc.cmd")
-      : join(process.cwd(), "node_modules", ".bin", "tsc");
+      : join(process.cwd(), "node_modules", ".bin", "tsc"));
   const tscArgs = [
     "lib/observability/logger.ts",
     "lib/observability/index.ts",
@@ -93,6 +92,10 @@ test("redactForLog redacts sensitive nested keys and truncates oversized payload
   const payload = redactForLog({
     userId: "user-1",
     Authorization: "Bearer secret-token",
+    rawPrompt: "private prompt text",
+    providerPayload: {
+      choices: [{ message: "private provider output" }]
+    },
     nested: {
       apiKey: "sk-live-secret",
       rawSecret: "Authorization: Bearer secret-token password=hunter2 sk-live-secret-value",
@@ -103,11 +106,24 @@ test("redactForLog redacts sensitive nested keys and truncates oversized payload
 
   assert.equal(payload.userId, "user-1");
   assert.equal(payload.Authorization, "[REDACTED]");
+  assert.equal(payload.rawPrompt, "[REDACTED]");
+  assert.equal(payload.providerPayload, "[REDACTED]");
   assert.equal(payload.nested.apiKey, "[REDACTED]");
   assert.equal(payload.nested.rawSecret, "[REDACTED]");
   assert.match(payload.nested.notes, /\[TRUNCATED 276 chars\]$/);
   assert.equal(payload.nested.values.length, 21);
   assert.equal(payload.nested.values.at(-1), "[TRUNCATED 10 items]");
+});
+
+test("redactForLog redacts sensitive error messages and stacks", async () => {
+  const { redactForLog } = await loadHelper();
+  const error = new Error("upstream failed with api_key=sk-live-secret-value");
+  error.stack = "Error: authorization: bearer secret-token\n    at test";
+
+  const payload = redactForLog({ error });
+
+  assert.equal(payload.error.message, "[REDACTED]");
+  assert.equal(payload.error.stack, "[REDACTED]");
 });
 
 test("developer logger stays disabled when DEV_OBSERVABILITY is false", async () => {

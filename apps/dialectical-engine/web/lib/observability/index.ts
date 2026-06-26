@@ -3,6 +3,7 @@ export {
   developerLogger,
   Logger,
   redactForLog,
+  type AppLogCategory,
   type AppLogEvent,
   type AppLogInput,
   type AppLogLevel,
