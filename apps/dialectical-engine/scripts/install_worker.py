@@ -151,7 +151,8 @@ def existing_registration_for(coordinator_url: str, name: str) -> WorkerConfig |
 
 async def run(args: argparse.Namespace) -> None:
     require_named_coordinator_url(args)
-    existing = existing_registration_for(args.coordinator_url, args.name)
+    rotate_token = getattr(args, "rotate_token", False)
+    existing = None if rotate_token else existing_registration_for(args.coordinator_url, args.name)
     allowed_models = parse_model_list(args.allowed_models)
     if args.allowed_models is None and existing is not None:
         allowed_models = existing.allowed_models
@@ -172,10 +173,15 @@ async def run(args: argparse.Namespace) -> None:
         config.user_token = user_token()
     client = CoordinatorClient(config)
     try:
-        await client.register(capabilities, persist=False)
+        if rotate_token:
+            await client.register(capabilities, persist=False, rotate_token=True)
+        else:
+            await client.register(capabilities, persist=False)
         await client.heartbeat(capabilities)
         save_config(config)
         print(f"Worker config saved for {config.name}.")
+        if rotate_token:
+            print("Worker token rotated; restart or reload any already-running worker process with the saved config.")
     finally:
         await client.aclose()
     if args.install_service:
@@ -200,6 +206,11 @@ def main() -> None:
         "--require-named-https",
         action="store_true",
         help="reject placeholder, non-HTTPS, local, or trycloudflare.com coordinator URLs",
+    )
+    parser.add_argument(
+        "--rotate-token",
+        action="store_true",
+        help="explicitly rotate an existing same-name worker token; restart/reload any running worker after this",
     )
     args = parser.parse_args()
     asyncio.run(run(args))

@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import get_type_hints
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from app.main import app
 from app.core.auth import hash_token
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, NodeScoringResult, ProvenanceRecord, Worker
+from app.core.db import SessionLocal
+from app.core.write_lock import commit_write
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
 from app.api import scoring as scoring_api
 from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegistry
 from app.scoring.caps import apply_score_caps
@@ -2847,6 +2852,93 @@ def test_score_debate_with_provider_registry_reports_unavailable_for_invalid_pro
     assert payload["errors"][0]["reason"] == "Judge output was not valid JSON."
 
 
+def test_score_nodes_with_provider_releases_sqlite_write_lock_before_each_provider_call(db) -> None:
+    class WriterProbeProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def judge_node(self, request):
+            self.calls += 1
+            with SessionLocal() as probe_db:
+                probe_db.execute(text("PRAGMA busy_timeout=50"))
+                probe_db.add(
+                    Worker(
+                        name=f"probe-writer-{self.calls}",
+                        token_hash="hash",
+                        capabilities=["probe"],
+                        status="online",
+                    )
+                )
+                try:
+                    commit_write(probe_db)
+                except OperationalError as exc:
+                    raise AssertionError("scoring provider call ran while a SQLite write lock was held") from exc
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={},
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/0",
+    )
+    child = Node(
+        id="child-node",
+        debate=debate,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Remote work removes commutes.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    root_generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    child_generation = Generation(
+        id="generation-child",
+        node=child,
+        model_id="model-a",
+        role="pro",
+        argument="Commute time can be spent on focused work or rest.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = root_generation.id
+    child.active_generation_id = child_generation.id
+    db.add_all([debate, worker, root, child, root_generation, child_generation])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    provider = WriterProbeProvider()
+
+    payload = score_nodes_with_provider(db, debate, provider, force_refresh=True)
+
+    assert provider.calls == 2
+    assert payload["status"] == "available"
+    assert db.scalars(select(Worker).where(Worker.name.like("probe-writer-%"))).all()
+
+
 def test_score_nodes_with_provider_audit_counts_only_model_calls_made(db) -> None:
     class CapturingProvider:
         provider = "test-provider"
@@ -3955,6 +4047,64 @@ def test_scoring_service_rejects_unknown_stored_status(db) -> None:
     assert payload["status"] == "unavailable"
     assert payload["items"] == []
     assert payload["reason"] == "Stored scoring output has an unknown status."
+
+
+def test_scoring_service_marks_active_scoring_job_over_stale_failed_output(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={
+                "status": "unavailable",
+                "node_ids": [node.id],
+                "items": [],
+                "reason": (
+                    "Scoring judge call failed: Codex command exited with code 1: "
+                    "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\","
+                    "\"message\":\"The 'codex-gpt-5.5' model is not supported when using Codex "
+                    "with a ChatGPT account.\"}}"
+                ),
+            },
+            status="complete",
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="gpt-5.5",
+        status="running",
+        deadline=now_utc() + timedelta(minutes=5),
+    )
+    db.add(job)
+    db.commit()
+
+    payload = debate_scoring_payload(db, debate)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["active_scoring_job_id"] == job.id
+    assert payload["active_scoring_job_status"] == "running"
+    assert payload["reason"] == "Judge outputs are being generated."
+    assert "codex-gpt-5.5" not in str(payload)
 
 
 def test_scoring_service_returns_stored_real_scoring_outputs(db) -> None:

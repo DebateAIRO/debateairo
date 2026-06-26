@@ -871,7 +871,34 @@ async def test_detect_adapters_respects_allowed_models(monkeypatch: pytest.Monke
         WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["codex-gpt-5.5"])
     )
 
-    assert set(adapters) == {"codex-gpt-5.5"}
+    assert set(adapters) == {"codex-gpt-5.5", "gpt-5.5"}
+    assert adapters["gpt-5.5"] is adapters["codex-gpt-5.5"]
+
+
+@pytest.mark.asyncio
+async def test_detect_adapters_allows_codex_scoring_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex")
+
+    async def no_ollama_models() -> list[str]:
+        return []
+
+    async def healthy_codex_probe(*command: str, stdout, stderr) -> FakeCliProcess:
+        assert command == ("codex", "--version")
+        assert stdout == asyncio.subprocess.PIPE
+        assert stderr == asyncio.subprocess.PIPE
+        return FakeCliProcess(stdout=b"codex 1.0\n", returncode=0)
+
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+    monkeypatch.setattr(subprocess_base.shutil, "which", lambda executable: f"/usr/local/bin/{executable}")
+    monkeypatch.setattr(codex_cli_module.asyncio, "create_subprocess_exec", healthy_codex_probe)
+    monkeypatch.setattr("app.capabilities.discover_ollama_models", no_ollama_models)
+
+    adapters = await detect_adapters(
+        WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["gpt-5.5"])
+    )
+
+    assert set(adapters) == {"gpt-5.5"}
+    assert adapters["gpt-5.5"].model_id == "codex-gpt-5.5"
 
 
 @pytest.mark.asyncio

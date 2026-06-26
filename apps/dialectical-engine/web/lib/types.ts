@@ -202,6 +202,8 @@ export type DebateScoringResponse = {
   generated_at?: string;
   model_metadata?: ScoringModelMetadata | null;
   cache?: ScoringCacheMetadata | null;
+  active_scoring_job_id?: string | null;
+  active_scoring_job_status?: "queued" | "running" | "complete" | "failed" | string | null;
 };
 
 export type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";

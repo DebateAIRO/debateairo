@@ -41,19 +41,34 @@ class CoordinatorClient:
             "X-Worker-ID": self.config.worker_id,
         }
 
-    async def register(self, capabilities: list[str], *, persist: bool = True, save_path: Path | None = None) -> None:
-        if self.config.worker_id and self.config.worker_token:
+    async def register(
+        self,
+        capabilities: list[str],
+        *,
+        persist: bool = True,
+        save_path: Path | None = None,
+        rotate_token: bool = False,
+    ) -> None:
+        if self.config.worker_id and self.config.worker_token and not rotate_token:
             return
         if not self.config.user_token:
             raise RuntimeError("Set user_token in worker config or DIALECTICAL_USER_TOKEN to register")
+        payload: dict[str, object] = {"name": self.config.name, "capabilities": capabilities}
+        if rotate_token:
+            payload["rotate_token"] = True
         response = await self.client.post(
             "/api/workers/register",
             headers={"Authorization": f"Bearer {self.config.user_token}"},
-            json={"name": self.config.name, "capabilities": capabilities},
+            json=payload,
         )
         response.raise_for_status()
         payload = response.json()
         self.config.worker_id = payload["worker_id"]
+        if not payload.get("worker_token"):
+            raise RuntimeError(
+                "Worker name is already registered and the coordinator preserved its token. "
+                "Reuse the saved worker config or pass --rotate-token, then restart/reload that worker."
+            )
         self.config.worker_token = payload["worker_token"]
         if isinstance(payload.get("name"), str) and payload["name"].strip():
             self.config.name = payload["name"].strip()

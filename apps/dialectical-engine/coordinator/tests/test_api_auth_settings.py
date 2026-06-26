@@ -461,7 +461,7 @@ def test_worker_registration_rejects_blank_identity_or_capabilities(db) -> None:
     assert db.scalars(select(Worker)).all() == []
 
 
-def test_worker_reregistration_requeues_active_job_and_rotates_token(db) -> None:
+def test_worker_reregistration_preserves_existing_token_and_live_job(db) -> None:
     _public_hits.clear()
     worker = Worker(
         name="adesso-mbp",
@@ -510,37 +510,29 @@ def test_worker_reregistration_requeues_active_job_and_rotates_token(db) -> None
     assert response.status_code == 200
     payload = response.json()
     assert payload["worker_id"] == worker.id
-    assert payload["worker_token"] != "old-worker-token"
+    assert payload["worker_token"] is None
     assert payload["name"] == "adesso-mbp"
     assert payload["capabilities"] == ["codex-gpt-5.5"]
     db.expire_all()
     refreshed_worker = db.get(Worker, worker.id)
     refreshed_job = db.get(Job, running_job.id)
-    assert refreshed_worker.current_job_id is None
+    assert refreshed_worker.current_job_id == running_job.id
     assert refreshed_worker.capabilities == ["codex-gpt-5.5"]
     assert refreshed_worker.name == "adesso-mbp"
     assert refreshed_worker.status == "online"
-    assert refreshed_job.status == "pending"
-    assert refreshed_job.worker_id is None
-    assert refreshed_job.claimed_at is None
-    assert refreshed_job.error == "Worker re-registered"
-    assert refreshed_job.stream_buffer == ""
+    assert refreshed_job.status == "running"
+    assert refreshed_job.worker_id == worker.id
+    assert refreshed_job.stream_buffer == "partial output from old registration"
 
     old_heartbeat = client.post(
         f"/api/workers/{worker.id}/heartbeat",
         headers={"Authorization": "Bearer old-worker-token"},
         json={"capabilities": ["mock-local"]},
     )
-    new_heartbeat = client.post(
-        f"/api/workers/{worker.id}/heartbeat",
-        headers={"Authorization": f"Bearer {payload['worker_token']}"},
-        json={"capabilities": [" codex-gpt-5.5 ", "codex-gpt-5.5"]},
-    )
-    assert old_heartbeat.status_code == 403
-    assert new_heartbeat.status_code == 200
+    assert old_heartbeat.status_code == 200
     db.expire_all()
     assert len(db.scalars(select(Worker)).all()) == 1
-    assert db.get(Worker, worker.id).capabilities == ["codex-gpt-5.5"]
+    assert db.get(Worker, worker.id).capabilities == ["mock-local"]
 
 
 def test_completed_job_rejects_late_worker_mutations(db) -> None:

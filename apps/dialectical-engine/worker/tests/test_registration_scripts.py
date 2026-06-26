@@ -43,6 +43,9 @@ def test_register_worker_respects_allowed_models(tmp_path: Path, monkeypatch) ->
             self.config.worker_id = "worker-1"
             self.config.worker_token = "worker_secret"
 
+        async def heartbeat(self, capabilities: list[str]) -> None:
+            captured["heartbeat_capabilities"] = capabilities
+
         async def aclose(self) -> None:
             captured["closed"] = True
 
@@ -68,6 +71,7 @@ def test_register_worker_respects_allowed_models(tmp_path: Path, monkeypatch) ->
 
     assert captured["detected_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
     assert captured["registered_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
     assert captured["register_persist"] is False
     assert captured["register_save_path"] is None
     assert captured["saved_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
@@ -142,6 +146,82 @@ def test_register_worker_named_https_guard_rejects_quick_tunnel_before_token(tmp
 
     with pytest.raises(RuntimeError, match="trycloudflare.com quick tunnel"):
         asyncio.run(module.run(args))
+
+
+def test_register_worker_reuses_matching_registration_without_user_token(monkeypatch, tmp_path: Path) -> None:
+    module = load_module(ROOT / "scripts" / "register_worker.py", "dialectical_register_worker_reuse")
+    captured: dict[str, object] = {}
+
+    async def fake_detect_adapters(config):
+        captured["detected_allowed_models"] = config.allowed_models
+        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5"]}
+
+    class FakeCoordinatorClient:
+        def __init__(self, config) -> None:
+            self.config = config
+            captured["client_worker_id"] = config.worker_id
+            captured["client_worker_token"] = config.worker_token
+
+        async def register(self, capabilities: list[str], *, persist: bool = True, save_path: Path | None = None) -> None:
+            captured["register_capabilities"] = capabilities
+            captured["register_user_token"] = self.config.user_token
+            captured["register_worker_id"] = self.config.worker_id
+            captured["register_persist"] = persist
+            captured["register_save_path"] = save_path
+
+        async def heartbeat(self, capabilities: list[str]) -> None:
+            captured["heartbeat_capabilities"] = capabilities
+
+        async def aclose(self) -> None:
+            captured["closed"] = True
+
+    def unexpected_user_token() -> str:
+        raise AssertionError("user token should not be requested when a matching worker registration exists")
+
+    def fake_save_config(config, path=None) -> None:
+        captured["saved_worker_id"] = config.worker_id
+        captured["saved_worker_token"] = config.worker_token
+        captured["saved_path"] = path
+
+    monkeypatch.setattr(module, "user_token", unexpected_user_token)
+    monkeypatch.setattr(
+        module,
+        "load_file_config",
+        lambda path=None: module.WorkerConfig(
+            coordinator_url="https://debate.example.com/",
+            name="adesso-mbp",
+            worker_id="worker-existing",
+            worker_token="worker-secret",
+        ),
+    )
+    monkeypatch.setattr(module, "detect_adapters", fake_detect_adapters)
+    monkeypatch.setattr(module, "CoordinatorClient", FakeCoordinatorClient)
+    monkeypatch.setattr(module, "save_config", fake_save_config)
+
+    config_path = tmp_path / "worker.toml"
+    args = SimpleNamespace(
+        coordinator_url="https://debate.example.com",
+        name="adesso-mbp",
+        config=str(config_path),
+        enable_mock=False,
+        allowed_models="codex-gpt-5.5",
+        require_named_https=False,
+    )
+
+    asyncio.run(module.run(args))
+
+    assert captured["client_worker_id"] == "worker-existing"
+    assert captured["client_worker_token"] == "worker-secret"
+    assert captured["register_user_token"] is None
+    assert captured["register_worker_id"] == "worker-existing"
+    assert captured["register_capabilities"] == ["codex-gpt-5.5"]
+    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5"]
+    assert captured["register_persist"] is False
+    assert captured["register_save_path"] is None
+    assert captured["saved_worker_id"] == "worker-existing"
+    assert captured["saved_worker_token"] == "worker-secret"
+    assert captured["saved_path"] == config_path
+    assert captured["closed"] is True
 
 
 def test_install_worker_respects_allowed_models(monkeypatch) -> None:

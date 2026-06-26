@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
-from app.core.write_lock import flush_write
-from app.models.entities import AnalyzerRun, Debate, Generation, Node, ProvenanceRecord, now_utc, uuid_str
+from app.core.write_lock import commit_write, flush_write
+from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, ProvenanceRecord, now_utc, uuid_str
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
 from app.scoring.cache import (
     lookup_scoring_cache,
@@ -37,6 +37,7 @@ SCORING_ANALYZER_TYPE = "node_scoring"
 SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES = 12
+ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
 SECRET_METADATA_MARKERS = (
     "api_key",
     "apikey",
@@ -71,44 +72,60 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         .order_by(AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
         .limit(1)
     ).first()
+    active_job = _active_scoring_job(db, debate.id, newer_than=run.created_at if run else None)
     if not run:
-        return _unavailable_payload(debate.id, node_ids=node_ids)
+        return _attach_active_scoring_job(_unavailable_payload(debate.id, node_ids=node_ids), active_job)
     if not isinstance(run.provenance, dict) or run.provenance.get("scoring_source") != JUDGE_OUTPUT_SOURCE:
-        return _unavailable_payload(
-            debate.id,
-            reason="Stored scoring output was not produced by judge outputs.",
-            node_ids=node_ids,
+        return _attach_active_scoring_job(
+            _unavailable_payload(
+                debate.id,
+                reason="Stored scoring output was not produced by judge outputs.",
+                node_ids=node_ids,
+            ),
+            active_job,
         )
 
     output = run.output if isinstance(run.output, dict) else {}
     items = output.get("items")
     if not isinstance(items, list):
-        return _unavailable_payload(
-            debate.id,
-            reason="Stored scoring output is missing an items array.",
-            node_ids=node_ids,
+        return _attach_active_scoring_job(
+            _unavailable_payload(
+                debate.id,
+                reason="Stored scoring output is missing an items array.",
+                node_ids=node_ids,
+            ),
+            active_job,
         )
     try:
         validated_items = [_public_scoring_item(item) for item in items]
     except ValidationError:
-        return _unavailable_payload(
-            debate.id,
-            reason="Stored scoring output contains malformed node scoring items.",
-            node_ids=node_ids,
+        return _attach_active_scoring_job(
+            _unavailable_payload(
+                debate.id,
+                reason="Stored scoring output contains malformed node scoring items.",
+                node_ids=node_ids,
+            ),
+            active_job,
         )
     try:
         status = ScoringStatusModel(status=str(output.get("status") or "available")).status
     except ValidationError:
-        return _unavailable_payload(
-            debate.id,
-            reason="Stored scoring output has an unknown status.",
-            node_ids=node_ids,
+        return _attach_active_scoring_job(
+            _unavailable_payload(
+                debate.id,
+                reason="Stored scoring output has an unknown status.",
+                node_ids=node_ids,
+            ),
+            active_job,
         )
     if any(item["node_id"] not in set(node_ids) for item in validated_items):
-        return _unavailable_payload(
-            debate.id,
-            reason="Stored scoring output references nodes outside the current debate.",
-            node_ids=node_ids,
+        return _attach_active_scoring_job(
+            _unavailable_payload(
+                debate.id,
+                reason="Stored scoring output references nodes outside the current debate.",
+                node_ids=node_ids,
+            ),
+            active_job,
         )
 
     payload = {
@@ -133,7 +150,7 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         payload["producer"] = producer
     if output.get("generated_at"):
         payload["generated_at"] = output["generated_at"]
-    return payload
+    return _attach_active_scoring_job(payload, active_job)
 
 
 def score_one_node_with_provider(
@@ -336,6 +353,7 @@ def score_nodes_with_provider(
             max_nodes=max_nodes,
             model_call_count=0,
         )
+        commit_write(db)
     items: list[dict] = []
     errors: list[NodeScoringError] = [
         NodeScoringError(
@@ -370,6 +388,7 @@ def score_nodes_with_provider(
                 force_refresh=force_refresh,
                 provider_call_latencies_ms=provider_call_latencies_ms,
             )
+            commit_write(db)
         except asyncio.CancelledError:
             errors.append(
                 NodeScoringError(
@@ -608,6 +627,40 @@ def _unavailable_payload(
     if model_metadata is not None:
         payload["model_metadata"] = model_metadata
     return payload
+
+
+def _active_scoring_job(db: Session, debate_id: str, *, newer_than) -> Job | None:
+    query = select(Job).where(
+        Job.debate_id == debate_id,
+        Job.job_type == SCORING_JOB_TYPE,
+        Job.status.in_(ACTIVE_SCORING_JOB_STATUSES),
+        Job.deadline >= now_utc(),
+    )
+    if newer_than is not None:
+        query = query.where(Job.created_at >= newer_than)
+    return db.scalars(query.order_by(Job.created_at.desc(), Job.id.desc()).limit(1)).first()
+
+
+def _public_scoring_job_status(status: str) -> str:
+    if status == "pending":
+        return "queued"
+    if status in {"claimed", "running"}:
+        return "running"
+    if status in {"complete", "failed"}:
+        return status
+    return "failed"
+
+
+def _attach_active_scoring_job(payload: dict, job: Job | None) -> dict:
+    if job is None:
+        return payload
+    next_payload = dict(payload)
+    next_payload["active_scoring_job_id"] = job.id
+    next_payload["active_scoring_job_status"] = _public_scoring_job_status(job.status)
+    if not next_payload.get("items"):
+        next_payload["reason"] = "Judge outputs are being generated."
+        next_payload.pop("errors", None)
+    return next_payload
 
 
 def _provider_error_reason(exc: Exception, fallback: str) -> str:

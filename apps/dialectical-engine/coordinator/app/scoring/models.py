@@ -332,3 +332,5 @@ class DebateScoringResponse(BaseModel):
     producer: str | None = None
     model_metadata: ScoringModelMetadata | None = None
     cache: ScoringCacheMetadata | None = None
+    active_scoring_job_id: str | None = None
+    active_scoring_job_status: ScoringJobStatus | None = None

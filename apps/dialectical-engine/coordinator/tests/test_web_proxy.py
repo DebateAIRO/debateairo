@@ -216,6 +216,15 @@ def test_web_proxy_uses_longer_default_next_ready_timeout() -> None:
     assert proxy.next_ready_timeout == 360
 
 
+def test_web_proxy_detects_next_hmr_websocket_upgrade() -> None:
+    module = load_web_proxy_module()
+
+    assert module.is_websocket_upgrade({"Connection": "keep-alive, Upgrade", "Upgrade": "websocket"}) is True
+    assert module.is_websocket_upgrade({"Connection": "keep-alive", "Upgrade": "websocket"}) is False
+    assert module.is_next_hmr_websocket("/_next/webpack-hmr?page=/debate/1") is True
+    assert module.is_next_hmr_websocket("/api/debates") is False
+
+
 def test_web_proxy_stream_response_treats_sse_disconnect_as_closed_connection() -> None:
     handler = proxy_handler()
 

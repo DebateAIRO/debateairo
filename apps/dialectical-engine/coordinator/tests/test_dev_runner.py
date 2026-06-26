@@ -101,6 +101,48 @@ def test_make_dev_topology_defaults_to_goal_ports_and_worker_a() -> None:
     assert by_name["web"].cwd == ROOT
 
 
+def test_make_dev_can_start_autoreloading_real_worker_from_saved_config() -> None:
+    module = load_dev_module()
+
+    specs = module.build_process_specs(
+        root=ROOT,
+        python="/python",
+        environ={"DIALECTICAL_DEV_REAL_WORKER_CONFIG": "~/.dialectical-worker/config.toml"},
+    )
+    by_name = {spec.name: spec for spec in specs}
+
+    assert list(by_name) == ["coordinator", "worker-a", "worker-real", "web"]
+    assert by_name["worker-real"].cwd == ROOT / "worker"
+    assert "dialectical-worker" in by_name["worker-real"].env["DIALECTICAL_WORKER_CONFIG"]
+    assert by_name["worker-real"].env["DIALECTICAL_WORKER_CONFIG"].endswith("config.toml")
+    assert by_name["worker-real"].env["DIALECTICAL_COORDINATOR_URL"] == "http://localhost:8000"
+    assert by_name["worker-real"].args == [
+        "/python",
+        "-m",
+        "watchfiles",
+        "--filter",
+        "python",
+        '"/python" -m app.main',
+        str(ROOT / "worker" / "app"),
+    ]
+
+
+def test_make_dev_real_worker_reload_can_be_disabled() -> None:
+    module = load_dev_module()
+
+    specs = module.build_process_specs(
+        root=ROOT,
+        python="/python",
+        environ={
+            "DIALECTICAL_DEV_REAL_WORKER_CONFIG": "~/.dialectical-worker/config.toml",
+            "DIALECTICAL_DEV_WORKER_RELOAD": "0",
+        },
+    )
+    by_name = {spec.name: spec for spec in specs}
+
+    assert by_name["worker-real"].args == ["/python", "-m", "app.main"]
+
+
 def test_make_dev_allows_isolated_ports_for_smoke_checks() -> None:
     module = load_dev_module()
 
@@ -121,8 +163,8 @@ def test_make_dev_allows_isolated_ports_for_smoke_checks() -> None:
     by_name = {spec.name: spec for spec in specs}
 
     assert by_name["coordinator"].args[-1] == "8765"
-    assert by_name["coordinator"].env["DIALECTICAL_DATABASE_URL"] == "sqlite:////tmp/dialectical-isolated-dev/db.sqlite3"
-    assert by_name["worker-a"].env["DIALECTICAL_WORKER_CONFIG"] == "/tmp/dialectical-isolated-dev/worker.toml"
+    assert by_name["coordinator"].env["DIALECTICAL_DATABASE_URL"].replace("\\", "/") == "sqlite:////tmp/dialectical-isolated-dev/db.sqlite3"
+    assert by_name["worker-a"].env["DIALECTICAL_WORKER_CONFIG"].replace("\\", "/") == "/tmp/dialectical-isolated-dev/worker.toml"
     assert by_name["worker-a"].env["DIALECTICAL_COORDINATOR_URL"] == "http://localhost:8765"
     assert by_name["worker-a"].env["DIALECTICAL_USER_TOKEN"] == "user_custom"
     assert by_name["worker-a"].env["DIALECTICAL_WORKER_NAME"] == "custom-worker"

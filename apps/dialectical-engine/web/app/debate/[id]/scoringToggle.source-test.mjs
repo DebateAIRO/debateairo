@@ -62,10 +62,11 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   const responseSource = readFileSync(responsePath, "utf8");
   for (const label of [
     "Scoring off",
+    "No scoring run yet",
     "User token required",
     "Scoring provider required",
     "Scoring unavailable",
-    "Refreshing scoring",
+    "Scoring in progress",
     "Real scores displayed",
   ]) {
     assert.match(responseSource, new RegExp(label), `Scoring visibility copy should include ${label}`);
@@ -89,6 +90,16 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
     debatePageSource,
     /<ScoringHolesSummaryPanel[\s\S]*?enabled=\{scoringEnabled\}[\s\S]*?state=\{scoringState\}/,
     "The scoring summary panel should receive the same toggle and response state"
+  );
+  assert.match(
+    debatePageSource,
+    /const scoringInsightsExpandable = scoringEnabled && scoringState\.status === "loaded" && scoringByNodeId\.size > 0/,
+    "The full scoring insights panel should only be expandable after real scored nodes are available"
+  );
+  assert.match(
+    debatePageSource,
+    /scoringInsightsExpandable \? \([\s\S]*?<details className="scoringInsightsPanel">[\s\S]*?<ScoringVisibilityPanel state=\{scoringVisibility\} \/>[\s\S]*?\) : \([\s\S]*?<section[\s\S]*?className="scoringInsightsPanel scoringInsightsPanelCompact"[\s\S]*?data-scoring-insights-compact="true"/,
+    "Unavailable, errored, and off scoring states should stay in the compact scoring insights status instead of rendering the expanded stack"
   );
   assert.match(
     debatePageSource,

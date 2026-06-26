@@ -5,6 +5,7 @@ import atexit
 import http.client
 import os
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -27,6 +28,28 @@ HOP_BY_HOP_HEADERS = {
 DEFAULT_COORDINATOR_PREFIXES = ("/api/", "/healthz", "/openapi.json", "/docs", "/redoc")
 CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionResetError)
 DEFAULT_NEXT_READY_TIMEOUT_SECONDS = 360
+NEXT_HMR_WEBSOCKET_PATH = "/_next/webpack-hmr"
+
+
+def is_websocket_upgrade(headers: object) -> bool:
+    connection = str(headers.get("Connection", ""))  # type: ignore[attr-defined]
+    upgrade = str(headers.get("Upgrade", ""))  # type: ignore[attr-defined]
+    return "upgrade" in connection.lower() and upgrade.lower() == "websocket"
+
+
+def is_next_hmr_websocket(path: str) -> bool:
+    return urlsplit(path).path == NEXT_HMR_WEBSOCKET_PATH
+
+
+def close_socket(sock: socket.socket) -> None:
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    try:
+        sock.close()
+    except OSError:
+        pass
 
 
 class WebProxy:
@@ -161,6 +184,14 @@ class WebProxy:
                     if self.path.startswith(DEFAULT_COORDINATOR_PREFIXES)
                     else (proxy.next_host, proxy.next_port)
                 )
+                if (
+                    target_host == proxy.next_host
+                    and target_port == proxy.next_port
+                    and is_next_hmr_websocket(self.path)
+                    and is_websocket_upgrade(self.headers)
+                ):
+                    self.proxy_websocket(target_host, target_port)
+                    return
                 parsed = urlsplit(self.path)
                 path = parsed.path or "/"
                 if parsed.query:
@@ -205,6 +236,65 @@ class WebProxy:
                         self.close_connection = True
                 finally:
                     conn.close()
+
+            def proxy_websocket(self, target_host: str, target_port: int) -> None:
+                upstream: socket.socket | None = None
+                try:
+                    upstream = socket.create_connection((target_host, target_port), timeout=60)
+                    upstream.sendall(self.websocket_request_bytes(target_host, target_port))
+                    self.close_connection = True
+                    self.tunnel_websocket(upstream)
+                except CLIENT_DISCONNECT_ERRORS:
+                    self.close_connection = True
+                except Exception as exc:  # noqa: BLE001 - keep proxy alive and surface failure.
+                    if upstream is not None:
+                        close_socket(upstream)
+                    message = f"Upstream websocket proxy error: {exc}\n".encode()
+                    try:
+                        self.send_response(502, "Bad Gateway")
+                        self.send_header("Content-Type", "text/plain; charset=utf-8")
+                        self.send_header("Content-Length", str(len(message)))
+                        self.end_headers()
+                        self.wfile.write(message)
+                    except CLIENT_DISCONNECT_ERRORS:
+                        self.close_connection = True
+
+            def websocket_request_bytes(self, target_host: str, target_port: int) -> bytes:
+                parsed = urlsplit(self.path)
+                path = parsed.path or "/"
+                if parsed.query:
+                    path = f"{path}?{parsed.query}"
+                lines = [f"{self.command} {path} HTTP/1.1"]
+                for key, value in self.headers.items():
+                    if key.lower() == "host":
+                        continue
+                    lines.append(f"{key}: {value}")
+                lines.append(f"Host: {target_host}:{target_port}")
+                lines.append("")
+                lines.append("")
+                return "\r\n".join(lines).encode("latin-1")
+
+            def tunnel_websocket(self, upstream: socket.socket) -> None:
+                def copy(src: socket.socket, dst: socket.socket) -> None:
+                    try:
+                        while True:
+                            chunk = src.recv(64 * 1024)
+                            if not chunk:
+                                return
+                            dst.sendall(chunk)
+                    except OSError:
+                        return
+                    finally:
+                        close_socket(dst)
+
+                client = self.connection
+                upstream_to_client = threading.Thread(target=copy, args=(upstream, client), daemon=True)
+                client_to_upstream = threading.Thread(target=copy, args=(client, upstream), daemon=True)
+                upstream_to_client.start()
+                client_to_upstream.start()
+                upstream_to_client.join()
+                close_socket(client)
+                close_socket(upstream)
 
             def stream_response(self, response: http.client.HTTPResponse) -> None:
                 content_type = response.getheader("Content-Type", "")

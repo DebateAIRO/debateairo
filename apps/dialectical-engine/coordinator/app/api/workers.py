@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api", tags=["workers"])
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     capabilities: list[str] = Field(default_factory=list)
+    rotate_token: bool = False
 
 
 class HeartbeatRequest(BaseModel):
@@ -80,15 +81,18 @@ def register_worker(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    token = new_secret_token("worker")
+    token: str | None = None
     worker = db.scalar(select(Worker).where(Worker.name == name))
     if worker:
-        requeue_active_jobs_for_worker(db, worker, "Worker re-registered")
-        worker.token_hash = hash_token(token)
+        if payload.rotate_token:
+            token = new_secret_token("worker")
+            requeue_active_jobs_for_worker(db, worker, "Worker token rotated")
+            worker.token_hash = hash_token(token)
         worker.capabilities = capabilities
         worker.status = "online"
         worker.last_seen = now_utc()
     else:
+        token = new_secret_token("worker")
         worker = Worker(
             name=name,
             token_hash=hash_token(token),

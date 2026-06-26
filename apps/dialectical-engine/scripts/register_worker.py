@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "worker"))
 
-from app.config import WorkerConfig, parse_model_list, save_config
+from app.config import WorkerConfig, load_file_config, parse_model_list, save_config
 from app.capabilities import detect_adapters
 from app.client import CoordinatorClient
 
@@ -75,8 +75,29 @@ def require_named_coordinator_url(args: argparse.Namespace) -> None:
             raise RuntimeError(f"Invalid named coordinator URL: {issue}")
 
 
+def same_origin(left: str, right: str) -> bool:
+    return left.strip().rstrip("/") == right.strip().rstrip("/")
+
+
+def existing_registration_for(config_path: Path, coordinator_url: str, name: str) -> WorkerConfig | None:
+    try:
+        config = load_file_config(config_path)
+    except Exception:
+        return None
+    if not config.worker_id or not config.worker_token:
+        return None
+    if config.name != name:
+        return None
+    if not same_origin(config.coordinator_url, coordinator_url):
+        return None
+    return config
+
+
 async def run(args: argparse.Namespace) -> None:
     require_named_coordinator_url(args)
+    config_path = Path(args.config).expanduser()
+    rotate_token = getattr(args, "rotate_token", False)
+    existing = None if rotate_token else existing_registration_for(config_path, args.coordinator_url, args.name)
     config = WorkerConfig(
         coordinator_url=args.coordinator_url,
         name=args.name,
@@ -86,12 +107,23 @@ async def run(args: argparse.Namespace) -> None:
     adapters = await detect_adapters(config)
     capabilities = sorted(adapters)
     require_capabilities(capabilities, config.allowed_models)
-    config.user_token = user_token()
+    if existing is not None:
+        config.worker_id = existing.worker_id
+        config.worker_token = existing.worker_token
+        print(f"Reusing existing worker registration for {config.name}.")
+    else:
+        config.user_token = user_token()
     client = CoordinatorClient(config)
     try:
-        await client.register(capabilities, persist=False)
-        save_config(config, Path(args.config).expanduser())
+        if rotate_token:
+            await client.register(capabilities, persist=False, rotate_token=True)
+        else:
+            await client.register(capabilities, persist=False)
+        await client.heartbeat(capabilities)
+        save_config(config, config_path)
         print(f"Registered {config.name} as {config.worker_id}")
+        if rotate_token:
+            print("Worker token rotated; restart or reload any already-running worker process with the saved config.")
     finally:
         await client.aclose()
 
@@ -111,6 +143,11 @@ def main() -> None:
         "--require-named-https",
         action="store_true",
         help="reject placeholder, non-HTTPS, local, or trycloudflare.com coordinator URLs",
+    )
+    parser.add_argument(
+        "--rotate-token",
+        action="store_true",
+        help="explicitly rotate an existing same-name worker token; restart/reload any running worker after this",
     )
     args = parser.parse_args()
     asyncio.run(run(args))

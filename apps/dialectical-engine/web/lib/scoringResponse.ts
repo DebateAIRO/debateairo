@@ -1,4 +1,9 @@
 import type { DebateScoringResponse, NodeScoringError, NodeScoringPayload, Severity } from "./types";
+import {
+  recordSuspiciousScoringEvents,
+  type SuspiciousScoringContext,
+  type SuspiciousScoringLogger,
+} from "./observability/suspiciousScoring";
 
 export type IndexedScoringResponse = {
   scoringByNodeId: Map<string, NodeScoringPayload>;
@@ -55,6 +60,7 @@ export type DebateScoringUnresolvedIssue =
 
 export type ScoringVisibilityKind =
   | "off"
+  | "empty"
   | "token_required"
   | "provider_required"
   | "unavailable"
@@ -116,6 +122,34 @@ function retainedScoreDetail(response: DebateScoringResponse | null): string {
   return `Showing ${pluralize(count, "persisted scored node")} while it completes.`;
 }
 
+function hasActiveScoringJob(response: DebateScoringResponse | null): boolean {
+  return response?.active_scoring_job_status === "queued" || response?.active_scoring_job_status === "running";
+}
+
+function activeScoringJobDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "Judge outputs are being generated.";
+  return `Judge outputs are being generated. ${retainedScoreDetail(response)}`;
+}
+
+function unavailableNodeCount(response: DebateScoringResponse | null): number {
+  return response?.errors?.length ?? 0;
+}
+
+function partialScoreDetail(response: DebateScoringResponse | null): string {
+  const scoredCount = response?.scored_node_count ?? response?.items?.length ?? 0;
+  const unavailableCount = unavailableNodeCount(response);
+  const scoredDetail =
+    scoredCount > 0 ? `Showing ${pluralize(scoredCount, "persisted scored node")}` : "No persisted scored nodes";
+  return unavailableCount > 0
+    ? `${scoredDetail}; ${pluralize(unavailableCount, "unavailable node")}.`
+    : `${scoredDetail}.`;
+}
+
+function isMissingJudgeOutputReason(reason?: string | null): boolean {
+  return (reason || "").trim().toLowerCase() === "no scoring judge outputs are available for this debate.";
+}
+
 function looksProviderOrTokenRequired(value: string | null | undefined): boolean {
   const lower = (value || "").toLowerCase();
   return (
@@ -151,6 +185,14 @@ export function indexScoringResponse(response: DebateScoringResponse | null): In
   };
 }
 
+export async function recordSuspiciousScoringResponse(
+  response: DebateScoringResponse | null,
+  context: SuspiciousScoringContext,
+  logger: SuspiciousScoringLogger
+): Promise<void> {
+  await recordSuspiciousScoringEvents(response, context, logger);
+}
+
 export function formatScoringVisibilityState(input: ScoringVisibilityInput): ScoringVisibilityState {
   const reason = input.error || input.response?.reason || null;
 
@@ -163,13 +205,32 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
   }
 
   if (input.refreshStatus === "starting" || input.scoringStatus === "loading") {
+    const hasRetainedScores = (input.response?.scored_node_count ?? input.response?.items?.length ?? 0) > 0;
     return {
       kind: "refreshing",
-      title: input.scoringStatus === "loading" && input.refreshStatus === "idle" ? "Loading scoring" : "Refreshing scoring",
+      title: input.scoringStatus === "loading" && input.refreshStatus === "idle" ? "Loading scoring" : "Scoring in progress",
       detail:
         input.refreshStatus === "idle"
           ? "Reading persisted scoring state for this debate."
-          : `Running the synchronous scoring refresh now. ${retainedScoreDetail(input.response)}`,
+          : hasRetainedScores
+            ? `Judge outputs are being generated. ${retainedScoreDetail(input.response)}`
+            : "Judge outputs are being generated.",
+    };
+  }
+
+  if (hasActiveScoringJob(input.response)) {
+    return {
+      kind: "refreshing",
+      title: "Scoring in progress",
+      detail: activeScoringJobDetail(input.response),
+    };
+  }
+
+  if (input.scoringStatus === "unavailable" && isMissingJudgeOutputReason(reason)) {
+    return {
+      kind: "empty",
+      title: "No scoring run yet",
+      detail: "Refresh scoring to generate judge outputs.",
     };
   }
 
@@ -198,6 +259,14 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
         count > 0
           ? `Unlock actions with a user token to refresh scoring. Showing ${pluralize(count, "persisted scored node")}.`
           : "Unlock actions with a user token to refresh scoring. No persisted scored nodes are available.",
+    };
+  }
+
+  if (input.response?.status === "partial") {
+    return {
+      kind: "scores",
+      title: "Scores partially checked",
+      detail: partialScoreDetail(input.response),
     };
   }
 

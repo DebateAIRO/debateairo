@@ -58,6 +58,15 @@ test("formatScoringStatusCopy names unchecked, checking, checked, partial, faile
   assert.equal(formatScoringStatusCopy({ enabled: true, scoringStatus: "loaded", refreshStatus: "idle", responseStatus: "partial" }), "Scores partially checked");
   assert.equal(formatScoringStatusCopy({ enabled: true, scoringStatus: "error", refreshStatus: "idle", error: "Model timeout" }), "Scoring check failed: Model timeout");
   assert.equal(formatScoringStatusCopy({ enabled: true, scoringStatus: "unavailable", refreshStatus: "idle", reason: "Model unavailable" }), "Scoring check failed: Model unavailable");
+  assert.equal(
+    formatScoringStatusCopy({
+      enabled: true,
+      scoringStatus: "unavailable",
+      refreshStatus: "idle",
+      reason: "No scoring judge outputs are available for this debate.",
+    }),
+    "No scoring run yet - refresh scoring"
+  );
   assert.equal(formatScoringStatusCopy({ enabled: true, scoringStatus: "loaded", refreshStatus: "idle", responseStatus: "available", cacheHit: true }), "Cached scores");
 });
 
