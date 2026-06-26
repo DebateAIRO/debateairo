@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import get_type_hints
 
@@ -15,7 +16,7 @@ from app.main import app
 from app.core.auth import hash_token
 from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, NodeScoringResult, ProvenanceRecord, Worker
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
 from app.api import scoring as scoring_api
 from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegistry
 from app.scoring.caps import apply_score_caps
@@ -4046,6 +4047,64 @@ def test_scoring_service_rejects_unknown_stored_status(db) -> None:
     assert payload["status"] == "unavailable"
     assert payload["items"] == []
     assert payload["reason"] == "Stored scoring output has an unknown status."
+
+
+def test_scoring_service_marks_active_scoring_job_over_stale_failed_output(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={
+                "status": "unavailable",
+                "node_ids": [node.id],
+                "items": [],
+                "reason": (
+                    "Scoring judge call failed: Codex command exited with code 1: "
+                    "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\","
+                    "\"message\":\"The 'codex-gpt-5.5' model is not supported when using Codex "
+                    "with a ChatGPT account.\"}}"
+                ),
+            },
+            status="complete",
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="gpt-5.5",
+        status="running",
+        deadline=now_utc() + timedelta(minutes=5),
+    )
+    db.add(job)
+    db.commit()
+
+    payload = debate_scoring_payload(db, debate)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["active_scoring_job_id"] == job.id
+    assert payload["active_scoring_job_status"] == "running"
+    assert payload["reason"] == "Judge outputs are being generated."
+    assert "codex-gpt-5.5" not in str(payload)
 
 
 def test_scoring_service_returns_stored_real_scoring_outputs(db) -> None:

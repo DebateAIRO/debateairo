@@ -122,6 +122,16 @@ function retainedScoreDetail(response: DebateScoringResponse | null): string {
   return `Showing ${pluralize(count, "persisted scored node")} while it completes.`;
 }
 
+function hasActiveScoringJob(response: DebateScoringResponse | null): boolean {
+  return response?.active_scoring_job_status === "queued" || response?.active_scoring_job_status === "running";
+}
+
+function activeScoringJobDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "Judge outputs are being generated.";
+  return `Judge outputs are being generated. ${retainedScoreDetail(response)}`;
+}
+
 function unavailableNodeCount(response: DebateScoringResponse | null): number {
   return response?.errors?.length ?? 0;
 }
@@ -205,6 +215,14 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
           : hasRetainedScores
             ? `Judge outputs are being generated. ${retainedScoreDetail(input.response)}`
             : "Judge outputs are being generated.",
+    };
+  }
+
+  if (hasActiveScoringJob(input.response)) {
+    return {
+      kind: "refreshing",
+      title: "Scoring in progress",
+      detail: activeScoringJobDetail(input.response),
     };
   }
 

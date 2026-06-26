@@ -227,6 +227,34 @@ test("formatScoringVisibilityState reports refreshes as in progress without impl
   );
 });
 
+test("formatScoringVisibilityState treats active backend scoring jobs as in progress", async () => {
+  const { formatScoringVisibilityState } = await loadHelper();
+
+  assert.deepEqual(
+    formatScoringVisibilityState({
+      enabled: true,
+      hasActionToken: true,
+      scoringStatus: "unavailable",
+      refreshStatus: "idle",
+      response: {
+        debate_id: "debate-1",
+        status: "unavailable",
+        node_ids: ["node-a"],
+        items: [],
+        active_scoring_job_id: "job-1",
+        active_scoring_job_status: "running",
+        reason: "Scoring judge call failed: The 'codex-gpt-5.5' model is not supported.",
+      },
+      error: null,
+    }),
+    {
+      kind: "refreshing",
+      title: "Scoring in progress",
+      detail: "Judge outputs are being generated.",
+    }
+  );
+});
+
 test("formatScoringVisibilityState reports partial scoring counts", async () => {
   const { formatScoringVisibilityState } = await loadHelper();
 
