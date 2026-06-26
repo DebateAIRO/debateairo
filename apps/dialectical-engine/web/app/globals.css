@@ -1002,6 +1002,7 @@ a:focus-visible {
   gap: 18px;
   height: 60px;
   flex: 0 0 60px;
+  min-width: 0;
   padding: 0 22px;
   border-bottom: 1px solid var(--line);
   background: var(--surface-2);
@@ -1040,13 +1041,17 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .topSwitch {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 1 min(52vw, 680px);
+  min-width: 0;
+  max-width: min(52vw, 680px);
   min-height: 34px;
   padding: 0 8px;
   color: var(--muted);
@@ -1057,8 +1062,17 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.topSwitch > span:first-child,
+.topSwitch .switch,
+.topSwitch .btn,
+.topSwitch .iconBtn {
+  flex: 0 0 auto;
+}
+
 .topSwitchStatus {
-  max-width: 220px;
+  flex: 1 1 88px;
+  min-width: 0;
+  max-width: clamp(88px, 12vw, 180px);
   overflow: hidden;
   text-overflow: ellipsis;
   color: oklch(0.48 0.04 70);
@@ -1954,6 +1968,47 @@ a:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
+}
+
+.recommendationsPrimary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.recommendationsDetails {
+  display: grid;
+  gap: 10px;
+}
+
+.recommendationsSummary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.recommendationsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.recommendationsSummary::after {
+  content: "Open";
+  margin-left: 8px;
+  color: var(--muted-2);
+}
+
+.recommendationsDetails[open] .recommendationsSummary::after {
+  content: "Close";
 }
 
 .recommendationItem {
