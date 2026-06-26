@@ -1122,6 +1122,14 @@ a:focus-visible {
   content: "Close";
 }
 
+.scoringInsightsPanelCompact .scoringInsightsSummary {
+  cursor: default;
+}
+
+.scoringInsightsPanelCompact .scoringInsightsSummary::after {
+  content: "";
+}
+
 .scoringInsightsDetail {
   min-width: 0;
   overflow: hidden;

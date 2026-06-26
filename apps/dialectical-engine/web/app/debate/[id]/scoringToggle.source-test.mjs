@@ -92,6 +92,16 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   );
   assert.match(
     debatePageSource,
+    /const scoringInsightsExpandable = scoringEnabled && scoringState\.status === "loaded" && scoringByNodeId\.size > 0/,
+    "The full scoring insights panel should only be expandable after real scored nodes are available"
+  );
+  assert.match(
+    debatePageSource,
+    /scoringInsightsExpandable \? \([\s\S]*?<details className="scoringInsightsPanel">[\s\S]*?<ScoringVisibilityPanel state=\{scoringVisibility\} \/>[\s\S]*?\) : \([\s\S]*?<section[\s\S]*?className="scoringInsightsPanel scoringInsightsPanelCompact"[\s\S]*?data-scoring-insights-compact="true"/,
+    "Unavailable, errored, and off scoring states should stay in the compact scoring insights status instead of rendering the expanded stack"
+  );
+  assert.match(
+    debatePageSource,
     /Scoring issue summary unavailable[\s\S]*?Enable scoring to summarize unresolved holes and fatal flags from scored nodes\./,
     "The summary panel should be honest before scoring is enabled"
   );

@@ -912,6 +912,7 @@ export default function DebatePageClient({
   const scoringRefreshDisabledReasonText = scoringRefreshDisabled ? scoringRefreshDisabledReason() : null;
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = scoringEnabled ? formatScoringConfidenceCopy() : null;
+  const scoringInsightsExpandable = scoringEnabled && scoringState.status === "loaded" && scoringByNodeId.size > 0;
   return (
     <div
       className="debateView"
@@ -1001,47 +1002,61 @@ export default function DebatePageClient({
       </header>
 
       <ScoringErrorBoundary>
-        <details className="scoringInsightsPanel">
-          <summary className="scoringInsightsSummary">
-            <span className="progressLabel">Scoring insights</span>
-            <span className="progressCount">{scoringVisibility.title}</span>
-            <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
-          </summary>
-          <div className="scoringInsightsBody scroll">
-            <ScoringVisibilityPanel state={scoringVisibility} />
-            <ScoringHolesSummaryPanel
-              enabled={scoringEnabled}
-              state={scoringState}
-              holesSummary={scoringHolesSummary}
-              fatalFlagsSummary={scoringFatalFlagsSummary}
-              strongestIssue={strongestUnresolvedScoringIssue}
-            />
-            <ScoreAwareFilterPanel
-              enabled={scoringEnabled}
-              filter={scoreAwareFilter}
-              matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
-              scoredCount={scoringByNodeId.size}
-              onChange={setScoreAwareFilter}
-            />
-            <RecommendedInvestigations
-              recommendations={scoringEnabled ? debateRecommendations : []}
-              canOpenTarget={canFocusRecommendationNode}
-              onOpenTarget={focusRecommendationNode}
-              emptyMessage={
-                scoringEnabled
-                  ? "No recommended investigations are available from the current scoring data."
-                  : "Enable scoring to surface recommended investigations from scored nodes."
-              }
-            />
-            <AdaptiveDepthDryRunPanel
-              enabled={scoringEnabled}
-              state={adaptiveDepthDryRunState}
-              actionToken={actionToken}
-              approvalState={adaptiveDepthApprovalState}
-              onApprove={approveAdaptiveDepthExpansion}
-            />
-          </div>
-        </details>
+        {scoringInsightsExpandable ? (
+          <details className="scoringInsightsPanel">
+            <summary className="scoringInsightsSummary">
+              <span className="progressLabel">Scoring insights</span>
+              <span className="progressCount">{scoringVisibility.title}</span>
+              <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+            </summary>
+            <div className="scoringInsightsBody scroll">
+              <ScoringVisibilityPanel state={scoringVisibility} />
+              <ScoringHolesSummaryPanel
+                enabled={scoringEnabled}
+                state={scoringState}
+                holesSummary={scoringHolesSummary}
+                fatalFlagsSummary={scoringFatalFlagsSummary}
+                strongestIssue={strongestUnresolvedScoringIssue}
+              />
+              <ScoreAwareFilterPanel
+                enabled={scoringEnabled}
+                filter={scoreAwareFilter}
+                matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
+                scoredCount={scoringByNodeId.size}
+                onChange={setScoreAwareFilter}
+              />
+              <RecommendedInvestigations
+                recommendations={scoringEnabled ? debateRecommendations : []}
+                canOpenTarget={canFocusRecommendationNode}
+                onOpenTarget={focusRecommendationNode}
+                emptyMessage={
+                  scoringEnabled
+                    ? "No recommended investigations are available from the current scoring data."
+                    : "Enable scoring to surface recommended investigations from scored nodes."
+                }
+              />
+              <AdaptiveDepthDryRunPanel
+                enabled={scoringEnabled}
+                state={adaptiveDepthDryRunState}
+                actionToken={actionToken}
+                approvalState={adaptiveDepthApprovalState}
+                onApprove={approveAdaptiveDepthExpansion}
+              />
+            </div>
+          </details>
+        ) : (
+          <section
+            className="scoringInsightsPanel scoringInsightsPanelCompact"
+            aria-label="Scoring insights"
+            data-scoring-insights-compact="true"
+          >
+            <div className="scoringInsightsSummary">
+              <span className="progressLabel">Scoring insights</span>
+              <span className="progressCount">{scoringVisibility.title}</span>
+              <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+            </div>
+          </section>
+        )}
       </ScoringErrorBoundary>
 
       {/* ---- generation progress strip ---- */}
