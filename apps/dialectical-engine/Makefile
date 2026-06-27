@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev dev-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
+.PHONY: dev dev-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
 
 PYTHON ?= $(shell for py in "$(CURDIR)/.venv/bin/python" "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; elif command -v python3 >/dev/null 2>&1; then command -v python3; fi)
 PNPM ?= $(shell command -v pnpm)
@@ -321,6 +321,16 @@ install-services:
 	launchctl load "$$HOME/Library/LaunchAgents/com.dialectical.coordinator.plist"
 	launchctl load "$$HOME/Library/LaunchAgents/com.dialectical.web.plist"
 	@echo "Coordinator and web services installed. Register Worker A with: make install-worker COORDINATOR_URL=http://localhost:8000 WORKER_NAME=mac-mini"
+
+watchdog-once:
+	$(PYTHON_ENV) "$(PYTHON)" scripts/dezbatere_watchdog.py --root "$(CURDIR)" --public-url "https://dezbatere.ro" --check-lmstudio --strict-exit
+
+install-watchdog:
+	mkdir -p "$$HOME/Library/LaunchAgents"
+	sed -e "s#__ROOT__#$(CURDIR)#g" -e "s#__PYTHON__#$(PYTHON)#g" -e "s#__PATH__#$(LAUNCHD_PATH)#g" -e "s#__PYTHON_DYLD_LIBRARY_PATH__#$(PYTHON_DYLD_LIBRARY_PATH)#g" deploy/launchd/watchdog.plist > "$$HOME/Library/LaunchAgents/com.dialectical.watchdog.plist"
+	launchctl unload "$$HOME/Library/LaunchAgents/com.dialectical.watchdog.plist" 2>/dev/null || true
+	launchctl load "$$HOME/Library/LaunchAgents/com.dialectical.watchdog.plist"
+	@echo "Dezbatere watchdog installed. It runs at login and every 120 seconds."
 
 setup-named-tunnel:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/setup_named_tunnel.py --tunnel "$(TUNNEL_NAME)" --hostname "$(TUNNEL_HOSTNAME)" --credentials-file "$(CLOUDFLARED_CREDENTIALS)" $(if $(filter 1 true yes,$(STOP_QUICK_TUNNEL_AFTER_VERIFY)),--stop-quick-after-verified,) $(SETUP_NAMED_TUNNEL_FLAGS)
