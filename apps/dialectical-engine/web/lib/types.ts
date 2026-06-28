@@ -461,3 +461,57 @@ export type WorkerStatus = {
   status: string;
   current_job_id: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// DDD-10: Frontend/API DTO convergence on DDD language
+//
+// Domain type aliases aligning frontend consumption with DDD vocabulary.
+// ArgumentClaimView is added in DDD-06A (branch ddd-06a); types below are the
+// remaining DDD-10 layer. API field names are unchanged — renaming is deferred
+// to the Hermes integration gate.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lifecycle status of an investigation path.
+ * Extends ArgumentClaimStatus (DDD-06A) with exploration policy states.
+ * "abandoned" paths are never deleted and must remain visible in UX.
+ */
+export type InvestigationPathStatus =
+  | "pending"     // path not yet investigated
+  | "generating"  // generating argument text
+  | "active"      // investigation live, available for deepening
+  | "challenged"  // argument challenged; path under re-investigation
+  | "abandoned";  // path paused/stopped — preserved, never pruned
+
+/**
+ * Domain alias: the scoring output for an ArgumentClaim.
+ * Wraps NodeScoringPayload — use this name in DDD-facing code.
+ */
+export type ScoreSignal = NodeScoringPayload;
+
+/**
+ * Evidence quality and gap summary for an ArgumentClaim.
+ * Derived from NodeScoringPayload holes, fatal flags, and recommended
+ * investigations. Kept separate from scoring totals per DDD doctrine:
+ * evidence correctness is distinct from score values.
+ */
+export type EvidenceSignal = {
+  argumentClaimId: string;
+  holes: ScoringHole[];
+  fatalFlags: FatalFlag[];
+  recommendations: RecommendedInvestigation[];
+  evidenceQuality: number | null;
+};
+
+/**
+ * An ExplorationPolicy expansion/investigation decision for an ArgumentClaim.
+ * Maps over RecommendedInvestigation with DDD-language field names.
+ * Raw LLM outputs never directly populate this — deterministic policy decides.
+ */
+export type ExpansionDecision = {
+  argumentClaimId: string;
+  action: InvestigationAction;
+  reason: string;
+  priority: number;
+  expansionHint?: AdaptiveDepthExpansionHint | null;
+};

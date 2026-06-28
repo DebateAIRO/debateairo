@@ -1,4 +1,13 @@
-import type { DebateScoringResponse, NodeScoringError, NodeScoringPayload, Severity } from "./types";
+import type {
+  DebateScoringResponse,
+  EvidenceSignal,
+  ExpansionDecision,
+  InvestigationPathStatus,
+  NodeScoringError,
+  NodeScoringPayload,
+  RecommendedInvestigation,
+  Severity,
+} from "./types";
 import {
   recordSuspiciousScoringEvents,
   type SuspiciousScoringContext,
@@ -372,4 +381,53 @@ export function selectStrongestUnresolvedScoringIssue(
   });
 
   return issues.filter((item) => item.issue.description.length > 0).sort(compareRankedIssues)[0]?.issue ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// DDD-10: Domain signal extractors
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract an EvidenceSignal from a NodeScoringPayload.
+ * Evidence correctness is separate from score values per DDD doctrine.
+ */
+export function extractEvidenceSignal(score: NodeScoringPayload): EvidenceSignal {
+  return {
+    argumentClaimId: score.node_id,
+    holes: score.holes ?? [],
+    fatalFlags: score.fatal_flags ?? [],
+    recommendations: score.recommended_investigations ?? [],
+    evidenceQuality:
+      typeof score.scores?.evidence_quality === "number" ? score.scores.evidence_quality : null,
+  };
+}
+
+/**
+ * Convert a RecommendedInvestigation to an ExpansionDecision.
+ * Deterministic policy wrapping — raw LLM output never directly sets this.
+ */
+export function toExpansionDecision(
+  recommendation: RecommendedInvestigation,
+  argumentClaimId: string
+): ExpansionDecision {
+  return {
+    argumentClaimId,
+    action: recommendation.action,
+    reason: recommendation.reason,
+    priority: recommendation.priority,
+    expansionHint: null,
+  };
+}
+
+/**
+ * Map a raw backend status string to InvestigationPathStatus.
+ * Mirrors toArgumentClaimStatus (DDD-06A) with added policy states.
+ */
+export function toInvestigationPathStatus(rawStatus: string | null | undefined): InvestigationPathStatus {
+  const s = (rawStatus ?? "").toLowerCase();
+  if (s === "abandoned" || s === "stale" || s === "paused" || s === "stopped") return "abandoned";
+  if (s === "challenged" || s === "challenge") return "challenged";
+  if (s === "generating" || s === "running" || s === "streaming") return "generating";
+  if (s === "pending" || s === "queued") return "pending";
+  return "active";
 }
