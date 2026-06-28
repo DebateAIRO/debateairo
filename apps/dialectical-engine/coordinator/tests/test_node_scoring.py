@@ -1162,6 +1162,13 @@ def test_reducer_composes_minimal_scores_deterministically() -> None:
     }
     assert first.score_caps == []
     assert first.judge_disagreements == []
+    assert first.model_dump(mode="json")["score_provenance"] == {
+        "raw_judge_output_kind": "claim_assessment",
+        "raw_judge_output_included": False,
+        "final_score_source": "deterministic_reducer",
+        "reducer_version": "node-scoring-reducer-v1",
+        "rubric_version": "debateai-rubric-v1",
+    }
 
 
 def test_reducer_increases_uncertainty_when_evidence_refs_are_missing() -> None:
@@ -1557,6 +1564,8 @@ def test_debate_scoring_response_model_serializes_json_contract() -> None:
             "status": "unavailable",
         },
         "cache": None,
+        "active_scoring_job_id": None,
+        "active_scoring_job_status": None,
     }
 
 
@@ -1596,6 +1605,8 @@ def test_debate_scoring_response_model_serializes_partial_errors() -> None:
         "producer": None,
         "model_metadata": None,
         "cache": None,
+        "active_scoring_job_id": None,
+        "active_scoring_job_status": None,
     }
 
 
@@ -4400,6 +4411,15 @@ def test_scoring_api_returns_stored_judge_outputs(db) -> None:
     assert len(response.json()["items"]) == 1
     assert response.json()["items"][0]["node_id"] == scoring_item["node_id"]
     assert response.json()["items"][0]["scores"] == scoring_item["scores"]
+    assert response.json()["items"][0]["score_provenance"] == {
+        "raw_judge_output_kind": "claim_assessment",
+        "raw_judge_output_included": False,
+        "final_score_source": "deterministic_reducer",
+        "reducer_version": "node-scoring-reducer-v1",
+        "rubric_version": "debateai-rubric-v1",
+    }
+    assert "raw_output" not in str(response.json()["items"][0])
+    assert "judge_outputs" not in str(response.json()["items"][0]["score_provenance"])
 
 
 def test_scoring_api_returns_adaptive_depth_dry_run_from_stored_judge_outputs(db) -> None:

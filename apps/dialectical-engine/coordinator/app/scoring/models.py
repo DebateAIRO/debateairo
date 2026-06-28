@@ -297,6 +297,14 @@ class ScoringDebug(BaseModel):
     judge_outputs: dict | None = None
 
 
+class ScoreProvenance(BaseModel):
+    raw_judge_output_kind: Literal["claim_assessment"]
+    raw_judge_output_included: Literal[False] = False
+    final_score_source: Literal["deterministic_reducer"]
+    reducer_version: str
+    rubric_version: str
+
+
 class NodeScoringPayload(BaseModel):
     node_id: str
     claim: NormalizedClaim
@@ -308,6 +316,15 @@ class NodeScoringPayload(BaseModel):
     judge_disagreements: list[JudgeDisagreement]
     recommended_investigations: list[RecommendedInvestigation]
     rationale: ScoreRationale
+    score_provenance: ScoreProvenance = Field(
+        default_factory=lambda: ScoreProvenance(
+            raw_judge_output_kind="claim_assessment",
+            raw_judge_output_included=False,
+            final_score_source="deterministic_reducer",
+            reducer_version="node-scoring-reducer-v1",
+            rubric_version="debateai-rubric-v1",
+        )
+    )
     debug: ScoringDebug | None = None
 
 
