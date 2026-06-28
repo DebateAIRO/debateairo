@@ -1,4 +1,4 @@
-import type { DebateNode } from "./types";
+import type { ArgumentClaimView, DebateNode } from "./types";
 
 export type Role = "root" | "pro" | "con" | "pov";
 export type NodeRenderState = "root" | "pending" | "streaming" | "done" | "empty";
@@ -285,4 +285,45 @@ export function flattenOutline(root: DebateNode | null): { node: DebateNode; dep
   };
   walk(root, 0);
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// DDD-06A: ArgumentClaimView presentation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extended render state that includes abandoned paths.
+ * Abandoned paths must be visible in UX — collapsed/greyed + explained.
+ * Never map "abandoned" to "empty" or omit it from the tree.
+ */
+export type ArgumentClaimRenderState = NodeRenderState | "abandoned";
+
+/**
+ * Render state for an ArgumentClaimView.
+ * Handles "abandoned" explicitly — DDD doctrine: abandoned paths stay visible.
+ */
+export function claimRenderStateOf(view: ArgumentClaimView): ArgumentClaimRenderState {
+  if (view.claimRole === "ROOT_CLAIM") return "root";
+  if (view.status === "abandoned") return "abandoned";
+  if (view.status === "pending") return "pending";
+  if (view.status === "generating") return "streaming";
+  const hasContent = Boolean(view.claimText?.trim() || view.activeArgument?.argument?.trim());
+  if (!hasContent) return "empty";
+  return "done";
+}
+
+/**
+ * Role label for an ArgumentClaimView — domain language over internal node_type values.
+ */
+export function claimRoleLabel(view: ArgumentClaimView): string {
+  if (view.claimRole === "ROOT_CLAIM") return "Root claim";
+  if (view.claimRole === "PRO") return "Pro";
+  if (view.claimRole === "CON") return "Con";
+  const povLabels: Record<string, string> = {
+    SCIENTIFIC_POV: "Scientific",
+    STATISTICAL_POV: "Statistical",
+    ETHICAL_POV: "Ethical",
+    PRACTICAL_POV: "Practical",
+  };
+  return povLabels[view.claimRole] ?? "Lens";
 }

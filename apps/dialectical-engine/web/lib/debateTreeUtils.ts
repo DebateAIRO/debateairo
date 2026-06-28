@@ -1,4 +1,4 @@
-import type { DebateNode } from "./types";
+import type { ArgumentClaimRole, ArgumentClaimStatus, ArgumentClaimView, DebateNode } from "./types";
 
 export function findNodeById(tree: DebateNode, id: string): DebateNode | null {
   if (tree.id === id) {
@@ -71,4 +71,77 @@ export function nearestExistingNodeId(
   }
 
   return initialFocusedNodeId(tree);
+}
+
+// ---------------------------------------------------------------------------
+// DDD-06A: ArgumentClaim domain language helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Map a raw backend status string to the domain ArgumentClaimStatus.
+ * "stale" and related backend values are surfaced as "abandoned" — abandoned
+ * paths must remain visible in UX, never silently pruned.
+ */
+export function toArgumentClaimStatus(rawStatus: string | null | undefined): ArgumentClaimStatus {
+  const s = (rawStatus ?? "").toLowerCase();
+  if (s === "abandoned" || s === "stale" || s === "paused" || s === "stopped") return "abandoned";
+  if (s === "generating" || s === "running" || s === "streaming") return "generating";
+  if (s === "pending" || s === "queued") return "pending";
+  return "active";
+}
+
+/** Convert a DebateNode (persistence shape) to an ArgumentClaimView (domain shape). */
+export function nodeToArgumentClaimView(node: DebateNode): ArgumentClaimView {
+  return {
+    id: node.id,
+    debateId: node.debate_id,
+    parentId: node.parent_id,
+    claimRole: node.node_type as ArgumentClaimRole,
+    depth: node.depth,
+    position: node.position,
+    claimText: node.claim ?? "",
+    activeArgument: node.active_generation,
+    investigationPath: node.materialized_path,
+    children: node.children.map(nodeToArgumentClaimView),
+    status: toArgumentClaimStatus(node.status),
+    activeGenerationId: node.active_generation_id,
+    score: node.score,
+  };
+}
+
+/** Find an ArgumentClaimView by id in a domain tree. */
+export function findClaimById(tree: ArgumentClaimView, id: string): ArgumentClaimView | null {
+  if (tree.id === id) return tree;
+  for (const child of tree.children) {
+    const match = findClaimById(child, id);
+    if (match !== null) return match;
+  }
+  return null;
+}
+
+/** Returns true if this claim is on an abandoned exploration path. */
+export function isAbandonedClaim(view: ArgumentClaimView): boolean {
+  return view.status === "abandoned";
+}
+
+/** Split a claim's children into pro-stance and con-stance claims. */
+export function partitionByStance(view: ArgumentClaimView): {
+  proClaims: ArgumentClaimView[];
+  conClaims: ArgumentClaimView[];
+} {
+  return {
+    proClaims: view.children.filter((c) => c.claimRole === "PRO"),
+    conClaims: view.children.filter((c) => c.claimRole === "CON"),
+  };
+}
+
+/** Get perspective (analytical lens) children of a claim. */
+export function perspectiveClaims(view: ArgumentClaimView): ArgumentClaimView[] {
+  return view.children.filter(
+    (c) =>
+      c.claimRole === "SCIENTIFIC_POV" ||
+      c.claimRole === "STATISTICAL_POV" ||
+      c.claimRole === "ETHICAL_POV" ||
+      c.claimRole === "PRACTICAL_POV",
+  );
 }
