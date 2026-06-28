@@ -5,17 +5,23 @@ import { useState } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
 import type { DebateNode, Generation } from "@/lib/types";
 
+function isAbandonedNode(node: DebateNode): boolean {
+  const s = (node.status || "").toLowerCase();
+  return s === "abandoned" || s === "stale" || s === "paused" || s === "stopped";
+}
+
 function nodeClass(node: DebateNode): string {
-  if (node.node_type === "PRO") return "nodeCard pro";
-  if (node.node_type === "CON") return "nodeCard con";
+  const ab = isAbandonedNode(node) ? " abandoned" : "";
+  if (node.node_type === "PRO") return `nodeCard pro${ab}`;
+  if (node.node_type === "CON") return `nodeCard con${ab}`;
   if (
     node.node_type === "SCIENTIFIC_POV" ||
     node.node_type === "STATISTICAL_POV" ||
     node.node_type === "ETHICAL_POV" ||
     node.node_type === "PRACTICAL_POV"
   )
-    return "nodeCard root";
-  return "nodeCard root";
+    return `nodeCard root${ab}`;
+  return `nodeCard root${ab}`;
 }
 
 function nodeLabel(node: DebateNode): string {
@@ -166,7 +172,9 @@ export function ArgumentNodeCard({
         >
           <div className="toolbar">
             <span className="badge">{nodeLabel(node)}</span>
-            <span className="badge">{node.status}</span>
+            <span className={`badge${isAbandonedNode(node) ? " abandonedBadge" : ""}`}>
+              {isAbandonedNode(node) ? "Stopped" : node.status}
+            </span>
             {generation ? (
               <span className="badge modelBadge" data-model-id={generation.model_id} data-model-color={activeModelColor}>
                 {generation.model_id}
@@ -187,7 +195,7 @@ export function ArgumentNodeCard({
             {argument}
           </div>
         </div>
-        {token || canToggleChildren ? (
+        {(token && !isAbandonedNode(node)) || canToggleChildren ? (
           <div className="toolbar nodeActionToolbar">
             {canToggleChildren ? (
               <button
@@ -200,7 +208,7 @@ export function ArgumentNodeCard({
                 {childrenOpen ? "Collapse" : "Expand"}
               </button>
             ) : null}
-            {token ? (
+            {token && !isAbandonedNode(node) ? (
               <>
                 <button
                   className="secondary"
@@ -253,8 +261,10 @@ export function ArgumentNodeCard({
 export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onSelectNode, selectedNodeId }: DebateTreeProps) {
   const [childrenOpen, setChildrenOpen] = useState(node.node_type === "ROOT_CLAIM");
 
-  const hasChildren = node.children.length > 0;
-  const canToggleChildren = hasChildren && node.node_type !== "ROOT_CLAIM";
+  const activeChildren = node.children.filter((c) => !isAbandonedNode(c));
+  const abandonedChildren = node.children.filter(isAbandonedNode);
+  const hasActiveChildren = activeChildren.length > 0;
+  const canToggleChildren = hasActiveChildren && node.node_type !== "ROOT_CLAIM";
   const childLayout = node.node_type === "ROOT_CLAIM" ? "root-povs" : "vertical";
 
   return (
@@ -271,12 +281,12 @@ export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onS
         childrenOpen={childrenOpen}
         onToggleChildren={() => setChildrenOpen((current) => !current)}
       />
-      {hasChildren && childrenOpen ? (
+      {hasActiveChildren && childrenOpen ? (
         <div
           className={["children", childLayout === "root-povs" ? "rootPovChildren" : ""].filter(Boolean).join(" ")}
           data-child-layout={childLayout}
         >
-          {node.children.map((child) => (
+          {activeChildren.map((child) => (
             <DebateTree
               key={child.id}
               node={child}
@@ -288,6 +298,27 @@ export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onS
               selectedNodeId={selectedNodeId}
             />
           ))}
+        </div>
+      ) : null}
+      {abandonedChildren.length > 0 ? (
+        <div className="abandonedPaths" aria-label={`${abandonedChildren.length} stopped path${abandonedChildren.length === 1 ? "" : "s"}`}>
+          <div className="abandonedPathsSummary">
+            ⊗ {abandonedChildren.length} stopped path{abandonedChildren.length === 1 ? "" : "s"}
+          </div>
+          <div className="children vertical" data-child-layout="vertical">
+            {abandonedChildren.map((child) => (
+              <DebateTree
+                key={child.id}
+                node={child}
+                token={token}
+                onQueued={onQueued}
+                onError={onError}
+                onAuthRejected={onAuthRejected}
+                onSelectNode={onSelectNode}
+                selectedNodeId={selectedNodeId}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
