@@ -49,6 +49,7 @@ export function NodeDetailDrawer({
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
   const model = generation ? modelMeta(generation.model_id) : null;
+  const isAbandoned = ["abandoned", "stale", "paused", "stopped"].includes((node.status || "").toLowerCase());
 
   const [history, setHistory] = useState<Generation[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(0);
@@ -161,6 +162,12 @@ export function NodeDetailDrawer({
 
         <div className="drawerBody">
           <div className="nodeEyebrow">Argument</div>
+          {isAbandoned ? (
+            <div className="drawerAbandonedBanner" role="status">
+              <div className="drawerSectionTitle">Stopped path</div>
+              <p>This investigation path was paused or abandoned. It is preserved here for reference — abandoned paths are never deleted. You can resume investigation by regenerating this argument.</p>
+            </div>
+          ) : null}
           <div className="drawerClaim">{node.claim}</div>
           {generation?.argument ? (
             <div className="drawerProse" onMouseUp={selectProse}>

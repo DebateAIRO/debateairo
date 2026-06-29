@@ -172,7 +172,7 @@ function CanvasCard({
     left: placed.x,
     top: placed.y,
     width: CARD_W,
-    opacity: scoreFilterMatch ? 1 : 0.38
+    opacity: scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38
   };
 
   const innerStyle: CSSProperties = scrutiny
@@ -187,7 +187,7 @@ function CanvasCard({
           borderColor: "oklch(0.8 0.012 70)",
           boxShadow: "var(--shadow-card)"
         }
-      : state === "empty"
+      : state === "empty" || state === "abandoned"
         ? {
             background: "var(--surface-sunken)",
             borderColor: "var(--line-2)"
@@ -198,7 +198,7 @@ function CanvasCard({
           };
 
   function openIfDone() {
-    if (state === "done") onOpenNode(node.id);
+    if (state === "done" || state === "abandoned") onOpenNode(node.id);
   }
 
   const openNodeDetails = () => onOpenNode(node.id);
@@ -248,6 +248,14 @@ function CanvasCard({
                   {model.name} conceded
                 </div>
               ) : null}
+            </div>
+          </div>
+        ) : state === "abandoned" ? (
+          <div className="nodeAbandoned">
+            <span className="nodeAbandonedMark" aria-hidden>⊗</span>
+            <div>
+              <div className="nodeAbandonedLabel">Stopped path</div>
+              <div className="nodeAbandonedClaim">{node.claim || "Abandoned argument"}</div>
             </div>
           </div>
         ) : (
