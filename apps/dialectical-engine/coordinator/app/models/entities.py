@@ -55,6 +55,9 @@ class Node(Base):
     claim: Mapped[str] = mapped_column(Text, nullable=False)
     active_generation_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    path_status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    stopping_status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    stopping_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     materialized_path: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
