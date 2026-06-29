@@ -17,6 +17,7 @@ from app.scoring.models import (
     RecommendedInvestigation,
     Severity,
     ScoreLabels,
+    ScoreProvenance,
     ScoreRationale,
     ScoringDebug,
     ScoringHole,
@@ -141,6 +142,13 @@ def reduce_assessments(claim: NormalizedClaim, assessment: ClaimAssessment) -> N
             disagreements,
         ),
         rationale=_rationale(claim, scores, holes),
+        score_provenance=ScoreProvenance(
+            raw_judge_output_kind="claim_assessment",
+            raw_judge_output_included=False,
+            final_score_source="deterministic_reducer",
+            reducer_version=REDUCER_VERSION,
+            rubric_version=RUBRIC_VERSION,
+        ),
         debug=ScoringDebug(
             reducer_version=REDUCER_VERSION,
             rubric_version=RUBRIC_VERSION,
