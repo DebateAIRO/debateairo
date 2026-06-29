@@ -11,6 +11,7 @@ from app.core.auth import hash_token
 from app.core.config import DEFAULT_ROUTING, RUNTIME_SETTINGS_KEY
 from app.core.db import SessionLocal
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc
+from app.exploration.policy import ExpansionDecision
 from app.services.orchestrator import (
     StaleJobMutationError,
     append_stream_delta,
@@ -520,7 +521,15 @@ def test_debate_role_overrides_route_child_jobs(db) -> None:
         db.add(parent)
         db.flush()
 
-        spawn_child_argument_jobs(db, debate, parent, "Cleaner air improves public health.")
+        spawn_child_argument_jobs(
+            db,
+            debate,
+            parent,
+            [
+                {"node_type": "PRO", "claim": "Cleaner air improves public health."},
+                {"node_type": "CON", "claim": "Costs may outweigh air benefits."},
+            ],
+        )
         db.flush()
 
         pro_child = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.node_type == "PRO"))
@@ -632,7 +641,15 @@ def test_opponent_constraint_avoids_claim_author_model_when_alternative_online(d
         db.flush()
         parent.active_generation_id = generation.id
 
-        spawn_child_argument_jobs(db, debate, parent, generation.argument)
+        spawn_child_argument_jobs(
+            db,
+            debate,
+            parent,
+            [
+                {"node_type": "PRO", "claim": "Health gains support the cleaner air claim."},
+                {"node_type": "CON", "claim": "Implementation costs challenge the cleaner air claim."},
+            ],
+        )
         db.flush()
 
         con_child = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.node_type == "CON"))
@@ -693,7 +710,15 @@ def test_opponent_constraint_does_not_deadlock_single_model(db) -> None:
         db.flush()
         parent.active_generation_id = generation.id
 
-        spawn_child_argument_jobs(db, debate, parent, generation.argument)
+        spawn_child_argument_jobs(
+            db,
+            debate,
+            parent,
+            [
+                {"node_type": "PRO", "claim": "Health gains support the cleaner air claim."},
+                {"node_type": "CON", "claim": "Implementation costs challenge the cleaner air claim."},
+            ],
+        )
         db.flush()
 
         con_child = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.node_type == "CON"))
@@ -1360,7 +1385,7 @@ def test_decomposition_respects_branching_limit(db) -> None:
     assert len(child_jobs) == 2
 
 
-def test_decomposition_fills_missing_children_to_branching(db) -> None:
+def test_decomposition_uses_only_generated_candidate_claims(db) -> None:
     worker = Worker(
         name="mac-mini",
         token_hash=hash_token("worker-token"),
@@ -1389,11 +1414,76 @@ def test_decomposition_fills_missing_children_to_branching(db) -> None:
     )
 
     children = db.scalars(select(Node).where(Node.parent_id == debate.root_node_id).order_by(Node.position)).all()
-    child_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue")).all()
-    assert [child.node_type for child in children] == ["PRO", "CON", "PRO", "CON"]
-    assert children[0].claim == "Cleaner air."
-    assert all("Should cities ban cars?" in child.claim for child in children[1:])
-    assert len(child_jobs) == 4
+    child_jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue", Job.status == "pending")
+    ).all()
+    assert [child.node_type for child in children] == ["PRO"]
+    assert [child.claim for child in children] == ["Cleaner air."]
+    assert len(child_jobs) == 1
+
+
+def test_argument_generation_delegates_abandonment_to_exploration_policy(db, monkeypatch) -> None:
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    debate = create_debate(db, "Should cities ban cars?", {"max_depth": 2, "branching": 2})
+    decompose = claim_pending_job(db, worker)
+    assert decompose is not None
+    asyncio.run(
+        complete_job(
+            db,
+            decompose,
+            {
+                "root_claim": "Should cities ban cars?",
+                "children": [{"node_type": "PRO", "claim": "Cleaner air."}],
+            },
+            {"latency_ms": 12, "tokens_out": 20},
+        )
+    )
+    argue_job = claim_pending_job(db, worker)
+    assert argue_job is not None
+
+    def abandon_decision(_db, _debate, node):
+        return ExpansionDecision(
+            node_id=node.id,
+            action="abandon",
+            priority=0.8,
+            reasons=("low-strength low-impact path is resolved enough to pause",),
+            keeps_path_active=False,
+        )
+
+    monkeypatch.setattr("app.services.orchestrator.exploration_decision_for_node", abandon_decision)
+
+    asyncio.run(
+        complete_job(
+            db,
+            argue_job,
+            {
+                "argument": "Cleaner air benefits are marginal under this design.",
+                "children": [
+                    {"node_type": "PRO", "claim": "A generated support candidate."},
+                    {"node_type": "CON", "claim": "A generated challenge candidate."},
+                ],
+            },
+            {"latency_ms": 12, "tokens_out": 20},
+        )
+    )
+
+    node = db.get(Node, argue_job.node_id)
+    children = db.scalars(select(Node).where(Node.parent_id == argue_job.node_id)).all()
+    child_jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue", Job.status == "pending")
+    ).all()
+    assert node.path_status == "abandoned"
+    assert node.stopping_status == "abandon"
+    assert node.stopping_reason == "low-strength low-impact path is resolved enough to pause"
+    assert children == []
+    assert child_jobs == []
 
 
 def test_interior_regeneration_replaces_visible_descendants(db) -> None:
@@ -1486,7 +1576,20 @@ def test_interior_regeneration_replaces_visible_descendants(db) -> None:
 
     assert job is not None
     assert job.node_id == parent.id
-    asyncio.run(complete_job(db, job, {"argument": "Regenerated parent argument."}, {"latency_ms": 12}))
+    asyncio.run(
+        complete_job(
+            db,
+            job,
+            {
+                "argument": "Regenerated parent argument.",
+                "children": [
+                    {"node_type": "PRO", "claim": "Regenerated supporting candidate."},
+                    {"node_type": "CON", "claim": "Regenerated challenging candidate."},
+                ],
+            },
+            {"latency_ms": 12},
+        )
+    )
 
     db.refresh(old_pro)
     db.refresh(old_con)
@@ -1503,8 +1606,8 @@ def test_interior_regeneration_replaces_visible_descendants(db) -> None:
     visible_parent = visible["tree"]["children"][0]
     assert visible_parent["id"] == parent.id
     assert [child["claim"] for child in visible_parent["children"]] == [
-        "A supports line for: Regenerated parent argument.",
-        "A challenges line for: Regenerated parent argument.",
+        "Regenerated supporting candidate.",
+        "Regenerated challenging candidate.",
     ]
 
 

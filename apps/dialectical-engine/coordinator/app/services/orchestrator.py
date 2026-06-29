@@ -293,37 +293,80 @@ def normalized_decomposition_children(payload: dict[str, Any], debate: Debate) -
         if node_type not in {"PRO", "CON"}:
             node_type = "PRO" if position % 2 == 0 else "CON"
         children.append({"node_type": node_type, "claim": claim})
-    while len(children) < branching:
-        node_type = "PRO" if len(children) % 2 == 0 else "CON"
-        stance = "supporting" if node_type == "PRO" else "opposing"
-        children.append(
-            {
-                "node_type": node_type,
-                "claim": f"A {stance} opening line for: {debate.topic}",
-            }
-        )
     return children
 
 
-def spawn_child_argument_jobs(db: Session, debate: Debate, parent: Node, argument: str) -> None:
+def _candidate_child_claims(result: Any) -> list[dict[str, str]]:
+    payload = result if isinstance(result, dict) else {}
+    raw_children = payload.get("children") if isinstance(payload, dict) else None
+    rows = raw_children if isinstance(raw_children, list) else []
+    candidates: list[dict[str, str]] = []
+    for position, row in enumerate(rows):
+        if isinstance(row, dict):
+            claim = sanitize_text(str(row.get("claim") or ""))
+            node_type = str(row.get("node_type") or row.get("type") or "").upper()
+        else:
+            claim = sanitize_text(str(row))
+            node_type = ""
+        if not claim:
+            continue
+        if node_type not in {"PRO", "CON"}:
+            node_type = "PRO" if position % 2 == 0 else "CON"
+        candidates.append({"node_type": node_type, "claim": claim})
+    return candidates
+
+
+def _score_signal_for_node(node: Node) -> ScoreSignal:
+    from app.exploration.policy import ScoreSignal
+
+    return ScoreSignal(
+        node_id=node.id,
+        claim_type="normative",
+        strength=0.5,
+        uncertainty=0.5,
+        impact=0.5,
+        evidence_quality=0.5,
+        logical_validity=0.5,
+        assumption_risk=0.5,
+        counter_resilience=0.5,
+    )
+
+
+def exploration_decision_for_node(db: Session, debate: Debate, node: Node):
+    from app.exploration.policy import ExplorationPolicy
+
+    return ExplorationPolicy().decide(
+        score=_score_signal_for_node(node),
+        evidence=None,
+        path_state="abandoned" if node.path_status == "abandoned" else "active",
+    )
+
+
+def spawn_child_argument_jobs(db: Session, debate: Debate, parent: Node, child_candidates: list[dict[str, str]]) -> None:
     max_depth = int(debate.config.get("max_depth", 2))
     if parent.depth >= max_depth:
         return
     existing = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.status != "stale").limit(1))
     if existing:
         return
+    decision = exploration_decision_for_node(db, debate, parent)
+    parent.stopping_status = decision.action
+    parent.stopping_reason = "; ".join(decision.reasons) if decision.reasons else None
+    if decision.action == "abandon" or not decision.keeps_path_active:
+        parent.path_status = "abandoned"
+        return
+    if decision.action not in {"continue", "deepen", "challenge"}:
+        return
     branching = int(debate.config.get("branching", 2))
-    child_types = ["PRO", "CON"]
-    for position in range(branching):
-        node_type = child_types[position % 2]
-        stance = "supports" if node_type == "PRO" else "challenges"
+    for position, candidate in enumerate(child_candidates[:branching]):
+        node_type = candidate["node_type"]
         child = Node(
             debate_id=debate.id,
             parent_id=parent.id,
             node_type=node_type,
             depth=parent.depth + 1,
             position=position,
-            claim=f"A {stance} line for: {argument[:180]}",
+            claim=candidate["claim"],
             status="pending",
             materialized_path=f"{parent.materialized_path}/{position}",
         )
@@ -813,7 +856,7 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
             raise ValueError("Node not found")
         argument = result.get("argument") if isinstance(result, dict) else str(result)
         generation = create_generation(db, job, node, argument, job.stream_buffer or str(result), metadata)
-        spawn_child_argument_jobs(db, debate, node, generation.argument)
+        spawn_child_argument_jobs(db, debate, node, _candidate_child_claims(result))
         flush_write(db)
         maybe_queue_synthesis(db, debate)
         commit_write(db)
