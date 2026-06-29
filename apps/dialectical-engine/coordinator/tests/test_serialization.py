@@ -69,6 +69,19 @@ def test_debate_detail_includes_active_node_stream_snapshot(db) -> None:
     visible = debate_to_dict(db, db.get(Debate, debate.id))
     streamed = visible["tree"]["children"][0]
 
+    assert streamed["argument_claim"] == {
+        "id": child.id,
+        "debate_id": debate.id,
+        "parent_id": root.id,
+        "node_type": "PRO",
+        "depth": 1,
+        "position": 0,
+        "text": "Fewer cars would reduce street danger.",
+        "status": "generating",
+        "materialized_path": "0/0",
+        "active_generation_id": child.active_generation_id,
+    }
+    assert streamed["claim"] == streamed["argument_claim"]["text"]
     assert streamed["status"] == "generating"
     assert streamed["active_generation_id"] == child.active_generation_id
     assert streamed["active_generation"] == {
