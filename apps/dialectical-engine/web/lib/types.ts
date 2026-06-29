@@ -461,3 +461,53 @@ export type WorkerStatus = {
   status: string;
   current_job_id: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// DDD-06A: ArgumentClaim domain language layer
+//
+// These types sit on top of the persistence types (DebateNode, Generation,
+// NodeScore). API field names are unchanged — renaming is deferred to DDD-10.
+// ---------------------------------------------------------------------------
+
+/** Role of an ArgumentClaim in the debate tree. */
+export type ArgumentClaimRole =
+  | "ROOT_CLAIM"
+  | "SCIENTIFIC_POV"
+  | "STATISTICAL_POV"
+  | "ETHICAL_POV"
+  | "PRACTICAL_POV"
+  | "PRO"
+  | "CON";
+
+/**
+ * Lifecycle status of an ArgumentClaim.
+ * "abandoned" replaces the legacy "stale" — abandoned paths are never deleted,
+ * must be visible in UX (collapsed/greyed + summarized + explained).
+ */
+export type ArgumentClaimStatus = "pending" | "generating" | "active" | "abandoned";
+
+/** Domain alias: a ClaimGeneration is the LLM output that produced the argument text. */
+export type ClaimGeneration = Generation;
+
+/** Domain alias: scoring information for an ArgumentClaim. */
+export type ArgumentScore = NodeScore;
+
+/**
+ * Domain view of a DebateNode — uses ArgumentClaim language over raw persistence
+ * field names. Convert with nodeToArgumentClaimView() in debateTreeUtils.ts.
+ */
+export type ArgumentClaimView = {
+  id: string;
+  debateId: string;
+  parentId: string | null;
+  claimRole: ArgumentClaimRole;
+  depth: number;
+  position: number;
+  claimText: string;
+  activeArgument: ClaimGeneration | null;
+  investigationPath: string;
+  children: ArgumentClaimView[];
+  status: ArgumentClaimStatus;
+  activeGenerationId: string | null;
+  score?: ArgumentScore | null;
+};
