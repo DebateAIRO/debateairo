@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from app.evidence.entailment import classify_entailment
-from app.evidence.model import EntailmentLabel, EvidenceScore, SourceRecord
+from app.evidence.model import EntailmentLabel, EvidenceScore, EvidenceStatus, SourceRecord
 from app.evidence.quality import quality_multiplier
 from app.evidence.retraction import retraction_caveats
 from app.qbaf import ClaimNode
@@ -30,28 +30,46 @@ class EvidenceValidationPipeline:
                 base_score=RETRACTED_SCORE,
                 uncertainty=1.0,
                 entailment=entailment,
+                status=EvidenceStatus.RETRACTED,
                 caveats=tuple(caveats),
             )
 
         if entailment == EntailmentLabel.REFUTES:
             caveats.append("Source refutes the claim.")
             score = REFUTES_SCORE
+            status = EvidenceStatus.REFUTED
         elif entailment == EntailmentLabel.NOINFO:
             caveats.append("Source does not contain information for the claim.")
             score = NOINFO_SCORE
+            status = EvidenceStatus.NO_INFO
         else:
             multiplier, quality_caveats = quality_multiplier(source.quality_grade)
             caveats.extend(quality_caveats)
             score = SUPPORT_BASE_SCORE * multiplier
             score = min(1.0, score + source.corroboration_count * CORROBORATION_BOOST)
+            status = EvidenceStatus.GROUNDED
 
         caveats.extend(_statistical_caveats(source))
         return EvidenceScore(
             reference=source.reference,
             base_score=require_unit_interval(score, "base_score"),
-            uncertainty=_uncertainty(source, caveats),
+            uncertainty=_uncertainty(source, caveats, status),
             entailment=entailment,
+            status=status,
             caveats=tuple(caveats),
+        )
+
+    def mark_missing_leaf(self, node: ClaimNode, reference: str) -> ClaimNode:
+        if node.type != "evidence_leaf":
+            raise ValueError("mark_missing_leaf requires an evidence_leaf node")
+        clean_reference = require_non_empty(reference, "reference")
+        return replace(
+            node,
+            base_score=0.0,
+            final_strength=0.0,
+            uncertainty=1.0,
+            status=EvidenceStatus.MISSING.value,
+            caveats=[*node.caveats, f"Evidence source is missing or unavailable for {clean_reference}."],
         )
 
     def ground_leaf(self, node: ClaimNode, source: SourceRecord) -> ClaimNode:
@@ -63,7 +81,7 @@ class EvidenceValidationPipeline:
             base_score=score.base_score,
             final_strength=score.base_score,
             uncertainty=score.uncertainty,
-            status="grounded",
+            status=score.status.value,
             caveats=list(score.caveats),
         )
 
@@ -72,7 +90,9 @@ def _statistical_caveats(source: SourceRecord) -> list[str]:
     return [f"Statistical red flag: {flag}" for flag in source.statistical_flags]
 
 
-def _uncertainty(source: SourceRecord, caveats: list[str]) -> float:
+def _uncertainty(source: SourceRecord, caveats: list[str], status: EvidenceStatus) -> float:
+    if status != EvidenceStatus.GROUNDED:
+        return 1.0 if status in {EvidenceStatus.MISSING, EvidenceStatus.UNAVAILABLE, EvidenceStatus.NO_INFO} else 0.90
     uncertainty = 0.10
     if source.quality_grade == "moderate":
         uncertainty += 0.15

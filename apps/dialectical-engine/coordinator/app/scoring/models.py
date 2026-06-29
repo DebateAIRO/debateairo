@@ -21,7 +21,15 @@ InvestigationAction = Literal["challenge", "support", "find_evidence", "decompos
 AdaptiveDepthExpansionHint = Literal["expand", "review_for_expansion"]
 ScoringStatus = Literal["available", "partial", "unavailable"]
 ScoringJobStatus = Literal["queued", "running", "complete", "failed"]
-EvidenceSupportStatus = Literal["verified", "unverified", "unavailable", "contradicted"]
+EvidenceSupportStatus = Literal[
+    "grounded",
+    "missing",
+    "unavailable",
+    "refuted",
+    "contradicted",
+    "retracted",
+    "no_info",
+]
 ScoringCacheStaleReason = Literal["input_hash_mismatch"]
 AdaptiveDepthMode = Literal["fixed", "manual", "recommended", "adaptive"]
 ManualInvestigationStatus = Literal["queued", "unavailable"]
@@ -148,7 +156,7 @@ class EvidenceAssessment(BaseModel):
     evidence_sufficiency: float
     source_reliability: float
     freshness: float
-    support_status: EvidenceSupportStatus = "unverified"
+    support_status: EvidenceSupportStatus = "missing"
     missing_evidence: list[str] = Field(default_factory=list)
     fatal_flags: list[FatalFlag] = Field(default_factory=list)
     recommended_investigations: list[str] = Field(default_factory=list)

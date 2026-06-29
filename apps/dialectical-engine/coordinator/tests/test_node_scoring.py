@@ -22,6 +22,7 @@ from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegi
 from app.scoring.caps import apply_score_caps
 from app.scoring.normalizer import normalize_claim
 from app.scoring.models import (
+    EvidenceSupportStatus,
     ManualInvestigationRequest,
     ManualInvestigationResponse,
     NodeScoringPayload,
@@ -1750,14 +1751,14 @@ def test_judge_assessment_base_model_serializes_common_fields() -> None:
     }
 
 
-def test_evidence_assessment_model_serializes_unverified_support_status() -> None:
+def test_evidence_assessment_model_serializes_missing_support_status() -> None:
     assessment = EvidenceAssessment(
         evidence_quality=0.0,
         evidence_relevance=0.0,
         evidence_sufficiency=0.0,
         source_reliability=0.0,
         freshness=0.0,
-        support_status="unverified",
+        support_status="missing",
         missing_evidence=["No retrieval-backed source was provided."],
         fatal_flags=[],
         recommended_investigations=["Find retrieval-backed evidence."],
@@ -1769,11 +1770,23 @@ def test_evidence_assessment_model_serializes_unverified_support_status() -> Non
         "evidence_sufficiency": 0.0,
         "source_reliability": 0.0,
         "freshness": 0.0,
-        "support_status": "unverified",
+        "support_status": "missing",
         "missing_evidence": ["No retrieval-backed source was provided."],
         "fatal_flags": [],
         "recommended_investigations": ["Find retrieval-backed evidence."],
     }
+
+
+def test_evidence_support_status_contract_uses_explicit_domain_states() -> None:
+    assert EvidenceSupportStatus.__args__ == (
+        "grounded",
+        "missing",
+        "unavailable",
+        "refuted",
+        "contradicted",
+        "retracted",
+        "no_info",
+    )
 
 
 def test_consistency_assessment_model_serializes_fallacy_fields() -> None:
@@ -1828,7 +1841,7 @@ def test_all_judge_output_models_serialize_contracts() -> None:
             evidence_sufficiency=0.0,
             source_reliability=0.0,
             freshness=0.0,
-            support_status="unverified",
+            support_status="missing",
             missing_evidence=["No retrieval-backed source was provided."],
             fatal_flags=[],
             recommended_investigations=["Find retrieval-backed evidence."],
@@ -1871,7 +1884,7 @@ def test_all_judge_output_models_serialize_contracts() -> None:
             "evidence_sufficiency": 0.0,
             "source_reliability": 0.0,
             "freshness": 0.0,
-            "support_status": "unverified",
+            "support_status": "missing",
             "missing_evidence": ["No retrieval-backed source was provided."],
             "fatal_flags": [],
             "recommended_investigations": ["Find retrieval-backed evidence."],
@@ -2307,7 +2320,7 @@ def test_score_node_with_provider_does_not_invent_evidence_refs(db) -> None:
                             evidence_sufficiency=0.9,
                             source_reliability=0.9,
                             freshness=0.9,
-                            support_status="verified",
+                            support_status="grounded",
                         ),
                     ).model_dump(mode="json")
                 ),

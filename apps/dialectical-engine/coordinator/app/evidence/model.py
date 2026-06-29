@@ -12,6 +12,16 @@ class EntailmentLabel(str, Enum):
     NOINFO = "NOINFO"
 
 
+class EvidenceStatus(str, Enum):
+    GROUNDED = "grounded"
+    MISSING = "missing"
+    UNAVAILABLE = "unavailable"
+    REFUTED = "refuted"
+    CONTRADICTED = "contradicted"
+    RETRACTED = "retracted"
+    NO_INFO = "no_info"
+
+
 @dataclass(frozen=True)
 class SourceRecord:
     reference: str
@@ -39,10 +49,12 @@ class EvidenceScore:
     base_score: float
     uncertainty: float
     entailment: EntailmentLabel
+    status: EvidenceStatus
     caveats: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "reference", require_non_empty(self.reference, "reference"))
         object.__setattr__(self, "base_score", require_unit_interval(float(self.base_score), "base_score"))
         object.__setattr__(self, "uncertainty", require_unit_interval(float(self.uncertainty), "uncertainty"))
+        object.__setattr__(self, "status", EvidenceStatus(self.status))
         object.__setattr__(self, "caveats", tuple(str(caveat) for caveat in self.caveats))

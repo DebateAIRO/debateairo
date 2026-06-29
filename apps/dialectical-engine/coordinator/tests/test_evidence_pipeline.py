@@ -4,6 +4,7 @@ import pytest
 
 from app.evidence import (
     EntailmentLabel,
+    EvidenceStatus,
     EvidenceValidationPipeline,
     SourceRecord,
     classify_entailment,
@@ -23,6 +24,7 @@ def test_retracted_source_caps_evidence_score_near_zero() -> None:
     result = pipeline.score_claim_source("Remote work improves productivity", source)
 
     assert result.base_score == pytest.approx(0.02)
+    assert result.status == EvidenceStatus.RETRACTED
     assert "Source is retracted." in result.caveats
     assert result.entailment == EntailmentLabel.SUPPORTS
 
@@ -38,6 +40,7 @@ def test_noinfo_source_collapses_support() -> None:
     result = pipeline.score_claim_source("Remote work improves productivity", source)
 
     assert result.base_score == pytest.approx(0.05)
+    assert result.status == EvidenceStatus.NO_INFO
     assert "Source does not contain information for the claim." in result.caveats
     assert result.entailment == EntailmentLabel.NOINFO
 
@@ -55,6 +58,7 @@ def test_supported_source_uses_quality_corroboration_and_statistical_caveats() -
     result = pipeline.score_claim_source("Remote work improves productivity", source)
 
     assert result.base_score == pytest.approx(0.42)
+    assert result.status == EvidenceStatus.GROUNDED
     assert "Low quality evidence multiplier applied." in result.caveats
     assert "Statistical red flag: small n" in result.caveats
     assert "Statistical red flag: missing effect size" in result.caveats
@@ -107,3 +111,66 @@ def test_pipeline_grounds_only_evidence_leaf_nodes() -> None:
 
     with pytest.raises(ValueError, match="evidence_leaf"):
         pipeline.ground_leaf(ClaimNode(id="root", text="Root", type="root"), source)
+
+
+def test_pipeline_marks_refuted_retracted_and_noinfo_leaves_as_not_grounded() -> None:
+    pipeline = EvidenceValidationPipeline()
+    leaf = ClaimNode(
+        id="e1",
+        text="Remote work improves productivity",
+        type="evidence_leaf",
+    )
+
+    cases = [
+        (
+            SourceRecord(
+                reference="doi:10/refute",
+                text="The study refutes that remote work improves productivity.",
+                quality_grade="high",
+            ),
+            EvidenceStatus.REFUTED,
+        ),
+        (
+            SourceRecord(
+                reference="doi:10/retracted",
+                text="Remote work improves productivity.",
+                retracted=True,
+                quality_grade="high",
+            ),
+            EvidenceStatus.RETRACTED,
+        ),
+        (
+            SourceRecord(
+                reference="doi:10/noinfo",
+                text="This article discusses urban planning.",
+                quality_grade="high",
+            ),
+            EvidenceStatus.NO_INFO,
+        ),
+    ]
+
+    for source, expected_status in cases:
+        grounded = pipeline.ground_leaf(leaf, source)
+
+        assert grounded.status == expected_status.value
+        assert grounded.base_score < 0.10
+        assert grounded.final_strength < 0.10
+        assert grounded.uncertainty >= 0.90
+
+
+def test_pipeline_can_mark_missing_evidence_without_fake_grounding() -> None:
+    pipeline = EvidenceValidationPipeline()
+    leaf = ClaimNode(
+        id="e1",
+        text="Remote work improves productivity",
+        type="evidence_leaf",
+        transcript=[{"reference": "doi:10/missing"}],
+    )
+
+    missing = pipeline.mark_missing_leaf(leaf, "doi:10/missing")
+
+    assert missing.status == EvidenceStatus.MISSING.value
+    assert missing.base_score == 0.0
+    assert missing.final_strength == 0.0
+    assert missing.uncertainty == 1.0
+    assert missing.caveats == ["Evidence source is missing or unavailable for doi:10/missing."]
