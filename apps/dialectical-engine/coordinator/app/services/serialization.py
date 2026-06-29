@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.argument_claim.node_adapter import argument_claim_from_node
 from app.models.entities import (
     AgentCapability,
     AgentOutput,
@@ -95,28 +96,23 @@ def node_to_dict(
     streaming_jobs_by_node: dict[str, Job] | None = None,
 ) -> dict[str, Any]:
     streaming_job = (streaming_jobs_by_node or {}).get(node.id)
+    status = "generating" if streaming_job else node.status
+    argument_claim = argument_claim_from_node(node)
     active_generation = (
         streaming_generation_summary(db, streaming_job)
         if streaming_job
         else generation_summary(db, node.active_generation_id)
     )
-    return {
-        "id": node.id,
-        "debate_id": node.debate_id,
-        "parent_id": node.parent_id,
-        "node_type": node.node_type,
-        "depth": node.depth,
-        "position": node.position,
-        "claim": node.claim,
-        "status": "generating" if streaming_job else node.status,
-        "materialized_path": node.materialized_path,
-        "active_generation_id": node.active_generation_id,
+    payload = {
+        **argument_claim.to_node_payload(status=status),
+        "argument_claim": argument_claim.to_domain_payload(status=status),
         "active_generation": active_generation,
         "children": [
             node_to_dict(db, child, children_by_parent, streaming_jobs_by_node)
             for child in sorted(children_by_parent.get(node.id, []), key=lambda item: item.position)
         ],
     }
+    return payload
 
 
 def synthesis_to_dict(db: Session, synthesis: Synthesis | None) -> dict[str, Any] | None:
