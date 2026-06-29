@@ -106,6 +106,9 @@ def node_to_dict(
     payload = {
         **argument_claim.to_node_payload(status=status),
         "argument_claim": argument_claim.to_domain_payload(status=status),
+        "path_status": node.path_status,
+        "stopping_status": node.stopping_status,
+        "stopping_reason": node.stopping_reason,
         "active_generation": active_generation,
         "children": [
             node_to_dict(db, child, children_by_parent, streaming_jobs_by_node)
