@@ -463,10 +463,11 @@ export type WorkerStatus = {
 };
 
 // ---------------------------------------------------------------------------
-// DDD-06A: ArgumentClaim domain language layer
+// DDD-06A / DDD-10: frontend DDD language layer
 //
-// These types sit on top of the persistence types (DebateNode, Generation,
-// NodeScore). API field names are unchanged — renaming is deferred to DDD-10.
+// These types sit on top of the persistence/API DTOs (DebateNode, Generation,
+// NodeScore/NodeScoringPayload). API field names are unchanged; this layer gives
+// UI and scoring helpers domain-language names while preserving compatibility.
 // ---------------------------------------------------------------------------
 
 /** Role of an ArgumentClaim in the debate tree. */
@@ -480,11 +481,18 @@ export type ArgumentClaimRole =
   | "CON";
 
 /**
- * Lifecycle status of an ArgumentClaim.
- * "abandoned" replaces the legacy "stale" — abandoned paths are never deleted,
- * must be visible in UX (collapsed/greyed + summarized + explained).
+ * Lifecycle status of an investigation path.
+ * "abandoned" paths are never deleted and must remain visible in UX.
  */
-export type ArgumentClaimStatus = "pending" | "generating" | "active" | "abandoned";
+export type InvestigationPathStatus =
+  | "pending"     // path not yet investigated
+  | "generating"  // generating argument text
+  | "active"      // investigation live, available for deepening
+  | "challenged"  // argument challenged; path under re-investigation
+  | "abandoned";  // path paused/stopped — preserved, never pruned
+
+/** Lifecycle status of an ArgumentClaim shown in the tree. */
+export type ArgumentClaimStatus = InvestigationPathStatus;
 
 /** Domain alias: a ClaimGeneration is the LLM output that produced the argument text. */
 export type ClaimGeneration = Generation;
@@ -510,4 +518,37 @@ export type ArgumentClaimView = {
   status: ArgumentClaimStatus;
   activeGenerationId: string | null;
   score?: ArgumentScore | null;
+};
+
+/**
+ * Domain alias: the scoring output for an ArgumentClaim.
+ * Wraps NodeScoringPayload — use this name in DDD-facing code.
+ */
+export type ScoreSignal = NodeScoringPayload;
+
+/**
+ * Evidence quality and gap summary for an ArgumentClaim.
+ * Derived from NodeScoringPayload holes, fatal flags, and recommended
+ * investigations. Kept separate from scoring totals per DDD doctrine:
+ * evidence correctness is distinct from score values.
+ */
+export type EvidenceSignal = {
+  argumentClaimId: string;
+  holes: ScoringHole[];
+  fatalFlags: FatalFlag[];
+  recommendations: RecommendedInvestigation[];
+  evidenceQuality: number | null;
+};
+
+/**
+ * An ExplorationPolicy expansion/investigation decision for an ArgumentClaim.
+ * Maps over RecommendedInvestigation with DDD-language field names.
+ * Raw LLM outputs never directly populate this — deterministic policy decides.
+ */
+export type ExpansionDecision = {
+  argumentClaimId: string;
+  action: InvestigationAction;
+  reason: string;
+  priority: number;
+  expansionHint?: AdaptiveDepthExpansionHint | null;
 };
