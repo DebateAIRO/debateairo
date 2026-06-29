@@ -20,6 +20,7 @@ class RoutingEngine:
         allowed_models: set[str] | None = None,
         roles: dict[str, dict[str, Any]] | None = None,
     ) -> str:
+        known_online_capabilities = online_capabilities is not None and bool(online_capabilities)
         online_capabilities = online_capabilities or set()
         exclude_models = exclude_models or set()
         configured_roles = roles or self.roles
@@ -33,6 +34,8 @@ class RoutingEngine:
                 available = [model for model in pool if model in online_capabilities]
                 if available:
                     pool = available
+                else:
+                    raise ValueError(f"No online models available for role {role}")
             if not pool:
                 raise ValueError(f"No models available for role {role}")
             if config.get("strategy") == "round_robin":
@@ -49,6 +52,8 @@ class RoutingEngine:
             for model in ordered:
                 if model in online_capabilities:
                     return model
+            if known_online_capabilities:
+                raise ValueError(f"No online models available for role {role}")
         if ordered:
             return ordered[0]
         raise ValueError(f"No models configured for role {role}")
