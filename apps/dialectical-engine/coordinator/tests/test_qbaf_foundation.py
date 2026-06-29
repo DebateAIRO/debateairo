@@ -14,6 +14,12 @@ def test_qbaf_package_exposes_step_1_marker() -> None:
     assert qbaf.FOUNDATION_STEP == "proposal-b-step-1"
 
 
+def test_qbaf_package_exposes_purity_contract_marker() -> None:
+    from app import qbaf
+
+    assert qbaf.PURITY_CONTRACT == "pure-graph-math-no-io"
+
+
 def test_agents_file_records_proposal_b_invariants() -> None:
     agents_text = (ENGINE_ROOT / "AGENTS.md").read_text()
 
@@ -29,6 +35,20 @@ def test_agents_file_records_proposal_b_invariants() -> None:
     ]
     for phrase in required_phrases:
         assert phrase in agents_text
+
+
+def test_qbaf_boundary_note_records_adapter_ownership() -> None:
+    note = (ENGINE_ROOT / "docs" / "ddd" / "qbaf-boundary.md").read_text()
+
+    required_phrases = [
+        "QBAF remains pure graph math",
+        "No DB/session imports",
+        "No provider, LLM, CLI, or worker calls",
+        "No filesystem, network, time, randomness, or environment access",
+        "Adapters own persistence, providers, evidence, and orchestration",
+    ]
+    for phrase in required_phrases:
+        assert phrase in note
 
 
 def test_coordinator_config_loads_openai_values_from_dotenv(

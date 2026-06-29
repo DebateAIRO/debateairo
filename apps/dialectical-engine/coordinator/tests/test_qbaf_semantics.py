@@ -53,6 +53,23 @@ def test_df_quad_propagates_weighted_support_and_attack_formula() -> None:
     assert result.nodes["root"].final_strength == pytest.approx(0.52)
 
 
+def test_df_quad_propagation_preserves_input_graph_and_edges() -> None:
+    edge = Edge(source_id="support", target_id="root", polarity="support", weight=0.5)
+    graph = QBAFGraph(
+        root_id="root",
+        nodes={"root": root(0.4), "support": claim("support", 0.7)},
+        edges=[edge],
+    )
+
+    result = DFQuADSemantics().propagate(graph)
+
+    assert graph.nodes["root"].final_strength == 0.0
+    assert graph.nodes["support"].final_strength == 0.0
+    assert graph.edges == [edge]
+    assert result.edges == [edge]
+    assert result.nodes["root"].final_strength == pytest.approx(0.61)
+
+
 def test_df_quad_combines_multiple_weighted_supporters() -> None:
     graph = QBAFGraph(
         root_id="root",
