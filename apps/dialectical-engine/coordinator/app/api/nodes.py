@@ -55,6 +55,12 @@ def generations(
     rows = list(
         db.scalars(select(Generation).where(Generation.node_id == node_id).order_by(Generation.created_at.desc())).all()
     )
+    worker_ids = {row.worker_id for row in rows}
+    workers_by_id = (
+        {worker.id: worker for worker in db.scalars(select(Worker).where(Worker.id.in_(worker_ids))).all()}
+        if worker_ids
+        else {}
+    )
     return {
         "node_id": node_id,
         "items": [
@@ -68,7 +74,7 @@ def generations(
                 "tokens_out": row.tokens_out,
                 "latency_ms": row.latency_ms,
                 "worker_id": row.worker_id,
-                "worker_name": db.get(Worker, row.worker_id).name if db.get(Worker, row.worker_id) else row.worker_id,
+                "worker_name": workers_by_id[row.worker_id].name if row.worker_id in workers_by_id else row.worker_id,
                 "created_at": iso(row.created_at),
             }
             for row in rows

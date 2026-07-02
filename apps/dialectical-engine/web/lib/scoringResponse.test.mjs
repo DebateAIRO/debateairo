@@ -110,7 +110,7 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
     {
       kind: "token_required",
       title: "User token required",
-      detail: "Unlock actions with a user token to refresh scoring. Showing 2 persisted scored nodes.",
+      detail: "Unlock actions with a user token to refresh scoring. Showing 2 persisted scored claims.",
     }
   );
   assert.deepEqual(
@@ -155,7 +155,7 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
     {
       kind: "refreshing",
       title: "Scoring in progress",
-      detail: "Judge outputs are being generated. Showing 1 persisted scored node while it completes.",
+      detail: "Judge outputs are being generated. Showing 1 persisted scored claim while it completes.",
     }
   );
   assert.deepEqual(
@@ -170,7 +170,7 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
     {
       kind: "scores",
       title: "Real scores displayed",
-      detail: "Showing 3 persisted scored nodes from the scoring response.",
+      detail: "Showing 3 persisted scored claims from the scoring response.",
     }
   );
 });
@@ -277,7 +277,7 @@ test("formatScoringVisibilityState reports partial scoring counts", async () => 
     {
       kind: "scores",
       title: "Scores partially checked",
-      detail: "Showing 2 persisted scored nodes; 1 unavailable node.",
+      detail: "Showing 2 persisted scored claims; 1 unavailable claim.",
     }
   );
 });
@@ -473,7 +473,7 @@ test("selectStrongestUnresolvedScoringIssue picks the highest-priority real issu
   });
 });
 
-test("selectStrongestUnresolvedScoringIssue uses scored node priority as a deterministic tie-break", async () => {
+test("selectStrongestUnresolvedScoringIssue uses scored claim priority as a deterministic tie-break", async () => {
   const { selectStrongestUnresolvedScoringIssue } = await loadHelper();
   const issue = selectStrongestUnresolvedScoringIssue({
     debate_id: "debate-1",
@@ -648,10 +648,10 @@ test("recordSuspiciousScoringResponse logs successful empty scoring output once"
         requestId: "request-1",
         operation: "refresh-scoring",
         status: "available",
-        itemCount: 0,
-        nodeIdCount: 1,
+        claimCount: 1,
+        argumentClaimIds: ["node-a"],
         errorCount: 0,
-        scoredNodeCount: 0,
+        scoredClaimCount: 0,
       },
     },
   ]);
@@ -705,12 +705,12 @@ test("recordSuspiciousScoringResponse logs successful missing artifact chain onc
         debateId: "debate-1",
         operation: "load-scoring",
         status: "available",
-        missingFields: ["model_metadata", "cache"],
+        missingFields: ["modelMetadata", "cache"],
         artifactChainExpectation: "current-scoring-producers-emit-model-metadata-and-cache",
-        itemCount: 1,
-        nodeIdCount: 1,
+        claimCount: 1,
+        argumentClaimIds: ["node-a"],
         errorCount: 0,
-        scoredNodeCount: 1,
+        scoredClaimCount: 1,
       },
     },
   ]);
@@ -765,11 +765,11 @@ test("recordSuspiciousScoringResponse logs success with missing required fields 
         debateId: "debate-1",
         operation: "refresh-scoring",
         status: "available",
-        missingFields: ["items[0].scores"],
-        itemCount: 1,
-        nodeIdCount: 1,
+        missingFields: ["argumentClaims[0].scores"],
+        claimCount: 1,
+        argumentClaimIds: ["node-a"],
         errorCount: 0,
-        scoredNodeCount: 1,
+        scoredClaimCount: 1,
       },
     },
   ]);

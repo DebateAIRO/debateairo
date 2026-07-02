@@ -13,6 +13,7 @@ import {
   type SuspiciousScoringContext,
   type SuspiciousScoringLogger,
 } from "./observability/suspiciousScoring";
+import { toArgumentClaimStatus } from "./debateTreeUtils";
 
 export type IndexedScoringResponse = {
   scoringByNodeId: Map<string, NodeScoringPayload>;
@@ -119,16 +120,16 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function scoredNodeDetail(response: DebateScoringResponse | null): string {
+function scoredClaimDetail(response: DebateScoringResponse | null): string {
   const count = response?.scored_node_count ?? response?.items?.length ?? 0;
-  if (count <= 0) return "No persisted scored nodes are available.";
-  return `Showing ${pluralize(count, "persisted scored node")} from the scoring response.`;
+  if (count <= 0) return "No persisted scored claims are available.";
+  return `Showing ${pluralize(count, "persisted scored claim")} from the scoring response.`;
 }
 
 function retainedScoreDetail(response: DebateScoringResponse | null): string {
   const count = response?.scored_node_count ?? response?.items?.length ?? 0;
-  if (count <= 0) return "No persisted scored nodes are available yet.";
-  return `Showing ${pluralize(count, "persisted scored node")} while it completes.`;
+  if (count <= 0) return "No persisted scored claims are available yet.";
+  return `Showing ${pluralize(count, "persisted scored claim")} while it completes.`;
 }
 
 function hasActiveScoringJob(response: DebateScoringResponse | null): boolean {
@@ -141,17 +142,17 @@ function activeScoringJobDetail(response: DebateScoringResponse | null): string 
   return `Judge outputs are being generated. ${retainedScoreDetail(response)}`;
 }
 
-function unavailableNodeCount(response: DebateScoringResponse | null): number {
+function unavailableClaimCount(response: DebateScoringResponse | null): number {
   return response?.errors?.length ?? 0;
 }
 
 function partialScoreDetail(response: DebateScoringResponse | null): string {
   const scoredCount = response?.scored_node_count ?? response?.items?.length ?? 0;
-  const unavailableCount = unavailableNodeCount(response);
+  const unavailableCount = unavailableClaimCount(response);
   const scoredDetail =
-    scoredCount > 0 ? `Showing ${pluralize(scoredCount, "persisted scored node")}` : "No persisted scored nodes";
+    scoredCount > 0 ? `Showing ${pluralize(scoredCount, "persisted scored claim")}` : "No persisted scored claims";
   return unavailableCount > 0
-    ? `${scoredDetail}; ${pluralize(unavailableCount, "unavailable node")}.`
+    ? `${scoredDetail}; ${pluralize(unavailableCount, "unavailable claim")}.`
     : `${scoredDetail}.`;
 }
 
@@ -266,8 +267,8 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
       title: "User token required",
       detail:
         count > 0
-          ? `Unlock actions with a user token to refresh scoring. Showing ${pluralize(count, "persisted scored node")}.`
-          : "Unlock actions with a user token to refresh scoring. No persisted scored nodes are available.",
+          ? `Unlock actions with a user token to refresh scoring. Showing ${pluralize(count, "persisted scored claim")}.`
+          : "Unlock actions with a user token to refresh scoring. No persisted scored claims are available.",
     };
   }
 
@@ -282,7 +283,7 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
   return {
     kind: "scores",
     title: "Real scores displayed",
-    detail: scoredNodeDetail(input.response),
+    detail: scoredClaimDetail(input.response),
   };
 }
 
@@ -425,9 +426,6 @@ export function toExpansionDecision(
  */
 export function toInvestigationPathStatus(rawStatus: string | null | undefined): InvestigationPathStatus {
   const s = (rawStatus ?? "").toLowerCase();
-  if (s === "abandoned" || s === "stale" || s === "paused" || s === "stopped") return "abandoned";
   if (s === "challenged" || s === "challenge") return "challenged";
-  if (s === "generating" || s === "running" || s === "streaming") return "generating";
-  if (s === "pending" || s === "queued") return "pending";
-  return "active";
+  return toArgumentClaimStatus(s);
 }

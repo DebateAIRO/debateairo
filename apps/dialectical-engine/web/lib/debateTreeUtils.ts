@@ -82,9 +82,14 @@ export function nearestExistingNodeId(
  * "stale" and related backend values are surfaced as "abandoned" — abandoned
  * paths must remain visible in UX, never silently pruned.
  */
+export function isAbandonedArgumentStatus(rawStatus: string | null | undefined): boolean {
+  const s = (rawStatus ?? "").toLowerCase();
+  return s === "abandoned" || s === "stale" || s === "paused" || s === "stopped";
+}
+
 export function toArgumentClaimStatus(rawStatus: string | null | undefined): ArgumentClaimStatus {
   const s = (rawStatus ?? "").toLowerCase();
-  if (s === "abandoned" || s === "stale" || s === "paused" || s === "stopped") return "abandoned";
+  if (isAbandonedArgumentStatus(s)) return "abandoned";
   if (s === "generating" || s === "running" || s === "streaming") return "generating";
   if (s === "pending" || s === "queued") return "pending";
   return "active";

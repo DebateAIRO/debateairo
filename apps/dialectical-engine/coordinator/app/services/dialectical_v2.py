@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -69,6 +70,25 @@ PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 AgentCapability = AgentDefinition
 SkillCapability = SkillDefinition
 AgentOutput = AgentRun
+LOGGER = logging.getLogger(__name__)
+
+
+def _log_event_publish_exception(task: asyncio.Task[None]) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        LOGGER.exception("Failed to publish dialectical v2 event")
+
+
+async def _publish_event_observably(debate_id: str, event: str, data: dict[str, Any]) -> None:
+    try:
+        await event_bus.publish(debate_id, event, data)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        LOGGER.exception("Failed to publish dialectical v2 event")
 
 
 def publish_event(debate_id: str, event: str, data: dict[str, Any]) -> None:
@@ -78,9 +98,10 @@ def publish_event(debate_id: str, event: str, data: dict[str, Any]) -> None:
         asyncio.run(event_bus.publish(debate_id, event, data))
     else:
         # This service is called from sync coordinator paths today. If a future
-        # async caller enters here, the task still records the event without
-        # blocking the caller.
-        asyncio.create_task(event_bus.publish(debate_id, event, data))
+        # async caller enters here, publish without blocking but keep failures
+        # visible instead of dropping task exceptions.
+        task = asyncio.create_task(_publish_event_observably(debate_id, event, data))
+        task.add_done_callback(_log_event_publish_exception)
 
 
 def keyword_set(text: str) -> set[str]:
@@ -400,7 +421,7 @@ def select_reusable_agent(
     branch: DebateBranch,
     skill: SkillCapability,
     classification: dict[str, Any],
-) -> tuple[AgentCapability, str]:
+) -> AgentCapability | None:
     target_tags = set(classification["domain_tags"])
     candidates = db.scalars(select(AgentCapability)).all()
     selectable = [
@@ -1042,7 +1063,13 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
             .limit(1)
         )
-        existing_synthesis = db.scalar(select(Job).where(Job.debate_id == debate.id, Job.job_type == "v2_synthesize"))
+        existing_synthesis = db.scalar(
+            select(Job).where(
+                Job.debate_id == debate.id,
+                Job.job_type == "v2_synthesize",
+                Job.status.in_(["pending", "claimed", "running"]),
+            )
+        )
         if incomplete_pov is None and existing_synthesis is None:
             queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
@@ -1068,7 +1095,13 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         incomplete = db.scalar(
             select(AgentRun).where(AgentRun.debate_id == debate.id, AgentRun.status != "complete").limit(1)
         )
-        existing_synthesis = db.scalar(select(Job).where(Job.debate_id == debate.id, Job.job_type == "v2_synthesize"))
+        existing_synthesis = db.scalar(
+            select(Job).where(
+                Job.debate_id == debate.id,
+                Job.job_type == "v2_synthesize",
+                Job.status.in_(["pending", "claimed", "running"]),
+            )
+        )
         if incomplete is None and existing_synthesis is None:
             queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
@@ -1149,50 +1182,6 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         publish_event(debate.id, "agent_output_completed", {"debate_id": debate.id, "agent_output_id": agent_output.id, "job_id": job.id})
         queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
-        return
-
-    if job.job_type == "v2_synthesize":
-        payload = validate_synthesis_contract(result if isinstance(result, dict) else {})
-        agent_outputs = db.scalars(select(AgentRun).where(AgentRun.debate_id == debate.id).order_by(AgentRun.created_at.asc())).all()
-        incomplete_pov = db.scalar(
-            select(Node)
-            .where(
-                Node.debate_id == debate.id,
-                Node.node_type.in_([node_type for node_type, _label in POV_BRANCHES]),
-                Node.status != "complete",
-            )
-            .limit(1)
-        )
-        if incomplete_pov is not None:
-            raise ValueError("Cannot synthesize until all POV branches are complete")
-        findings = {run.analyzer_type: (run.output.get("findings") or [""])[0] for run in analyzer_runs_for_debate(db, debate.id)}
-        synthesis = Synthesis(
-            debate_id=debate.id,
-            strongest_pro=sanitize_text(str(payload["strongest_pro"])),
-            strongest_con=sanitize_text(str(payload["strongest_con"])),
-            verdict=sanitize_text(str(payload["verdict"])),
-            upstream_agent_output_ids=[output.id for output in agent_outputs],
-            analyzer_findings=findings,
-            provenance={
-                **payload["provenance"],
-                "tensions": payload.get("tensions") or [],
-                "agreements": payload.get("agreements") or [],
-                "evidence_gaps": payload.get("evidence_gaps") or [],
-                "key_takeaways": payload.get("key_takeaways") or [],
-                "contribution_summary": payload.get("contribution_summary") or [],
-            },
-            model_id=str(payload["provenance"].get("model_id") or job.required_model),
-            worker_id=str(payload["provenance"].get("worker_id") or (worker.id if worker else job.worker_id)),
-        )
-        db.add(synthesis)
-        flush_write(db)
-        debate.synthesis_id = synthesis.id
-        debate.status = "complete"
-        debate.completed_at = now_utc()
-        record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
-        commit_write(db)
-        publish_event(debate.id, "synthesis_completed", {"debate_id": debate.id, "synthesis_id": synthesis.id, "job_id": job.id})
-        publish_event(debate.id, "debate_complete", {"debate_id": debate.id})
         return
 
     raise ValueError(f"Unsupported V2 job type {job.job_type}")

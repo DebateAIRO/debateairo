@@ -5,14 +5,15 @@ import type { MouseEvent, ReactNode } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
 import type { DebateNode, Generation, NodeScoringError, NodeScoringPayload } from "@/lib/types";
 import { ROLE_PALETTES, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { modelMeta } from "@/lib/models";
+import { isAbandonedArgumentStatus } from "@/lib/debateTreeUtils";
 import {
   formatRecommendationAction,
   manualInvestigationActionState,
-  recommendationTargetNodeId,
+  recommendationTargetClaimId,
   selectAdditionalRecommendations,
   selectTopRecommendation
 } from "@/lib/recommendation";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
 function looksAuthRelated(message: string): boolean {
@@ -39,8 +40,8 @@ export function NodeDetailDrawer({
   token: string | null;
   onClose: () => void;
   onChallenge: (anchor: HTMLElement, text: string) => void;
-  onFocusRecommendationNode: (targetNodeId: string) => boolean;
-  canFocusRecommendationNode: (targetNodeId: string) => boolean;
+  onFocusRecommendationNode: (targetClaimId: string) => boolean;
+  canFocusRecommendationNode: (targetClaimId: string) => boolean;
   onQueued: () => void;
   onError: (message: string) => void;
   onAuthRejected: () => void;
@@ -48,8 +49,7 @@ export function NodeDetailDrawer({
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
-  const model = generation ? modelMeta(generation.model_id) : null;
-  const isAbandoned = ["abandoned", "stale", "paused", "stopped"].includes((node.status || "").toLowerCase());
+  const isAbandoned = isAbandonedArgumentStatus(node.status);
 
   const [history, setHistory] = useState<Generation[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(0);
@@ -103,19 +103,19 @@ export function NodeDetailDrawer({
   }
 
   function recommendationTargetButton(recommendation: NodeScoringPayload["recommended_investigations"][number]) {
-    const targetNodeId = recommendationTargetNodeId(recommendation);
-    const canFocusTarget = Boolean(targetNodeId && canFocusRecommendationNode(targetNodeId));
+    const targetClaimId = recommendationTargetClaimId(recommendation);
+    const canFocusTarget = Boolean(targetClaimId && canFocusRecommendationNode(targetClaimId));
     return (
       <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
         <button
           type="button"
           className="linkBtn"
-          disabled={!targetNodeId || !canFocusTarget}
-          aria-label={canFocusTarget ? "Open recommended target node" : "Recommended target node unavailable"}
+          disabled={!targetClaimId || !canFocusTarget}
+          aria-label={canFocusTarget ? "Open recommended target claim" : "Recommended target claim unavailable"}
           onClick={() => {
-            if (!targetNodeId || !canFocusTarget) return;
-            if (onFocusRecommendationNode(targetNodeId) === false) {
-              setFocusFailedTargetNodeId(targetNodeId);
+            if (!targetClaimId || !canFocusTarget) return;
+            if (onFocusRecommendationNode(targetClaimId) === false) {
+              setFocusFailedTargetNodeId(targetClaimId);
             } else {
               setFocusFailedTargetNodeId(null);
             }
@@ -123,12 +123,12 @@ export function NodeDetailDrawer({
         >
           {canFocusTarget ? "Open target" : "Target unavailable"}
         </button>
-        {targetNodeId && !canFocusTarget ? (
+        {targetClaimId && !canFocusTarget ? (
           <span className="muted" role="status">
-            This recommendation references a node that is not visible in the current debate tree.
+            This recommendation references a claim that is not visible in the current debate tree.
           </span>
         ) : null}
-        {targetNodeId && focusFailedTargetNodeId === targetNodeId ? (
+        {targetClaimId && focusFailedTargetNodeId === targetClaimId ? (
           <span className="muted" role="status">
             Unable to focus that recommendation target because it is no longer visible.
           </span>
@@ -148,12 +148,7 @@ export function NodeDetailDrawer({
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
               {pal.arrow} {roleLabel(node)}
             </span>
-            {model ? (
-              <span className="metaLine">
-                <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                {model.name}
-              </span>
-            ) : null}
+            {generation ? <ModelMetaLine modelId={generation.model_id} /> : null}
           </div>
           <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
             ×
@@ -220,18 +215,13 @@ export function NodeDetailDrawer({
               <div className="compareCell current">
                 <div className="compareCellHead">
                   <span className="compareTag">Current</span>
-                  {model ? (
-                    <span className="metaLine">
-                      <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                      {model.name}
-                    </span>
-                  ) : null}
+                  {generation ? <ModelMetaLine modelId={generation.model_id} /> : null}
                 </div>
                 <div className="compareClaim">{node.claim}</div>
               </div>
               <div className="compareCell">
                 <div className="compareCellHead">
-                  <span className="compareTag">{modelMeta(current.model_id).name}</span>
+                  <ModelMetaLine modelId={current.model_id} className="compareTag metaLine" />
                 </div>
                 <div className="compareClaim muted">{current.argument.slice(0, 200)}</div>
               </div>
@@ -245,7 +235,6 @@ export function NodeDetailDrawer({
               <div className="muted">No previous generations.</div>
             ) : (
               history.map((item, index) => {
-                const itemModel = modelMeta(item.model_id);
                 const selected = index === selectedVersion;
                 return (
                   <button
@@ -258,10 +247,7 @@ export function NodeDetailDrawer({
                     }}
                   >
                     <div className="historyCardHead">
-                      <span className="metaLine">
-                        <span className="modelDot" style={{ ["--dot" as string]: itemModel.dot }} />
-                        {itemModel.name}
-                      </span>
+                      <ModelMetaLine modelId={item.model_id} />
                       <span className="historyTag">{item.is_active ? "active" : "archived"}</span>
                     </div>
                     <div className="historyCardBody">{item.argument}</div>

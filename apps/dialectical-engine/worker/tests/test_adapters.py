@@ -419,6 +419,16 @@ class FakeStreamingProcess:
         return self.returncode
 
 
+class BarrierStreamingProcess(FakeStreamingProcess):
+    def __init__(self, barrier: asyncio.Event, stdout: bytes = b"", stderr: bytes = b"", returncode: int = 0) -> None:
+        super().__init__(stdout=stdout, stderr=stderr, returncode=returncode)
+        self.barrier = barrier
+
+    async def wait(self) -> int:
+        await self.barrier.wait()
+        return self.returncode
+
+
 @pytest.mark.asyncio
 async def test_codex_stream_reads_last_message_when_stdout_empty(
     monkeypatch: pytest.MonkeyPatch,
@@ -438,6 +448,40 @@ async def test_codex_stream_reads_last_message_when_stdout_empty(
     chunks = [chunk async for chunk in CodexCliAdapter().stream("sys", '"evidence_gaps"', 100)]
 
     assert "".join(chunks) == json.dumps(expected)
+
+
+@pytest.mark.asyncio
+async def test_codex_stream_uses_per_call_last_message_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    barrier = asyncio.Event()
+    started_paths: list[Path] = []
+    payloads = [json.dumps({"call": 1}), json.dumps({"call": 2})]
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del stdin, stdout, stderr, env
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text(payloads[len(started_paths)], encoding="utf-8")
+        started_paths.append(output_path)
+        if len(started_paths) == 2:
+            barrier.set()
+        return BarrierStreamingProcess(barrier, stdout=b"", returncode=0)
+
+    async def collect(chunks) -> str:
+        return "".join([chunk async for chunk in chunks])
+
+    monkeypatch.setattr(codex_cli_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(codex_cli_module.asyncio, "create_subprocess_exec", fake_exec)
+
+    adapter = CodexCliAdapter()
+    results = await asyncio.gather(
+        collect(adapter.stream("sys", "first", 100)),
+        collect(adapter.stream("sys", "second", 100)),
+    )
+
+    assert results == payloads
+    assert all(not path.exists() for path in started_paths)
 
 
 @pytest.mark.asyncio
@@ -557,6 +601,21 @@ class FakeOllamaClient:
         return FakeStream(['{"response":"hello ","done":false}', '{"response":"world","done":true}'])
 
 
+class FakeTaggedOllamaClient(FakeOllamaClient):
+    async def get(self, url: str) -> FakeResponse:
+        assert url.endswith("/api/tags")
+        response = FakeResponse()
+        response.json = lambda: {"models": [{"name": "qwen-3.6:latest"}]}  # type: ignore[method-assign]
+        return response
+
+
+class FakeMalformedOllamaClient(FakeOllamaClient):
+    def stream(self, method: str, url: str, json: dict[str, object]) -> FakeStream:
+        assert method == "POST"
+        assert url.endswith("/api/generate")
+        return FakeStream(["{}", "not-json", '{"response":"ok"}'])
+
+
 class FakeLMStudioResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -602,6 +661,20 @@ async def test_ollama_health_and_stream(monkeypatch: pytest.MonkeyPatch) -> None
     assert [chunk async for chunk in adapter.stream("sys", "user", 10)] == ["hello ", "world"]
 
 
+@pytest.mark.asyncio
+async def test_ollama_health_requires_exact_tag_when_requested(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ollama_module.httpx, "AsyncClient", FakeTaggedOllamaClient)
+
+    assert not await OllamaAdapter("qwen-3.6:instruct").health_check()
+
+
+@pytest.mark.asyncio
+async def test_ollama_stream_skips_malformed_or_keepalive_lines(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ollama_module.httpx, "AsyncClient", FakeMalformedOllamaClient)
+
+    assert [chunk async for chunk in OllamaAdapter("qwen-3.6").stream("sys", "user", 10)] == ["ok"]
+
+
 def test_ollama_adapter_model_id_matches_routing_without_tag() -> None:
     adapter = OllamaAdapter("qwen-3.6:latest")
 
@@ -642,12 +715,35 @@ class FakeXaiClient:
         )
 
 
+class FakeMalformedXaiClient(FakeXaiClient):
+    def stream(self, method: str, url: str, headers: dict[str, str], json: dict[str, object]) -> FakeStream:
+        assert method == "POST"
+        assert url.endswith("/chat/completions")
+        return FakeStream(
+            [
+                "data: ",
+                "data: not-json",
+                "data: {}",
+                'data: {"choices":[{"delta":{"content":"ok"}}]}',
+                "data: [DONE]",
+            ]
+        )
+
+
 @pytest.mark.asyncio
 async def test_xai_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XAI_API_KEY", "xai-test")
     monkeypatch.setattr(xai_module.httpx, "AsyncClient", FakeXaiClient)
 
     assert [chunk async for chunk in XaiApiAdapter().stream("sys", "user", 20)] == ["hello"]
+
+
+@pytest.mark.asyncio
+async def test_xai_stream_skips_malformed_or_keepalive_lines(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XAI_API_KEY", "xai-test")
+    monkeypatch.setattr(xai_module.httpx, "AsyncClient", FakeMalformedXaiClient)
+
+    assert [chunk async for chunk in XaiApiAdapter().stream("sys", "user", 20)] == ["ok"]
 
 
 class FakeGeminiClient:
@@ -676,12 +772,34 @@ class FakeGeminiClient:
         )
 
 
+class FakeMalformedGeminiClient(FakeGeminiClient):
+    def stream(self, method: str, url: str, headers: dict[str, str], json: dict[str, object]) -> FakeStream:
+        assert method == "POST"
+        assert url.endswith("/models/gemini-2.5-flash:streamGenerateContent?alt=sse")
+        return FakeStream(
+            [
+                "data:",
+                "data: not-json",
+                "data: {}",
+                'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}',
+            ]
+        )
+
+
 @pytest.mark.asyncio
 async def test_gemini_api_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test")
     monkeypatch.setattr(gemini_api_module.httpx, "AsyncClient", FakeGeminiClient)
 
     assert [chunk async for chunk in GeminiApiAdapter().stream("sys", "user", 20)] == ["hello ", "world"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_api_stream_skips_malformed_or_keepalive_lines(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test")
+    monkeypatch.setattr(gemini_api_module.httpx, "AsyncClient", FakeMalformedGeminiClient)
+
+    assert [chunk async for chunk in GeminiApiAdapter().stream("sys", "user", 20)] == ["ok"]
 
 
 @pytest.mark.asyncio

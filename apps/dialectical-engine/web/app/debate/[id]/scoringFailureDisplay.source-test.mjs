@@ -57,7 +57,7 @@ test("scoring provider/API failures and per-node scoring errors surface non-cras
   assert.match(
     debatePageSource,
     /state\.status === "error" \|\| state\.status === "unavailable"[\s\S]*?<span className="progressLabel">Scoring issue summary unavailable<\/span>[\s\S]*?<span className="progressCount">\{reason \|\| "No scoring payload is available\."\}<\/span>/,
-    "The scoring summary should surface failure reasons without requiring scored nodes"
+    "The scoring summary should surface failure reasons without requiring scored claims"
   );
   assert.match(
     debatePageSource,

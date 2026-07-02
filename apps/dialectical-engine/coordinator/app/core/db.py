@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 import json
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
@@ -15,12 +16,51 @@ class Base(DeclarativeBase):
     pass
 
 
-settings = load_settings()
-ensure_home(settings)
+_settings = None
+_engine: Engine | None = None
+_session_factory: sessionmaker[Session] | None = None
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
+def get_engine() -> Engine:
+    global _engine, _session_factory, _settings
+    if _engine is None:
+        _settings = load_settings()
+        ensure_home(_settings)
+        connect_args = {"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {}
+        _engine = create_engine(_settings.database_url, connect_args=connect_args, future=True)
+        _session_factory = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
+    return _engine
+
+
+def get_session_factory() -> sessionmaker[Session]:
+    if _session_factory is None:
+        get_engine()
+    assert _session_factory is not None
+    return _session_factory
+
+
+def is_initialized() -> bool:
+    return _engine is not None
+
+
+class _LazyEngine:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_engine(), name)
+
+    def __repr__(self) -> str:
+        return repr(get_engine()) if is_initialized() else "<LazyEngine uninitialized>"
+
+
+class _LazySessionLocal:
+    def __call__(self, **kwargs: Any) -> Session:
+        return get_session_factory()(**kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_session_factory(), name)
+
+
+engine = _LazyEngine()
+SessionLocal = _LazySessionLocal()
 
 
 @event.listens_for(Engine, "connect")
@@ -38,12 +78,13 @@ def set_sqlite_pragma(dbapi_connection, connection_record):  # type: ignore[no-u
 def init_db() -> None:
     from app.models import entities  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
+    db_engine = get_engine()
+    Base.metadata.create_all(bind=db_engine)
     backfill_existing_schema()
     for table in Base.metadata.tables.values():
         for index in table.indexes:
             if index.name == "ux_generations_active_per_node":
-                index.create(bind=engine, checkfirst=True)
+                index.create(bind=db_engine, checkfirst=True)
 
 
 def _sqlite_column_names(connection, table_name: str) -> set[str]:
@@ -232,8 +273,9 @@ def backfill_existing_schema() -> None:
             "updated_at": "DATETIME",
         },
     }
-    with engine.connect() as connection:
-        sqlite_rebuild = engine.dialect.name == "sqlite"
+    db_engine = get_engine()
+    with db_engine.connect() as connection:
+        sqlite_rebuild = db_engine.dialect.name == "sqlite"
         if sqlite_rebuild:
             connection.execute(text("PRAGMA foreign_keys=OFF"))
             connection.commit()

@@ -5,7 +5,7 @@ import test from "node:test";
 
 const source = readFileSync(join(process.cwd(), "components", "DebateCanvas.tsx"), "utf8");
 
-test("scored node badges expose a keyboard-operable details control", () => {
+test("scored claim badges expose a keyboard-operable details control", () => {
   assert.match(source, /<button\s+type="button"\s+className="scoreBadgeButton"/);
   assert.match(source, /aria-label=\{`Open scoring explanation for \$\{node\.claim\}`\}/);
   assert.match(source, /event\.stopPropagation\(\);\s*openNodeDetails\(\);/s);

@@ -81,12 +81,29 @@ test("suspicious logger method records an ordered warning severity", async () =>
 
   const event = JSON.parse(readFileSync(logPath, "utf8").trim());
   assert.equal(event.level, "warn");
+  assert.equal(event.category, "suspicious");
   assert.equal(event.event, "scoring.empty_output");
   assert.deepEqual(event.rootHint, {
     suspectedLayer: "artifact",
     upstreamEventId: "api.proxy.debate_scoring",
     notes: "Scoring returned success with zero items."
   });
+});
+
+test("ordinary warning events are not suspicious category events", async () => {
+  const logPath = tempLogPath();
+  process.env.DEV_OBSERVABILITY = "true";
+  process.env.DEV_OBSERVABILITY_LOG_PATH = logPath;
+  const { developerLogger } = await loadHelper();
+
+  developerLogger.warn("scoring.skipped", {
+    source: "scoring-response",
+    message: "Scoring skipped because scoring is disabled."
+  });
+
+  const event = JSON.parse(readFileSync(logPath, "utf8").trim());
+  assert.equal(event.level, "warn");
+  assert.equal(event.category, undefined);
 });
 
 test("redactForLog redacts api key values embedded in strings", async () => {

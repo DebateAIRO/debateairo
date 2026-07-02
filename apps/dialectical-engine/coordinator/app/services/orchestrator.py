@@ -595,7 +595,6 @@ def reroute_unavailable_pending_jobs(db: Session, now: Any) -> None:
         if replacement != job.required_model:
             job.required_model = replacement
             job.deadline = make_deadline()
-            job.attempts += 1
 
 
 def maybe_queue_synthesis(db: Session, debate: Debate) -> Job | None:
@@ -677,7 +676,6 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
         job.stream_buffer = ""
         job.error = "Job deadline expired"
         job.deadline = make_deadline()
-        job.attempts += 1
     flush_write(db)
 
     jobs = list(

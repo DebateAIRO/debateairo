@@ -28,6 +28,37 @@ def load_dev_smoke_module():
     return module
 
 
+def load_common_module():
+    spec = importlib.util.spec_from_file_location("dialectical_script_common", ROOT / "scripts" / "_common.py")
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_dev_scripts_share_masked_token_helper() -> None:
+    common = load_common_module()
+    dev = load_dev_module()
+    smoke = load_dev_smoke_module()
+
+    assert dev.DEFAULT_USER_TOKEN == common.DEFAULT_DEV_USER_TOKEN
+    assert smoke.DEFAULT_USER_TOKEN == common.DEFAULT_DEV_USER_TOKEN
+    assert common.dev_user_token({}) == "user_dev_token"
+    assert common.dev_user_token({"DIALECTICAL_USER_TOKEN": "custom-token"}) == "custom-token"
+    assert common.mask_secret("user_custom_token") == "user...oken"
+    assert common.mask_secret("short") == "***"
+
+
+def test_start_dev_masks_token_output_by_default() -> None:
+    script = (ROOT / "scripts" / "start_dev.ps1").read_text(encoding="utf-8")
+
+    assert 'Write-Output "Token: $env:DIALECTICAL_USER_TOKEN"' not in script
+    assert "Format-DevSecret" in script
+    assert "DIALECTICAL_SHOW_DEV_TOKEN" in script
+
+
 def test_dev_smoke_wait_for_worker_registration_retries_not_registered(monkeypatch) -> None:
     module = load_dev_smoke_module()
     monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
@@ -59,7 +90,7 @@ def test_dev_smoke_wait_for_worker_registration_retries_not_registered(monkeypat
 def test_make_dev_topology_defaults_to_goal_ports_and_worker_a() -> None:
     module = load_dev_module()
 
-    specs = module.build_process_specs(root=ROOT, python="/python", environ={})
+    specs = module.build_process_specs(root=ROOT, python="/python", environ={"DIALECTICAL_DEV_REAL_WORKER_AUTO": "0"})
     by_name = {spec.name: spec for spec in specs}
 
     assert list(by_name) == ["coordinator", "worker-a", "web"]
@@ -101,6 +132,45 @@ def test_make_dev_topology_defaults_to_goal_ports_and_worker_a() -> None:
     assert by_name["web"].cwd == ROOT
 
 
+def test_make_dev_auto_starts_saved_real_worker_config(tmp_path) -> None:
+    module = load_dev_module()
+    config_path = tmp_path / ".dialectical-worker" / "config.toml"
+    config_path.parent.mkdir()
+    config_path.write_text('name = "VLADWORKS"\n', encoding="utf-8")
+
+    specs = module.build_process_specs(
+        root=ROOT,
+        python="/python",
+        environ={
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+        },
+    )
+    by_name = {spec.name: spec for spec in specs}
+
+    assert list(by_name) == ["coordinator", "worker-a", "worker-real", "web"]
+    assert by_name["worker-real"].env["DIALECTICAL_WORKER_CONFIG"] == str(config_path)
+
+
+def test_make_dev_real_worker_auto_can_be_disabled(tmp_path) -> None:
+    module = load_dev_module()
+    config_path = tmp_path / ".dialectical-worker" / "config.toml"
+    config_path.parent.mkdir()
+    config_path.write_text('name = "VLADWORKS"\n', encoding="utf-8")
+
+    specs = module.build_process_specs(
+        root=ROOT,
+        python="/python",
+        environ={
+            "DIALECTICAL_DEV_REAL_WORKER_AUTO": "0",
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+        },
+    )
+
+    assert [spec.name for spec in specs] == ["coordinator", "worker-a", "web"]
+
+
 def test_make_dev_can_start_autoreloading_real_worker_from_saved_config() -> None:
     module = load_dev_module()
 
@@ -122,7 +192,7 @@ def test_make_dev_can_start_autoreloading_real_worker_from_saved_config() -> Non
         "watchfiles",
         "--filter",
         "python",
-        '"/python" -m app.main',
+        "/python -m app.main",
         str(ROOT / "worker" / "app"),
     ]
 

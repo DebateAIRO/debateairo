@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterator
 
 import httpx
+
+from app.adapters.streaming_json import parse_json_payload
 
 
 class OllamaAdapter:
@@ -19,9 +20,23 @@ class OllamaAdapter:
                 response = await client.get("http://localhost:11434/api/tags")
                 response.raise_for_status()
                 models = response.json().get("models", [])
-                return any(model.get("name", "").split(":")[0] == self.model_name.split(":")[0] for model in models)
+                requested_name, has_requested_tag = self._model_health_matcher()
+                return any(
+                    self._model_matches_health_entry(str(model.get("name", "")), requested_name, has_requested_tag)
+                    for model in models
+                    if isinstance(model, dict)
+                )
         except Exception:
             return False
+
+    def _model_health_matcher(self) -> tuple[str, bool]:
+        return self.model_name if ":" in self.model_name else self.model_name.split(":")[0], ":" in self.model_name
+
+    @staticmethod
+    def _model_matches_health_entry(model_name: str, requested_name: str, has_requested_tag: bool) -> bool:
+        if has_requested_tag:
+            return model_name == requested_name
+        return model_name.split(":")[0] == requested_name
 
     async def stream(self, system: str, user: str, max_tokens: int) -> AsyncIterator[str]:
         prompt = f"{system}\n\n{user}"
@@ -32,7 +47,9 @@ class OllamaAdapter:
                 async for line in response.aiter_lines():
                     if not line:
                         continue
-                    chunk = json.loads(line)
+                    chunk = parse_json_payload(line)
+                    if not isinstance(chunk, dict):
+                        continue
                     delta = chunk.get("response", "")
                     if delta:
                         yield delta

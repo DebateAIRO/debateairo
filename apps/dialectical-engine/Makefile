@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .PHONY: dev dev-real dev-smoke real-codex-scoring-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
 
-PYTHON ?= $(shell for py in "$(CURDIR)/.venv/bin/python" "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; elif command -v python3 >/dev/null 2>&1; then command -v python3; fi)
+PYTHON ?= $(shell if [ -f "$(CURDIR)/.venv/Scripts/python.exe" ]; then printf '%s\n' "$(CURDIR)/.venv/Scripts/python.exe"; exit; fi; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; exit; fi; for py in "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -f "$$py" ] || [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if command -v python3 >/dev/null 2>&1; then command -v python3; fi)
 PNPM ?= $(shell command -v pnpm)
 PYTHON_DYLD_LIBRARY_PATH ?= $(shell if [ -d /opt/homebrew/opt/expat/lib ]; then printf '%s\n' /opt/homebrew/opt/expat/lib; fi)
 PYTHON_ENV ?= $(if $(PYTHON_DYLD_LIBRARY_PATH),DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)",)
@@ -54,7 +54,11 @@ CLOUDFLARED_CREDENTIALS ?= auto
 STOP_QUICK_TUNNEL_AFTER_VERIFY ?= 1
 SETUP_NAMED_TUNNEL_FLAGS ?=
 USER_TOKEN ?=
+DIALECTICAL_USER_TOKEN ?= user_dev_token
+DIALECTICAL_DEV_WORKER_RELOAD ?= 0
 export USER_TOKEN
+export DIALECTICAL_USER_TOKEN
+export DIALECTICAL_DEV_WORKER_RELOAD
 EXPECTED_WORKERS ?= 1
 EXPECTED_WORKER_NAMES ?=
 EXPECTED_OFFLINE_WORKER_NAMES ?=
@@ -77,7 +81,11 @@ WORKER_B_NAME ?= adesso-mbp
 LAUNCHD_PATH ?= $(HOME)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 dev:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/dev.py
+	@if command -v powershell.exe >/dev/null 2>&1; then \
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start_dev.ps1; \
+	else \
+		$(PYTHON_ENV) "$(PYTHON)" scripts/dev.py; \
+	fi
 
 dev-real:
 	DIALECTICAL_DEV_REAL_WORKER_CONFIG="$${DIALECTICAL_DEV_REAL_WORKER_CONFIG:-$$HOME/.dialectical-worker/config.toml}" $(PYTHON_ENV) "$(PYTHON)" scripts/dev.py

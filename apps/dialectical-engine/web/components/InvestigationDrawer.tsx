@@ -57,7 +57,7 @@ export function InvestigationDrawer({
             <span>Resolution</span>
           </div>
           <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
-            Record how this claim held up under scrutiny. The node carries the badge so the rest of the tree reads it
+            Record how this claim held up under scrutiny. The claim carries the badge so the rest of the tree reads it
             in context.
           </p>
 
@@ -86,7 +86,7 @@ export function InvestigationDrawer({
 
           {resolved ? (
             <div className="invFinal" style={{ background: current.bg, borderColor: current.color }}>
-              <div className="invFinalText">{current.label} — this is recorded on the node.</div>
+              <div className="invFinalText">{current.label} — this is recorded on the claim.</div>
               <button type="button" className="btn" style={{ marginTop: 11 }} onClick={onClear}>
                 Resolve &amp; clear scrutiny
               </button>

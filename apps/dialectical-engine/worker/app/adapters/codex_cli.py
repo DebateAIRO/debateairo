@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import os
 import shlex
 import shutil
@@ -46,7 +47,10 @@ class CodexCliAdapter(SubprocessStreamingAdapter):
     def __init__(self, command: str | None = None) -> None:
         self.command_prefix = split_command(command or os.getenv("CODEX_COMMAND", default_codex_command()))
         self.executable = self.command_prefix[0]
-        self._last_message_path: Path | None = None
+        self._last_message_path: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
+            "codex_last_message_path",
+            default=None,
+        )
 
     async def health_check(self) -> bool:
         if not await super().health_check():
@@ -71,7 +75,8 @@ class CodexCliAdapter(SubprocessStreamingAdapter):
         return process.returncode == 0
 
     def command(self, system: str, user: str, max_tokens: int) -> list[str]:
-        self._last_message_path = LOCAL_PATH_CLASS(tempfile.gettempdir()) / f"dialectical-codex-last-message-{uuid.uuid4()}.json"
+        last_message_path = LOCAL_PATH_CLASS(tempfile.gettempdir()) / f"dialectical-codex-last-message-{uuid.uuid4()}.json"
+        self._last_message_path.set(last_message_path)
         command = [
             *self.command_prefix,
             "exec",
@@ -79,7 +84,7 @@ class CodexCliAdapter(SubprocessStreamingAdapter):
             "--sandbox",
             "workspace-write",
             "--output-last-message",
-            str(self._last_message_path),
+            str(last_message_path),
             "--model",
             self.cli_model,
             "-",
@@ -93,12 +98,13 @@ class CodexCliAdapter(SubprocessStreamingAdapter):
         return f"{system}\n\n{user}\n\nKeep the answer under {max_tokens} tokens."
 
     def final_output_text(self) -> str | None:
-        path = self._last_message_path
+        path = self._last_message_path.get()
         if path is None or not path.exists():
             return None
         try:
             return path.read_text(encoding="utf-8").strip() or None
         finally:
+            self._last_message_path.set(None)
             try:
                 path.unlink()
             except OSError:

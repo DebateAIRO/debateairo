@@ -31,6 +31,7 @@ export interface LogErrorShape {
 export interface AppLogEvent {
   timestamp: string;
   level: AppLogLevel;
+  category?: string;
   event: string;
   source: string;
   message: string;
@@ -239,7 +240,7 @@ export function createDeveloperLogger(options: DeveloperLoggerOptions = {}): Dev
     warn: (event, input) => write("warn", event, input),
     error: (event, input) => write("error", event, input),
     fatal: (event, input) => write("fatal", event, input),
-    suspicious: (event, input) => write("warn", event, input)
+    suspicious: (event, input) => write("warn", event, { ...input, category: "suspicious" })
   };
 }
 

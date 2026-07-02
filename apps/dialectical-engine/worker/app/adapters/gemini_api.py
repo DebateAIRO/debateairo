@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterator
 
 import httpx
 
 from app.adapters.credentials import configured_api_key
+from app.adapters.streaming_json import parse_json_payload
 
 
 class GeminiApiAdapter:
@@ -42,7 +42,10 @@ class GeminiApiAdapter:
                     data = line.removeprefix("data:").strip()
                     if not data or data == "[DONE]":
                         continue
-                    for chunk in self.text_chunks(json.loads(data)):
+                    payload = parse_json_payload(data)
+                    if payload is None:
+                        continue
+                    for chunk in self.text_chunks(payload):
                         yield chunk
 
     @staticmethod

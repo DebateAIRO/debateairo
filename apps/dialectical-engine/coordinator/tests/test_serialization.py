@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from sqlalchemy import event
+
 from app.core.auth import hash_token
-from app.models.entities import Debate, Job, Node, Synthesis, Worker, now_utc
+from app.core.db import get_engine
+from app.models.entities import Debate, Generation, Job, Node, Synthesis, Worker, now_utc
 from app.services.serialization import debate_to_dict, iso
 
 
@@ -159,3 +162,123 @@ def test_debate_detail_includes_completed_synthesis_worker_name(db) -> None:
     assert visible["synthesis"]["worker_name"] == "mac-mini"
     assert visible["models"] == ["mock-local"]
     assert visible["workers"] == ["mac-mini"]
+
+
+def test_debate_detail_batches_worker_name_lookup(db) -> None:
+    workers = [
+        Worker(
+            name="mac-mini",
+            token_hash=hash_token("worker-a-token"),
+            capabilities=["mock-local"],
+            last_seen=now_utc(),
+            status="online",
+        ),
+        Worker(
+            name="adesso-mbp",
+            token_hash=hash_token("worker-b-token"),
+            capabilities=["mock-beta"],
+            last_seen=now_utc(),
+            status="online",
+        ),
+        Worker(
+            name="spare-mac",
+            token_hash=hash_token("worker-c-token"),
+            capabilities=["mock-gamma"],
+            last_seen=now_utc(),
+            status="online",
+        ),
+    ]
+    db.add_all(workers)
+    db.flush()
+    worker_ids = [worker.id for worker in workers]
+
+    debate = Debate(topic="Should cities add night buses?", status="generating", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Night buses improve access.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(child)
+    db.flush()
+    root_generation = Generation(
+        node_id=root.id,
+        model_id="mock-local",
+        role="decomposer",
+        argument="Root argument.",
+        worker_id=worker_ids[0],
+    )
+    child_generation = Generation(
+        node_id=child.id,
+        model_id="mock-beta",
+        role="proposer",
+        argument="Child argument.",
+        worker_id=worker_ids[1],
+    )
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="Access improves.",
+        strongest_con="Funding is hard.",
+        verdict="Pilot it.",
+        model_id="mock-gamma",
+        worker_id=worker_ids[2],
+    )
+    db.add_all([root_generation, child_generation, synthesis])
+    db.flush()
+    root.active_generation_id = root_generation.id
+    child.active_generation_id = child_generation.id
+    debate.root_node_id = root.id
+    debate.synthesis_id = synthesis.id
+    db.add(
+        Job(
+            debate_id=debate.id,
+            node_id=child.id,
+            job_type="argue",
+            required_role="skeptic",
+            required_model="mock-local",
+            status="running",
+            worker_id=worker_ids[0],
+            claimed_at=now_utc(),
+            stream_buffer="Streaming counterpoint.",
+        )
+    )
+    db.commit()
+    db.expire_all()
+
+    worker_selects = 0
+
+    def count_worker_select(conn, cursor, statement, parameters, context, executemany) -> None:
+        nonlocal worker_selects
+        if "FROM workers" in statement:
+            worker_selects += 1
+
+    db_engine = get_engine()
+    event.listen(db_engine, "before_cursor_execute", count_worker_select)
+    try:
+        visible = debate_to_dict(db, db.get(Debate, debate.id))
+    finally:
+        event.remove(db_engine, "before_cursor_execute", count_worker_select)
+
+    assert worker_selects == 1
+    assert visible["workers"] == ["adesso-mbp", "mac-mini", "spare-mac"]
+    assert visible["tree"]["active_generation"]["worker_name"] == "mac-mini"
+    assert visible["tree"]["children"][0]["active_generation"]["worker_name"] == "mac-mini"
+    assert visible["synthesis"]["worker_name"] == "spare-mac"

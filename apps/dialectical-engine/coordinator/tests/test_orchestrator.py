@@ -1692,6 +1692,29 @@ def test_unavailable_pending_job_reroutes_after_deadline(db) -> None:
     assert claimed.worker_id == worker.id
 
 
+def test_unavailable_pending_job_reroute_counts_only_claim_execution_attempt(db) -> None:
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
+    job = db.scalar(select(Job).where(Job.debate_id == debate.id))
+    job.required_model = "claude-sonnet-4-6"
+    job.deadline = now_utc() - timedelta(seconds=1)
+    db.commit()
+
+    claimed = claim_pending_job(db, worker)
+
+    assert claimed is not None
+    assert claimed.id == job.id
+    assert claimed.required_model == "mock-local"
+    assert claimed.attempts == 1
+
+
 def test_retryable_failure_keeps_worker_degraded_while_retrying(db) -> None:
     worker = Worker(
         name="mac-mini",
@@ -1766,6 +1789,36 @@ def test_expired_job_requeue_clears_previous_worker_current_job(db) -> None:
     assert worker_a.current_job_id is None
     assert worker_b.current_job_id == job.id
     assert node.status == "pending"
+
+
+def test_expired_job_requeue_does_not_count_without_new_execution(db) -> None:
+    worker_a = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-a-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    worker_b = Worker(
+        name="adesso-mbp",
+        token_hash=hash_token("worker-b-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add_all([worker_a, worker_b])
+    debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
+    job = claim_pending_job(db, worker_a)
+    assert job is not None
+    assert job.attempts == 1
+    job.deadline = now_utc() - timedelta(seconds=1)
+    db.commit()
+
+    reclaimed = claim_pending_job(db, worker_b)
+
+    assert reclaimed is not None
+    assert reclaimed.id == job.id
+    assert reclaimed.attempts == 2
 
 
 def test_nonretryable_synthesis_failure_marks_debate_failed(db) -> None:

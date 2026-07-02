@@ -8,8 +8,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _common import DEFAULT_DEV_USER_TOKEN, dev_user_token
+
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_USER_TOKEN = "user_dev_token"
+DEFAULT_USER_TOKEN = DEFAULT_DEV_USER_TOKEN
+DEFAULT_REAL_WORKER_CONFIG = ".dialectical-worker/config.toml"
 
 
 @dataclass(frozen=True)
@@ -37,6 +44,23 @@ def enabled_env(environ: dict[str, str], name: str, default: bool) -> bool:
     return raw.strip().lower() not in {"0", "false", "no"}
 
 
+def home_dir(environ: dict[str, str]) -> Path:
+    raw = environ.get("HOME") or environ.get("USERPROFILE")
+    if raw and raw.strip():
+        return Path(raw).expanduser()
+    return Path.home()
+
+
+def real_worker_config_path(environ: dict[str, str]) -> Path | None:
+    configured = environ.get("DIALECTICAL_DEV_REAL_WORKER_CONFIG", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    if not enabled_env(environ, "DIALECTICAL_DEV_REAL_WORKER_AUTO", True):
+        return None
+    default_config = home_dir(environ) / DEFAULT_REAL_WORKER_CONFIG
+    return default_config if default_config.exists() else None
+
+
 def real_worker_command(python: str, root: Path, environ: dict[str, str]) -> list[str]:
     if not enabled_env(environ, "DIALECTICAL_DEV_WORKER_RELOAD", True):
         return [python, "-m", "app.main"]
@@ -46,7 +70,7 @@ def real_worker_command(python: str, root: Path, environ: dict[str, str]) -> lis
         "watchfiles",
         "--filter",
         "python",
-        f'"{python}" -m app.main',
+        f"{python} -m app.main",
         str(root / "worker" / "app"),
     ]
 
@@ -86,7 +110,7 @@ def build_process_specs(
             {
                 "DIALECTICAL_WORKER_CONFIG": str(dev_home / "worker.toml"),
                 "DIALECTICAL_COORDINATOR_URL": coordinator_url,
-                "DIALECTICAL_USER_TOKEN": environ.get("DIALECTICAL_USER_TOKEN", DEFAULT_USER_TOKEN),
+                "DIALECTICAL_USER_TOKEN": dev_user_token(environ),
                 "DIALECTICAL_WORKER_NAME": environ.get("DIALECTICAL_WORKER_NAME", "mac-mini"),
                 "DIALECTICAL_ENABLE_MOCK": environ.get("DIALECTICAL_ENABLE_MOCK", "1"),
                 "DIALECTICAL_ENABLE_REAL_ADAPTERS": environ.get("DIALECTICAL_ENABLE_REAL_ADAPTERS", "0"),
@@ -114,7 +138,7 @@ def build_process_specs(
             {},
         ),
     ]
-    real_worker_config = environ.get("DIALECTICAL_DEV_REAL_WORKER_CONFIG", "").strip()
+    real_worker_config = real_worker_config_path(environ)
     if real_worker_config:
         specs.insert(
             2,
@@ -123,7 +147,7 @@ def build_process_specs(
                 real_worker_command(python, root, environ),
                 root / "worker",
                 {
-                    "DIALECTICAL_WORKER_CONFIG": str(Path(real_worker_config).expanduser()),
+                    "DIALECTICAL_WORKER_CONFIG": str(real_worker_config),
                     "DIALECTICAL_COORDINATOR_URL": coordinator_url,
                 },
             ),
@@ -134,7 +158,7 @@ def build_process_specs(
 def start(spec: ProcessSpec) -> subprocess.Popen:
     child_env = os.environ.copy()
     child_env.update(spec.env)
-    child_env.setdefault("DIALECTICAL_USER_TOKEN", DEFAULT_USER_TOKEN)
+    child_env["DIALECTICAL_USER_TOKEN"] = dev_user_token(child_env)
     process = subprocess.Popen(spec.args, cwd=spec.cwd, env=child_env)
     print(f"[dev] started {spec.name} pid={process.pid}", flush=True)
     return process

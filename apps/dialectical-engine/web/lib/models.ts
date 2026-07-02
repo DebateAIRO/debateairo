@@ -44,7 +44,7 @@ export function modelMeta(modelId: string): ModelMeta {
   const base = NAMES[key];
   const isLocal = (modelId || "").toLowerCase().includes("local") || (modelId || "").toLowerCase().includes("qwen");
   const name = key === "qwen" || isLocal ? `${base}·local` : base;
-  return { key, name: key === "qwen" ? "Qwen·local" : base, dot };
+  return { key, name, dot };
 }
 
 export function modelDot(modelId: string): string {

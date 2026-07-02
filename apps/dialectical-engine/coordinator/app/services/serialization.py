@@ -39,27 +39,51 @@ def iso(dt: datetime | None) -> str | None:
     return dt.isoformat()
 
 
-def generation_summary(db: Session, generation_id: str | None) -> dict[str, Any] | None:
+def _worker_names_by_id(db: Session, worker_ids: set[str]) -> dict[str, str]:
+    if not worker_ids:
+        return {}
+    return {
+        worker.id: worker.name
+        for worker in db.scalars(select(Worker).where(Worker.id.in_(worker_ids))).all()
+    }
+
+
+def _worker_name(worker_names_by_id: dict[str, str], worker_id: str | None) -> str:
+    if not worker_id:
+        return ""
+    return worker_names_by_id.get(worker_id, worker_id)
+
+
+def generation_summary(
+    db: Session,
+    generation_id: str | None,
+    worker_names_by_id: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
     if not generation_id:
         return None
     generation = db.get(Generation, generation_id)
     if not generation:
         return None
-    worker = db.get(Worker, generation.worker_id)
+    if worker_names_by_id is None:
+        worker_names_by_id = _worker_names_by_id(db, {generation.worker_id})
     return {
         "id": generation.id,
         "model_id": generation.model_id,
         "role": generation.role,
         "argument": generation.argument,
         "worker_id": generation.worker_id,
-        "worker_name": worker.name if worker else generation.worker_id,
+        "worker_name": _worker_name(worker_names_by_id, generation.worker_id),
         "created_at": iso(generation.created_at),
     }
 
 
-def streaming_generation_summary(db: Session, job: Job) -> dict[str, Any]:
-    worker = db.get(Worker, job.worker_id) if job.worker_id else None
-    worker_name = worker.name if worker else job.worker_id or ""
+def streaming_generation_summary(
+    db: Session,
+    job: Job,
+    worker_names_by_id: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    if worker_names_by_id is None:
+        worker_names_by_id = _worker_names_by_id(db, {job.worker_id} if job.worker_id else set())
     return {
         "id": f"stream:{job.id}",
         "job_id": job.id,
@@ -67,22 +91,26 @@ def streaming_generation_summary(db: Session, job: Job) -> dict[str, Any]:
         "role": job.required_role,
         "argument": job.stream_buffer or "",
         "worker_id": job.worker_id or "",
-        "worker_name": worker_name,
+        "worker_name": _worker_name(worker_names_by_id, job.worker_id),
         "created_at": iso(job.claimed_at or job.created_at),
         "is_streaming": True,
     }
 
 
-def active_synthesis_summary(db: Session, job: Job) -> dict[str, Any]:
-    worker = db.get(Worker, job.worker_id) if job.worker_id else None
-    worker_name = worker.name if worker else job.worker_id or ""
+def active_synthesis_summary(
+    db: Session,
+    job: Job,
+    worker_names_by_id: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    if worker_names_by_id is None:
+        worker_names_by_id = _worker_names_by_id(db, {job.worker_id} if job.worker_id else set())
     return {
         "id": f"stream:{job.id}",
         "job_id": job.id,
         "debate_id": job.debate_id,
         "model_id": job.required_model,
         "worker_id": job.worker_id or "",
-        "worker_name": worker_name,
+        "worker_name": _worker_name(worker_names_by_id, job.worker_id),
         "created_at": iso(job.claimed_at or job.created_at),
         "raw": job.stream_buffer or "",
         "is_streaming": True,
@@ -94,14 +122,15 @@ def node_to_dict(
     node: Node,
     children_by_parent: dict[str | None, list[Node]],
     streaming_jobs_by_node: dict[str, Job] | None = None,
+    worker_names_by_id: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     streaming_job = (streaming_jobs_by_node or {}).get(node.id)
     status = "generating" if streaming_job else node.status
     argument_claim = argument_claim_from_node(node)
     active_generation = (
-        streaming_generation_summary(db, streaming_job)
+        streaming_generation_summary(db, streaming_job, worker_names_by_id)
         if streaming_job
-        else generation_summary(db, node.active_generation_id)
+        else generation_summary(db, node.active_generation_id, worker_names_by_id)
     )
     payload = {
         **argument_claim.to_node_payload(status=status),
@@ -111,17 +140,22 @@ def node_to_dict(
         "stopping_reason": node.stopping_reason,
         "active_generation": active_generation,
         "children": [
-            node_to_dict(db, child, children_by_parent, streaming_jobs_by_node)
+            node_to_dict(db, child, children_by_parent, streaming_jobs_by_node, worker_names_by_id)
             for child in sorted(children_by_parent.get(node.id, []), key=lambda item: item.position)
         ],
     }
     return payload
 
 
-def synthesis_to_dict(db: Session, synthesis: Synthesis | None) -> dict[str, Any] | None:
+def synthesis_to_dict(
+    db: Session,
+    synthesis: Synthesis | None,
+    worker_names_by_id: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
     if not synthesis:
         return None
-    worker = db.get(Worker, synthesis.worker_id)
+    if worker_names_by_id is None:
+        worker_names_by_id = _worker_names_by_id(db, {synthesis.worker_id})
     return {
         "id": synthesis.id,
         "debate_id": synthesis.debate_id,
@@ -134,7 +168,7 @@ def synthesis_to_dict(db: Session, synthesis: Synthesis | None) -> dict[str, Any
         "provenance": synthesis.provenance or {},
         "model_id": synthesis.model_id,
         "worker_id": synthesis.worker_id,
-        "worker_name": worker.name if worker else synthesis.worker_id,
+        "worker_name": _worker_name(worker_names_by_id, synthesis.worker_id),
         "created_at": iso(synthesis.created_at),
     }
 
@@ -281,20 +315,22 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
             select(Generation).join(Node, Generation.node_id == Node.id).where(Node.debate_id == debate.id)
         ).all()
     )
+    worker_ids = {generation.worker_id for generation in generations}
+    if synthesis:
+        worker_ids.add(synthesis.worker_id)
+    worker_ids.update(job.worker_id for job in streaming_jobs if job.worker_id)
+    worker_names_by_id = _worker_names_by_id(db, worker_ids)
     worker_names: set[str] = set()
     models = {generation.model_id for generation in generations}
     for generation in generations:
-        worker = db.get(Worker, generation.worker_id)
-        worker_names.add(worker.name if worker else generation.worker_id)
+        worker_names.add(_worker_name(worker_names_by_id, generation.worker_id))
     if synthesis:
         models.add(synthesis.model_id)
-        worker = db.get(Worker, synthesis.worker_id)
-        worker_names.add(worker.name if worker else synthesis.worker_id)
+        worker_names.add(_worker_name(worker_names_by_id, synthesis.worker_id))
     for job in streaming_jobs:
         models.add(job.required_model)
         if job.worker_id:
-            worker = db.get(Worker, job.worker_id)
-            worker_names.add(worker.name if worker else job.worker_id)
+            worker_names.add(_worker_name(worker_names_by_id, job.worker_id))
     branches = list(
         db.scalars(select(DebateBranch).where(DebateBranch.debate_id == debate.id).order_by(DebateBranch.created_at.asc())).all()
     )
@@ -332,9 +368,11 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         "synthesis_id": debate.synthesis_id,
         "created_at": iso(debate.created_at),
         "completed_at": iso(debate.completed_at),
-        "tree": node_to_dict(db, root, children_by_parent, streaming_jobs_by_node) if root else None,
-        "synthesis": synthesis_to_dict(db, synthesis),
-        "active_synthesis": active_synthesis_summary(db, active_synthesis_job) if active_synthesis_job else None,
+        "tree": node_to_dict(db, root, children_by_parent, streaming_jobs_by_node, worker_names_by_id) if root else None,
+        "synthesis": synthesis_to_dict(db, synthesis, worker_names_by_id),
+        "active_synthesis": active_synthesis_summary(db, active_synthesis_job, worker_names_by_id)
+        if active_synthesis_job
+        else None,
         "branch_lineage": [branch_to_dict(branch) for branch in branches],
         "analyzer_runs": [analyzer_run_to_dict(run) for run in analyzer_runs],
         "selected_skills": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "skill"],

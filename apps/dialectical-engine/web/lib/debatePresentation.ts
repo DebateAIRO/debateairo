@@ -1,7 +1,8 @@
 import type { ArgumentClaimView, DebateNode } from "./types";
+import { toArgumentClaimStatus } from "./debateTreeUtils";
 
 export type Role = "root" | "pro" | "con" | "pov";
-export type NodeRenderState = "root" | "pending" | "streaming" | "done" | "empty" | "abandoned";
+export type ClaimRenderState = "root" | "pending" | "streaming" | "done" | "empty" | "abandoned";
 
 export type RolePalette = {
   text: string;
@@ -61,12 +62,12 @@ export function roleLabel(node: DebateNode): string {
   return "Root claim";
 }
 
-export function renderStateOf(node: DebateNode): NodeRenderState {
+export function renderStateOf(node: DebateNode): ClaimRenderState {
   if (node.node_type === "ROOT_CLAIM") return "root";
-  const status = (node.status || "").toLowerCase();
-  if (status === "abandoned" || status === "stale" || status === "paused" || status === "stopped") return "abandoned";
-  if (status === "pending" || status === "queued") return "pending";
-  if (status === "generating" || status === "running" || status === "streaming") return "streaming";
+  const status = toArgumentClaimStatus(node.status);
+  if (status === "abandoned") return "abandoned";
+  if (status === "pending") return "pending";
+  if (status === "generating") return "streaming";
   const hasContent = Boolean(node.claim?.trim() || node.active_generation?.argument?.trim());
   if (!hasContent) return "empty";
   return "done";
@@ -80,7 +81,7 @@ const VGAP = 24;
 const PADX = 44;
 const PADY = 40;
 
-export type PlacedNode = {
+export type PlacedClaim = {
   id: string;
   node: DebateNode;
   parent: DebateNode | null;
@@ -90,7 +91,7 @@ export type PlacedNode = {
   w: number;
   h: number;
   role: Role;
-  state: NodeRenderState;
+  state: ClaimRenderState;
 };
 
 export type Connector = {
@@ -103,7 +104,7 @@ export type Connector = {
 };
 
 export type CanvasLayout = {
-  placed: PlacedNode[];
+  placed: PlacedClaim[];
   connectors: Connector[];
   width: number;
   height: number;
@@ -120,7 +121,7 @@ type Internal = {
   y: number;
 };
 
-export function estimateHeight(node: DebateNode, state: NodeRenderState, expanded: boolean): number {
+export function estimateHeight(node: DebateNode, state: ClaimRenderState, expanded: boolean): number {
   if (state === "root") {
     const lines = Math.max(2, Math.ceil((node.claim?.length || 0) / 34));
     return 96 + lines * 26;
@@ -135,7 +136,7 @@ export function estimateHeight(node: DebateNode, state: NodeRenderState, expande
 
 /**
  * Compute an absolute layout for the tree. `heightOf` returns the measured (or
- * estimated) pixel height of each node's card so the columns pack without overlap.
+ * estimated) pixel height of each claim card so the columns pack without overlap.
  */
 export function layoutTree(
   root: DebateNode,
@@ -172,7 +173,7 @@ export function layoutTree(
   measure(tree);
   place(tree, 0);
 
-  const placed: PlacedNode[] = [];
+  const placed: PlacedClaim[] = [];
   const flatten = (n: Internal): void => {
     placed.push({
       id: n.node.id,
@@ -231,7 +232,7 @@ export function layoutTree(
   return { placed, connectors, width: maxX + PADX, height: maxY + PADY };
 }
 
-export function countNodes(root: DebateNode | null): number {
+export function countClaims(root: DebateNode | null): number {
   if (!root) return 0;
   let count = 0;
   const walk = (n: DebateNode) => {
@@ -298,7 +299,7 @@ export function flattenOutline(root: DebateNode | null): { node: DebateNode; dep
  * Abandoned paths must be visible in UX — collapsed/greyed + explained.
  * Never map "abandoned" to "empty" or omit it from the tree.
  */
-export type ArgumentClaimRenderState = NodeRenderState | "abandoned";
+export type ArgumentClaimRenderState = ClaimRenderState | "abandoned";
 
 /**
  * Render state for an ArgumentClaimView.

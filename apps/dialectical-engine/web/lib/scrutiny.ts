@@ -47,7 +47,7 @@ export type ChallengeAction = {
 };
 
 export const CHALLENGE_ACTIONS: ChallengeAction[] = [
-  { key: "counter", label: "Counter it", sub: "Spawn a focused opposing node", icon: "⚔" },
+  { key: "counter", label: "Counter it", sub: "Spawn a focused opposing argument", icon: "⚔" },
   { key: "factcheck", label: "Fact-check", sub: "Ask for sources, then verify", icon: "◉" },
   { key: "weak", label: "Mark as weak", sub: "Flag as unsupported", icon: "⚠" },
   { key: "reinterpret", label: "Reinterpret", sub: "The claim was misread", icon: "↻" }

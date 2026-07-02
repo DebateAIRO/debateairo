@@ -11,7 +11,7 @@ const responsePath = join(root, "lib", "scoringResponse.ts");
 const statusCopyPath = join(root, "lib", "scoringStatusCopy.ts");
 const typesPath = join(root, "lib", "types.ts");
 
-test("cached real scoring responses display metadata and node badges through the debate page path", () => {
+test("cached real scoring responses display metadata and claim badges through the debate page path", () => {
   const debatePageSource = readFileSync(debatePagePath, "utf8");
   const canvasSource = readFileSync(canvasPath, "utf8");
   const drawerSource = readFileSync(drawerPath, "utf8");
@@ -67,7 +67,7 @@ test("cached real scoring responses display metadata and node badges through the
   assert.match(
     debatePageSource,
     /<NodeDetailDrawer[\s\S]*scoring=\{scoringByNodeId\.get\(detailNode\.id\)\}[\s\S]*scoringError=\{scoringErrorsByNodeId\.get\(detailNode\.id\)\}/,
-    "Opening a scored node should route the same cached score payload into the detail drawer"
+    "Opening a scored claim should route the same cached score payload into the detail drawer"
   );
   assert.match(
     drawerSource,

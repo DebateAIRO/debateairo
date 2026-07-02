@@ -3,15 +3,15 @@
 import type { RecommendedInvestigation } from "@/lib/types";
 import {
   formatRecommendationAction,
-  recommendationTargetNodeId,
+  recommendationTargetClaimId,
   selectAdditionalRecommendations,
   selectTopRecommendation,
 } from "@/lib/recommendation";
 
 export type RecommendedInvestigationsProps = {
   recommendations: RecommendedInvestigation[];
-  canOpenTarget?: (targetNodeId: string) => boolean;
-  onOpenTarget?: (targetNodeId: string) => void;
+  canOpenTarget?: (targetClaimId: string) => boolean;
+  onOpenTarget?: (targetClaimId: string) => void;
   onStartInvestigation?: (recommendation: RecommendedInvestigation) => void;
   emptyMessage?: string;
 };
@@ -28,11 +28,11 @@ export function RecommendedInvestigations({
   const rankedRecommendations = topRecommendation ? [topRecommendation, ...additionalRecommendations] : [];
 
   function renderRecommendationItem(recommendation: RecommendedInvestigation, index: number) {
-    const targetNodeId = recommendationTargetNodeId(recommendation);
-    const targetAvailable = Boolean(targetNodeId && (canOpenTarget ? canOpenTarget(targetNodeId) : true));
+    const targetClaimId = recommendationTargetClaimId(recommendation);
+    const targetAvailable = Boolean(targetClaimId && (canOpenTarget ? canOpenTarget(targetClaimId) : true));
     return (
       <li
-        key={`${recommendation.action}-${recommendation.priority}-${targetNodeId ?? "none"}-${index}`}
+        key={`${recommendation.action}-${recommendation.priority}-${targetClaimId ?? "none"}-${index}`}
         className="recommendationItem"
       >
         <div className="recommendationMeta">
@@ -46,10 +46,10 @@ export function RecommendedInvestigations({
           <button
             type="button"
             className="linkBtn"
-            disabled={!targetNodeId || !targetAvailable || !onOpenTarget}
+            disabled={!targetClaimId || !targetAvailable || !onOpenTarget}
             onClick={() => {
-              if (!targetNodeId || !targetAvailable || !onOpenTarget) return;
-              onOpenTarget(targetNodeId);
+              if (!targetClaimId || !targetAvailable || !onOpenTarget) return;
+              onOpenTarget(targetClaimId);
             }}
           >
             Open target

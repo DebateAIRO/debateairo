@@ -94,7 +94,7 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   assert.match(
     debatePageSource,
     /const scoringInsightsExpandable = scoringEnabled && scoringState\.status === "loaded" && scoringByNodeId\.size > 0/,
-    "The full scoring insights panel should only be expandable after real scored nodes are available"
+    "The full scoring insights panel should only be expandable after real scored claims are available"
   );
   assert.match(
     debatePageSource,
@@ -103,12 +103,12 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
   );
   assert.match(
     debatePageSource,
-    /Scoring issue summary unavailable[\s\S]*?Enable scoring to summarize unresolved holes and fatal flags from scored nodes\./,
+    /Scoring issue summary unavailable[\s\S]*?Enable scoring to summarize unresolved holes and fatal flags from scored claims\./,
     "The summary panel should be honest before scoring is enabled"
   );
   assert.match(
     debatePageSource,
-    /state\.status === "loading"[\s\S]*?Loading scoring issue summary[\s\S]*?Waiting for scored nodes\./,
+    /state\.status === "loading"[\s\S]*?Loading scoring issue summary[\s\S]*?Waiting for scored claims\./,
     "The summary panel should show a loading state for pending controlled responses"
   );
   assert.match(
@@ -120,6 +120,11 @@ test("DebatePageClient enables scoring through the real toggle and controlled sc
     debatePageSource,
     /const scoringRefreshDisabled = !hasTree \|\| !actionToken \|\| scoringState\.status === "loading" \|\| scoringRefreshBusy/,
     "The refresh action should stay gated until a real user token exists and loading has finished"
+  );
+  assert.ok(
+    debatePageSource.indexOf("const scoringRefreshBusy = scoringRefreshState.status === \"starting\";") <
+      debatePageSource.indexOf("function scoringRefreshDisabledReason()"),
+    "The refresh busy flag should be declared before helpers read it so render-time calls cannot hit the temporal dead zone"
   );
   assert.match(
     debatePageSource,

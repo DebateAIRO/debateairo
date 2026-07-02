@@ -1,13 +1,14 @@
 "use client";
 
-import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { useState } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
 import type { DebateNode, Generation } from "@/lib/types";
+import { isAbandonedArgumentStatus } from "@/lib/debateTreeUtils";
+import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
 
 function isAbandonedNode(node: DebateNode): boolean {
-  const s = (node.status || "").toLowerCase();
-  return s === "abandoned" || s === "stale" || s === "paused" || s === "stopped";
+  return isAbandonedArgumentStatus(node.status);
 }
 
 function nodeClass(node: DebateNode): string {
@@ -31,13 +32,6 @@ function nodeLabel(node: DebateNode): string {
   if (node.node_type === "ETHICAL_POV") return "Ethical POV";
   if (node.node_type === "PRACTICAL_POV") return "Practical POV";
   return node.node_type === "PRO" ? "Pro" : "Con";
-}
-
-function modelColor(modelId: string): string {
-  const palette = ["#1f6f8b", "#7a4d1d", "#6f5d9a", "#168050", "#b43c37", "#8062b5", "#2f6f5f"];
-  let hash = 0;
-  for (const char of modelId) hash = (hash + char.charCodeAt(0)) % palette.length;
-  return palette[hash];
 }
 
 type DebateTreeProps = {
@@ -139,12 +133,9 @@ export function ArgumentNodeCard({
   const generation = node.active_generation;
   const argument = generation?.argument || (node.status === "pending" ? "Queued" : "");
   const workerName = generation?.worker_name || generation?.worker_id;
-  const activeModelColor = generation ? modelColor(generation.model_id) : undefined;
   const isCardInteractive = Boolean(onSelectNode);
   const cardLabel = selectionLabel ?? (isCardInteractive ? `Select argument: ${node.claim}` : undefined);
-  const modelStyle = generation
-    ? ({ "--model-color": activeModelColor, "--node-model-color": activeModelColor } as CSSProperties)
-    : undefined;
+  const modelStyle = generation ? modelColorStyle(generation.model_id) : undefined;
   return (
     <article
       className={[nodeClass(node), canToggleChildren ? "expandable" : "", isCardInteractive ? "selectable" : "", isSelected ? "selected" : ""]
@@ -154,7 +145,6 @@ export function ArgumentNodeCard({
       data-node-type={node.node_type}
       data-model-id={generation?.model_id}
       data-worker-name={workerName}
-      data-model-color={activeModelColor}
       data-children-open={canToggleChildren ? childrenOpen : undefined}
       data-selectable={isCardInteractive ? "true" : undefined}
       aria-current={isSelected ? "true" : undefined}
@@ -175,11 +165,7 @@ export function ArgumentNodeCard({
             <span className={`badge${isAbandonedNode(node) ? " abandonedBadge" : ""}`}>
               {isAbandonedNode(node) ? "Stopped" : node.status}
             </span>
-            {generation ? (
-              <span className="badge modelBadge" data-model-id={generation.model_id} data-model-color={activeModelColor}>
-                {generation.model_id}
-              </span>
-            ) : null}
+            {generation ? <ModelBadge modelId={generation.model_id} /> : null}
             {generation ? <span className="badge" data-worker-name={workerName}>{workerName}</span> : null}
             {generation ? <span className="badge">{generation.role}</span> : null}
           </div>
@@ -242,9 +228,7 @@ export function ArgumentNodeCard({
               <section key={item.id}>
                 <div className="toolbar">
                   <span className="badge">{item.is_active ? "Active" : "Archived"}</span>
-                  <span className="badge modelBadge" style={{ "--model-color": modelColor(item.model_id) } as CSSProperties}>
-                    {item.model_id}
-                  </span>
+                  <ModelBadge modelId={item.model_id} />
                   <span className="badge">{item.worker_name || item.worker_id}</span>
                   <span className="badge">{item.role}</span>
                 </div>

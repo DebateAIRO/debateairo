@@ -30,7 +30,7 @@ test("debate-level holes panel surfaces unavailable and empty states without fak
   );
   assert.match(
     debatePageSource,
-    /Enable scoring to summarize unresolved holes and fatal flags from scored nodes\./,
+    /Enable scoring to summarize unresolved holes and fatal flags from scored claims\./,
     "Panel should honestly report that scoring must be enabled before holes are summarized"
   );
   assert.match(

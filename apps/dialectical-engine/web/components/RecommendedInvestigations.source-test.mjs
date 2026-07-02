@@ -14,14 +14,14 @@ test("RecommendedInvestigations is a presentational real-recommendation list", (
 
   assert.match(source, /import type \{ RecommendedInvestigation \} from "@\/lib\/types"/);
   assert.match(source, /recommendations:\s*RecommendedInvestigation\[\]/);
-  assert.match(source, /onOpenTarget\?:\s*\(targetNodeId: string\) => void/);
+  assert.match(source, /onOpenTarget\?:\s*\(targetClaimId: string\) => void/);
   assert.match(source, /onStartInvestigation\?:\s*\(recommendation: RecommendedInvestigation\) => void/);
-  assert.match(source, /canOpenTarget\?:\s*\(targetNodeId: string\) => boolean/);
+  assert.match(source, /canOpenTarget\?:\s*\(targetClaimId: string\) => boolean/);
 
   assert.match(source, /selectTopRecommendation/);
   assert.match(source, /selectAdditionalRecommendations/);
   assert.match(source, /formatRecommendationAction/);
-  assert.match(source, /recommendationTargetNodeId/);
+  assert.match(source, /recommendationTargetClaimId/);
   assert.match(source, /topRecommendation \? \[topRecommendation, \.\.\.additionalRecommendations\] : \[\]/);
 
   assert.match(source, /aria-label="Recommended investigations"/);

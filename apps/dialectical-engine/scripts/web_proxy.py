@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import http.client
+import json
 import os
 import signal
 import socket
@@ -10,9 +11,11 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 HOP_BY_HOP_HEADERS = {
@@ -26,9 +29,10 @@ HOP_BY_HOP_HEADERS = {
     "upgrade",
 }
 DEFAULT_COORDINATOR_PREFIXES = ("/api/", "/healthz", "/openapi.json", "/docs", "/redoc")
-CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionResetError)
+CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 DEFAULT_NEXT_READY_TIMEOUT_SECONDS = 360
 NEXT_HMR_WEBSOCKET_PATH = "/_next/webpack-hmr"
+SENSITIVE_QUERY_KEYS = {"access_token", "api_key", "apikey", "authorization", "key", "token"}
 
 
 def is_websocket_upgrade(headers: object) -> bool:
@@ -39,6 +43,15 @@ def is_websocket_upgrade(headers: object) -> bool:
 
 def is_next_hmr_websocket(path: str) -> bool:
     return urlsplit(path).path == NEXT_HMR_WEBSOCKET_PATH
+
+
+def redact_url(value: str) -> str:
+    split = urlsplit(value)
+    query = [
+        (key, "[redacted]" if key.lower() in SENSITIVE_QUERY_KEYS else query_value)
+        for key, query_value in parse_qsl(split.query, keep_blank_values=True)
+    ]
+    return urlunsplit((split.scheme, split.netloc, split.path, urlencode(query), split.fragment))
 
 
 def close_socket(sock: socket.socket) -> None:
@@ -82,6 +95,31 @@ class WebProxy:
         self.next_ready_timeout = next_ready_timeout
         self.next_dist_dir = next_dist_dir
         self.next_process: subprocess.Popen[bytes] | None = None
+
+    def developer_event_log_path(self) -> Path:
+        configured = os.getenv("DEV_OBSERVABILITY_LOG_PATH")
+        return Path(configured) if configured else self.web_dir / "logs" / "developer-events.jsonl"
+
+    def log_api_proxy_event(self, level: str, event: str, **context: object) -> None:
+        redacted_context = dict(context)
+        if isinstance(redacted_context.get("path"), str):
+            redacted_context["path"] = redact_url(str(redacted_context["path"]))
+        if isinstance(redacted_context.get("upstream"), str):
+            redacted_context["upstream"] = redact_url(str(redacted_context["upstream"]))
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": level,
+            "event": event,
+            "source": "python-web-proxy",
+            "context": redacted_context,
+        }
+        try:
+            log_path = self.developer_event_log_path()
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as file:
+                file.write(json.dumps(payload, separators=(",", ":")) + "\n")
+        except OSError:
+            return
 
     def start_next(self) -> None:
         self.next_process = subprocess.Popen(self.next_command(), cwd=self.root, env=self.next_env())
@@ -213,6 +251,17 @@ class WebProxy:
                 try:
                     conn.request(self.command, path, body=body, headers=headers)
                     response = conn.getresponse()
+                    upstream = f"http://{target_host}:{target_port}{path}"
+                    if target_host == proxy.coordinator_host and target_port == proxy.coordinator_port and response.status >= 400:
+                        proxy.log_api_proxy_event(
+                            "error" if response.status >= 500 else "warn",
+                            "api.proxy.non_ok",
+                            method=self.command,
+                            path=self.path,
+                            upstream=upstream,
+                            status=response.status,
+                            reason=response.reason,
+                        )
                     self.send_response(response.status, response.reason)
                     for key, value in response.getheaders():
                         if key.lower() not in HOP_BY_HOP_HEADERS:
@@ -225,6 +274,16 @@ class WebProxy:
                 except CLIENT_DISCONNECT_ERRORS:
                     self.close_connection = True
                 except Exception as exc:  # noqa: BLE001 - keep proxy alive and surface failure.
+                    upstream = f"http://{target_host}:{target_port}{path}"
+                    proxy.log_api_proxy_event(
+                        "error",
+                        "api.proxy.fetch_failed",
+                        method=self.command,
+                        path=self.path,
+                        upstream=upstream,
+                        error=str(exc),
+                        stack=traceback.format_exc(),
+                    )
                     message = f"Upstream proxy error: {exc}\n".encode()
                     try:
                         self.send_response(502, "Bad Gateway")

@@ -37,6 +37,7 @@ SCORING_ANALYZER_TYPE = "node_scoring"
 SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES = 12
+SCORING_PROVIDER_MAX_ATTEMPTS = 2
 ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
 SECRET_METADATA_MARKERS = (
     "api_key",
@@ -150,6 +151,16 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         payload["producer"] = producer
     if output.get("generated_at"):
         payload["generated_at"] = output["generated_at"]
+    for field in ("max_nodes", "scored_node_count", "skipped_node_count"):
+        if isinstance(output.get(field), int) and not isinstance(output.get(field), bool):
+            payload[field] = output[field]
+    if isinstance(output.get("truncated"), bool):
+        payload["truncated"] = output["truncated"]
+    output_cache = output.get("cache")
+    if isinstance(output_cache, dict) and isinstance(output_cache.get("hit"), bool):
+        payload["cache"] = output_cache
+    elif status in {"available", "partial"}:
+        payload["cache"] = {"hit": False}
     return _attach_active_scoring_job(payload, active_job)
 
 
@@ -233,15 +244,23 @@ def score_node_with_provider(
             provider=provider_name,
             model=model_name,
         )
+    request = ScoringProviderRequest(
+        claim=claim,
+        argument_text=argument_text,
+        judge_role=judge_role,
+        timeout_seconds=timeout_seconds,
+    )
     try:
-        result = provider.judge_node(
-            ScoringProviderRequest(
-                claim=claim,
-                argument_text=argument_text,
-                judge_role=judge_role,
-                timeout_seconds=timeout_seconds,
-            )
-        )
+        result = None
+        for attempt in range(1, SCORING_PROVIDER_MAX_ATTEMPTS + 1):
+            try:
+                result = provider.judge_node(request)
+                break
+            except ProviderError:
+                if attempt >= SCORING_PROVIDER_MAX_ATTEMPTS:
+                    raise
+        if result is None:
+            raise ProviderError("Scoring judge call failed.")
         provider_latency_ms = _public_latency_ms(result.latency_ms)
         if provider_latency_ms is not None and provider_call_latencies_ms is not None:
             provider_call_latencies_ms.append(provider_latency_ms)
@@ -251,12 +270,6 @@ def score_node_with_provider(
         return _unavailable_payload(
             debate.id,
             reason=_provider_error_reason(exc, "Scoring judge call failed."),
-            node_ids=node_ids,
-        )
-    except Exception as exc:
-        return _unavailable_payload(
-            debate.id,
-            reason=_provider_error_reason(exc, "Scoring judge call failed unexpectedly."),
             node_ids=node_ids,
         )
     parsed = parse_judge_json(result.raw_output)
@@ -365,6 +378,7 @@ def score_nodes_with_provider(
     ]
     model_metadata: dict | None = None
     cache_metadata: dict | None = None
+    batch_cache_hit: bool | None = None
     model_call_count = 0
     provider_call_latencies_ms: list[int] = []
     for node_id in scored_node_ids:
@@ -399,6 +413,8 @@ def score_nodes_with_provider(
             )
             break
         node_cache = node_payload.get("cache") if isinstance(node_payload.get("cache"), dict) else None
+        if isinstance(node_cache, dict) and isinstance(node_cache.get("hit"), bool):
+            batch_cache_hit = node_cache["hit"] if batch_cache_hit is None else batch_cache_hit and node_cache["hit"]
         if cache_metadata is None and isinstance(node_cache, dict) and node_cache.get("stale"):
             cache_metadata = node_cache
         if node_payload.get("model_metadata"):
@@ -414,6 +430,8 @@ def score_nodes_with_provider(
                     reason=str(node_payload.get("reason") or "Scoring judge output was unavailable."),
                 )
             )
+    if cache_metadata is None and batch_cache_hit is not None:
+        cache_metadata = {"hit": batch_cache_hit}
     payload = scoring_result_payload(
         debate_id=debate.id,
         node_ids=node_ids,

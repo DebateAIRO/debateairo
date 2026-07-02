@@ -25,6 +25,25 @@ def test_worker_install_targets_forward_allowed_models() -> None:
     ) in makefile
 
 
+def test_make_dev_sets_single_machine_defaults() -> None:
+    makefile = (ROOT / "Makefile").read_text()
+
+    assert '"$(CURDIR)/.venv/Scripts/python.exe"' in makefile
+    assert "DIALECTICAL_USER_TOKEN ?= user_dev_token" in makefile
+    assert "DIALECTICAL_DEV_WORKER_RELOAD ?= 0" in makefile
+    assert "export DIALECTICAL_USER_TOKEN" in makefile
+    assert "export DIALECTICAL_DEV_WORKER_RELOAD" in makefile
+    assert "scripts/start_dev.ps1" in makefile
+    assert '$(PYTHON_ENV) "$(PYTHON)" scripts/dev.py' in makefile
+
+
+def test_sibling_dialectical_engine_makefile_forwards_dev_target() -> None:
+    makefile = (ROOT.parents[1] / "dialectical-engine" / "Makefile").read_text()
+
+    assert ".PHONY: dev" in makefile
+    assert "$(MAKE) -C ../apps/dialectical-engine dev" in makefile
+
+
 def test_make_test_loads_pytest_cov_plugin_module_when_autoload_is_disabled() -> None:
     makefile = (ROOT / "Makefile").read_text()
 

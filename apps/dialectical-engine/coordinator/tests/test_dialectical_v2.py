@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -427,6 +428,39 @@ def test_synthesis_queues_only_after_all_pov_branches_complete(db) -> None:
     assert synthesis_job.required_model == "codex-gpt-5.5"
 
 
+def test_failed_stale_synthesis_job_does_not_block_required_v2_synthesis_queue(db) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    for _ in range(3):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, worker_pov_output(worker, job.id, job.required_role), {"latency_ms": 12}))
+
+    stale_synthesis = entities.Job(
+        debate_id=debate.id,
+        job_type="v2_synthesize",
+        required_role="v2_synthesizer",
+        required_model="codex-gpt-5.5",
+        status="failed",
+        error="previous synthesis failed",
+    )
+    db.add(stale_synthesis)
+    db.commit()
+
+    final_pov = claim_for_worker(db, worker)
+    assert final_pov.job_type == "v2_pov"
+    asyncio.run(complete_job(db, final_pov, worker_pov_output(worker, final_pov.id, final_pov.required_role), {"latency_ms": 12}))
+
+    synthesis_jobs = db.scalars(
+        select(entities.Job)
+        .where(entities.Job.debate_id == debate.id, entities.Job.job_type == "v2_synthesize")
+        .order_by(entities.Job.created_at)
+    ).all()
+    assert [job.status for job in synthesis_jobs] == ["failed", "pending"]
+
+
 def test_non_adjudicating_synthesis_completes_without_declaring_winner(db) -> None:
     service = v2_service()
     worker = real_codex_worker(db)
@@ -542,6 +576,45 @@ def test_agent_and_skill_json_contracts_persist_and_retrieve(db) -> None:
     assert saved_agent.definition["instructions"]["allowed_tools"] == ["default_analyzers"]
     assert saved_agent.definition["output_contract"]["pros_count"] == 5
     assert saved_agent.definition["provenance"]["created_in_debate_id"] == debate.id
+
+
+def test_select_reusable_agent_returns_none_when_no_real_agent_matches(db) -> None:
+    models = v2_models()
+    service = v2_service()
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    branch = db.scalar(select(models["DebateBranch"]).where(models["DebateBranch"].debate_id == debate.id))
+    skill = models["SkillDefinition"](definition=persisted_skill_json(debate.id), status="active", quality_score=0.9)
+    db.add(skill)
+    db.commit()
+
+    selected = service.select_reusable_agent(
+        db,
+        debate,
+        branch,
+        skill,
+        {"domain_tags": ["transport", "policy"]},
+    )
+
+    assert selected is None
+
+
+def test_publish_event_logs_async_task_failures(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    service = v2_service()
+
+    async def fail_publish(_debate_id: str, _event: str, _data: dict) -> None:
+        raise RuntimeError("event bus unavailable")
+
+    async def publish_inside_running_loop() -> None:
+        monkeypatch.setattr(service.event_bus, "publish", fail_publish)
+        with caplog.at_level(logging.ERROR, logger=service.__name__):
+            service.publish_event("debate-1", "event_failed", {"debate_id": "debate-1"})
+            await asyncio.sleep(0)
+
+    asyncio.run(publish_inside_running_loop())
+
+    assert "Failed to publish dialectical v2 event" in caplog.text
+    assert "event bus unavailable" in caplog.text
 
 
 def test_empty_database_question_creates_full_pipeline_without_direct_answer(db) -> None:

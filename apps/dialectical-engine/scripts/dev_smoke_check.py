@@ -16,11 +16,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _common import DEFAULT_DEV_USER_TOKEN
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT_PATH = Path("/private/tmp/dialectical-dev-smoke.json")
 LOG_PATH = Path("/private/tmp/dialectical-dev-smoke.log")
-DEFAULT_USER_TOKEN = "user_dev_token"
+DEFAULT_USER_TOKEN = DEFAULT_DEV_USER_TOKEN
 DEFAULT_TIMEOUT_SECONDS = 360
 
 

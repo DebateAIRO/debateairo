@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterator
 
 import httpx
 
 from app.adapters.credentials import configured_api_key
+from app.adapters.streaming_json import parse_json_payload
 
 
 class XaiApiAdapter:
@@ -39,7 +39,15 @@ class XaiApiAdapter:
                     data = line.removeprefix("data:").strip()
                     if data == "[DONE]":
                         break
-                    chunk = json.loads(data)
-                    delta = chunk["choices"][0].get("delta", {}).get("content", "")
+                    chunk = parse_json_payload(data)
+                    if not isinstance(chunk, dict):
+                        continue
+                    choices = chunk.get("choices")
+                    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+                        continue
+                    delta_payload = choices[0].get("delta", {})
+                    if not isinstance(delta_payload, dict):
+                        continue
+                    delta = delta_payload.get("content", "")
                     if delta:
                         yield delta

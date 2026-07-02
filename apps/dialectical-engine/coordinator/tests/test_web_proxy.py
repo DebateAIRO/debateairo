@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import shutil
 from pathlib import Path
 
 
@@ -17,8 +19,11 @@ def load_web_proxy_module():
 
 
 class DisconnectingWriter:
+    def __init__(self, error_type: type[OSError] = BrokenPipeError) -> None:
+        self.error_type = error_type
+
     def write(self, _chunk: bytes) -> None:
-        raise BrokenPipeError("client disconnected")
+        raise self.error_type("client disconnected")
 
     def flush(self) -> None:
         return
@@ -52,7 +57,7 @@ class FakeBodyResponse:
         return b'{"ok": true}'
 
 
-def proxy_handler():
+def proxy_handler(error_type: type[OSError] = BrokenPipeError):
     module = load_web_proxy_module()
     proxy = module.WebProxy(
         root=ROOT,
@@ -66,7 +71,7 @@ def proxy_handler():
     )
     handler_cls = proxy.handler_class()
     handler = handler_cls.__new__(handler_cls)
-    handler.wfile = DisconnectingWriter()
+    handler.wfile = DisconnectingWriter(error_type)
     handler.close_connection = False
     return handler
 
@@ -233,9 +238,59 @@ def test_web_proxy_stream_response_treats_sse_disconnect_as_closed_connection() 
     assert handler.close_connection is True
 
 
+def test_web_proxy_stream_response_treats_windows_aborted_sse_as_closed_connection() -> None:
+    handler = proxy_handler(ConnectionAbortedError)
+
+    handler.stream_response(FakeSseResponse())
+
+    assert handler.close_connection is True
+
+
 def test_web_proxy_stream_response_treats_body_disconnect_as_closed_connection() -> None:
     handler = proxy_handler()
 
     handler.stream_response(FakeBodyResponse())
 
     assert handler.close_connection is True
+
+
+def test_web_proxy_logs_api_proxy_events_to_developer_jsonl() -> None:
+    module = load_web_proxy_module()
+    root = ROOT / ".test-web-proxy-jsonl"
+    if root.exists():
+        shutil.rmtree(root)
+    try:
+        proxy = module.WebProxy(
+            root=root,
+            pnpm="pnpm",
+            next_host="127.0.0.1",
+            next_port=3001,
+            coordinator_host="127.0.0.1",
+            coordinator_port=8000,
+            public_host="127.0.0.1",
+            public_port=3000,
+        )
+
+        proxy.log_api_proxy_event(
+            "warn",
+            "api.proxy.non_ok",
+            method="GET",
+            path="/api/debates/abc?token=secret-token",
+            upstream="http://127.0.0.1:8000/api/debates/abc?token=secret-token",
+            status=500,
+            reason="Internal Server Error",
+        )
+
+        log_path = root / "web" / "logs" / "developer-events.jsonl"
+        [event] = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        assert event["level"] == "warn"
+        assert event["event"] == "api.proxy.non_ok"
+        assert event["source"] == "python-web-proxy"
+        assert event["context"]["method"] == "GET"
+        assert event["context"]["path"] == "/api/debates/abc?token=%5Bredacted%5D"
+        assert event["context"]["upstream"] == "http://127.0.0.1:8000/api/debates/abc?token=%5Bredacted%5D"
+        assert event["context"]["status"] == 500
+        assert event["context"]["reason"] == "Internal Server Error"
+    finally:
+        if root.exists():
+            shutil.rmtree(root)

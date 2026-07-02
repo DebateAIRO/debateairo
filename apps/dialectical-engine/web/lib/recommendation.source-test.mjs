@@ -72,16 +72,16 @@ assert(
   "NodeDetailDrawer should expose a compact click-through callback for targeted recommendations"
 );
 assert(
-  drawerSource.includes("const targetNodeId = recommendationTargetNodeId(recommendation)") &&
-    /disabled=\{!targetNodeId \|\| !canFocusTarget\}/.test(drawerSource),
+  drawerSource.includes("const targetClaimId = recommendationTargetClaimId(recommendation)") &&
+    /disabled=\{!targetClaimId \|\| !canFocusTarget\}/.test(drawerSource),
   "NodeDetailDrawer should disable recommendation click-through when target_node_id is missing"
 );
 assert(
-  /onFocusRecommendationNode\(targetNodeId\)/.test(drawerSource),
+  /onFocusRecommendationNode\(targetClaimId\)/.test(drawerSource),
   "NodeDetailDrawer should call the click-through callback with the real target_node_id"
 );
 assert(
-  drawerSource.includes("This recommendation references a node that is not visible in the current debate tree."),
+  drawerSource.includes("This recommendation references a claim that is not visible in the current debate tree."),
   "NodeDetailDrawer should explain when a real target_node_id is unavailable in the visible tree"
 );
 assert(
@@ -89,7 +89,7 @@ assert(
   "NodeDetailDrawer should show an honest focus-failed message when a visible target disappears before click-through"
 );
 assert(
-  /onFocusRecommendationNode\(targetNodeId\) === false/.test(drawerSource),
+  /onFocusRecommendationNode\(targetClaimId\) === false/.test(drawerSource),
   "NodeDetailDrawer should detect failed recommendation focus attempts"
 );
 
@@ -106,7 +106,7 @@ assert(
 assert(
   /setSelectedNodeId\(targetNodeId\)/.test(debatePageSource) &&
     /setDetailNodeId\(targetNodeId\)/.test(debatePageSource),
-  "DebatePageClient should select and open the real target node when a recommendation is clicked"
+  "DebatePageClient should select and open the real target claim when a recommendation is clicked"
 );
 assert(
   /showToast\("Recommendation target is no longer visible\."\)/.test(debatePageSource),

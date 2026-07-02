@@ -40,7 +40,7 @@ import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { Toast } from "@/components/Toast";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
-import { computeLean, countNodes, renderStateOf, treeDepth } from "@/lib/debatePresentation";
+import { computeLean, countClaims, renderStateOf, treeDepth } from "@/lib/debatePresentation";
 import type { PopoverState } from "@/lib/scrutiny";
 import { isComplete, statusLabel } from "@/lib/format";
 import {
@@ -522,7 +522,7 @@ export default function DebatePageClient({
       events.addEventListener("node_complete", () => refresh());
       events.addEventListener("node_failed", (event) => {
         const payload = parseEventData(event);
-        setError(payloadString(payload, "reason") || "Node generation failed");
+        setError(payloadString(payload, "reason") || "Claim generation failed");
       });
       events.addEventListener("synthesis_started", (event) => {
         const payload = parseEventData(event);
@@ -679,6 +679,7 @@ export default function DebatePageClient({
       }),
     [actionToken, scoringEnabled, scoringRefreshState.error, scoringRefreshState.status, scoringState]
   );
+  const scoringRefreshBusy = scoringRefreshState.status === "starting";
 
   function showToast(message: string) {
     setToast(message);
@@ -907,7 +908,6 @@ export default function DebatePageClient({
   }
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
-  const scoringRefreshBusy = scoringRefreshState.status === "starting";
   const scoringRefreshDisabled = !hasTree || !actionToken || scoringState.status === "loading" || scoringRefreshBusy;
   const scoringRefreshDisabledReasonText = scoringRefreshDisabled ? scoringRefreshDisabledReason() : null;
   const scoringStatusText = scoringStatusMessage();
@@ -1032,7 +1032,7 @@ export default function DebatePageClient({
                 emptyMessage={
                   scoringEnabled
                     ? "No recommended investigations are available from the current scoring data."
-                    : "Enable scoring to surface recommended investigations from scored nodes."
+                    : "Enable scoring to surface recommended investigations from scored claims."
                 }
               />
               <AdaptiveDepthDryRunPanel
@@ -1087,7 +1087,7 @@ export default function DebatePageClient({
             scoringByNodeId={scoringByNodeId}
             scoringErrorsByNodeId={scoringErrorsByNodeId}
             scoreFilterNodeIds={scoringEnabled ? scoreAwareFilterNodeIds : null}
-            meta={{ nodes: countNodes(debate.tree), depth: treeDepth(debate.tree) }}
+            meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
             canvasRef={(el) => {
               canvasElRef.current = el;
             }}
@@ -1279,8 +1279,8 @@ function ScoreAwareFilterPanel({
       </div>
       <span className="progressCount">
         {enabled
-          ? `${matchCount} of ${scoredCount} scored nodes match`
-          : "Enable scoring to filter by scored node signals."}
+          ? `${matchCount} of ${scoredCount} scored claims match`
+          : "Enable scoring to filter by scored claim signals."}
       </span>
     </section>
   );
@@ -1314,7 +1314,7 @@ function ScoringHolesSummaryPanel({
     return (
       <section className="progressStrip" aria-label="Scoring issue summary">
         <span className="progressLabel">Scoring issue summary unavailable</span>
-        <span className="progressCount">Enable scoring to summarize unresolved holes and fatal flags from scored nodes.</span>
+        <span className="progressCount">Enable scoring to summarize unresolved holes and fatal flags from scored claims.</span>
       </section>
     );
   }
@@ -1323,7 +1323,7 @@ function ScoringHolesSummaryPanel({
     return (
       <section className="progressStrip" aria-label="Scoring issue summary">
         <span className="progressLabel">Loading scoring issue summary</span>
-        <span className="progressCount">Waiting for scored nodes.</span>
+        <span className="progressCount">Waiting for scored claims.</span>
       </section>
     );
   }
@@ -1356,7 +1356,7 @@ function ScoringHolesSummaryPanel({
       <div className="scoringIssueIntro">
         <span className="progressLabel">Scoring issue summary</span>
         <div className="scoringIssueSubcopy">
-          {holesSummary.total} unresolved holes / {fatalFlagsSummary.total} fatal flags from {state.data.items.length} scored nodes
+          {holesSummary.total} unresolved holes / {fatalFlagsSummary.total} fatal flags from {state.data.items.length} scored claims
         </div>
       </div>
       <div className="scoringIssuePills">
@@ -1430,8 +1430,8 @@ function ScoringDiagnosticsDrawer({
     ["Generated at", data?.generated_at],
     ["Producer", data?.producer],
     ["Cache", formatCacheDebug(data?.cache)],
-    ["Scored nodes", data?.scored_node_count],
-    ["Skipped nodes", data?.skipped_node_count],
+    ["Scored claims", data?.scored_node_count],
+    ["Skipped claims", data?.skipped_node_count],
     ["Truncated", data?.truncated],
     ["Call count", "Not exposed by scoring API"],
     ["Latency", "Not exposed by scoring API"],
@@ -1619,7 +1619,7 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
         {recommendedDepthLabel} for {formatAdaptiveDepthAction(item.recommended_action).toLowerCase()}
       </div>
       <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
-        {item.hole_count} holes, {item.recommended_investigation_count} investigations, node {compactNodeId(item.node_id)}
+        {item.hole_count} holes, {item.recommended_investigation_count} investigations, claim {compactNodeId(item.node_id)}
       </div>
       {reasons.length > 0 ? (
         <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>

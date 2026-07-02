@@ -18,6 +18,7 @@ export function getStoredToken(): string | null {
 }
 
 export function setStoredToken(token: string): void {
+  if (typeof window === "undefined") return;
   window.localStorage.setItem("dialectical:userToken", token);
 }
 

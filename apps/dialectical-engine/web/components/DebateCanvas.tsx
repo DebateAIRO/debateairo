@@ -11,7 +11,7 @@ import {
   renderStateOf,
   roleLabel,
   roleOf,
-  type PlacedNode
+  type PlacedClaim
 } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
@@ -34,7 +34,7 @@ type DebateCanvasProps = CanvasCallbacks & {
   scoringByNodeId?: Map<string, NodeScoringPayload>;
   scoringErrorsByNodeId?: Map<string, NodeScoringError>;
   scoreFilterNodeIds?: Set<string> | null;
-  meta: { nodes: number; depth: number; decomposer?: string };
+  meta: { claims: number; depth: number; decomposer?: string };
   canvasRef?: (el: HTMLDivElement | null) => void;
 };
 
@@ -82,7 +82,7 @@ export function DebateCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   });
 
-  // Drop stale measurements when nodes disappear.
+  // Drop stale measurements when claims disappear.
   useEffect(() => {
     const ids = new Set(layout.placed.map((p) => p.id));
     setHeights((current) => {
@@ -135,14 +135,14 @@ export function DebateCanvas({
 }
 
 type CanvasCardProps = CanvasCallbacks & {
-  placed: PlacedNode;
+  placed: PlacedClaim;
   expanded: boolean;
   selected: boolean;
   scrutinyStatus?: string;
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
   scoreFilterMatch: boolean;
-  meta: { nodes: number; depth: number; decomposer?: string };
+  meta: { claims: number; depth: number; decomposer?: string };
   registerRef: (el: HTMLDivElement | null) => void;
 };
 
@@ -224,7 +224,7 @@ function CanvasCard({
             <div className="nodeEyebrow">Root claim</div>
             <div className="nodeClaim root">{node.claim}</div>
             <div className="nodeRootMeta">
-              <span>{meta.nodes} nodes</span>
+              <span>{meta.claims} claims</span>
               <span className="sep">/</span>
               <span>depth {meta.depth}</span>
               {meta.decomposer ? (

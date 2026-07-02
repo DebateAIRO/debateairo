@@ -1930,6 +1930,23 @@ def test_claim_normalizer_defaults_vague_text_to_unknown_claim_type() -> None:
     assert claim.claim_type == "unknown"
 
 
+@pytest.mark.parametrize(
+    ("raw_text", "claim_type"),
+    [
+        ("Teams should adopt remote work for retention.", "normative"),
+        ("Remote work causes higher retention.", "causal"),
+        ("Remote work is defined as work done away from a central office.", "definitional"),
+        ("Remote work will increase hiring competition next year.", "prediction"),
+        ("Remote work has higher retention than office-only work.", "comparative"),
+        ("Studies show remote work retention is 8 percent higher.", "empirical"),
+    ],
+)
+def test_claim_normalizer_assigns_minimal_deterministic_claim_types(raw_text: str, claim_type: str) -> None:
+    claim = normalize_claim(node_id="node-1", raw_text=raw_text)
+
+    assert claim.claim_type == claim_type
+
+
 def test_claim_normalizer_does_not_invent_assumptions_or_evidence() -> None:
     claim = normalize_claim(node_id="node-1", raw_text="Remote work might help some teams.")
 
@@ -2664,6 +2681,61 @@ def test_score_nodes_with_provider_scores_multiple_current_nodes_in_loop(db) -> 
     assert "errors" not in payload
 
 
+def test_score_nodes_with_provider_retries_transient_provider_error_once(db) -> None:
+    class FlakyProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.attempts_by_node_id: dict[str, int] = {}
+
+        def judge_node(self, request):
+            attempts = self.attempts_by_node_id.get(request.claim.node_id, 0) + 1
+            self.attempts_by_node_id[request.claim.node_id] = attempts
+            if request.claim.node_id == "child-node" and attempts == 1:
+                raise ProviderError("transient stream disconnected")
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    child = Node(
+        id="child-node",
+        debate=debate,
+        parent=root,
+        node_type="support",
+        depth=1,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0001",
+    )
+    db.add_all([debate, root, child])
+    db.commit()
+    provider = FlakyProvider()
+
+    payload = score_nodes_with_provider(db, debate, provider)
+
+    assert payload["status"] == "available"
+    assert [item["node_id"] for item in payload["items"]] == [root.id, child.id]
+    assert provider.attempts_by_node_id == {root.id: 1, child.id: 2}
+    assert "errors" not in payload
+
+
 def test_score_nodes_with_provider_records_sanitized_started_and_completed_audit_entries(db) -> None:
     class SecretMetadataProvider:
         provider = "test-provider --api-key secret-token"
@@ -3107,6 +3179,7 @@ def test_score_nodes_with_provider_enforces_max_nodes_limit(db) -> None:
     assert payload["scored_node_count"] == 2
     assert payload["skipped_node_count"] == 1
     assert payload["truncated"] is True
+    assert payload["cache"] == {"hit": False}
     assert payload["errors"] == [
         {
             "node_id": second_child.id,
@@ -3738,7 +3811,7 @@ def test_score_one_node_with_provider_exposes_public_provider_error(db) -> None:
     }
 
 
-def test_score_one_node_with_provider_maps_unexpected_error_to_unavailable(db) -> None:
+def test_score_one_node_with_provider_does_not_swallow_unexpected_provider_bug(db) -> None:
     class ExplodingProvider:
         def judge_node(self, request):
             raise RuntimeError("secret-token unexpected provider traceback")
@@ -3757,16 +3830,8 @@ def test_score_one_node_with_provider_maps_unexpected_error_to_unavailable(db) -
     db.add_all([debate, node])
     db.commit()
 
-    payload = score_one_node_with_provider(db, debate, ExplodingProvider())
-
-    assert payload == {
-        "debate_id": debate.id,
-        "status": "unavailable",
-        "reason": "Scoring judge call failed unexpectedly.",
-        "node_ids": [node.id],
-        "items": [],
-    }
-    assert "secret-token" not in payload["reason"]
+    with pytest.raises(RuntimeError, match="unexpected provider traceback"):
+        score_one_node_with_provider(db, debate, ExplodingProvider())
 
 
 def test_score_one_node_with_provider_rejects_malformed_model_output(db) -> None:
@@ -4186,6 +4251,7 @@ def test_scoring_service_returns_stored_real_scoring_outputs(db) -> None:
     assert len(payload["items"]) == 1
     assert payload["items"][0]["node_id"] == scoring_item["node_id"]
     assert payload["items"][0]["scores"] == scoring_item["scores"]
+    assert payload["cache"] == {"hit": False}
 
 
 def test_scoring_service_hides_secret_like_stored_model_metadata(db) -> None:

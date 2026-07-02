@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 from alembic import command
@@ -12,6 +15,29 @@ from sqlalchemy.exc import IntegrityError
 from app.core.auth import hash_token
 from app.core.db import init_db
 from app.models.entities import Debate, Generation, Node, Worker, now_utc
+
+
+def test_db_import_does_not_initialize_runtime_side_effects(tmp_path) -> None:
+    home = tmp_path / "dialectical-home"
+    env = os.environ.copy()
+    env["DIALECTICAL_HOME"] = str(home)
+    env["DIALECTICAL_DATABASE_URL"] = f"sqlite:///{home / 'test.sqlite3'}"
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import pathlib; import app.core.db as db; "
+            "print(db.is_initialized()); print(pathlib.Path(__import__('os').environ['DIALECTICAL_HOME']).exists())",
+        ],
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == ["False", "False"]
 
 
 def test_sqlite_pragmas_enable_wal_foreign_keys_and_busy_timeout(db) -> None:

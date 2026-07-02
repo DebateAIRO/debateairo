@@ -37,7 +37,7 @@ export function formatRecommendationAction(action: InvestigationAction): string 
   return ACTION_LABELS[action] ?? action;
 }
 
-export function recommendationTargetNodeId(recommendation: RecommendedInvestigation): string | null {
+export function recommendationTargetClaimId(recommendation: RecommendedInvestigation): string | null {
   return recommendation.target_node_id?.trim() || null;
 }
 

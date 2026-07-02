@@ -62,3 +62,34 @@ When working on the Debate-Weighted QBAF goal, keep these invariants current:
 Work one proposal Step at a time. Each Step starts with the goal, touched files,
 Definition of Done, exact tests, and a short plan; each Step ends with tests and
 a clear commit.
+
+## DebateAI Shared Agent Protocol
+
+For Kanban/Heartbeat multi-agent work, use the shared protocol spine instead
+of copy-pasted per-chat instructions:
+
+```text
+docs/agent-protocols/debateai-heartbeat-protocol.md
+docs/agent-protocols/codex-heartbeat-adapter.md
+docs/agent-protocols/claude-heartbeat-adapter.md
+```
+
+Codex-specific rule: before branch creation, subagents, edits, or handoff prep,
+read `docs/agent-protocols/debateai-heartbeat-protocol.md`, then
+`docs/agent-protocols/codex-heartbeat-adapter.md`, then the current Kanban
+ticket body/comments.
+
+Claude-specific rule: Claude's `.claude/skills/heartbeat-protocol/SKILL.md` is
+a thin adapter pointing at the same shared protocol spine.
+
+Source-of-truth order for active agent work:
+
+1. Safety and explicit V direction.
+2. Current Kanban ticket body and Hermes Kanban comments.
+3. The shared protocol spine and agent-specific adapter.
+4. This `AGENTS.md` file.
+5. Chat prompts and prior memory.
+
+Hermes owns Done, Blocked resolution, routing, and final review. Codex and
+Claude work assigned tickets, post heartbeats/blockers/handoffs through Kanban,
+and do not mark their own tickets Done.
