@@ -601,6 +601,10 @@ def test_select_reusable_agent_returns_none_when_no_real_agent_matches(db) -> No
 
 def test_publish_event_logs_async_task_failures(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     service = v2_service()
+    logger = logging.getLogger(service.__name__)
+    previous_disabled = logger.disabled
+    previous_propagate = logger.propagate
+    previous_global_disable = logging.root.manager.disable
 
     async def fail_publish(_debate_id: str, _event: str, _data: dict) -> None:
         raise RuntimeError("event bus unavailable")
@@ -609,9 +613,20 @@ def test_publish_event_logs_async_task_failures(monkeypatch: pytest.MonkeyPatch,
         monkeypatch.setattr(service.event_bus, "publish", fail_publish)
         with caplog.at_level(logging.ERROR, logger=service.__name__):
             service.publish_event("debate-1", "event_failed", {"debate_id": "debate-1"})
-            await asyncio.sleep(0)
+            for _ in range(10):
+                if "Failed to publish dialectical v2 event" in caplog.text:
+                    break
+                await asyncio.sleep(0)
 
-    asyncio.run(publish_inside_running_loop())
+    logger.disabled = False
+    logger.propagate = True
+    logging.disable(logging.NOTSET)
+    try:
+        asyncio.run(publish_inside_running_loop())
+    finally:
+        logger.disabled = previous_disabled
+        logger.propagate = previous_propagate
+        logging.disable(previous_global_disable)
 
     assert "Failed to publish dialectical v2 event" in caplog.text
     assert "event bus unavailable" in caplog.text
