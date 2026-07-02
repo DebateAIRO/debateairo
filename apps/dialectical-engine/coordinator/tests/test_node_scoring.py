@@ -2804,7 +2804,6 @@ def test_score_nodes_with_provider_records_sanitized_started_and_completed_audit
         "model": "test-model",
         "judge_role": "judge",
         "requested_node_count": 2,
-        "max_nodes": 12,
         "model_call_count": 0,
     }
     assert records_by_event["completed"].metadata_json == {
@@ -2817,7 +2816,6 @@ def test_score_nodes_with_provider_records_sanitized_started_and_completed_audit
         "scored_node_count": 2,
         "failed_node_count": 0,
         "skipped_node_count": 0,
-        "max_nodes": 12,
         "truncated": False,
         "model_call_count": 2,
         "provider_call_latencies_ms": [15, 25],
@@ -2883,7 +2881,6 @@ def test_score_nodes_with_provider_records_failed_audit_entry_when_no_node_score
         "scored_node_count": 0,
         "failed_node_count": 2,
         "skipped_node_count": 0,
-        "max_nodes": 12,
         "truncated": False,
         "model_call_count": 2,
         "latency_ms": records_by_event["failed"].metadata_json["latency_ms"],
@@ -3111,6 +3108,67 @@ def test_score_nodes_with_provider_audit_counts_only_model_calls_made(db) -> Non
     records_by_event = {record.metadata_json["event"]: record for record in records}
     assert records_by_event["started"].metadata_json["model_call_count"] == 0
     assert records_by_event["completed"].metadata_json["model_call_count"] == 1
+
+
+def test_score_nodes_with_provider_scores_all_current_nodes_by_default(db) -> None:
+    class CapturingProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.requested_node_ids = []
+
+        def judge_node(self, request):
+            self.requested_node_ids.append(request.claim.node_id)
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="node-00",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    nodes = [root]
+    for index in range(1, 14):
+        nodes.append(
+            Node(
+                id=f"node-{index:02d}",
+                debate=debate,
+                parent=root,
+                node_type="support",
+                depth=1,
+                position=index,
+                claim=f"Remote work supporting claim {index}.",
+                status="complete",
+                materialized_path=f"/{index:04d}",
+            )
+        )
+    db.add_all([debate, *nodes])
+    db.commit()
+    provider = CapturingProvider()
+
+    payload = score_nodes_with_provider(db, debate, provider)
+
+    expected_node_ids = [node.id for node in nodes]
+    assert provider.requested_node_ids == expected_node_ids
+    assert payload["status"] == "available"
+    assert payload["node_ids"] == expected_node_ids
+    assert [item["node_id"] for item in payload["items"]] == expected_node_ids
+    assert payload["scored_node_count"] == len(expected_node_ids)
+    assert payload["skipped_node_count"] == 0
+    assert payload["truncated"] is False
+    assert "errors" not in payload
 
 
 def test_score_nodes_with_provider_enforces_max_nodes_limit(db) -> None:

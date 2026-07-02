@@ -36,7 +36,7 @@ from app.services.orchestrator import create_job
 SCORING_ANALYZER_TYPE = "node_scoring"
 SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
-DEFAULT_SCORING_MAX_NODES = 12
+DEFAULT_SCORING_MAX_NODES: int | None = None
 SCORING_PROVIDER_MAX_ATTEMPTS = 2
 ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
 SECRET_METADATA_MARKERS = (
@@ -330,7 +330,7 @@ def score_nodes_with_provider(
     *,
     judge_role: str = "judge",
     timeout_seconds: int = 30,
-    max_nodes: int = DEFAULT_SCORING_MAX_NODES,
+    max_nodes: int | None = DEFAULT_SCORING_MAX_NODES,
     force_refresh: bool = False,
 ) -> dict:
     scoring_started_at = time.perf_counter()
@@ -341,7 +341,7 @@ def score_nodes_with_provider(
             reason="No current debate nodes are available for scoring.",
             node_ids=[],
         )
-    bounded_count = max(0, max_nodes)
+    bounded_count = len(node_ids) if max_nodes is None else max(0, max_nodes)
     scored_node_ids = node_ids[:bounded_count]
     skipped_node_ids = node_ids[bounded_count:]
     audit_run_id: str | None = None
@@ -507,7 +507,7 @@ def score_debate_with_provider_registry(
     *,
     judge_role: str = "judge",
     timeout_seconds: int = 30,
-    max_nodes: int = DEFAULT_SCORING_MAX_NODES,
+    max_nodes: int | None = DEFAULT_SCORING_MAX_NODES,
     force_refresh: bool = False,
 ) -> dict:
     node_ids = _debate_node_ids(db, debate.id)
@@ -848,7 +848,7 @@ def _record_scoring_audit(
     provider: ScoringProvider,
     judge_role: str,
     requested_node_count: int,
-    max_nodes: int,
+    max_nodes: int | None,
     scored_node_count: int | None = None,
     failed_node_count: int | None = None,
     skipped_node_count: int | None = None,
@@ -866,8 +866,9 @@ def _record_scoring_audit(
         "model": model_name,
         "judge_role": judge_role,
         "requested_node_count": requested_node_count,
-        "max_nodes": max_nodes,
     }
+    if max_nodes is not None:
+        metadata["max_nodes"] = max_nodes
     if scored_node_count is not None:
         metadata["scored_node_count"] = scored_node_count
     if failed_node_count is not None:
