@@ -35,6 +35,8 @@ from app.services.orchestrator import (
     merged_debate_config,
     sanitize_text,
 )
+from app.providers import ProviderRegistry
+from app.scoring.service import ensure_node_scoring_on_completion
 
 
 DEFAULT_ANALYZERS = ("Statistical Analyzer", "Scientific Analyzer", "Psychological Analyzer")
@@ -624,6 +626,10 @@ def generation_argument(title: str, content: str) -> str:
     return f"{title}\n\n{content}"
 
 
+def ensure_default_scoring_for_completed_v2_node(db: Session, debate: Debate, node: Node) -> dict:
+    return ensure_node_scoring_on_completion(db, debate, node, ProviderRegistry())
+
+
 def create_completed_node(
     db: Session,
     debate: Debate,
@@ -663,6 +669,7 @@ def create_completed_node(
         generation.model_id = str(provenance.get("model_id") or job.required_model)
         generation.role = node_type if node_type in {"PRO", "CON"} else job.required_role
     node.status = "complete"
+    ensure_default_scoring_for_completed_v2_node(db, debate, node)
     return node
 
 
@@ -688,6 +695,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         generation.role = job.required_role
     pov_node.claim = job.required_role
     pov_node.status = "complete"
+    ensure_default_scoring_for_completed_v2_node(db, debate, pov_node)
 
     pro_node = create_completed_node(
         db,

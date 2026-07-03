@@ -48,6 +48,7 @@ from app.scoring import (
     NormalizedClaim,
     NodeScores,
     NodeScoringError,
+    NodeScoringPending,
     SCORING_CACHE_ANALYZER_TYPE,
     SCORING_CACHE_SOURCE,
     ScoringModelMetadata,
@@ -77,6 +78,7 @@ from app.scoring import (
     select_depth_pressure,
     scoring_result_payload,
 )
+from app.scoring.service import ensure_node_scoring_on_completion
 
 
 USER_HEADERS = {"Authorization": "Bearer user_test_token"}
@@ -1552,6 +1554,7 @@ def test_debate_scoring_response_model_serializes_json_contract() -> None:
         "node_ids": ["node-1"],
         "items": [],
         "errors": None,
+        "pending": None,
         "max_nodes": None,
         "scored_node_count": None,
         "skipped_node_count": None,
@@ -1597,6 +1600,7 @@ def test_debate_scoring_response_model_serializes_partial_errors() -> None:
                 "reason": "Scoring judge call timed out.",
             }
         ],
+        "pending": None,
         "max_nodes": None,
         "scored_node_count": None,
         "skipped_node_count": None,
@@ -2529,6 +2533,85 @@ def test_scoring_result_payload_returns_partial_with_node_errors() -> None:
     assert all(item["node_id"] != "node-2" for item in payload["items"])
 
 
+def test_scoring_result_payload_represents_pending_nodes_without_fake_scores() -> None:
+    scored_item = reduce_assessments(base_claim(node_id="node-1"), base_assessment()).model_dump(mode="json")
+
+    payload = scoring_result_payload(
+        debate_id="debate-1",
+        node_ids=["node-1", "node-2", "node-3"],
+        items=[scored_item],
+        errors=[
+            NodeScoringError(
+                node_id="node-3",
+                status="unavailable",
+                reason="Scoring provider is unavailable.",
+            )
+        ],
+        pending=[
+            NodeScoringPending(
+                node_id="node-2",
+                status="pending",
+                reason="Scoring has not completed for this node.",
+            )
+        ],
+    )
+
+    assert payload == {
+        "debate_id": "debate-1",
+        "status": "partial",
+        "reason": "Some scoring checks are pending or unavailable.",
+        "node_ids": ["node-1", "node-2", "node-3"],
+        "items": [scored_item],
+        "errors": [
+            {
+                "node_id": "node-3",
+                "status": "unavailable",
+                "reason": "Scoring provider is unavailable.",
+            }
+        ],
+        "pending": [
+            {
+                "node_id": "node-2",
+                "status": "pending",
+                "reason": "Scoring has not completed for this node.",
+            }
+        ],
+    }
+    assert all(item["node_id"] != "node-2" for item in payload["items"])
+    assert all(item["node_id"] != "node-3" for item in payload["items"])
+
+
+def test_debate_scoring_response_accepts_pending_nodes_alongside_legacy_errors() -> None:
+    response = DebateScoringResponse(
+        debate_id="debate-1",
+        status="partial",
+        node_ids=["node-1", "node-2"],
+        items=[],
+        errors=[
+            NodeScoringError(
+                node_id="node-1",
+                status="unavailable",
+                reason="Scoring provider is unavailable.",
+            )
+        ],
+        pending=[
+            NodeScoringPending(
+                node_id="node-2",
+                status="pending",
+                reason="Scoring has not completed for this node.",
+            )
+        ],
+    )
+
+    assert response.model_dump(mode="json")["pending"] == [
+        {
+            "node_id": "node-2",
+            "status": "pending",
+            "reason": "Scoring has not completed for this node.",
+        }
+    ]
+
+
 def test_scoring_result_payload_returns_honest_unavailable_reason_from_node_errors() -> None:
     payload = scoring_result_payload(
         debate_id="debate-1",
@@ -3449,6 +3532,118 @@ def test_score_nodes_with_provider_exposes_stale_cache_metadata_for_changed_node
             "refresh_available": True,
         },
     }
+
+
+def test_ensure_node_scoring_on_completion_reuses_cache_or_queues_once(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    first = ensure_node_scoring_on_completion(db, debate, node, registry)
+    second = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    assert first["status"] == "unavailable"
+    assert first["pending"] == [
+        {
+            "node_id": node.id,
+            "status": "pending",
+            "reason": "Scoring has been queued for this node.",
+        }
+    ]
+    assert second["pending"] == first["pending"]
+    jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert len(jobs) == 1
+    assert second["active_scoring_job_id"] == jobs[0].id
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+    claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    scoring_item = reduce_assessments(claim, base_assessment()).model_dump(mode="json")
+    cached_payload = {
+        "debate_id": debate.id,
+        "status": "available",
+        "node_ids": [node.id],
+        "items": [scoring_item],
+    }
+    db.add(
+        NodeScoringResult(
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=node_scoring_input_hash(claim=claim, argument_text=generation.argument),
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            provider_metadata={"provider": "codex", "model": "codex-test-model", "status": "available"},
+            status="available",
+            result=cached_payload,
+        )
+    )
+    db.commit()
+
+    cached = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    assert cached["status"] == "available"
+    assert cached["items"][0]["node_id"] == node.id
+    assert cached["cache"] == {"hit": True}
+    assert len(db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()) == 1
+
+
+def test_ensure_node_scoring_on_completion_reports_provider_unavailable_without_fake_scores(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+    registry = ProviderRegistry(agents={}, providers={})
+
+    payload = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["errors"] == [
+        {
+            "node_id": node.id,
+            "status": "unavailable",
+            "reason": "No scoring provider is configured.",
+        }
+    ]
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all() == []
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
 def test_score_nodes_with_provider_stops_on_cancellation_and_returns_partial(db) -> None:
@@ -5503,6 +5698,213 @@ def test_scoring_api_exposes_stored_partial_status_without_fake_data(db) -> None
     assert "reason" not in body
 
 
+def test_scoring_api_exposes_stored_pending_nodes_without_fake_data(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    scored_node = Node(
+        id="scored-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/",
+    )
+    pending_node = Node(
+        id="pending-node",
+        debate=debate,
+        node_type="support",
+        depth=1,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0001",
+    )
+    db.add_all([debate, scored_node, pending_node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    scoring_item = reduce_assessments(base_claim(node_id=scored_node.id), base_assessment()).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={
+                "status": "partial",
+                "items": [scoring_item],
+                "pending": [
+                    {
+                        "node_id": pending_node.id,
+                        "status": "pending",
+                        "reason": "Scoring has not completed for this node.",
+                    }
+                ],
+            },
+            provenance={"scoring_source": "judge_outputs"},
+            status="complete",
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "partial"
+    assert body["node_ids"] == [scored_node.id, pending_node.id]
+    assert body["items"][0]["node_id"] == scored_node.id
+    assert all(item["node_id"] != pending_node.id for item in body["items"])
+    assert body["pending"] == [
+        {
+            "node_id": pending_node.id,
+            "status": "pending",
+            "reason": "Scoring has not completed for this node.",
+        }
+    ]
+    assert "errors" not in body
+
+
+def test_scoring_api_covers_every_current_node_when_stored_snapshot_is_stale(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    scored_node = Node(
+        id="scored-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/",
+    )
+    missing_node = Node(
+        id="missing-node",
+        debate=debate,
+        node_type="support",
+        depth=1,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0001",
+    )
+    db.add_all([debate, scored_node, missing_node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    scoring_item = reduce_assessments(base_claim(node_id=scored_node.id), base_assessment()).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={
+                "status": "available",
+                "items": [scoring_item],
+                "producer": "stored-judge-output",
+            },
+            provenance={"scoring_source": "judge_outputs"},
+            status="complete",
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "partial"
+    assert body["node_ids"] == [scored_node.id, missing_node.id]
+    covered_node_ids = {
+        item["node_id"]
+        for key in ("items", "errors", "pending")
+        for item in body.get(key, [])
+    }
+    assert covered_node_ids == {scored_node.id, missing_node.id}
+    assert [item["node_id"] for item in body["items"]] == [scored_node.id]
+    assert body["errors"] == [
+        {
+            "node_id": missing_node.id,
+            "status": "unavailable",
+            "reason": "Stored scoring output has no result for this current node.",
+        }
+    ]
+    assert "pending" not in body
+
+
+def test_scoring_api_marks_missing_current_nodes_pending_when_scoring_job_is_running(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    scored_node = Node(
+        id="scored-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/",
+    )
+    pending_node = Node(
+        id="pending-node",
+        debate=debate,
+        node_type="support",
+        depth=1,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0001",
+    )
+    db.add_all([debate, scored_node, pending_node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    scoring_item = reduce_assessments(base_claim(node_id=scored_node.id), base_assessment()).model_dump(mode="json")
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        output={
+            "status": "available",
+            "items": [scoring_item],
+            "producer": "stored-judge-output",
+        },
+        provenance={"scoring_source": "judge_outputs"},
+        status="complete",
+    )
+    db.add(run)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="running",
+        deadline=now_utc() + timedelta(minutes=5),
+    )
+    db.add(job)
+    db.commit()
+
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "partial"
+    assert body["node_ids"] == [scored_node.id, pending_node.id]
+    assert body["active_scoring_job_id"] == job.id
+    assert body["active_scoring_job_status"] == "running"
+    assert [item["node_id"] for item in body["items"]] == [scored_node.id]
+    assert body["pending"] == [
+        {
+            "node_id": pending_node.id,
+            "status": "pending",
+            "reason": "Scoring is running for this node.",
+        }
+    ]
+    assert "errors" not in body
+
+
 def test_scoring_api_hides_missing_and_archived_debates(db) -> None:
     archived = Debate(topic="Archived", status="archived")
     db.add(archived)
@@ -5653,8 +6055,11 @@ def test_scoring_api_docs_gate_cache_work_on_real_producer_contract() -> None:
     assert "force_refresh: true" in docs
     assert "must not fabricate scores when no real provider is\navailable" in docs
     assert "not durable completed\nanalyzer-run records" in docs
-    assert "Option B is the active contract for this refactor" in docs
-    assert "synchronous transitional refresh rather than a real background worker job" in docs
+    assert "Option B remains the transitional API shape for compatibility/operator checks" in docs
+    assert "scoring-by-default is the normal product contract" in docs
+    assert "normal debate UI" in docs
+    assert "Refresh Scoring button" in docs
+    assert "synchronous transitional\nprovider-backed check rather than a real background worker job" in docs
     assert "`GET /api/debates/{id}/scoring` remains a read path" in docs
     assert "Real async worker scoring is explicitly deferred to a later milestone" in docs
     assert "scoring_source: \"judge_outputs\"" in docs

@@ -24,12 +24,12 @@ export function formatScoringStatusCopy(input: ScoringStatusCopyInput): string {
   }
   if (input.scoringStatus === "unavailable") {
     if (isMissingJudgeOutputReason(input.reason)) {
-      return withMetadata("No scoring run yet - refresh scoring", input);
+      return withMetadata("Scoring pending", input);
     }
     return withMetadata(appendDetail("Scoring check failed", input.reason), input);
   }
   if (isStaleInputHashMismatch(input)) {
-    return withMetadata("Scores may be stale - refresh scoring", input);
+    return withMetadata("Scores may be stale", input);
   }
   const cacheLabel = formatCacheLabel(input);
   if (cacheLabel) return withMetadata(cacheLabel, input);

@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 import time
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
 from app.core.write_lock import commit_write, flush_write
-from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, ProvenanceRecord, now_utc, uuid_str
+from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, NodeFeedbackVote, NodeScoringResult, ProvenanceRecord, now_utc, uuid_str
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
 from app.scoring.cache import (
     lookup_scoring_cache,
@@ -21,6 +21,7 @@ from app.scoring.models import (
     AdaptiveDepthDryRunItem,
     AdaptiveDepthPolicy,
     NodeScoringError,
+    NodeScoringPending,
     NodeScoringPayload,
     ScoringModelMetadata,
     ScoringStatus,
@@ -75,13 +76,20 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
     ).first()
     active_job = _active_scoring_job(db, debate.id, newer_than=run.created_at if run else None)
     if not run:
-        return _attach_active_scoring_job(_unavailable_payload(debate.id, node_ids=node_ids), active_job)
+        return _attach_active_scoring_job(
+            _with_current_node_coverage(_unavailable_payload(debate.id, node_ids=node_ids), node_ids, active_job),
+            active_job,
+        )
     if not isinstance(run.provenance, dict) or run.provenance.get("scoring_source") != JUDGE_OUTPUT_SOURCE:
         return _attach_active_scoring_job(
-            _unavailable_payload(
-                debate.id,
-                reason="Stored scoring output was not produced by judge outputs.",
-                node_ids=node_ids,
+            _with_current_node_coverage(
+                _unavailable_payload(
+                    debate.id,
+                    reason="Stored scoring output was not produced by judge outputs.",
+                    node_ids=node_ids,
+                ),
+                node_ids,
+                active_job,
             ),
             active_job,
         )
@@ -90,10 +98,14 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
     items = output.get("items")
     if not isinstance(items, list):
         return _attach_active_scoring_job(
-            _unavailable_payload(
-                debate.id,
-                reason="Stored scoring output is missing an items array.",
-                node_ids=node_ids,
+            _with_current_node_coverage(
+                _unavailable_payload(
+                    debate.id,
+                    reason="Stored scoring output is missing an items array.",
+                    node_ids=node_ids,
+                ),
+                node_ids,
+                active_job,
             ),
             active_job,
         )
@@ -101,10 +113,14 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         validated_items = [_public_scoring_item(item) for item in items]
     except ValidationError:
         return _attach_active_scoring_job(
-            _unavailable_payload(
-                debate.id,
-                reason="Stored scoring output contains malformed node scoring items.",
-                node_ids=node_ids,
+            _with_current_node_coverage(
+                _unavailable_payload(
+                    debate.id,
+                    reason="Stored scoring output contains malformed node scoring items.",
+                    node_ids=node_ids,
+                ),
+                node_ids,
+                active_job,
             ),
             active_job,
         )
@@ -112,19 +128,27 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         status = ScoringStatusModel(status=str(output.get("status") or "available")).status
     except ValidationError:
         return _attach_active_scoring_job(
-            _unavailable_payload(
-                debate.id,
-                reason="Stored scoring output has an unknown status.",
-                node_ids=node_ids,
+            _with_current_node_coverage(
+                _unavailable_payload(
+                    debate.id,
+                    reason="Stored scoring output has an unknown status.",
+                    node_ids=node_ids,
+                ),
+                node_ids,
+                active_job,
             ),
             active_job,
         )
     if any(item["node_id"] not in set(node_ids) for item in validated_items):
         return _attach_active_scoring_job(
-            _unavailable_payload(
-                debate.id,
-                reason="Stored scoring output references nodes outside the current debate.",
-                node_ids=node_ids,
+            _with_current_node_coverage(
+                _unavailable_payload(
+                    debate.id,
+                    reason="Stored scoring output references nodes outside the current debate.",
+                    node_ids=node_ids,
+                ),
+                node_ids,
+                active_job,
             ),
             active_job,
         )
@@ -140,6 +164,11 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         public_errors = _public_scoring_errors(output_errors)
         if public_errors:
             payload["errors"] = public_errors
+    output_pending = output.get("pending")
+    if isinstance(output_pending, list):
+        public_pending = _public_scoring_pending(output_pending)
+        if public_pending:
+            payload["pending"] = public_pending
     reason = _public_metadata_text(output.get("reason"))
     if reason:
         payload["reason"] = reason
@@ -161,6 +190,7 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         payload["cache"] = output_cache
     elif status in {"available", "partial"}:
         payload["cache"] = {"hit": False}
+    payload = _with_current_node_coverage(payload, node_ids, active_job)
     return _attach_active_scoring_job(payload, active_job)
 
 
@@ -530,12 +560,93 @@ def score_debate_with_provider_registry(
     )
 
 
+def ensure_node_scoring_on_completion(
+    db: Session,
+    debate: Debate,
+    node: Node,
+    registry: ProviderRegistry,
+    *,
+    judge_role: str = "judge",
+) -> dict:
+    node_ids = _debate_node_ids(db, debate.id)
+    if node.debate_id != debate.id or node.id not in set(node_ids):
+        return scoring_result_payload(
+            debate_id=debate.id,
+            node_ids=node_ids,
+            items=[],
+            errors=[
+                NodeScoringError(
+                    node_id=node.id,
+                    status="unavailable",
+                    reason="Completed scoring node is not current in this debate.",
+                )
+            ],
+        )
+    generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
+    claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    config = detect_scoring_provider_config(
+        registry.agents,
+        role=judge_role,
+        providers=registry.providers,
+    )
+    if not config.available or config.provider is None or config.model is None:
+        return scoring_result_payload(
+            debate_id=debate.id,
+            node_ids=node_ids,
+            items=[],
+            errors=[
+                NodeScoringError(
+                    node_id=node.id,
+                    status="unavailable",
+                    reason="No scoring provider is configured.",
+                )
+            ],
+        )
+
+    cached_result = db.scalar(
+        select(NodeScoringResult)
+        .where(
+            NodeScoringResult.debate_id == debate.id,
+            NodeScoringResult.node_id == node.id,
+            NodeScoringResult.input_hash == input_hash,
+            NodeScoringResult.judge_role == judge_role,
+            NodeScoringResult.provider == config.provider,
+            NodeScoringResult.model == config.model,
+        )
+        .order_by(NodeScoringResult.updated_at.desc(), NodeScoringResult.created_at.desc(), NodeScoringResult.id.desc())
+    )
+    if cached_result is not None and isinstance(cached_result.result, dict):
+        return _with_cache_metadata(cached_result.result, hit=True)
+
+    active_job = _active_scoring_job(db, debate.id, newer_than=None)
+    if active_job is None:
+        active_job = queue_scoring_job(db, debate, model_id=config.model, judge_role=judge_role)
+    return _attach_active_scoring_job(
+        scoring_result_payload(
+            debate_id=debate.id,
+            node_ids=node_ids,
+            items=[],
+            errors=[],
+            pending=[
+                NodeScoringPending(
+                    node_id=node.id,
+                    status="pending",
+                    reason="Scoring has been queued for this node.",
+                )
+            ],
+        ),
+        active_job,
+    )
+
+
 def scoring_result_payload(
     *,
     debate_id: str,
     node_ids: list[str],
     items: list[dict],
     errors: list[NodeScoringError],
+    pending: list[NodeScoringPending] | None = None,
     reason: str | None = None,
     model_metadata: dict | None = None,
     max_nodes: int | None = None,
@@ -545,15 +656,20 @@ def scoring_result_payload(
     cache: dict | None = None,
 ) -> dict:
     serialized_errors = [error.model_dump(mode="json") for error in errors]
-    if items and serialized_errors:
+    serialized_pending = [item.model_dump(mode="json") for item in pending or []]
+    if items and (serialized_errors or serialized_pending):
         status = "partial"
-        default_reason = "Some scoring checks were unavailable."
+        default_reason = (
+            "Some scoring checks are pending or unavailable."
+            if serialized_pending
+            else "Some scoring checks were unavailable."
+        )
     elif items:
         status = "available"
         default_reason = None
     else:
         status = "unavailable"
-        default_reason = _unavailable_result_reason(errors)
+        default_reason = _unavailable_result_reason(errors, pending or [])
     payload = {
         "debate_id": debate_id,
         "status": status,
@@ -562,6 +678,8 @@ def scoring_result_payload(
     }
     if serialized_errors:
         payload["errors"] = serialized_errors
+    if serialized_pending:
+        payload["pending"] = serialized_pending
     final_reason = reason if reason is not None else default_reason
     if final_reason:
         payload["reason"] = final_reason
@@ -619,12 +737,114 @@ def _public_scoring_errors(errors: list[object]) -> list[dict]:
     return public_errors
 
 
-def _unavailable_result_reason(errors: list[NodeScoringError]) -> str:
+def _public_scoring_pending(pending: list[object]) -> list[dict]:
+    public_pending: list[dict] = []
+    for item in pending:
+        try:
+            node_pending = NodeScoringPending.model_validate(item)
+        except ValidationError:
+            continue
+        reason = _public_metadata_text(node_pending.reason)
+        if reason is None:
+            continue
+        public_pending.append(
+            NodeScoringPending(
+                node_id=node_pending.node_id,
+                status=node_pending.status,
+                reason=reason,
+            ).model_dump(mode="json")
+        )
+    return public_pending
+
+
+def _with_current_node_coverage(payload: dict, node_ids: list[str], active_job: Job | None) -> dict:
+    current_node_ids = set(node_ids)
+    next_payload = dict(payload)
+    next_payload["node_ids"] = node_ids
+    raw_items = next_payload.get("items")
+    raw_errors = next_payload.get("errors")
+    raw_pending = next_payload.get("pending")
+    items = [
+        item
+        for item in (raw_items if isinstance(raw_items, list) else [])
+        if isinstance(item, dict) and isinstance(item.get("node_id"), str) and item["node_id"] in current_node_ids
+    ]
+    errors = [
+        error
+        for error in (raw_errors if isinstance(raw_errors, list) else [])
+        if isinstance(error, dict) and isinstance(error.get("node_id"), str) and error["node_id"] in current_node_ids
+    ]
+    pending = [
+        item
+        for item in (raw_pending if isinstance(raw_pending, list) else [])
+        if isinstance(item, dict) and isinstance(item.get("node_id"), str) and item["node_id"] in current_node_ids
+    ]
+    covered_node_ids = {
+        item["node_id"]
+        for collection in (items, errors, pending)
+        for item in collection
+        if isinstance(item.get("node_id"), str)
+    }
+    missing_node_ids = [node_id for node_id in node_ids if node_id not in covered_node_ids]
+    if missing_node_ids:
+        if active_job is not None:
+            pending_status = _public_scoring_job_status(active_job.status)
+            reason = (
+                "Scoring is running for this node."
+                if pending_status == "running"
+                else "Scoring is queued for this node."
+            )
+            pending.extend(
+                {
+                    "node_id": node_id,
+                    "status": "pending",
+                    "reason": reason,
+                }
+                for node_id in missing_node_ids
+            )
+        else:
+            if items or errors or pending:
+                errors.extend(
+                    {
+                        "node_id": node_id,
+                        "status": "unavailable",
+                        "reason": "Stored scoring output has no result for this current node.",
+                    }
+                    for node_id in missing_node_ids
+                )
+    next_payload["items"] = items
+    if errors:
+        next_payload["errors"] = errors
+    else:
+        next_payload.pop("errors", None)
+    if pending:
+        next_payload["pending"] = pending
+    else:
+        next_payload.pop("pending", None)
+    if items and (errors or pending):
+        next_payload["status"] = "partial"
+        next_payload.setdefault("reason", "Some scoring checks are pending or unavailable.")
+    elif items:
+        if next_payload.get("status") not in {"partial", "unavailable"}:
+            next_payload["status"] = "available"
+    else:
+        next_payload["status"] = "unavailable"
+        next_payload.setdefault("reason", _unavailable_result_reason(
+            [NodeScoringError.model_validate(error) for error in errors],
+            [NodeScoringPending.model_validate(item) for item in pending],
+        ))
+    return next_payload
+
+
+def _unavailable_result_reason(errors: list[NodeScoringError], pending: list[NodeScoringPending] | None = None) -> str:
     for error in errors:
         if error.reason != "Scoring node limit reached.":
             return error.reason
     if errors:
         return errors[0].reason
+    for item in pending or []:
+        if item.reason:
+            return item.reason
     return "No scoring judge outputs are available for this debate."
 
 
@@ -693,6 +913,58 @@ def get_debate_scoring(db: Session, debate_id: str) -> dict | None:
     if not debate or debate.status == "archived":
         return None
     return debate_scoring_payload(db, debate)
+
+
+def attach_feedback_to_scoring_payload(db: Session, payload: dict, *, raw_user_token: str | None = None) -> dict:
+    node_ids = [node_id for node_id in payload.get("node_ids") or [] if isinstance(node_id, str)]
+    if not node_ids:
+        return payload
+    feedback_summary = feedback_summary_for_nodes(db, node_ids)
+    current_user_votes = current_feedback_votes_for_nodes(db, node_ids, raw_user_token=raw_user_token)
+    if not feedback_summary and not current_user_votes:
+        return payload
+    next_payload = dict(payload)
+    if feedback_summary:
+        next_payload["feedback_summary"] = feedback_summary
+    if current_user_votes:
+        next_payload["current_user_votes"] = current_user_votes
+    return next_payload
+
+
+def feedback_summary_for_nodes(db: Session, node_ids: list[str]) -> list[dict]:
+    if not node_ids:
+        return []
+    rows = db.execute(
+        select(NodeFeedbackVote.node_id, NodeFeedbackVote.vote, func.count(NodeFeedbackVote.id))
+        .where(NodeFeedbackVote.node_id.in_(node_ids))
+        .group_by(NodeFeedbackVote.node_id, NodeFeedbackVote.vote)
+    ).all()
+    counts = {node_id: {"node_id": node_id, "up": 0, "down": 0} for node_id in node_ids}
+    for node_id, vote, count in rows:
+        if node_id in counts and vote in {"up", "down"}:
+            counts[node_id][vote] = int(count)
+    return [counts[node_id] for node_id in node_ids if counts[node_id]["up"] or counts[node_id]["down"]]
+
+
+def current_feedback_votes_for_nodes(
+    db: Session,
+    node_ids: list[str],
+    *,
+    raw_user_token: str | None,
+) -> list[dict]:
+    if not node_ids or raw_user_token is None:
+        return []
+    user_identity_hash = NodeFeedbackVote.hash_user_identity(raw_user_token)
+    votes = db.scalars(
+        select(NodeFeedbackVote)
+        .where(
+            NodeFeedbackVote.node_id.in_(node_ids),
+            NodeFeedbackVote.user_identity_hash == user_identity_hash,
+        )
+        .order_by(NodeFeedbackVote.node_id.asc())
+    ).all()
+    vote_by_node = {vote.node_id: vote.vote for vote in votes}
+    return [{"node_id": node_id, "vote": vote_by_node[node_id]} for node_id in node_ids if node_id in vote_by_node]
 
 
 def get_adaptive_depth_dry_run(db: Session, debate_id: str) -> dict | None:

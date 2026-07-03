@@ -26,11 +26,11 @@ test("scoring UI has a local class error boundary around scoring surfaces", () =
   assert.match(
     debatePageSource,
     /<ScoringErrorBoundary[\s\S]*?<div className="topSwitch">[\s\S]*?<\/ScoringErrorBoundary>/,
-    "DebatePageClient should keep scoring controls inside a local boundary"
+    "DebatePageClient should keep default scoring status inside a local boundary"
   );
   assert.match(
     debatePageSource,
-    /<ScoringErrorBoundary[\s\S]*?<AdaptiveDepthDryRunPanel[\s\S]*?enabled=\{scoringEnabled\}[\s\S]*?state=\{adaptiveDepthDryRunState\}[\s\S]*?\/>[\s\S]*?<\/ScoringErrorBoundary>/,
+    /<ScoringErrorBoundary[\s\S]*?<AdaptiveDepthDryRunPanel[\s\S]*?enabled=\{true\}[\s\S]*?state=\{adaptiveDepthDryRunState\}[\s\S]*?\/>[\s\S]*?<\/ScoringErrorBoundary>/,
     "DebatePageClient should keep the adaptive dry-run panel inside a local boundary"
   );
   assert.match(

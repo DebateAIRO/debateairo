@@ -187,12 +187,46 @@ export type NodeScoringError = {
   reason: string;
 };
 
+export type NodeScoringPending = {
+  node_id: string;
+  status: "pending";
+  reason: string;
+};
+
+export type ScoringFeedbackVote = "up" | "down";
+
+export type ScoringFeedbackRequest = {
+  vote: ScoringFeedbackVote;
+};
+
+export type NodeFeedbackSummary = {
+  node_id: string;
+  up: number;
+  down: number;
+};
+
+export type CurrentUserFeedbackVote = {
+  node_id: string;
+  vote: ScoringFeedbackVote;
+};
+
+export type ScoringFeedbackResponse = {
+  debate_id: string;
+  node_id: string;
+  vote: ScoringFeedbackVote;
+  current_user_vote: ScoringFeedbackVote;
+  feedback_summary: NodeFeedbackSummary;
+};
+
 export type DebateScoringResponse = {
   debate_id: string;
   status: ScoringStatus;
   node_ids: string[];
   items: NodeScoringPayload[];
   errors?: NodeScoringError[] | null;
+  pending?: NodeScoringPending[] | null;
+  feedback_summary?: NodeFeedbackSummary[] | null;
+  current_user_votes?: CurrentUserFeedbackVote[] | null;
   max_nodes?: number | null;
   scored_node_count?: number | null;
   skipped_node_count?: number | null;
@@ -262,14 +296,6 @@ export type NodeScore = NodeScoringPayload;
 export type DebateScoreSummary = DebateScoringResponse;
 
 export type ScoringJobStatus = "queued" | "running" | "complete" | "failed";
-
-export type DebateScoringJobStatus = {
-  debate_id: string;
-  job_id: string;
-  status: ScoringJobStatus;
-  error?: string;
-  detail?: string;
-};
 
 export type Synthesis = {
   id: string;

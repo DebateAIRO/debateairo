@@ -5,11 +5,16 @@ import test from "node:test";
 const pageSource = readFileSync("app/debate/[id]/DebatePageClient.tsx", "utf8");
 const globalsSource = readFileSync("app/globals.css", "utf8");
 
-test("debate header keeps scoring controls and view controls in the top toolbar", () => {
+test("debate header keeps default scoring status and view controls in the top toolbar", () => {
   assert.match(
     pageSource,
-    /<div className="debateTopActions">[\s\S]*?<div className="topSwitch">[\s\S]*aria-label="Toggle scoring"[\s\S]*Refresh scoring[\s\S]*aria-label="Open scoring diagnostics"[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*Tree[\s\S]*Outline/s,
-    "Scoring controls, diagnostics, and Tree/Outline controls should remain in the same toolbar action cluster"
+    /<div className="debateTopActions">[\s\S]*?<div className="topSwitch">[\s\S]*<span>Scoring<\/span>[\s\S]*aria-label="Open scoring diagnostics"[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*Tree[\s\S]*Outline/s,
+    "Default scoring status, diagnostics, and Tree/Outline controls should remain in the same toolbar action cluster"
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /aria-label="Toggle scoring"|Refresh scoring/,
+    "The normal toolbar should not expose removed scoring toggle or refresh controls"
   );
 });
 
@@ -32,7 +37,7 @@ test("scoring status text shrinks instead of pushing toolbar controls away", () 
   assert.match(
     globalsSource,
     /\.topSwitch > span:first-child,[\s\S]*?\.topSwitch \.iconBtn\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?\}/,
-    "Scoring label, switch, refresh, and diagnostics controls should not collapse away"
+    "Scoring label and diagnostics controls should not collapse away"
   );
   assert.match(
     globalsSource,

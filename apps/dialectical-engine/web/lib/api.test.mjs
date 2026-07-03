@@ -55,42 +55,40 @@ async function loadHelper() {
   return import(`${moduleUrl}?cacheBust=${Date.now()}`);
 }
 
-test("startDebateScoringRefresh queues scoring with user bearer token", async () => {
-  const calls = [];
-  globalThis.fetch = async (url, init = {}) => {
-    calls.push({ url, init });
-    return new Response(JSON.stringify({ debate_id: "debate-1", job_id: "job-1", status: "queued" }), {
-      status: 202,
-      headers: { "Content-Type": "application/json" }
-    });
-  };
-  const { startDebateScoringRefresh } = await loadHelper();
+test("api helper does not expose normal scoring refresh or polling helpers", async () => {
+  const helper = await loadHelper();
 
-  const payload = await startDebateScoringRefresh("debate-1", "user-token");
-
-  assert.deepEqual(payload, { debate_id: "debate-1", job_id: "job-1", status: "queued" });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "/api/debates/debate-1/scoring/jobs");
-  assert.equal(calls[0].init.method, "POST");
-  assert.equal(calls[0].init.headers.get("Authorization"), "Bearer user-token");
+  assert.equal("startDebateScoringRefresh" in helper, false);
+  assert.equal("getDebateScoringJobStatus" in helper, false);
 });
 
-test("getDebateScoringJobStatus reads existing queued scoring status", async () => {
+test("submitScoringFeedback posts up and changed down votes with user bearer token", async () => {
   const calls = [];
+  const responses = [
+    { debate_id: "debate-1", node_id: "node-1", vote: "up", current_user_vote: "up", feedback_summary: { node_id: "node-1", up: 1, down: 0 } },
+    { debate_id: "debate-1", node_id: "node-1", vote: "down", current_user_vote: "down", feedback_summary: { node_id: "node-1", up: 0, down: 1 } }
+  ];
   globalThis.fetch = async (url, init = {}) => {
     calls.push({ url, init });
-    return new Response(JSON.stringify({ debate_id: "debate-1", job_id: "job-1", status: "running" }), {
+    return new Response(JSON.stringify(responses[calls.length - 1]), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
   };
-  const { getDebateScoringJobStatus } = await loadHelper();
+  const { submitScoringFeedback } = await loadHelper();
 
-  const payload = await getDebateScoringJobStatus("debate-1", "job-1");
+  const upPayload = await submitScoringFeedback("debate-1", "node-1", "up", "user-token");
+  const downPayload = await submitScoringFeedback("debate-1", "node-1", "down", "user-token");
 
-  assert.deepEqual(payload, { debate_id: "debate-1", job_id: "job-1", status: "running" });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "/api/debates/debate-1/scoring/jobs/job-1");
-  assert.equal(calls[0].init.method, undefined);
-  assert.equal(calls[0].init.headers.has("Authorization"), false);
+  assert.deepEqual(upPayload, responses[0]);
+  assert.deepEqual(downPayload, responses[1]);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "/api/debates/debate-1/scoring/nodes/node-1/feedback");
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].init.headers.get("Authorization"), "Bearer user-token");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { vote: "up" });
+  assert.equal(calls[1].url, "/api/debates/debate-1/scoring/nodes/node-1/feedback");
+  assert.equal(calls[1].init.method, "POST");
+  assert.equal(calls[1].init.headers.get("Authorization"), "Bearer user-token");
+  assert.deepEqual(JSON.parse(calls[1].init.body), { vote: "down" });
 });

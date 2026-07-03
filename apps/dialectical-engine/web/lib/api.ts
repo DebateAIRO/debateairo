@@ -3,10 +3,11 @@ import type {
   DebateAdaptiveDepthApprovalResponse,
   DebateAdaptiveDepthDryRunResponse,
   DebateDetail,
-  DebateScoringJobStatus,
   DebateScoringResponse,
   DebateSummary,
   Generation,
+  ScoringFeedbackResponse,
+  ScoringFeedbackVote,
   WorkerStatus
 } from "./types";
 
@@ -75,18 +76,20 @@ export async function approveDebateAdaptiveDepthExpansion(
   );
 }
 
-export async function startDebateScoringRefresh(id: string, token: string): Promise<DebateScoringJobStatus> {
-  return apiFetch<DebateScoringJobStatus>(
-    `/api/debates/${id}/scoring/jobs`,
+export async function submitScoringFeedback(
+  debateId: string,
+  nodeId: string,
+  vote: ScoringFeedbackVote,
+  token: string
+): Promise<ScoringFeedbackResponse> {
+  return apiFetch<ScoringFeedbackResponse>(
+    `/api/debates/${debateId}/scoring/nodes/${nodeId}/feedback`,
     {
-      method: "POST"
+      method: "POST",
+      body: JSON.stringify({ vote })
     },
     token
   );
-}
-
-export async function getDebateScoringJobStatus(id: string, jobId: string): Promise<DebateScoringJobStatus> {
-  return apiFetch<DebateScoringJobStatus>(`/api/debates/${id}/scoring/jobs/${jobId}`);
 }
 
 export async function createDebate(topic: string, config: Record<string, unknown>, token: string): Promise<DebateDetail> {

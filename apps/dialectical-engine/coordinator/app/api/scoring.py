@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import bearer_token, require_user_token
 from app.core.db import SessionLocal, get_db
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node, now_utc
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
 from app.scoring import get_adaptive_depth_dry_run as get_adaptive_depth_dry_run_payload
@@ -21,6 +21,7 @@ from app.scoring import record_approved_adaptive_expansion
 from app.scoring import score_debate_with_provider_registry
 from app.scoring.models import ManualInvestigationRequest, ManualInvestigationResponse
 from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
+from app.scoring.service import attach_feedback_to_scoring_payload, feedback_summary_for_nodes
 from app.services.orchestrator import regenerate_node
 
 router = APIRouter(prefix="/api/debates", tags=["scoring"])
@@ -33,6 +34,26 @@ class AdaptiveDepthApprovalRequest(BaseModel):
     debate_id: str
     selected_node_ids: list[str] = Field(min_length=1)
     approval_reason: str | None = None
+
+
+class ScoringFeedbackRequest(BaseModel):
+    vote: Literal["up", "down"]
+
+
+class ScoringFeedbackSummary(BaseModel):
+    node_id: str
+    up: int
+    down: int
+
+
+class CurrentUserScoringFeedbackVote(BaseModel):
+    node_id: str
+    vote: Literal["up", "down"]
+
+
+class DebateScoringWithFeedbackResponse(DebateScoringResponse):
+    feedback_summary: list[ScoringFeedbackSummary] | None = None
+    current_user_votes: list[CurrentUserScoringFeedbackVote] | None = None
 
 
 def scoring_provider_registry_dependency() -> ProviderRegistry:
@@ -146,28 +167,75 @@ def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
         commit_write(db)
 
 
-@router.get("/{debate_id}/scoring", response_model=DebateScoringResponse, response_model_exclude_none=True)
+@router.get("/{debate_id}/scoring", response_model=DebateScoringWithFeedbackResponse, response_model_exclude_none=True)
 def get_debate_scoring(
     debate_id: str,
     db: Annotated[Session, Depends(get_db)],
     authorization: Annotated[str | None, Header()] = None,
     force_refresh: bool = Query(False),
 ) -> dict:
+    raw_user_token = None
+    if authorization is not None:
+        raw_user_token = bearer_token(authorization)
+        require_user_token(raw_user_token, db)
     if force_refresh:
         # Transitional manual refresh path; user-facing real scoring refreshes
         # should move through queued job/status endpoints.
-        require_user_token(bearer_token(authorization), db)
+        require_user_token(raw_user_token or bearer_token(authorization), db)
         debate = db.get(Debate, debate_id)
         if not debate or debate.status == "archived":
             raise HTTPException(status_code=404, detail="Debate not found")
         provider_registry = scoring_provider_registry_dependency()
         payload = score_debate_with_provider_registry(db, debate, provider_registry, force_refresh=True)
         commit_write(db)
-        return payload
+        return attach_feedback_to_scoring_payload(db, payload, raw_user_token=raw_user_token)
     payload = get_debate_scoring_payload(db, debate_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Debate not found")
-    return payload
+    return attach_feedback_to_scoring_payload(db, payload, raw_user_token=raw_user_token)
+
+
+@router.post("/{debate_id}/scoring/nodes/{node_id}/feedback")
+def submit_scoring_feedback(
+    debate_id: str,
+    node_id: str,
+    payload: ScoringFeedbackRequest,
+    db: Annotated[Session, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> dict:
+    raw_user_token = bearer_token(authorization)
+    require_user_token(raw_user_token, db)
+    debate = db.get(Debate, debate_id)
+    node = db.get(Node, node_id)
+    if not debate or debate.status == "archived" or not node or node.debate_id != debate.id or node.status == "stale":
+        raise HTTPException(status_code=404, detail="Debate node not found")
+    scoring_result_id = _latest_node_scoring_result_id(db, debate_id=debate.id, node_id=node.id)
+    NodeFeedbackVote.upsert(
+        db,
+        debate_id=debate.id,
+        node_id=node.id,
+        raw_user_token=raw_user_token,
+        vote=payload.vote,
+        scoring_result_id=scoring_result_id,
+    )
+    commit_write(db)
+    summary = feedback_summary_for_nodes(db, [node.id])
+    return {
+        "debate_id": debate.id,
+        "node_id": node.id,
+        "vote": payload.vote,
+        "current_user_vote": payload.vote,
+        "feedback_summary": summary[0] if summary else {"node_id": node.id, "up": 0, "down": 0},
+    }
+
+
+def _latest_node_scoring_result_id(db: Session, *, debate_id: str, node_id: str) -> str | None:
+    return db.scalar(
+        select(NodeScoringResult.id)
+        .where(NodeScoringResult.debate_id == debate_id, NodeScoringResult.node_id == node_id)
+        .order_by(NodeScoringResult.updated_at.desc(), NodeScoringResult.created_at.desc(), NodeScoringResult.id.desc())
+        .limit(1)
+    )
 
 
 @router.post(

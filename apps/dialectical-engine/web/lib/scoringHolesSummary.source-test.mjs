@@ -17,7 +17,7 @@ test("DebatePageClient derives debate-level holes summary from real scoring payl
   );
   assert.match(
     debatePageSource,
-    /<ScoringHolesSummaryPanel[\s\S]*?enabled=\{scoringEnabled\}[\s\S]*?state=\{scoringState\}[\s\S]*?holesSummary=\{scoringHolesSummary\}[\s\S]*?fatalFlagsSummary=\{scoringFatalFlagsSummary\}[\s\S]*?strongestIssue=\{strongestUnresolvedScoringIssue\}[\s\S]*?\/>/,
+    /<ScoringHolesSummaryPanel[\s\S]*?enabled=\{true\}[\s\S]*?state=\{scoringState\}[\s\S]*?holesSummary=\{scoringHolesSummary\}[\s\S]*?fatalFlagsSummary=\{scoringFatalFlagsSummary\}[\s\S]*?strongestIssue=\{strongestUnresolvedScoringIssue\}[\s\S]*?\/>/,
     "DebatePageClient should render the debate-level holes summary panel"
   );
 });
@@ -28,10 +28,10 @@ test("debate-level holes panel surfaces unavailable and empty states without fak
     /function ScoringHolesSummaryPanel/,
     "DebatePageClient should own a focused scoring holes summary panel"
   );
-  assert.match(
+  assert.doesNotMatch(
     debatePageSource,
     /Enable scoring to summarize unresolved holes and fatal flags from scored claims\./,
-    "Panel should honestly report that scoring must be enabled before holes are summarized"
+    "Panel should not mention enabling scoring now that scoring loads by default"
   );
   assert.match(
     debatePageSource,

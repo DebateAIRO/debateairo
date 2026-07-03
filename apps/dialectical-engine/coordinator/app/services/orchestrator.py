@@ -274,6 +274,13 @@ def create_generation(
     return generation
 
 
+def ensure_default_scoring_for_completed_generation(db: Session, debate: Debate, node: Node) -> dict:
+    from app.providers import ProviderRegistry
+    from app.scoring.service import ensure_node_scoring_on_completion
+
+    return ensure_node_scoring_on_completion(db, debate, node, ProviderRegistry())
+
+
 def normalized_decomposition_children(payload: dict[str, Any], debate: Debate) -> list[dict[str, str]]:
     branching = int(debate.config.get("branching", 2))
     raw_children = payload.get("children")
@@ -844,6 +851,7 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
                 child.id,
                 exclude_models=claim_author_exclusions(db, role, node, debate),
             )
+        ensure_default_scoring_for_completed_generation(db, debate, node)
         commit_write(db)
         await event_bus.publish(job.debate_id, "tree_ready", {"tree": debate_to_dict(db, debate)})
         await event_bus.publish(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": node.active_generation_id})
@@ -854,6 +862,7 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
             raise ValueError("Node not found")
         argument = result.get("argument") if isinstance(result, dict) else str(result)
         generation = create_generation(db, job, node, argument, job.stream_buffer or str(result), metadata)
+        ensure_default_scoring_for_completed_generation(db, debate, node)
         spawn_child_argument_jobs(db, debate, node, _candidate_child_claims(result))
         flush_write(db)
         maybe_queue_synthesis(db, debate)

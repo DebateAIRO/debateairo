@@ -342,12 +342,19 @@ class NodeScoringError(BaseModel):
     reason: str
 
 
+class NodeScoringPending(BaseModel):
+    node_id: str
+    status: Literal["pending"]
+    reason: str
+
+
 class DebateScoringResponse(BaseModel):
     debate_id: str
     status: ScoringStatus
     node_ids: list[str] = Field(default_factory=list)
     items: list[NodeScoringPayload] = Field(default_factory=list)
     errors: list[NodeScoringError] | None = None
+    pending: list[NodeScoringPending] | None = None
     max_nodes: int | None = None
     scored_node_count: int | None = None
     skipped_node_count: int | None = None

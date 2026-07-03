@@ -21,10 +21,10 @@ test("DebatePageClient wires score-aware navigation from real scoring payloads",
     /const \[scoreAwareFilter, setScoreAwareFilter\] = useState<ScoreAwareFilter>\("all"\)/,
     "Score-aware filtering should be explicit page state, not implicit fake data"
   );
-  assert.match(
+  assert.doesNotMatch(
     pageSource,
-    /if \(!scoringEnabled\) setScoreAwareFilter\("all"\)/,
-    "Turning scoring off should clear stale score-aware filters"
+    /scoringEnabled|setScoringEnabled/,
+    "Score-aware navigation should no longer depend on a normal scoring toggle"
   );
   assert.match(
     pageSource,
@@ -48,18 +48,18 @@ test("DebatePageClient wires score-aware navigation from real scoring payloads",
   );
   assert.match(
     pageSource,
-    /<ScoreAwareFilterPanel[\s\S]*enabled=\{scoringEnabled\}[\s\S]*filter=\{scoreAwareFilter\}[\s\S]*onChange=\{setScoreAwareFilter\}/,
+    /<ScoreAwareFilterPanel[\s\S]*enabled=\{true\}[\s\S]*filter=\{scoreAwareFilter\}[\s\S]*onChange=\{setScoreAwareFilter\}/,
     "The page should render controls for the score-aware filter state"
   );
   assert.match(
     pageSource,
-    /<RecommendedInvestigations[\s\S]*recommendations=\{scoringEnabled \? debateRecommendations : \[\]\}[\s\S]*canOpenTarget=\{canFocusRecommendationNode\}[\s\S]*onOpenTarget=\{focusRecommendationNode\}/,
+    /<RecommendedInvestigations[\s\S]*recommendations=\{debateRecommendations\}[\s\S]*canOpenTarget=\{canFocusRecommendationNode\}[\s\S]*onOpenTarget=\{focusRecommendationNode\}/,
     "Recommended investigations should surface at debate level with existing target navigation guards"
   );
   assert.match(
     pageSource,
-    /<DebateCanvas[\s\S]*scoreFilterNodeIds=\{scoringEnabled \? scoreAwareFilterNodeIds : null\}/,
-    "The tree should receive an inert filter when scoring is disabled and real matching node ids when enabled"
+    /<DebateCanvas[\s\S]*scoreFilterNodeIds=\{scoreAwareFilterNodeIds\}/,
+    "The tree should receive real matching node ids from default scoring state"
   );
   assert.match(
     pageSource,

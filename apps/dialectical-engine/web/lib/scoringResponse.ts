@@ -1,9 +1,12 @@
 import type {
+  CurrentUserFeedbackVote,
   DebateScoringResponse,
   EvidenceSignal,
   ExpansionDecision,
   InvestigationPathStatus,
+  NodeFeedbackSummary,
   NodeScoringError,
+  NodeScoringPending,
   NodeScoringPayload,
   RecommendedInvestigation,
   Severity,
@@ -18,6 +21,9 @@ import { toArgumentClaimStatus } from "./debateTreeUtils";
 export type IndexedScoringResponse = {
   scoringByNodeId: Map<string, NodeScoringPayload>;
   scoringErrorsByNodeId: Map<string, NodeScoringError>;
+  scoringPendingByNodeId: Map<string, NodeScoringPending>;
+  feedbackSummaryByNodeId: Map<string, NodeFeedbackSummary>;
+  currentUserFeedbackByNodeId: Map<string, CurrentUserFeedbackVote>;
 };
 
 export type DebateScoringHoleSummaryItem = {
@@ -71,7 +77,6 @@ export type DebateScoringUnresolvedIssue =
 export type ScoringVisibilityKind =
   | "off"
   | "empty"
-  | "token_required"
   | "provider_required"
   | "unavailable"
   | "refreshing"
@@ -192,6 +197,15 @@ export function indexScoringResponse(response: DebateScoringResponse | null): In
     scoringErrorsByNodeId: new Map<string, NodeScoringError>(
       (response?.errors ?? []).map((error) => [error.node_id, error])
     ),
+    scoringPendingByNodeId: new Map<string, NodeScoringPending>(
+      (response?.pending ?? []).map((item) => [item.node_id, item])
+    ),
+    feedbackSummaryByNodeId: new Map<string, NodeFeedbackSummary>(
+      (response?.feedback_summary ?? []).map((summary) => [summary.node_id, summary])
+    ),
+    currentUserFeedbackByNodeId: new Map<string, CurrentUserFeedbackVote>(
+      (response?.current_user_votes ?? []).map((vote) => [vote.node_id, vote])
+    ),
   };
 }
 
@@ -239,8 +253,8 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
   if (input.scoringStatus === "unavailable" && isMissingJudgeOutputReason(reason)) {
     return {
       kind: "empty",
-      title: "No scoring run yet",
-      detail: "Refresh scoring to generate judge outputs.",
+      title: "Scoring pending",
+      detail: "No persisted judge outputs are available yet.",
     };
   }
 
@@ -257,18 +271,6 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
       kind: "unavailable",
       title: "Scoring unavailable",
       detail: reason || "No scoring payload is available.",
-    };
-  }
-
-  if (!input.hasActionToken) {
-    const count = input.response?.scored_node_count ?? input.response?.items?.length ?? 0;
-    return {
-      kind: "token_required",
-      title: "User token required",
-      detail:
-        count > 0
-          ? `Unlock actions with a user token to refresh scoring. Showing ${pluralize(count, "persisted scored claim")}.`
-          : "Unlock actions with a user token to refresh scoring. No persisted scored claims are available.",
     };
   }
 

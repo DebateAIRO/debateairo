@@ -7,11 +7,17 @@ Returns the public node-scoring state for a non-archived debate.
 `404` means the debate does not exist or is archived. Default public reads do
 not require a bearer token.
 
-For the scoring refactor currently in flight, Option B is authoritative:
-`POST /api/debates/{id}/scoring/jobs` performs a synchronous transitional
-refresh and returns a terminal `complete` or `failed` status. Real async worker
-scoring is deferred to a later milestone; no runtime path should preserve fake
-queued-job behavior for scoring refreshes.
+For the scoring refactor currently in flight, scoring is default product state:
+generated arguments should already have scoring state from the generation
+completion path. The normal debate UI must not ask users to enable scoring or
+press Refresh Scoring. Default reads should show the stored scored item,
+per-node pending/error state, or an honest unavailable/partial response.
+
+The transitional refresh APIs remain compatibility/operator paths only, not the
+normal UX. `POST /api/debates/{id}/scoring/jobs` performs a synchronous
+transitional provider-backed check and returns a terminal `complete` or
+`failed` status. Real async worker scoring is deferred to a later milestone; no
+runtime path should preserve fake queued-job behavior for scoring refreshes.
 
 By default this endpoint is a stored-output read path. Passing
 `force_refresh=true` bypasses matching node-scoring cache entries and performs a
@@ -20,6 +26,8 @@ provider. Because this path can trigger real model/provider work, requests with
 `force_refresh=true` require a valid user bearer token. If no real scoring
 provider is configured or the provider call fails, the response remains an
 honest `unavailable` or `partial` payload; the API must not fabricate scores.
+Normal debate UI should not use `force_refresh=true` as a user-facing refresh
+flow.
 
 ## Response Shape
 
@@ -72,6 +80,91 @@ Fields with no value are omitted from the public response.
 `scores`, `labels`, `holes`, `fatal_flags`, `score_caps`,
 `judge_disagreements`, `recommended_investigations`, `rationale`, and optional
 `debug` metadata.
+
+## User Scoring Feedback Contract
+
+### `POST /api/debates/{debate_id}/scoring/nodes/{node_id}/feedback`
+
+Records the authenticated current user's UP/DOWN feedback on a scored debate
+node. This is a user feedback write path only. It must not enqueue, refresh,
+call, or otherwise trigger provider-backed node re-scoring.
+
+Authentication:
+
+- Requires an `Authorization` header containing a bearer user token and the same
+  user-token validation as other user write routes.
+- The raw bearer token is used only for the current request identity check and
+  for deriving a stable per-user feedback identity hash.
+- Runtime storage must never persist the raw bearer token, return it in an API
+  response, write it to scoring provider metadata, or expose it in logs.
+
+Request body:
+
+```json
+{
+  "vote": "up"
+}
+```
+
+- `vote` is required and must be either `"up"` or `"down"`.
+- Submitting the opposite vote for the same authenticated user, debate, and node
+  changes the existing vote instead of creating a second current-user vote.
+
+Successful response body (`200`):
+
+```json
+{
+  "debate_id": "debate-123",
+  "node_id": "node-1",
+  "vote": "up",
+  "current_user_vote": "up",
+  "feedback_summary": {
+    "node_id": "node-1",
+    "up": 1,
+    "down": 0
+  }
+}
+```
+
+- `vote` and `current_user_vote` both represent the authenticated user's current
+  state after the write.
+- `feedback_summary` is the aggregate public count for the node after the write.
+  It is not user-specific and must contain only counts by vote direction.
+
+Invalid-node behavior:
+
+- Return `404` with `detail: "Debate node not found"` when the debate is
+  missing, archived, the node does not exist, belongs to another debate, or has
+  `status: "stale"`.
+- Do not create feedback rows for rejected nodes.
+- Do not treat stale or nonexistent nodes as a signal to refresh scoring.
+
+### Feedback fields on `GET /api/debates/{id}/scoring`
+
+Scoring reads may include feedback metadata alongside the scoring payload:
+
+```json
+{
+  "feedback_summary": [
+    {"node_id": "node-1", "up": 3, "down": 1}
+  ],
+  "current_user_votes": [
+    {"node_id": "node-1", "vote": "down"}
+  ]
+}
+```
+
+- `feedback_summary` is aggregate feedback. It may be exposed to unauthenticated
+  frontend reads because it contains no raw tokens or per-user identity hashes.
+- `current_user_votes` is authenticated current-user state. It must be omitted
+  from unauthenticated responses and included only when the request carries a
+  valid bearer token for that user.
+- Both feedback fields are scoped to current non-stale `node_ids` in the scoring
+  response. Stale, nonexistent, or cross-debate node feedback must not be exposed
+  as current scoring feedback.
+- Feedback metadata is separate from model scoring metadata. Feedback submission
+  and feedback reads must never mutate model scores, provider cache identity,
+  `AnalyzerRun` scoring output, or provider-backed scoring job state.
 
 The public payload must not expose raw judge output blobs or arbitrary provider
 metadata. If internal scoring data contains `debug.judge_outputs`, the API
@@ -167,9 +260,9 @@ cache-hit value. The flag must not fabricate scores when no real provider is
 available, and the endpoint must not silently convert `force_refresh` into fake
 runtime scoring.
 
-The Option B user refresh path,
+The transitional Option B compatibility refresh path,
 `POST /api/debates/{id}/scoring/jobs`, validates the configured `judge`
-provider, runs the scoring refresh inline, writes a completed scoring
+provider, runs the provider-backed check inline, writes a completed scoring
 `AnalyzerRun` when the provider succeeds, and returns a terminal `complete` or
 `failed` job response. The authenticated `force_refresh=true` read-route
 compatibility path remains a live provider-check response plus cache updates,
@@ -278,16 +371,19 @@ be replaced with fabricated scores.
 
 ## Sync vs Async Decision
 
-Option B is the active contract for this refactor. User-triggered scoring
-refreshes go through `POST /api/debates/{id}/scoring/jobs`, but that route is a
-synchronous transitional refresh rather than a real background worker job: it
-runs the scoring refresh inline, persists the resulting scoring output when
-available, and returns a terminal `complete` or `failed` response.
+Option B remains the transitional API shape for compatibility/operator checks,
+but scoring-by-default is the normal product contract. Users should not need to
+press a refresh button in the debate UI to get scoring state. The
+`POST /api/debates/{id}/scoring/jobs` route is a synchronous transitional
+provider-backed check rather than a real background worker job: it runs the
+check inline, persists the resulting scoring output when available, and returns
+a terminal `complete` or `failed` response.
 
 `GET /api/debates/{id}/scoring` remains a read path. It reads persisted scoring
 output and returns either validated public scoring data or an honest
-`unavailable` state with a reason. Normal page loads must not fabricate queued
-job progress, placeholder scores, or scaffolded scoring output.
+`unavailable` state with a reason. Normal page loads must not expose an Enable
+Scoring switch, a Refresh Scoring button, fake queued job progress, placeholder
+scores, or scaffolded scoring output.
 
 Real async worker scoring is explicitly deferred to a later milestone. That
 future milestone may introduce durable queued/running job progress and polling,

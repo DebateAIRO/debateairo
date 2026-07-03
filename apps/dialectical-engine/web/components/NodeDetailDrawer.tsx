@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
-import type { DebateNode, Generation, NodeScoringError, NodeScoringPayload } from "@/lib/types";
+import type {
+  CurrentUserFeedbackVote,
+  DebateNode,
+  Generation,
+  NodeFeedbackSummary,
+  NodeScoringError,
+  NodeScoringPayload,
+  ScoringFeedbackVote
+} from "@/lib/types";
 import { ROLE_PALETTES, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { isAbandonedArgumentStatus } from "@/lib/debateTreeUtils";
 import {
@@ -25,9 +33,13 @@ export function NodeDetailDrawer({
   node,
   scoring,
   scoringError,
+  feedbackSummary,
+  currentUserFeedback,
+  feedbackSubmitState,
   token,
   onClose,
   onChallenge,
+  onSubmitFeedback,
   onFocusRecommendationNode,
   canFocusRecommendationNode,
   onQueued,
@@ -37,9 +49,13 @@ export function NodeDetailDrawer({
   node: DebateNode;
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
+  feedbackSummary?: NodeFeedbackSummary;
+  currentUserFeedback?: CurrentUserFeedbackVote;
+  feedbackSubmitState?: { status: "idle" | "submitting" | "error"; error: string | null };
   token: string | null;
   onClose: () => void;
   onChallenge: (anchor: HTMLElement, text: string) => void;
+  onSubmitFeedback: (vote: ScoringFeedbackVote) => void;
   onFocusRecommendationNode: (targetClaimId: string) => boolean;
   canFocusRecommendationNode: (targetClaimId: string) => boolean;
   onQueued: () => void;
@@ -181,6 +197,11 @@ export function NodeDetailDrawer({
             <NodeScoringDetails
               scoring={scoring}
               scoringError={scoringError}
+              feedbackSummary={feedbackSummary}
+              currentUserFeedback={currentUserFeedback}
+              feedbackSubmitState={feedbackSubmitState}
+              token={token}
+              onSubmitFeedback={onSubmitFeedback}
               recommendationTargetButton={recommendationTargetButton}
             />
           </ScoringErrorBoundary>
@@ -262,13 +283,92 @@ export function NodeDetailDrawer({
   );
 }
 
+function ScoringFeedbackControls({
+  summary,
+  currentVote,
+  submitState,
+  token,
+  onSubmit
+}: {
+  summary?: NodeFeedbackSummary;
+  currentVote?: ScoringFeedbackVote;
+  submitState: { status: "idle" | "submitting" | "error"; error: string | null };
+  token: string | null;
+  onSubmit: (vote: ScoringFeedbackVote) => void;
+}) {
+  const busy = submitState.status === "submitting";
+  const upCount = summary?.up ?? 0;
+  const downCount = summary?.down ?? 0;
+  const locked = !token;
+
+  return (
+    <section
+      className="drawerScoringRationale"
+      aria-label="User feedback on scoring usefulness"
+      data-scoring-feedback="user-feedback"
+    >
+      <div className="drawerSectionTitle">Your feedback</div>
+      <p>Was this scoring explanation useful for reviewing the claim?</p>
+      <div
+        role="group"
+        aria-label="User feedback on scoring usefulness"
+        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}
+      >
+        <button
+          type="button"
+          className="nodeCtrl"
+          aria-pressed={currentVote === "up"}
+          disabled={locked || busy}
+          onClick={() => onSubmit("up")}
+        >
+          UP {upCount}
+        </button>
+        <button
+          type="button"
+          className="nodeCtrl"
+          aria-pressed={currentVote === "down"}
+          disabled={locked || busy}
+          onClick={() => onSubmit("down")}
+        >
+          DOWN {downCount}
+        </button>
+      </div>
+      {locked ? (
+        <div className="drawerHintMuted">Unlock actions to save feedback.</div>
+      ) : busy ? (
+        <div className="drawerHintMuted" role="status">
+          Saving feedback...
+        </div>
+      ) : submitState.status === "error" && submitState.error ? (
+        <div className="drawerHintMuted" role="alert">
+          Feedback was not saved: {submitState.error}
+        </div>
+      ) : currentVote ? (
+        <div className="drawerHintMuted" role="status">
+          Current user feedback: {currentVote === "up" ? "useful" : "not useful"}.
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function NodeScoringDetails({
   scoring,
   scoringError,
+  feedbackSummary,
+  currentUserFeedback,
+  feedbackSubmitState = { status: "idle", error: null },
+  token,
+  onSubmitFeedback,
   recommendationTargetButton
 }: {
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
+  feedbackSummary?: NodeFeedbackSummary;
+  currentUserFeedback?: CurrentUserFeedbackVote;
+  feedbackSubmitState?: { status: "idle" | "submitting" | "error"; error: string | null };
+  token: string | null;
+  onSubmitFeedback: (vote: ScoringFeedbackVote) => void;
   recommendationTargetButton: (
     recommendation: NodeScoringPayload["recommended_investigations"][number]
   ) => ReactNode;
@@ -315,6 +415,16 @@ function NodeScoringDetails({
           <div className="drawerSectionTitle">Scoring rationale</div>
           <p>{rationaleShort}</p>
         </section>
+      ) : null}
+
+      {scoring ? (
+        <ScoringFeedbackControls
+          summary={feedbackSummary}
+          currentVote={currentUserFeedback?.vote}
+          submitState={feedbackSubmitState}
+          token={token}
+          onSubmit={onSubmitFeedback}
+        />
       ) : null}
 
       {hasScoringFindings ? (

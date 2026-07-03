@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.core.auth import hash_token
 from app.core.config import DEFAULT_ROUTING, RUNTIME_SETTINGS_KEY
 from app.core.db import SessionLocal
-from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc
+from app.models.entities import Debate, Generation, Job, Node, NodeScoringResult, Setting, Synthesis, Worker, now_utc
 from app.exploration.policy import ExpansionDecision
 from app.services.orchestrator import (
     StaleJobMutationError,
@@ -90,7 +90,10 @@ def test_mock_orchestration_completes_and_exports(db) -> None:
     assert debate.root_node_id
     assert debate.synthesis_id
     assert db.scalar(select(Generation.id).limit(1))
-    assert not db.scalars(select(Job).where(Job.status.in_(["pending", "running", "claimed"]))).all()
+    active_non_scoring_jobs = db.scalars(
+        select(Job).where(Job.status.in_(["pending", "running", "claimed"]), Job.job_type != "score_debate")
+    ).all()
+    assert active_non_scoring_jobs == []
 
     exported = markdown_export(db, debate)
     assert "# Debate: Should the EU ban gas cars by 2035?" in exported
@@ -98,6 +101,135 @@ def test_mock_orchestration_completes_and_exports(db) -> None:
     assert "mock-local" in exported
     assert "## Synthesis" in exported
     assert "Cleaner transport." in exported
+
+
+def test_classic_argue_completion_queues_default_scoring_state(db) -> None:
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="pending",
+        materialized_path="/0/0",
+    )
+    db.add_all([root, child])
+    db.flush()
+    debate.root_node_id = root.id
+    job = Job(
+        debate_id=debate.id,
+        node_id=child.id,
+        job_type="argue",
+        required_role="proposer",
+        required_model="mock-local",
+        status="claimed",
+        worker_id=worker.id,
+        deadline=now_utc(),
+    )
+    db.add(job)
+    db.flush()
+    worker.current_job_id = job.id
+    db.commit()
+
+    asyncio.run(complete_job(db, job, {"argument": "Cleaner air improves health."}, {"latency_ms": 12}))
+
+    db.refresh(child)
+    assert child.status == "complete"
+    assert child.active_generation_id is not None
+    scoring_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert len(scoring_jobs) == 1
+    assert scoring_jobs[0].status == "pending"
+    assert scoring_jobs[0].required_role == "judge"
+    assert scoring_jobs[0].required_model == "gpt-5.5"
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def test_classic_decompose_completion_queues_root_scoring_state(db) -> None:
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="pending",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    job = Job(
+        debate_id=debate.id,
+        node_id=root.id,
+        job_type="decompose",
+        required_role="decomposer",
+        required_model="mock-local",
+        status="claimed",
+        worker_id=worker.id,
+        deadline=now_utc(),
+    )
+    db.add(job)
+    db.flush()
+    worker.current_job_id = job.id
+    db.commit()
+
+    asyncio.run(
+        complete_job(
+            db,
+            job,
+            {
+                "root_claim": "Updated root claim.",
+                "argument": "The root has been decomposed.",
+                "children": [
+                    {"node_type": "PRO", "claim": "New pro opening."},
+                    {"node_type": "CON", "claim": "New con opening."},
+                ],
+            },
+            {"latency_ms": 12},
+        )
+    )
+
+    db.refresh(root)
+    children = db.scalars(select(Node).where(Node.parent_id == root.id)).all()
+    scoring_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert root.status == "complete"
+    assert root.active_generation_id is not None
+    assert [child.claim for child in children] == ["New pro opening.", "New con opening."]
+    assert len(scoring_jobs) == 1
+    assert scoring_jobs[0].status == "pending"
+    child_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue")).all()
+    assert len(child_jobs) == 2
+    assert scoring_jobs[0].created_at >= max(job.created_at for job in child_jobs)
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
 def test_markdown_export_formats_structured_v2_synthesis(db) -> None:
@@ -1224,6 +1356,85 @@ def test_root_regeneration_replaces_visible_opening_tree(db) -> None:
     assert [child["claim"] for child in visible["tree"]["children"]] == ["New pro opening.", "New con opening."]
     root_history = db.scalars(select(Generation).where(Generation.node_id == root.id)).all()
     assert len(root_history) == 2
+
+
+def test_classic_regeneration_completion_reuses_active_scoring_state(db) -> None:
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 2, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    parent = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+    parent_generation = Generation(
+        node_id=parent.id,
+        model_id="mock-local",
+        role="proposer",
+        argument="Cleaner air improves public health.",
+        prompt_version="v1",
+        prompt_rendered="prompt",
+        latency_ms=10,
+        is_active=True,
+        worker_id=worker.id,
+    )
+    db.add(parent_generation)
+    db.flush()
+    parent.active_generation_id = parent_generation.id
+    db.commit()
+
+    asyncio.run(regenerate_node(db, parent))
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    assert job.node_id == parent.id
+    asyncio.run(complete_job(db, job, {"argument": "Regenerated parent argument."}, {"latency_ms": 12}))
+
+    db.refresh(parent)
+    scoring_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert parent.status == "complete"
+    assert parent.active_generation_id != parent_generation.id
+    assert len(scoring_jobs) == 1
+    assert scoring_jobs[0].status == "pending"
+
+    first_scoring_job_id = scoring_jobs[0].id
+    first_regenerated_generation_id = parent.active_generation_id
+    asyncio.run(regenerate_node(db, parent))
+    second_job = claim_pending_job(db, worker)
+    assert second_job is not None
+    assert second_job.node_id == parent.id
+    asyncio.run(complete_job(db, second_job, {"argument": "Regenerated parent argument again."}, {"latency_ms": 12}))
+
+    db.refresh(parent)
+    scoring_jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert parent.active_generation_id != first_regenerated_generation_id
+    assert [job.id for job in scoring_jobs] == [first_scoring_job_id]
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
 def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:

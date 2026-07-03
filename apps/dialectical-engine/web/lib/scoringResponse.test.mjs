@@ -71,6 +71,53 @@ test("indexScoringResponse keeps partial node errors separate from successful sc
   assert.equal(indexed.scoringErrorsByNodeId.get("failed-node"), failedError);
 });
 
+test("indexScoringResponse keeps pending nodes separate from scores and unavailable errors", async () => {
+  const { indexScoringResponse } = await loadHelper();
+  const successfulScore = { node_id: "scored-node" };
+  const failedError = {
+    node_id: "failed-node",
+    status: "unavailable",
+    reason: "Scoring judge call timed out.",
+  };
+  const pendingItem = {
+    node_id: "pending-node",
+    status: "pending",
+    reason: "Scoring has not completed for this node.",
+  };
+
+  const indexed = indexScoringResponse({
+    debate_id: "debate-1",
+    status: "partial",
+    node_ids: ["scored-node", "failed-node", "pending-node"],
+    items: [successfulScore],
+    errors: [failedError],
+    pending: [pendingItem],
+  });
+
+  assert.equal(indexed.scoringByNodeId.get("scored-node"), successfulScore);
+  assert.equal(indexed.scoringByNodeId.has("pending-node"), false);
+  assert.equal(indexed.scoringErrorsByNodeId.get("failed-node"), failedError);
+  assert.equal(indexed.scoringPendingByNodeId.get("pending-node"), pendingItem);
+});
+
+test("indexScoringResponse indexes feedback summary and current user votes by node", async () => {
+  const { indexScoringResponse } = await loadHelper();
+  const feedbackSummary = { node_id: "node-1", up: 2, down: 1 };
+  const currentUserVote = { node_id: "node-1", vote: "down" };
+
+  const indexed = indexScoringResponse({
+    debate_id: "debate-1",
+    status: "available",
+    node_ids: ["node-1"],
+    items: [],
+    feedback_summary: [feedbackSummary],
+    current_user_votes: [currentUserVote],
+  });
+
+  assert.equal(indexed.feedbackSummaryByNodeId.get("node-1"), feedbackSummary);
+  assert.equal(indexed.currentUserFeedbackByNodeId.get("node-1"), currentUserVote);
+});
+
 test("indexScoringResponse returns empty maps for absent scoring data", async () => {
   const { indexScoringResponse } = await loadHelper();
 
@@ -78,9 +125,12 @@ test("indexScoringResponse returns empty maps for absent scoring data", async ()
 
   assert.equal(indexed.scoringByNodeId.size, 0);
   assert.equal(indexed.scoringErrorsByNodeId.size, 0);
+  assert.equal(indexed.scoringPendingByNodeId.size, 0);
+  assert.equal(indexed.feedbackSummaryByNodeId.size, 0);
+  assert.equal(indexed.currentUserFeedbackByNodeId.size, 0);
 });
 
-test("formatScoringVisibilityState names off, token/provider required, unavailable, refreshing, and scored states", async () => {
+test("formatScoringVisibilityState names off, provider required, unavailable, refreshing, and scored states", async () => {
   const { formatScoringVisibilityState } = await loadHelper();
 
   assert.deepEqual(
@@ -108,9 +158,9 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
       error: null,
     }),
     {
-      kind: "token_required",
-      title: "User token required",
-      detail: "Unlock actions with a user token to refresh scoring. Showing 2 persisted scored claims.",
+      kind: "scores",
+      title: "Real scores displayed",
+      detail: "Showing 2 persisted scored claims from the scoring response.",
     }
   );
   assert.deepEqual(
@@ -175,7 +225,7 @@ test("formatScoringVisibilityState names off, token/provider required, unavailab
   );
 });
 
-test("formatScoringVisibilityState treats missing judge output as a no-run empty state", async () => {
+test("formatScoringVisibilityState treats missing judge output as a pending default scoring state", async () => {
   const { formatScoringVisibilityState } = await loadHelper();
 
   assert.deepEqual(
@@ -195,8 +245,8 @@ test("formatScoringVisibilityState treats missing judge output as a no-run empty
     }),
     {
       kind: "empty",
-      title: "No scoring run yet",
-      detail: "Refresh scoring to generate judge outputs.",
+      title: "Scoring pending",
+      detail: "No persisted judge outputs are available yet.",
     }
   );
 });

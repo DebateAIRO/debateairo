@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import UniqueConstraint, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.core.db import Base
@@ -287,3 +289,71 @@ Index(
     NodeScoringResult.model,
     unique=True,
 )
+
+
+class NodeFeedbackVote(Base):
+    __tablename__ = "node_feedback_votes"
+    __table_args__ = (
+        CheckConstraint("vote IN ('up', 'down')", name="ck_node_feedback_votes_vote"),
+        UniqueConstraint(
+            "debate_id",
+            "node_id",
+            "user_identity_hash",
+            name="ux_node_feedback_votes_current_identity",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    debate_id: Mapped[str] = mapped_column(ForeignKey("debates.id"), index=True)
+    node_id: Mapped[str] = mapped_column(ForeignKey("nodes.id"), index=True)
+    scoring_result_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("node_scoring_results.id"), nullable=True, index=True
+    )
+    user_identity_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    vote: Mapped[str] = mapped_column(String(4), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    @staticmethod
+    def hash_user_identity(raw_user_token: str) -> str:
+        token = raw_user_token.strip()
+        if not token:
+            raise ValueError("raw_user_token must not be empty")
+        return hashlib.sha256(f"debateai-scoring-feedback:{token}".encode("utf-8")).hexdigest()
+
+    @classmethod
+    def upsert(
+        cls,
+        db: Session,
+        *,
+        debate_id: str,
+        node_id: str,
+        raw_user_token: str,
+        vote: str,
+        scoring_result_id: str | None = None,
+    ) -> "NodeFeedbackVote":
+        if vote not in {"up", "down"}:
+            raise ValueError("vote must be 'up' or 'down'")
+        user_identity_hash = cls.hash_user_identity(raw_user_token)
+        existing = db.scalars(
+            select(cls).where(
+                cls.debate_id == debate_id,
+                cls.node_id == node_id,
+                cls.user_identity_hash == user_identity_hash,
+            )
+        ).one_or_none()
+        if existing is None:
+            existing = cls(
+                debate_id=debate_id,
+                node_id=node_id,
+                user_identity_hash=user_identity_hash,
+                vote=vote,
+                scoring_result_id=scoring_result_id,
+            )
+            db.add(existing)
+            return existing
+        existing.vote = vote
+        if scoring_result_id is not None:
+            existing.scoring_result_id = scoring_result_id
+        existing.updated_at = now_utc()
+        return existing

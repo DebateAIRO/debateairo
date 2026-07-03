@@ -409,6 +409,43 @@ def test_pov_completion_materializes_title_content_and_nested_pro_con_cards(db) 
         assert all(child["status"] == "complete" for child in stance["children"])
 
 
+def test_pov_completion_invokes_default_scoring_for_materialized_nodes(db, monkeypatch: pytest.MonkeyPatch) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    scored_nodes: list[tuple[str, str, str, str]] = []
+
+    def record_scoring(scoring_db, scored_debate, node):
+        assert scoring_db is db
+        assert scored_debate.id == debate.id
+        assert node.status == "complete"
+        scored_nodes.append((scored_debate.id, node.id, node.node_type, node.claim))
+        return {
+            "status": "unavailable",
+            "items": [],
+            "errors": [{"node_id": node.id, "status": "unavailable", "reason": "No scoring provider is configured."}],
+        }
+
+    monkeypatch.setattr(service, "ensure_default_scoring_for_completed_v2_node", record_scoring)
+
+    first_job = claim_for_worker(db, worker)
+    assert first_job.job_type == "v2_pov"
+    asyncio.run(complete_job(db, first_job, worker_pov_output(worker, first_job.id, first_job.required_role), {"latency_ms": 12}))
+
+    assert [(node_type, claim) for _debate_id, _node_id, node_type, claim in scored_nodes] == [
+        (next(node_type for node_type, label in service.POV_BRANCHES if label == first_job.required_role), first_job.required_role),
+        ("PRO", f"{first_job.required_role} strongest pro"),
+        ("CON", f"{first_job.required_role} strongest con"),
+        ("PRO", f"{first_job.required_role} pro support"),
+        ("CON", f"{first_job.required_role} pro limitation"),
+        ("PRO", f"{first_job.required_role} con support"),
+        ("CON", f"{first_job.required_role} con limitation"),
+    ]
+    assert {debate_id for debate_id, _node_id, _node_type, _claim in scored_nodes} == {debate.id}
+    assert len({node_id for _debate_id, node_id, _node_type, _claim in scored_nodes}) == 7
+    assert db.scalars(select(entities.NodeScoringResult).where(entities.NodeScoringResult.debate_id == debate.id)).all() == []
+
+
 def test_synthesis_queues_only_after_all_pov_branches_complete(db) -> None:
     service = v2_service()
     worker = real_codex_worker(db)

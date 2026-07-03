@@ -65,7 +65,7 @@ test("formatScoringStatusCopy names unchecked, checking, checked, partial, faile
       refreshStatus: "idle",
       reason: "No scoring judge outputs are available for this debate.",
     }),
-    "No scoring run yet - refresh scoring"
+    "Scoring pending"
   );
   assert.equal(formatScoringStatusCopy({ enabled: true, scoringStatus: "loaded", refreshStatus: "idle", responseStatus: "available", cacheHit: true }), "Cached scores");
 });
@@ -168,7 +168,7 @@ test("formatScoringStatusCopy warns when explicit stale score metadata is presen
       cacheHit: false,
       staleReason: "input_hash_mismatch",
     }),
-    "Scores may be stale - refresh scoring"
+    "Scores may be stale"
   );
   assert.equal(
     formatScoringStatusCopy({
@@ -180,7 +180,7 @@ test("formatScoringStatusCopy warns when explicit stale score metadata is presen
       staleReason: "input_hash_mismatch",
       checkedAt: "2026-06-19T14:30:45Z",
     }),
-    "Scores may be stale - refresh scoring - Last checked 2026-06-19 14:30 UTC"
+    "Scores may be stale - Last checked 2026-06-19 14:30 UTC"
   );
 });
 
