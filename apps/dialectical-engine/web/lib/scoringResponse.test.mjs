@@ -641,6 +641,114 @@ test("selectStrongestUnresolvedScoringIssue uses payload order after equal ranki
   });
 });
 
+test("recordSuspiciousScoringResponse does not emit events for null response", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = { suspicious(event, payload) { events.push({ event, payload }); } };
+
+  await recordSuspiciousScoringResponse(null, { operation: "load-scoring" }, logger);
+
+  assert.deepEqual(events, []);
+});
+
+test("recordSuspiciousScoringResponse does not emit events for unavailable status", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = { suspicious(event, payload) { events.push({ event, payload }); } };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "unavailable",
+      node_ids: ["node-a"],
+      items: [],
+      reason: "No scoring judge outputs are available for this debate.",
+    },
+    { operation: "load-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, []);
+});
+
+test("recordSuspiciousScoringResponse does not emit events for unrecognised non-success status", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = { suspicious(event, payload) { events.push({ event, payload }); } };
+
+  await recordSuspiciousScoringResponse(
+    { debate_id: "debate-1", status: "error", node_ids: [], items: [] },
+    { operation: "load-scoring" },
+    logger
+  );
+
+  assert.deepEqual(events, []);
+});
+
+test("recordSuspiciousScoringResponse emits empty-output event for partial status with no items", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = { suspicious(event, payload) { events.push({ event, payload }); } };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "partial",
+      node_ids: ["node-a", "node-b"],
+      items: [],
+      scored_node_count: 0,
+    },
+    { operation: "refresh-scoring" },
+    logger
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].event, "scoring.empty_output");
+  assert.equal(events[0].payload.category, "suspicious");
+  assert.equal(events[0].payload.status, "partial");
+});
+
+test("recordSuspiciousScoringResponse missing fields payload contains field names not raw response data", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const events = [];
+  const logger = { suspicious(event, payload) { events.push({ event, payload }); } };
+
+  await recordSuspiciousScoringResponse(
+    {
+      debate_id: "debate-1",
+      status: "available",
+      node_ids: ["node-a"],
+      items: [
+        {
+          node_id: "node-a",
+          claim: { core_claim: "Sensitive claim text that must not leak raw" },
+          labels: { strength: "strong", uncertainty: "low", impact: "medium" },
+          holes: [],
+          fatal_flags: [],
+          score_caps: [],
+          judge_disagreements: [],
+          recommended_investigations: [],
+          rationale: { short: "Private rationale.", why_not_higher: ".", why_not_lower: ".", weakest_link: "." },
+        },
+      ],
+      scored_node_count: 1,
+      model_metadata: { provider: "codex", model: "model-a", checked_at: "2026-06-26T00:00:00Z" },
+      cache: { hit: false },
+    },
+    { operation: "load-scoring" },
+    logger
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].event, "scoring.success_missing_required_fields");
+  const payload = events[0].payload;
+  assert.ok(Array.isArray(payload.missingFields), "missingFields must be an array of field names");
+  assert.ok(payload.missingFields.includes("items[0].scores"), "must name the missing field");
+  assert.equal("claim" in payload, false, "raw claim text must not appear at top level");
+  assert.equal("rationale" in payload, false, "raw rationale must not appear at top level");
+  assert.equal("labels" in payload, false, "raw labels must not appear at top level");
+});
+
 test("selectStrongestUnresolvedScoringIssue returns null when no real issue is present", async () => {
   const { selectStrongestUnresolvedScoringIssue } = await loadHelper();
 
@@ -691,6 +799,7 @@ test("recordSuspiciousScoringResponse logs successful empty scoring output once"
     {
       event: "scoring.empty_output",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response contained no scored items.",
         debateId: "debate-1",
@@ -750,6 +859,7 @@ test("recordSuspiciousScoringResponse logs successful missing artifact chain onc
     {
       event: "scoring.missing_artifact_chain",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response is missing artifact chain metadata.",
         debateId: "debate-1",
@@ -810,6 +920,7 @@ test("recordSuspiciousScoringResponse logs success with missing required fields 
     {
       event: "scoring.success_missing_required_fields",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response is missing required fields.",
         debateId: "debate-1",
@@ -823,6 +934,48 @@ test("recordSuspiciousScoringResponse logs success with missing required fields 
       },
     },
   ]);
+});
+
+test("recordSuspiciousScoringResponse does not propagate synchronous logger exceptions", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const throwingLogger = {
+    suspicious() { throw new Error("Logger infrastructure failure"); },
+  };
+
+  await assert.doesNotReject(() =>
+    recordSuspiciousScoringResponse(
+      {
+        debate_id: "debate-1",
+        status: "available",
+        node_ids: ["node-a"],
+        items: [],
+        scored_node_count: 0,
+      },
+      { operation: "load-scoring" },
+      throwingLogger
+    )
+  );
+});
+
+test("recordSuspiciousScoringResponse does not propagate async logger rejections", async () => {
+  const { recordSuspiciousScoringResponse } = await loadHelper();
+  const rejectingLogger = {
+    async suspicious() { throw new Error("Async logger infrastructure failure"); },
+  };
+
+  await assert.doesNotReject(() =>
+    recordSuspiciousScoringResponse(
+      {
+        debate_id: "debate-1",
+        status: "available",
+        node_ids: ["node-a"],
+        items: [],
+        scored_node_count: 0,
+      },
+      { operation: "load-scoring" },
+      rejectingLogger
+    )
+  );
 });
 
 test("recordSuspiciousScoringResponse does not log complete normal scoring output", async () => {

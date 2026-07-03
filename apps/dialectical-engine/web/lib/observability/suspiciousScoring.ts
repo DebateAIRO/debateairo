@@ -64,6 +64,7 @@ function scoringBasePayload(
   context: SuspiciousScoringContext
 ): Record<string, unknown> {
   return compactPayload({
+    category: "suspicious",
     source: "scoring-response",
     message: "Scoring response contains a suspicious output state.",
     debateId: context.debateId ?? response.debate_id,
@@ -133,6 +134,10 @@ export async function recordSuspiciousScoringEvents(
   logger: SuspiciousScoringLogger
 ): Promise<void> {
   for (const { event, payload } of suspiciousScoringEvents(response, context)) {
-    await logger.suspicious(event, payload);
+    try {
+      await logger.suspicious(event, payload);
+    } catch {
+      // swallow — observability must never break product flow (FR6)
+    }
   }
 }
