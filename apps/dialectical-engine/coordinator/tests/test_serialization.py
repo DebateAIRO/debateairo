@@ -102,6 +102,51 @@ def test_debate_detail_includes_active_node_stream_snapshot(db) -> None:
     assert visible["workers"] == ["mac-mini"]
 
 
+def test_debate_detail_includes_stale_abandoned_descendant(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    abandoned = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="CON",
+        depth=1,
+        position=0,
+        claim="The downtown policy path was paused after weakening evidence.",
+        status="stale",
+        path_status="abandoned",
+        stopping_status="abandoned",
+        stopping_reason="low-strength path is inactive but visible",
+        materialized_path="0/0",
+    )
+    db.add(abandoned)
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["node_count"] == 2
+    child = visible["tree"]["children"][0]
+    assert child["id"] == abandoned.id
+    assert child["status"] == "stale"
+    assert child["path_status"] == "abandoned"
+    assert child["stopping_status"] == "abandoned"
+    assert child["stopping_reason"] == "low-strength path is inactive but visible"
+
+
 def test_debate_detail_includes_active_synthesis_stream_snapshot(db) -> None:
     worker = add_worker(db)
     debate = Debate(topic="Should schools ban phones?", status="generating", config={"max_depth": 1})

@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.argument_claim.node_adapter import argument_claim_from_node
@@ -290,7 +290,14 @@ def provenance_to_dict(record: ProvenanceRecord) -> dict[str, Any]:
 
 
 def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
-    nodes = list(db.scalars(select(Node).where(Node.debate_id == debate.id, Node.status != "stale")).all())
+    nodes = list(
+        db.scalars(
+            select(Node).where(
+                Node.debate_id == debate.id,
+                or_(Node.status != "stale", Node.path_status != "active", Node.stopping_status != "active"),
+            )
+        ).all()
+    )
     streaming_jobs = list(
         db.scalars(
             select(Job)
