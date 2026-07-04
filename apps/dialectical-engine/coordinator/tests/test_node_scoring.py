@@ -79,6 +79,7 @@ from app.scoring import (
     scoring_result_payload,
 )
 from app.scoring.service import ensure_node_scoring_on_completion
+from app.services.orchestrator import claim_pending_job
 
 
 USER_HEADERS = {"Authorization": "Bearer user_test_token"}
@@ -1422,6 +1423,30 @@ def test_queue_scoring_job_uses_existing_background_job_system(db) -> None:
     assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
     assert get_debate_scoring(db, debate.id)["status"] == "unavailable"
+
+
+def test_worker_poll_does_not_claim_score_debate_jobs(db) -> None:
+    worker = Worker(
+        name="VLADWORKS",
+        token_hash=hash_token("worker-token"),
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
+    db.add_all([worker, debate])
+    db.flush()
+    job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
+    db.commit()
+
+    claimed = claim_pending_job(db, worker)
+
+    db.refresh(job)
+    db.refresh(worker)
+    assert claimed is None
+    assert job.status == "pending"
+    assert job.worker_id is None
+    assert worker.current_job_id is None
 
 
 def test_claim_type_model_accepts_unknown_claim_type() -> None:
@@ -5370,6 +5395,65 @@ def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_jo
     assert scoring_payload["items"][0]["node_id"] == root.id
 
 
+def test_scoring_api_wakes_expired_internal_scoring_job_and_persists_outputs(db, monkeypatch) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    job.deadline = now_utc() - timedelta(minutes=5)
+    db.commit()
+
+    fake_provider = FakeProvider(
+        responses={
+            "judge": json.dumps(base_assessment(node_id=root.id).model_dump(mode="json")),
+        }
+    )
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": fake_provider},
+    )
+    monkeypatch.setattr(scoring_api, "scoring_provider_registry_dependency", lambda: registry)
+
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["active_scoring_job_id"] == job.id
+    assert body["active_scoring_job_status"] == "running"
+    assert body["reason"] == "Judge outputs are being generated."
+    assert len(fake_provider.calls) == 1
+
+    db.expire_all()
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "complete"
+    scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+    scoring_payload = scoring_response.json()
+    assert scoring_payload["status"] == "available"
+    assert scoring_payload["items"][0]["node_id"] == root.id
+
+
 def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
@@ -6048,7 +6132,8 @@ def test_scoring_api_docs_gate_cache_work_on_real_producer_contract() -> None:
     docs_path = Path(__file__).resolve().parents[2] / "docs" / "scoring-api.md"
     docs = docs_path.read_text(encoding="utf-8")
 
-    assert "GET /api/debates/{id}/scoring without `force_refresh` is a read API" in docs
+    assert "GET /api/debates/{id}/scoring without `force_refresh` primarily reads persisted" in docs
+    assert "coordinator background" in docs
     assert "`force_refresh=true` bypasses matching node-scoring cache entries" in docs
     assert "ProviderRegistry" in docs
     assert "score_nodes_with_provider" in docs

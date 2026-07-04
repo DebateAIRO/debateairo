@@ -29,6 +29,14 @@ class DisconnectingWriter:
         return
 
 
+class FailingStdout:
+    def write(self, _text: str) -> None:
+        raise OSError(22, "Invalid argument")
+
+    def flush(self) -> None:
+        raise OSError(22, "Invalid argument")
+
+
 class FakeSseResponse:
     def __init__(self) -> None:
         self._sent = False
@@ -228,6 +236,27 @@ def test_web_proxy_detects_next_hmr_websocket_upgrade() -> None:
     assert module.is_websocket_upgrade({"Connection": "keep-alive", "Upgrade": "websocket"}) is False
     assert module.is_next_hmr_websocket("/_next/webpack-hmr?page=/debate/1") is True
     assert module.is_next_hmr_websocket("/api/debates") is False
+
+
+def test_web_proxy_log_message_ignores_stdout_oserror(monkeypatch) -> None:
+    module = load_web_proxy_module()
+    proxy = module.WebProxy(
+        root=ROOT,
+        pnpm="pnpm",
+        next_host="127.0.0.1",
+        next_port=3001,
+        coordinator_host="127.0.0.1",
+        coordinator_port=8000,
+        public_host="127.0.0.1",
+        public_port=3000,
+    )
+    handler_cls = proxy.handler_class()
+    handler = handler_cls.__new__(handler_cls)
+    handler.address_string = lambda: "127.0.0.1"
+    handler.log_date_time_string = lambda: "03/Jul/2026 20:51:16"
+    monkeypatch.setattr(module.sys, "stdout", FailingStdout())
+
+    handler.log_message('"%s" %s %s', "GET /debate/1 HTTP/1.1", "200", "-")
 
 
 def test_web_proxy_stream_response_treats_sse_disconnect_as_closed_connection() -> None:

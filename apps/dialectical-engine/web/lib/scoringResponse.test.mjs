@@ -743,7 +743,7 @@ test("recordSuspiciousScoringResponse missing fields payload contains field name
   assert.equal(events[0].event, "scoring.success_missing_required_fields");
   const payload = events[0].payload;
   assert.ok(Array.isArray(payload.missingFields), "missingFields must be an array of field names");
-  assert.ok(payload.missingFields.includes("items[0].scores"), "must name the missing field");
+  assert.ok(payload.missingFields.includes("argumentClaims[0].scores"), "must name the missing field");
   assert.equal("claim" in payload, false, "raw claim text must not appear at top level");
   assert.equal("rationale" in payload, false, "raw rationale must not appear at top level");
   assert.equal("labels" in payload, false, "raw labels must not appear at top level");

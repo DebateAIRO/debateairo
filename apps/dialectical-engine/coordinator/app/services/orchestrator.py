@@ -688,7 +688,11 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
     jobs = list(
         db.scalars(
             select(Job)
-            .where(Job.status == "pending", Job.required_model.in_(capabilities))
+            .where(
+                Job.status == "pending",
+                Job.required_model.in_(capabilities),
+                Job.job_type != "score_debate",
+            )
             .order_by(Job.created_at.asc())
         ).all()
     )

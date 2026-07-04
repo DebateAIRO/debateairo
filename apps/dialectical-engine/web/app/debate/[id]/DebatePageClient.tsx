@@ -1424,6 +1424,7 @@ function ScoringDiagnosticsDrawer({
     ["Generated at", data?.generated_at],
     ["Producer", data?.producer],
     ["Cache", formatCacheDebug(data?.cache)],
+    ["Current claims", data?.node_ids?.length],
     ["Scored claims", data?.scored_node_count],
     ["Skipped claims", data?.skipped_node_count],
     ["Truncated", data?.truncated],

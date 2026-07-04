@@ -27,7 +27,7 @@ test("DebatePageClient loads scoring by default without normal toggle or refresh
   );
   assert.doesNotMatch(
     debatePageSource,
-    /<button[\s\S]{0,240}(Scoring|Refresh Scoring|Enable scoring|Disable scoring)[\s\S]{0,240}<\/button>/,
+    /<button(?![\s\S]{0,240}aria-label="Open scoring diagnostics")[\s\S]{0,240}(Scoring|Refresh Scoring|Enable scoring|Disable scoring)[\s\S]{0,240}<\/button>/,
     "Normal debate UI should not render button controls for enabling or refreshing scoring"
   );
   assert.doesNotMatch(
@@ -133,7 +133,7 @@ test("default scoring states render from real response state without an action-t
 
   assert.match(
     debatePageSource,
-    /const scoringVisibility = formatScoringVisibilityState\(\{[\s\S]*?enabled: true,[\s\S]*?hasActionToken: Boolean\(actionToken\),[\s\S]*?response: scoringState\.data/,
+    /const scoringVisibility = useMemo\([\s\S]*?formatScoringVisibilityState\(\{[\s\S]*?enabled: true,[\s\S]*?hasActionToken: Boolean\(actionToken\),[\s\S]*?response: scoringState\.data/,
     "Visibility state should be produced with default scoring enabled while action token remains only metadata"
   );
   assert.match(

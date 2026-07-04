@@ -167,9 +167,35 @@ def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
         commit_write(db)
 
 
+def _wake_pending_internal_scoring_job(db: Session, debate: Debate, background_tasks: BackgroundTasks) -> Job | None:
+    job = db.scalars(
+        select(Job)
+        .where(
+            Job.debate_id == debate.id,
+            Job.job_type == "score_debate",
+            Job.status == "pending",
+        )
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .limit(1)
+    ).first()
+    if job is None:
+        return None
+    registry = scoring_provider_registry_dependency()
+    scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
+    if not scoring_config.available:
+        return None
+    job.status = "claimed"
+    job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
+    job.error = None
+    commit_write(db)
+    background_tasks.add_task(_run_scoring_job_background, job.id, debate.id)
+    return job
+
+
 @router.get("/{debate_id}/scoring", response_model=DebateScoringWithFeedbackResponse, response_model_exclude_none=True)
 def get_debate_scoring(
     debate_id: str,
+    background_tasks: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
     authorization: Annotated[str | None, Header()] = None,
     force_refresh: bool = Query(False),
@@ -189,6 +215,10 @@ def get_debate_scoring(
         payload = score_debate_with_provider_registry(db, debate, provider_registry, force_refresh=True)
         commit_write(db)
         return attach_feedback_to_scoring_payload(db, payload, raw_user_token=raw_user_token)
+    debate = db.get(Debate, debate_id)
+    if not debate or debate.status == "archived":
+        raise HTTPException(status_code=404, detail="Debate not found")
+    _wake_pending_internal_scoring_job(db, debate, background_tasks)
     payload = get_debate_scoring_payload(db, debate_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Debate not found")

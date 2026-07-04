@@ -211,10 +211,13 @@ class WebProxy:
                 self.proxy()
 
             def log_message(self, fmt: str, *args: object) -> None:
-                sys.stdout.write(
-                    "%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), fmt % args)
-                )
-                sys.stdout.flush()
+                try:
+                    sys.stdout.write(
+                        "%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), fmt % args)
+                    )
+                    sys.stdout.flush()
+                except OSError:
+                    return
 
             def proxy(self) -> None:
                 target_host, target_port = (

@@ -27,6 +27,7 @@ from app.models.entities import (
 
 
 STREAMING_JOB_STATUSES = {"claimed", "running"}
+ACTIVE_DEBATE_JOB_STATUSES = {"pending", "claimed", "running"}
 
 
 def iso(dt: datetime | None) -> str | None:
@@ -52,6 +53,36 @@ def _worker_name(worker_names_by_id: dict[str, str], worker_id: str | None) -> s
     if not worker_id:
         return ""
     return worker_names_by_id.get(worker_id, worker_id)
+
+
+def effective_debate_status(
+    db: Session,
+    debate: Debate,
+    *,
+    nodes: list[Node] | None = None,
+    active_jobs: list[Job] | None = None,
+) -> str:
+    if (debate.status or "").lower() != "generating":
+        return debate.status
+    if not debate.synthesis_id or not debate.completed_at:
+        return debate.status
+    if nodes is None:
+        nodes = list(db.scalars(select(Node).where(Node.debate_id == debate.id)).all())
+    if any(node.status in {"pending", "generating"} for node in nodes):
+        return debate.status
+    if active_jobs is None:
+        active_jobs = list(
+            db.scalars(
+                select(Job).where(
+                    Job.debate_id == debate.id,
+                    Job.status.in_(ACTIVE_DEBATE_JOB_STATUSES),
+                    Job.job_type != "score_debate",
+                )
+            ).all()
+        )
+    if active_jobs:
+        return debate.status
+    return "complete"
 
 
 def generation_summary(
@@ -368,7 +399,7 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     return {
         "id": debate.id,
         "topic": debate.topic,
-        "status": debate.status,
+        "status": effective_debate_status(db, debate, nodes=nodes),
         "config": debate.config,
         "direct_answer": None,
         "root_node_id": debate.root_node_id,

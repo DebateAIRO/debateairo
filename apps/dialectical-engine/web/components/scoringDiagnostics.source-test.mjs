@@ -43,6 +43,10 @@ assert(
   "Diagnostics drawer should display already-existing provider, model, and cache metadata"
 );
 assert(
+  /Current claims/.test(debatePageSource) && /data\?\.node_ids\?\.length/.test(debatePageSource),
+  "Diagnostics drawer should expose current node coverage even when judge outputs are missing"
+);
+assert(
   /Call count/.test(debatePageSource) &&
     /Latency/.test(debatePageSource) &&
     /Not exposed by scoring API/.test(debatePageSource),

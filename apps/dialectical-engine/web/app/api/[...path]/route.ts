@@ -147,6 +147,7 @@ async function proxyApi(request: Request, { params }: { params: Promise<{ path: 
   const correlation = getRequestCorrelation(request, path);
   const headers = new Headers(request.headers);
   headers.delete("host");
+  headers.delete("expect");
 
   let response: Response;
 

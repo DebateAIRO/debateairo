@@ -238,11 +238,13 @@ Stored scoring output references nodes outside the current debate.
 
 ## Producer Path Status
 
-GET /api/debates/{id}/scoring without `force_refresh` is a read API, not a
-scoring producer. It reads the latest completed `AnalyzerRun` with
-`analyzer_type: "node_scoring"` and `scoring_source: "judge_outputs"`, validates
-the stored payload, strips private debug/provider data, and returns the public
-response shape above.
+GET /api/debates/{id}/scoring without `force_refresh` primarily reads persisted
+judge output. It reads the latest completed `AnalyzerRun` with `analyzer_type:
+"node_scoring"` and `scoring_source: "judge_outputs"`, validates the stored
+payload, strips private debug/provider data, and returns the public response
+shape above. If an internal `score_debate` job already exists in `pending`
+state, the route may claim that job and schedule the coordinator background
+scorer so auto-queued scoring work does not expire silently.
 
 With `force_refresh=true`, the route first requires a valid user bearer token,
 then uses the existing `ProviderRegistry` configuration for the `judge` role,

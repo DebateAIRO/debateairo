@@ -209,6 +209,49 @@ def test_debate_detail_includes_completed_synthesis_worker_name(db) -> None:
     assert visible["workers"] == ["mac-mini"]
 
 
+def test_debate_detail_reports_stale_generating_synthesis_as_complete(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Xbox or PS5?",
+        status="generating",
+        config={"max_depth": 1},
+        completed_at=now_utc(),
+    )
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="Synthesis",
+        strongest_con="",
+        verdict="Choose based on preferred games and budget.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.root_node_id = root.id
+    debate.synthesis_id = synthesis.id
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["status"] == "complete"
+    assert visible["completed_at"]
+    assert visible["synthesis"]["verdict"] == "Choose based on preferred games and budget."
+
+
 def test_debate_detail_batches_worker_name_lookup(db) -> None:
     workers = [
         Worker(

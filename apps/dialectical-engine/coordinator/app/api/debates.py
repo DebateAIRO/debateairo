@@ -18,7 +18,7 @@ from app.services.events import event_bus
 from app.services.dialectical_v2 import create_dialectical_debate
 from app.services.orchestrator import archive_debate as archive_debate_state
 from app.services.orchestrator import markdown_export
-from app.services.serialization import debate_to_dict, iso
+from app.services.serialization import debate_to_dict, effective_debate_status, iso
 from app.services.single_shot import (
     DebateGenerationResult,
     SINGLE_SHOT_MODE,
@@ -72,7 +72,7 @@ def list_debates(
             {
                 "id": debate.id,
                 "topic": debate.topic,
-                "status": debate.status,
+                "status": effective_debate_status(db, debate),
                 "created_at": iso(debate.created_at),
                 "completed_at": iso(debate.completed_at),
                 "models": debate_models(db, debate.id),
