@@ -33,8 +33,10 @@ import type {
 } from "@/lib/types";
 import { BrandMark } from "@/components/TopBar";
 import { DebateCanvas } from "@/components/DebateCanvas";
-import { DebateOutline } from "@/components/DebateOutline";
 import { RecommendedInvestigations } from "@/components/RecommendedInvestigations";
+import { DebateThread } from "@/components/DebateThread";
+import { DebateSplit } from "@/components/DebateSplit";
+import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
@@ -113,6 +115,8 @@ const SCORE_AWARE_FILTERS = [
 ] as const;
 
 type ScoreAwareFilter = (typeof SCORE_AWARE_FILTERS)[number]["id"];
+
+type DebateView = "thread" | "split" | "tree" | "map";
 
 function parseEventData(event: Event): Record<string, unknown> | null {
   const data = (event as MessageEvent).data;
@@ -248,16 +252,6 @@ function findNode(root: DebateNode | null, id: string | null): DebateNode | null
     if (found) return found;
   }
   return null;
-}
-
-function findPathToNode(root: DebateNode | null, id: string | null): string[] {
-  if (!root || !id) return [];
-  if (root.id === id) return [root.id];
-  for (const child of root.children || []) {
-    const childPath = findPathToNode(child, id);
-    if (childPath.length > 0) return [root.id, ...childPath];
-  }
-  return [];
 }
 
 function hasHighPriorityScoringIssue(scoring: NodeScoringPayload): boolean {
@@ -411,8 +405,11 @@ export default function DebatePageClient({
   const [tokenDraft, setTokenDraft] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
 
-  const [view, setView] = useState<"tree" | "outline">("tree");
+  const [view, setView] = useState<DebateView>("tree");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [replayNonce, setReplayNonce] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverState | null>(null);
@@ -705,10 +702,6 @@ export default function DebatePageClient({
         .map((scoring) => scoring.node_id)
     );
   }, [scoreAwareFilter, scoringByNodeId, scoringErrorsByNodeId]);
-  const selectedPathNodeIds = useMemo(
-    () => new Set(findPathToNode(debate?.tree ?? null, selectedNodeId)),
-    [debate?.tree, selectedNodeId]
-  );
   const debateRecommendations = useMemo(
     () => collectRecommendedInvestigations(scoringState.data),
     [scoringState.data]
@@ -751,6 +744,25 @@ export default function DebatePageClient({
       else next.add(nodeId);
       return next;
     });
+  }
+
+  function toggleCollapse(nodeId: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }
+
+  function openInSplit(nodeId: string) {
+    setFocusNodeId(nodeId);
+    setView("split");
+  }
+
+  function replayGeneration() {
+    setReplayNonce((nonce) => nonce + 1);
+    showToast("Replaying generation");
   }
 
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
@@ -963,14 +975,25 @@ export default function DebatePageClient({
             </div>
           </ScoringErrorBoundary>
           {hasTree ? (
-            <div className="segment" role="group" aria-label="View">
-              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                Tree
+            <>
+              <div className="segment" role="group" aria-label="View">
+                <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+                  Thread
+                </button>
+                <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+                  Split
+                </button>
+                <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+                  Tree
+                </button>
+                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+                  Map
+                </button>
+              </div>
+              <button type="button" className="btn" onClick={replayGeneration} title="Replay generation">
+                ↻ Replay
               </button>
-              <button type="button" aria-pressed={view === "outline"} onClick={() => setView("outline")}>
-                Outline
-              </button>
-            </div>
+            </>
           ) : null}
           {hasArtifacts ? (
             <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
@@ -1064,44 +1087,73 @@ export default function DebatePageClient({
 
       {/* ---- main split ---- */}
       <div className="debateMain">
-        {view === "tree" && hasTree && debate.tree ? (
-          <DebateCanvas
-            root={debate.tree}
-            expanded={expanded}
-            selectedNodeId={selectedNodeId}
-            scrutiny={scrutiny}
-            scoringByNodeId={scoringByNodeId}
-            scoringErrorsByNodeId={scoringErrorsByNodeId}
-            scoreFilterNodeIds={scoreAwareFilterNodeIds}
-            meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
-            canvasRef={(el) => {
-              canvasElRef.current = el;
-            }}
-            onOpenNode={(nodeId) => {
-              setSelectedNodeId(nodeId);
-              setDetailNodeId(nodeId);
-            }}
-            onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
-            onToggleExpand={toggleExpand}
-            onProseSelect={onProseSelect}
-          />
-        ) : view === "outline" && hasTree && debate.tree ? (
-          <DebateOutline
-            root={debate.tree}
-            selectedNodeId={selectedNodeId}
-            selectedPathNodeIds={selectedPathNodeIds}
-            scoringByNodeId={scoringByNodeId}
-            scoringErrorsByNodeId={scoringErrorsByNodeId}
-          />
-        ) : singleShotResult ? (
-          <SingleShotMain result={singleShotResult} />
-        ) : (
-          <div className="canvasEmpty">
-            <p className="muted">
-              {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
-            </p>
-          </div>
-        )}
+        <div key={`${view}-${replayNonce}`} className="fadeup" style={{ flex: 1, minWidth: 0, display: "flex" }}>
+          {hasTree && debate.tree ? (
+            view === "thread" ? (
+              <DebateThread
+                root={debate.tree}
+                expanded={expanded}
+                collapsed={collapsed}
+                scrutiny={scrutiny}
+                meta={{ nodes: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onToggleCollapse={toggleCollapse}
+                onProseSelect={onProseSelect}
+              />
+            ) : view === "split" ? (
+              <DebateSplit
+                root={debate.tree}
+                focusNodeId={focusNodeId}
+                expanded={expanded}
+                scrutiny={scrutiny}
+                onFocus={setFocusNodeId}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onProseSelect={onProseSelect}
+              />
+            ) : view === "map" ? (
+              <DebateMap root={debate.tree} onOpenSplit={openInSplit} />
+            ) : (
+              <DebateCanvas
+                root={debate.tree}
+                expanded={expanded}
+                selectedNodeId={selectedNodeId}
+                scrutiny={scrutiny}
+                scoringByNodeId={scoringByNodeId}
+                scoringErrorsByNodeId={scoringErrorsByNodeId}
+                scoreFilterNodeIds={scoreAwareFilterNodeIds}
+                meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
+                canvasRef={(el) => {
+                  canvasElRef.current = el;
+                }}
+                onOpenNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setDetailNodeId(nodeId);
+                }}
+                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                onToggleExpand={toggleExpand}
+                onProseSelect={onProseSelect}
+              />
+            )
+          ) : singleShotResult ? (
+            <SingleShotMain result={singleShotResult} />
+          ) : (
+            <div className="canvasEmpty">
+              <p className="muted">
+                {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
+              </p>
+            </div>
+          )}
+        </div>
 
         <SynthesisPanel
           ready={complete}

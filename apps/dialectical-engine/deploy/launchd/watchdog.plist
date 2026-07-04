@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dialectical.watchdog</string>
+  <key>WorkingDirectory</key>
+  <string>__ROOT__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__PATH__</string>
+    <key>DYLD_LIBRARY_PATH</key>
+    <string>__PYTHON_DYLD_LIBRARY_PATH__</string>
+  </dict>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PYTHON__</string>
+    <string>__ROOT__/scripts/dezbatere_watchdog.py</string>
+    <string>--root</string>
+    <string>__ROOT__</string>
+    <string>--public-url</string>
+    <string>https://dezbatere.ro</string>
+    <string>--check-lmstudio</string>
+    <string>--invoke-codex</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>StandardOutPath</key>
+  <string>/tmp/dialectical-watchdog.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/dialectical-watchdog.err.log</string>
+</dict>
+</plist>
