@@ -379,6 +379,11 @@ def score_node_with_provider(
     model_name = getattr(provider, "model", None)
     stale_cache_metadata = None
     if provider_name and model_name and not force_refresh:
+        try:
+            lookup_contract = active_contract(judge_role)
+        except KeyError:
+            lookup_contract = None
+        lookup_contract_hash = lookup_contract.contract_hash if lookup_contract is not None else None
         cached_payload = lookup_scoring_cache(
             db,
             debate_id=debate.id,
@@ -387,6 +392,7 @@ def score_node_with_provider(
             judge_role=judge_role,
             provider=provider_name,
             model=model_name,
+            contract_hash=lookup_contract_hash,
         )
         if cached_payload is not None:
             return _with_cache_metadata(cached_payload, hit=True)
@@ -398,6 +404,7 @@ def score_node_with_provider(
             judge_role=judge_role,
             provider=provider_name,
             model=model_name,
+            contract_hash=lookup_contract_hash,
         )
     request = ScoringProviderRequest(
         claim=claim,
@@ -1499,12 +1506,17 @@ def _score_node_will_call_provider(
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     argument_text = generation.argument if generation else None
+    try:
+        will_call_contract = active_contract(judge_role)
+    except KeyError:
+        will_call_contract = None
     cached_payload = lookup_scoring_cache(
         db,
         debate_id=debate.id,
         node_id=node.id,
         input_hash=node_scoring_input_hash(claim=claim, argument_text=argument_text),
         judge_role=judge_role,
+        contract_hash=will_call_contract.contract_hash if will_call_contract is not None else None,
         provider=provider_name,
         model=model_name,
     )

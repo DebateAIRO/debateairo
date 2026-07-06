@@ -79,6 +79,7 @@ from app.scoring import (
     select_depth_pressure,
     scoring_result_payload,
 )
+from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE
 from app.scoring.service import ensure_node_scoring_on_completion
 from app.services.orchestrator import claim_pending_job, complete_job
 
@@ -2136,6 +2137,9 @@ def test_score_node_with_provider_returns_matching_cache_without_model_call(db) 
             provider_metadata={"provider": "test-provider", "model": "test-model", "status": "available"},
             status="available",
             result=cached_payload,
+            judge_id=PRIMARY_NODE_SCORING_JUDGE.judge_id,
+            judge_version=PRIMARY_NODE_SCORING_JUDGE.judge_version,
+            contract_hash=PRIMARY_NODE_SCORING_JUDGE.contract_hash,
         )
     )
     db.commit()
@@ -3867,6 +3871,9 @@ def test_score_nodes_with_provider_audit_counts_only_model_calls_made(db) -> Non
                 "node_ids": [cached_node.id, fresh_node.id],
                 "items": [{"node_id": cached_node.id, "status": "available"}],
             },
+            judge_id=PRIMARY_NODE_SCORING_JUDGE.judge_id,
+            judge_version=PRIMARY_NODE_SCORING_JUDGE.judge_version,
+            contract_hash=PRIMARY_NODE_SCORING_JUDGE.contract_hash,
         )
     )
     db.commit()

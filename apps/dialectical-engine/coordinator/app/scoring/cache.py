@@ -36,17 +36,21 @@ def lookup_scoring_cache(
     judge_role: str,
     provider: str,
     model: str,
+    contract_hash: str | None = None,
 ) -> dict[str, Any] | None:
+    conditions = [
+        NodeScoringResult.debate_id == debate_id,
+        NodeScoringResult.node_id == node_id,
+        NodeScoringResult.input_hash == input_hash,
+        NodeScoringResult.judge_role == judge_role,
+        NodeScoringResult.provider == provider,
+        NodeScoringResult.model == model,
+    ]
+    if contract_hash is not None:
+        conditions.append(NodeScoringResult.contract_hash == contract_hash)
     cached_result = db.scalar(
         select(NodeScoringResult)
-        .where(
-            NodeScoringResult.debate_id == debate_id,
-            NodeScoringResult.node_id == node_id,
-            NodeScoringResult.input_hash == input_hash,
-            NodeScoringResult.judge_role == judge_role,
-            NodeScoringResult.provider == provider,
-            NodeScoringResult.model == model,
-        )
+        .where(*conditions)
         .order_by(NodeScoringResult.updated_at.desc(), NodeScoringResult.created_at.desc(), NodeScoringResult.id.desc())
     )
     if cached_result:
@@ -77,6 +81,8 @@ def lookup_scoring_cache(
             continue
         if provenance.get("model") != model:
             continue
+        if contract_hash is not None and provenance.get("contract_hash") != contract_hash:
+            continue
         output = run.output if isinstance(run.output, dict) else {}
         payload = output.get("payload")
         return payload if isinstance(payload, dict) else None
@@ -92,7 +98,23 @@ def lookup_stale_scoring_cache_metadata(
     judge_role: str,
     provider: str,
     model: str,
+    contract_hash: str | None = None,
 ) -> dict[str, Any] | None:
+    if contract_hash is not None:
+        contract_mismatch = db.scalar(
+            select(NodeScoringResult).where(
+                NodeScoringResult.debate_id == debate_id,
+                NodeScoringResult.node_id == node_id,
+                NodeScoringResult.input_hash == input_hash,
+                NodeScoringResult.judge_role == judge_role,
+                NodeScoringResult.provider == provider,
+                NodeScoringResult.model == model,
+                (NodeScoringResult.contract_hash != contract_hash)
+                | (NodeScoringResult.contract_hash.is_(None)),
+            )
+        )
+        if contract_mismatch is not None:
+            return {"reason": "scoring_contract_changed", "refresh_available": True}
     prior_result = db.scalar(
         select(NodeScoringResult)
         .where(
