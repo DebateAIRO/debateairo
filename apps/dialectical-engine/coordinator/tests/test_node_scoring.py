@@ -7090,6 +7090,9 @@ def test_scoring_api_hydrates_from_persisted_judge_artifacts_after_session_reloa
             judge_role="judge",
             provider="codex",
             model="codex-test-model",
+            judge_id=PRIMARY_NODE_SCORING_JUDGE.judge_id,
+            judge_version=PRIMARY_NODE_SCORING_JUDGE.judge_version,
+            contract_hash=PRIMARY_NODE_SCORING_JUDGE.contract_hash,
             prompt_version="node-judge-v1",
             request_metadata={"prompt": private_prompt_marker, "token": "secret-token"},
             raw_output=json.dumps(

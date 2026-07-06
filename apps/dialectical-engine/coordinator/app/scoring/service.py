@@ -284,19 +284,27 @@ def _hydrate_node_scoring_item_from_judge_artifact(
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    try:
+        contract = active_contract("judge")
+    except KeyError:
+        return None, None
     artifact = db.scalars(
         select(JudgeOutputArtifact)
         .where(
             JudgeOutputArtifact.debate_id == debate.id,
             JudgeOutputArtifact.node_id == node.id,
             JudgeOutputArtifact.input_hash == input_hash,
+            JudgeOutputArtifact.judge_role == contract.role,
             JudgeOutputArtifact.parse_status == "available",
             JudgeOutputArtifact.assessment.is_not(None),
+            JudgeOutputArtifact.contract_hash == contract.contract_hash,
         )
         .order_by(JudgeOutputArtifact.checked_at.desc(), JudgeOutputArtifact.created_at.desc(), JudgeOutputArtifact.id.desc())
         .limit(1)
     ).first()
-    if artifact is None or not isinstance(artifact.assessment, dict):
+    if artifact is None:
+        return _hydrate_historical_public_result(db, debate, node, input_hash)
+    if not isinstance(artifact.assessment, dict):
         return None, None
     try:
         assessment = ClaimAssessment.model_validate(artifact.assessment)
@@ -314,6 +322,49 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         provider=_public_metadata_text(artifact.provider),
         model=_public_metadata_text(artifact.model),
         checked_at=artifact.checked_at.isoformat() if artifact.checked_at else None,
+        status="available",
+    ).model_dump(mode="json")
+    return item, metadata
+
+
+def _hydrate_historical_public_result(
+    db: Session,
+    debate: Debate,
+    node: Node,
+    input_hash: str,
+) -> tuple[dict | None, dict | None]:
+    """Serve a stored public result verbatim for legacy/mismatched contracts.
+
+    Never re-reduces old assessments through current code; never fabricates
+    a score when nothing was persisted. The stored ``result`` is the full
+    public scoring payload (with an ``items`` array), so we extract the
+    single item for this node rather than treating the payload as an item.
+    """
+    stored = db.scalar(
+        select(NodeScoringResult)
+        .where(
+            NodeScoringResult.debate_id == debate.id,
+            NodeScoringResult.node_id == node.id,
+            NodeScoringResult.input_hash == input_hash,
+            NodeScoringResult.status == "available",
+        )
+        .order_by(NodeScoringResult.updated_at.desc(), NodeScoringResult.created_at.desc(), NodeScoringResult.id.desc())
+    )
+    if stored is None or not isinstance(stored.result, dict):
+        return None, None
+    stored_items = stored.result.get("items")
+    if not isinstance(stored_items, list):
+        return None, None
+    item = next(
+        (candidate for candidate in stored_items if isinstance(candidate, dict) and candidate.get("node_id") == node.id),
+        None,
+    )
+    if item is None:
+        return None, None
+    metadata = ScoringModelMetadata(
+        provider=_public_metadata_text(stored.provider),
+        model=_public_metadata_text(stored.model),
+        checked_at=stored.updated_at.isoformat() if stored.updated_at else None,
         status="available",
     ).model_dump(mode="json")
     return item, metadata
