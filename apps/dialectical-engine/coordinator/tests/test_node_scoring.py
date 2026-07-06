@@ -1982,7 +1982,7 @@ def test_claim_normalizer_does_not_invent_assumptions_or_evidence() -> None:
 
     assert claim.implied_assumptions == []
     assert claim.evidence_refs == []
-    assert claim.ambiguity_flags == []
+    assert claim.ambiguity_flags == ["might"]
     assert claim.key_terms == []
 
 

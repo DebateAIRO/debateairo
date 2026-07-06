@@ -13,7 +13,7 @@ from app.scoring.models import NormalizedClaim
 
 SCORING_CACHE_ANALYZER_TYPE = "node_scoring_cache"
 SCORING_CACHE_SOURCE = "scoring_cache"
-SCORING_INPUT_HASH_VERSION = "node-scoring-input-v1"
+SCORING_INPUT_HASH_VERSION = "node-scoring-input-v2"
 
 
 def node_scoring_input_hash(*, claim: NormalizedClaim, argument_text: str | None) -> str:
