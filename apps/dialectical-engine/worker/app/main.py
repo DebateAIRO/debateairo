@@ -270,13 +270,34 @@ async def worker_loop(run_once: bool = False) -> None:
                     print(f"Worker identity desync ({exc}); re-registering with token rotation.", flush=True)
                     client.config.worker_id = None
                     client.config.worker_token = None
-                    await register_with_backoff(client, capabilities, stop, rotate_token=True)
-                    continue
-                if not retryable_coordinator_error(exc):
+                    try:
+                        await register_with_backoff(client, capabilities, stop, rotate_token=True)
+                    except Exception as recovery_exc:
+                        is_blocked_auth = identity_desync_error(recovery_exc) or (
+                            isinstance(recovery_exc, httpx.HTTPStatusError)
+                            and recovery_exc.response.status_code == 403
+                        )
+                        if is_blocked_auth:
+                            print(
+                                f"Worker blocked_auth: re-registration rejected ({recovery_exc}); retrying in 30s.",
+                                flush=True,
+                            )
+                            await wait_or_stop(stop, 30)
+                        elif retryable_coordinator_error(recovery_exc):
+                            print(
+                                f"Coordinator unavailable: {recovery_exc}. Retrying in {backoff_seconds}s.",
+                                flush=True,
+                            )
+                            await wait_or_stop(stop, backoff_seconds)
+                            backoff_seconds = min(backoff_seconds * 2, 30)
+                        else:
+                            raise
+                elif not retryable_coordinator_error(exc):
                     raise
-                print(f"Coordinator unavailable: {exc}. Retrying in {backoff_seconds}s.", flush=True)
-                await wait_or_stop(stop, backoff_seconds)
-                backoff_seconds = min(backoff_seconds * 2, 30)
+                else:
+                    print(f"Coordinator unavailable: {exc}. Retrying in {backoff_seconds}s.", flush=True)
+                    await wait_or_stop(stop, backoff_seconds)
+                    backoff_seconds = min(backoff_seconds * 2, 30)
             if run_once:
                 break
     finally:
