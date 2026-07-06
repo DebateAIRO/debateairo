@@ -72,6 +72,7 @@ class WorkerConfig:
     enable_real_adapters: bool = True
     mock_models: list[str] | None = None
     allowed_models: list[str] | None = None
+    last_capabilities: list[str] | None = None
     heartbeat_seconds: int = 30
     request_timeout_seconds: int = 60
 
@@ -92,6 +93,7 @@ def load_config(path: Path | None = None) -> WorkerConfig:
         ),
         mock_models=parse_model_list(os.getenv("DIALECTICAL_MOCK_MODELS", data.get("mock_models"))),
         allowed_models=parse_model_list(os.getenv("DIALECTICAL_ALLOWED_MODELS", data.get("allowed_models"))),
+        last_capabilities=parse_model_list(data.get("last_capabilities")),
         heartbeat_seconds=int(data.get("heartbeat_seconds", 30)),
         request_timeout_seconds=int(data.get("request_timeout_seconds", 60)),
     )
@@ -109,6 +111,7 @@ def save_config(config: WorkerConfig, path: Path | None = None) -> None:
         "enable_real_adapters": config.enable_real_adapters,
         "mock_models": config.mock_models,
         "allowed_models": config.allowed_models,
+        "last_capabilities": config.last_capabilities,
         "heartbeat_seconds": config.heartbeat_seconds,
         "request_timeout_seconds": config.request_timeout_seconds,
     }
@@ -142,6 +145,7 @@ def load_file_config(path: Path | None = None) -> WorkerConfig:
         enable_real_adapters=as_bool(data.get("enable_real_adapters", True)),
         mock_models=parse_model_list(data.get("mock_models")),
         allowed_models=parse_model_list(data.get("allowed_models")),
+        last_capabilities=parse_model_list(data.get("last_capabilities")),
         heartbeat_seconds=int(data.get("heartbeat_seconds", 30)),
         request_timeout_seconds=int(data.get("request_timeout_seconds", 60)),
     )

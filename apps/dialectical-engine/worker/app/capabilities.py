@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 
 import httpx
@@ -41,9 +42,8 @@ def configured_lm_studio_models() -> list[str]:
     return models
 
 
-async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
+async def candidate_adapters(config: WorkerConfig) -> list[ModelClient]:
     candidates: list[ModelClient] = []
-    allowed_models = set(config.allowed_models or [])
     if config.enable_mock:
         for model_id in config.mock_models or ["mock-local"]:
             candidates.append(MockAdapter(model_id))
@@ -61,23 +61,42 @@ async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
         candidates.extend(LMStudioAdapter(model_name) for model_name in configured_lm_studio_models())
         for model_name in await discover_ollama_models():
             candidates.append(OllamaAdapter(model_name))
+    return candidates
 
-    adapters: dict[str, ModelClient] = {}
+
+async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
+    allowed_models = set(config.allowed_models or [])
+    candidates = candidate_adapters(config)
+    if asyncio.iscoroutine(candidates):
+        candidates = await candidates
+
+    probeable: list[ModelClient] = []
     for adapter in candidates:
         model_ids = adapter_model_ids(adapter)
         if allowed_models and not allowed_models.intersection(model_ids):
             continue
-        if adapter.model_id in adapters:
-            continue
+        probeable.append(adapter)
+
+    async def probe(adapter: ModelClient) -> tuple[ModelClient, bool]:
         try:
-            healthy = await adapter.health_check()
-        except Exception:
-            healthy = False
-        if healthy:
-            for model_id in model_ids:
-                if allowed_models and model_id not in allowed_models and adapter.model_id not in allowed_models:
-                    continue
-                adapters.setdefault(model_id, adapter)
+            return adapter, await adapter.health_check()
+        except Exception:  # health probe failure = unhealthy, never fatal
+            return adapter, False
+
+    results = await asyncio.gather(*(probe(adapter) for adapter in probeable))
+
+    adapters: dict[str, ModelClient] = {}
+    seen_adapter_ids: set[str] = set()
+    for adapter, healthy in results:
+        if adapter.model_id in seen_adapter_ids:
+            continue
+        if not healthy:
+            continue
+        seen_adapter_ids.add(adapter.model_id)
+        for model_id in adapter_model_ids(adapter):
+            if allowed_models and model_id not in allowed_models and adapter.model_id not in allowed_models:
+                continue
+            adapters.setdefault(model_id, adapter)
     return adapters
 
 

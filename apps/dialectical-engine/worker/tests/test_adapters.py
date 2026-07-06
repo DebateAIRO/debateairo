@@ -1092,7 +1092,8 @@ class FlakyRegistrationClient:
         if self.register_attempts == 1:
             raise httpx.ConnectError("coordinator offline")
 
-    async def heartbeat(self, capabilities) -> None:
+    async def heartbeat(self, capabilities, status: str = "online") -> None:
+        del status
         self.heartbeats.append(list(capabilities))
 
 
@@ -1103,8 +1104,8 @@ class ForbiddenRegistrationClient:
         response = httpx.Response(403, request=request)
         raise httpx.HTTPStatusError("forbidden", request=request, response=response)
 
-    async def heartbeat(self, capabilities) -> None:
-        del capabilities
+    async def heartbeat(self, capabilities, status: str = "online") -> None:
+        del capabilities, status
         raise AssertionError("heartbeat should not run after forbidden registration")
 
 

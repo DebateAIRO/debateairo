@@ -12,7 +12,7 @@ import httpx
 
 from app.capabilities import detect_adapters
 from app.client import CoordinatorClient
-from app.config import load_config
+from app.config import load_config, save_config
 
 
 class StructuredOutputError(ValueError):
@@ -134,12 +134,13 @@ async def register_with_backoff(
     stop: asyncio.Event,
     initial_backoff_seconds: float = 1,
     max_backoff_seconds: float = 30,
+    status: str = "online",
 ) -> None:
     backoff_seconds = initial_backoff_seconds
     while not stop.is_set():
         try:
             await client.register(capabilities)
-            await client.heartbeat(capabilities)
+            await client.heartbeat(capabilities, status=status)
             return
         except Exception as exc:
             if not retryable_coordinator_error(exc):
@@ -213,9 +214,6 @@ async def handle_job_with_heartbeats(
 
 async def worker_loop(run_once: bool = False) -> None:
     config = load_config()
-    adapters = await detect_adapters(config)
-    if not adapters:
-        raise RuntimeError("No healthy model adapters detected")
     client = CoordinatorClient(config)
     stop = asyncio.Event()
 
@@ -230,8 +228,25 @@ async def worker_loop(run_once: bool = False) -> None:
             pass
 
     try:
+        early_registered = False
+        if config.worker_id and config.worker_token and config.last_capabilities:
+            await register_with_backoff(client, config.last_capabilities, stop, status="starting")
+            early_registered = True
+
+        adapters = await detect_adapters(config)
+        if not adapters:
+            if early_registered:
+                await client.heartbeat(config.last_capabilities, status="degraded")
+            raise RuntimeError("No healthy model adapters detected")
+
         capabilities = sorted(adapters)
-        await register_with_backoff(client, capabilities, stop)
+        if config.last_capabilities != capabilities:
+            config.last_capabilities = capabilities
+            save_config(config)
+        if early_registered:
+            await client.heartbeat(capabilities, status="online")
+        else:
+            await register_with_backoff(client, capabilities, stop)
         last_heartbeat = time.monotonic()
         backoff_seconds = 1
         while not stop.is_set():

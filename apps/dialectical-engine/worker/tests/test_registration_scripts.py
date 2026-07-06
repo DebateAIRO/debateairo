@@ -13,15 +13,33 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_module(path: Path, name: str):
-    for module_name in [key for key in sys.modules if key == "app" or key.startswith("app.")]:
+    # Scripts under `scripts/` import `app.*` fresh via their own sys.path setup, so any
+    # cached `app.*` modules are removed here to force a clean reload for the script under
+    # test. That removal is reverted afterward: leaving it in place would swap out the
+    # `app.*` module objects for the rest of the process, silently detaching any
+    # already-imported function's `__globals__` (e.g. `from app.capabilities import
+    # detect_adapters` in another test file) from the module dict later tests monkeypatch by
+    # string path (e.g. `monkeypatch.setattr("app.capabilities.foo", ...)`).
+    previous_app_modules = {
+        module_name: sys.modules[module_name]
+        for module_name in list(sys.modules)
+        if module_name == "app" or module_name.startswith("app.")
+    }
+    for module_name in previous_app_modules:
         del sys.modules[module_name]
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        for module_name in list(sys.modules):
+            if module_name != name and (module_name == "app" or module_name.startswith("app.")):
+                del sys.modules[module_name]
+        sys.modules.update(previous_app_modules)
 
 
 def test_register_worker_respects_allowed_models(tmp_path: Path, monkeypatch) -> None:
