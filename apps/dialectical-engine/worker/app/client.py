@@ -65,9 +65,17 @@ class CoordinatorClient:
         payload = response.json()
         self.config.worker_id = payload["worker_id"]
         if not payload.get("worker_token"):
-            raise RuntimeError(
-                "Worker name is already registered and the coordinator preserved its token. "
-                "Reuse the saved worker config or pass --rotate-token, then restart/reload that worker."
+            if rotate_token:
+                raise RuntimeError(
+                    "Coordinator refused to issue a worker token even with rotate_token; "
+                    "check user_token permissions."
+                )
+            print(
+                f"Worker name '{self.config.name}' already registered; rotating token to recover identity.",
+                flush=True,
+            )
+            return await self.register(
+                capabilities, persist=persist, save_path=save_path, rotate_token=True
             )
         self.config.worker_token = payload["worker_token"]
         if isinstance(payload.get("name"), str) and payload["name"].strip():

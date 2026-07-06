@@ -97,6 +97,12 @@ def retryable_coordinator_error(exc: Exception) -> bool:
     return False
 
 
+def identity_desync_error(exc: Exception) -> bool:
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return False
+    return exc.response.status_code in {401, 404}
+
+
 def stale_job_coordinator_error(exc: Exception) -> bool:
     if not isinstance(exc, httpx.HTTPStatusError):
         return False
@@ -135,11 +141,12 @@ async def register_with_backoff(
     initial_backoff_seconds: float = 1,
     max_backoff_seconds: float = 30,
     status: str = "online",
+    rotate_token: bool = False,
 ) -> None:
     backoff_seconds = initial_backoff_seconds
     while not stop.is_set():
         try:
-            await client.register(capabilities)
+            await client.register(capabilities, rotate_token=rotate_token)
             await client.heartbeat(capabilities, status=status)
             return
         except Exception as exc:
@@ -259,6 +266,12 @@ async def worker_loop(run_once: bool = False) -> None:
                 if job:
                     await handle_job_with_heartbeats(client, adapters, job, capabilities, config.heartbeat_seconds)
             except Exception as exc:
+                if identity_desync_error(exc):
+                    print(f"Worker identity desync ({exc}); re-registering with token rotation.", flush=True)
+                    client.config.worker_id = None
+                    client.config.worker_token = None
+                    await register_with_backoff(client, capabilities, stop, rotate_token=True)
+                    continue
                 if not retryable_coordinator_error(exc):
                     raise
                 print(f"Coordinator unavailable: {exc}. Retrying in {backoff_seconds}s.", flush=True)

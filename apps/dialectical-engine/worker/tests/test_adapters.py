@@ -1086,8 +1086,8 @@ class FlakyRegistrationClient:
         self.register_attempts = 0
         self.heartbeats: list[list[str]] = []
 
-    async def register(self, capabilities) -> None:
-        del capabilities
+    async def register(self, capabilities, *, rotate_token: bool = False) -> None:
+        del capabilities, rotate_token
         self.register_attempts += 1
         if self.register_attempts == 1:
             raise httpx.ConnectError("coordinator offline")
@@ -1098,8 +1098,8 @@ class FlakyRegistrationClient:
 
 
 class ForbiddenRegistrationClient:
-    async def register(self, capabilities) -> None:
-        del capabilities
+    async def register(self, capabilities, *, rotate_token: bool = False) -> None:
+        del capabilities, rotate_token
         request = httpx.Request("POST", "http://coordinator/api/workers/register")
         response = httpx.Response(403, request=request)
         raise httpx.HTTPStatusError("forbidden", request=request, response=response)
