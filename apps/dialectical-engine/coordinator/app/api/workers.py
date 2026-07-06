@@ -35,7 +35,9 @@ class RegisterRequest(BaseModel):
 
 class HeartbeatRequest(BaseModel):
     capabilities: Optional[list[str]] = None
-    status: Literal["online", "offline", "degraded"] = "online"
+    status: Literal[
+        "online", "offline", "degraded", "starting", "recovering_identity", "blocked_auth"
+    ] = "online"
 
 
 def clean_worker_name(value: str) -> str:

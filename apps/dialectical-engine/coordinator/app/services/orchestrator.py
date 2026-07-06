@@ -130,7 +130,7 @@ def online_capabilities(db: Session) -> set[str]:
     settings = load_settings()
     allowed = routing_allowed_models(db)
     cutoff = now_utc() - timedelta(seconds=settings.worker_offline_seconds)
-    workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status != "offline")).all()
+    workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status == "online")).all()
     caps: set[str] = set()
     for worker in workers:
         caps.update(worker_capability_set(worker))
@@ -457,7 +457,7 @@ def capable_online_workers(db: Session, model_id: str) -> list[Worker]:
         return []
     settings = load_settings()
     cutoff = now_utc() - timedelta(seconds=settings.worker_offline_seconds)
-    workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status != "offline")).all()
+    workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status == "online")).all()
     return [worker for worker in workers if model_id in worker_capability_set(worker)]
 
 
