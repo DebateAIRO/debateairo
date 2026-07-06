@@ -31,6 +31,7 @@ from app.scoring.cache import (
     store_scoring_cache,
 )
 from app.scoring.disagreement import detect_persisted_judge_disagreements
+from app.scoring.judge_registry import active_contract
 from app.scoring.judges import ScoringProvider, ScoringProviderRequest, ScoringProviderResult
 from app.scoring.models import (
     AdaptiveDepthDryRunItem,
@@ -447,6 +448,10 @@ def score_node_with_provider(
             model_metadata=_provider_model_metadata(result, "unavailable"),
         )
         if provider_name and model_name:
+            try:
+                cache_contract = active_contract(judge_role)
+            except KeyError:
+                cache_contract = None
             store_scoring_cache(
                 db,
                 debate_id=debate.id,
@@ -458,6 +463,7 @@ def score_node_with_provider(
                 provider_metadata=payload["model_metadata"],
                 status="unavailable",
                 result=payload,
+                contract=cache_contract,
             )
             db.flush()
         return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
@@ -480,6 +486,10 @@ def score_node_with_provider(
     if producer:
         payload["producer"] = producer
     if provider_name and model_name:
+        try:
+            cache_contract = active_contract(judge_role)
+        except KeyError:
+            cache_contract = None
         store_scoring_cache(
             db,
             debate_id=debate.id,
@@ -491,6 +501,7 @@ def score_node_with_provider(
             provider_metadata=payload["model_metadata"],
             status="available",
             result=payload,
+            contract=cache_contract,
         )
         db.flush()
     return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
@@ -685,6 +696,14 @@ def _persist_judge_output_artifact(
     elif artifact.job_id is None:
         artifact.job_id = current_job_id
     artifact.prompt_version = _artifact_prompt_version(request, result)
+    try:
+        contract = active_contract(judge_role)
+    except KeyError:
+        contract = None
+    if contract is not None:
+        artifact.judge_id = contract.judge_id
+        artifact.judge_version = contract.judge_version
+        artifact.contract_hash = contract.contract_hash
     artifact.request_metadata = _private_request_metadata(request)
     artifact.parse_status = parse_status
     artifact.parse_error = _public_metadata_text(parse_error)

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import AnalyzerRun, NodeScoringResult, now_utc
+from app.scoring.judge_registry import JudgeContract
 from app.scoring.models import NormalizedClaim
 
 
@@ -121,6 +122,7 @@ def store_scoring_cache(
     provider_metadata: dict[str, Any],
     status: str,
     result: dict[str, Any],
+    contract: JudgeContract | None = None,
 ) -> NodeScoringResult:
     cached_result = db.scalar(
         select(NodeScoringResult).where(
@@ -145,5 +147,9 @@ def store_scoring_cache(
     cached_result.provider_metadata = provider_metadata
     cached_result.status = status
     cached_result.result = result
+    if contract is not None:
+        cached_result.judge_id = contract.judge_id
+        cached_result.judge_version = contract.judge_version
+        cached_result.contract_hash = contract.contract_hash
     cached_result.updated_at = now_utc()
     return cached_result
