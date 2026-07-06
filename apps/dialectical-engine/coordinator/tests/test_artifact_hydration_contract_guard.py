@@ -3,6 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.models.entities import Debate, Generation, JudgeOutputArtifact, Node, NodeScoringResult, Worker, now_utc
 from app.scoring.cache import node_scoring_input_hash
 from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE
@@ -13,7 +16,28 @@ from app.scoring.service import (
     scoring_result_payload,
 )
 
-from tests.test_node_scoring import base_assessment, explicit_depth_pressure_payload
+from tests.test_node_scoring import (
+    _assert_public_payload_has_no_private_judge_output,
+    base_assessment,
+    explicit_depth_pressure_payload,
+)
+
+
+def _assert_same_on_common_keys(left: dict, right: dict) -> None:
+    """Assert ``left`` and ``right`` agree on every key present in both.
+
+    Recurses into nested dicts. This tolerates the HTTP response model
+    serializing with e.g. ``exclude_none``/``exclude_defaults`` (so a raw
+    stored fixture's ``claim.scope`` sub-keys or ``debug.judge_outputs: None``
+    may be absent from the served JSON) without masking a real mismatch on
+    any key that *is* present on both sides.
+    """
+    for key in left.keys() & right.keys():
+        left_value, right_value = left[key], right[key]
+        if isinstance(left_value, dict) and isinstance(right_value, dict):
+            _assert_same_on_common_keys(left_value, right_value)
+        else:
+            assert left_value == right_value, f"{key!r}: {left_value!r} != {right_value!r}"
 
 
 def _seed_debate_with_node(db, *, node_id: str = "node-hydration-guard"):
@@ -168,6 +192,122 @@ def test_artifact_with_mismatched_contract_falls_back_to_stored_public_result(db
     assert item is not None
     assert item == stored_item
     assert metadata is not None
+
+
+def test_historical_fallback_picks_matching_node_item_from_multi_item_payload(db) -> None:
+    debate, node, input_hash = _seed_debate_with_node(db, node_id="node-legacy-multi-item-payload")
+    raw_output = json.dumps(base_assessment(node_id=node.id).model_dump(mode="json"))
+    _add_artifact(
+        db,
+        debate=debate,
+        node=node,
+        input_hash=input_hash,
+        raw_output=raw_output,
+        assessment=base_assessment(node_id=node.id).model_dump(mode="json"),
+        contract_hash="stale-contract-hash-from-a-retired-judge-version",
+    )
+    decoy_item = stored_result_item_fixture("other-node")
+    real_item = stored_result_item_fixture(node.id)
+    stored_payload = scoring_result_payload(
+        debate_id=debate.id,
+        node_ids=["other-node", node.id],
+        items=[decoy_item, real_item],
+        errors=[],
+        model_metadata={
+            "provider": "codex",
+            "model": "codex-test-model",
+            "checked_at": "2026-06-18T10:15:30+00:00",
+            "status": "available",
+        },
+    )
+    db.add(
+        NodeScoringResult(
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=input_hash,
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            status="available",
+            result=stored_payload,
+        )
+    )
+    db.commit()
+
+    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+
+    assert item is not None
+    assert item == real_item
+    assert item["node_id"] == node.id
+    assert item != decoy_item
+    assert metadata is not None
+
+
+def test_scoring_api_serves_historical_result_for_mismatched_contract_artifact(db) -> None:
+    debate, node, input_hash = _seed_debate_with_node(db, node_id="node-rj05-e2e-mismatch")
+    raw_output = json.dumps(base_assessment(node_id=node.id).model_dump(mode="json"))
+    _add_artifact(
+        db,
+        debate=debate,
+        node=node,
+        input_hash=input_hash,
+        raw_output=raw_output,
+        assessment=base_assessment(node_id=node.id).model_dump(mode="json"),
+        contract_hash="stale-contract-hash",
+    )
+    decoy_item = stored_result_item_fixture("other-node")
+    real_item = stored_result_item_fixture(node.id)
+    stored_payload = scoring_result_payload(
+        debate_id=debate.id,
+        node_ids=["other-node", node.id],
+        items=[decoy_item, real_item],
+        errors=[],
+        model_metadata={
+            "provider": "codex",
+            "model": "codex-test-model",
+            "checked_at": "2026-06-18T10:15:30+00:00",
+            "status": "available",
+        },
+    )
+    db.add(
+        NodeScoringResult(
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=input_hash,
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            status="available",
+            result=stored_payload,
+        )
+    )
+    db.commit()
+    debate_id = debate.id
+    node_id = node.id
+    db.close()
+
+    response = TestClient(app).get(f"/api/debates/{debate_id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["debate_id"] == debate_id
+    assert body["status"] == "available"
+    assert body["node_ids"] == [node_id]
+    assert [item["node_id"] for item in body["items"]] == [node_id]
+    served_item = body["items"][0]
+    # The HTTP response model may serialize with exclude_none/exclude_defaults,
+    # so some keys present on the raw stored fixture (e.g. `claim.scope`
+    # sub-keys, `debug.judge_outputs`) can be absent from the served JSON.
+    # Compare on whatever keys both sides share instead of requiring
+    # byte-for-byte dict equality with the stored fixture.
+    _assert_same_on_common_keys(served_item, real_item)
+    assert served_item["node_id"] == real_item["node_id"] != decoy_item["node_id"]
+    assert served_item["claim"]["node_id"] == real_item["claim"]["node_id"] != decoy_item["claim"]["node_id"]
+    assert body["producer"] == "persisted-judge-artifacts"
+    assert body["cache"] == {"hit": False}
+    assert "active_scoring_job_id" not in body
+    assert "active_scoring_job_status" not in body
+    _assert_public_payload_has_no_private_judge_output(body, "stale-contract-hash")
 
 
 def test_malformed_legacy_artifact_stays_private(db) -> None:
