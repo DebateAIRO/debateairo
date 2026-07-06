@@ -667,6 +667,22 @@ def ensure_mutable_claim(db: Session, job: Job) -> None:
 
 
 def claim_pending_job(db: Session, worker: Worker) -> Job | None:
+    if worker.current_job_id:
+        orphaned = db.get(Job, worker.current_job_id)
+        if (
+            orphaned is not None
+            and orphaned.worker_id == worker.id
+            and orphaned.status in {"claimed", "running"}
+        ):
+            orphaned.status = "pending"
+            release_job_claim(db, orphaned)
+            reset_job_target_for_retry(db, orphaned)
+            orphaned.stream_buffer = ""
+            orphaned.error = "Worker restarted while job was active"
+            orphaned.deadline = make_deadline()
+        else:
+            worker.current_job_id = None
+
     capabilities = worker_capability_set(worker)
     allowed_models = routing_allowed_models(db)
     if allowed_models is not None:
