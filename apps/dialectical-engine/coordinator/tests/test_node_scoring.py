@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from datetime import timedelta
 from pathlib import Path
@@ -79,7 +80,7 @@ from app.scoring import (
     scoring_result_payload,
 )
 from app.scoring.service import ensure_node_scoring_on_completion
-from app.services.orchestrator import claim_pending_job
+from app.services.orchestrator import claim_pending_job, complete_job
 
 
 USER_HEADERS = {"Authorization": "Bearer user_test_token"}
@@ -2359,6 +2360,310 @@ def test_score_node_with_provider_writes_successful_result_to_cache(db) -> None:
     assert cached.result == {key: value for key, value in payload.items() if key != "cache"}
 
 
+def _judge_output_artifact_model():
+    from app.models.entities import JudgeOutputArtifact
+
+    return JudgeOutputArtifact
+
+
+def _single_judge_output_artifact(db, *, debate_id: str, node_id: str):
+    artifact_model = _judge_output_artifact_model()
+    artifacts = db.scalars(
+        select(artifact_model)
+        .where(
+            artifact_model.debate_id == debate_id,
+            artifact_model.node_id == node_id,
+        )
+        .order_by(artifact_model.created_at.asc(), artifact_model.id.asc())
+    ).all()
+    assert len(artifacts) == 1
+    return artifacts[0]
+
+
+def _assert_public_payload_has_no_private_judge_output(payload: dict, *private_markers: str) -> None:
+    serialized = json.dumps(payload, sort_keys=True)
+    forbidden_fragments = (
+        "raw_output",
+        "raw judge",
+        "judge_output_artifact",
+        "provider_metadata",
+        "request_metadata",
+        "prompt_version",
+        "prompt:",
+        "token=",
+        "api_key",
+        "secret-token",
+        *private_markers,
+    )
+    for fragment in forbidden_fragments:
+        assert fragment not in serialized
+
+
+def test_score_node_with_provider_persists_private_raw_judge_output_without_public_leak(db) -> None:
+    raw_marker = "RJ01-RAW-VALID-MARKER"
+    prompt_version = "node-judge-v1"
+
+    class ArtifactProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": raw_marker,
+                    }
+                ),
+                latency_ms=17,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={
+                    "provider_response_id": "resp-rj01-valid",
+                    "prompt_version": prompt_version,
+                    "request": {"prompt": "prompt: private judge rubric", "token": "token=secret-token"},
+                },
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, ArtifactProvider(), force_refresh=True)
+
+    assert payload["status"] == "available"
+    _assert_public_payload_has_no_private_judge_output(payload, raw_marker)
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=node.id)
+    assert artifact.raw_output and raw_marker in artifact.raw_output
+    assert artifact.raw_output_sha256 == hashlib.sha256(artifact.raw_output.encode("utf-8")).hexdigest()
+    assert artifact.parse_status == "available"
+    assert artifact.parse_error is None
+    assert artifact.judge_role == "judge"
+    assert artifact.provider == "test-real-judge"
+    assert artifact.model == "codex-test-model"
+    assert artifact.prompt_version == prompt_version
+    assert artifact.input_hash == node_scoring_input_hash(
+        claim=normalize_claim(node_id=node.id, raw_text=node.claim),
+        argument_text=generation.argument,
+    )
+    cached = db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).one()
+    _assert_public_payload_has_no_private_judge_output(cached.result, raw_marker)
+
+
+def test_score_node_with_provider_exposes_plural_provenance_from_distinct_persisted_judges(db) -> None:
+    class PrimaryJudgeProvider:
+        provider = "primary-provider"
+        model = "primary-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(
+                            node_id=request.claim.node_id,
+                            evidence=EvidenceAssessment(
+                                evidence_quality=0.8,
+                                evidence_relevance=0.8,
+                                evidence_sufficiency=0.8,
+                                source_reliability=0.8,
+                                freshness=0.8,
+                            ),
+                        ).model_dump(mode="json"),
+                        "_private_test_marker": "RJ04-PRIMARY-RAW",
+                    }
+                ),
+                latency_ms=11,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class SkepticJudgeProvider:
+        provider = "skeptic-provider"
+        model = "skeptic-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(
+                            node_id=request.claim.node_id,
+                            critic=CriticAssessment(
+                                logical_validity=0.25,
+                                assumption_risk=0.9,
+                                counterargument_strength=0.85,
+                            ),
+                            evidence=EvidenceAssessment(
+                                evidence_quality=0.15,
+                                evidence_relevance=0.25,
+                                evidence_sufficiency=0.15,
+                                source_reliability=0.2,
+                                freshness=0.2,
+                                missing_evidence=["No independent source supports this claim."],
+                            ),
+                        ).model_dump(mode="json"),
+                        "_private_test_marker": "RJ04-SKEPTIC-RAW",
+                    }
+                ),
+                latency_ms=13,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    score_node_with_provider(
+        db,
+        debate,
+        node.id,
+        PrimaryJudgeProvider(),
+        judge_role="primary_judge",
+        force_refresh=True,
+    )
+    payload = score_node_with_provider(
+        db,
+        debate,
+        node.id,
+        SkepticJudgeProvider(),
+        judge_role="skeptic_judge",
+        force_refresh=True,
+    )
+
+    db.expire_all()
+    artifact_model = _judge_output_artifact_model()
+    artifacts = db.scalars(
+        select(artifact_model)
+        .where(artifact_model.debate_id == debate.id, artifact_model.node_id == node.id)
+        .order_by(artifact_model.judge_role.asc())
+    ).all()
+    assert [(artifact.judge_role, artifact.provider, artifact.model) for artifact in artifacts] == [
+        ("primary_judge", "primary-provider", "primary-model"),
+        ("skeptic_judge", "skeptic-provider", "skeptic-model"),
+    ]
+    assert artifacts[0].raw_output != artifacts[1].raw_output
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["judge_participation"] == {
+        "plural_judges": True,
+        "judge_count": 2,
+        "judge_roles": ["primary_judge", "skeptic_judge"],
+    }
+    assert item["score_provenance"]["disagreement_status"] == {
+        "status": "present",
+        "derived_from": "persisted_judge_artifacts",
+    }
+    assert item["judge_disagreements"] == [
+        {
+            "judges": ["primary_judge", "skeptic_judge"],
+            "type": "persisted_judge_strength_gap",
+            "severity": "high",
+            "description": "Persisted judge assessments materially disagree on claim strength.",
+        }
+    ]
+    _assert_public_payload_has_no_private_judge_output(payload, "RJ04-PRIMARY-RAW", "RJ04-SKEPTIC-RAW")
+    assert "primary-provider" not in json.dumps(item)
+    assert "skeptic-provider" not in json.dumps(item)
+
+
+def test_score_node_with_provider_persists_malformed_judge_output_privately_without_public_secret_leak(db) -> None:
+    secret_marker = "secret-token-rj01-malformed"
+    raw_output = f"not json; token={secret_marker}; prompt: private scoring prompt"
+
+    class MalformedArtifactProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=raw_output,
+                latency_ms=19,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={"provider_response_id": "resp-rj01-malformed", "token": secret_marker},
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, MalformedArtifactProvider(), force_refresh=True)
+
+    assert payload["status"] == "unavailable"
+    assert payload["reason"] == "Judge output was not valid JSON."
+    _assert_public_payload_has_no_private_judge_output(payload, secret_marker)
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=node.id)
+    assert artifact.raw_output == raw_output
+    assert artifact.raw_output_sha256 == hashlib.sha256(raw_output.encode("utf-8")).hexdigest()
+    assert artifact.parse_status == "unavailable"
+    assert artifact.parse_error == "Judge output was not valid JSON."
+    cached = db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).one()
+    assert cached.status == "unavailable"
+    _assert_public_payload_has_no_private_judge_output(cached.result, secret_marker)
+
+
 def test_score_node_with_provider_does_not_invent_evidence_refs(db) -> None:
     class OptimisticEvidenceProvider:
         provider = "test-provider"
@@ -3053,6 +3358,369 @@ def test_score_debate_with_provider_registry_reports_unavailable_for_invalid_pro
     assert payload["errors"][0]["reason"] == "Judge output was not valid JSON."
 
 
+def test_background_scoring_job_persists_judge_artifacts_before_public_analyzer_snapshot(db) -> None:
+    from app.scoring.jobs import run_scoring_job_background
+
+    class BackgroundArtifactProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def judge_node(self, request):
+            self.calls += 1
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": f"RJ01-BACKGROUND-RAW-{self.calls}",
+                    }
+                ),
+                latency_ms=23,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={"provider_response_id": f"resp-rj01-background-{self.calls}"},
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": BackgroundArtifactProvider()},
+    )
+
+    run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=root.id)
+    analyzer_run = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == "node_scoring")
+        .order_by(AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+    ).one()
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "complete"
+    assert analyzer_run.status == "complete"
+    assert analyzer_run.provenance["scoring_source"] == "judge_outputs"
+    assert artifact.raw_output and "RJ01-BACKGROUND-RAW-1" in artifact.raw_output
+    assert artifact.raw_output_sha256 == hashlib.sha256(artifact.raw_output.encode("utf-8")).hexdigest()
+    assert artifact.job_id == job.id
+    assert artifact.analyzer_run_id == analyzer_run.id
+    _assert_public_payload_has_no_private_judge_output(analyzer_run.output, "RJ01-BACKGROUND-RAW-1")
+
+
+def test_background_scoring_job_marks_failed_when_final_persistence_commit_fails(db, monkeypatch) -> None:
+    from app.scoring import jobs as scoring_jobs
+
+    class BackgroundArtifactProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": "RJ03-FINAL-COMMIT-RAW",
+                    }
+                ),
+                latency_ms=23,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={"provider_response_id": "resp-rj03-final-commit"},
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": BackgroundArtifactProvider()},
+    )
+    real_commit_write = scoring_jobs.commit_write
+    commit_calls = 0
+
+    def fail_final_job_commit(session):
+        nonlocal commit_calls
+        commit_calls += 1
+        if commit_calls == 2:
+            raise RuntimeError("simulated final analyzer/job commit failure")
+        return real_commit_write(session)
+
+    monkeypatch.setattr(scoring_jobs, "commit_write", fail_final_job_commit)
+
+    scoring_jobs.run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=root.id)
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "failed"
+    assert refreshed_job.error == "Failed to persist scoring job completion after judge artifacts were produced."
+    assert artifact.raw_output and "RJ03-FINAL-COMMIT-RAW" in artifact.raw_output
+    assert artifact.job_id == job.id
+    assert artifact.analyzer_run_id is None
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+
+
+def test_background_scoring_job_fails_when_payload_has_no_durable_judge_artifacts(db) -> None:
+    from app.scoring.jobs import run_scoring_job_background
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, root])
+    db.flush()
+    debate.root_node_id = root.id
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+    scoring_item = explicit_depth_pressure_payload(node_id=root.id).model_dump(mode="json")
+
+    def scoring_runner(db, debate, registry, **kwargs):
+        return scoring_result_payload(
+            debate_id=debate.id,
+            node_ids=[root.id],
+            items=[scoring_item],
+            errors=[],
+        )
+
+    run_scoring_job_background(
+        job.id,
+        debate.id,
+        registry_factory=lambda: registry,
+        scoring_runner=scoring_runner,
+    )
+
+    db.expire_all()
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "failed"
+    assert refreshed_job.error == "No durable judge output artifacts were persisted for this scoring job."
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+
+
+def test_background_scoring_job_fails_when_payload_missing_node_judge_artifacts(db) -> None:
+    from app.scoring.jobs import run_scoring_job_background
+
+    artifact_model = _judge_output_artifact_model()
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    child = Node(
+        id="child-node",
+        debate=debate,
+        parent=root,
+        node_type="pro",
+        depth=1,
+        position=0,
+        claim="Retention improved in the latest employee survey.",
+        status="complete",
+        materialized_path="/root-node/",
+    )
+    db.add_all([debate, root, child])
+    db.flush()
+    debate.root_node_id = root.id
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    raw_output = "RJ03-ROOT-ONLY-RAW"
+    root_claim = normalize_claim(node_id=root.id, raw_text=root.claim)
+    db.add(
+        artifact_model(
+            debate_id=debate.id,
+            node_id=root.id,
+            job_id=job.id,
+            input_hash=node_scoring_input_hash(claim=root_claim, argument_text=None),
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            raw_output=raw_output,
+            raw_output_sha256=hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
+            parse_status="available",
+            assessment=base_assessment(node_id=root.id).model_dump(mode="json"),
+            checked_at=now_utc(),
+        )
+    )
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+    scoring_items = [
+        explicit_depth_pressure_payload(node_id=root.id).model_dump(mode="json"),
+        explicit_depth_pressure_payload(node_id=child.id).model_dump(mode="json"),
+    ]
+
+    def scoring_runner(db, debate, registry, **kwargs):
+        return scoring_result_payload(
+            debate_id=debate.id,
+            node_ids=[root.id, child.id],
+            items=scoring_items,
+            errors=[],
+        )
+
+    run_scoring_job_background(
+        job.id,
+        debate.id,
+        registry_factory=lambda: registry,
+        scoring_runner=scoring_runner,
+    )
+
+    db.expire_all()
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "failed"
+    assert refreshed_job.error == "Missing durable judge output artifacts for scoring job nodes."
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+    artifact_node_ids = db.scalars(
+        select(artifact_model.node_id).where(artifact_model.job_id == job.id).order_by(artifact_model.node_id.asc())
+    ).all()
+    assert artifact_node_ids == [root.id]
+
+
+def test_background_scoring_job_relinks_reused_judge_artifact_to_current_job(db) -> None:
+    from app.scoring.jobs import run_scoring_job_background
+
+    class StableArtifactProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": "RJ03-STABLE-RAW",
+                    }
+                ),
+                latency_ms=23,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={"provider_response_id": "resp-rj03-stable"},
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=root,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    root.active_generation_id = generation.id
+    db.add_all([debate, worker, root, generation])
+    db.flush()
+    debate.root_node_id = root.id
+    first_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": StableArtifactProvider()},
+    )
+
+    run_scoring_job_background(first_job.id, debate.id, registry_factory=lambda: registry)
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=root.id)
+    assert artifact.job_id == first_job.id
+
+    second_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+
+    run_scoring_job_background(second_job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    refreshed_second_job = db.get(Job, second_job.id)
+    assert refreshed_second_job is not None
+    assert refreshed_second_job.status == "complete"
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=root.id)
+    assert artifact.raw_output and "RJ03-STABLE-RAW" in artifact.raw_output
+    assert artifact.job_id == second_job.id
+    assert artifact.analyzer_run_id is not None
+    assert len(db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()) == 2
+
+
 def test_score_nodes_with_provider_releases_sqlite_write_lock_before_each_provider_call(db) -> None:
     class WriterProbeProvider:
         provider = "test-provider"
@@ -3667,8 +4335,223 @@ def test_ensure_node_scoring_on_completion_reports_provider_unavailable_without_
             "reason": "No scoring provider is configured.",
         }
     ]
-    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all() == []
+    jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert len(jobs) == 1
+    assert jobs[0].status == "failed"
+    assert jobs[0].error == "No scoring provider is configured."
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def _v2_codex_worker(db) -> Worker:
+    worker = Worker(
+        name="codex-worker",
+        token_hash="test-token",
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    db.commit()
+    return worker
+
+
+def _v2_pov_output(worker: Worker, job: Job) -> dict:
+    return {
+        "title": f"{job.required_role} assessment",
+        "content": f"A concise assessment for {job.required_role}.",
+        "strongest_pro": {
+            "title": f"{job.required_role} strongest pro",
+            "content": "The strongest pro relies on the clearest relevant evidence.",
+            "pro": {"title": f"{job.required_role} pro support", "content": "Supporting detail."},
+            "con": {"title": f"{job.required_role} pro limitation", "content": "Limiting detail."},
+        },
+        "strongest_con": {
+            "title": f"{job.required_role} strongest con",
+            "content": "The strongest con identifies the most important risk.",
+            "pro": {"title": f"{job.required_role} con support", "content": "Supporting detail."},
+            "con": {"title": f"{job.required_role} con limitation", "content": "Limiting detail."},
+        },
+        "provenance": {
+            "model_id": "codex-gpt-5.5",
+            "worker_id": worker.id,
+            "prompt_id": f"prompt-{job.id}",
+            "job_id": job.id,
+        },
+    }
+
+
+def _v2_synthesis_output(worker: Worker, job: Job) -> dict:
+    return {
+        "title": "Synthesis",
+        "content": "The completed V2 debate is ready for judge scoring.",
+        "tensions": ["Evidence quality remains context-sensitive."],
+        "agreements": ["All perspectives require transparent assumptions."],
+        "evidence_gaps": ["Local baseline data is still needed."],
+        "key_takeaways": ["Treat the question as evidence-sensitive."],
+        "provenance": {
+            "model_id": "codex-gpt-5.5",
+            "worker_id": worker.id,
+            "prompt_id": f"prompt-{job.id}",
+            "job_id": job.id,
+        },
+    }
+
+
+def test_v2_first_partial_pov_completion_does_not_wake_debate_scoring(db, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import dialectical_v2
+
+    worker = _v2_codex_worker(db)
+    debate = dialectical_v2.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    scoring_wakes: list[tuple[str, str]] = []
+
+    def record_scoring_wake(scoring_db, scored_debate, node):
+        scoring_wakes.append((scored_debate.id, node.id))
+        return {"status": "unavailable", "items": []}
+
+    monkeypatch.setattr(dialectical_v2, "ensure_default_scoring_for_completed_v2_node", record_scoring_wake)
+
+    first_job = claim_pending_job(db, worker)
+    assert first_job is not None
+    assert first_job.job_type == "v2_pov"
+    asyncio.run(complete_job(db, first_job, _v2_pov_output(worker, first_job), {"latency_ms": 12}))
+
+    assert scoring_wakes == []
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all() == []
+
+
+def test_v2_final_synthesis_completion_wakes_debate_scoring_exactly_once(db, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import dialectical_v2
+
+    worker = _v2_codex_worker(db)
+    debate = dialectical_v2.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    scoring_wakes: list[str] = []
+
+    def record_scoring_wake(scoring_db, scored_debate, node):
+        if scored_debate.status == "complete":
+            scoring_wakes.append(scored_debate.id)
+        return {"status": "unavailable", "items": []}
+
+    monkeypatch.setattr(dialectical_v2, "ensure_default_scoring_for_completed_v2_node", record_scoring_wake)
+
+    for _ in range(4):
+        pov_job = claim_pending_job(db, worker)
+        assert pov_job is not None
+        assert pov_job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, pov_job, _v2_pov_output(worker, pov_job), {"latency_ms": 12}))
+    assert scoring_wakes == []
+
+    synthesis_job = claim_pending_job(db, worker)
+    assert synthesis_job is not None
+    assert synthesis_job.job_type == "v2_synthesize"
+    asyncio.run(complete_job(db, synthesis_job, _v2_synthesis_output(worker, synthesis_job), {"latency_ms": 13}))
+
+    assert scoring_wakes == [debate.id]
+
+
+def test_provider_unavailable_scoring_completion_persists_observable_lifecycle_without_fake_items(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    payload = ensure_node_scoring_on_completion(db, debate, node, ProviderRegistry(agents={}, providers={}))
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert len(jobs) == 1
+    assert jobs[0].status == "failed"
+    assert jobs[0].error == "No scoring provider is configured."
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def test_scoring_job_start_provider_unavailable_persists_failed_lifecycle_without_fake_items(db, monkeypatch) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    db.add(debate)
+    db.commit()
+    monkeypatch.setattr(
+        scoring_api,
+        "scoring_provider_registry_dependency",
+        lambda: ProviderRegistry(agents={}, providers={}),
+    )
+
+    response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["debate_id"] == debate.id
+    assert body["status"] == "failed"
+    assert body["error"] == "No scoring provider is configured."
+    assert "items" not in body
+    jobs = db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")).all()
+    assert len(jobs) == 1
+    assert jobs[0].status == "failed"
+    assert jobs[0].error == "No scoring provider is configured."
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def test_stale_pending_scoring_job_is_marked_failed_before_fresh_lifecycle_is_queued(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-root",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    stale_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    stale_job.deadline = now_utc() - timedelta(minutes=10)
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    payload = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    db.expire_all()
+    refreshed_stale_job = db.get(Job, stale_job.id)
+    assert refreshed_stale_job is not None
+    assert refreshed_stale_job.status == "failed"
+    assert refreshed_stale_job.error == "Stale scoring job expired before judge outputs were produced."
+    jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate").order_by(Job.created_at.asc())
+    ).all()
+    assert len(jobs) == 2
+    fresh_job = jobs[1]
+    assert fresh_job.id != stale_job.id
+    assert fresh_job.status == "pending"
+    assert fresh_job.deadline >= now_utc()
+    assert payload["active_scoring_job_id"] == fresh_job.id
+    assert payload["active_scoring_job_status"] == "queued"
+    assert payload["items"] == []
 
 
 def test_score_nodes_with_provider_stops_on_cancellation_and_returns_partial(db) -> None:
@@ -5395,7 +6278,7 @@ def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_jo
     assert scoring_payload["items"][0]["node_id"] == root.id
 
 
-def test_scoring_api_wakes_expired_internal_scoring_job_and_persists_outputs(db, monkeypatch) -> None:
+def test_scoring_api_expires_stale_internal_scoring_job_without_reusing_it(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
     root = Node(
@@ -5439,19 +6322,18 @@ def test_scoring_api_wakes_expired_internal_scoring_job_and_persists_outputs(db,
 
     assert response.status_code == 200
     body = response.json()
-    assert body["active_scoring_job_id"] == job.id
-    assert body["active_scoring_job_status"] == "running"
-    assert body["reason"] == "Judge outputs are being generated."
-    assert len(fake_provider.calls) == 1
+    assert "active_scoring_job_id" not in body
+    assert body["status"] == "unavailable"
+    assert body["reason"] == "No scoring judge outputs are available for this debate."
+    assert len(fake_provider.calls) == 0
 
     db.expire_all()
     refreshed_job = db.get(Job, job.id)
     assert refreshed_job is not None
-    assert refreshed_job.status == "complete"
-    scoring_response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
-    scoring_payload = scoring_response.json()
-    assert scoring_payload["status"] == "available"
-    assert scoring_payload["items"][0]["node_id"] == root.id
+    assert refreshed_job.status == "failed"
+    assert refreshed_job.error == "Stale scoring job expired before judge outputs were produced."
+    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
 def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable(db, monkeypatch) -> None:
@@ -5515,6 +6397,37 @@ def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable
     assert scoring_payload["reason"] == "No scoring judge outputs are available for this debate."
 
 
+def test_scoring_job_status_expires_stale_running_job_as_failed(db) -> None:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    db.add(debate)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="running",
+        deadline=now_utc() - timedelta(minutes=5),
+    )
+    db.add(job)
+    db.commit()
+
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring/jobs/{job.id}")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "debate_id": debate.id,
+        "job_id": job.id,
+        "status": "failed",
+        "error": "Stale scoring job expired before judge outputs were produced.",
+    }
+    db.expire_all()
+    refreshed_job = db.get(Job, job.id)
+    assert refreshed_job is not None
+    assert refreshed_job.status == "failed"
+    assert refreshed_job.error == "Stale scoring job expired before judge outputs were produced."
+
+
 def test_scoring_jobs_api_persisted_refresh_keeps_public_payload_sanitized(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     root = Node(
@@ -5555,8 +6468,41 @@ def test_scoring_jobs_api_persisted_refresh_keeps_public_payload_sanitized(db, m
         providers={"codex": FakeProvider()},
     )
 
+    def scoring_refresh_with_durable_artifact(scoring_db, scoring_debate, *_args, **_kwargs):
+        artifact_model = _judge_output_artifact_model()
+        active_job = scoring_db.scalars(
+            select(Job)
+            .where(
+                Job.debate_id == scoring_debate.id,
+                Job.job_type == "score_debate",
+                Job.status == "running",
+            )
+            .order_by(Job.created_at.desc(), Job.id.desc())
+            .limit(1)
+        ).one()
+        claim = normalize_claim(node_id=root.id, raw_text=root.claim)
+        raw_output = "RJ03-SANITIZED-PRIVATE-RAW token=secret-token"
+        scoring_db.add(
+            artifact_model(
+                debate_id=scoring_debate.id,
+                node_id=root.id,
+                job_id=active_job.id,
+                input_hash=node_scoring_input_hash(claim=claim, argument_text=None),
+                judge_role="judge",
+                provider="codex",
+                model="codex-test-model",
+                raw_output=raw_output,
+                raw_output_sha256=hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
+                parse_status="available",
+                assessment=base_assessment(node_id=root.id).model_dump(mode="json"),
+                checked_at=now_utc(),
+            )
+        )
+        scoring_db.flush()
+        return internal_payload
+
     monkeypatch.setattr(scoring_api, "scoring_provider_registry_dependency", lambda: registry)
-    monkeypatch.setattr(scoring_api, "score_debate_with_provider_registry", lambda *args, **kwargs: internal_payload)
+    monkeypatch.setattr(scoring_api, "score_debate_with_provider_registry", scoring_refresh_with_durable_artifact)
 
     response = TestClient(app).post(f"/api/debates/{debate.id}/scoring/jobs", headers=USER_HEADERS)
 
@@ -5577,6 +6523,104 @@ def test_scoring_jobs_api_persisted_refresh_keeps_public_payload_sanitized(db, m
     assert "judge_outputs" not in str(body)
     assert "secret-token" not in str(body)
     assert "--api-key" not in str(body)
+
+
+def test_public_scoring_response_never_exposes_judge_output_artifact_private_fields(db) -> None:
+    raw_output = "RJ01-PRIVATE-RAW prompt: hidden judge prompt token=secret-token"
+    artifact_model = _judge_output_artifact_model()
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, root])
+    db.flush()
+    debate.root_node_id = root.id
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    claim = normalize_claim(node_id=root.id, raw_text=root.claim)
+    scoring_item = reduce_assessments(claim, base_assessment(node_id=root.id)).model_dump(mode="json")
+    public_payload = scoring_result_payload(
+        debate_id=debate.id,
+        node_ids=[root.id],
+        items=[scoring_item],
+        errors=[],
+        model_metadata={
+            "provider": "test-real-judge",
+            "model": "codex-test-model",
+            "checked_at": "2026-06-18T10:15:30+00:00",
+            "status": "available",
+        },
+    )
+    artifact = artifact_model(
+        debate_id=debate.id,
+        node_id=root.id,
+        input_hash=node_scoring_input_hash(claim=claim, argument_text=None),
+        judge_role="judge",
+        provider="test-real-judge",
+        model="codex-test-model",
+        prompt_version="node-judge-v1",
+        request_metadata={"prompt": "prompt: hidden judge prompt", "token_marker": "token=secret-token"},
+        raw_output=raw_output,
+        raw_output_sha256=hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
+        parse_status="available",
+        parse_error=None,
+        assessment=base_assessment(node_id=root.id).model_dump(mode="json"),
+        provider_metadata={"provider_response_id": "resp-private", "api_key": "secret-token"},
+        latency_ms=31,
+        checked_at=now_utc(),
+    )
+    db.add(artifact)
+    db.flush()
+    db.add(
+        NodeScoringResult(
+            debate_id=debate.id,
+            node_id=root.id,
+            input_hash=node_scoring_input_hash(claim=claim, argument_text=None),
+            judge_role="judge",
+            provider="test-real-judge",
+            model="codex-test-model",
+            provider_metadata={
+                "provider": "test-real-judge",
+                "model": "codex-test-model",
+                "status": "available",
+                "judge_output_artifact_id": artifact.id,
+            },
+            status="available",
+            result=public_payload,
+        )
+    )
+    analyzer_run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        status="complete",
+        output=public_payload,
+        provenance={"scoring_source": "judge_outputs", "judge_output_artifact_ids": [artifact.id]},
+    )
+    db.add(analyzer_run)
+    db.flush()
+    artifact.analyzer_run_id = analyzer_run.id
+    db.commit()
+
+    db.expire_all()
+    cached = db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).one()
+    stored_run = db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).one()
+    response = TestClient(app).get(f"/api/debates/{debate.id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    DebateScoringResponse.model_validate(body)
+    _assert_public_payload_has_no_private_judge_output(cached.result, "RJ01-PRIVATE-RAW")
+    _assert_public_payload_has_no_private_judge_output(stored_run.output, "RJ01-PRIVATE-RAW")
+    _assert_public_payload_has_no_private_judge_output(body, "RJ01-PRIVATE-RAW")
 
 
 def test_scoring_api_force_refresh_scores_real_stored_debate_generation_path(db, monkeypatch) -> None:
@@ -5987,6 +7031,99 @@ def test_scoring_api_marks_missing_current_nodes_pending_when_scoring_job_is_run
         }
     ]
     assert "errors" not in body
+
+
+def test_scoring_api_hydrates_from_persisted_judge_artifacts_after_session_reload_without_stale_job_lie(db) -> None:
+    artifact_model = _judge_output_artifact_model()
+    private_raw_marker = "RJ05-PRIVATE-RAW-JUDGE-OUTPUT"
+    private_prompt_marker = "RJ05-PRIVATE-PROMPT"
+    debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
+    worker = Worker(id="worker-rj05", name="Worker RJ05", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-rj05",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-rj05",
+        node=node,
+        model_id="model-rj05",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    input_hash = node_scoring_input_hash(
+        claim=normalize_claim(node_id=node.id, raw_text=node.claim),
+        argument_text=generation.argument,
+    )
+    stale_job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="running",
+        deadline=now_utc() - timedelta(minutes=1),
+    )
+    db.add(stale_job)
+    db.add(
+        artifact_model(
+            debate_id=debate.id,
+            node_id=node.id,
+            job_id=stale_job.id,
+            input_hash=input_hash,
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            prompt_version="node-judge-v1",
+            request_metadata={"prompt": private_prompt_marker, "token": "secret-token"},
+            raw_output=json.dumps(
+                {
+                    **base_assessment(node_id=node.id).model_dump(mode="json"),
+                    "_private_test_marker": private_raw_marker,
+                }
+            ),
+            raw_output_sha256=hashlib.sha256(private_raw_marker.encode("utf-8")).hexdigest(),
+            parse_status="available",
+            parse_error=None,
+            assessment=base_assessment(node_id=node.id).model_dump(mode="json"),
+            provider_metadata={"response_id": "resp-rj05", "token_count": 123, "secret": "secret-token"},
+            latency_ms=19,
+            checked_at=now_utc() - timedelta(minutes=2),
+        )
+    )
+    db.commit()
+    debate_id = debate.id
+    node_id = node.id
+    stale_job_id = stale_job.id
+    db.close()
+
+    response = TestClient(app).get(f"/api/debates/{debate_id}/scoring")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["debate_id"] == debate_id
+    assert body["status"] == "available"
+    assert body["node_ids"] == [node_id]
+    assert [item["node_id"] for item in body["items"]] == [node_id]
+    assert body["items"][0]["claim"]["core_claim"] == "Remote work improves retention."
+    assert body["producer"] == "persisted-judge-artifacts"
+    assert body["cache"] == {"hit": False}
+    assert "active_scoring_job_id" not in body
+    assert "active_scoring_job_status" not in body
+    _assert_public_payload_has_no_private_judge_output(body, private_raw_marker, private_prompt_marker)
+
+    with SessionLocal() as reloaded:
+        assert reloaded.get(Job, stale_job_id).status == "failed"
+        assert reloaded.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate_id)).all() == []
 
 
 def test_scoring_api_hides_missing_and_archived_debates(db) -> None:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import re
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -20,6 +22,19 @@ def load_dev_module():
 
 def load_dev_smoke_module():
     spec = importlib.util.spec_from_file_location("dialectical_dev_smoke", ROOT / "scripts" / "dev_smoke_check.py")
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_v2_worker_judge_smoke_module():
+    spec = importlib.util.spec_from_file_location(
+        "dialectical_v2_worker_judge_smoke",
+        ROOT / "scripts" / "v2_worker_judge_smoke.py",
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -59,6 +74,36 @@ def test_start_dev_masks_token_output_by_default() -> None:
     assert "DIALECTICAL_SHOW_DEV_TOKEN" in script
 
 
+def test_start_dev_already_running_ports_success_requires_canonical_v2_readiness() -> None:
+    script = (ROOT / "scripts" / "start_dev.ps1").read_text(encoding="utf-8")
+    already_running_branch = re.search(
+        r"if \(\(Test-ListeningPort 3000\).*?Dialectical dev stack already appears to be running\..*?exit 0",
+        script,
+        flags=re.DOTALL,
+    )
+
+    assert already_running_branch is not None
+    branch = already_running_branch.group(0)
+    assert "/api/backends/status" in branch
+    assert "v2_generation_readiness" in branch
+    assert "ready" in branch
+
+
+def test_start_dev_newly_started_ports_success_requires_canonical_v2_readiness() -> None:
+    script = (ROOT / "scripts" / "start_dev.ps1").read_text(encoding="utf-8")
+    newly_started_branch = re.search(
+        r"while \(\(Get-Date\).*?Dialectical dev stack started\..*?exit 0",
+        script,
+        flags=re.DOTALL,
+    )
+
+    assert newly_started_branch is not None
+    branch = newly_started_branch.group(0)
+    assert "/api/backends/status" in branch
+    assert "v2_generation_readiness" in branch
+    assert "ready" in branch
+
+
 def test_dev_smoke_wait_for_worker_registration_retries_not_registered(monkeypatch) -> None:
     module = load_dev_smoke_module()
     monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
@@ -85,6 +130,219 @@ def test_dev_smoke_wait_for_worker_registration_retries_not_registered(monkeypat
 
     assert calls["count"] == 2
     assert worker["name"] == "mac-mini"
+
+
+def test_v2_worker_judge_smoke_rejects_mock_worker_readiness() -> None:
+    module = load_v2_worker_judge_smoke_module()
+
+    report = module.evaluate_v2_worker_judge_smoke(
+        fetch_json=lambda _url, **_kwargs: {
+            "v2_generation_readiness": {
+                "ready": True,
+                "reason_code": "ready",
+                "required_model": "codex-gpt-5.5",
+                "online_worker_names": ["mock-local"],
+            },
+            "workers": [
+                {
+                    "name": "mock-local",
+                    "status": "online",
+                    "capabilities": ["mock-local", "codex-gpt-5.5"],
+                }
+            ],
+        },
+        base_url="http://localhost:8000",
+        debate_id="debate-1",
+    )
+
+    assert report["status"] == "unavailable"
+    assert report["checks"]["v2_readiness"]["status"] == "failed"
+    assert "mock/local/deterministic" in report["checks"]["v2_readiness"]["reason"]
+    assert report["checks"]["scoring_lifecycle"]["status"] == "not_checked"
+
+
+def test_v2_worker_judge_smoke_does_not_pass_without_scoring_lifecycle_proof() -> None:
+    module = load_v2_worker_judge_smoke_module()
+
+    def fetch_json(url: str, **_kwargs):
+        if url.endswith("/api/backends/status"):
+            return {
+                "v2_generation_readiness": {
+                    "ready": True,
+                    "reason_code": "ready",
+                    "required_model": "codex-gpt-5.5",
+                    "online_worker_names": ["VLADWORKS"],
+                },
+                "workers": [
+                    {
+                        "name": "VLADWORKS",
+                        "status": "online",
+                        "capabilities": ["codex-gpt-5.5"],
+                    }
+                ],
+            }
+        if url.endswith("/api/debates/debate-1/scoring"):
+            return {
+                "debate_id": "debate-1",
+                "status": "unavailable",
+                "items": [],
+                "reason": "No scoring judge outputs are available for this debate.",
+            }
+        raise AssertionError(f"unexpected URL {url}")
+
+    report = module.evaluate_v2_worker_judge_smoke(
+        fetch_json=fetch_json,
+        base_url="http://localhost:8000",
+        debate_id="debate-1",
+    )
+
+    assert report["status"] == "unavailable"
+    assert report["checks"]["v2_readiness"]["status"] == "passed"
+    assert report["checks"]["scoring_lifecycle"]["status"] == "failed"
+    assert "No scoring judge outputs" in report["checks"]["scoring_lifecycle"]["reason"]
+
+
+def test_v2_worker_judge_smoke_does_not_pass_without_db_persistence_proof(tmp_path) -> None:
+    module = load_v2_worker_judge_smoke_module()
+    db_path = tmp_path / "missing.sqlite3"
+
+    def fetch_json(url: str, **_kwargs):
+        if url.endswith("/api/backends/status"):
+            return {
+                "v2_generation_readiness": {
+                    "ready": True,
+                    "reason_code": "ready",
+                    "required_model": "codex-gpt-5.5",
+                    "online_worker_names": ["VLADWORKS"],
+                },
+                "workers": [
+                    {
+                        "name": "VLADWORKS",
+                        "status": "online",
+                        "capabilities": ["codex-gpt-5.5"],
+                    }
+                ],
+            }
+        if url.endswith("/api/debates/debate-1/scoring"):
+            return {
+                "debate_id": "debate-1",
+                "status": "available",
+                "items": [{"node_id": "node-1", "score": 0.7}],
+            }
+        raise AssertionError(f"unexpected URL {url}")
+
+    report = module.evaluate_v2_worker_judge_smoke(
+        fetch_json=fetch_json,
+        base_url="http://localhost:8000",
+        debate_id="debate-1",
+        database_url=f"sqlite:///{db_path}",
+    )
+
+    assert report["status"] == "unavailable"
+    assert report["checks"]["scoring_lifecycle"]["status"] == "passed"
+    assert report["checks"]["db_persistence"]["status"] == "failed"
+    assert "read-only" in report["checks"]["db_persistence"]["reason"]
+
+
+def test_v2_worker_judge_smoke_requires_persisted_judge_artifacts(tmp_path) -> None:
+    module = load_v2_worker_judge_smoke_module()
+    db_path = tmp_path / "db.sqlite3"
+    with sqlite3.connect(db_path) as db:
+        db.executescript(
+            """
+            CREATE TABLE analyzer_runs (
+                id TEXT PRIMARY KEY,
+                debate_id TEXT,
+                analyzer_type TEXT,
+                output TEXT,
+                status TEXT,
+                provenance TEXT,
+                created_at TEXT
+            );
+            CREATE TABLE judge_output_artifacts (
+                id TEXT PRIMARY KEY,
+                debate_id TEXT,
+                node_id TEXT,
+                analyzer_run_id TEXT,
+                judge_role TEXT,
+                provider TEXT,
+                model TEXT,
+                raw_output TEXT,
+                raw_output_sha256 TEXT,
+                parse_status TEXT,
+                created_at TEXT
+            );
+            INSERT INTO analyzer_runs (
+                id, debate_id, analyzer_type, output, status, provenance, created_at
+            ) VALUES (
+                'run-1',
+                'debate-1',
+                'node_scoring',
+                '{"items":[{"node_id":"node-1","score":0.7}]}',
+                'complete',
+                '{"scoring_source":"judge_outputs"}',
+                '2026-07-06T12:00:00Z'
+            );
+            INSERT INTO judge_output_artifacts (
+                id, debate_id, node_id, analyzer_run_id, judge_role, provider, model,
+                raw_output, raw_output_sha256, parse_status, created_at
+            ) VALUES (
+                'artifact-1',
+                'debate-1',
+                'node-1',
+                'run-1',
+                'judge',
+                'codex',
+                'codex-gpt-5.5',
+                '{"score":0.7}',
+                '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+                'available',
+                '2026-07-06T12:00:01Z'
+            );
+            """
+        )
+
+    report = module.evaluate_v2_worker_judge_smoke(
+        fetch_json=lambda url, **_kwargs: (
+            {
+                "v2_generation_readiness": {
+                    "ready": True,
+                    "reason_code": "ready",
+                    "required_model": "codex-gpt-5.5",
+                    "online_worker_names": ["VLADWORKS"],
+                },
+                "workers": [
+                    {
+                        "name": "VLADWORKS",
+                        "status": "online",
+                        "capabilities": ["codex-gpt-5.5"],
+                    }
+                ],
+            }
+            if url.endswith("/api/backends/status")
+            else {
+                "debate_id": "debate-1",
+                "status": "available",
+                "items": [{"node_id": "node-1", "score": 0.7}],
+            }
+        ),
+        base_url="http://localhost:8000",
+        debate_id="debate-1",
+        database_url=f"sqlite:///{db_path}",
+    )
+
+    assert report["status"] == "passed"
+    assert report["checks"]["db_persistence"]["status"] == "passed"
+    assert report["checks"]["db_persistence"]["artifact_count"] == 1
+    assert report["checks"]["db_persistence"]["analyzer_run_id"] == "run-1"
+
+
+def test_makefile_exposes_v2_worker_judge_smoke_target() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "V2_WORKER_JUDGE_SMOKE_FLAGS ?=" in makefile
+    assert "v2-worker-judge-smoke:" in makefile
+    assert 'scripts/v2_worker_judge_smoke.py $(V2_WORKER_JUDGE_SMOKE_FLAGS)' in makefile
 
 
 def test_make_dev_topology_defaults_to_goal_ports_and_worker_a() -> None:

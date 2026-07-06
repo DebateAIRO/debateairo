@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Response, status
@@ -9,9 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth import bearer_token, require_user_token
-from app.core.db import SessionLocal, get_db
+from app.core.db import get_db
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
+from app.models.entities import Debate, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
 from app.scoring import get_adaptive_depth_dry_run as get_adaptive_depth_dry_run_payload
@@ -19,15 +18,21 @@ from app.scoring import get_debate_scoring as get_debate_scoring_payload
 from app.scoring import queue_scoring_job
 from app.scoring import record_approved_adaptive_expansion
 from app.scoring import score_debate_with_provider_registry
+from app.scoring.jobs import run_scoring_job_background, wake_pending_internal_scoring_job
 from app.scoring.models import ManualInvestigationRequest, ManualInvestigationResponse
-from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
-from app.scoring.service import attach_feedback_to_scoring_payload, feedback_summary_for_nodes
+from app.scoring.service import (
+    ACTIVE_SCORING_JOB_STATUSES,
+    STALE_SCORING_JOB_ERROR,
+    UNAVAILABLE_SCORING_JOB_ERROR,
+    attach_feedback_to_scoring_payload,
+    fail_unavailable_scoring_job,
+    feedback_summary_for_nodes,
+)
 from app.services.orchestrator import regenerate_node
 
 router = APIRouter(prefix="/api/debates", tags=["scoring"])
 
 MAX_ADAPTIVE_DEPTH_APPROVAL_EXPANSIONS = 3
-SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
 
 
 class AdaptiveDepthApprovalRequest(BaseModel):
@@ -70,21 +75,6 @@ def public_scoring_job_status(status: str) -> str:
     return "failed"
 
 
-def _current_scoring_branch(db: Session, debate: Debate) -> DebateBranch:
-    branch = db.scalars(
-        select(DebateBranch)
-        .where(DebateBranch.debate_id == debate.id)
-        .order_by(DebateBranch.created_at.desc(), DebateBranch.id.desc())
-        .limit(1)
-    ).first()
-    if branch is not None:
-        return branch
-    branch = DebateBranch(debate_id=debate.id, root_node_id=debate.root_node_id, status="active")
-    db.add(branch)
-    db.flush()
-    return branch
-
-
 @router.get("/{debate_id}/scoring/jobs/{job_id}")
 def get_scoring_job_status(
     debate_id: str,
@@ -97,6 +87,7 @@ def get_scoring_job_status(
     job = db.get(Job, job_id)
     if not job or job.debate_id != debate.id or job.job_type != "score_debate":
         raise HTTPException(status_code=404, detail="Scoring job not found")
+    _expire_stale_scoring_job(db, job)
     payload = {
         "debate_id": debate.id,
         "job_id": job.id,
@@ -105,6 +96,14 @@ def get_scoring_job_status(
     if job.status == "failed" and job.error:
         payload["error"] = job.error
     return payload
+
+
+def _expire_stale_scoring_job(db: Session, job: Job) -> None:
+    if job.status not in ACTIVE_SCORING_JOB_STATUSES or job.deadline >= now_utc():
+        return
+    job.status = "failed"
+    job.error = STALE_SCORING_JOB_ERROR
+    commit_write(db)
 
 
 @router.post("/{debate_id}/scoring/jobs", status_code=status.HTTP_202_ACCEPTED)
@@ -121,10 +120,17 @@ def start_scoring_job(
     registry = scoring_provider_registry_dependency()
     scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
     if not scoring_config.available or scoring_config.model is None:
-        raise HTTPException(status_code=503, detail=scoring_config.reason or "No scoring provider is configured")
-    job = queue_scoring_job(db, debate, model_id=scoring_config.model)
+        job = fail_unavailable_scoring_job(
+            db,
+            debate,
+            model_id=scoring_config.model or "",
+            reason=UNAVAILABLE_SCORING_JOB_ERROR,
+        )
+    else:
+        job = queue_scoring_job(db, debate, model_id=scoring_config.model)
     commit_write(db)
-    background_tasks.add_task(_run_scoring_job_background, job.id, debate.id)
+    if job.status != "failed":
+        background_tasks.add_task(_run_scoring_job_background, job.id, debate.id)
     payload = {
         "debate_id": debate.id,
         "job_id": job.id,
@@ -136,60 +142,22 @@ def start_scoring_job(
 
 
 def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
-    with SessionLocal() as db:
-        job = db.get(Job, job_id)
-        debate = db.get(Debate, debate_id)
-        if not job or not debate or debate.status == "archived":
-            return
-        registry = scoring_provider_registry_dependency()
-        job.status = "running"
-        job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
-        job.error = None
-        commit_write(db)
-        try:
-            scoring_payload = score_debate_with_provider_registry(db, debate, registry, force_refresh=True)
-            branch = _current_scoring_branch(db, debate)
-            db.add(
-                AnalyzerRun(
-                    debate_id=debate.id,
-                    branch_id=branch.id,
-                    analyzer_type=SCORING_ANALYZER_TYPE,
-                    status="complete",
-                    output=scoring_payload,
-                    provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
-                )
-            )
-            job.status = "complete"
-            job.error = None
-        except Exception as exc:
-            job.status = "failed"
-            job.error = str(exc)
-        commit_write(db)
+    run_scoring_job_background(
+        job_id,
+        debate_id,
+        registry_factory=scoring_provider_registry_dependency,
+        scoring_runner=score_debate_with_provider_registry,
+    )
 
 
 def _wake_pending_internal_scoring_job(db: Session, debate: Debate, background_tasks: BackgroundTasks) -> Job | None:
-    job = db.scalars(
-        select(Job)
-        .where(
-            Job.debate_id == debate.id,
-            Job.job_type == "score_debate",
-            Job.status == "pending",
-        )
-        .order_by(Job.created_at.desc(), Job.id.desc())
-        .limit(1)
-    ).first()
-    if job is None:
-        return None
-    registry = scoring_provider_registry_dependency()
-    scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
-    if not scoring_config.available:
-        return None
-    job.status = "claimed"
-    job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
-    job.error = None
-    commit_write(db)
-    background_tasks.add_task(_run_scoring_job_background, job.id, debate.id)
-    return job
+    return wake_pending_internal_scoring_job(
+        db,
+        debate,
+        background_tasks,
+        registry_factory=scoring_provider_registry_dependency,
+        background_runner=_run_scoring_job_background,
+    )
 
 
 @router.get("/{debate_id}/scoring", response_model=DebateScoringWithFeedbackResponse, response_model_exclude_none=True)

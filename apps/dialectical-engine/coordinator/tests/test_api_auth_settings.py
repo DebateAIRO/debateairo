@@ -432,6 +432,32 @@ def test_backend_status_requeues_active_jobs_for_stale_worker(db) -> None:
     assert refreshed_debate.status == "generating"
 
 
+def test_backend_status_includes_canonical_v2_generation_readiness_without_secrets(db) -> None:
+    worker = Worker(
+        name="mock-worker-codex-alias",
+        token_hash=hash_token("super-secret-worker-token"),
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    db.commit()
+
+    response = TestClient(app).get("/api/backends/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    readiness = payload["v2_generation_readiness"]
+    assert readiness["ready"] is False
+    assert readiness["required_model"] == "codex-gpt-5.5"
+    assert readiness["reason_code"] == "mock_or_deterministic_only"
+    assert readiness["reason"]
+    assert readiness["online_worker_names"] == []
+    assert readiness["known_worker_names"] == ["mock-worker-codex-alias"]
+    assert "super-secret-worker-token" not in str(payload)
+    assert "token_hash" not in str(payload)
+
+
 def test_worker_registration_rejects_blank_identity_or_capabilities(db) -> None:
     _public_hits.clear()
     client = TestClient(app)

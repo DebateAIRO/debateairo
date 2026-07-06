@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,9 @@ from app.services.orchestrator import (
     create_generation,
     create_job,
     merged_debate_config,
+    routing_allowed_models,
     sanitize_text,
+    worker_capability_set,
 )
 from app.providers import ProviderRegistry
 from app.scoring.service import ensure_node_scoring_on_completion
@@ -73,6 +76,16 @@ AgentCapability = AgentDefinition
 SkillCapability = SkillDefinition
 AgentOutput = AgentRun
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class V2GenerationReadiness:
+    ready: bool
+    required_model: str
+    reason: str
+    reason_code: str
+    online_worker_names: list[str]
+    known_worker_names: list[str]
 
 
 def _log_event_publish_exception(task: asyncio.Task[None]) -> None:
@@ -163,8 +176,81 @@ def overlap_score(candidate_tags: Iterable[str], target_tags: Iterable[str]) -> 
     return len(set(candidate_tags) & set(target_tags))
 
 
+def _worker_name(worker: Worker) -> str:
+    return str(worker.name or worker.id or "").strip()
+
+
+def _is_mock_or_deterministic_worker(worker: Worker) -> bool:
+    markers = ("mock", "fake", "deterministic", "local")
+    name = _worker_name(worker).lower()
+    return any(marker in name for marker in markers)
+
+
+def _real_v2_codex_workers(workers: Iterable[Worker]) -> list[Worker]:
+    return [
+        worker
+        for worker in workers
+        if V2_CODEX_MODEL_ID in worker_capability_set(worker)
+        and not _is_mock_or_deterministic_worker(worker)
+    ]
+
+
+def v2_generation_readiness(db: Session) -> V2GenerationReadiness:
+    workers = list(db.scalars(select(Worker).order_by(Worker.created_at.asc(), Worker.id.asc())).all())
+    known_worker_names = [_worker_name(worker) for worker in workers if _worker_name(worker)]
+    capable_workers = [worker for worker in workers if V2_CODEX_MODEL_ID in worker_capability_set(worker)]
+
+    allowed = routing_allowed_models(db)
+    if allowed is not None and V2_CODEX_MODEL_ID not in allowed:
+        return V2GenerationReadiness(
+            ready=False,
+            required_model=V2_CODEX_MODEL_ID,
+            reason=f"{V2_CODEX_MODEL_ID} is not currently allowed for routing.",
+            reason_code="offline_real_worker",
+            online_worker_names=[],
+            known_worker_names=known_worker_names,
+        )
+
+    online_workers = capable_online_workers(db, V2_CODEX_MODEL_ID)
+    online_real_workers = _real_v2_codex_workers(online_workers)
+    if online_real_workers:
+        return V2GenerationReadiness(
+            ready=True,
+            required_model=V2_CODEX_MODEL_ID,
+            reason=f"Real {V2_CODEX_MODEL_ID} worker is online.",
+            reason_code="ready",
+            online_worker_names=[_worker_name(worker) for worker in online_real_workers if _worker_name(worker)],
+            known_worker_names=known_worker_names,
+        )
+
+    if not workers:
+        reason_code = "no_workers"
+        reason = "No workers are known to the coordinator."
+    elif capable_workers and all(_is_mock_or_deterministic_worker(worker) for worker in capable_workers):
+        reason_code = "mock_or_deterministic_only"
+        reason = f"Only mock, local, or deterministic workers advertise {V2_CODEX_MODEL_ID}."
+    elif any(worker.status == "offline" for worker in _real_v2_codex_workers(capable_workers)):
+        reason_code = "offline_real_worker"
+        reason = f"A real {V2_CODEX_MODEL_ID} worker is known but marked offline."
+    elif _real_v2_codex_workers(capable_workers):
+        reason_code = "stale_real_worker"
+        reason = f"A real {V2_CODEX_MODEL_ID} worker is known but stale or not currently online."
+    else:
+        reason_code = "mock_or_deterministic_only"
+        reason = f"No real {V2_CODEX_MODEL_ID} worker is online."
+
+    return V2GenerationReadiness(
+        ready=False,
+        required_model=V2_CODEX_MODEL_ID,
+        reason=reason,
+        reason_code=reason_code,
+        online_worker_names=[],
+        known_worker_names=known_worker_names,
+    )
+
+
 def require_v2_codex_model(db: Session) -> str:
-    if capable_online_workers(db, V2_CODEX_MODEL_ID):
+    if v2_generation_readiness(db).ready:
         return V2_CODEX_MODEL_ID
     raise RuntimeError(NO_REAL_CODEX_WORKER_ERROR)
 
@@ -669,7 +755,6 @@ def create_completed_node(
         generation.model_id = str(provenance.get("model_id") or job.required_model)
         generation.role = node_type if node_type in {"PRO", "CON"} else job.required_role
     node.status = "complete"
-    ensure_default_scoring_for_completed_v2_node(db, debate, node)
     return node
 
 
@@ -695,7 +780,6 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         generation.role = job.required_role
     pov_node.claim = job.required_role
     pov_node.status = "complete"
-    ensure_default_scoring_for_completed_v2_node(db, debate, pov_node)
 
     pro_node = create_completed_node(
         db,
@@ -794,6 +878,9 @@ def persist_v2_synthesis(
     debate.status = "complete"
     debate.completed_at = now_utc()
     record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
+    scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
+    if scoring_node is not None:
+        ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
     commit_write(db)
     publish_event(debate.id, "synthesis_completed", {"debate_id": debate.id, "synthesis_id": synthesis.id, "job_id": job.id})
     publish_event(debate.id, "debate_complete", {"debate_id": debate.id})

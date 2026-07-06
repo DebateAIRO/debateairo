@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -409,7 +410,7 @@ def test_pov_completion_materializes_title_content_and_nested_pro_con_cards(db) 
         assert all(child["status"] == "complete" for child in stance["children"])
 
 
-def test_pov_completion_invokes_default_scoring_for_materialized_nodes(db, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pov_completion_does_not_invoke_default_debate_scoring_before_synthesis(db, monkeypatch: pytest.MonkeyPatch) -> None:
     service = v2_service()
     worker = real_codex_worker(db)
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
@@ -432,17 +433,7 @@ def test_pov_completion_invokes_default_scoring_for_materialized_nodes(db, monke
     assert first_job.job_type == "v2_pov"
     asyncio.run(complete_job(db, first_job, worker_pov_output(worker, first_job.id, first_job.required_role), {"latency_ms": 12}))
 
-    assert [(node_type, claim) for _debate_id, _node_id, node_type, claim in scored_nodes] == [
-        (next(node_type for node_type, label in service.POV_BRANCHES if label == first_job.required_role), first_job.required_role),
-        ("PRO", f"{first_job.required_role} strongest pro"),
-        ("CON", f"{first_job.required_role} strongest con"),
-        ("PRO", f"{first_job.required_role} pro support"),
-        ("CON", f"{first_job.required_role} pro limitation"),
-        ("PRO", f"{first_job.required_role} con support"),
-        ("CON", f"{first_job.required_role} con limitation"),
-    ]
-    assert {debate_id for debate_id, _node_id, _node_type, _claim in scored_nodes} == {debate.id}
-    assert len({node_id for _debate_id, node_id, _node_type, _claim in scored_nodes}) == 7
+    assert scored_nodes == []
     assert db.scalars(select(entities.NodeScoringResult).where(entities.NodeScoringResult.debate_id == debate.id)).all() == []
 
 
@@ -894,6 +885,75 @@ def test_v2_requires_real_codex_capable_worker_even_if_deterministic_worker_exis
 
     with pytest.raises(RuntimeError, match="No real Codex worker online"):
         service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+
+def test_v2_rejects_mock_worker_alias_advertising_protected_codex_model(db) -> None:
+    service = v2_service()
+    worker = Worker(
+        name="mock-worker-codex-alias",
+        token_hash="internal",
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    db.commit()
+
+    with pytest.raises(RuntimeError, match="No real Codex worker online"):
+        service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+
+@pytest.mark.parametrize(
+    ("worker_name", "capabilities", "status", "last_seen_offset", "expected_reason_code"),
+    [
+        (None, [], "online", None, "no_workers"),
+        ("stale-codex", ["codex-gpt-5.5"], "online", timedelta(hours=-2), "stale_real_worker"),
+        ("offline-codex", ["codex-gpt-5.5"], "offline", timedelta(seconds=0), "offline_real_worker"),
+        ("mock-worker-codex-alias", ["codex-gpt-5.5"], "online", timedelta(seconds=0), "mock_or_deterministic_only"),
+    ],
+)
+def test_v2_generation_readiness_reports_canonical_reason_codes(
+    db,
+    worker_name: str | None,
+    capabilities: list[str],
+    status: str,
+    last_seen_offset: timedelta | None,
+    expected_reason_code: str,
+) -> None:
+    service = v2_service()
+    if worker_name is not None:
+        db.add(
+            Worker(
+                name=worker_name,
+                token_hash="internal",
+                capabilities=capabilities,
+                last_seen=now_utc() + (last_seen_offset or timedelta(seconds=0)),
+                status=status,
+            )
+        )
+        db.commit()
+
+    readiness = service.v2_generation_readiness(db)
+
+    assert readiness.ready is False
+    assert readiness.required_model == "codex-gpt-5.5"
+    assert readiness.reason_code == expected_reason_code
+    assert readiness.reason
+    assert "token" not in readiness.reason.lower()
+    assert "secret" not in readiness.reason.lower()
+
+
+def test_v2_generation_readiness_accepts_only_real_online_codex_worker(db) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db, name="VLADWORKS")
+
+    readiness = service.v2_generation_readiness(db)
+
+    assert readiness.ready is True
+    assert readiness.required_model == "codex-gpt-5.5"
+    assert readiness.reason_code == "ready"
+    assert readiness.online_worker_names == [worker.name]
+    assert readiness.known_worker_names == [worker.name]
 
 
 def test_v2_creates_worker_jobs_for_pov_branches_and_synthesis(db) -> None:

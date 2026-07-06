@@ -1,14 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
+from datetime import datetime, timezone
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import event, func, select
+from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
 from app.core.write_lock import commit_write, flush_write
-from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, NodeFeedbackVote, NodeScoringResult, ProvenanceRecord, now_utc, uuid_str
+from app.models.entities import (
+    AnalyzerRun,
+    Debate,
+    Generation,
+    Job,
+    JudgeOutputArtifact,
+    Node,
+    NodeFeedbackVote,
+    NodeScoringResult,
+    ProvenanceRecord,
+    now_utc,
+    uuid_str,
+)
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
 from app.scoring.cache import (
     lookup_scoring_cache,
@@ -16,10 +30,12 @@ from app.scoring.cache import (
     node_scoring_input_hash,
     store_scoring_cache,
 )
+from app.scoring.disagreement import detect_persisted_judge_disagreements
 from app.scoring.judges import ScoringProvider, ScoringProviderRequest, ScoringProviderResult
 from app.scoring.models import (
     AdaptiveDepthDryRunItem,
     AdaptiveDepthPolicy,
+    ClaimAssessment,
     NodeScoringError,
     NodeScoringPending,
     NodeScoringPayload,
@@ -40,6 +56,8 @@ JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES: int | None = None
 SCORING_PROVIDER_MAX_ATTEMPTS = 2
 ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
+STALE_SCORING_JOB_ERROR = "Stale scoring job expired before judge outputs were produced."
+UNAVAILABLE_SCORING_JOB_ERROR = "No scoring provider is configured."
 SECRET_METADATA_MARKERS = (
     "api_key",
     "apikey",
@@ -56,8 +74,34 @@ SECRET_METADATA_MARKERS = (
 )
 
 
+def _normalize_loaded_job_deadline(job: Job, *_args) -> None:
+    if job.job_type != SCORING_JOB_TYPE or job.deadline is None or job.deadline.tzinfo is not None:
+        return
+    attributes.set_committed_value(job, "deadline", job.deadline.replace(tzinfo=timezone.utc))
+
+
+event.listen(Job, "load", _normalize_loaded_job_deadline)
+event.listen(Job, "refresh", _normalize_loaded_job_deadline)
+
+
 def queue_scoring_job(db: Session, debate: Debate, *, model_id: str, judge_role: str = "judge"):
     job = create_job(db, debate.id, SCORING_JOB_TYPE, judge_role, None, required_model=model_id)
+    flush_write(db)
+    return job
+
+
+def fail_unavailable_scoring_job(
+    db: Session,
+    debate: Debate,
+    *,
+    model_id: str = "",
+    judge_role: str = "judge",
+    reason: str = UNAVAILABLE_SCORING_JOB_ERROR,
+) -> Job:
+    job = queue_scoring_job(db, debate, model_id=model_id, judge_role=judge_role)
+    job.status = "failed"
+    job.error = reason
+    job.deadline = now_utc()
     flush_write(db)
     return job
 
@@ -76,6 +120,9 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
     ).first()
     active_job = _active_scoring_job(db, debate.id, newer_than=run.created_at if run else None)
     if not run:
+        hydrated_payload = _hydrate_scoring_payload_from_judge_artifacts(db, debate, node_ids, active_job)
+        if hydrated_payload is not None:
+            return hydrated_payload
         return _attach_active_scoring_job(
             _with_current_node_coverage(_unavailable_payload(debate.id, node_ids=node_ids), node_ids, active_job),
             active_job,
@@ -194,6 +241,83 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
     return _attach_active_scoring_job(payload, active_job)
 
 
+def _hydrate_scoring_payload_from_judge_artifacts(
+    db: Session,
+    debate: Debate,
+    node_ids: list[str],
+    active_job: Job | None,
+) -> dict | None:
+    items: list[dict] = []
+    model_metadata: dict | None = None
+    for node_id in node_ids:
+        item, artifact_metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node_id)
+        if item is None:
+            continue
+        items.append(item)
+        if model_metadata is None:
+            model_metadata = artifact_metadata
+    if not items:
+        return None
+    payload = {
+        "debate_id": debate.id,
+        "status": "available",
+        "node_ids": node_ids,
+        "items": items,
+        "producer": "persisted-judge-artifacts",
+        "cache": {"hit": False},
+    }
+    if model_metadata is not None:
+        payload["model_metadata"] = model_metadata
+    payload = _with_current_node_coverage(payload, node_ids, active_job)
+    return _attach_active_scoring_job(payload, active_job)
+
+
+def _hydrate_node_scoring_item_from_judge_artifact(
+    db: Session,
+    debate: Debate,
+    node_id: str,
+) -> tuple[dict | None, dict | None]:
+    node = db.get(Node, node_id)
+    if node is None:
+        return None, None
+    generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
+    claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    artifact = db.scalars(
+        select(JudgeOutputArtifact)
+        .where(
+            JudgeOutputArtifact.debate_id == debate.id,
+            JudgeOutputArtifact.node_id == node.id,
+            JudgeOutputArtifact.input_hash == input_hash,
+            JudgeOutputArtifact.parse_status == "available",
+            JudgeOutputArtifact.assessment.is_not(None),
+        )
+        .order_by(JudgeOutputArtifact.checked_at.desc(), JudgeOutputArtifact.created_at.desc(), JudgeOutputArtifact.id.desc())
+        .limit(1)
+    ).first()
+    if artifact is None or not isinstance(artifact.assessment, dict):
+        return None, None
+    try:
+        assessment = ClaimAssessment.model_validate(artifact.assessment)
+    except ValidationError:
+        return None, None
+    item = reduce_assessments(claim, assessment).model_dump(mode="json")
+    item = _attach_plural_judge_provenance(
+        db,
+        item,
+        debate_id=debate.id,
+        node_id=node.id,
+        input_hash=input_hash,
+    )
+    metadata = ScoringModelMetadata(
+        provider=_public_metadata_text(artifact.provider),
+        model=_public_metadata_text(artifact.model),
+        checked_at=artifact.checked_at.isoformat() if artifact.checked_at else None,
+        status="available",
+    ).model_dump(mode="json")
+    return item, metadata
+
+
 def score_one_node_with_provider(
     db: Session,
     debate: Debate,
@@ -303,6 +427,18 @@ def score_node_with_provider(
             node_ids=node_ids,
         )
     parsed = parse_judge_json(result.raw_output)
+    _persist_judge_output_artifact(
+        db,
+        debate_id=debate.id,
+        node_id=node.id,
+        input_hash=input_hash,
+        judge_role=judge_role,
+        request=request,
+        result=result,
+        parse_status="available" if parsed.status == "available" and parsed.assessment is not None else "unavailable",
+        parse_error=None if parsed.status == "available" and parsed.assessment is not None else parsed.reason,
+        assessment=parsed.assessment.model_dump(mode="json") if parsed.assessment is not None else None,
+    )
     if parsed.status != "available" or parsed.assessment is None:
         payload = _unavailable_payload(
             debate.id,
@@ -326,6 +462,13 @@ def score_node_with_provider(
             db.flush()
         return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
     item = reduce_assessments(claim, parsed.assessment).model_dump(mode="json")
+    item = _attach_plural_judge_provenance(
+        db,
+        item,
+        debate_id=debate.id,
+        node_id=node.id,
+        input_hash=input_hash,
+    )
     payload = {
         "debate_id": debate.id,
         "status": "available",
@@ -498,6 +641,222 @@ def score_nodes_with_provider(
     return payload
 
 
+def _persist_judge_output_artifact(
+    db: Session,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+    judge_role: str,
+    request: ScoringProviderRequest,
+    result: ScoringProviderResult,
+    parse_status: str,
+    parse_error: str | None,
+    assessment: dict | None,
+) -> JudgeOutputArtifact:
+    raw_output_sha256 = hashlib.sha256(result.raw_output.encode("utf-8")).hexdigest()
+    artifact = db.scalar(
+        select(JudgeOutputArtifact).where(
+            JudgeOutputArtifact.debate_id == debate_id,
+            JudgeOutputArtifact.node_id == node_id,
+            JudgeOutputArtifact.input_hash == input_hash,
+            JudgeOutputArtifact.judge_role == judge_role,
+            JudgeOutputArtifact.provider == result.provider,
+            JudgeOutputArtifact.model == result.model,
+            JudgeOutputArtifact.raw_output_sha256 == raw_output_sha256,
+        )
+    )
+    if artifact is None:
+        artifact = JudgeOutputArtifact(
+            debate_id=debate_id,
+            node_id=node_id,
+            input_hash=input_hash,
+            judge_role=judge_role,
+            provider=result.provider,
+            model=result.model,
+            raw_output=result.raw_output,
+            raw_output_sha256=raw_output_sha256,
+        )
+        db.add(artifact)
+    current_job_id = _current_scoring_job_id(db, debate_id)
+    if current_job_id is not None and artifact.job_id != current_job_id:
+        artifact.job_id = current_job_id
+        artifact.analyzer_run_id = None
+    elif artifact.job_id is None:
+        artifact.job_id = current_job_id
+    artifact.prompt_version = _artifact_prompt_version(request, result)
+    artifact.request_metadata = _private_request_metadata(request)
+    artifact.parse_status = parse_status
+    artifact.parse_error = _public_metadata_text(parse_error)
+    artifact.assessment = assessment
+    artifact.provider_metadata = _private_provider_metadata(result.metadata)
+    artifact.latency_ms = _public_latency_ms(result.latency_ms)
+    artifact.checked_at = _artifact_checked_at(result.checked_at)
+    db.flush()
+    return artifact
+
+
+def _attach_plural_judge_provenance(
+    db: Session,
+    item: dict,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+) -> dict:
+    judge_evidence = _persisted_judge_evidence_for_node(
+        db,
+        debate_id=debate_id,
+        node_id=node_id,
+        input_hash=input_hash,
+    )
+    if len(judge_evidence) < 2:
+        return item
+    disagreements = detect_persisted_judge_disagreements(judge_evidence)
+    next_item = dict(item)
+    provenance = dict(next_item.get("score_provenance") or {})
+    provenance["judge_participation"] = {
+        "plural_judges": True,
+        "judge_count": len(judge_evidence),
+        "judge_roles": sorted({str(evidence["judge_role"]) for evidence in judge_evidence}),
+    }
+    provenance["disagreement_status"] = {
+        "status": "present" if disagreements else "none",
+        "derived_from": "persisted_judge_artifacts",
+    }
+    next_item["score_provenance"] = provenance
+    if disagreements:
+        next_item["judge_disagreements"] = [item.model_dump(mode="json") for item in disagreements]
+    return next_item
+
+
+def _persisted_judge_evidence_for_node(
+    db: Session,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+) -> list[dict]:
+    artifacts = db.scalars(
+        select(JudgeOutputArtifact)
+        .where(
+            JudgeOutputArtifact.debate_id == debate_id,
+            JudgeOutputArtifact.node_id == node_id,
+            JudgeOutputArtifact.input_hash == input_hash,
+            JudgeOutputArtifact.parse_status == "available",
+            JudgeOutputArtifact.assessment.is_not(None),
+        )
+        .order_by(
+            JudgeOutputArtifact.judge_role.asc(),
+            JudgeOutputArtifact.provider.asc(),
+            JudgeOutputArtifact.model.asc(),
+            JudgeOutputArtifact.created_at.asc(),
+            JudgeOutputArtifact.id.asc(),
+        )
+    ).all()
+    evidence: list[dict] = []
+    seen_identities: set[tuple[str, str, str]] = set()
+    seen_outputs: set[str] = set()
+    for artifact in artifacts:
+        identity = (artifact.judge_role, artifact.provider, artifact.model)
+        if identity in seen_identities or artifact.raw_output_sha256 in seen_outputs:
+            continue
+        evidence.append(
+            {
+                "judge_role": artifact.judge_role,
+                "provider": artifact.provider,
+                "model": artifact.model,
+                "raw_output_sha256": artifact.raw_output_sha256,
+                "assessment": artifact.assessment,
+            }
+        )
+        seen_identities.add(identity)
+        seen_outputs.add(artifact.raw_output_sha256)
+    return evidence
+
+
+def _current_scoring_job_id(db: Session, debate_id: str) -> str | None:
+    job = db.scalars(
+        select(Job)
+        .where(
+            Job.debate_id == debate_id,
+            Job.job_type == SCORING_JOB_TYPE,
+            Job.status.in_(ACTIVE_SCORING_JOB_STATUSES | {"complete"}),
+        )
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .limit(1)
+    ).first()
+    return job.id if job is not None else None
+
+
+def _artifact_prompt_version(request: ScoringProviderRequest, result: ScoringProviderResult) -> str | None:
+    metadata_prompt_version = result.metadata.get("prompt_version") if isinstance(result.metadata, dict) else None
+    return _public_metadata_text(metadata_prompt_version) or _public_metadata_text(request.prompt_version)
+
+
+def _private_request_metadata(request: ScoringProviderRequest) -> dict:
+    metadata: dict[str, object] = {
+        "prompt_version": request.prompt_version,
+        "timeout_seconds": request.timeout_seconds,
+    }
+    if request.metadata:
+        metadata["metadata"] = _private_provider_metadata(request.metadata)
+    return {key: value for key, value in metadata.items() if value not in (None, {}, [])}
+
+
+def _private_provider_metadata(value: object) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    allowed_keys = {
+        "id",
+        "provider_response_id",
+        "response_id",
+        "request_id",
+        "model",
+        "provider",
+        "finish_reason",
+        "stop_reason",
+        "usage",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+    }
+    sanitized: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or key not in allowed_keys:
+            continue
+        sanitized_item = _private_metadata_value(item)
+        if sanitized_item is not None:
+            sanitized[key] = sanitized_item
+    return sanitized
+
+
+def _private_metadata_value(value: object) -> object | None:
+    if isinstance(value, str):
+        return _public_metadata_text(value)
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int | float):
+        return value
+    if isinstance(value, list):
+        sanitized_list = [_private_metadata_value(item) for item in value]
+        return [item for item in sanitized_list if item is not None]
+    if isinstance(value, dict):
+        return _private_provider_metadata(value)
+    return None
+
+
+def _artifact_checked_at(value: object) -> datetime:
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+    return now_utc()
+
+
 class RegistryScoringProvider:
     def __init__(self, registry: ProviderRegistry, *, judge_role: str = "judge") -> None:
         status = detect_scoring_provider_config(
@@ -513,6 +872,10 @@ class RegistryScoringProvider:
         self.model = status.model
 
     def judge_node(self, request: ScoringProviderRequest) -> ScoringProviderResult:
+        provider = self.registry.providers[self.provider]
+        direct_judge_node = getattr(provider, "judge_node", None)
+        if callable(direct_judge_node):
+            return direct_judge_node(request)
         try:
             response = self.registry.generate_for_role(
                 self.judge_role,
@@ -585,12 +948,14 @@ def ensure_node_scoring_on_completion(
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    _expire_stale_scoring_jobs(db, debate.id)
     config = detect_scoring_provider_config(
         registry.agents,
         role=judge_role,
         providers=registry.providers,
     )
     if not config.available or config.provider is None or config.model is None:
+        fail_unavailable_scoring_job(db, debate, model_id=config.model or "", judge_role=judge_role)
         return scoring_result_payload(
             debate_id=debate.id,
             node_ids=node_ids,
@@ -868,6 +1233,7 @@ def _unavailable_payload(
 
 
 def _active_scoring_job(db: Session, debate_id: str, *, newer_than) -> Job | None:
+    _expire_stale_scoring_jobs(db, debate_id)
     query = select(Job).where(
         Job.debate_id == debate_id,
         Job.job_type == SCORING_JOB_TYPE,
@@ -877,6 +1243,22 @@ def _active_scoring_job(db: Session, debate_id: str, *, newer_than) -> Job | Non
     if newer_than is not None:
         query = query.where(Job.created_at >= newer_than)
     return db.scalars(query.order_by(Job.created_at.desc(), Job.id.desc()).limit(1)).first()
+
+
+def _expire_stale_scoring_jobs(db: Session, debate_id: str) -> None:
+    stale_jobs = db.scalars(
+        select(Job).where(
+            Job.debate_id == debate_id,
+            Job.job_type == SCORING_JOB_TYPE,
+            Job.status.in_(ACTIVE_SCORING_JOB_STATUSES),
+            Job.deadline < now_utc(),
+        )
+    ).all()
+    for job in stale_jobs:
+        job.status = "failed"
+        job.error = STALE_SCORING_JOB_ERROR
+    if stale_jobs:
+        commit_write(db)
 
 
 def _public_scoring_job_status(status: str) -> str:

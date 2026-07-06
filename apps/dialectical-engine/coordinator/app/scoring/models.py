@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 ClaimType = Literal[
@@ -306,6 +306,8 @@ class ScoringDebug(BaseModel):
 
 
 class ScoreProvenance(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     raw_judge_output_kind: Literal["claim_assessment"]
     raw_judge_output_included: Literal[False] = False
     final_score_source: Literal["deterministic_reducer"]

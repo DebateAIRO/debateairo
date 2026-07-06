@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Literal, Optional
 
@@ -14,6 +15,7 @@ from app.core.config import load_settings, new_secret_token
 from app.core.db import get_db
 from app.core.write_lock import commit_write
 from app.models.entities import Worker, now_utc
+from app.services.dialectical_v2 import v2_generation_readiness
 from app.services.orchestrator import (
     claim_pending_job,
     mark_worker_seen,
@@ -155,6 +157,7 @@ def backend_status(db: Annotated[Session, Depends(get_db)]) -> dict[str, object]
             worker.status = "offline"
     commit_write(db)
     return {
+        "v2_generation_readiness": asdict(v2_generation_readiness(db)),
         "workers": [
             {
                 "id": worker.id,

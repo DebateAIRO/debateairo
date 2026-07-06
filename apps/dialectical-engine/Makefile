@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev dev-real dev-smoke real-codex-scoring-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
+.PHONY: dev dev-real dev-smoke real-codex-scoring-smoke v2-worker-judge-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
 
 PYTHON ?= $(shell if [ -f "$(CURDIR)/.venv/Scripts/python.exe" ]; then printf '%s\n' "$(CURDIR)/.venv/Scripts/python.exe"; exit; fi; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; exit; fi; for py in "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -f "$$py" ] || [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if command -v python3 >/dev/null 2>&1; then command -v python3; fi)
 PNPM ?= $(shell command -v pnpm)
@@ -20,6 +20,7 @@ ROMARG_NAMESERVER_CARD ?= Romarg_Nameservers_To_Set.md
 FINAL_SINGLE_MACHINE_REPORT ?= /private/tmp/dialectical-final-single-machine-check.json
 FINAL_SINGLE_MACHINE_FLAGS ?=
 SCORING_SMOKE_FLAGS ?=
+V2_WORKER_JUDGE_SMOKE_FLAGS ?=
 RESTART_WORKER ?= 1
 COORDINATOR_URL ?= http://localhost:8000
 WEB_URL ?=
@@ -95,6 +96,9 @@ dev-smoke:
 
 real-codex-scoring-smoke:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/real_codex_scoring_smoke.py $(SCORING_SMOKE_FLAGS)
+
+v2-worker-judge-smoke:
+	$(PYTHON_ENV) "$(PYTHON)" scripts/v2_worker_judge_smoke.py $(V2_WORKER_JUDGE_SMOKE_FLAGS)
 
 test:
 	cd coordinator && PYTHONPYCACHEPREFIX="$(TEST_PYCACHE_PREFIX)" PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 $(PYTHON_ENV) "$(PYTHON)" -m pytest -p pytest_cov.plugin -p pytest_asyncio.plugin tests --cov=app/services --cov-report=term-missing --cov-fail-under=70

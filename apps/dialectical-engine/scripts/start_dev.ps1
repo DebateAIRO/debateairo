@@ -46,10 +46,59 @@ function Test-ListeningPort {
     return $null -ne $connection
 }
 
-if ((Test-ListeningPort 3000) -and (Test-ListeningPort 8000)) {
-    Write-Output "Dialectical dev stack already appears to be running."
+function Get-V2GenerationReadiness {
+    $Headers = @{}
+    if ($env:DIALECTICAL_USER_TOKEN) {
+        $Headers["Authorization"] = "Bearer $($env:DIALECTICAL_USER_TOKEN)"
+    }
+    try {
+        $Status = Invoke-RestMethod `
+            -Uri "http://127.0.0.1:8000/api/backends/status" `
+            -Headers $Headers `
+            -TimeoutSec 5
+        return $Status.v2_generation_readiness
+    } catch {
+        return [pscustomobject]@{
+            ready = $false
+            reason = "Canonical backend readiness check failed."
+            reason_code = "backend_status_unavailable"
+        }
+    }
+}
+
+function Write-DevStackReady {
+    param(
+        [string] $StartedMessage,
+        [string] $LogsPath = "",
+        $Readiness = $null
+    )
+    if ($null -eq $Readiness) {
+        $Readiness = Get-V2GenerationReadiness
+    }
+    Write-Output $StartedMessage
     Write-Output "Web: http://127.0.0.1:3000"
     Write-Output "Token: $(Format-DevSecret $env:DIALECTICAL_USER_TOKEN)"
+    if ($LogsPath) {
+        Write-Output "Logs: $LogsPath"
+    }
+    if ($Readiness -and $Readiness.ready -eq $true) {
+        Write-Output "V2 generation readiness: ready"
+        return
+    }
+    $Reason = "Real codex-gpt-5.5 worker is required."
+    if ($Readiness -and $Readiness.reason) {
+        $Reason = $Readiness.reason
+    }
+    $ReasonCode = ""
+    if ($Readiness -and $Readiness.reason_code) {
+        $ReasonCode = " ($($Readiness.reason_code))"
+    }
+    Write-Output "Coordinator/web are up, but V2 generation is not ready: $Reason$ReasonCode"
+}
+
+if ((Test-ListeningPort 3000) -and (Test-ListeningPort 8000)) {
+    $Readiness = Get-V2GenerationReadiness # /api/backends/status v2_generation_readiness ready
+    Write-DevStackReady "Dialectical dev stack already appears to be running." "" $Readiness
     exit 0
 }
 
@@ -65,10 +114,8 @@ $Process = Start-Process `
 $Deadline = (Get-Date).AddSeconds(45)
 while ((Get-Date) -lt $Deadline) {
     if ((Test-ListeningPort 3000) -and (Test-ListeningPort 8000)) {
-        Write-Output "Dialectical dev stack started."
-        Write-Output "Web: http://127.0.0.1:3000"
-        Write-Output "Token: $(Format-DevSecret $env:DIALECTICAL_USER_TOKEN)"
-        Write-Output "Logs: $OutLog"
+        $Readiness = Get-V2GenerationReadiness # /api/backends/status v2_generation_readiness ready
+        Write-DevStackReady "Dialectical dev stack started." $OutLog $Readiness
         exit 0
     }
     if ($Process.HasExited) {

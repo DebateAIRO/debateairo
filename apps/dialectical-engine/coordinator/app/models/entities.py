@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text, event, update
 from sqlalchemy import UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -260,6 +260,65 @@ class ProvenanceRecord(Base):
     job_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class JudgeOutputArtifact(Base):
+    __tablename__ = "judge_output_artifacts"
+    __table_args__ = (
+        CheckConstraint("parse_status IN ('available', 'unavailable')", name="ck_judge_output_parse_status"),
+        UniqueConstraint(
+            "debate_id",
+            "node_id",
+            "input_hash",
+            "judge_role",
+            "provider",
+            "model",
+            "raw_output_sha256",
+            name="ux_judge_output_artifacts_identity",
+        ),
+        Index("ix_judge_output_artifacts_debate_id", "debate_id"),
+        Index("ix_judge_output_artifacts_node_id", "node_id"),
+        Index("ix_judge_output_artifacts_job_id", "job_id"),
+        Index("ix_judge_output_artifacts_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    debate_id: Mapped[str] = mapped_column(ForeignKey("debates.id"), nullable=False)
+    node_id: Mapped[str] = mapped_column(ForeignKey("nodes.id"), nullable=False)
+    job_id: Mapped[Optional[str]] = mapped_column(ForeignKey("jobs.id"), nullable=True)
+    analyzer_run_id: Mapped[Optional[str]] = mapped_column(ForeignKey("analyzer_runs.id"), nullable=True)
+    input_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    judge_role: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(120), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    request_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    raw_output: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_output_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    parse_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    parse_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    assessment: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    provider_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+@event.listens_for(AnalyzerRun, "after_insert")
+def _link_judge_artifacts_to_analyzer_run(_mapper, connection, target: AnalyzerRun) -> None:
+    if target.analyzer_type != "node_scoring" or target.status != "complete":
+        return
+    provenance = target.provenance if isinstance(target.provenance, dict) else {}
+    if provenance.get("scoring_source") != "judge_outputs":
+        return
+    connection.execute(
+        update(JudgeOutputArtifact)
+        .where(
+            JudgeOutputArtifact.debate_id == target.debate_id,
+            JudgeOutputArtifact.analyzer_run_id.is_(None),
+        )
+        .values(analyzer_run_id=target.id)
+    )
 
 
 class NodeScoringResult(Base):
