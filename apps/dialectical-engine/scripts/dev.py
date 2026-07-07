@@ -220,6 +220,14 @@ def run_guardians(specs: list[ProcessSpec]) -> None:
             process.wait(timeout=5)
             print(f"[dev] {spec.name} exit=timeout (NOT READY — killed after 240s)", flush=True)
             continue
+        except KeyboardInterrupt:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+            print(f"[dev] {spec.name} interrupted — terminated", flush=True)
+            raise
         if code == 0:
             print(f"[dev] {spec.name} exit=0 (ready)", flush=True)
         elif code == 1:

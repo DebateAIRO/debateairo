@@ -89,19 +89,33 @@ def test_build_process_specs_unchanged_by_guardian_feature() -> None:
 
 
 class _FakeProcess:
-    def __init__(self, name: str, *, exit_code: int | None = 0, hang: bool = False) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        exit_code: int | None = 0,
+        hang: bool = False,
+        interrupt_on_wait: bool = False,
+    ) -> None:
         self.name = name
         self.pid = 4242
         self._exit_code = exit_code
         self._hang = hang
+        self._interrupt_on_wait = interrupt_on_wait
         self.killed = False
+        self.terminated = False
         self.wait_calls = 0
 
     def wait(self, timeout=None):  # noqa: ANN001 - mirrors subprocess.Popen.wait signature
         self.wait_calls += 1
+        if self._interrupt_on_wait and self.wait_calls == 1:
+            raise KeyboardInterrupt
         if self._hang and not self.killed:
             raise subprocess.TimeoutExpired(cmd=self.name, timeout=timeout)
         return self._exit_code
+
+    def terminate(self) -> None:
+        self.terminated = True
 
     def kill(self) -> None:
         self.killed = True
@@ -155,3 +169,23 @@ def test_run_guardians_kills_on_timeout_and_does_not_raise(monkeypatch, capsys) 
     assert fake.killed is True
     output = capsys.readouterr().out
     assert "worker-guardian exit=timeout" in output
+
+
+def test_run_guardians_terminates_and_reraises_on_keyboard_interrupt(monkeypatch, capsys) -> None:
+    module = load_dev_module()
+    specs = [module.ProcessSpec("worker-guardian", ["python", "dev_guardian.py"], ROOT, {})]
+    fake = _FakeProcess("worker-guardian", interrupt_on_wait=True)
+
+    monkeypatch.setattr(module, "start", lambda spec: fake)
+
+    try:
+        module.run_guardians(specs)
+    except KeyboardInterrupt:
+        raised = True
+    else:
+        raised = False
+
+    assert raised is True
+    assert fake.terminated is True
+    output = capsys.readouterr().out
+    assert "worker-guardian interrupted — terminated" in output
