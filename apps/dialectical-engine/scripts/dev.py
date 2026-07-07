@@ -164,6 +164,70 @@ def start(spec: ProcessSpec) -> subprocess.Popen:
     return process
 
 
+def guardian_specs(root: Path, python: str, environ: dict[str, str]) -> list[ProcessSpec]:
+    """Build the one-shot startup-guardian specs that run after the stack is up.
+
+    Returns [] when DIALECTICAL_DEV_GUARDIANS is disabled. Otherwise returns
+    the judge-guardian and worker-guardian specs, in that order.
+    """
+    if not enabled_env(environ, "DIALECTICAL_DEV_GUARDIANS", True):
+        return []
+    coordinator_port = int_env(environ, "DIALECTICAL_DEV_COORDINATOR_PORT", 8000)
+    coordinator_url = f"http://localhost:{coordinator_port}"
+    return [
+        ProcessSpec(
+            "judge-guardian",
+            [python, str(root / "scripts" / "judge_guardian.py")],
+            root,
+            {},
+        ),
+        ProcessSpec(
+            "worker-guardian",
+            [
+                python,
+                str(root / "scripts" / "dev_guardian.py"),
+                # --once is deliberately version-agnostic: the committed
+                # dev_guardian.py treats it as "run one pass and exit with a
+                # real readiness code" (see its main()); an extended
+                # working-tree version may instead treat it as a no-op since
+                # it already runs once by default. Either way it is safe to
+                # pass here.
+                "--once",
+                "--base-url",
+                coordinator_url,
+                "--user-token",
+                dev_user_token(environ),
+            ],
+            root,
+            {},
+        ),
+    ]
+
+
+def run_guardians(specs: list[ProcessSpec]) -> None:
+    """Run guardian specs sequentially, honestly reporting pass/fail.
+
+    Guardians REPORT; they never kill the dev stack. A nonzero or timed-out
+    guardian is printed and then ignored — this function never raises or
+    returns a failure signal to the caller.
+    """
+    for spec in specs:
+        process = start(spec)
+        try:
+            code = process.wait(timeout=240)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+            print(f"[dev] {spec.name} exit=timeout (NOT READY — killed after 240s)", flush=True)
+            continue
+        if code == 0:
+            print(f"[dev] {spec.name} exit=0 (ready)", flush=True)
+        elif code == 1:
+            print(f"[dev] {spec.name} exit=1 (NOT READY — see output above)", flush=True)
+        else:
+            print(f"[dev] {spec.name} exit={code} (unknown)", flush=True)
+
+
 def main() -> int:
     processes: list[subprocess.Popen] = []
     try:
@@ -171,6 +235,7 @@ def main() -> int:
             processes.append(start(spec))
             if spec.name == "coordinator":
                 time.sleep(2)
+        run_guardians(guardian_specs(ROOT, sys.executable, os.environ))
         while True:
             for process in processes:
                 code = process.poll()
