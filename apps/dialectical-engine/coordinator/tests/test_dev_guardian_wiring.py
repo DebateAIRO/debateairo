@@ -96,12 +96,14 @@ class _FakeProcess:
         exit_code: int | None = 0,
         hang: bool = False,
         interrupt_on_wait: bool = False,
+        terminate_raises_oserror: bool = False,
     ) -> None:
         self.name = name
         self.pid = 4242
         self._exit_code = exit_code
         self._hang = hang
         self._interrupt_on_wait = interrupt_on_wait
+        self._terminate_raises_oserror = terminate_raises_oserror
         self.killed = False
         self.terminated = False
         self.wait_calls = 0
@@ -116,6 +118,8 @@ class _FakeProcess:
 
     def terminate(self) -> None:
         self.terminated = True
+        if self._terminate_raises_oserror:
+            raise OSError("process already reaped")
 
     def kill(self) -> None:
         self.killed = True
@@ -182,6 +186,32 @@ def test_run_guardians_terminates_and_reraises_on_keyboard_interrupt(monkeypatch
         module.run_guardians(specs)
     except KeyboardInterrupt:
         raised = True
+    else:
+        raised = False
+
+    assert raised is True
+    assert fake.terminated is True
+    output = capsys.readouterr().out
+    assert "worker-guardian interrupted — terminated" in output
+
+
+def test_run_guardians_keyboard_interrupt_survives_terminate_oserror(monkeypatch, capsys) -> None:
+    module = load_dev_module()
+    specs = [module.ProcessSpec("worker-guardian", ["python", "dev_guardian.py"], ROOT, {})]
+    fake = _FakeProcess(
+        "worker-guardian",
+        interrupt_on_wait=True,
+        terminate_raises_oserror=True,
+    )
+
+    monkeypatch.setattr(module, "start", lambda spec: fake)
+
+    try:
+        module.run_guardians(specs)
+    except KeyboardInterrupt:
+        raised = True
+    except OSError:
+        raised = False
     else:
         raised = False
 
