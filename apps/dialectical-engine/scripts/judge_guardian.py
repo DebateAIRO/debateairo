@@ -176,7 +176,7 @@ def check_executable(codex_command: str) -> dict[str, Any]:
         }
     try:
         completed = subprocess.run(
-            [codex_command, "--version"],
+            [which, "--version"],
             capture_output=True,
             text=True,
             timeout=EXECUTABLE_PROBE_TIMEOUT_SECONDS,

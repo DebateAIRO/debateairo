@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -203,6 +204,31 @@ def test_executable_missing_reports_honest_blocked_reason(module, tmp_path, monk
     assert "totally-missing-codex-binary" in report["executable"]["reason"]
     # provider_detection can still be available (config-only check); readiness overall is gated by executable too.
     assert module.exit_code_for(report) == 1
+
+
+def test_executable_probe_execs_resolved_path_not_raw_command(module, monkeypatch) -> None:
+    """On Windows, `codex` is an npm .CMD shim: CreateProcess can't exec the
+    bare command name directly. Production (CodexCliProvider.generate) always
+    execs the shutil.which-resolved full path, so the guardian's probe must
+    mirror that exactly or it reports false 'blocked' failures.
+    """
+    fake_resolved_path = "C:\\fake\\nodejs\\codex.CMD"
+    monkeypatch.setattr(module.shutil, "which", lambda _cmd: fake_resolved_path)
+
+    captured_args: dict[str, Any] = {}
+
+    def fake_run(args, **kwargs):
+        captured_args["args"] = args
+        return module.subprocess.CompletedProcess(args=args, returncode=0, stdout="codex-cli 1.2.3", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    result = module.check_executable("codex")
+
+    assert captured_args["args"][0] == fake_resolved_path
+    assert captured_args["args"][0] != "codex"
+    assert result["state"] == "ready"
+    assert result["which"] == fake_resolved_path
 
 
 def test_summary_line_and_human_output_never_crash(module, tmp_path, capsys) -> None:
