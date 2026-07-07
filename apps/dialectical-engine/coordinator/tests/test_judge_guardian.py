@@ -265,3 +265,71 @@ def test_json_mode_dumps_full_report(module, tmp_path, capsys) -> None:
     assert "provider_detection" in payload
     assert "executable" in payload
     assert "contract" in payload
+
+
+# --- import-failure guard: never a traceback, honest unknown state --------
+
+
+def test_import_failure_reports_unknown_everywhere_exit_2_no_repair(module, tmp_path, monkeypatch) -> None:
+    """Simulates a broken coordinator app package (missing dep, broken
+    import, etc). The guardian must never crash and must never repair
+    config against an environment it cannot trust.
+    """
+    agents_path = tmp_path / "agents.yaml"
+    write_yaml(
+        agents_path,
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"proponent": {}}},
+    )
+    before = agents_path.read_text(encoding="utf-8")
+
+    monkeypatch.setattr(module, "IMPORT_ERROR", "ModuleNotFoundError: No module named 'app.providers.registry'")
+
+    exit_code = module.main(["--agents-path", str(agents_path), "--json"])
+
+    assert exit_code == 2
+    # No repair write happened against a broken environment.
+    assert agents_path.read_text(encoding="utf-8") == before
+
+    report = module.run_guardian_import_failed(agents_path=agents_path, codex_command="codex")
+    assert report["agents_config"]["state"] == "unknown"
+    assert report["agents_config"]["repaired"] is False
+    assert report["agents_config"]["repair_skipped"] == "broken_environment"
+    assert "coordinator import failed" in report["agents_config"]["reason"]
+    assert report["provider_detection"]["available"] is None
+    assert "coordinator import failed" in report["provider_detection"]["reason"]
+    assert report["contract"]["state"] == "unknown"
+    assert "coordinator import failed" in report["contract"]["reason"]
+    assert module.exit_code_for(report) == 2
+
+
+def test_import_failure_summary_and_human_output_never_crash(module, tmp_path, monkeypatch, capsys) -> None:
+    agents_path = tmp_path / "agents.yaml"
+    write_yaml(
+        agents_path,
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+    )
+
+    monkeypatch.setattr(module, "IMPORT_ERROR", "ImportError: broken dependency")
+
+    exit_code = module.main(["--agents-path", str(agents_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "agents_config: unknown" in captured.out
+    assert "UNKNOWN/CORRUPT" in captured.out
+
+
+def test_import_error_none_leaves_existing_behavior_untouched(module, tmp_path) -> None:
+    """Sanity check: when IMPORT_ERROR is None (the normal case), behavior
+    is unchanged from before this fix — repair still runs and reports ready.
+    """
+    agents_path = tmp_path / "agents.yaml"
+    assert module.IMPORT_ERROR is None
+
+    report = module.run_guardian(agents_path=agents_path, codex_command="codex", repair=True)
+
+    assert agents_path.exists()
+    assert report["agents_config"]["state"] == "ready"
+    assert report["agents_config"]["repaired"] is True
+    assert report["provider_detection"]["available"] is True
+    assert module.exit_code_for(report) in (0, 1)

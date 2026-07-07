@@ -34,13 +34,17 @@ COORDINATOR_ROOT = ROOT / "coordinator"
 if str(COORDINATOR_ROOT) not in sys.path:
     sys.path.insert(0, str(COORDINATOR_ROOT))
 
-from app.providers.registry import (  # noqa: E402
-    AgentConfig,
-    default_agents_path,
-    detect_scoring_provider_config,
-    load_agent_configs,
-)
-from app.scoring.judge_registry import active_contract  # noqa: E402
+IMPORT_ERROR: str | None = None
+try:
+    from app.providers.registry import (  # noqa: E402
+        AgentConfig,
+        default_agents_path,
+        detect_scoring_provider_config,
+        load_agent_configs,
+    )
+    from app.scoring.judge_registry import active_contract  # noqa: E402
+except Exception as exc:  # noqa: BLE001 - never crash the guardian on import
+    IMPORT_ERROR = f"{exc.__class__.__name__}: {exc}"
 
 REPAIR_ROLE = "judge"
 REPAIR_DEFAULTS = {"provider": "codex", "model": "codex-gpt-5.5"}
@@ -186,19 +190,22 @@ def check_executable(codex_command: str) -> dict[str, Any]:
         return {
             "state": "blocked",
             "which": which,
-            "reason": f"'{codex_command} --version' timed out after {EXECUTABLE_PROBE_TIMEOUT_SECONDS}s.",
+            "reason": (
+                f"'{which}' (resolved from '{codex_command}') --version timed out "
+                f"after {EXECUTABLE_PROBE_TIMEOUT_SECONDS}s."
+            ),
         }
     except OSError as exc:
         return {
             "state": "blocked",
             "which": which,
-            "reason": f"'{codex_command} --version' could not be run: {exc}",
+            "reason": f"'{which}' (resolved from '{codex_command}') --version could not be run: {exc}",
         }
     if completed.returncode != 0:
         return {
             "state": "blocked",
             "which": which,
-            "reason": f"'{codex_command} --version' exited {completed.returncode}.",
+            "reason": f"'{which}' (resolved from '{codex_command}') --version exited {completed.returncode}.",
             "stderr": (completed.stderr or "").strip()[:200],
         }
     return {
@@ -232,14 +239,42 @@ def run_guardian(*, agents_path: Path, codex_command: str, repair: bool) -> dict
     return report
 
 
+def run_guardian_import_failed(*, agents_path: Path, codex_command: str) -> dict[str, Any]:
+    """Build an honest report when the app.* imports failed at module load.
+
+    Every app-dependent check (agents_config, provider_detection, contract) is
+    reported as "unknown" — repair never runs, since repairing config against
+    a broken environment is unsafe. Only the executable check, which needs no
+    app imports, still runs for real.
+    """
+    assert IMPORT_ERROR is not None
+    unknown_reason = f"coordinator import failed: {IMPORT_ERROR}"
+    report: dict[str, Any] = {
+        "agents_config": {
+            "state": "unknown",
+            "repaired": False,
+            "repair_skipped": "broken_environment",
+            "reason": unknown_reason,
+        },
+        "provider_detection": {"available": None, "reason": unknown_reason},
+        "executable": check_executable(codex_command),
+        "contract": {"state": "unknown", "reason": unknown_reason},
+        "import_error": IMPORT_ERROR,
+    }
+    _ = agents_path  # kept for signature symmetry with run_guardian; not read when imports are broken
+    return report
+
+
 def exit_code_for(report: dict[str, Any]) -> int:
     agents_config = report.get("agents_config")
     if not isinstance(agents_config, dict) or "state" not in agents_config:
         return 2
-    if agents_config["state"] == "corrupt_config":
+    if agents_config["state"] in ("corrupt_config", "unknown"):
         return 2
     provider_detection = report.get("provider_detection")
     if not isinstance(provider_detection, dict) or "available" not in provider_detection:
+        return 2
+    if provider_detection.get("available") is None:
         return 2
     if agents_config["state"] != "ready":
         return 1
@@ -317,11 +352,19 @@ def resolve_codex_command(explicit: str | None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    agents_path = Path(args.agents_path) if args.agents_path else default_agents_path()
     codex_command = resolve_codex_command(args.codex_command)
     repair = not args.no_repair
 
-    report = run_guardian(agents_path=agents_path, codex_command=codex_command, repair=repair)
+    if IMPORT_ERROR is not None:
+        # The coordinator app package failed to import: never run repair
+        # against a broken environment, and never resolve default_agents_path
+        # (itself an app import) — fall back to a plain Path when the caller
+        # didn't pass an explicit one.
+        agents_path = Path(args.agents_path) if args.agents_path else Path("config/agents.yaml")
+        report = run_guardian_import_failed(agents_path=agents_path, codex_command=codex_command)
+    else:
+        agents_path = Path(args.agents_path) if args.agents_path else default_agents_path()
+        report = run_guardian(agents_path=agents_path, codex_command=codex_command, repair=repair)
     exit_code = exit_code_for(report)
 
     if args.json:
