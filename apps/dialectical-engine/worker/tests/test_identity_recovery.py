@@ -118,3 +118,58 @@ async def test_worker_loop_survives_auth_blocked_identity_recovery(monkeypatch, 
     await asyncio.wait_for(worker_loop(run_once=True), timeout=10)
 
     assert 30 in wait_calls
+
+
+@pytest.mark.asyncio
+async def test_worker_loop_exits_blocked_auth_after_recovery_cap(monkeypatch) -> None:
+    """Persistent auth failure must not loop forever: after the recovery cap,
+    the worker sends a best-effort blocked_auth heartbeat and exits loudly."""
+    from app import main as worker_main
+    from app.config import WorkerConfig
+
+    heartbeat_statuses: list[str] = []
+    waits: list[float] = []
+
+    class FakeAdapter:
+        model_id = "fake-model"
+        role_pool = {"proposer"}
+
+    async def fake_detect(config):
+        return {"fake-model": FakeAdapter()}
+
+    def fake_load_config(path=None):
+        return WorkerConfig(
+            worker_id="w-1",
+            worker_token="tok-1",
+            user_token="user-tok",
+            last_capabilities=["fake-model"],
+        )
+
+    async def fake_wait_or_stop(stop, seconds):
+        waits.append(seconds)
+
+    async def fake_poll(self):
+        raise _http_status_error(401, "http://localhost:8000/api/workers/w-1/poll")
+
+    async def fake_heartbeat(self, capabilities, status="online"):
+        heartbeat_statuses.append(status)
+        if status == "blocked_auth":
+            return None
+        raise _http_status_error(401)
+
+    async def fake_register(self, capabilities, **kwargs):
+        raise _http_status_error(401, "http://localhost:8000/api/workers/register")
+
+    monkeypatch.setattr(worker_main, "detect_adapters", fake_detect)
+    monkeypatch.setattr(worker_main, "load_config", fake_load_config)
+    monkeypatch.setattr(worker_main, "wait_or_stop", fake_wait_or_stop)
+    monkeypatch.setattr(CoordinatorClient, "poll", fake_poll)
+    monkeypatch.setattr(CoordinatorClient, "heartbeat", fake_heartbeat)
+    monkeypatch.setattr(CoordinatorClient, "register", fake_register)
+
+    import asyncio
+
+    with pytest.raises(RuntimeError, match="blocked_auth"):
+        await asyncio.wait_for(worker_main.worker_loop(run_once=False), timeout=8)
+
+    assert "blocked_auth" in heartbeat_statuses

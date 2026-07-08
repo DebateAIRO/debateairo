@@ -9,6 +9,7 @@ from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
+from app.core.config import bool_env, float_env
 from app.core.write_lock import commit_write, flush_write
 from app.models.entities import (
     AnalyzerRun,
@@ -30,8 +31,15 @@ from app.scoring.cache import (
     node_scoring_input_hash,
     store_scoring_cache,
 )
+from app.scoring.calibration import correlated_discount, judge_weight
 from app.scoring.disagreement import detect_persisted_judge_disagreements
 from app.scoring.judge_registry import active_contract
+from app.scoring.lineage import (
+    SECRET_METADATA_MARKERS,
+    _public_metadata_text,
+    judge_lineage_metadata,
+    lineage_family,
+)
 from app.scoring.judges import ScoringProvider, ScoringProviderRequest, ScoringProviderResult
 from app.scoring.models import (
     AdaptiveDepthDryRunItem,
@@ -40,6 +48,7 @@ from app.scoring.models import (
     NodeScoringError,
     NodeScoringPending,
     NodeScoringPayload,
+    NormalizedClaim,
     ScoringModelMetadata,
     ScoringStatus,
     ScoringStatusModel,
@@ -47,6 +56,7 @@ from app.scoring.models import (
 from app.scoring.normalizer import normalize_claim
 from app.scoring.parser import parse_judge_json
 from app.scoring.prompts import render_single_node_judge_prompt
+from app.scoring.qbaf_debug import qbaf_debug_block
 from app.scoring.reducer import adaptive_depth_dry_run, reduce_assessments
 from app.services.orchestrator import create_job
 
@@ -59,20 +69,14 @@ SCORING_PROVIDER_MAX_ATTEMPTS = 2
 ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
 STALE_SCORING_JOB_ERROR = "Stale scoring job expired before judge outputs were produced."
 UNAVAILABLE_SCORING_JOB_ERROR = "No scoring provider is configured."
-SECRET_METADATA_MARKERS = (
-    "api_key",
-    "apikey",
-    "authorization",
-    "bearer ",
-    "client_secret",
-    "password",
-    "secret",
-    "token",
-    "--api-key",
-    "--token",
-    "key=",
-    "token=",
-)
+# Phase 6 Task 2 (lineage independence, docs/superpowers/plans/2026-07-07-phase6-lineage-independence.md):
+# v1 has exactly ONE configured judge system-wide (no pool of independent judge
+# candidates to rotate across -- see plan UNVERIFIED #1). This guard is therefore
+# a binary block/proceed check, not true rotation: if the single configured
+# judge's lineage family collides with the arguer's, there is no second
+# candidate to fall back to, so scoring is honestly blocked instead of silently
+# reusing the same-lineage judge or fabricating independence.
+NO_INDEPENDENT_JUDGE_REASON = "no_independent_judge: judge lineage matches arguer lineage"
 
 
 def _normalize_loaded_job_deadline(job: Job, *_args) -> None:
@@ -108,6 +112,13 @@ def fail_unavailable_scoring_job(
 
 
 def debate_scoring_payload(db: Session, debate: Debate) -> dict:
+    """Build the public scoring payload for a debate.
+
+    When DIALECTICAL_QBAF_DEBUG is enabled, the successful-scoring path also
+    attaches a "qbaf_debug" key (see app.scoring.qbaf_debug.qbaf_debug_block).
+    qbaf_debug is a dev/debug field only -- it is not part of the stable wire
+    contract and is entirely absent when the flag is off (the default).
+    """
     node_ids = _debate_node_ids(db, debate.id)
     run = db.scalars(
         select(AnalyzerRun)
@@ -116,7 +127,7 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
             AnalyzerRun.analyzer_type == SCORING_ANALYZER_TYPE,
             AnalyzerRun.status == "complete",
         )
-        .order_by(AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
         .limit(1)
     ).first()
     active_job = _active_scoring_job(db, debate.id, newer_than=run.created_at if run else None)
@@ -238,6 +249,8 @@ def debate_scoring_payload(db: Session, debate: Debate) -> dict:
         payload["cache"] = output_cache
     elif status in {"available", "partial"}:
         payload["cache"] = {"hit": False}
+    if bool_env("DIALECTICAL_QBAF_DEBUG", False):
+        payload["qbaf_debug"] = qbaf_debug_block(db, debate, payload)
     payload = _with_current_node_coverage(payload, node_ids, active_job)
     return _attach_active_scoring_job(payload, active_job)
 
@@ -250,21 +263,32 @@ def _hydrate_scoring_payload_from_judge_artifacts(
 ) -> dict | None:
     items: list[dict] = []
     model_metadata: dict | None = None
+    sources: set[str] = set()
     for node_id in node_ids:
-        item, artifact_metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node_id)
+        item, artifact_metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node_id)
         if item is None:
             continue
         items.append(item)
+        if source:
+            sources.add(source)
         if model_metadata is None:
             model_metadata = artifact_metadata
     if not items:
         return None
+    # Provenance-precise producer: only claim artifact provenance when at
+    # least one item genuinely hydrated from a contract-matched artifact;
+    # a payload served purely from stored public results is historical.
+    producer = (
+        "persisted-judge-artifacts"
+        if "persisted-judge-artifacts" in sources
+        else "historical-scoring-cache"
+    )
     payload = {
         "debate_id": debate.id,
         "status": "available",
         "node_ids": node_ids,
         "items": items,
-        "producer": "persisted-judge-artifacts",
+        "producer": producer,
         "cache": {"hit": False},
     }
     if model_metadata is not None:
@@ -277,17 +301,17 @@ def _hydrate_node_scoring_item_from_judge_artifact(
     db: Session,
     debate: Debate,
     node_id: str,
-) -> tuple[dict | None, dict | None]:
+) -> tuple[dict | None, dict | None, str | None]:
     node = db.get(Node, node_id)
     if node is None:
-        return None, None
+        return None, None, None
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
     try:
         contract = active_contract("judge")
     except KeyError:
-        return None, None
+        return None, None, None
     artifact = db.scalars(
         select(JudgeOutputArtifact)
         .where(
@@ -303,13 +327,16 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         .limit(1)
     ).first()
     if artifact is None:
-        return _hydrate_historical_public_result(db, debate, node, input_hash)
+        historical_item, historical_metadata = _hydrate_historical_public_result(db, debate, node, input_hash)
+        if historical_item is None:
+            return None, None, None
+        return historical_item, historical_metadata, "historical-scoring-cache"
     if not isinstance(artifact.assessment, dict):
-        return None, None
+        return None, None, None
     try:
         assessment = ClaimAssessment.model_validate(artifact.assessment)
     except ValidationError:
-        return None, None
+        return None, None, None
     item = reduce_assessments(claim, assessment).model_dump(mode="json")
     item = _attach_plural_judge_provenance(
         db,
@@ -317,6 +344,7 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         debate_id=debate.id,
         node_id=node.id,
         input_hash=input_hash,
+        claim=claim,
     )
     metadata = ScoringModelMetadata(
         provider=_public_metadata_text(artifact.provider),
@@ -324,7 +352,7 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         checked_at=artifact.checked_at.isoformat() if artifact.checked_at else None,
         status="available",
     ).model_dump(mode="json")
-    return item, metadata
+    return item, metadata, "persisted-judge-artifacts"
 
 
 def _hydrate_historical_public_result(
@@ -457,6 +485,36 @@ def score_node_with_provider(
             model=model_name,
             contract_hash=lookup_contract_hash,
         )
+
+    # Phase 6 Task 2 fix wave (enforcement coverage): the completion-hook
+    # guard in ensure_node_scoring_on_completion only gates ONE of three
+    # production entry points into this shared write path -- run_scoring_job_
+    # background (POST /{debate_id}/scoring/jobs, wake_pending_internal_
+    # scoring_job) and force_refresh GET /{debate_id}/scoring both reach
+    # score_node_with_provider directly via score_nodes_with_provider /
+    # score_debate_with_provider_registry, bypassing that hook entirely.
+    # This is the single shared site where every NodeScoringResult row is
+    # written (store_scoring_cache below), so the lineage check belongs
+    # here, not only at the completion hook. Same binary block/proceed
+    # semantics as the completion-hook guard (see NO_INDEPENDENT_JUDGE_REASON
+    # module comment): unknown lineage on either side never blocks. Flag OFF
+    # short-circuits before any new work -- byte-identical to prior behavior.
+    if bool_env("DIALECTICAL_LINEAGE_INDEPENDENCE", False) and provider_name and model_name:
+        arguer_family = lineage_family(generation.model_id if generation else None)
+        judge_family = lineage_family(_public_metadata_text(model_name))
+        if arguer_family is not None and judge_family is not None and arguer_family == judge_family:
+            return scoring_result_payload(
+                debate_id=debate.id,
+                node_ids=node_ids,
+                items=[],
+                errors=[
+                    NodeScoringError(
+                        node_id=node.id,
+                        status="no_independent_judge",
+                        reason=NO_INDEPENDENT_JUDGE_REASON,
+                    )
+                ],
+            )
     request = ScoringProviderRequest(
         claim=claim,
         argument_text=argument_text,
@@ -510,6 +568,13 @@ def score_node_with_provider(
                 cache_contract = active_contract(judge_role)
             except KeyError:
                 cache_contract = None
+            payload.update(
+                judge_lineage_metadata(
+                    arguer_model_id=generation.model_id if generation else None,
+                    judge_provider=_public_metadata_text(provider_name),
+                    judge_model_id=_public_metadata_text(model_name),
+                )
+            )
             store_scoring_cache(
                 db,
                 debate_id=debate.id,
@@ -532,6 +597,7 @@ def score_node_with_provider(
         debate_id=debate.id,
         node_id=node.id,
         input_hash=input_hash,
+        claim=claim,
     )
     payload = {
         "debate_id": debate.id,
@@ -548,6 +614,13 @@ def score_node_with_provider(
             cache_contract = active_contract(judge_role)
         except KeyError:
             cache_contract = None
+        payload.update(
+            judge_lineage_metadata(
+                arguer_model_id=generation.model_id if generation else None,
+                judge_provider=_public_metadata_text(provider_name),
+                judge_model_id=_public_metadata_text(model_name),
+            )
+        )
         store_scoring_cache(
             db,
             debate_id=debate.id,
@@ -665,13 +738,32 @@ def score_nodes_with_provider(
         if node_items:
             items.extend(node_items)
         else:
-            errors.append(
-                NodeScoringError(
-                    node_id=node_id,
-                    status="unavailable",
-                    reason=str(node_payload.get("reason") or "Scoring judge output was unavailable."),
-                )
+            # score_node_with_provider surfaces its own per-node errors[]
+            # (currently only the lineage-independence guard does this --
+            # see NO_INDEPENDENT_JUDGE_REASON) with the precise status; fall
+            # back to the generic "unavailable" synthesis (timeout,
+            # ProviderError, parse failure, etc.) when it did not.
+            node_errors = node_payload.get("errors") if isinstance(node_payload.get("errors"), list) else []
+            propagated = next(
+                (error for error in node_errors if isinstance(error, dict) and error.get("node_id") == node_id),
+                None,
             )
+            if propagated is not None:
+                errors.append(
+                    NodeScoringError(
+                        node_id=node_id,
+                        status=propagated.get("status", "unavailable"),
+                        reason=str(propagated.get("reason") or "Scoring judge output was unavailable."),
+                    )
+                )
+            else:
+                errors.append(
+                    NodeScoringError(
+                        node_id=node_id,
+                        status="unavailable",
+                        reason=str(node_payload.get("reason") or "Scoring judge output was unavailable."),
+                    )
+                )
     if cache_metadata is None and batch_cache_hit is not None:
         cache_metadata = {"hit": batch_cache_hit}
     payload = scoring_result_payload(
@@ -780,6 +872,7 @@ def _attach_plural_judge_provenance(
     debate_id: str,
     node_id: str,
     input_hash: str,
+    claim: NormalizedClaim,
 ) -> dict:
     judge_evidence = _persisted_judge_evidence_for_node(
         db,
@@ -787,14 +880,108 @@ def _attach_plural_judge_provenance(
         node_id=node_id,
         input_hash=input_hash,
     )
-    if len(judge_evidence) < 2:
-        return item
-    disagreements = detect_persisted_judge_disagreements(judge_evidence)
     next_item = dict(item)
+    # Phase 8 Task 2 (calibration discounting,
+    # docs/superpowers/plans/2026-07-07-phase8-calibration-discounting.md):
+    # metadata is ALWAYS computed and recorded here, regardless of the
+    # judge-count and regardless of the DIALECTICAL_CALIBRATION_WEIGHTS flag
+    # -- this mirrors the always-on lineage/provenance recording precedent
+    # from Phase 6/7. Only the score-affecting weighted-aggregate below (step
+    # 3) is flag-gated. Single-judgment nodes (len(judge_evidence) < 2) still
+    # get a full calibrationWeights/calibrationApplied/discountFactor block
+    # (applicable: False, calibrationApplied: False) -- "aggregation not
+    # applicable" is itself an honest, always-recorded fact, not an early
+    # return that skips metadata (unlike judge_participation/
+    # disagreement_status above, which ARE skipped below 2 judgments).
+    discount_factor = float_env("DIALECTICAL_CALIBRATION_DISCOUNT_FACTOR", 0.5, 0.0, 1.0)
+    calibration_flag_on = bool_env("DIALECTICAL_CALIBRATION_WEIGHTS", False)
+
+    # Scrub model text before deriving family: `_public_metadata_text` is the
+    # same scrub already applied to provider/model at every other point they
+    # are used to derive a served family bucket in this file (the
+    # DIALECTICAL_LINEAGE_INDEPENDENCE check at the top of
+    # score_node_with_provider derives judge_family the same way:
+    # lineage_family(_public_metadata_text(model_name))). judge_evidence's
+    # model column is a cache-identity value on JudgeOutputArtifact (written
+    # from the raw, unscrubbed ScoringProviderResult at persist time -- see
+    # _persist_judge_output_artifact), so it is scrubbed here the same way
+    # as every other read-site before it is used, consistent with that
+    # established P6 invariant rather than inventing a new rule. The raw
+    # provider/model strings themselves are never embedded in the served
+    # weights list below (see comment there) -- only judge_role and the
+    # derived family are.
+    labeled_evidence = [
+        {
+            "judge_role": evidence["judge_role"],
+            "family": lineage_family(_public_metadata_text(evidence["model"])),
+        }
+        for evidence in judge_evidence
+    ]
+
+    discount = correlated_discount(
+        [{"family": labeled["family"]} for labeled in labeled_evidence],
+        discount_factor=discount_factor,
+    )
+    # Traceability keying: judge_role + family (never raw provider/model
+    # strings). judge_role is already served unscrubbed elsewhere in this
+    # same metadata block (judge_participation.judge_roles below), and
+    # family is a coarse, non-identifying vendor bucket (mirrors
+    # judgeLineage.family) -- but raw provider/model text must NOT be
+    # embedded here: an existing, unmodified regression test
+    # (test_score_node_with_provider_exposes_plural_provenance_from_
+    # distinct_persisted_judges in tests/test_node_scoring.py) asserts the
+    # served item never contains the raw provider strings verbatim, even
+    # when they carry no SECRET_METADATA_MARKERS substring (e.g.
+    # "primary-provider"/"skeptic-provider" are not secrets but are still
+    # never leaked into a served item today). judge_role/family alone
+    # satisfy the brief's "not just bare indices, to stay legible"
+    # requirement without violating that invariant.
+    calibration_weights = {
+        "applicable": discount["applicable"],
+        "discountFactor": discount["discountFactor"],
+        "effectiveWeightTotal": discount["effectiveWeightTotal"],
+        "weights": [
+            {
+                "judge_role": labeled_evidence[entry["index"]]["judge_role"],
+                "family": entry.get("family"),
+                "weight": entry["weight"],
+                "discounted": entry["discounted"],
+                "source": judge_weight(entry.get("family"), config=None)["source"],
+            }
+            for entry in discount["weights"]
+        ],
+    }
+    if "reason" in discount:
+        calibration_weights["reason"] = discount["reason"]
+
+    calibration_applied = calibration_flag_on and discount["applicable"]
+
     provenance = dict(next_item.get("score_provenance") or {})
+    provenance["calibrationWeights"] = calibration_weights
+    provenance["calibrationApplied"] = calibration_applied
+    provenance["discountFactor"] = discount_factor
+    next_item["score_provenance"] = provenance
+
+    if len(judge_evidence) < 2:
+        # Nothing to aggregate against -- no judge_participation/
+        # disagreement_status block (existing behavior, unchanged) and
+        # scores are never touched, regardless of the flag.
+        return next_item
+
+    disagreements = detect_persisted_judge_disagreements(judge_evidence)
     provenance["judge_participation"] = {
         "plural_judges": True,
         "judge_count": len(judge_evidence),
+        # BINDING (orchestrator ruling): within a same-family group, WHICH
+        # judgment keeps weight 1.0 (the "first occurrence") is decided by
+        # the stable DB ordering in _persisted_judge_evidence_for_node --
+        # judge_role asc, provider asc, model asc, created_at asc, id asc.
+        # Consequence: judge_role/provider/model naming influences which
+        # same-family judgment dominates the weighted aggregate below (the
+        # alphabetically-first judge_role/provider/model combination in a
+        # repeated family wins full weight; later same-family entries in
+        # that ordering are the ones discounted). This is a deliberate,
+        # recorded choice -- not an accident of iteration order.
         "judge_roles": sorted({str(evidence["judge_role"]) for evidence in judge_evidence}),
     }
     provenance["disagreement_status"] = {
@@ -804,7 +991,64 @@ def _attach_plural_judge_provenance(
     next_item["score_provenance"] = provenance
     if disagreements:
         next_item["judge_disagreements"] = [item.model_dump(mode="json") for item in disagreements]
+
+    if calibration_applied:
+        next_item["scores"] = _weighted_aggregate_scores(claim, judge_evidence, discount["weights"])
+
     return next_item
+
+
+# NodeScores numeric fields that reduce_assessments produces per assessment;
+# these are exactly the fields weighted-averaged by _weighted_aggregate_scores
+# when DIALECTICAL_CALIBRATION_WEIGHTS is on and 2+ persisted judgments exist.
+_CALIBRATION_WEIGHTED_SCORE_FIELDS = (
+    "strength",
+    "uncertainty",
+    "impact",
+    "evidence_quality",
+    "relevance",
+    "logical_validity",
+    "assumption_risk",
+    "counter_resilience",
+)
+
+
+def _weighted_aggregate_scores(
+    claim: NormalizedClaim,
+    judge_evidence: list[dict],
+    weights: list[dict],
+) -> dict:
+    """Re-run reduce_assessments once per historical persisted judgment and
+    return the correlated_discount-weighted average of each NodeScores
+    numeric field.
+
+    There is no existing multi-assessment reducer (reduce_assessments takes
+    exactly one ClaimAssessment) -- this recomputes N single-assessment
+    NodeScoringPayload.scores objects from the SAME already-fetched
+    judge_evidence list (no second query), then takes a flat weighted mean
+    of each numeric field using the weights correlated_discount already
+    computed (same weights recorded in calibrationWeights, so the served
+    score and the recorded provenance are always consistent with each
+    other). Only called when the flag is on and discounting is applicable;
+    callers must leave item["scores"] untouched otherwise.
+    """
+    weight_by_index = {entry["index"]: entry["weight"] for entry in weights}
+    totals = {field: 0.0 for field in _CALIBRATION_WEIGHTED_SCORE_FIELDS}
+    weight_total = 0.0
+    for index, evidence in enumerate(judge_evidence):
+        assessment = ClaimAssessment.model_validate(evidence["assessment"])
+        scores = reduce_assessments(claim, assessment).scores
+        weight = weight_by_index.get(index, 1.0)
+        weight_total += weight
+        for field in _CALIBRATION_WEIGHTED_SCORE_FIELDS:
+            totals[field] += weight * getattr(scores, field)
+    if weight_total <= 0.0:
+        # Unreachable in practice (correlated_discount always returns a
+        # positive effectiveWeightTotal for 2+ items) but fail closed rather
+        # than divide by zero or fabricate a score if that invariant is ever
+        # broken: serve the plain unweighted mean instead of crashing.
+        weight_total = float(len(judge_evidence))
+    return {field: round(totals[field] / weight_total, 4) for field in _CALIBRATION_WEIGHTED_SCORE_FIELDS}
 
 
 def _persisted_judge_evidence_for_node(
@@ -1046,6 +1290,59 @@ def ensure_node_scoring_on_completion(
             ],
         )
 
+    # Phase 6 Task 2: lineage-independence enforcement guard, feature-flagged
+    # OFF by default. Enforcement only -- lineage *recording* (judgeLineage/
+    # arguerLineage/independent) always happens regardless of this flag, at
+    # the score_node_with_provider write sites (Task 1).
+    #
+    # No rotation across judge candidates exists or is implemented here (v1
+    # has a single configured judge system-wide -- see the module-level
+    # comment on NO_INDEPENDENT_JUDGE_REASON above). This is a binary
+    # block/proceed guard: same lineage on both known sides blocks; anything
+    # else proceeds.
+    #
+    # Judgment call (flagged for product sign-off before wider rollout):
+    # unknown arguer lineage does NOT block. The honesty law here is about
+    # never FABRICATING independence, not about blocking on ignorance --
+    # blocking on an unknown would be more conservative, but nothing proves
+    # dependence when the arguer lineage is unknown, so the recorded
+    # `independent: null` already surfaces the uncertainty honestly.
+    if bool_env("DIALECTICAL_LINEAGE_INDEPENDENCE", False):
+        arguer_family = lineage_family(generation.model_id if generation else None)
+        judge_family = lineage_family(config.model)
+        if arguer_family is not None and judge_family is not None and arguer_family == judge_family:
+            fail_unavailable_scoring_job(
+                db,
+                debate,
+                model_id=config.model,
+                judge_role=judge_role,
+                reason=NO_INDEPENDENT_JUDGE_REASON,
+            )
+            return scoring_result_payload(
+                debate_id=debate.id,
+                node_ids=node_ids,
+                items=[],
+                errors=[
+                    NodeScoringError(
+                        node_id=node.id,
+                        status="no_independent_judge",
+                        reason=NO_INDEPENDENT_JUDGE_REASON,
+                    )
+                ],
+            )
+
+    # Contract-keyed cache lane (mirrors store_scoring_cache/lookup_scoring_cache):
+    # a row stamped with a different judge contract is historical, never a
+    # current hit — completion scoring must queue fresh work instead.
+    try:
+        completion_contract = active_contract(judge_role)
+    except KeyError:
+        completion_contract = None
+    completion_contract_condition = (
+        NodeScoringResult.contract_hash == completion_contract.contract_hash
+        if completion_contract is not None
+        else NodeScoringResult.contract_hash.is_(None)
+    )
     cached_result = db.scalar(
         select(NodeScoringResult)
         .where(
@@ -1055,6 +1352,7 @@ def ensure_node_scoring_on_completion(
             NodeScoringResult.judge_role == judge_role,
             NodeScoringResult.provider == config.provider,
             NodeScoringResult.model == config.model,
+            completion_contract_condition,
         )
         .order_by(NodeScoringResult.updated_at.desc(), NodeScoringResult.created_at.desc(), NodeScoringResult.id.desc())
     )
@@ -1669,18 +1967,6 @@ def _public_model_metadata(value: object) -> dict | None:
         checked_at=_public_metadata_text(metadata.checked_at),
         status=metadata.status,
     ).model_dump(mode="json")
-
-
-def _public_metadata_text(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip()
-    if not normalized:
-        return None
-    lowered = normalized.lower()
-    if any(marker in lowered for marker in SECRET_METADATA_MARKERS):
-        return None
-    return normalized
 
 
 def _with_cache_metadata(payload: dict, *, hit: bool, stale: dict | None = None) -> dict:

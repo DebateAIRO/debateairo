@@ -24,6 +24,17 @@ from app.models.entities import (
     Synthesis,
     Worker,
 )
+from app.scoring.verdict import verdict_summary
+
+# Phase 9 Task 1: analyzer_type value for the protocol_analysis AnalyzerRun.
+# Duplicated here as a literal (rather than imported from
+# app.protocol.runner.PROTOCOL_ANALYSIS_TYPE) because that import creates a
+# real circular-import cycle: app.scoring.__init__ -> app.scoring.service ->
+# app.services.orchestrator -> app.services.serialization (this module) ->
+# app.protocol.runner -> app.scoring.service (partially initialized).
+# Confirmed live by attempting the direct import first. Keep this literal in
+# sync with app/protocol/runner.py:PROTOCOL_ANALYSIS_TYPE.
+PROTOCOL_ANALYSIS_TYPE = "protocol_analysis"
 
 
 STREAMING_JOB_STATUSES = {"claimed", "running"}
@@ -375,6 +386,24 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     analyzer_runs = list(
         db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id).order_by(AnalyzerRun.created_at.asc())).all()
     )
+    # Phase 9 Task 1: latest protocol_analysis run, reusing the query shape
+    # confirmed at app/protocol/runner.py:174-179 (order_by created_at.desc(),
+    # id.desc(), limit 1).
+    #
+    # Phase 11 Task 1: the id-desc tiebreak hazard documented here previously
+    # (created_at is coarse wall-clock -- especially on Windows -- and id is
+    # a random UUID4, so two same-tick protocol_analysis runs could resolve
+    # non-deterministically) is now FIXED by the application-assigned
+    # monotonic AnalyzerRun.seq column (migration 0011), which is the primary
+    # sort key below. created_at.desc()/id.desc() remain only as a defensive
+    # fallback for legacy rows where seq IS NULL (should not occur after
+    # backfill).
+    latest_protocol_analysis_run = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE)
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+        .limit(1)
+    ).first()
     matches = list(
         db.scalars(select(CapabilityMatch).where(CapabilityMatch.debate_id == debate.id).order_by(CapabilityMatch.created_at.asc())).all()
     )
@@ -413,6 +442,14 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         else None,
         "branch_lineage": [branch_to_dict(branch) for branch in branches],
         "analyzer_runs": [analyzer_run_to_dict(run) for run in analyzer_runs],
+        # Phase 9 Task 1: additive field, no existing key removed/renamed.
+        # `root` is the same already-resolved Node variable used by "tree"
+        # above (line 349 in the pre-Task-1 file); root.id is the ROOT_CLAIM
+        # node id that keys dialecticalStrengths/verificationStatuses.
+        "verdict": verdict_summary(
+            latest_protocol_analysis_run.output if latest_protocol_analysis_run else None,
+            root_node_id=root.id if root else None,
+        ),
         "selected_skills": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "skill"],
         "selected_agents": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "agent"],
         "agent_outputs": [agent_output_to_dict(output) for output in agent_outputs],

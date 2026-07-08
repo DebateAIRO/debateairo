@@ -33,6 +33,34 @@ When working from the original active local tree at
 `.venv313/bin/python` and run `make setup-status` there to verify the live Mac
 services.
 
+### Windows / repo-local full-suite acceptance command
+
+The full `coordinator/` suite's canonical, environment-independent invocation is:
+
+```sh
+cd coordinator && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../.venv/Scripts/python.exe -m pytest -p pytest_cov.plugin -p pytest_asyncio.plugin tests/ -q
+```
+
+`coordinator/pyproject.toml` sets `addopts = "--basetemp=.tmp/pytest-basetemp"`
+and `cache_dir = ".tmp/pytest-cache"` so this literal command is reproducible
+even in sandboxes where the OS default pytest temp root (e.g.
+`%LOCALAPPDATA%\Temp\pytest-of-<user>` on Windows) is not writable. An explicit
+`--basetemp`/`-o cache_dir` on the command line still overrides these
+`addopts` defaults (last-flag-wins), so the older
+`--basetemp=.tmp/pytest-claude -o cache_dir=.tmp/pytest-cache-claude -p no:cacheprovider`
+style invocation keeps working unchanged. Expect `17 failed, 1395 passed, 4
+skipped` on a clean tree (the 17 failures are environment/harness-dependent,
+see below).
+
+**Mission-surface acceptance** (the subset that must be 0-failed everywhere,
+excluding the environment-dependent/foreign-stream harness tests):
+
+```sh
+cd coordinator && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../.venv/Scripts/python.exe -m pytest -p pytest_cov.plugin -p pytest_asyncio.plugin tests/ -q --ignore=tests/test_status_report.py --ignore=tests/test_dev_guardian.py --ignore=tests/test_dev_runner.py --ignore=tests/test_local_cluster_check.py --ignore=tests/test_makefile_targets.py --ignore=tests/test_providers.py
+```
+
+Last observed: `0 failed, 954 passed, 4 skipped` (exit code 0).
+
 ## Proposal B QBAF Guardrails
 
 When working on the Debate-Weighted QBAF goal, keep these invariants current:

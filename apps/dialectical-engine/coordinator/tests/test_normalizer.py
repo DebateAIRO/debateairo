@@ -237,6 +237,52 @@ def test_extract_scope_population_among_pattern() -> None:
     assert scope.population == "software engineers"
 
 
+def test_extract_scope_population_stops_before_scope_prepositions() -> None:
+    scope = extract_scope("Remote work is more popular among software engineers during 2024 in Germany.")
+    assert scope.population == "software engineers"
+    assert scope.timeframe == "2024"
+    assert scope.geography == "Germany"
+
+
+def test_extract_scope_population_boundary_preposition_matrix() -> None:
+    # Ticket expected examples, pinned exactly.
+    scope = extract_scope("Remote work is more popular among software engineers in Germany.")
+    assert scope.population == "software engineers"
+    assert scope.geography == "Germany"
+
+    scope = extract_scope("Remote work is more popular among software engineers during 2024.")
+    assert scope.population == "software engineers"
+    assert scope.timeframe == "2024"
+
+    scope = extract_scope("Burnout increased among nurses since 2020.")
+    assert scope.population == "nurses"
+    assert scope.timeframe == "since 2020"
+
+
+def test_extract_scope_population_stops_at_each_boundary_preposition() -> None:
+    cases = {
+        "by": "Remote work grew among adults by 2030.",
+        "over": "Output rose among analysts over the last 3 years.",
+        "across": "Adoption spread among teachers across Europe.",
+        "within": "Adoption rose among teachers within Europe.",
+        "after": "Stress fell among pilots after 2019.",
+        "before": "Turnover spiked among cashiers before 2021.",
+    }
+    expected_population = {
+        "by": "adults",
+        "over": "analysts",
+        "across": "teachers",
+        "within": "teachers",
+        "after": "pilots",
+        "before": "cashiers",
+    }
+    for preposition, sentence in cases.items():
+        scope = extract_scope(sentence)
+        assert scope.population == expected_population[preposition], preposition
+        # The boundary word itself must never be absorbed into the population.
+        assert preposition not in (scope.population or "").split(), preposition
+
+
 def test_extract_scope_unmatched_fields_stay_none() -> None:
     scope = extract_scope("Remote work improves retention.")
     assert scope.timeframe is None

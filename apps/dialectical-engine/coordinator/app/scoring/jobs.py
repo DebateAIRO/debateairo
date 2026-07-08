@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, now_utc
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
@@ -66,16 +66,28 @@ def run_scoring_job_background(
             if _scoring_payload_requires_judge_artifacts(scoring_payload):
                 _ensure_job_has_required_judge_artifacts(db, job.id, scoring_payload)
             branch = current_scoring_branch(db, debate)
-            db.add(
-                AnalyzerRun(
-                    debate_id=debate.id,
-                    branch_id=branch.id,
-                    analyzer_type=SCORING_ANALYZER_TYPE,
-                    status="complete",
-                    output=scoring_payload,
-                    provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
-                )
+            new_run = AnalyzerRun(
+                debate_id=debate.id,
+                branch_id=branch.id,
+                analyzer_type=SCORING_ANALYZER_TYPE,
+                status="complete",
+                output=scoring_payload,
+                provenance={
+                    "scoring_source": JUDGE_OUTPUT_SOURCE,
+                    # Scope artifact linking to exactly this scoring
+                    # operation (see _link_judge_artifacts_to_analyzer_run).
+                    "job_id": job.id,
+                    "node_ids": [
+                        item["node_id"]
+                        for item in scoring_payload.get("items", [])
+                        if isinstance(item, dict) and isinstance(item.get("node_id"), str)
+                    ],
+                },
             )
+            # next_analyzer_run_seq assigns new_run.seq, db.add()s, and
+            # db.flush()es as one lock-covered critical section (see
+            # app.models.entities) -- do not db.add() this row separately.
+            next_analyzer_run_seq(db, new_run)
             job.status = "complete"
             job.error = None
             try:

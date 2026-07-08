@@ -228,3 +228,43 @@ def test_empty_graph_computes_to_empty_dict() -> None:
 def test_isolated_node_strength_equals_its_base_score() -> None:
     graph = ArgumentGraph(base_scores={"solo": 0.73}, attacks=[], supports=[])
     assert graph.compute_strengths() == {"solo": pytest.approx(0.73, abs=1e-12)}
+
+
+def test_exact_duplicate_edges_do_not_double_count() -> None:
+    """Duplicate identity = (source, target, polarity): exact duplicates are
+    counted once in the probabilistic sum."""
+    taus = {"a": 0.5, "b": 0.5}
+    once = ArgumentGraph(base_scores=taus, attacks=[("b", "a")], supports=[])
+    twice = ArgumentGraph(base_scores=taus, attacks=[("b", "a"), ("b", "a")], supports=[])
+    assert twice.compute_strengths()["a"] == once.compute_strengths()["a"]
+
+    supported_once = ArgumentGraph(base_scores=taus, attacks=[], supports=[("b", "a")])
+    supported_twice = ArgumentGraph(base_scores=taus, attacks=[], supports=[("b", "a"), ("b", "a")])
+    assert supported_twice.compute_strengths()["a"] == supported_once.compute_strengths()["a"]
+
+
+def test_compute_strengths_does_not_mutate_caller_inputs() -> None:
+    taus = {"a": 0.5, "b": 0.5}
+    attacks = [("b", "a")]
+    supports: list[tuple[str, str]] = []
+    graph = ArgumentGraph(base_scores=taus, attacks=attacks, supports=supports)
+
+    graph.compute_strengths()
+
+    assert taus == {"a": 0.5, "b": 0.5}
+    assert attacks == [("b", "a")]
+    assert supports == []
+    # The graph's own collections are independent frozen copies: mutating the
+    # caller's originals after construction must not affect the graph.
+    taus["a"] = 0.99
+    attacks.append(("a", "b"))
+    assert graph.compute_strengths()["a"] != 0.99
+    assert len(graph.attacks) == 1
+
+
+def test_argument_graph_collections_are_read_only() -> None:
+    graph = ArgumentGraph(base_scores={"a": 0.5}, attacks=[], supports=[])
+    import pytest as _pytest
+
+    with _pytest.raises(TypeError):
+        graph.base_scores["b"] = 0.1  # type: ignore[index]

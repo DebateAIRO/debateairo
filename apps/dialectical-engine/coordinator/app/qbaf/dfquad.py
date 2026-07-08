@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 
@@ -43,10 +44,14 @@ class CyclicGraphError(ValueError):
     """
 
 
-def _probabilistic_sum(values: Sequence[float]) -> float:
-    """DF-QuAD aggregation function (alpha): probabilistic sum.
+def probabilistic_sum(values: Sequence[float]) -> float:
+    """Canonical DF-QuAD aggregation function (alpha): probabilistic sum.
 
     agg([]) = 0; agg(v1..vn) = 1 - prod(1 - vi).
+
+    This is THE single canonical implementation of the DF-QuAD formula in the
+    codebase; ``app.qbaf.semantics`` delegates to it (adding its own input
+    validation and edge-weighting on top).
     """
     aggregate = 0.0
     for value in values:
@@ -54,11 +59,15 @@ def _probabilistic_sum(values: Sequence[float]) -> float:
     return aggregate
 
 
-def _mediating_function(tau: float, attacker_strength: float, supporter_strength: float) -> float:
-    """DF-QuAD mediating function (sigma)."""
+def mediating_function(tau: float, attacker_strength: float, supporter_strength: float) -> float:
+    """Canonical DF-QuAD mediating function (sigma). See probabilistic_sum."""
     if attacker_strength >= supporter_strength:
         return tau - tau * (attacker_strength - supporter_strength)
     return tau + (1 - tau) * (supporter_strength - attacker_strength)
+
+
+_probabilistic_sum = probabilistic_sum
+_mediating_function = mediating_function
 
 
 @dataclass(frozen=True)
@@ -74,6 +83,19 @@ class ArgumentGraph:
     base_scores: Mapping[str, float]
     attacks: Sequence[tuple[str, str]]
     supports: Sequence[tuple[str, str]]
+
+    def __post_init__(self) -> None:
+        # Freeze independent copies so the graph is genuinely immutable and
+        # detached from the caller's collections. Duplicate edges (identity =
+        # (source, target, polarity)) are deduplicated here, order-preserving,
+        # so exact duplicates never double-count in the probabilistic sum.
+        object.__setattr__(self, "base_scores", MappingProxyType(dict(self.base_scores)))
+        object.__setattr__(
+            self, "attacks", tuple(dict.fromkeys((str(s_), str(t)) for s_, t in self.attacks))
+        )
+        object.__setattr__(
+            self, "supports", tuple(dict.fromkeys((str(s_), str(t)) for s_, t in self.supports))
+        )
 
     def _validate(self) -> None:
         for node_id, tau in self.base_scores.items():

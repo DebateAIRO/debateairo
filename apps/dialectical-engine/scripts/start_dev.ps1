@@ -22,6 +22,22 @@ if (-not $env:PNPM) {
     }
 }
 
+function Repair-ProcessPathEnvironment {
+    $ProcessEnv = [System.Environment]::GetEnvironmentVariables("Process")
+    $PathKeys = @($ProcessEnv.Keys | Where-Object { $_ -ieq "Path" })
+    if ($PathKeys.Count -le 1) {
+        return
+    }
+
+    $PathValue = $env:Path
+    foreach ($PathKey in $PathKeys) {
+        [System.Environment]::SetEnvironmentVariable($PathKey, $null, "Process")
+    }
+    [System.Environment]::SetEnvironmentVariable("Path", $PathValue, "Process")
+}
+
+Repair-ProcessPathEnvironment
+
 function Format-DevSecret {
     param([string] $Value)
     if ($env:DIALECTICAL_SHOW_DEV_TOKEN -eq "1") {
@@ -44,6 +60,21 @@ function Test-ListeningPort {
     param([int] $Port)
     $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     return $null -ne $connection
+}
+
+function Test-HttpEndpoint {
+    param([string] $Uri)
+    try {
+        $Response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec 5
+        return $Response.StatusCode -ge 200 -and $Response.StatusCode -lt 500
+    } catch {
+        return $false
+    }
+}
+
+function Test-DevStackReady {
+    return (Test-HttpEndpoint "http://127.0.0.1:3000") -and `
+        (Test-HttpEndpoint "http://127.0.0.1:8000/api/backends/status")
 }
 
 function Get-V2GenerationReadiness {
@@ -96,7 +127,7 @@ function Write-DevStackReady {
     Write-Output "Coordinator/web are up, but V2 generation is not ready: $Reason$ReasonCode"
 }
 
-if ((Test-ListeningPort 3000) -and (Test-ListeningPort 8000)) {
+if (Test-DevStackReady) {
     $Readiness = Get-V2GenerationReadiness # /api/backends/status v2_generation_readiness ready
     Write-DevStackReady "Dialectical dev stack already appears to be running." "" $Readiness
     exit 0
@@ -113,7 +144,7 @@ $Process = Start-Process `
 
 $Deadline = (Get-Date).AddSeconds(45)
 while ((Get-Date) -lt $Deadline) {
-    if ((Test-ListeningPort 3000) -and (Test-ListeningPort 8000)) {
+    if (Test-DevStackReady) {
         $Readiness = Get-V2GenerationReadiness # /api/backends/status v2_generation_readiness ready
         Write-DevStackReady "Dialectical dev stack started." $OutLog $Readiness
         exit 0

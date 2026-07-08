@@ -5,12 +5,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text, event, update
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text, event, func, update
 from sqlalchemy import UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.core.db import Base
+from app.core.write_lock import hold_write_lock
 
 
 def now_utc() -> datetime:
@@ -61,6 +62,13 @@ class Node(Base):
     stopping_status: Mapped[str] = mapped_column(String(24), default="active", index=True)
     stopping_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     materialized_path: Mapped[str] = mapped_column(Text, default="")
+    # Phase 7 Task 1: additive JSON home for per-node metadata (e.g. an
+    # EVIDENCE node's evidenceKind classification). Mapped-name is
+    # `evidence_metadata` -> DB column "metadata" (mirrors
+    # ProvenanceRecord.metadata_json's rename pattern, since `metadata` is a
+    # reserved attribute name on SQLAlchemy declarative Base subclasses).
+    # Nullable/default-safe; see migrations/versions/0010_node_evidence_metadata.py.
+    evidence_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column("metadata", JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     debate: Mapped[Debate] = relationship("Debate", back_populates="nodes")
@@ -198,6 +206,90 @@ class AnalyzerRun(Base):
     status: Mapped[str] = mapped_column(String(24), default="complete", index=True)
     provenance: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    # Phase 11 Task 1: application-assigned monotonic tiebreak. `id` is a
+    # random UUID4 (non-sequential) and `created_at` is coarse wall-clock
+    # (especially on Windows), so neither can deterministically order two
+    # AnalyzerRun rows written in the same timestamp tick. `seq` is assigned
+    # by next_analyzer_run_seq and is the primary sort key at every "latest
+    # AnalyzerRun" read site. Nullable at the schema level only for legacy
+    # pre-migration rows / SQLite ADD COLUMN safety -- every row written after
+    # migration 0011 must carry a real integer seq.
+    #
+    # Fix-wave correction (see task-11-1-report.md "Fix wave" section): the
+    # ORIGINAL docstring here claimed the MAX(seq)+1 read happened "under the
+    # process-wide write lock" merely because callers invoked this function
+    # before their surrounding flush_write/commit_write call. That claim was
+    # FALSE -- flush_write/commit_write only wrap db.flush()/db.commit(); the
+    # SELECT MAX(seq) executed during AnalyzerRun(...) construction, i.e.
+    # entirely BEFORE the lock was ever acquired. Two concurrent FastAPI
+    # BackgroundTasks threads (separate sessions, e.g. un-deduped scoring
+    # jobs) could both read MAX=N and both proceed to commit seq=N+1,
+    # silently degrading to the old (created_at, id) tie -- exactly the
+    # failure mode this column exists to eliminate.
+    #
+    # Fixed by making next_analyzer_run_seq itself hold
+    # app.core.write_lock.hold_write_lock() across BOTH the MAX(seq) read AND
+    # this row's db.add()+db.flush() (see that function's body/docstring) --
+    # not just around the read, which would still leave a read/commit TOCTOU
+    # window open for a second thread. Belt-and-suspenders: seq also carries a
+    # partial UNIQUE index (ux_analyzer_runs_seq, WHERE seq IS NOT NULL,
+    # migration 0011) so that if this invariant is ever violated by a future
+    # call site that bypasses next_analyzer_run_seq's locked flush, the
+    # collision fails loudly (IntegrityError) instead of silently degrading.
+    seq: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+
+
+def next_analyzer_run_seq(db: Session, run: "AnalyzerRun") -> int:
+    """Assign the next monotonic seq value to `run` and flush it atomically.
+
+    This does three things as ONE critical section under
+    app.core.write_lock.hold_write_lock() (the same process-wide RLock
+    flush_write/commit_write use -- RLock is reentrant, so this function's
+    acquisition plus the caller's later flush_write/commit_write on the same
+    thread is safe, not a deadlock):
+
+      1. read current_max = MAX(seq)
+      2. set run.seq = current_max + 1, db.add(run)
+      3. db.flush() -- actually issue the INSERT before releasing the lock
+
+    Lock-around-the-read ALONE would be unsound: thread B could still acquire
+    the lock, read MAX, and commit AFTER thread A released the lock following
+    its own read but BEFORE thread A's row was actually written -- the read
+    and the write must be atomic together, not just the read. Holding the
+    lock through db.flush() here closes that window: while thread A holds the
+    lock, thread B's call to this same function blocks entirely (it cannot
+    even perform its MAX(seq) read) until thread A's row has already been
+    flushed to the database, so thread B's subsequent MAX(seq) read is
+    guaranteed to observe thread A's row.
+
+    Returns the assigned seq value for convenience (callers may still want it
+    for logging), but the primary effect is the mutation of `run` in place.
+    """
+    with hold_write_lock():
+        current_max = db.scalar(select(func.max(AnalyzerRun.seq)))
+        run.seq = (current_max or 0) + 1
+        db.add(run)
+        db.flush()
+    return run.seq
+
+
+# Fix-wave addition (Phase 11 Task 1 fix wave, see task-11-1-report.md):
+# defense-in-depth partial UNIQUE index -- the actual race-freedom guarantee
+# comes from next_analyzer_run_seq holding app.core.write_lock across the
+# read+flush (see that function's docstring), not from this index. But if
+# that invariant is ever violated by a future call site, this makes the
+# violation fail loudly (IntegrityError) instead of silently degrading back
+# to the (created_at, id) tie. Partial (sqlite_where) because legacy rows
+# may carry seq=NULL and NULLs must not collide against each other. Mirrors
+# migrations/versions/0011_analyzer_run_seq.py's ux_analyzer_runs_seq index
+# -- also registered in app.core.db.init_db's explicit index-creation
+# allowlist for the create_all() bootstrap path.
+Index(
+    "ux_analyzer_runs_seq",
+    AnalyzerRun.seq,
+    unique=True,
+    sqlite_where=AnalyzerRun.seq.is_not(None),
+)
 
 
 class CapabilityMatch(Base):
@@ -279,6 +371,7 @@ class JudgeOutputArtifact(Base):
         Index("ix_judge_output_artifacts_debate_id", "debate_id"),
         Index("ix_judge_output_artifacts_node_id", "node_id"),
         Index("ix_judge_output_artifacts_job_id", "job_id"),
+        Index("ix_judge_output_artifacts_analyzer_run_id", "analyzer_run_id"),
         Index("ix_judge_output_artifacts_created_at", "created_at"),
     )
 
@@ -309,18 +402,31 @@ class JudgeOutputArtifact(Base):
 
 @event.listens_for(AnalyzerRun, "after_insert")
 def _link_judge_artifacts_to_analyzer_run(_mapper, connection, target: AnalyzerRun) -> None:
+    """Link judge artifacts to the analyzer run that actually produced them.
+
+    Provenance precision: linking requires the run's provenance to name the
+    scoring job (and, when recorded, the produced node ids). A run without job
+    scoping links nothing — old or interrupted-job artifacts must never be
+    absorbed by a later run (that would be false provenance).
+    """
     if target.analyzer_type != "node_scoring" or target.status != "complete":
         return
     provenance = target.provenance if isinstance(target.provenance, dict) else {}
     if provenance.get("scoring_source") != "judge_outputs":
         return
+    job_id = provenance.get("job_id")
+    if not isinstance(job_id, str) or not job_id:
+        return
+    conditions = [
+        JudgeOutputArtifact.debate_id == target.debate_id,
+        JudgeOutputArtifact.analyzer_run_id.is_(None),
+        JudgeOutputArtifact.job_id == job_id,
+    ]
+    node_ids = provenance.get("node_ids")
+    if isinstance(node_ids, list) and node_ids:
+        conditions.append(JudgeOutputArtifact.node_id.in_([n for n in node_ids if isinstance(n, str)]))
     connection.execute(
-        update(JudgeOutputArtifact)
-        .where(
-            JudgeOutputArtifact.debate_id == target.debate_id,
-            JudgeOutputArtifact.analyzer_run_id.is_(None),
-        )
-        .values(analyzer_run_id=target.id)
+        update(JudgeOutputArtifact).where(*conditions).values(analyzer_run_id=target.id)
     )
 
 
@@ -352,6 +458,7 @@ Index(
     NodeScoringResult.judge_role,
     NodeScoringResult.provider,
     NodeScoringResult.model,
+    NodeScoringResult.contract_hash,
     unique=True,
 )
 

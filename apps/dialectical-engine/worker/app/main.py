@@ -219,6 +219,71 @@ async def handle_job_with_heartbeats(
         await heartbeat_task
 
 
+RECOVERY_ATTEMPT_CAP = 5
+
+
+async def handle_identity_desync(
+    client: CoordinatorClient,
+    capabilities: list[str],
+    stop: asyncio.Event,
+    recovery_attempts: int,
+) -> int:
+    """One identity-recovery cycle with a hard cap.
+
+    Clears local identity and re-registers with token rotation. Repeated
+    auth-class failures increment the attempt counter; at the cap the worker
+    sends a best-effort blocked_auth heartbeat (so the coordinator reports the
+    true state) and exits loudly instead of looping forever. Returns the
+    updated attempt counter; callers reset it to 0 only after a healthy poll.
+    """
+    recovery_attempts += 1
+    if client.config.worker_id and client.config.worker_token:
+        client.last_known_identity = (client.config.worker_id, client.config.worker_token)
+    if recovery_attempts >= RECOVERY_ATTEMPT_CAP:
+        identity = (client.config.worker_id, client.config.worker_token)
+        if not all(identity):
+            identity = getattr(client, "last_known_identity", (None, None))
+        if all(identity):
+            # Restore the last-known identity for one best-effort truthful
+            # state report; a rejection here is swallowed (best-effort only).
+            client.config.worker_id, client.config.worker_token = identity
+            try:
+                await client.heartbeat(capabilities, status="blocked_auth")
+            except Exception:  # noqa: BLE001 - best-effort truthful state report.
+                pass
+        raise RuntimeError(
+            "Worker blocked_auth: identity recovery failed "
+            f"{recovery_attempts} consecutive times. Fix DIALECTICAL_USER_TOKEN "
+            "or the worker registration on the coordinator, then restart the worker."
+        )
+    print(
+        f"Worker identity desync (attempt {recovery_attempts}/{RECOVERY_ATTEMPT_CAP}); "
+        "re-registering with token rotation.",
+        flush=True,
+    )
+    client.config.worker_id = None
+    client.config.worker_token = None
+    try:
+        await register_with_backoff(client, capabilities, stop, rotate_token=True)
+    except Exception as recovery_exc:
+        is_blocked_auth = identity_desync_error(recovery_exc) or (
+            isinstance(recovery_exc, httpx.HTTPStatusError)
+            and recovery_exc.response.status_code == 403
+        )
+        if is_blocked_auth:
+            print(
+                f"Worker blocked_auth: re-registration rejected ({recovery_exc}); retrying in 30s.",
+                flush=True,
+            )
+            await wait_or_stop(stop, 30)
+        elif retryable_coordinator_error(recovery_exc):
+            print(f"Coordinator unavailable during recovery: {recovery_exc}. Retrying in 5s.", flush=True)
+            await wait_or_stop(stop, 5)
+        else:
+            raise
+    return recovery_attempts
+
+
 async def worker_loop(run_once: bool = False) -> None:
     config = load_config()
     client = CoordinatorClient(config)
@@ -235,10 +300,23 @@ async def worker_loop(run_once: bool = False) -> None:
             pass
 
     try:
+        recovery_attempts = 0
         early_registered = False
         if config.worker_id and config.worker_token and config.last_capabilities:
-            await register_with_backoff(client, config.last_capabilities, stop, status="starting")
-            early_registered = True
+            while not stop.is_set():
+                try:
+                    await register_with_backoff(client, config.last_capabilities, stop, status="starting")
+                    early_registered = True
+                    break
+                except Exception as exc:
+                    if not identity_desync_error(exc):
+                        raise
+                    recovery_attempts = await handle_identity_desync(
+                        client, config.last_capabilities, stop, recovery_attempts
+                    )
+                    if client.config.worker_id and client.config.worker_token:
+                        early_registered = True
+                        break
 
         adapters = await detect_adapters(config)
         if not adapters:
@@ -250,10 +328,17 @@ async def worker_loop(run_once: bool = False) -> None:
         if config.last_capabilities != capabilities:
             config.last_capabilities = capabilities
             save_config(config)
-        if early_registered:
-            await client.heartbeat(capabilities, status="online")
-        else:
-            await register_with_backoff(client, capabilities, stop)
+        try:
+            if early_registered:
+                await client.heartbeat(capabilities, status="online")
+            else:
+                await register_with_backoff(client, capabilities, stop)
+        except Exception as exc:
+            if not identity_desync_error(exc):
+                raise
+            # Funnel startup desync into the capped recovery path; the poll
+            # loop below re-attempts and re-enters recovery if still broken.
+            recovery_attempts = await handle_identity_desync(client, capabilities, stop, recovery_attempts)
         last_heartbeat = time.monotonic()
         backoff_seconds = 1
         while not stop.is_set():
@@ -263,35 +348,12 @@ async def worker_loop(run_once: bool = False) -> None:
                     last_heartbeat = time.monotonic()
                 job = await client.poll()
                 backoff_seconds = 1
+                recovery_attempts = 0
                 if job:
                     await handle_job_with_heartbeats(client, adapters, job, capabilities, config.heartbeat_seconds)
             except Exception as exc:
                 if identity_desync_error(exc):
-                    print(f"Worker identity desync ({exc}); re-registering with token rotation.", flush=True)
-                    client.config.worker_id = None
-                    client.config.worker_token = None
-                    try:
-                        await register_with_backoff(client, capabilities, stop, rotate_token=True)
-                    except Exception as recovery_exc:
-                        is_blocked_auth = identity_desync_error(recovery_exc) or (
-                            isinstance(recovery_exc, httpx.HTTPStatusError)
-                            and recovery_exc.response.status_code == 403
-                        )
-                        if is_blocked_auth:
-                            print(
-                                f"Worker blocked_auth: re-registration rejected ({recovery_exc}); retrying in 30s.",
-                                flush=True,
-                            )
-                            await wait_or_stop(stop, 30)
-                        elif retryable_coordinator_error(recovery_exc):
-                            print(
-                                f"Coordinator unavailable: {recovery_exc}. Retrying in {backoff_seconds}s.",
-                                flush=True,
-                            )
-                            await wait_or_stop(stop, backoff_seconds)
-                            backoff_seconds = min(backoff_seconds * 2, 30)
-                        else:
-                            raise
+                    recovery_attempts = await handle_identity_desync(client, capabilities, stop, recovery_attempts)
                 elif not retryable_coordinator_error(exc):
                     raise
                 else:

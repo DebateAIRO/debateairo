@@ -24,3 +24,12 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "strict"
+# Repo-local temp/cache roots so the literal acceptance command
+# (PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ... -m pytest -p pytest_cov.plugin -p pytest_asyncio.plugin tests/ -q)
+# is reproducible even when the OS default pytest temp root
+# (e.g. %LOCALAPPDATA%\Temp\pytest-of-<user> on Windows) is not writable.
+# addopts values are prepended to the CLI args, so an explicit --basetemp on
+# the command line still wins (pytest/argparse last-match-wins); see
+# hermes-ticket-3-report.md step 3c for the empirical proof.
+addopts = "--basetemp=.tmp/pytest-basetemp"
+cache_dir = ".tmp/pytest-cache"

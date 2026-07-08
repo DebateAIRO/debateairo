@@ -134,6 +134,20 @@ def test_init_db_backfills_active_generation_index_for_existing_tables(db) -> No
     }
 
 
+def test_init_db_backfills_judge_artifact_analyzer_run_index_for_existing_tables(db) -> None:
+    db.execute(text("DROP INDEX IF EXISTS ix_judge_output_artifacts_analyzer_run_id"))
+    db.commit()
+    assert "ix_judge_output_artifacts_analyzer_run_id" not in {
+        index["name"] for index in inspect(db.bind).get_indexes("judge_output_artifacts")
+    }
+
+    init_db()
+
+    assert "ix_judge_output_artifacts_analyzer_run_id" in {
+        index["name"] for index in inspect(db.bind).get_indexes("judge_output_artifacts")
+    }
+
+
 def test_init_db_backfills_v2_synthesis_columns_for_existing_tables(db) -> None:
     db.execute(text("DROP TABLE syntheses"))
     db.execute(
@@ -238,8 +252,48 @@ def test_scoring_cache_migration_applies_cleanly_to_empty_database(tmp_path, mon
             "created_at",
             "updated_at",
         } <= columns
-        indexes = {index["name"] for index in inspector.get_indexes("node_scoring_results")}
-        assert "ux_node_scoring_results_cache_identity" in indexes
+        cache_identity_columns = None
+        for index in inspector.get_indexes("node_scoring_results"):
+            if index["name"] == "ux_node_scoring_results_cache_identity":
+                cache_identity_columns = list(index["column_names"])
+        assert cache_identity_columns is not None
+        assert cache_identity_columns[-1] == "contract_hash", cache_identity_columns
+        judge_artifact_indexes = {index["name"] for index in inspector.get_indexes("judge_output_artifacts")}
+        assert "ix_judge_output_artifacts_analyzer_run_id" in judge_artifact_indexes
+    finally:
+        migrated_engine.dispose()
+
+
+def test_nodes_table_has_evidence_metadata_json_column(db) -> None:
+    """Phase 7 Task 1: Node needs a migration-free-at-model-level JSON home
+    for evidenceKind (and future per-node metadata) after confirming no
+    existing unused JSON column exists on Node/Generation. Modeled on
+    ProvenanceRecord.metadata_json's `metadata_json -> "metadata"` column
+    rename pattern (metadata is a reserved SQLAlchemy declarative attribute
+    name)."""
+    inspector = inspect(db.bind)
+    columns = {column["name"] for column in inspector.get_columns("nodes")}
+    assert "metadata" in columns
+
+
+def test_evidence_metadata_migration_applies_cleanly_to_empty_database(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "migration-evidence.sqlite3"
+    coordinator_dir = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("DIALECTICAL_HOME", str(tmp_path))
+    monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{db_path}")
+
+    config = Config(str(coordinator_dir / "alembic.ini"))
+    config.set_main_option("script_location", str(coordinator_dir / "migrations"))
+    command.upgrade(config, "head")
+
+    from sqlalchemy import create_engine
+
+    migrated_engine = create_engine(f"sqlite:///{db_path}", future=True)
+    try:
+        inspector = inspect(migrated_engine)
+        assert "nodes" in set(inspector.get_table_names())
+        columns = {column["name"] for column in inspector.get_columns("nodes")}
+        assert "metadata" in columns
     finally:
         migrated_engine.dispose()
 

@@ -340,7 +340,7 @@ class NodeScoringPayload(BaseModel):
 
 class NodeScoringError(BaseModel):
     node_id: str
-    status: Literal["unavailable"]
+    status: Literal["unavailable", "no_independent_judge"]
     reason: str
 
 

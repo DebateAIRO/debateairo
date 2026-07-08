@@ -1951,12 +1951,26 @@ def test_retryable_failure_keeps_worker_degraded_while_retrying(db) -> None:
     assert worker.status == "degraded"
     assert worker.current_job_id is None
 
+    # Worker lifecycle contract: a degraded worker may heartbeat but may NOT
+    # claim — the failed job stays pending rather than bouncing straight back
+    # to the still-degraded worker.
+    blocked_retry = claim_pending_job(db, worker)
+    db.refresh(worker)
+    assert blocked_retry is None
+    assert worker.status == "degraded"
+    assert worker.current_job_id is None
+
+    # The real worker loop restores itself via its next steady-state
+    # heartbeat (status="online"); only then may it claim the retry.
+    worker.status = "online"
+    db.commit()
+
     retry = claim_pending_job(db, worker)
 
     db.refresh(worker)
     assert retry is not None
     assert retry.id == job.id
-    assert worker.status == "degraded"
+    assert worker.status == "online"
     assert worker.current_job_id == job.id
 
 

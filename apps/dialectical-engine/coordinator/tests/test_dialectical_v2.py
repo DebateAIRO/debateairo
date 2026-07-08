@@ -410,6 +410,101 @@ def test_pov_completion_materializes_title_content_and_nested_pro_con_cards(db) 
         assert all(child["status"] == "complete" for child in stance["children"])
 
 
+def worker_pov_output_with_extractable_evidence(worker: Worker, job_id: str, pov: str) -> dict:
+    """Same shape as worker_pov_output, but the pro/con content prose
+    contains extractable-evidence sentences (statistical pattern) so that
+    extract_and_persist_evidence_for_completed_node actually persists
+    EVIDENCE child nodes under pro_node/con_node during materialize_pov_branch
+    (Hermes ticket 1 regression coverage: real end-to-end flow through
+    materialize_pov_branch, not just the extraction unit)."""
+    prefixes = {
+        "Scientific POV": "scientific",
+        "Statistical POV": "statistical",
+        "Ethical POV": "ethical",
+        "Practical POV": "practical",
+    }
+    prefix = prefixes[pov]
+    evidence_sentence = "A 2023 study found that 55% of respondents reported measurable improvement."
+    return {
+        "title": f"{pov} assessment",
+        "content": f"A concise {prefix} assessment of the question based on the strongest available reasoning.",
+        "strongest_pro": {
+            "title": f"{pov} strongest pro",
+            "content": f"The strongest {prefix} pro relies on the clearest relevant evidence. {evidence_sentence}",
+            "pro": {
+                "title": f"{pov} pro support",
+                "content": f"Supporting detail that strengthens the {prefix} pro without padding. {evidence_sentence}",
+            },
+            "con": {
+                "title": f"{pov} pro limitation",
+                "content": f"Counter-detail that limits the {prefix} pro and identifies uncertainty. {evidence_sentence}",
+            },
+        },
+        "strongest_con": {
+            "title": f"{pov} strongest con",
+            "content": f"The strongest {prefix} con identifies the most important risk or weakness. {evidence_sentence}",
+            "pro": {
+                "title": f"{pov} con support",
+                "content": f"Supporting detail that strengthens the {prefix} con without padding. {evidence_sentence}",
+            },
+            "con": {
+                "title": f"{pov} con limitation",
+                "content": f"Counter-detail that limits the {prefix} con and identifies uncertainty. {evidence_sentence}",
+            },
+        },
+        "provenance": {
+            "model_id": "codex-gpt-5.5",
+            "worker_id": worker.id,
+            "prompt_id": f"prompt-{job_id}",
+            "job_id": job_id,
+        },
+    }
+
+
+def test_pov_completion_evidence_and_nested_pro_con_children_never_collide(db) -> None:
+    """Regression for Hermes ticket 1: materialize_pov_branch calls
+    extract_and_persist_evidence_for_completed_node(pro_node) /
+    (con_node) BEFORE it creates each stance's nested PRO/CON children at
+    positions 0/1. When the generated prose contains extractable evidence,
+    this used to make an EVIDENCE node and a nested PRO child both claim
+    sibling position 0 with an identical materialized_path. Drive this
+    through the REAL end-to-end flow (create_dialectical_debate ->
+    complete_job -> materialize_pov_branch) and assert every claim node's
+    children end up with unique (position, materialized_path) pairs,
+    EVIDENCE and nested PRO/CON coexisting.
+    """
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    first_job = claim_for_worker(db, worker)
+    assert first_job.job_type == "v2_pov"
+    payload = worker_pov_output_with_extractable_evidence(worker, first_job.id, first_job.required_role)
+    asyncio.run(complete_job(db, first_job, payload, {"latency_ms": 12}))
+
+    all_nodes = db.scalars(select(entities.Node).where(entities.Node.debate_id == debate.id)).all()
+    assert any(node.node_type == "EVIDENCE" for node in all_nodes), (
+        "test fixture did not actually produce any EVIDENCE nodes -- "
+        "strengthen the evidence-bearing prose fixture"
+    )
+
+    children_by_parent: dict[str, list] = {}
+    for node in all_nodes:
+        if node.parent_id is not None:
+            children_by_parent.setdefault(node.parent_id, []).append(node)
+
+    for parent_id, children in children_by_parent.items():
+        positions = [child.position for child in children]
+        paths = [child.materialized_path for child in children]
+        assert len(positions) == len(set(positions)), (
+            f"duplicate sibling position under parent {parent_id}: {[(c.node_type, c.position) for c in children]}"
+        )
+        assert len(paths) == len(set(paths)), (
+            f"duplicate sibling materialized_path under parent {parent_id}: "
+            f"{[(c.node_type, c.materialized_path) for c in children]}"
+        )
+
+
 def test_pov_completion_does_not_invoke_default_debate_scoring_before_synthesis(db, monkeypatch: pytest.MonkeyPatch) -> None:
     service = v2_service()
     worker = real_codex_worker(db)
@@ -672,7 +767,11 @@ def test_empty_database_question_creates_full_pipeline_without_direct_answer(db)
     assert detail["direct_answer"] is None
     assert detail["status"] == "complete"
     assert detail["branch_lineage"][0]["parent_branch_id"] is None
-    assert detail["analyzer_runs"] == []
+    # V2 never runs the legacy V1-style DEFAULT_ANALYZERS stage; the only
+    # AnalyzerRun this pipeline produces is Phase 5b's best-effort
+    # protocol_analysis run persisted during synthesis (cross-exam +
+    # verification), which is expected here, not a leftover V1 artifact.
+    assert [run["analyzer_type"] for run in detail["analyzer_runs"]] == ["protocol_analysis"]
     assert detail["selected_skills"] == []
     assert detail["selected_agents"] == []
     assert detail["agent_outputs"] == []
@@ -689,7 +788,10 @@ def test_empty_database_question_creates_full_pipeline_without_direct_answer(db)
 
     db.expire_all()
     assert db.scalar(select(models["DebateBranch"]).where(models["DebateBranch"].debate_id == debate.id)) is not None
-    assert db.scalars(select(models["AnalyzerRun"]).where(models["AnalyzerRun"].debate_id == debate.id)).all() == []
+    assert [
+        run.analyzer_type
+        for run in db.scalars(select(models["AnalyzerRun"]).where(models["AnalyzerRun"].debate_id == debate.id)).all()
+    ] == ["protocol_analysis"]
     assert db.scalar(select(models["CapabilityMatch"]).where(models["CapabilityMatch"].debate_id == debate.id)) is None
     assert db.scalar(select(models["AgentOutput"]).where(models["AgentOutput"].debate_id == debate.id)) is None
     assert db.scalar(select(models["ProvenanceRecord"]).where(models["ProvenanceRecord"].debate_id == debate.id)) is not None

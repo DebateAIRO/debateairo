@@ -38,6 +38,7 @@ import { DebateThread } from "@/components/DebateThread";
 import { DebateSplit } from "@/components/DebateSplit";
 import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
+import { VerdictBanner } from "@/components/VerdictBanner";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { ChallengePopover } from "@/components/ChallengePopover";
@@ -1011,6 +1012,9 @@ export default function DebatePageClient({
           </Link>
         </div>
       </header>
+
+      {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
+      {process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
 
       <ScoringErrorBoundary>
         {scoringInsightsExpandable ? (

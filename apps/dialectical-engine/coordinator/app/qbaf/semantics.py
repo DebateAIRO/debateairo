@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Iterable, Protocol
 
+from app.qbaf.dfquad import mediating_function as _canonical_mediating_function
+from app.qbaf.dfquad import probabilistic_sum as _canonical_probabilistic_sum
 from app.qbaf.model import Edge, QBAFGraph, require_unit_interval
 
 
@@ -15,21 +17,17 @@ class Semantics(Protocol):
 
 
 def probabilistic_sum(values: Iterable[float]) -> float:
-    aggregate = 0.0
-    for value in values:
-        strength = require_unit_interval(float(value), "strength")
-        aggregate = aggregate + strength - aggregate * strength
-    return aggregate
+    """Validated wrapper over the canonical DF-QuAD aggregation in dfquad.py."""
+    validated = [require_unit_interval(float(value), "strength") for value in values]
+    return _canonical_probabilistic_sum(validated)
 
 
 def combine_df_quad(base_score: float, attacker_strength: float, supporter_strength: float) -> float:
+    """Validated wrapper over the canonical DF-QuAD mediating function in dfquad.py."""
     base = require_unit_interval(float(base_score), "base_score")
     attackers = require_unit_interval(float(attacker_strength), "attacker_strength")
     supporters = require_unit_interval(float(supporter_strength), "supporter_strength")
-    delta = abs(supporters - attackers)
-    if attackers >= supporters:
-        return base - base * delta
-    return base + (1 - base) * delta
+    return _canonical_mediating_function(base, attackers, supporters)
 
 
 class DFQuADSemantics:
@@ -82,7 +80,24 @@ class DFQuADSemantics:
 
     @staticmethod
     def _incoming_edges(graph: QBAFGraph) -> dict[str, list[Edge]]:
+        """Group incoming edges per target with duplicate handling.
+
+        Duplicate identity = (source_id, target_id, polarity). Exact
+        duplicates (same weight) collapse to one edge; the same identity with
+        conflicting weights is ambiguous input and raises ValueError.
+        """
+        seen: dict[tuple[str, str, str], float] = {}
         incoming_edges: dict[str, list[Edge]] = {node_id: [] for node_id in graph.nodes}
         for edge in graph.edges:
+            key = (edge.source_id, edge.target_id, edge.polarity)
+            if key in seen:
+                if seen[key] != edge.weight:
+                    raise ValueError(
+                        "conflicting duplicate edge weights for "
+                        f"{edge.source_id!r}->{edge.target_id!r} ({edge.polarity}): "
+                        f"{seen[key]!r} vs {edge.weight!r}"
+                    )
+                continue
+            seen[key] = edge.weight
             incoming_edges[edge.target_id].append(edge)
         return incoming_edges

@@ -16,7 +16,14 @@ import {
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import { formatScoreBadgeLabel, formatScorePercent } from "@/lib/scoringFormat";
+import { isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
+
+// Verdict-first UI (Phase 9): low-strength node dimming is additive and
+// gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
+// byte-identical to pre-Task-4 behavior. See debateTreeUtils.isLowStrengthNode
+// for the honesty contract (missing score is never treated as low strength).
+const VERDICT_FIRST_UI_ENABLED = process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true";
 
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
@@ -168,11 +175,21 @@ function CanvasCard({
   const model = generation ? modelMeta(generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
 
+  // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
+  // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
+  // AND low-strength AND filtered simultaneously, so the new dim is composed
+  // via multiplication (rather than min/replace) onto the existing base
+  // opacity: it scales whatever the existing rules already produced, so all
+  // three states keep contributing and stay distinguishable in combination,
+  // and the flag-off value is preserved exactly (multiplying by 1).
+  const lowStrength = isLowStrengthNode(scoring?.scores?.strength);
+  const lowStrengthDim = VERDICT_FIRST_UI_ENABLED && lowStrength ? 0.7 : 1;
+
   const cardStyle: CSSProperties = {
     left: placed.x,
     top: placed.y,
     width: CARD_W,
-    opacity: scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38
+    opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim
   };
 
   const innerStyle: CSSProperties = scrutiny
@@ -204,7 +221,11 @@ function CanvasCard({
   const openNodeDetails = () => onOpenNode(node.id);
 
   return (
-    <div className="nodeWrap" style={cardStyle}>
+    <div
+      className="nodeWrap"
+      style={cardStyle}
+      data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
+    >
       <div
         ref={registerRef}
         className={`node${selected ? " selected" : ""}${scoreFilterMatch ? "" : " scoreFilteredOut"}`}

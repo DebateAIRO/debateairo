@@ -27,7 +27,7 @@ export type DebateNode = {
   id: string;
   debate_id: string;
   parent_id: string | null;
-  node_type: "ROOT_CLAIM" | "SCIENTIFIC_POV" | "STATISTICAL_POV" | "ETHICAL_POV" | "PRACTICAL_POV" | "PRO" | "CON";
+  node_type: "ROOT_CLAIM" | "SCIENTIFIC_POV" | "STATISTICAL_POV" | "ETHICAL_POV" | "PRACTICAL_POV" | "PRO" | "CON" | "EVIDENCE";
   depth: number;
   position: number;
   claim: string;
@@ -183,7 +183,7 @@ export type NodeScoringPayload = {
 
 export type NodeScoringError = {
   node_id: string;
-  status: "unavailable";
+  status: "unavailable" | "no_independent_judge";
   reason: string;
 };
 
@@ -452,6 +452,28 @@ export type DebateConfig = Record<string, unknown> & {
   single_shot_result?: SingleShotResult | null;
 };
 
+// ---------------------------------------------------------------------------
+// Phase 9 Task 1/2: verdict-first UI (feature-flagged, NEXT_PUBLIC_VERDICT_FIRST_UI).
+//
+// VerdictSummary matches coordinator/app/scoring/verdict.py's verdict_summary()
+// wire shape exactly (camelCase, additive). Older cached debate-detail payloads
+// may lack the "verdict" key entirely, so it is an optional field here -- the
+// UI must render nothing (honest absence), never a fabricated verdict.
+// ---------------------------------------------------------------------------
+
+export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable";
+
+export type VerdictSummary = {
+  verdictBand: VerdictBand;
+  claimLanguage: string;
+  basis: {
+    dialecticalStrength: number | null;
+    verificationStatus: string | null;
+    convergence: Record<string, unknown> | null;
+  };
+  verdictThresholdsVersion: string;
+};
+
 export type DebateDetail = {
   id: string;
   topic: string;
@@ -468,6 +490,7 @@ export type DebateDetail = {
   active_synthesis: ActiveSynthesis | null;
   branch_lineage: DebateBranch[];
   analyzer_runs: AnalyzerRun[];
+  verdict?: VerdictSummary;
   selected_skills: SelectedCapability[];
   selected_agents: SelectedCapability[];
   agent_outputs: AgentOutput[];

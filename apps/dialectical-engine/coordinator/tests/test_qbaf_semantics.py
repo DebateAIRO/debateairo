@@ -130,3 +130,81 @@ def test_df_quad_rejects_cycles() -> None:
 
     with pytest.raises(ValueError, match="cycle"):
         DFQuADSemantics().propagate(graph)
+
+
+def test_exact_duplicate_edges_do_not_double_count() -> None:
+    edge = Edge(source_id="support", target_id="root", polarity="support", weight=0.5)
+    duplicate = Edge(source_id="support", target_id="root", polarity="support", weight=0.5)
+    graph = QBAFGraph(
+        root_id="root",
+        nodes={"root": root(0.4), "support": claim("support", 0.7)},
+        edges=[edge, duplicate],
+    )
+
+    single = QBAFGraph(
+        root_id="root",
+        nodes={"root": root(0.4), "support": claim("support", 0.7)},
+        edges=[edge],
+    )
+
+    assert (
+        DFQuADSemantics().propagate(graph).nodes["root"].final_strength
+        == DFQuADSemantics().propagate(single).nodes["root"].final_strength
+    )
+
+
+def test_conflicting_duplicate_edge_weights_raise_value_error() -> None:
+    graph = QBAFGraph(
+        root_id="root",
+        nodes={"root": root(0.4), "support": claim("support", 0.7)},
+        edges=[
+            Edge(source_id="support", target_id="root", polarity="support", weight=0.5),
+            Edge(source_id="support", target_id="root", polarity="support", weight=0.9),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="conflicting"):
+        DFQuADSemantics().propagate(graph)
+
+
+def test_propagate_does_not_mutate_input_graph() -> None:
+    nodes = {"root": root(0.4), "support": claim("support", 0.7)}
+    edges = [Edge(source_id="support", target_id="root", polarity="support", weight=0.5)]
+    graph = QBAFGraph(root_id="root", nodes=nodes, edges=edges)
+
+    result = DFQuADSemantics().propagate(graph)
+
+    assert result is not graph
+    assert graph.nodes["root"].final_strength == 0.0
+    assert graph.nodes["support"].final_strength == 0.0
+    assert graph.edges == edges
+    assert result.nodes["root"].final_strength not in (None, 0.0)
+
+
+def test_unweighted_semantics_matches_canonical_dfquad_core() -> None:
+    """Unification proof: with all edge weights 1.0 the QBAFGraph adapter must
+    reproduce the canonical pure core exactly (CE-QArg Example 1 topology)."""
+    from app.qbaf.dfquad import ArgumentGraph
+
+    taus = {"alpha": 0.5, "beta": 0.3, "gamma": 0.6, "rho": 0.7, "zeta": 0.4}
+    core = ArgumentGraph(
+        base_scores=taus,
+        attacks=[("gamma", "alpha"), ("rho", "beta")],
+        supports=[("beta", "alpha"), ("zeta", "gamma")],
+    ).compute_strengths()
+
+    graph = QBAFGraph(
+        root_id="alpha",
+        nodes={name: claim(name, tau) for name, tau in taus.items()},
+        edges=[
+            Edge(source_id="gamma", target_id="alpha", polarity="attack", weight=1.0),
+            Edge(source_id="rho", target_id="beta", polarity="attack", weight=1.0),
+            Edge(source_id="beta", target_id="alpha", polarity="support", weight=1.0),
+            Edge(source_id="zeta", target_id="gamma", polarity="support", weight=1.0),
+        ],
+    )
+    adapted = DFQuADSemantics().propagate(graph)
+
+    for name in taus:
+        assert adapted.nodes[name].final_strength == pytest.approx(core[name], abs=1e-12), name
+    assert adapted.nodes["alpha"].final_strength == pytest.approx(0.165, abs=1e-12)

@@ -26,8 +26,10 @@ from app.models.entities import (
     SkillDefinition,
     Synthesis,
     Worker,
+    next_analyzer_run_seq,
     now_utc,
 )
+from app.evidence.extraction import persist_evidence_nodes
 from app.services.events import event_bus
 from app.services.orchestrator import (
     capable_online_workers,
@@ -38,6 +40,8 @@ from app.services.orchestrator import (
     sanitize_text,
     worker_capability_set,
 )
+from app.protocol.runner import run_protocol_analysis
+from app.protocol.state import advance_phase, initialize_protocol_state, protocol_state_of
 from app.providers import ProviderRegistry
 from app.scoring.service import ensure_node_scoring_on_completion
 
@@ -591,8 +595,10 @@ def run_analyzers(db: Session, debate: Debate, branch: DebateBranch, classificat
             status="complete",
             provenance={"model_id": MODEL_ID, "worker_id": WORKER_LABEL, "prompt_id": f"analyzer-{analyzer_type}"},
         )
-        db.add(run)
-        flush_write(db)
+        # next_analyzer_run_seq assigns run.seq, db.add()s, and db.flush()es
+        # as one lock-covered critical section (see app.models.entities) --
+        # do not call db.add()/flush_write() separately for this row.
+        next_analyzer_run_seq(db, run)
         runs.append(run)
         publish_event(debate.id, "analyzer_completed", {"debate_id": debate.id, "analyzer_run_id": run.id, "analyzer_type": analyzer_type})
     return runs
@@ -758,6 +764,25 @@ def create_completed_node(
     return node
 
 
+def extract_and_persist_evidence_for_completed_node(db: Session, debate: Debate, node: Node) -> None:
+    """Best-effort EVIDENCE-node extraction over a completed claim node's
+    active Generation prose (Phase 7 Task 1). Extraction/persistence is
+    always-on (no feature flag) and unconditional per the phase's Global
+    Constraints, but must NEVER fail node completion/generation persistence
+    -- mirrors the protocol runner's best-effort try/except pattern used
+    elsewhere in this file (see persist_v2_synthesis's protocol-analysis and
+    marker-update guards above)."""
+    try:
+        if not node.active_generation_id:
+            return
+        generation = db.get(Generation, node.active_generation_id)
+        if generation is None:
+            return
+        persist_evidence_nodes(db, debate, node, generation)
+    except Exception as exc:
+        print(f"[dialectical_v2] evidence extraction failed for node {node.id} (non-fatal): {exc!r}")
+
+
 def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[str, Any]) -> Node:
     if not job.node_id:
         raise ValueError("POV job must target a POV node")
@@ -793,6 +818,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         provenance=provenance,
         prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_pro"]),
     )
+    extract_and_persist_evidence_for_completed_node(db, debate, pro_node)
     con_node = create_completed_node(
         db,
         debate,
@@ -805,8 +831,9 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         provenance=provenance,
         prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_con"]),
     )
+    extract_and_persist_evidence_for_completed_node(db, debate, con_node)
     for parent, stance in ((pro_node, payload["strongest_pro"]), (con_node, payload["strongest_con"])):
-        create_completed_node(
+        nested_pro = create_completed_node(
             db,
             debate,
             parent,
@@ -818,7 +845,8 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
             provenance=provenance,
             prompt_rendered=job.stream_buffer or json.dumps(stance["pro"]),
         )
-        create_completed_node(
+        extract_and_persist_evidence_for_completed_node(db, debate, nested_pro)
+        nested_con = create_completed_node(
             db,
             debate,
             parent,
@@ -830,6 +858,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
             provenance=provenance,
             prompt_rendered=job.stream_buffer or json.dumps(stance["con"]),
         )
+        extract_and_persist_evidence_for_completed_node(db, debate, nested_con)
     return pov_node
 
 
@@ -877,6 +906,23 @@ def persist_v2_synthesis(
     debate.synthesis_id = synthesis.id
     debate.status = "complete"
     debate.completed_at = now_utc()
+    try:
+        state = protocol_state_of(debate.config)
+        if state is not None:
+            state = advance_phase(state, "5.3_generation", "complete")
+            state = advance_phase(state, "5.8_synthesis", "complete")
+            debate.config = {**debate.config, "protocol_state": state}
+    except Exception as exc:
+        # Best-effort: marker update must never fail synthesis persistence.
+        print(f"[dialectical_v2] protocol_state advance failed (non-fatal): {exc!r}")
+    try:
+        run_protocol_analysis(db, debate)
+    except Exception as exc:
+        # Best-effort: protocol analysis must never fail synthesis persistence.
+        # run_protocol_analysis is already internally best-effort/non-raising;
+        # this outer try/except is defense-in-depth, kept symmetric with the
+        # marker-update try/except above (Phase 5a style).
+        print(f"[dialectical_v2] protocol analysis failed (non-fatal): {exc!r}")
     record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
     scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
     if scoring_node is not None:
@@ -1287,6 +1333,12 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     if not topic:
         raise ValueError("Topic is required")
     debate_config = merged_debate_config(config)
+    try:
+        debate_config["protocol_state"] = initialize_protocol_state(topic, debate_config)
+    except Exception as exc:
+        # Best-effort: protocol state is scaffolding, not load-bearing for the
+        # debate itself. A triage/state bug must never block debate creation.
+        print(f"[dialectical_v2] protocol_state init failed (non-fatal): {exc!r}")
     model_id = require_v2_codex_model(db)
     debate = Debate(topic=topic, status="generating", config=debate_config)
     db.add(debate)
@@ -1322,6 +1374,17 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
         db.add(pov_node)
         flush_write(db)
         queue_v2_job(db, debate, "v2_pov", label, model_id, pov_node.id)
+
+    try:
+        state = protocol_state_of(debate.config)
+        if state is not None:
+            state = advance_phase(state, "5.2_decomposition", "complete")
+            state = advance_phase(state, "5.3_generation", "in_progress")
+            debate.config = {**debate.config, "protocol_state": state}
+    except Exception as exc:
+        # Best-effort: marker update must never fail debate creation.
+        print(f"[dialectical_v2] protocol_state advance failed (non-fatal): {exc!r}")
+
     commit_write(db)
     db.refresh(debate)
     return debate

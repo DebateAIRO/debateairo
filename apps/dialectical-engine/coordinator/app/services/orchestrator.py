@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.core.config import RUNTIME_SETTINGS_KEY, load_settings
+from app.core.config import RUNTIME_SETTINGS_KEY, bool_env, load_settings
 from app.core.write_lock import commit_write, flush_write
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
 from app.services.events import event_bus
@@ -16,6 +16,7 @@ from app.services.prompts import render_prompt
 from app.services.routing import routing_engine
 from app.services.serialization import debate_to_dict, iso
 from app.services.spend import capped_model_ids
+from app.services.swarm_planner import plan_swarm
 
 
 DEFAULT_DEBATE_CONFIG = {
@@ -24,6 +25,13 @@ DEFAULT_DEBATE_CONFIG = {
     "max_tokens": 800,
 }
 ROLE_OVERRIDE_KEYS = ("role_overrides", "roles", "routing")
+# Mirrors app.services.dialectical_v2.V2_CODEX_MODEL_ID (the debate's default
+# arguer model). Duplicated as a literal rather than imported: dialectical_v2
+# imports from this module, so importing back would create a circular
+# import. Swarm planning at create_debate time queries real online workers
+# for this exact model id -- never fabricated, no import needed to keep this
+# in sync since dialectical_v2's constant is itself a fixed literal.
+SWARM_DEFAULT_MODEL_ID = "codex-gpt-5.5"
 MAX_STREAM_DELTA_CHARS = 16_384
 MAX_STREAM_BUFFER_CHARS = 200_000
 MUTABLE_JOB_STATUSES = {"claimed", "running"}
@@ -50,6 +58,13 @@ def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
         if key in incoming:
             raw_role_overrides = incoming.pop(key)
             break
+    # The caller's raw "swarm" request (e.g. {"requestedPerspectives": N}) is
+    # never persisted verbatim -- it is popped here so that flag-off (or
+    # no-request) leaves debate.config byte-identical to today (no "swarm"
+    # key at all). create_debate reads the popped raw request separately and,
+    # only when DIALECTICAL_SWARM is on, replaces it with a real
+    # worker-derived descriptor via plan_swarm.
+    incoming.pop("swarm", None)
     merged = {**DEFAULT_DEBATE_CONFIG, **incoming}
     merged["max_depth"] = bounded_config_int(merged, "max_depth", 2, 1, 5)
     merged["branching"] = bounded_config_int(merged, "branching", 2, 2, 6)
@@ -59,6 +74,30 @@ def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
 
         merged["role_overrides"] = validate_routing(raw_role_overrides)
     return merged
+
+
+def _requested_swarm_perspectives(config: dict[str, Any] | None) -> int | None:
+    """Read the caller's requested swarm perspective count, honestly.
+
+    Returns None when the caller did not request a swarm at all (no
+    "swarm" key, or the key isn't a dict). Returns a validated int
+    otherwise -- invalid/non-numeric input defaults to 0 (an honest
+    no-op request, never a fabricated count), mirroring
+    convergence_epsilon's invalid-input-falls-back-to-default discipline
+    in app/protocol/runner.py.
+    """
+    if not isinstance(config, dict):
+        return None
+    swarm_request = config.get("swarm")
+    if not isinstance(swarm_request, dict):
+        return None
+    raw_requested = swarm_request.get("requestedPerspectives", 0)
+    if isinstance(raw_requested, bool) or not isinstance(raw_requested, (int, float)):
+        return 0
+    try:
+        return int(raw_requested)
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
 
 def bounded_config_int(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
@@ -204,6 +243,7 @@ def create_debate(db: Session, topic: str, config: dict[str, Any] | None = None)
     topic = sanitize_text(topic, 2_000)
     if not topic:
         raise ValueError("Topic is required")
+    requested_perspectives = _requested_swarm_perspectives(config)
     debate = Debate(topic=topic, status="generating", config=merged_debate_config(config))
     db.add(debate)
     flush_write(db)
@@ -221,6 +261,28 @@ def create_debate(db: Session, topic: str, config: dict[str, Any] | None = None)
     flush_write(db)
     debate.root_node_id = root.id
     create_job(db, debate.id, "decompose", "decomposer", root.id)
+
+    # Swarm descriptor: flag-gated, additive, never blocks debate creation.
+    # Flag off (default) or no swarm requested -> debate.config gets no
+    # "swarm" key at all, byte-identical to pre-swarm behavior. Flag on with
+    # a request -> plan_swarm derives assignments ONLY from real online,
+    # capable Worker rows (never fabricated); fewer real workers than
+    # requested yields an honest partial assignment + recorded shortfall;
+    # zero real workers yields empty assignments + full shortfall -- debate
+    # creation still succeeds either way, since the swarm is a descriptor,
+    # not a blocker. Any unexpected failure here fails closed: no swarm
+    # descriptor is written and the existing non-swarm flow proceeds
+    # untouched (never a half-written descriptor).
+    if bool_env("DIALECTICAL_SWARM", False) and requested_perspectives is not None:
+        try:
+            capable_workers = capable_online_workers(db, SWARM_DEFAULT_MODEL_ID)
+            swarm_descriptor = plan_swarm(
+                requested_perspectives=requested_perspectives, capable_workers=capable_workers
+            )
+            debate.config = {**debate.config, "swarm": swarm_descriptor}
+        except Exception as exc:
+            print(f"[orchestrator] swarm planning failed (non-fatal, fail-closed): {exc!r}")
+
     commit_write(db)
     db.refresh(debate)
     return debate
@@ -682,6 +744,11 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
             orphaned.deadline = make_deadline()
         else:
             worker.current_job_id = None
+
+    if worker.status != "online":
+        worker.last_seen = now_utc()
+        commit_write(db)
+        return None
 
     capabilities = worker_capability_set(worker)
     allowed_models = routing_allowed_models(db)

@@ -22,7 +22,7 @@ from app.scoring.jobs import run_scoring_job_background
 from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE, active_contract
 from app.scoring.service import debate_scoring_payload, queue_scoring_job
 
-from tests.test_node_scoring import base_assessment
+from test_node_scoring import base_assessment
 
 
 def test_active_judge_set_is_exactly_the_expected_registry() -> None:

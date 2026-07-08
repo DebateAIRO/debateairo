@@ -17,7 +17,7 @@ from app.main import app
 from app.core.auth import hash_token
 from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, JudgeOutputArtifact, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
 from app.api import scoring as scoring_api
 from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegistry
 from app.scoring.caps import apply_score_caps
@@ -80,7 +80,7 @@ from app.scoring import (
     scoring_result_payload,
 )
 from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE
-from app.scoring.service import ensure_node_scoring_on_completion
+from app.scoring.service import NO_INDEPENDENT_JUDGE_REASON, ensure_node_scoring_on_completion
 from app.services.orchestrator import claim_pending_job, complete_job
 
 
@@ -2364,6 +2364,109 @@ def test_score_node_with_provider_writes_successful_result_to_cache(db) -> None:
     assert cached.result == {key: value for key, value in payload.items() if key != "cache"}
 
 
+def test_score_node_with_provider_records_judge_and_arguer_lineage(db) -> None:
+    class GptJudgeProvider:
+        provider = "codex"
+        model = "gpt-5.2-codex"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="claude-sonnet-5",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, GptJudgeProvider())
+
+    assert payload["judgeLineage"] == {"provider": "codex", "model": "gpt-5.2-codex", "family": "gpt"}
+    assert payload["arguerLineage"] == {"model": "claude-sonnet-5", "family": "claude"}
+    assert payload["independent"] is True
+    assert payload["independenceReason"] == "independent_lineage"
+    cached = db.query(NodeScoringResult).filter_by(
+        debate_id=debate.id,
+        node_id=node.id,
+        judge_role="judge",
+        provider="codex",
+        model="gpt-5.2-codex",
+    ).one()
+    assert cached.result["judgeLineage"]["family"] == "gpt"
+    assert cached.result["arguerLineage"]["model"] == "claude-sonnet-5"
+    assert cached.result["independent"] is True
+
+
+def test_score_node_with_provider_records_null_arguer_lineage_when_no_active_generation(db) -> None:
+    class GptJudgeProvider:
+        provider = "codex"
+        model = "gpt-5.2-codex"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, GptJudgeProvider())
+
+    assert payload["arguerLineage"] is None
+    assert payload["independent"] is None
+    assert payload["independenceReason"] == "arguer_lineage_unknown"
+    cached = db.query(NodeScoringResult).filter_by(
+        debate_id=debate.id,
+        node_id=node.id,
+        judge_role="judge",
+        provider="codex",
+        model="gpt-5.2-codex",
+    ).one()
+    assert cached.result["arguerLineage"] is None
+    assert cached.result["independent"] is None
+    assert cached.result["independenceReason"] == "arguer_lineage_unknown"
+
+
 def _judge_output_artifact_model():
     from app.models.entities import JudgeOutputArtifact
 
@@ -3098,6 +3201,93 @@ def test_score_nodes_with_provider_scores_multiple_current_nodes_in_loop(db) -> 
     assert "errors" not in payload
 
 
+def test_score_nodes_with_provider_keeps_distinct_per_node_scores(db) -> None:
+    """Fidelity guard: per-node judge outputs must stay attached to their node.
+
+    The provider returns deliberately different assessments per node; if the
+    scoring loop ever reuses one node's assessment/score for another (copied
+    fixture, swapped wiring, cached bleed-through), the per-node expected
+    values and the inter-node difference assertions below fail.
+    """
+
+    per_node_assessments = {
+        "root-node": base_assessment(
+            steelman=SteelmanAssessment(charitable_strength=0.9, confidence=0.8),
+            context=ContextAssessment(relevance=0.9, impact=0.85, dependency_weight=0.6),
+        ),
+        "child-node": base_assessment(
+            steelman=SteelmanAssessment(charitable_strength=0.3, confidence=0.4),
+            critic=CriticAssessment(
+                logical_validity=0.35,
+                assumption_risk=0.8,
+                counterargument_strength=0.7,
+            ),
+            context=ContextAssessment(relevance=0.5, impact=0.2, dependency_weight=0.3),
+        ),
+    }
+
+    class PerNodeProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def judge_node(self, request):
+            assessment = per_node_assessments[request.claim.node_id]
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(assessment.model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    child = Node(
+        id="child-node",
+        debate=debate,
+        parent=root,
+        node_type="support",
+        depth=1,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0001",
+    )
+    db.add_all([debate, root, child])
+    db.commit()
+
+    payload = score_nodes_with_provider(db, debate, PerNodeProvider())
+
+    assert payload["status"] == "available"
+    items_by_node = {item["node_id"]: item for item in payload["items"]}
+    assert set(items_by_node) == {"root-node", "child-node"}
+
+    for node in (root, child):
+        expected = reduce_assessments(
+            normalize_claim(node_id=node.id, raw_text=node.claim),
+            per_node_assessments[node.id],
+        ).model_dump(mode="json")
+        actual = items_by_node[node.id]
+        assert actual["scores"] == expected["scores"], node.id
+        assert actual["scores"]["uncertainty"] == expected["scores"]["uncertainty"], node.id
+        assert actual["scores"]["impact"] == expected["scores"]["impact"], node.id
+
+    root_scores = items_by_node["root-node"]["scores"]
+    child_scores = items_by_node["child-node"]["scores"]
+    assert root_scores["strength"] != child_scores["strength"]
+    assert root_scores["impact"] != child_scores["impact"]
+    assert root_scores["uncertainty"] != child_scores["uncertainty"]
+
+
 def test_score_nodes_with_provider_retries_transient_provider_error_once(db) -> None:
     class FlakyProvider:
         provider = "test-provider"
@@ -3438,6 +3628,147 @@ def test_background_scoring_job_persists_judge_artifacts_before_public_analyzer_
     assert artifact.job_id == job.id
     assert artifact.analyzer_run_id == analyzer_run.id
     _assert_public_payload_has_no_private_judge_output(analyzer_run.output, "RJ01-BACKGROUND-RAW-1")
+
+
+def test_analyzer_run_links_only_artifacts_from_its_own_job(db) -> None:
+    """Provenance precision: a node_scoring analyzer run must never absorb
+    unlinked judge artifacts produced by a different (e.g. interrupted) job."""
+    debate = Debate(topic="Provenance precision", status="complete")
+    node = Node(
+        id="prov-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Provenance must be truthful.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    job_a = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="failed",
+    )
+    job_b = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="complete",
+    )
+    db.add_all([branch, job_a, job_b])
+    db.flush()
+
+    def artifact_for_job(job_id: str, marker: str) -> JudgeOutputArtifact:
+        raw = f"PROV-RAW-{marker}"
+        artifact = JudgeOutputArtifact(
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=f"hash-{marker}",
+            judge_role="judge",
+            provider="codex",
+            model="codex-test-model",
+            raw_output=raw,
+            raw_output_sha256=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+            parse_status="available",
+            assessment=None,
+            checked_at=now_utc(),
+            job_id=job_id,
+        )
+        db.add(artifact)
+        return artifact
+
+    artifact_a = artifact_for_job(job_a.id, "A")
+    artifact_b = artifact_for_job(job_b.id, "B")
+    db.flush()
+
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        status="complete",
+        output={},
+        provenance={
+            "scoring_source": "judge_outputs",
+            "job_id": job_b.id,
+            "node_ids": [node.id],
+        },
+    )
+    db.add(run)
+    db.commit()
+
+    db.expire_all()
+    refreshed_a = db.get(JudgeOutputArtifact, artifact_a.id)
+    refreshed_b = db.get(JudgeOutputArtifact, artifact_b.id)
+    assert refreshed_b is not None and refreshed_b.analyzer_run_id == run.id
+    assert refreshed_a is not None and refreshed_a.analyzer_run_id is None, (
+        "artifact from a different job was stolen by a later analyzer run"
+    )
+
+
+def test_analyzer_run_without_job_scope_links_nothing(db) -> None:
+    """No evidence, no claim: a node_scoring run whose provenance lacks job
+    scoping must not link any artifacts."""
+    debate = Debate(topic="Provenance precision unscoped", status="complete")
+    node = Node(
+        id="prov-node-unscoped",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Unscoped runs claim nothing.",
+        status="complete",
+        materialized_path="/",
+    )
+    db.add_all([debate, node])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    job_orphan = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="codex-test-model",
+        status="failed",
+    )
+    db.add_all([branch, job_orphan])
+    db.flush()
+    raw = "PROV-RAW-UNSCOPED"
+    artifact = JudgeOutputArtifact(
+        debate_id=debate.id,
+        node_id=node.id,
+        input_hash="hash-unscoped",
+        judge_role="judge",
+        provider="codex",
+        model="codex-test-model",
+        raw_output=raw,
+        raw_output_sha256=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        parse_status="available",
+        assessment=None,
+        checked_at=now_utc(),
+        job_id=job_orphan.id,
+    )
+    db.add(artifact)
+    db.flush()
+
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        status="complete",
+        output={},
+        provenance={"scoring_source": "judge_outputs"},
+    )
+    db.add(run)
+    db.commit()
+
+    db.expire_all()
+    refreshed = db.get(JudgeOutputArtifact, artifact.id)
+    assert refreshed is not None and refreshed.analyzer_run_id is None
 
 
 def test_background_scoring_job_marks_failed_when_final_persistence_commit_fails(db, monkeypatch) -> None:
@@ -4234,6 +4565,73 @@ def test_score_nodes_with_provider_exposes_stale_cache_metadata_for_changed_node
     }
 
 
+def test_ensure_node_scoring_on_completion_never_serves_stale_contract_row(db) -> None:
+    """Hermes blocker regression: a cache row stamped with a DIFFERENT judge
+    contract must never be served as a current cache hit from
+    ensure_node_scoring_on_completion — it must queue fresh scoring instead."""
+    from app.scoring.judge_registry import active_contract
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-stale", name="Worker Stale", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="stale-contract-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-stale-contract",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+
+    claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument)
+    stale_row = NodeScoringResult(
+        debate_id=debate.id,
+        node_id=node.id,
+        input_hash=input_hash,
+        judge_role="judge",
+        provider="codex",
+        model="codex-test-model",
+        status="available",
+        result={"sentinel": "OLD_CONTRACT_SHOULD_NOT_BE_CURRENT", "cache": {"hit": True}},
+        contract_hash="stale-contract-hash-from-a-retired-judge-version",
+    )
+    assert stale_row.contract_hash != active_contract("judge").contract_hash
+    db.add(stale_row)
+    db.commit()
+
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    payload = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    serialized = json.dumps(payload)
+    assert "OLD_CONTRACT_SHOULD_NOT_BE_CURRENT" not in serialized
+    assert payload.get("cache", {}).get("hit") is not True
+    # The stale row must not satisfy completion scoring: fresh scoring queued.
+    assert payload.get("pending") or payload.get("active_scoring_job_id")
+    # And the stale row itself is preserved, never deleted.
+    db.expire_all()
+    preserved = db.get(NodeScoringResult, stale_row.id)
+    assert preserved is not None
+    assert preserved.result["sentinel"] == "OLD_CONTRACT_SHOULD_NOT_BE_CURRENT"
+
+
 def test_ensure_node_scoring_on_completion_reuses_cache_or_queues_once(db) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
@@ -4301,6 +4699,11 @@ def test_ensure_node_scoring_on_completion_reuses_cache_or_queues_once(db) -> No
             provider_metadata={"provider": "codex", "model": "codex-test-model", "status": "available"},
             status="available",
             result=cached_payload,
+            # Current-lane reuse requires the active contract stamp; unstamped
+            # rows are legacy/historical and deliberately MISS.
+            judge_id=PRIMARY_NODE_SCORING_JUDGE.judge_id,
+            judge_version=PRIMARY_NODE_SCORING_JUDGE.judge_version,
+            contract_hash=PRIMARY_NODE_SCORING_JUDGE.contract_hash,
         )
     )
     db.commit()
@@ -4347,6 +4750,264 @@ def test_ensure_node_scoring_on_completion_reports_provider_unavailable_without_
     assert jobs[0].status == "failed"
     assert jobs[0].error == "No scoring provider is configured."
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def _lineage_guard_debate_and_node(db, *, arguer_model_id: str | None) -> tuple[Debate, Node, Generation | None]:
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    node = Node(
+        id="lineage-guard-node",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = None
+    if arguer_model_id is not None:
+        worker = Worker(id="worker-lineage", name="Worker Lineage", token_hash="hash", capabilities=["debate"])
+        generation = Generation(
+            id="generation-lineage",
+            node=node,
+            model_id=arguer_model_id,
+            role="pro",
+            argument="Employees are less likely to leave when commutes are removed.",
+            worker_id=worker.id,
+        )
+        node.active_generation_id = generation.id
+        db.add_all([debate, worker, node, generation])
+    else:
+        db.add_all([debate, node])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+    return debate, node, generation
+
+
+def test_lineage_guard_off_by_default_scores_even_with_same_lineage(db, monkeypatch) -> None:
+    monkeypatch.delenv("DIALECTICAL_LINEAGE_INDEPENDENCE", raising=False)
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
+        providers={"anthropic": FakeProvider()},
+    )
+
+    result = ensure_node_scoring_on_completion(db, debate, node, registry, judge_role="judge")
+
+    # No blocking -- flag is off, existing behavior unchanged (queues a job
+    # exactly like the pre-existing unavailable/pending paths do).
+    assert not any(error.get("status") == "no_independent_judge" for error in result.get("errors", []))
+    assert result.get("pending") or result.get("active_scoring_job_id")
+
+
+def test_lineage_guard_blocks_same_lineage_judge_when_enabled(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
+        providers={"anthropic": FakeProvider()},
+    )
+
+    result = ensure_node_scoring_on_completion(db, debate, node, registry, judge_role="judge")
+
+    assert any(error["status"] == "no_independent_judge" for error in result["errors"])
+    # No fake score was recorded for this node.
+    scoring_row = db.scalar(
+        select(NodeScoringResult).where(
+            NodeScoringResult.debate_id == debate.id,
+            NodeScoringResult.node_id == node.id,
+        )
+    )
+    assert scoring_row is None or scoring_row.status != "complete"
+
+
+def test_lineage_guard_allows_independent_lineage_judge_when_enabled(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="gpt-5.2-codex", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    result = ensure_node_scoring_on_completion(db, debate, node, registry, judge_role="judge")
+
+    assert not any(error.get("status") == "no_independent_judge" for error in result.get("errors", []))
+
+
+def test_lineage_guard_does_not_block_when_arguer_lineage_unknown(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id=None)
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
+        providers={"anthropic": FakeProvider()},
+    )
+
+    result = ensure_node_scoring_on_completion(db, debate, node, registry, judge_role="judge")
+
+    assert not any(error.get("status") == "no_independent_judge" for error in result.get("errors", []))
+
+
+def test_lineage_guard_blocks_score_nodes_with_provider_bypass_when_enabled(db, monkeypatch) -> None:
+    """Slice-review finding 1 (critical): the completion-hook guard only gates
+    ensure_node_scoring_on_completion. score_nodes_with_provider is a SEPARATE
+    production entry point (POST /{debate_id}/scoring/jobs via
+    run_scoring_job_background, and wake_pending_internal_scoring_job from
+    GET /scoring) that reaches score_node_with_provider directly, never
+    passing through the completion hook. With the flag on and same-lineage
+    judge/arguer, this call must NOT reach the provider, must NOT write a
+    NodeScoringResult, and must surface a per-node no_independent_judge error
+    -- exactly like the completion hook does."""
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+
+    class ExplodingProvider:
+        provider = "anthropic"
+        model = "claude-opus-4"
+
+        def judge_node(self, request):
+            raise AssertionError("provider must not be called when lineage guard blocks")
+
+    payload = score_nodes_with_provider(db, debate, ExplodingProvider(), judge_role="judge")
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["errors"] == [
+        {
+            "node_id": node.id,
+            "status": "no_independent_judge",
+            "reason": NO_INDEPENDENT_JUDGE_REASON,
+        }
+    ]
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def test_lineage_guard_blocks_force_refresh_registry_bypass_when_enabled(db, monkeypatch) -> None:
+    """Slice-review finding 1 (critical): GET /{debate_id}/scoring?force_refresh=true
+    calls score_debate_with_provider_registry directly, which never passes
+    through the completion hook either. With the flag on and same-lineage
+    judge/arguer, force_refresh must not bypass the guard: no provider call,
+    no NodeScoringResult write, honest no_independent_judge error."""
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
+        providers={"anthropic": FakeProvider()},
+    )
+
+    payload = score_debate_with_provider_registry(db, debate, registry, judge_role="judge", force_refresh=True)
+
+    assert payload["status"] == "unavailable"
+    assert payload["items"] == []
+    assert payload["errors"] == [
+        {
+            "node_id": node.id,
+            "status": "no_independent_judge",
+            "reason": NO_INDEPENDENT_JUDGE_REASON,
+        }
+    ]
+    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+
+
+def test_lineage_guard_allows_independent_lineage_via_score_nodes_with_provider(db, monkeypatch) -> None:
+    """Companion positive case for the shared-write-path guard: independent
+    lineage must still score normally through score_nodes_with_provider (no
+    regression on the legitimate path when the guard is enforced)."""
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+
+    class IndependentProvider:
+        provider = "codex"
+        model = "gpt-5.2-codex"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    payload = score_nodes_with_provider(db, debate, IndependentProvider(), judge_role="judge")
+
+    assert payload["status"] == "available"
+    assert not any(error.get("status") == "no_independent_judge" for error in payload.get("errors", []))
+    stored = db.scalar(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id))
+    assert stored is not None
+
+
+def test_lineage_guard_blocks_completion_hook_but_preserves_and_still_serves_cached_result(db, monkeypatch) -> None:
+    """Slice-review finding 3: pin block-vs-serve semantics. A node that
+    ALREADY has a valid cached NodeScoringResult under the current contract
+    must, with the flag on and same lineage:
+      1. Have the completion hook BLOCK (no_independent_judge error, NOT the
+         cached result served as a hit).
+      2. Leave the persisted row completely untouched (still present,
+         unmodified).
+      3. Still be served by the separate read path (debate_scoring_payload),
+         which reads historical rows independently of the completion hook.
+    """
+    debate, node, generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    scoring_item = reduce_assessments(claim, base_assessment(node_id=node.id)).model_dump(mode="json")
+    cached_payload = {
+        "debate_id": debate.id,
+        "status": "available",
+        "node_ids": [node.id],
+        "items": [scoring_item],
+    }
+    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument)
+    db.add(
+        NodeScoringResult(
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=input_hash,
+            judge_role="judge",
+            provider="anthropic",
+            model="claude-opus-4",
+            provider_metadata={"provider": "anthropic", "model": "claude-opus-4", "status": "available"},
+            status="available",
+            result=cached_payload,
+            judge_id=PRIMARY_NODE_SCORING_JUDGE.judge_id,
+            judge_version=PRIMARY_NODE_SCORING_JUDGE.judge_version,
+            contract_hash=PRIMARY_NODE_SCORING_JUDGE.contract_hash,
+        )
+    )
+    db.commit()
+
+    monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
+        providers={"anthropic": FakeProvider()},
+    )
+
+    result = ensure_node_scoring_on_completion(db, debate, node, registry, judge_role="judge")
+
+    # (1) Completion hook blocks -- does NOT serve the cache as a hit.
+    assert any(error["status"] == "no_independent_judge" for error in result["errors"])
+    assert result.get("cache", {}).get("hit") is not True
+
+    # (2) The persisted row is untouched: still present, unmodified.
+    db.expire_all()
+    preserved = db.get(NodeScoringResult, next(
+        row.id
+        for row in db.scalars(
+            select(NodeScoringResult).where(
+                NodeScoringResult.debate_id == debate.id,
+                NodeScoringResult.node_id == node.id,
+            )
+        ).all()
+    ))
+    assert preserved is not None
+    assert preserved.status == "available"
+    assert preserved.result == cached_payload
+
+    # (3) The separate read path still serves the historical row.
+    read_payload = debate_scoring_payload(db, debate)
+    assert read_payload["status"] == "available"
+    assert read_payload["items"]
+    assert read_payload["items"][0]["node_id"] == node.id
 
 
 def _v2_codex_worker(db) -> Worker:

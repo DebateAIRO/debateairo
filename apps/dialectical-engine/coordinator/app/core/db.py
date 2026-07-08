@@ -83,7 +83,16 @@ def init_db() -> None:
     backfill_existing_schema()
     for table in Base.metadata.tables.values():
         for index in table.indexes:
-            if index.name == "ux_generations_active_per_node":
+            if index.name in {
+                "ux_generations_active_per_node",
+                "ix_judge_output_artifacts_analyzer_run_id",
+                # Fix-wave addition (Phase 11 Task 1 fix wave): partial
+                # UNIQUE index backing next_analyzer_run_seq's
+                # defense-in-depth loudness guarantee -- see
+                # app.models.entities.AnalyzerRun.seq and
+                # migrations/versions/0011_analyzer_run_seq.py.
+                "ux_analyzer_runs_seq",
+            }:
                 index.create(bind=db_engine, checkfirst=True)
 
 
@@ -213,6 +222,7 @@ def backfill_existing_schema() -> None:
             "status": "VARCHAR(24)",
             "provenance": "JSON",
             "created_at": "DATETIME",
+            "seq": "INTEGER",
         },
         "capability_matches": {
             "debate_id": "VARCHAR(36)",
@@ -271,6 +281,9 @@ def backfill_existing_schema() -> None:
             "result": "JSON",
             "created_at": "DATETIME",
             "updated_at": "DATETIME",
+        },
+        "nodes": {
+            "metadata": "JSON",
         },
     }
     db_engine = get_engine()

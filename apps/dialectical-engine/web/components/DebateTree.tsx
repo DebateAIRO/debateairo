@@ -3,26 +3,33 @@
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useState } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
-import type { DebateNode, Generation } from "@/lib/types";
-import { isAbandonedArgumentStatus } from "@/lib/debateTreeUtils";
+import type { DebateNode, Generation, NodeScoringPayload } from "@/lib/types";
+import { isAbandonedArgumentStatus, isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
 
 function isAbandonedNode(node: DebateNode): boolean {
   return isAbandonedArgumentStatus(node.status);
 }
 
-function nodeClass(node: DebateNode): string {
+// Verdict-first UI (Phase 9): low-strength node dimming is additive and
+// gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
+// byte-identical to pre-Task-3 behavior. See debateTreeUtils.isLowStrengthNode
+// for the honesty contract (missing score is never treated as low strength).
+const VERDICT_FIRST_UI_ENABLED = process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true";
+
+function nodeClass(node: DebateNode, lowStrength: boolean): string {
   const ab = isAbandonedNode(node) ? " abandoned" : "";
-  if (node.node_type === "PRO") return `nodeCard pro${ab}`;
-  if (node.node_type === "CON") return `nodeCard con${ab}`;
+  const ls = VERDICT_FIRST_UI_ENABLED && lowStrength ? " lowStrengthNode" : "";
+  if (node.node_type === "PRO") return `nodeCard pro${ab}${ls}`;
+  if (node.node_type === "CON") return `nodeCard con${ab}${ls}`;
   if (
     node.node_type === "SCIENTIFIC_POV" ||
     node.node_type === "STATISTICAL_POV" ||
     node.node_type === "ETHICAL_POV" ||
     node.node_type === "PRACTICAL_POV"
   )
-    return `nodeCard root${ab}`;
-  return `nodeCard root${ab}`;
+    return `nodeCard root${ab}${ls}`;
+  return `nodeCard root${ab}${ls}`;
 }
 
 function nodeLabel(node: DebateNode): string {
@@ -42,6 +49,7 @@ type DebateTreeProps = {
   onAuthRejected: () => void;
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
+  scoringByNodeId?: Map<string, NodeScoringPayload>;
 };
 
 type ArgumentNodeCardProps = {
@@ -56,6 +64,7 @@ type ArgumentNodeCardProps = {
   childrenOpen?: boolean;
   onToggleChildren?: () => void;
   selectionLabel?: string;
+  scoring?: NodeScoringPayload;
 };
 
 function errorMessage(exc: unknown, fallback: string): string {
@@ -79,6 +88,7 @@ export function ArgumentNodeCard({
   childrenOpen,
   onToggleChildren,
   selectionLabel,
+  scoring,
 }: ArgumentNodeCardProps) {
   const [busyNode, setBusyNode] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -136,9 +146,13 @@ export function ArgumentNodeCard({
   const isCardInteractive = Boolean(onSelectNode);
   const cardLabel = selectionLabel ?? (isCardInteractive ? `Select argument: ${node.claim}` : undefined);
   const modelStyle = generation ? modelColorStyle(generation.model_id) : undefined;
+  // Additive, flag-gated low-strength dimming (Phase 9 Task 3). Never replaces
+  // the existing abandoned/selection classes -- a node can be both abandoned
+  // AND low-strength, and dimming never affects clickability or children.
+  const lowStrength = isLowStrengthNode(scoring?.scores?.strength);
   return (
     <article
-      className={[nodeClass(node), canToggleChildren ? "expandable" : "", isCardInteractive ? "selectable" : "", isSelected ? "selected" : ""]
+      className={[nodeClass(node, lowStrength), canToggleChildren ? "expandable" : "", isCardInteractive ? "selectable" : "", isSelected ? "selected" : ""]
         .filter(Boolean)
         .join(" ")}
       style={modelStyle}
@@ -147,6 +161,7 @@ export function ArgumentNodeCard({
       data-worker-name={workerName}
       data-children-open={canToggleChildren ? childrenOpen : undefined}
       data-selectable={isCardInteractive ? "true" : undefined}
+      data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
       aria-current={isSelected ? "true" : undefined}
     >
       <div className="nodeTop">
@@ -242,7 +257,16 @@ export function ArgumentNodeCard({
   );
 }
 
-export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onSelectNode, selectedNodeId }: DebateTreeProps) {
+export function DebateTree({
+  node,
+  token,
+  onQueued,
+  onError,
+  onAuthRejected,
+  onSelectNode,
+  selectedNodeId,
+  scoringByNodeId,
+}: DebateTreeProps) {
   const [childrenOpen, setChildrenOpen] = useState(node.node_type === "ROOT_CLAIM");
 
   const activeChildren = node.children.filter((c) => !isAbandonedNode(c));
@@ -264,6 +288,7 @@ export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onS
         canToggleChildren={canToggleChildren}
         childrenOpen={childrenOpen}
         onToggleChildren={() => setChildrenOpen((current) => !current)}
+        scoring={scoringByNodeId?.get(node.id)}
       />
       {hasActiveChildren && childrenOpen ? (
         <div
@@ -280,6 +305,7 @@ export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onS
               onAuthRejected={onAuthRejected}
               onSelectNode={onSelectNode}
               selectedNodeId={selectedNodeId}
+              scoringByNodeId={scoringByNodeId}
             />
           ))}
         </div>
@@ -300,6 +326,7 @@ export function DebateTree({ node, token, onQueued, onError, onAuthRejected, onS
                 onAuthRejected={onAuthRejected}
                 onSelectNode={onSelectNode}
                 selectedNodeId={selectedNodeId}
+                scoringByNodeId={scoringByNodeId}
               />
             ))}
           </div>

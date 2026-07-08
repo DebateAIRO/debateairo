@@ -44,6 +44,13 @@ def test_sibling_dialectical_engine_makefile_forwards_dev_target() -> None:
     assert "$(MAKE) -C ../apps/dialectical-engine dev" in makefile
 
 
+def test_repository_root_makefile_forwards_dev_target() -> None:
+    makefile = (ROOT.parents[1] / "Makefile").read_text()
+
+    assert ".PHONY: dev" in makefile
+    assert "$(MAKE) -C apps/dialectical-engine dev" in makefile
+
+
 def test_make_test_loads_pytest_cov_plugin_module_when_autoload_is_disabled() -> None:
     makefile = (ROOT / "Makefile").read_text()
 

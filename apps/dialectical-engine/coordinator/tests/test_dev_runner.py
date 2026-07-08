@@ -77,7 +77,7 @@ def test_start_dev_masks_token_output_by_default() -> None:
 def test_start_dev_already_running_ports_success_requires_canonical_v2_readiness() -> None:
     script = (ROOT / "scripts" / "start_dev.ps1").read_text(encoding="utf-8")
     already_running_branch = re.search(
-        r"if \(\(Test-ListeningPort 3000\).*?Dialectical dev stack already appears to be running\..*?exit 0",
+        r"if \(Test-DevStackReady\).*?Dialectical dev stack already appears to be running\..*?exit 0",
         script,
         flags=re.DOTALL,
     )

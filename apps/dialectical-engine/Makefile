@@ -1,11 +1,19 @@
+ifeq ($(OS),Windows_NT)
+SHELL := cmd.exe
+.SHELLFLAGS := /C
+PYTHON ?= $(CURDIR)\.venv\Scripts\python.exe
+PNPM ?= pnpm.cmd
+PYTHON_ENV ?=
+else
 SHELL := /bin/bash
-
-.PHONY: dev dev-real dev-guardian dev-smoke real-codex-scoring-smoke v2-worker-judge-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
-
 PYTHON ?= $(shell if [ -f "$(CURDIR)/.venv/Scripts/python.exe" ]; then printf '%s\n' "$(CURDIR)/.venv/Scripts/python.exe"; exit; fi; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; exit; fi; for py in "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -f "$$py" ] || [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if command -v python3 >/dev/null 2>&1; then command -v python3; fi)
 PNPM ?= $(shell command -v pnpm)
 PYTHON_DYLD_LIBRARY_PATH ?= $(shell if [ -d /opt/homebrew/opt/expat/lib ]; then printf '%s\n' /opt/homebrew/opt/expat/lib; fi)
 PYTHON_ENV ?= $(if $(PYTHON_DYLD_LIBRARY_PATH),DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)",)
+endif
+
+.PHONY: dev dev-real dev-guardian dev-smoke real-codex-scoring-smoke v2-worker-judge-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
+
 TEST_PYCACHE_PREFIX ?= /private/tmp/dialectical-test-pycache
 LOCAL_CHECK_PYTHON ?= $(PYTHON)
 DEZBATERE_DOMAIN ?= dezbatere.ro
@@ -21,6 +29,9 @@ FINAL_SINGLE_MACHINE_REPORT ?= /private/tmp/dialectical-final-single-machine-che
 FINAL_SINGLE_MACHINE_FLAGS ?=
 SCORING_SMOKE_FLAGS ?=
 V2_WORKER_JUDGE_SMOKE_FLAGS ?=
+DEV_GUARDIAN_FLAGS ?=
+DEBATE_ID ?=
+START_SCORING_JOB ?= 0
 RESTART_WORKER ?= 1
 COORDINATOR_URL ?= http://localhost:8000
 WEB_URL ?=
@@ -81,18 +92,21 @@ PUBLIC_URL ?= https://debate.<your-domain>
 WORKER_B_NAME ?= adesso-mbp
 LAUNCHD_PATH ?= $(HOME)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
+ifeq ($(OS),Windows_NT)
+dev: SHELL := cmd.exe
+dev: .SHELLFLAGS := /C
 dev:
-	@if command -v powershell.exe >/dev/null 2>&1; then \
-		powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start_dev.ps1; \
-	else \
-		$(PYTHON_ENV) "$(PYTHON)" scripts/dev.py; \
-	fi
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start_dev.ps1
+else
+dev:
+	$(PYTHON_ENV) "$(PYTHON)" scripts/dev.py
+endif
 
 dev-real:
 	DIALECTICAL_DEV_REAL_WORKER_CONFIG="$${DIALECTICAL_DEV_REAL_WORKER_CONFIG:-$$HOME/.dialectical-worker/config.toml}" $(PYTHON_ENV) "$(PYTHON)" scripts/dev.py
 
 dev-guardian:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/dev_guardian.py --base-url "$(COORDINATOR_URL)" --user-token "$$DIALECTICAL_USER_TOKEN"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/dev_guardian.py --base-url "$(COORDINATOR_URL)" --user-token "$(DIALECTICAL_USER_TOKEN)" $(if $(DEBATE_ID),--debate-id "$(DEBATE_ID)",) $(if $(filter 1 true yes,$(START_SCORING_JOB)),--start-scoring-job,) $(DEV_GUARDIAN_FLAGS)
 
 dev-smoke:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/dev_smoke_check.py

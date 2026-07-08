@@ -208,10 +208,25 @@ _GEOGRAPHY_PATTERN = re.compile(
     r"\b(" + "|".join(re.escape(name) for name in _GEOGRAPHY_VOCABULARY) + r")\b"
 )
 
-# The (?!in\b) lookaheads stop the capture before an "in <place>" geography
-# clause (e.g. "among software engineers in Germany" -> "software engineers").
+# The boundary-preposition lookaheads stop the capture before scope clauses
+# (e.g. "among software engineers in Germany" -> "software engineers",
+# "among software engineers during 2024" -> "software engineers").
+_POPULATION_BOUNDARY_PREPOSITIONS = (
+    "in",
+    "during",
+    "since",
+    "by",
+    "over",
+    "across",
+    "within",
+    "after",
+    "before",
+)
+_POPULATION_BOUNDARY_PATTERN = "|".join(_POPULATION_BOUNDARY_PREPOSITIONS)
 _POPULATION_PATTERN = re.compile(
-    r"\bamong ((?!in\b)[a-z][\w\-]*(?:\s+(?!in\b)[a-z][\w\-]*){0,3})", re.IGNORECASE
+    rf"\bamong ((?!(?:{_POPULATION_BOUNDARY_PATTERN})\b)[a-z][\w\-]*"
+    rf"(?:\s+(?!(?:{_POPULATION_BOUNDARY_PATTERN})\b)[a-z][\w\-]*){{0,3}})",
+    re.IGNORECASE,
 )
 
 

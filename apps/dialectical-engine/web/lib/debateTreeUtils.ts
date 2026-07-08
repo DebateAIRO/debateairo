@@ -87,6 +87,28 @@ export function isAbandonedArgumentStatus(rawStatus: string | null | undefined):
   return s === "abandoned" || s === "stale" || s === "paused" || s === "stopped";
 }
 
+/**
+ * Returns true when a node's dialectical strength score is at or below the
+ * documented low-strength threshold, false otherwise.
+ *
+ * Honesty contract: `strength == null` (missing/unknown score) always returns
+ * `false` -- unknown strength is NOT the same as "known low strength," and
+ * nodes without a score must never be dimmed for missing data.
+ *
+ * The default threshold (0.35) intentionally reuses the SAME value as the
+ * "unsupported" band cutoff in coordinator/app/scoring/verdict.py
+ * (VERDICT_THRESHOLDS_VERSION = "verdict-v1", _UNSUPPORTED_THRESHOLD = 0.35)
+ * so the two numbers do not silently drift apart. If that coordinator
+ * threshold ever changes, update this default to match.
+ */
+export function isLowStrengthNode(
+  strength: number | null | undefined,
+  threshold = 0.35,
+): boolean {
+  if (strength == null) return false;
+  return strength <= threshold;
+}
+
 export function toArgumentClaimStatus(rawStatus: string | null | undefined): ArgumentClaimStatus {
   const s = (rawStatus ?? "").toLowerCase();
   if (isAbandonedArgumentStatus(s)) return "abandoned";

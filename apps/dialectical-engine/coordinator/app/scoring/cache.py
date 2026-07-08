@@ -58,6 +58,11 @@ def lookup_scoring_cache(
             return cached_result.result
         return None
 
+    # Phase 11 Task 1: this fallback scan relies on encountering the newest-
+    # matching row first when multiple AnalyzerRun rows share the same
+    # provenance identity (node_id/input_hash/etc). seq (migration 0011) is
+    # now the primary sort key -- created_at.desc()/id.desc() remain only as
+    # a defensive fallback for legacy rows where seq IS NULL.
     runs = db.scalars(
         select(AnalyzerRun)
         .where(
@@ -65,7 +70,7 @@ def lookup_scoring_cache(
             AnalyzerRun.analyzer_type == SCORING_CACHE_ANALYZER_TYPE,
             AnalyzerRun.status == "complete",
         )
-        .order_by(AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
     ).all()
     for run in runs:
         provenance = run.provenance if isinstance(run.provenance, dict) else {}
@@ -146,6 +151,17 @@ def store_scoring_cache(
     result: dict[str, Any],
     contract: JudgeContract | None = None,
 ) -> NodeScoringResult:
+    # Contract-keyed immutable cache: the upsert identity INCLUDES the judge
+    # contract. A changed contract means a different scoring artifact — it
+    # gets its own row; the old contract's row is preserved as historical.
+    # Within one contract (or the legacy NULL-contract lane) re-stores refresh
+    # the same row in place.
+    contract_hash_value = contract.contract_hash if contract is not None else None
+    contract_condition = (
+        NodeScoringResult.contract_hash == contract_hash_value
+        if contract_hash_value is not None
+        else NodeScoringResult.contract_hash.is_(None)
+    )
     cached_result = db.scalar(
         select(NodeScoringResult).where(
             NodeScoringResult.debate_id == debate_id,
@@ -154,6 +170,7 @@ def store_scoring_cache(
             NodeScoringResult.judge_role == judge_role,
             NodeScoringResult.provider == provider,
             NodeScoringResult.model == model,
+            contract_condition,
         )
     )
     if cached_result is None:

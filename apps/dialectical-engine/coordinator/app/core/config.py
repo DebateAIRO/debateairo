@@ -141,6 +141,13 @@ def float_env(name: str, default: float, minimum: float, maximum: float) -> floa
     return bounded_float(value, default, minimum, maximum) if value is not None else default
 
 
+def bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def load_settings(path: Path | None = None) -> Settings:
     path = path or Path(os.getenv("DIALECTICAL_COORDINATOR_CONFIG", DEFAULT_CONFIG_PATH)).expanduser()
     dotenv_values = {

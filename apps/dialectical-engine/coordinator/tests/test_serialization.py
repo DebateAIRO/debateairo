@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from sqlalchemy import event
 
 from app.core.auth import hash_token
 from app.core.db import get_engine
-from app.models.entities import Debate, Generation, Job, Node, Synthesis, Worker, now_utc
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, Synthesis, Worker, now_utc
+from app.scoring.verdict import verdict_summary
 from app.services.serialization import debate_to_dict, iso
 
 
@@ -370,3 +373,107 @@ def test_debate_detail_batches_worker_name_lookup(db) -> None:
     assert visible["tree"]["active_generation"]["worker_name"] == "mac-mini"
     assert visible["tree"]["children"][0]["active_generation"]["worker_name"] == "mac-mini"
     assert visible["synthesis"]["worker_name"] == "spare-mac"
+
+
+def _root_with_branch(db, debate: Debate) -> tuple[Node, DebateBranch]:
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    branch = DebateBranch(debate_id=debate.id, root_node_id=root.id, status="active")
+    db.add(branch)
+    db.flush()
+    return root, branch
+
+
+def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analysis_run(db) -> None:
+    # Phase 9 Task 1: detail["verdict"] is ADDITIVE -- assert it is present
+    # AND every pre-existing key from the module docstring/Verified Ground
+    # Truth ("tree", "analyzer_runs", "branch_lineage", ...) remains intact.
+    #
+    # created_at is set EXPLICITLY (not left to wall-clock `now_utc()`
+    # defaults) with a deliberate gap between the two rows. This sidesteps
+    # the documented tie hazard in the debate_to_dict "latest protocol_analysis"
+    # lookup (created_at.desc(), id.desc() -- see the comment at its call site
+    # and tests/test_protocol_runner.py::_other_protocol_analysis_run's
+    # docstring): created_at is coarse wall-clock (especially on Windows) and
+    # id is a random UUID4, so two rows created back-to-back in the same test
+    # can otherwise land in the same timestamp tick and make the id-desc
+    # tiebreak pick either row non-deterministically.
+    older_created_at = now_utc()
+    newer_created_at = older_created_at + timedelta(seconds=5)
+
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+
+    # An OLDER protocol_analysis run (must be superseded by the newer one).
+    older_run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="protocol_analysis",
+        output={
+            "dialecticalStrengths": {root.id: 0.1},
+            "verificationStatuses": {root.id: "pending_verification"},
+            "convergence": {"converged": None, "reason": "first_evaluation", "epsilon": 0.05},
+        },
+        status="complete",
+        provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        created_at=older_created_at,
+    )
+    db.add(older_run)
+    db.commit()
+
+    # A NEWER protocol_analysis run -- this is the one detail["verdict"] must
+    # reflect (real dialecticalStrengths/verificationStatuses/convergence,
+    # shaped exactly like app/protocol/runner.py persists them).
+    latest_run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="protocol_analysis",
+        output={
+            "dialecticalStrengths": {root.id: 0.8},
+            "verificationStatuses": {root.id: "verified"},
+            "convergence": {"converged": True, "reason": None, "epsilon": 0.05},
+        },
+        status="complete",
+        provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        created_at=newer_created_at,
+    )
+    db.add(latest_run)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    expected = verdict_summary(latest_run.output, root_node_id=root.id)
+    assert visible["verdict"] == expected
+    assert visible["verdict"]["verdictBand"] == "supported"
+
+    # Additive: every pre-existing top-level key must remain present/unchanged.
+    assert visible["tree"]["id"] == root.id
+    assert len(visible["analyzer_runs"]) == 2
+    assert visible["branch_lineage"][0]["id"] == branch.id
+    assert visible["node_count"] == 1
+
+
+def test_debate_detail_verdict_unavailable_when_no_protocol_analysis_run(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    _root_with_branch(db, debate)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["verdict"]["verdictBand"] == "unavailable"
+    assert visible["analyzer_runs"] == []

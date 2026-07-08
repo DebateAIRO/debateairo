@@ -22,3 +22,8 @@ coordinator/.coverage
 coordinator/.pytest_cache/
 worker/.coverage
 worker/.pytest_cache/
+
+# Repo-local pytest basetemp/cache roots (see coordinator/pyproject.toml addopts).
+coordinator/.tmp/
+coordinator/.pytest-tmp/
+.tmp/

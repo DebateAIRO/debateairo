@@ -16,7 +16,7 @@ from app.scoring.service import (
     scoring_result_payload,
 )
 
-from tests.test_node_scoring import (
+from test_node_scoring import (
     _assert_public_payload_has_no_private_judge_output,
     base_assessment,
     explicit_depth_pressure_payload,
@@ -121,7 +121,7 @@ def test_artifact_with_matching_contract_hydrates(db) -> None:
     )
     db.commit()
 
-    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+    item, metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
 
     assert item is not None
     assert metadata is not None
@@ -142,7 +142,7 @@ def test_artifact_with_null_contract_is_not_reduced_through_current_reducer(db) 
     )
     db.commit()
 
-    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+    item, metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
 
     assert item is None
     assert metadata is None
@@ -187,7 +187,7 @@ def test_artifact_with_mismatched_contract_falls_back_to_stored_public_result(db
     )
     db.commit()
 
-    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+    item, metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
 
     assert item is not None
     assert item == stored_item
@@ -234,7 +234,7 @@ def test_historical_fallback_picks_matching_node_item_from_multi_item_payload(db
     )
     db.commit()
 
-    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+    item, metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
 
     assert item is not None
     assert item == real_item
@@ -303,7 +303,7 @@ def test_scoring_api_serves_historical_result_for_mismatched_contract_artifact(d
     _assert_same_on_common_keys(served_item, real_item)
     assert served_item["node_id"] == real_item["node_id"] != decoy_item["node_id"]
     assert served_item["claim"]["node_id"] == real_item["claim"]["node_id"] != decoy_item["claim"]["node_id"]
-    assert body["producer"] == "persisted-judge-artifacts"
+    assert body["producer"] == "historical-scoring-cache"
     assert body["cache"] == {"hit": False}
     assert "active_scoring_job_id" not in body
     assert "active_scoring_job_status" not in body
@@ -326,7 +326,7 @@ def test_malformed_legacy_artifact_stays_private(db) -> None:
     )
     db.commit()
 
-    item, metadata = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
+    item, metadata, source = _hydrate_node_scoring_item_from_judge_artifact(db, debate, node.id)
 
     assert item is None
     assert metadata is None
