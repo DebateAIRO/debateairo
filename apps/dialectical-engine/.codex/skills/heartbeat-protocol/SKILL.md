@@ -1,58 +1,137 @@
 ---
 name: heartbeat-protocol
-description: Claude adapter for the DebateAI shared Kanban heartbeat protocol. Use when Hermes routes a [Claude] ticket or V invokes the Claude coding loop. Hermes acts as cockpit broker — Claude sources routing, tenant, branch, and file contracts from Kanban/Hermes, not from V.
+description: Codex adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Codex requests independent peer review; Hermes performs its own review and runs verified same-terminal /compact after every durable coding/review/rework sequence.
+version: 2.2.0
 ---
 
-# Claude Heartbeat Protocol Adapter
+# Codex Heartbeat Protocol
 
-This Claude skill is intentionally thin. The shared protocol spine lives in repo docs so Hermes, Claude, and Codex follow the same rules.
+## Read order
 
-Read in this order:
-
-1. This SKILL.md
+1. `AGENTS.md`
 2. `docs/agent-protocols/debateai-heartbeat-protocol.md`
-3. `docs/agent-protocols/claude-heartbeat-adapter.md`
-4. The current Kanban ticket body and Hermes comments
+3. `docs/agent-protocols/codex-heartbeat-adapter.md`
+4. Current Kanban ticket body and every comment in chronological order
 
-## Claude role
+The latest applicable Hermes/human comment is current routing law. Do not act from status alone.
+
+## Role
 
 ```text
-V      = commander / product decision maker — Claude does NOT ask V for ticket IDs, branches, file contracts, or routing.
-Hermes = cockpit broker / reviewer / Done gate / Blocked authority — Claude's primary interface.
-Claude = isolated parallel lane worker for [Claude] tickets.
-Kanban = current source of truth.
+Codex GPT-5.6 Sol = sole coding worker
+Peer reviewer       = different read-only agent/session
+Hermes              = non-delegable evidence reviewer, cockpit, human-review router, Done/Blocked authority
+V                    = human product/acceptance reviewer
 ```
 
-**Hermes is the cockpit broker by default.** When V invokes `/heartbeat-protocol`:
-- Hermes infers the active tenant/workstream and routes Claude through Kanban.
-- Claude reads all routing, branch, file contract, and ticket info from Kanban ticket bodies and Hermes comments.
-- If confused, Claude asks Hermes through Kanban (`CLAUDE HEARTBEAT` with `needs Hermes: yes`) — not V.
+Hermes launches one managed Codex CLI PTY per implementation ticket. New ticket means new terminal. Rework means resume the same original ticket/session.
 
-## Non-negotiables
+## On launch or wakeup
 
-- Work only `[Claude]` tickets.
-- Read the ticket body and comments before editing.
-- Respect `Allowed to edit` and `Forbidden` file contracts.
-- Do not touch Codex-owned files.
-- Do not mark tickets Done.
-- Do not push without explicit V approval.
-- Do not delete product/database data.
-- Do not create fake runtime product data.
-- Use `CLAUDE HEARTBEAT`, `CLAUDE BLOCKED`, and `READY FOR HERMES REVIEW` exactly as defined in the shared docs.
-- When Hermes declares `LIVE MONITORING ACTIVE`, also keep the named V-visible live-output channel updated with short progress lines. If Hermes provides only a `.hermes/live/` fallback file, write there and report that path in heartbeats.
+1. Read the ticket body and all comments.
+2. Record `comments read through: <latest id/timestamp>`.
+3. Determine from comments whether this is first-pass work, peer-review correction, Hermes rework, human rework, or waiting.
+4. Confirm `[Codex]`, `Assigned agent: Codex`, original/rework owner, session ID, branch/worktree, dependencies, file contract, verification, and human gate.
+5. Continue this session's `running` ticket before claiming anything new.
+6. Post `WORKER CLAIM` before edits.
+7. Repeat the comment scan before every edit phase, heartbeat, review request, and handoff.
 
-## Self-blocking prevention
+## First-pass flow
 
-If a valid active `[Claude]` ticket exists, do NOT block the whole goal because of:
-- worktree path confusion
-- branch uncertainty when the branch is declared in the ticket
-- prior completed ticket state
-- local implementation friction
+```text
+WORKER CLAIM
+→ RED → GREEN → REFACTOR
+→ exact focused checks
+→ READY FOR PEER REVIEW
+→ stop editing
+```
 
-Instead: continue the active ticket, fix the smallest local slice, or post `CLAUDE HEARTBEAT` with `needs Hermes: yes`. Ask Hermes through Kanban — not V.
+The first-pass Codex worker does **not** post `READY FOR HERMES REVIEW`. Hermes launches a separate reviewer. On reviewer RED, the same Codex worker fixes and requests peer re-review. On reviewer GREEN, the reviewer posts `READY FOR HERMES REVIEW`; Hermes itself then reads the full comment chain, diff, tests, and product evidence. Reviewer GREEN never substitutes for Hermes's own review.
 
-## ScheduleWakeup note
+## Post-dialogue checkpoint compaction
 
-If running in a scheduler-capable Claude environment, use the one-minute heartbeat loop described in `docs/agent-protocols/claude-heartbeat-adapter.md`. End the loop only when the Claude chain is complete or a V-level blocker exists.
+After every durable Codex coding, review, or correction handoff—and after any
+substantive Hermes↔Codex ping-pong—keep this PTY open and idle. Hermes first
+verifies that artifacts/diffs, checks, comments, decisions, unresolved
+findings, and next gate are durable, then sends exactly:
 
-Kanban ticket bodies and Hermes comments override this adapter for current mission details.
+```text
+/compact
+```
+
+The installed Codex 0.144.0 menu does not document preservation arguments.
+Hermes waits for completion/prompt return and records
+`CODEX COMPACTION CHECKPOINT` before parking this terminal or proceeding:
+
+```text
+READY FOR PEER REVIEW → compact worker PTY → peer review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+If substantive dialogue follows the checkpoint, compact again at the next
+stable handoff. Never compact while work/tests/generation are in flight and do
+not exit merely because the conversation became chatty.
+
+## Hermes/human correction flow
+
+When the ticket returns to `ready` with `HERMES CHANGES REQUESTED` or `HUMAN REVIEW CHANGES REQUESTED`:
+
+1. Resume this exact original Codex session.
+2. Read all comments added after the prior handoff, including supersessions.
+3. Post `REWORK ACKNOWLEDGED` with the triggering comment and each finding.
+4. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
+5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes.
+6. Peer re-review only when Hermes explicitly requests it.
+7. If Hermes returns it again, repeat in this same session.
+
+If this session is lost, post `CODEX BLOCKED` with `session_continuity`. Do not create a replacement without `WORKER CONTINUITY OVERRIDE`.
+
+## Reviewer mode
+
+If Hermes launches this Codex session as a reviewer, it is read-only:
+
+- read all comments and `READY FOR PEER REVIEW` evidence;
+- independently inspect and verify;
+- never edit the reviewed files;
+- post `PEER REVIEW CHANGES REQUESTED` on RED;
+- post `PEER REVIEW APPROVED` and then `READY FOR HERMES REVIEW` on GREEN;
+- never review work authored by this same CLI session.
+
+## Required comment markers
+
+Recognize and obey:
+
+```text
+WORKER CLAIM
+CODEX HEARTBEAT
+CODEX BLOCKED
+CODEX COMPACTION CHECKPOINT
+COMPACTION BLOCKED
+READY FOR PEER REVIEW
+PEER REVIEW CHANGES REQUESTED
+PEER REVIEW APPROVED
+READY FOR HERMES REVIEW
+HERMES CHANGES REQUESTED
+READY FOR HUMAN REVIEW
+HUMAN REVIEW PASSED
+HUMAN REVIEW CHANGES REQUESTED
+REWORK ACKNOWLEDGED
+REWORK READY FOR HERMES REVIEW
+WORKER CONTINUITY OVERRIDE
+```
+
+Every outgoing marker includes the latest `comments read through` cursor.
+
+## Hard rules
+
+- Use GPT-5.6 Sol.
+- Work only the assigned `[Codex]` ticket and file contract.
+- Do not create/split/reroute tickets.
+- One writer per file/hunk; parallel lanes require non-overlap.
+- Serialize heavy builds/tests when in doubt about V's available RAM.
+- Do not mark Done, push without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
+- Reviewer never writes the fix; worker never self-approves first-pass work.
+- Hermes's own review remains mandatory after reviewer GREEN.
+- Every durable coding/review/rework handoff is followed by verified
+  same-terminal `/compact` before parking or review.
