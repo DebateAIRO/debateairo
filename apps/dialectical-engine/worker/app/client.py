@@ -187,9 +187,18 @@ class CoordinatorClient:
         return response.json()
 
     async def fail(self, job_id: str, reason: str, retryable: bool = True) -> None:
+        safe_reason = reason[:MAX_FAILURE_REASON_CHARS]
+        if not safe_reason.strip():
+            # The coordinator's FailRequest requires a non-empty reason
+            # (min_length=1). Some exceptions stringify to "" (e.g.
+            # str(httpx.ReadError()) == ""), which would trigger a 422 and, in
+            # turn, crash the worker. Substitute a non-empty default here as a
+            # last line of defense before the request goes out; callers are
+            # expected to pass a more descriptive reason where possible.
+            safe_reason = "worker error: empty failure reason"
         response = await self.client.post(
             f"/api/jobs/{job_id}/fail",
             headers=self.worker_headers,
-            json={"reason": reason[:MAX_FAILURE_REASON_CHARS], "retryable": retryable},
+            json={"reason": safe_reason, "retryable": retryable},
         )
         response.raise_for_status()

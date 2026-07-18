@@ -23,11 +23,42 @@ export type Generation = {
   latency_ms?: number;
 };
 
+/**
+ * The four legacy POV lenses plus the structural node types. Kept as named
+ * literals so existing narrowing (`node.node_type === "SCIENTIFIC_POV"`) and
+ * editor autocomplete keep working.
+ */
+export type LegacyNodeType =
+  | "ROOT_CLAIM"
+  | "SCIENTIFIC_POV"
+  | "STATISTICAL_POV"
+  | "ETHICAL_POV"
+  | "PRACTICAL_POV"
+  | "PRO"
+  | "CON"
+  | "EVIDENCE";
+
+/**
+ * Node type of a debate tree node. The backend dynamic engine may emit ANY
+ * lens/branch node_type string, not just the four legacy POV literals; the
+ * `(string & {})` member accepts any backend-provided value while preserving
+ * literal autocomplete. The web layer must render whatever branches the backend
+ * created and never assume exactly the four legacy lenses.
+ */
+export type NodeType = LegacyNodeType | (string & {});
+
 export type DebateNode = {
   id: string;
   debate_id: string;
   parent_id: string | null;
-  node_type: "ROOT_CLAIM" | "SCIENTIFIC_POV" | "STATISTICAL_POV" | "ETHICAL_POV" | "PRACTICAL_POV" | "PRO" | "CON" | "EVIDENCE";
+  node_type: NodeType;
+  /**
+   * Optional backend-provided display label / lens name for a branch node.
+   * When present it is preferred over any label derived from node_type, so the
+   * dynamic engine can name lenses directly. Absent for legacy four-POV debates.
+   */
+  label?: string | null;
+  lens?: string | null;
   depth: number;
   position: number;
   claim: string;
@@ -549,8 +580,8 @@ export type WorkerStatus = {
 // UI and scoring helpers domain-language names while preserving compatibility.
 // ---------------------------------------------------------------------------
 
-/** Role of an ArgumentClaim in the debate tree. */
-export type ArgumentClaimRole =
+/** The legacy set of ArgumentClaim roles. */
+export type LegacyArgumentClaimRole =
   | "ROOT_CLAIM"
   | "SCIENTIFIC_POV"
   | "STATISTICAL_POV"
@@ -558,6 +589,13 @@ export type ArgumentClaimRole =
   | "PRACTICAL_POV"
   | "PRO"
   | "CON";
+
+/**
+ * Role of an ArgumentClaim in the debate tree. Open to any backend-provided
+ * lens/branch role (see NodeType) while keeping the legacy literals for
+ * narrowing and autocomplete.
+ */
+export type ArgumentClaimRole = LegacyArgumentClaimRole | (string & {});
 
 /**
  * Lifecycle status of an investigation path.

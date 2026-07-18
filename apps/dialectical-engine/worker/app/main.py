@@ -100,7 +100,18 @@ def retryable_coordinator_error(exc: Exception) -> bool:
 def identity_desync_error(exc: Exception) -> bool:
     if not isinstance(exc, httpx.HTTPStatusError):
         return False
-    return exc.response.status_code in {401, 404}
+    status = exc.response.status_code
+    if status in {401, 404}:
+        return True
+    if status == 403:
+        # A 403 on a worker-identity endpoint (register / heartbeat / poll)
+        # means the coordinator no longer recognizes this worker identity, so
+        # recover by re-registering a fresh identity -- same path as 401/404.
+        # Job-endpoint 403s ("not claimed by this worker" / stale mutation) are
+        # a different signal handled by stale_job_coordinator_error, so this is
+        # scoped to /api/workers/ to avoid conflating the two.
+        return "/api/workers/" in str(exc.request.url)
+    return False
 
 
 def stale_job_coordinator_error(exc: Exception) -> bool:
@@ -122,6 +133,54 @@ def nonretryable_coordinator_completion_error(exc: Exception) -> bool:
     if not isinstance(exc, httpx.HTTPStatusError):
         return False
     return exc.response.status_code == 400 and "/complete" in str(exc.request.url)
+
+
+# Transient network errors that warrant a bounded retry of /complete before we
+# give up and fall back to fail(). These typically come from the coordinator
+# dropping in-flight connections (e.g. an uvicorn --reload restart), not from a
+# genuine job problem, so retrying recovers the completion instead of wastefully
+# failing (and re-generating) the job.
+TRANSIENT_NETWORK_ERRORS = (httpx.ReadError, httpx.ConnectError, httpx.RemoteProtocolError)
+COMPLETE_RETRY_ATTEMPTS = 3
+COMPLETE_RETRY_BACKOFF_SECONDS = 0.5
+
+
+def failure_reason_for(exc: Exception) -> str:
+    """A non-empty failure reason for the coordinator FailRequest contract.
+
+    Some exceptions stringify to "" (e.g. str(httpx.ReadError()) == ""), which
+    would violate the coordinator's min_length=1 reason and crash the worker.
+    Fall back to the exception class name when the message is empty.
+    """
+    message = str(exc).strip()
+    if message:
+        return message
+    return f"worker error: {type(exc).__name__}"
+
+
+async def complete_with_retry(
+    client: CoordinatorClient,
+    job_id: str,
+    result: Any,
+    started_at: float,
+    tokens_in: int,
+    tokens_out: int,
+) -> None:
+    """Call client.complete, retrying transient network errors a bounded number
+    of times with a short backoff before letting the last error propagate."""
+    for attempt in range(1, COMPLETE_RETRY_ATTEMPTS + 1):
+        try:
+            await client.complete(job_id, result, started_at, tokens_in, tokens_out)
+            return
+        except TRANSIENT_NETWORK_ERRORS as exc:
+            if attempt >= COMPLETE_RETRY_ATTEMPTS:
+                raise
+            print(
+                f"Transient network error completing job {job_id} "
+                f"(attempt {attempt}/{COMPLETE_RETRY_ATTEMPTS}): {exc!r}. Retrying.",
+                flush=True,
+            )
+            await asyncio.sleep(COMPLETE_RETRY_BACKOFF_SECONDS)
 
 
 async def wait_or_stop(stop: asyncio.Event, seconds: float) -> None:
@@ -197,7 +256,7 @@ async def handle_job_with_heartbeats(
         result = enrich_v2_result(job, result, getattr(client_config, "worker_id", None))
         if str(job.get("job_type") or "").startswith("v2_"):
             print(f"V2 result for {job['id']}: {json.dumps(result, default=str)[:2000]}", flush=True)
-        await client.complete(job["id"], result, started_at, tokens_in, estimate_tokens(text))
+        await complete_with_retry(client, job["id"], result, started_at, tokens_in, estimate_tokens(text))
     except Exception as exc:
         if stale_job_coordinator_error(exc):
             print(f"Coordinator no longer accepts job {job['id']}: {exc}", flush=True)
@@ -205,13 +264,24 @@ async def handle_job_with_heartbeats(
         try:
             await client.fail(
                 job["id"],
-                str(exc),
+                failure_reason_for(exc),
                 retryable=not isinstance(exc, StructuredOutputError)
                 and not nonretryable_coordinator_completion_error(exc),
             )
         except Exception as fail_exc:
             if stale_job_coordinator_error(fail_exc):
                 print(f"Coordinator no longer accepts failure for job {job['id']}: {fail_exc}", flush=True)
+                return
+            if isinstance(fail_exc, (httpx.HTTPStatusError, httpx.RequestError)):
+                # Reporting a job failure is best-effort: a 4xx/5xx or a network
+                # drop on /fail must NEVER kill the worker process. The job is
+                # coordinator-side recoverable (its deadline reaper re-queues
+                # it), so log and continue the worker loop instead of raising.
+                print(
+                    f"Failed to report failure for job {job['id']} ({fail_exc!r}); "
+                    "continuing worker loop.",
+                    flush=True,
+                )
                 return
             raise
     finally:

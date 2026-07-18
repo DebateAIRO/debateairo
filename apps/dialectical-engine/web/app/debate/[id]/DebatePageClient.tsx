@@ -369,11 +369,17 @@ function adaptiveDepthDryRunStateFromPayload(
 export default function DebatePageClient({
   id,
   initialDebate,
-  initialError = null
+  initialError = null,
+  initialPending = false
 }: {
   id: string;
   initialDebate: DebateDetail | null;
   initialError?: string | null;
+  // True when the SSR fetch failed transiently (coordinator timeout/unreachable).
+  // This is NOT an error: the page renders a loading/connecting state and the
+  // client polling/stream below retries. Only a definitive failure sets
+  // initialError, which is the sole seed of the fatal `error && !debate` gate.
+  initialPending?: boolean;
 }) {
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
@@ -430,6 +436,11 @@ export default function DebatePageClient({
     try {
       const latest = await getDebate(id);
       setDebate(latest);
+      // Self-heal: recovered data must always clear any stale error banner/fatal
+      // screen (e.g. a transient SSR coordinator timeout, or an earlier failed
+      // poll). Without this, a debate that arrives after a transient failure
+      // would stay stuck behind an old error (see the `error && !debate` gate).
+      setError(null);
       const draft = activeSynthesisDraft(latest);
       if (draft) {
         setSynthesisDraft(draft);
@@ -540,6 +551,9 @@ export default function DebatePageClient({
       events.onopen = () => {
         attempt = 0;
         setStreamState({ status: "live" });
+        // Live stream (re)connected: clear any stale transient error before the
+        // refresh so recovered data is never masked by an old banner/fatal screen.
+        setError(null);
         refresh();
       };
       events.addEventListener("tree_ready", () => refresh());
@@ -906,6 +920,9 @@ export default function DebatePageClient({
     }
   }
 
+  // Fatal dead-end ONLY for a definitive error with no data. A transient SSR
+  // failure never reaches here: it leaves error null (pending), so it falls
+  // through to the loading/connecting state below and the client retries.
   if (error && !debate) {
     return (
       <div className="screen scroll">
@@ -922,7 +939,7 @@ export default function DebatePageClient({
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <p className="muted">Loading…</p>
+          <p className="muted">{initialPending ? "Connecting to the coordinator…" : "Loading…"}</p>
         </div>
       </div>
     );

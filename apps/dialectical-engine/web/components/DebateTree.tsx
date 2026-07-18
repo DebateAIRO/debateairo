@@ -5,6 +5,7 @@ import { useState } from "react";
 import { nodeGenerations, regenerateNode } from "@/lib/api";
 import type { DebateNode, Generation, NodeScoringPayload } from "@/lib/types";
 import { isAbandonedArgumentStatus, isLowStrengthNode } from "@/lib/debateTreeUtils";
+import { branchLabelOf } from "@/lib/debatePresentation";
 import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
 
 function isAbandonedNode(node: DebateNode): boolean {
@@ -20,25 +21,19 @@ const VERDICT_FIRST_UI_ENABLED = process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "t
 function nodeClass(node: DebateNode, lowStrength: boolean): string {
   const ab = isAbandonedNode(node) ? " abandoned" : "";
   const ls = VERDICT_FIRST_UI_ENABLED && lowStrength ? " lowStrengthNode" : "";
-  if (node.node_type === "PRO") return `nodeCard pro${ab}${ls}`;
-  if (node.node_type === "CON") return `nodeCard con${ab}${ls}`;
-  if (
-    node.node_type === "SCIENTIFIC_POV" ||
-    node.node_type === "STATISTICAL_POV" ||
-    node.node_type === "ETHICAL_POV" ||
-    node.node_type === "PRACTICAL_POV"
-  )
-    return `nodeCard root${ab}${ls}`;
-  return `nodeCard root${ab}${ls}`;
+  // Any non-argument node (root claim or ANY lens/branch type) shares the
+  // "root" card styling; only PRO/CON get their own stance styling. This works
+  // for arbitrary backend lens types, not just the four legacy POV literals.
+  const roleClass = node.node_type === "PRO" ? "pro" : node.node_type === "CON" ? "con" : "root";
+  return `nodeCard ${roleClass}${ab}${ls}`;
 }
 
 function nodeLabel(node: DebateNode): string {
   if (node.node_type === "ROOT_CLAIM") return "Root";
-  if (node.node_type === "SCIENTIFIC_POV") return "Scientific POV";
-  if (node.node_type === "STATISTICAL_POV") return "Statistical POV";
-  if (node.node_type === "ETHICAL_POV") return "Ethical POV";
-  if (node.node_type === "PRACTICAL_POV") return "Practical POV";
-  return node.node_type === "PRO" ? "Pro" : "Con";
+  if (node.node_type === "PRO") return "Pro";
+  if (node.node_type === "CON") return "Con";
+  // Data-driven: backend-provided label/lens wins, else derive from node_type.
+  return branchLabelOf(node);
 }
 
 type DebateTreeProps = {

@@ -44,12 +44,52 @@ export const ROLE_PALETTES: Record<Exclude<Role, "root">, RolePalette> = {
   }
 };
 
-const POV_LABELS: Record<string, string> = {
+/** Generic fallback label for a lens/branch whose type yields no readable name. */
+export const LENS_FALLBACK_LABEL = "Lens";
+
+/**
+ * Human labels for the four legacy POV lenses. These keep their curated names;
+ * any other lens type is derived generically by lensLabelFromNodeType. This is
+ * NOT an exhaustive list of allowed lenses -- the backend dynamic engine may
+ * emit arbitrary lens node types.
+ */
+const LEGACY_LENS_LABELS: Record<string, string> = {
   SCIENTIFIC_POV: "Scientific",
   STATISTICAL_POV: "Statistical",
   ETHICAL_POV: "Ethical",
   PRACTICAL_POV: "Practical"
 };
+
+/**
+ * Derive a readable label for an analytical lens/branch node type. Works for any
+ * backend-provided node_type string, not just the four legacy POV literals:
+ * strips a trailing "_POV", splits on separators, and title-cases. Returns the
+ * generic fallback only when nothing meaningful can be derived (blank/unknown).
+ */
+export function lensLabelFromNodeType(nodeType: string | null | undefined): string {
+  const raw = (nodeType ?? "").trim();
+  if (!raw) return LENS_FALLBACK_LABEL;
+  const known = LEGACY_LENS_LABELS[raw.toUpperCase()];
+  if (known) return known;
+  const cleaned = raw.replace(/_POV$/i, "").replace(/[_-]+/g, " ").trim();
+  if (!cleaned) return LENS_FALLBACK_LABEL;
+  return cleaned
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/**
+ * Data-driven display label for a lens/branch node. Prefers an explicit
+ * backend-provided label or lens name, then derives one from the node_type.
+ * Keeps arbitrary N-branch debates rendering without the four legacy POV
+ * literals baked in.
+ */
+export function branchLabelOf(node: Pick<DebateNode, "node_type" | "label" | "lens">): string {
+  const provided = (node.label ?? node.lens ?? "").trim();
+  if (provided) return provided;
+  return lensLabelFromNodeType(node.node_type);
+}
 
 export function roleOf(node: DebateNode): Role {
   if (node.node_type === "ROOT_CLAIM") return "root";
@@ -60,7 +100,7 @@ export function roleOf(node: DebateNode): Role {
 
 export function roleLabel(node: DebateNode): string {
   const role = roleOf(node);
-  if (role === "pov") return POV_LABELS[node.node_type] ?? "Lens";
+  if (role === "pov") return branchLabelOf(node);
   if (role === "pro") return "Pro";
   if (role === "con") return "Con";
   return "Root claim";
@@ -326,11 +366,5 @@ export function claimRoleLabel(view: ArgumentClaimView): string {
   if (view.claimRole === "ROOT_CLAIM") return "Root claim";
   if (view.claimRole === "PRO") return "Pro";
   if (view.claimRole === "CON") return "Con";
-  const povLabels: Record<string, string> = {
-    SCIENTIFIC_POV: "Scientific",
-    STATISTICAL_POV: "Statistical",
-    ETHICAL_POV: "Ethical",
-    PRACTICAL_POV: "Practical",
-  };
-  return povLabels[view.claimRole] ?? "Lens";
+  return lensLabelFromNodeType(view.claimRole);
 }

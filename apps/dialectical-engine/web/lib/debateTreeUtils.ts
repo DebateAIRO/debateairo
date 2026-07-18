@@ -48,14 +48,26 @@ export function partitionArgumentChildren(node: DebateNode): {
   return { proChildren, conChildren };
 }
 
+/**
+ * Structural / argument node types that are NOT analytical lenses. Everything
+ * else (any backend-provided lens/branch node_type) is treated as a lens, so
+ * the tree renders arbitrary N-branch debates, not just the four legacy POVs.
+ */
+const NON_LENS_NODE_TYPES = new Set(["ROOT_CLAIM", "PRO", "CON", "EVIDENCE"]);
+
+/**
+ * True when a node_type represents an analytical lens/branch rather than the
+ * structural root, a pro/con argument, or evidence. Generic across any
+ * backend-provided lens type -- not limited to the four legacy POV literals.
+ */
+export function isLensNodeType(nodeType: string | null | undefined): boolean {
+  const raw = (nodeType ?? "").trim().toUpperCase();
+  if (!raw) return false;
+  return !NON_LENS_NODE_TYPES.has(raw);
+}
+
 export function perspectiveChildren(node: DebateNode): DebateNode[] {
-  return node.children.filter(
-    (child) =>
-      child.node_type === "SCIENTIFIC_POV" ||
-      child.node_type === "STATISTICAL_POV" ||
-      child.node_type === "ETHICAL_POV" ||
-      child.node_type === "PRACTICAL_POV",
-  );
+  return node.children.filter((child) => isLensNodeType(child.node_type));
 }
 
 export function initialFocusedNodeId(tree: DebateNode): string {
@@ -162,13 +174,7 @@ export function partitionByStance(view: ArgumentClaimView): {
   };
 }
 
-/** Get perspective (analytical lens) children of a claim. */
+/** Get perspective (analytical lens) children of a claim, for any lens type. */
 export function perspectiveClaims(view: ArgumentClaimView): ArgumentClaimView[] {
-  return view.children.filter(
-    (c) =>
-      c.claimRole === "SCIENTIFIC_POV" ||
-      c.claimRole === "STATISTICAL_POV" ||
-      c.claimRole === "ETHICAL_POV" ||
-      c.claimRole === "PRACTICAL_POV",
-  );
+  return view.children.filter((c) => isLensNodeType(c.claimRole));
 }

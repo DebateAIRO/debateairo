@@ -74,15 +74,57 @@ async function loadHelper() {
   return import(`${moduleUrl}?cacheBust=${Date.now()}`);
 }
 
-test("listDebatesServer times out instead of hanging on an unresponsive coordinator", async () => {
+// Contract (updated): a coordinator SSR timeout is a TRANSIENT signal, not a
+// bare user-facing throw. getDebateServer resolves to a discriminated result so
+// the debate page can render a pending/loading state and let client-side
+// polling/stream retry, instead of a fatal dead-end screen. See serverApi.ts
+// classifyCoordinatorFetchError and app/debate/[id]/page.tsx.
+test("getDebateServer classifies a coordinator timeout as a transient pending result instead of throwing", async () => {
   globalThis.fetch = () => new Promise(() => {});
-  const { listDebatesServer } = await loadHelper();
+  const { getDebateServer } = await loadHelper();
 
-  await assert.rejects(
-    Promise.race([
-      listDebatesServer(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("test timed out before server API did")), 200)),
-    ]),
-    /timed out after 20ms/,
-  );
+  const result = await Promise.race([
+    getDebateServer("debate-1"),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("test timed out before server API did")), 200)),
+  ]);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "pending");
+  assert.match(result.message, /timed out after 20ms/);
+});
+
+test("getDebateServer classifies a definitive 404 as a not_found result", async () => {
+  globalThis.fetch = async () =>
+    new Response("debate not found", { status: 404, statusText: "Not Found" });
+  const { getDebateServer } = await loadHelper();
+
+  const result = await getDebateServer("missing-debate");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "not_found");
+  assert.equal(result.status, 404);
+});
+
+test("getDebateServer returns an ok result carrying the debate payload on success", async () => {
+  const payload = { id: "debate-1", topic: "Test", status: "complete" };
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+  const { getDebateServer } = await loadHelper();
+
+  const result = await getDebateServer("debate-1");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.debate.id, "debate-1");
+});
+
+test("a non-404 coordinator HTTP failure is treated as transient (pending), not fatal", async () => {
+  globalThis.fetch = async () =>
+    new Response("coordinator exploded", { status: 503, statusText: "Service Unavailable" });
+  const { getDebateServer } = await loadHelper();
+
+  const result = await getDebateServer("debate-1");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "pending");
+  assert.equal(result.status, 503);
 });

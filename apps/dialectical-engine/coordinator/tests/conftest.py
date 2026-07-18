@@ -7,6 +7,12 @@ TEST_HOME = tempfile.mkdtemp(prefix="dialectical-test-")
 os.environ["DIALECTICAL_HOME"] = TEST_HOME
 os.environ["DIALECTICAL_DATABASE_URL"] = f"sqlite:///{TEST_HOME}/test.sqlite3"
 os.environ["DIALECTICAL_USER_TOKEN"] = "user_test_token"
+# Test-suite baseline: run the legacy fixed-quartet debate-creation path so the
+# existing quartet-asserting tests remain valid byte-for-byte. Production
+# defaults DIALECTICAL_DYNAMIC_PERSPECTIVES to TRUE (see dialectical_v2.bool_env
+# call). setdefault (not a hard set) so a test can still opt into the dynamic
+# path via monkeypatch.setenv, and delenv to exercise the production default.
+os.environ.setdefault("DIALECTICAL_DYNAMIC_PERSPECTIVES", "false")
 
 import pytest
 

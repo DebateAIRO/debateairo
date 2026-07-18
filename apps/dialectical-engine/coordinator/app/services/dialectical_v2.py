@@ -29,7 +29,9 @@ from app.models.entities import (
     next_analyzer_run_seq,
     now_utc,
 )
+from app.core.config import bool_env
 from app.evidence.extraction import persist_evidence_nodes
+from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
 from app.services.orchestrator import (
     capable_online_workers,
@@ -75,6 +77,101 @@ POV_LENS_DESCRIPTIONS = {
         "rollout risks, and edge cases, including whether the action can realistically be done."
     ),
 }
+# --------------------------------------------------------------------------
+# Dynamic perspectives (DIALECTICAL_DYNAMIC_PERSPECTIVES)
+# --------------------------------------------------------------------------
+# V's product direction: put the dynamic-perspective algorithm to work in place
+# of the fixed 4-POV quartet. Perspective SELECTION is deterministic and
+# provider-free at creation time (creation is a synchronous API call): it reuses
+# the existing rule-based claim classifier (app.scoring.normalizer.
+# classify_claim_type) to pick a claim-type-appropriate lens set, with a safe
+# generalist fallback when the type is unknown.
+#
+# node_type design (safest minimal choice, justified): the qbaf debate adapter
+# (app/qbaf/debate_adapter.py) recognizes ONLY the four legacy POV node types as
+# support containers -- any unknown node_type produces an "unmapped_edge" in
+# BOTH semantics paths, which would DROP a perspective's support edge and orphan
+# its subtree from scoring. So each dynamic perspective REUSES a legacy POV
+# node_type (drawn by cycling POV_BRANCHES), keeping the scoring graph
+# structurally identical to the quartet, while the perspective's real identity
+# lives in its dynamic LABEL (Node.claim) and lens description. This also fits
+# the Node.node_type String(16) column trivially (the reused types already do).
+#
+# Each entry below is (label, lens_description). Labels stay <= 32 chars because
+# they flow into Job.required_role (String(32)).
+_CLAIM_TYPE_PERSPECTIVES: dict[str, tuple[tuple[str, str], ...]] = {
+    "causal": (
+        ("Mechanism POV", "Evaluate the proposed causal mechanism, its plausibility, dose-response, and the temporal ordering linking cause to effect."),
+        ("Confounding POV", "Evaluate alternative explanations, confounders, reverse causation, and selection effects that could produce the association without the claimed cause."),
+        ("Evidence POV", "Evaluate the design, quality, and external validity of the empirical evidence offered for the causal claim."),
+    ),
+    "prediction": (
+        ("Trend POV", "Evaluate whether the historical trend the forecast extrapolates is stable and what conditions must hold for it to continue."),
+        ("Disruptor POV", "Evaluate shocks, regime changes, saturation, and feedback effects that could break the forecast."),
+        ("Base-rate POV", "Evaluate base rates and reference-class outcomes for similar predictions, and the calibration of the forecast's stated confidence."),
+    ),
+    "comparative": (
+        ("Baseline POV", "Evaluate whether the comparison baseline and reference class are well-defined and genuinely like-for-like."),
+        ("Measurement POV", "Evaluate how each side of the comparison is measured and whether the magnitude of the difference is meaningful and robust."),
+    ),
+    "normative": (
+        ("Ethical POV", POV_LENS_DESCRIPTIONS["Ethical POV"]),
+        ("Stakeholder POV", "Evaluate who bears the benefits and harms, whose interests are weighted, and distributional fairness across affected groups."),
+        ("Rights POV", "Evaluate rights, duties, consent, and side-constraints that may hold regardless of aggregate outcomes."),
+        ("Consequence POV", "Evaluate the realistic downstream consequences, incentives, and second-order effects of adopting the prescription."),
+    ),
+    "definitional": (
+        ("Conceptual POV", "Evaluate whether the definition is coherent, non-circular, and captures the intended concept."),
+        ("Boundary POV", "Evaluate edge cases, counterexamples, and borderline instances that test the definition's boundaries."),
+    ),
+    "empirical": (
+        ("Scientific POV", POV_LENS_DESCRIPTIONS["Scientific POV"]),
+        ("Statistical POV", POV_LENS_DESCRIPTIONS["Statistical POV"]),
+        ("Data-quality POV", "Evaluate sampling, measurement error, missing data, and reproducibility of the underlying data."),
+    ),
+    "mixed": (
+        ("Scientific POV", POV_LENS_DESCRIPTIONS["Scientific POV"]),
+        ("Statistical POV", POV_LENS_DESCRIPTIONS["Statistical POV"]),
+        ("Ethical POV", POV_LENS_DESCRIPTIONS["Ethical POV"]),
+        ("Practical POV", POV_LENS_DESCRIPTIONS["Practical POV"]),
+        ("Integrative POV", "Evaluate how the claim's factual, quantitative, ethical, and practical dimensions interact, and where they reinforce or conflict."),
+    ),
+}
+
+# Fallback for "unknown" (and any unmapped claim type): the general four-lens
+# set, carried through the SAME dynamic path so the algorithm is genuinely
+# active by default while staying a safe generalist default.
+_FALLBACK_PERSPECTIVES: tuple[tuple[str, str], ...] = tuple(
+    (label, POV_LENS_DESCRIPTIONS[label]) for _node_type, label in POV_BRANCHES
+)
+
+# Flat label -> lens map for the render path (render_v2_job_prompt). Labels that
+# recur across sets map to an identical lens, so flattening is unambiguous.
+DYNAMIC_LENS_DESCRIPTIONS: dict[str, str] = {
+    label: lens
+    for perspectives in (*_CLAIM_TYPE_PERSPECTIVES.values(), _FALLBACK_PERSPECTIVES)
+    for label, lens in perspectives
+}
+
+
+def dynamic_perspectives(topic: str) -> list[tuple[str, str, str]]:
+    """Return [(node_type, label, lens_description), ...] for `topic`.
+
+    Deterministic and provider-free. The perspective COUNT and the label/lens
+    CONTENT vary by claim type (at least 2, no fixed universal count); the
+    node_type is always drawn from the legacy POV vocabulary so downstream
+    scoring/qbaf/serialization treat each perspective exactly like a legacy POV
+    lens.
+    """
+    claim_type, _markers = classify_claim_type(topic)
+    labelled = _CLAIM_TYPE_PERSPECTIVES.get(claim_type, _FALLBACK_PERSPECTIVES)
+    pov_types = [node_type for node_type, _label in POV_BRANCHES]
+    return [
+        (pov_types[index % len(pov_types)], label, lens)
+        for index, (label, lens) in enumerate(labelled)
+    ]
+
+
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 AgentCapability = AgentDefinition
 SkillCapability = SkillDefinition
@@ -998,7 +1095,9 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             raise ValueError("POV job must target a POV node")
         pov_node = db.get(Node, job.node_id)
         pov_label = pov_node.claim if pov_node else job.required_role
-        lens_description = POV_LENS_DESCRIPTIONS.get(pov_label, "")
+        # Legacy POV labels resolve from POV_LENS_DESCRIPTIONS (byte-identical
+        # render); dynamic-perspective labels fall back to the dynamic lens map.
+        lens_description = POV_LENS_DESCRIPTIONS.get(pov_label) or DYNAMIC_LENS_DESCRIPTIONS.get(pov_label, "")
         pov_context = {
             **base_context,
             "pov": pov_label,
@@ -1356,7 +1455,17 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     db.add(branch)
     flush_write(db)
 
-    for position, (node_type, label) in enumerate(POV_BRANCHES):
+    # Dynamic perspectives (DEFAULT ON): derive a claim-type-appropriate lens
+    # set instead of the fixed quartet. When the flag is off, `perspectives` is
+    # exactly POV_BRANCHES, so the loop below is byte-identical to the legacy
+    # path. Only the (node_type, label) source list changes; the per-perspective
+    # Node + v2_pov job mechanics are shared.
+    if bool_env("DIALECTICAL_DYNAMIC_PERSPECTIVES", True):
+        perspectives = [(node_type, label) for node_type, label, _lens in dynamic_perspectives(topic)]
+    else:
+        perspectives = list(POV_BRANCHES)
+
+    for position, (node_type, label) in enumerate(perspectives):
         pov_node = Node(
             debate_id=debate.id,
             parent_id=root.id,

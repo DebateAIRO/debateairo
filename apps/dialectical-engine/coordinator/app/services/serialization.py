@@ -70,6 +70,30 @@ def _worker_name(worker_names_by_id: dict[str, str], worker_id: str | None) -> s
     return worker_names_by_id.get(worker_id, worker_id)
 
 
+def _debate_generation_terminally_failed(db: Session, debate: Debate) -> bool:
+    """True when the debate's generation cannot progress: at least one
+    generation job has terminally failed and no pending/claimed/running
+    generation job remains to advance it. Scoring jobs (``score_debate``) are a
+    separate lifecycle and are excluded from both checks."""
+    active = db.scalar(
+        select(Job.id).where(
+            Job.debate_id == debate.id,
+            Job.status.in_(ACTIVE_DEBATE_JOB_STATUSES),
+            Job.job_type != "score_debate",
+        )
+    )
+    if active is not None:
+        return False
+    failed = db.scalar(
+        select(Job.id).where(
+            Job.debate_id == debate.id,
+            Job.status == "failed",
+            Job.job_type != "score_debate",
+        )
+    )
+    return failed is not None
+
+
 def effective_debate_status(
     db: Session,
     debate: Debate,
@@ -80,6 +104,13 @@ def effective_debate_status(
     if (debate.status or "").lower() != "generating":
         return debate.status
     if not debate.synthesis_id or not debate.completed_at:
+        # No synthesis yet: the debate is either still generating or has
+        # terminally failed. Surface an honest "failed" for the latter so the
+        # FE can stop spinning instead of polling a debate that can never
+        # complete. This is additive -- when generation can still progress we
+        # fall through to the unchanged "generating" return below.
+        if _debate_generation_terminally_failed(db, debate):
+            return "failed"
         return debate.status
     if nodes is None:
         nodes = list(db.scalars(select(Node).where(Node.debate_id == debate.id)).all())
@@ -163,6 +194,40 @@ def active_synthesis_summary(
     }
 
 
+# Legacy quartet node_type -> curated label pairs. Duplicated here as a literal
+# (rather than imported from app.services.dialectical_v2.POV_BRANCHES) because
+# dialectical_v2 imports app.services.orchestrator, which imports this module --
+# the same real circular-import cycle documented for PROTOCOL_ANALYSIS_TYPE at
+# the top of this file. Keep in sync with dialectical_v2.POV_BRANCHES.
+_LEGACY_POV_LABELS = {
+    "SCIENTIFIC_POV": "Scientific POV",
+    "STATISTICAL_POV": "Statistical POV",
+    "ETHICAL_POV": "Ethical POV",
+    "PRACTICAL_POV": "Practical POV",
+}
+
+
+def _node_label(node: Node) -> str | None:
+    """Backend-provided display label for a lens/branch node, or None.
+
+    Dynamic perspectives store their real lens identity in Node.claim while
+    reusing (cycling) the legacy POV node_types for scoring-graph safety, so
+    the FE must receive the label explicitly -- deriving it from node_type
+    would rename e.g. "Mechanism POV" (node_type SCIENTIFIC_POV) to
+    "Scientific". Emitted only when the claim differs from the legacy curated
+    pairing for that node_type: legacy four-POV debates keep label=None so the
+    FE's curated legacy lens names render byte-identically.
+    """
+    if not str(node.node_type or "").endswith("_POV"):
+        return None
+    label = (node.claim or "").strip()
+    if not label:
+        return None
+    if _LEGACY_POV_LABELS.get(node.node_type) == label:
+        return None
+    return label
+
+
 def node_to_dict(
     db: Session,
     node: Node,
@@ -180,6 +245,7 @@ def node_to_dict(
     )
     payload = {
         **argument_claim.to_node_payload(status=status),
+        "label": _node_label(node),
         "argument_claim": argument_claim.to_domain_payload(status=status),
         "path_status": node.path_status,
         "stopping_status": node.stopping_status,
