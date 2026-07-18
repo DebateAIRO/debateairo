@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -139,7 +140,15 @@ def cloudflared(directory: Path) -> dict[str, Any]:
     cert = directory / "cert.pem"
     config = directory / "config.yml"
     credentials = sorted(path.name for path in directory.glob("*.json")) if directory.exists() else []
-    service = run(["launchctl", "print", f"gui/{os.getuid()}/com.dialectical.cloudflared"], timeout=5)
+    if sys.platform == "darwin":
+        service = run(["launchctl", "print", f"gui/{os.getuid()}/com.dialectical.cloudflared"], timeout=5)
+    else:
+        service = {
+            "applicable": False,
+            "platform": sys.platform,
+            "status": "not_applicable",
+            "reason": "launchd checks require macOS",
+        }
     return {
         "directory": str(directory),
         "cert_path": str(cert),
@@ -243,7 +252,13 @@ def main() -> int:
         print("- delegation: not Cloudflare")
     print(f"- cloudflared login: {'ok' if cf.get('cert_exists') else 'missing'}")
     print(f"- named tunnel config: {'ok' if cf.get('named_tunnel_ready') else 'missing'}")
-    print(f"- named tunnel service: {'loaded' if cf.get('service_loaded') else 'not loaded'}")
+    service = cf.get("service", {})
+    service_summary = (
+        "not applicable"
+        if isinstance(service, dict) and service.get("status") == "not_applicable"
+        else "loaded" if cf.get("service_loaded") else "not loaded"
+    )
+    print(f"- named tunnel service: {service_summary}")
     print(f"- named endpoint: {'ok' if named_endpoint.get('ok') else 'failed'}")
     print(f"- named web UI: {'ok' if named_web.get('ok') else 'failed'}")
     if quick.get("current_url"):

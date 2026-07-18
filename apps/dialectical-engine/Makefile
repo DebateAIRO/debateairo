@@ -4,6 +4,13 @@ SHELL := cmd.exe
 PYTHON ?= $(CURDIR)\.venv\Scripts\python.exe
 PNPM ?= pnpm.cmd
 PYTHON_ENV ?=
+SETUP_STATUS_REPORT_DIR ?= $(TEMP)
+LOCAL_CHECK_REPORT ?= $(SETUP_STATUS_REPORT_DIR)/dialectical-local-single-machine-check.json
+ACCEPTANCE_REPORT ?= $(SETUP_STATUS_REPORT_DIR)/dialectical-local-single-machine-acceptance.json
+LMSTUDIO_REPORT ?= $(SETUP_STATUS_REPORT_DIR)/dialectical-lmstudio-job-probe.json
+MODEL_AUTH_REPORT ?= $(SETUP_STATUS_REPORT_DIR)/dialectical-model-auth-check.json
+HOSTING_STATUS_REPORT ?= $(SETUP_STATUS_REPORT_DIR)/dialectical-hosting-status.json
+MANUAL_SETUP_OUTPUT ?= $(SETUP_STATUS_REPORT_DIR)/ManualSetup_TODO.md
 else
 SHELL := /bin/bash
 PYTHON ?= $(shell if [ -f "$(CURDIR)/.venv/Scripts/python.exe" ]; then printf '%s\n' "$(CURDIR)/.venv/Scripts/python.exe"; exit; fi; if [ -x "$(CURDIR)/.venv/bin/python" ]; then printf '%s\n' "$(CURDIR)/.venv/bin/python"; exit; fi; for py in "$(CURDIR)/.venv313/bin/python" "$(CURDIR)/.venv312/bin/python" python3.13 python3.12 python3; do if [ -f "$$py" ] || [ -x "$$py" ]; then resolved="$$py"; elif command -v "$$py" >/dev/null 2>&1; then resolved="$$(command -v "$$py")"; else continue; fi; if "$$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then printf '%s\n' "$$resolved"; exit; fi; done; if command -v python3 >/dev/null 2>&1; then command -v python3; fi)
@@ -19,8 +26,12 @@ LOCAL_CHECK_PYTHON ?= $(PYTHON)
 DEZBATERE_DOMAIN ?= dezbatere.ro
 WAIT_DEZBATERE_DNS_TIMEOUT ?= 1800
 WAIT_DEZBATERE_DNS_INTERVAL ?= 60
+LOCAL_CHECK_REPORT ?= /private/tmp/dialectical-local-single-machine-check.json
+ACCEPTANCE_REPORT ?= /private/tmp/dialectical-local-single-machine-acceptance.json
+LMSTUDIO_REPORT ?= /private/tmp/dialectical-lmstudio-job-probe.json
 MODEL_AUTH_REPORT ?= /private/tmp/dialectical-model-auth-check.json
 HOSTING_STATUS_REPORT ?= /private/tmp/dialectical-hosting-status.json
+MANUAL_SETUP_OUTPUT ?= ManualSetup_TODO.md
 SOURCE_SNAPSHOT ?= /private/tmp/dialectical-engine-source.tgz
 SOURCE_SNAPSHOT_REPORT ?= /private/tmp/dialectical-engine-source-snapshot.json
 CLOUDFLARE_NAMESERVERS ?=
@@ -156,10 +167,10 @@ local-cluster-check:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/local_cluster_check.py
 
 local-single-machine-check:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_check.py
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_check.py --report-path "$(LOCAL_CHECK_REPORT)"
 
 local-single-machine-acceptance:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_acceptance.py
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_acceptance.py --check-report "$(LOCAL_CHECK_REPORT)" --lmstudio-report "$(LMSTUDIO_REPORT)" --report-path "$(ACCEPTANCE_REPORT)"
 
 local-status: local-single-machine-acceptance local-next-steps
 
@@ -177,13 +188,13 @@ source-snapshot:
 	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/export_source_snapshot.py --output "$(SOURCE_SNAPSHOT)" --report-path "$(SOURCE_SNAPSHOT_REPORT)"
 
 local-next-steps:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/local_next_steps.py --auth-report "$(MODEL_AUTH_REPORT)"
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/local_next_steps.py --auth-report "$(MODEL_AUTH_REPORT)" --check-report "$(LOCAL_CHECK_REPORT)" --acceptance-report "$(ACCEPTANCE_REPORT)"
 
 manual-setup-checklist:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/manual_setup_checklist.py --auth-report "$(MODEL_AUTH_REPORT)" --hosting-report "$(HOSTING_STATUS_REPORT)"
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/manual_setup_checklist.py --auth-report "$(MODEL_AUTH_REPORT)" --hosting-report "$(HOSTING_STATUS_REPORT)" --check-report "$(LOCAL_CHECK_REPORT)" --acceptance-report "$(ACCEPTANCE_REPORT)" --output "$(MANUAL_SETUP_OUTPUT)"
 
 hosting-status:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/hosting_status.py --domain "$(DEZBATERE_DOMAIN)" --report-path "$(HOSTING_STATUS_REPORT)"
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/hosting_status.py --domain "$(DEZBATERE_DOMAIN)" --report-path "$(HOSTING_STATUS_REPORT)"
 
 prepare-romarg-nameservers:
 	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/prepare_romarg_nameservers.py $(if $(strip $(CLOUDFLARE_NAMESERVERS)),--nameservers "$(CLOUDFLARE_NAMESERVERS)",) --output "$(ROMARG_NAMESERVER_CARD)"
@@ -229,7 +240,7 @@ probe-lmstudio-job:
 probe-lmstudio-worker-job: probe-lmstudio-job
 
 probe-model-auth:
-	DYLD_LIBRARY_PATH="$(PYTHON_DYLD_LIBRARY_PATH)" "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_check.py --probe-models --report-path "$(MODEL_AUTH_REPORT)"
+	$(PYTHON_ENV) "$(LOCAL_CHECK_PYTHON)" scripts/local_single_machine_check.py --probe-models --report-path "$(MODEL_AUTH_REPORT)"
 
 deploy-preflight:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/deployment_preflight.py --role "$(DEPLOY_ROLE)" $(PREFLIGHT_FLAGS)

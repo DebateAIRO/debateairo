@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -159,3 +161,29 @@ def test_local_cluster_check_builds_web_before_running_proof() -> None:
     assert "pnpm --dir web build" in target
     assert "scripts/local_cluster_check.py" in target
     assert target.index("pnpm --dir web build") < target.index("scripts/local_cluster_check.py")
+
+
+def test_setup_status_windows_dry_run_uses_cmd_safe_full_sequence() -> None:
+    proc = subprocess.run(
+        ["make", "-n", "setup-status"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        timeout=30,
+    )
+
+    assert proc.returncode == 0, proc.stdout
+    assert 'DYLD_LIBRARY_PATH=""' not in proc.stdout
+    assert f'--output "{os.environ["TEMP"]}/ManualSetup_TODO.md"' in proc.stdout
+    expected_steps = [
+        "scripts/local_single_machine_check.py",
+        "scripts/local_single_machine_check.py --probe-models",
+        "scripts/hosting_status.py",
+        "scripts/manual_setup_checklist.py",
+        "scripts/local_single_machine_acceptance.py",
+        "scripts/local_next_steps.py",
+    ]
+    positions = [proc.stdout.index(step) for step in expected_steps]
+    assert positions == sorted(positions)

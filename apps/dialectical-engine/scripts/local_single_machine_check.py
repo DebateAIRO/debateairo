@@ -6,6 +6,7 @@ import json
 import os
 import plistlib
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -184,10 +185,16 @@ def checkout_hydration() -> dict[str, object]:
 
 
 def command_path(name: str) -> str | None:
-    result = run(["/usr/bin/which", name], timeout=2)
-    if result["ok"] and result["stdout"]:
-        return str(result["stdout"]).splitlines()[0]
-    return None
+    return shutil.which(name)
+
+
+def platform_not_applicable(reason: str) -> dict[str, object]:
+    return {
+        "applicable": False,
+        "platform": sys.platform,
+        "status": "not_applicable",
+        "reason": reason,
+    }
 
 
 def cli_status(probe_models: bool) -> dict[str, object]:
@@ -205,28 +212,35 @@ def cli_status(probe_models: bool) -> dict[str, object]:
         status[name] = entry
 
     if probe_models:
-        status["claude"]["probe"] = run(
-            ["claude", "-p", "--model", CLAUDE_MODEL, "--max-turns", "1", "Reply with exactly: ok"],
-            timeout=20,
-        )
-        status["codex"]["probe"] = run(
-            [
-                "codex",
-                "exec",
-                "--skip-git-repo-check",
-                "--sandbox",
-                "read-only",
-                "--model",
-                CODEX_CLI_MODEL,
-                "Reply with exactly: ok",
-            ],
-            timeout=60,
-        )
-        status["gemini"]["probe"] = run(
-            ["gemini", "-m", GEMINI_MODEL, "-p", "Reply with exactly: ok"],
-            timeout=30,
-            env={"GOOGLE_GENAI_USE_GCA": "true"},
-        )
+        if sys.platform != "darwin":
+            unavailable = platform_not_applicable(
+                "active model auth probes are only supported by the single-Mac setup"
+            )
+            for name in ("claude", "codex", "gemini"):
+                status[name]["probe"] = dict(unavailable)
+        else:
+            status["claude"]["probe"] = run(
+                ["claude", "-p", "--model", CLAUDE_MODEL, "--max-turns", "1", "Reply with exactly: ok"],
+                timeout=20,
+            )
+            status["codex"]["probe"] = run(
+                [
+                    "codex",
+                    "exec",
+                    "--skip-git-repo-check",
+                    "--sandbox",
+                    "read-only",
+                    "--model",
+                    CODEX_CLI_MODEL,
+                    "Reply with exactly: ok",
+                ],
+                timeout=60,
+            )
+            status["gemini"]["probe"] = run(
+                ["gemini", "-m", GEMINI_MODEL, "-p", "Reply with exactly: ok"],
+                timeout=30,
+                env={"GOOGLE_GENAI_USE_GCA": "true"},
+            )
     return status
 
 
@@ -301,6 +315,8 @@ def runtime_routing_status(db_path: Path, capability: str) -> dict[str, object]:
 
 
 def launch_agent(label: str) -> dict[str, object]:
+    if sys.platform != "darwin":
+        return platform_not_applicable("launchd checks require macOS")
     path = Path("~/Library/LaunchAgents").expanduser() / f"{label}.plist"
     entry: dict[str, object] = {"path": str(path), "exists": path.exists()}
     if path.exists():
@@ -449,6 +465,8 @@ def probe_summary(entry: object) -> str:
     probe = entry.get("probe")
     if not isinstance(probe, dict):
         return "not checked"
+    if probe.get("status") == "not_applicable":
+        return "not applicable"
     if probe.get("ok"):
         return "ok"
     stderr = str(probe.get("stderr") or "")
@@ -537,7 +555,12 @@ def summarize(report: dict[str, object]) -> int:
         print("- local workers: unavailable")
     print(f"- LM Studio server: {'ok' if lm_studio['models_endpoint']['ok'] else 'failed'}")
     print(f"- LM Studio expected model: {lm_studio['expected_model_loaded']}")
-    print(f"- local routing includes LM Studio: {'ok' if routing['ok'] else 'failed'}")
+    routing_summary = (
+        "not applicable"
+        if routing.get("status") == "not_applicable"
+        else "ok" if routing["ok"] else "failed"
+    )
+    print(f"- local routing includes LM Studio: {routing_summary}")
     if any(isinstance(entry, dict) and "probe" in entry for entry in cli.values()):
         print(f"- Codex CLI probe: {probe_summary(cli.get('codex'))}")
         print(f"- Claude CLI probe: {probe_summary(cli.get('claude'))}")
@@ -607,8 +630,16 @@ def main() -> int:
             "checkout_hydration": checkout_hydration(),
             "cli_status": cli_status(args.probe_models),
             "gemini_auth": gemini_auth_status(args.gemini_settings.expanduser(), launchd["com.dialectical.worker"]),
-            "lm_studio": lm_studio_status(args.lm_studio_url, args.lm_studio_model, probe=True),
-            "runtime_routing": runtime_routing_status(args.database, args.lm_studio_capability),
+            "lm_studio": lm_studio_status(
+                args.lm_studio_url,
+                args.lm_studio_model,
+                probe=sys.platform == "darwin",
+            ),
+            "runtime_routing": (
+                runtime_routing_status(args.database, args.lm_studio_capability)
+                if sys.platform == "darwin"
+                else platform_not_applicable("single-Mac runtime routing database check requires macOS")
+            ),
             "local_endpoints": local_endpoints(args.web_url, args.coordinator_url, public_url.get("url")),
             "cloudflared": cloudflared,
             "quick_tunnel": quick_tunnel,

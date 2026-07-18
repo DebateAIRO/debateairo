@@ -7,11 +7,11 @@ Honesty laws (binding):
     response (an actual provider call). Parse failures, timeouts, and
     provider errors ALWAYS produce an honest "unverifiable" status with a
     specific reason string -- NEVER a silently-defaulted "supported".
-  - The Phase 6 lineage-independence guard (`lineage_family`,
-    `judge_lineage_metadata` from `app.scoring.lineage`) is reused verbatim,
-    never reimplemented. When enabled and the judge is same-family with the
-    evidence's arguer, the provider is never called and no verdict is
-    fabricated.
+  - The shared Phase 6 lineage metadata helper (`judge_lineage_metadata`
+    from `app.scoring.lineage`) is reused rather than reimplemented. Evidence
+    verification is stricter than claim scoring: unless that metadata
+    affirmatively establishes independence, the provider is never called and
+    no verdict is fabricated.
   - Gated by `DIALECTICAL_EVIDENCE_VERIFICATION` (default OFF). Flag off is a
     total no-op: no provider call, no DB writes, byte-identical to not having
     this module wired in at all.
@@ -28,13 +28,13 @@ an EVIDENCE child node's text AGAINST the credibility of a claim, and must
 persist per-evidence-node verdicts distinct from claim-level QBAF scoring
 (see UNVERIFIED #3). Forking a parallel cache/claim-scoring code path into
 that function would be a mismatch; instead we reuse only the shared
-primitives (`lineage_family`, `judge_lineage_metadata`, `bool_env`, the
+primitives (`judge_lineage_metadata`, `bool_env`, the
 `ScoringProviderRequest`/`ScoringProvider` transport, and the same
 try/except retry-free single-call shape used by `score_node_with_provider`
 for the actual `provider.judge_node` invocation) without forking the guard
-LOGIC itself -- the guard's semantics (binary block/proceed on known-equal
-families) are identical to Phase 6's, just re-expressed at this call site
-per the plan's explicit sanction ("apply the lineage guard directly").
+metadata itself. This evaluator applies the lifecycle contract's stricter
+fail-closed rule at its call site: only explicit `independent=True` may
+proceed to the provider.
 
 UNVERIFIED #6 (JudgeContract registration, RESOLVED): no new JudgeContract is
 registered for judge_role="verifier". The role-specific prompt and strict
@@ -72,7 +72,7 @@ from app.evidence.lifecycle_input_repository import (
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Node, next_analyzer_run_seq
 from app.providers import ProviderError
 from app.scoring.judges import ScoringProvider, ScoringProviderRequest
-from app.scoring.lineage import judge_lineage_metadata, lineage_family
+from app.scoring.lineage import judge_lineage_metadata
 from app.scoring.normalizer import normalize_claim
 from app.scoring.service import _public_metadata_text
 
@@ -255,10 +255,6 @@ def evaluate_evidence_verdict(
 
     claim_generation = _active_generation(db, claim_node)
 
-    # Phase 6 lineage guard, reused (not reimplemented) per Global Constraints:
-    # same binary block/proceed semantics as score_node_with_provider's guard
-    # -- unknown lineage on either side never blocks (see that function's
-    # module comment for the judgment-call rationale, carried over verbatim).
     # Provider metadata is routed through the SAME secret-safety scrub
     # (`_public_metadata_text`, app.scoring.service) that
     # score_node_with_provider applies before lineage computation --
@@ -266,15 +262,19 @@ def evaluate_evidence_verdict(
     # BEFORE it ever reaches lineage_family/judge_lineage_metadata, never
     # echoed raw into persisted output.
     scrubbed_model = _public_metadata_text(getattr(provider, "model", None))
-    arguer_family = lineage_family(claim_generation.model_id if claim_generation else None)
-    judge_family = lineage_family(scrubbed_model)
     provider_name = _public_metadata_text(getattr(provider, "provider", None))
     lineage_metadata = judge_lineage_metadata(
         arguer_model_id=claim_generation.model_id if claim_generation else None,
         judge_provider=provider_name,
         judge_model_id=scrubbed_model,
     )
-    if arguer_family is not None and judge_family is not None and arguer_family == judge_family:
+    if lineage_metadata.get("independent") is not True:
+        independence_reason = lineage_metadata.get("independenceReason")
+        reason = (
+            independence_reason
+            if independence_reason in {"arguer_lineage_unknown", "judge_lineage_unknown"}
+            else "no_independent_judge"
+        )
         _persist_verification_attempt(
             db,
             debate=debate,
@@ -282,11 +282,11 @@ def evaluate_evidence_verdict(
             evidence_node=evidence_node,
             judge_role=judge_role,
             status="unverifiable",
-            reason="no_independent_judge",
+            reason=reason,
             lineage_metadata=lineage_metadata,
             commit=commit,
         )
-        return {"status": "unverifiable", "reason": "no_independent_judge"}
+        return {"status": "unverifiable", "reason": reason}
 
     evidence_kind = None
     if isinstance(evidence_node.evidence_metadata, dict):

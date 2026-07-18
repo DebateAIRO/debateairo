@@ -8,7 +8,15 @@ from app.evidence.verification_evaluator import (
     evaluate_evidence_verdict,
     rollup_claim_verification_status,
 )
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Node, Worker
+from app.models.entities import (
+    AnalyzerRun,
+    Debate,
+    DebateBranch,
+    EvidenceLifecycleSnapshot,
+    Generation,
+    Node,
+    Worker,
+)
 from app.providers import ProviderError
 from app.scoring.judges import ScoringProviderResult
 
@@ -147,6 +155,19 @@ class _FakeProvider:
         )
 
 
+def _complete_supported_verdict() -> dict:
+    return {
+        "verdict": "supported",
+        "evidence": {
+            "status": "grounded",
+            "base_score": 0.8,
+            "uncertainty": 0.1,
+            "entailment": "SUPPORTS",
+            "caveats": [],
+        },
+    }
+
+
 def test_evaluate_evidence_verdict_is_noop_pending_when_flag_off(db, monkeypatch) -> None:
     monkeypatch.delenv("DIALECTICAL_EVIDENCE_VERIFICATION", raising=False)
     debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
@@ -186,7 +207,7 @@ def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(d
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
-        raw_output=json.dumps({"verdict": "supported"}),
+        raw_output=json.dumps(_complete_supported_verdict()),
     )
 
     result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
@@ -209,6 +230,11 @@ def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(d
     assert run.output["evaluatorVersion"] == "evidence-verification-v1"
     assert run.status == "complete"
     assert run.provenance["judge_role"] == "verifier"
+
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.verification_status == "supported"
+    assert snapshot.payload["availability"] == "present"
+    assert snapshot.payload["value"]["status"] == "grounded"
 
 
 def test_evaluate_evidence_verdict_honest_unverifiable_on_provider_failure(db, monkeypatch) -> None:
@@ -284,13 +310,13 @@ def test_evaluate_evidence_verdict_records_contradicted_verdict(db, monkeypatch)
 #     lineage guard raw and must never be echoed into persisted output.
 #   Finding 3 -- TimeoutError is a distinct honest-failure branch from
 #     ProviderError.
-#   Finding 4 -- unknown arguer lineage (no claim Generation) must NOT block
-#     the guard even with DIALECTICAL_LINEAGE_INDEPENDENCE on, and a
-#     failure-path run must still persist lineage metadata.
+#   LIP-05R -- unknown arguer or scrubbed judge lineage cannot establish an
+#     independent verifier. Both paths fail closed before the provider call
+#     and persist terminal-unverifiable lineage provenance.
 # ---------------------------------------------------------------------------
 
 
-def test_evaluate_evidence_verdict_scrubs_secret_like_model_before_lineage_and_never_persists_it(
+def test_evaluate_evidence_verdict_unknown_scrubbed_judge_lineage_fails_closed_without_provider_call(
     db, monkeypatch
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
@@ -301,29 +327,36 @@ def test_evaluate_evidence_verdict_scrubs_secret_like_model_before_lineage_and_n
     fake_provider = _FakeProvider(
         provider=f"codex --api-key {secret_marker}",
         model=f"gpt-5.4 TOKEN={secret_marker}",
-        raw_output=json.dumps({"verdict": "supported"}),
+        raw_output=json.dumps(_complete_supported_verdict()),
     )
 
     result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
 
-    # Secret-like model must be scrubbed to None -> lineage family None ->
-    # guard treats it as unknown lineage -> never blocks -> provider IS
-    # called (proves the guard did not raw-getattr its way to a false block
-    # OR a false proceed based on the literal secret string).
-    assert len(fake_provider.requests) == 1
-    assert result["status"] == "supported"
+    assert fake_provider.requests == []
+    assert result == {"status": "unverifiable", "reason": "judge_lineage_unknown"}
 
     run = db.scalars(
         select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
     ).one()
+    assert run.output["status"] == "unverifiable"
+    assert run.output["reason"] == "judge_lineage_unknown"
     assert run.output["judgeLineage"]["provider"] is None
     assert run.output["judgeLineage"]["model"] is None
     assert run.output["judgeLineage"]["family"] is None
     assert run.output["independent"] is None
     assert run.output["independenceReason"] == "judge_lineage_unknown"
 
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.verification_status == "unverifiable"
+    assert snapshot.payload["availability"] == "terminal_unverifiable"
+    assert snapshot.payload["value"] is None
+    assert snapshot.payload["unavailability_reason"] == "judge_lineage_unknown"
+    assert snapshot.payload["source_identity"]["claim_node_id"] == claim_node.id
+    assert snapshot.payload["source_identity"]["evidence_node_id"] == evidence_node.id
+    assert snapshot.payload["provenance"]["source_record_id"] == run.id
+
     # No secret appears ANYWHERE in the persisted output or provenance.
-    persisted = json.dumps(run.output) + json.dumps(run.provenance)
+    persisted = json.dumps(run.output) + json.dumps(run.provenance) + json.dumps(snapshot.payload)
     assert secret_marker not in persisted
     assert "secret" not in persisted.lower()
 
@@ -345,7 +378,7 @@ def test_evaluate_evidence_verdict_honest_unverifiable_on_timeout(db, monkeypatc
     assert result["reason"] == "verification_judge_call_timed_out"
 
 
-def test_evaluate_evidence_verdict_unknown_arguer_lineage_does_not_block_and_persists_honest_nulls(
+def test_evaluate_evidence_verdict_unknown_arguer_lineage_fails_closed_without_provider_call(
     db, monkeypatch
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
@@ -356,22 +389,31 @@ def test_evaluate_evidence_verdict_unknown_arguer_lineage_does_not_block_and_per
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
-        raw_output=json.dumps({"verdict": "supported"}),
+        raw_output=json.dumps(_complete_supported_verdict()),
     )
 
     result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
 
-    # Guard must NOT block even with DIALECTICAL_LINEAGE_INDEPENDENCE on --
-    # unknown lineage never blocks. Provider IS called.
-    assert len(fake_provider.requests) == 1
-    assert result["status"] == "supported"
+    assert fake_provider.requests == []
+    assert result == {"status": "unverifiable", "reason": "arguer_lineage_unknown"}
 
     run = db.scalars(
         select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
     ).one()
+    assert run.output["status"] == "unverifiable"
+    assert run.output["reason"] == "arguer_lineage_unknown"
     assert run.output["independent"] is None
     assert run.output["independenceReason"] == "arguer_lineage_unknown"
     assert run.output["arguerLineage"] is None
+
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.verification_status == "unverifiable"
+    assert snapshot.payload["availability"] == "terminal_unverifiable"
+    assert snapshot.payload["value"] is None
+    assert snapshot.payload["unavailability_reason"] == "arguer_lineage_unknown"
+    assert snapshot.payload["source_identity"]["claim_node_id"] == claim_node.id
+    assert snapshot.payload["source_identity"]["evidence_node_id"] == evidence_node.id
+    assert snapshot.payload["provenance"]["source_record_id"] == run.id
 
 
 def test_evaluate_evidence_verdict_failure_path_still_persists_lineage_metadata(db, monkeypatch) -> None:

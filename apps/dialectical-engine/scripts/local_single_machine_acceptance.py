@@ -128,6 +128,19 @@ def main() -> int:
     parser.add_argument("--require-public-tunnel", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
 
+    if sys.platform != "darwin":
+        report = {
+            "ok": None,
+            "platform": sys.platform,
+            "reason": "strict local single-machine acceptance is only supported by the single-Mac setup",
+            "status": "not_applicable",
+        }
+        args.report_path.parent.mkdir(parents=True, exist_ok=True)
+        args.report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        print(f"Report: {args.report_path}")
+        print("Local single-machine acceptance: not applicable (single-Mac check)")
+        return 0
+
     command = [sys.executable, str(ROOT / "scripts" / "local_single_machine_check.py")]
     if args.probe_model_auth:
         command.append("--probe-models")

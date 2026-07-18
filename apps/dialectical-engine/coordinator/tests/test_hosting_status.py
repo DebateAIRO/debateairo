@@ -101,3 +101,29 @@ def test_next_action_points_to_romarg_nameserver_helper_before_delegation() -> N
 
     assert "make prepare-romarg-nameservers" in action
     assert "make wait-dezbatere-dns" in action
+
+
+def test_cloudflared_service_is_not_applicable_on_windows_without_launchctl(tmp_path: Path, monkeypatch) -> None:
+    module = load_hosting_status_module()
+    monkeypatch.setattr(module, "sys", type("FakeSys", (), {"platform": "win32"})(), raising=False)
+    monkeypatch.setattr(
+        module.os,
+        "getuid",
+        lambda: (_ for _ in ()).throw(AssertionError("os.getuid must not run on Windows")),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        module,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("launchctl must not run on Windows")),
+    )
+
+    result = module.cloudflared(tmp_path)
+
+    assert result["service_loaded"] is False
+    assert result["service"] == {
+        "applicable": False,
+        "platform": "win32",
+        "status": "not_applicable",
+        "reason": "launchd checks require macOS",
+    }
