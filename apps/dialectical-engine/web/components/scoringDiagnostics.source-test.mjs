@@ -47,6 +47,10 @@ assert(
   "Diagnostics drawer should expose current node coverage even when judge outputs are missing"
 );
 assert(
+  /Scoring payload status/.test(debatePageSource) && !/Backend status/.test(debatePageSource),
+  "Diagnostics drawer should label data?.status as scoring payload status, not backend availability"
+);
+assert(
   /Call count/.test(debatePageSource) &&
     /Latency/.test(debatePageSource) &&
     /Not exposed by scoring API/.test(debatePageSource),

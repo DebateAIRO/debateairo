@@ -329,7 +329,7 @@ def test_same_created_at_tick_resolved_by_seq_at_serialization_verdict_site(db) 
     from app.scoring.verdict import verdict_summary
 
     visible = debate_to_dict(db, db.get(Debate, debate.id))
-    expected = verdict_summary(newer_run.output, root_node_id=root.id)
+    expected = verdict_summary(newer_run.output, root_node_id=root.id, evidence_presence="none")
     assert visible["verdict"] == expected
 
 

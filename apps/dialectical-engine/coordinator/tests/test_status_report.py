@@ -1338,7 +1338,7 @@ def test_gemini_api_summary_reports_api_adapter_detection_and_preflight(
         "\n".join(
             [
                 "class XaiApiAdapter:",
-                'model_id = "grok-4"',
+                'model_id = "grok-4.5"',
                 "from app.adapters.credentials import configured_api_key",
                 'configured_api_key("XAI_API_KEY")',
                 '"https://api.x.ai/v1/chat/completions"',
@@ -1375,7 +1375,7 @@ def test_gemini_api_summary_reports_api_adapter_detection_and_preflight(
                 "os.getenv(variable)",
                 'adapter_api_env.get(variable)',
                 'detected.append("gemini-2.5-flash")',
-                'detected.append("grok-4")',
+                'detected.append("grok-4.5")',
                 'pass_check("adapter-credential:gemini-api", f"GEMINI_API_KEY is set in {source}")',
                 'pass_check("adapter-credential:xai-api", f"XAI_API_KEY is set in {source}")',
                 'launch-agent:worker:env:{variable}',
@@ -1494,7 +1494,7 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
             [
                 "PROMPT_FLAG_PATTERN",
                 "class GrokCliAdapter(SubprocessStreamingAdapter):",
-                'model_id = "grok-4"',
+                'model_id = "grok-4.5"',
                 "async def health_check(self) -> bool:",
                 "asyncio.create_subprocess_exec(",
                 '"--help",',
@@ -1987,7 +1987,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs",
                 "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs",
                 "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+                "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
                 'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2010,7 +2010,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker B real-model setup requires non-empty model IDs in ALLOWED_MODELS",
                 "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
                 "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+                "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
                 'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2339,7 +2339,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker A real-model setup requires non-empty model IDs in ALLOWED_MODELS",
                 "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
                 "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+                "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
                 "GEMINI_API_KEY_FOR_INSTALL=",
                 "XAI_API_KEY_FOR_INSTALL=",
                 "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A",
@@ -3310,7 +3310,7 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
     module = load_status_report_module()
     payload = {
         "workers": [
@@ -3318,7 +3318,7 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "grok-4"],
+                "capabilities": ["codex-gpt-5.5", "grok-4.5"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3326,14 +3326,14 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["grok-4", "codex-gpt-5.5"],
+                "capabilities": ["grok-4.5", "codex-gpt-5.5"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
         ]
     }
 
-    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4"]
+    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4.5"]
     assert module.production_worker_endpoint_issues(payload) == []
 
 
@@ -5685,7 +5685,7 @@ echo "Worker A real-model setup requires real model IDs in ALLOWED_MODELS, not m
 echo "Worker A real-model setup requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs"
 echo "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs"
 echo "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
 GEMINI_API_KEY_FOR_INSTALL=
 XAI_API_KEY_FOR_INSTALL=
 echo "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A"
@@ -7301,7 +7301,7 @@ echo "Worker B registration requires real model IDs in ALLOWED_MODELS, not place
 echo "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs"
 echo "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs"
 echo "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
 USER_TOKEN="${USER_TOKEN:-}"
 echo "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
 export DIALECTICAL_ALLOWED_MODELS="$ALLOWED_MODELS"
@@ -7341,7 +7341,7 @@ echo "not mock model IDs"
 echo "not duplicate model IDs"
 echo "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs"
 echo "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
 	USER_TOKEN="${USER_TOKEN:-}"
 	echo "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
 	GEMINI_API_KEY_FOR_INSTALL=
@@ -11038,7 +11038,7 @@ def test_acceptance_report_issues_requires_final_required_capability_evidence(
     payload = production_acceptance_payload(module, "two-worker")
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
 
     issues = module.acceptance_report_issues(
         report,
@@ -11048,9 +11048,9 @@ def test_acceptance_report_issues_requires_final_required_capability_evidence(
         require_production_scope=True,
     )
 
-    assert any("final required model ids missing observed evidence: grok-4" in issue for issue in issues)
+    assert any("final required model ids missing observed evidence: grok-4.5" in issue for issue in issues)
     assert any(
-        "online worker row adesso-mbp missing final required capabilities: grok-4" in issue
+        "online worker row adesso-mbp missing final required capabilities: grok-4.5" in issue
         for issue in issues
     )
 
@@ -14698,7 +14698,7 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
@@ -14706,9 +14706,9 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
         plistlib.dump({"EnvironmentVariables": {"XAI_API_KEY": "xai-secret"}}, file)
     monkeypatch.setattr(module, "INSTALLED_WORKER_LAUNCHD_PLIST", plist_path)
 
-    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4"]
+    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4.5"]
     assert module.final_worker_launchd_api_key_issues() == []
-    assert module.final_worker_launchd_api_key_summary() == "ready (XAI_API_KEY for grok-4)"
+    assert module.final_worker_launchd_api_key_summary() == "ready (XAI_API_KEY for grok-4.5)"
 
 
 def test_final_worker_config_topology_summary_reports_ready_config(

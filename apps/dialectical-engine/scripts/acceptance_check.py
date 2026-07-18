@@ -1466,13 +1466,13 @@ def settings_round_trip_evidence(client: httpx.Client, token: str) -> dict[str, 
     original_enabled = list(enabled_models)
     original_cap = float(original["grok_monthly_cap_usd"])
     ordered_configured_models = sorted(configured_model_set)
-    cap_model = next((model for model in ordered_configured_models if model != "grok-4"), ordered_configured_models[0])
+    cap_model = next((model for model in ordered_configured_models if model != "grok-4.5"), ordered_configured_models[0])
     original_model_cap = original_model_caps.get(cap_model, 0.0)
     temporary_enabled = [cap_model]
     temporary_cap = round(original_cap + 0.01, 2)
     if temporary_cap == original_cap:
         temporary_cap = original_cap + 1
-    temporary_model_cap = temporary_cap if cap_model == "grok-4" else round(original_model_cap + 1.0, 2)
+    temporary_model_cap = temporary_cap if cap_model == "grok-4.5" else round(original_model_cap + 1.0, 2)
     if temporary_model_cap == original_model_cap:
         temporary_model_cap = original_model_cap + 1
     temporary_model_caps = dict(original_model_caps)

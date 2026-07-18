@@ -29,6 +29,16 @@ function looksAuthRelated(message: string): boolean {
   return lower.includes("401") || lower.includes("403") || lower.includes("invalid user token");
 }
 
+function isSetAsidePath(node: DebateNode): boolean {
+  const pathStatus = node.path_status?.trim().toLowerCase();
+  const stoppingStatus = node.stopping_status?.trim().toLowerCase();
+  return (
+    pathStatus === "abandoned" ||
+    stoppingStatus === "abandon" ||
+    stoppingStatus === "abandoned"
+  );
+}
+
 export function NodeDetailDrawer({
   node,
   scoring,
@@ -66,6 +76,7 @@ export function NodeDetailDrawer({
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
   const isAbandoned = isAbandonedArgumentStatus(node.status);
+  const stoppingReason = node.stopping_reason?.trim();
 
   const [history, setHistory] = useState<Generation[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(0);
@@ -173,10 +184,13 @@ export function NodeDetailDrawer({
 
         <div className="drawerBody">
           <div className="nodeEyebrow">Argument</div>
-          {isAbandoned ? (
+          {isAbandoned || isSetAsidePath(node) ? (
             <div className="drawerAbandonedBanner" role="status">
               <div className="drawerSectionTitle">Stopped path</div>
               <p>This investigation path was paused or abandoned. It is preserved here for reference — abandoned paths are never deleted. You can resume investigation by regenerating this argument.</p>
+              {isSetAsidePath(node) && stoppingReason ? (
+                <p>set aside because: {stoppingReason}</p>
+              ) : null}
             </div>
           ) : null}
           <div className="drawerClaim">{node.claim}</div>

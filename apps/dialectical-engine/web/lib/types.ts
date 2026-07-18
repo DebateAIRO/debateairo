@@ -32,6 +32,9 @@ export type DebateNode = {
   position: number;
   claim: string;
   status: string;
+  path_status?: string;
+  stopping_status?: string;
+  stopping_reason?: string | null;
   materialized_path: string;
   active_generation_id: string | null;
   active_generation: Generation | null;
@@ -297,12 +300,24 @@ export type DebateScoreSummary = DebateScoringResponse;
 
 export type ScoringJobStatus = "queued" | "running" | "complete" | "failed";
 
+export type VerdictSuppressionReason = {
+  code: "no_evidence";
+  claimType: "empirical";
+  claimTypeSource: "root_claim_text" | "scoring_item" | null;
+  detail: string;
+  unlock: string[];
+};
+
 export type Synthesis = {
   id: string;
   debate_id: string;
   strongest_pro: string;
   strongest_con: string;
   verdict: string;
+  verdict_gate?: {
+    state: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
+    reason: VerdictSuppressionReason | null;
+  } | null;
   upstream_agent_output_ids?: string[];
   upstream_agent_run_ids?: string[];
   analyzer_findings?: Record<string, string>;
@@ -461,7 +476,7 @@ export type DebateConfig = Record<string, unknown> & {
 // UI must render nothing (honest absence), never a fabricated verdict.
 // ---------------------------------------------------------------------------
 
-export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable";
+export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "suppressed";
 
 export type VerdictSummary = {
   verdictBand: VerdictBand;
@@ -470,8 +485,23 @@ export type VerdictSummary = {
     dialecticalStrength: number | null;
     verificationStatus: string | null;
     convergence: Record<string, unknown> | null;
+    preGateVerdictBand?: VerdictBand;
+    semanticsVersion?: string;
   };
   verdictThresholdsVersion: string;
+  verdictState?: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
+  evidencePresence?: "none" | "extracted_unresolved";
+  suppressionReason?: VerdictSuppressionReason | null;
+  caveats?: {
+    code: "evidence_unverified" | "claim_type_unknown";
+    detail: string;
+  }[];
+  evidenceGateShadow?: {
+    wouldSuppress: boolean;
+    reason: VerdictSuppressionReason | null;
+    claimType: string | null;
+    claimTypeSource: string | null;
+  };
 };
 
 export type DebateDetail = {

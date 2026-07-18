@@ -28,6 +28,8 @@ from app.protocol.state import advance_phase, protocol_state_of
 from app.protocol.verification import classify_verification, verification_statuses
 from app.qbaf.dfquad import CyclicGraphError
 from app.qbaf.debate_adapter import debate_argument_graph
+from app.qbaf.semantics_versions import DEFAULT_SEMANTICS, resolve_semantics
+from app.scoring.normalizer import classify_claim_type
 from app.scoring.service import debate_scoring_payload
 
 PROTOCOL_ANALYSIS_TYPE = "protocol_analysis"
@@ -80,6 +82,25 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
         for item in scoring_items
         if item.get("node_id")
     ]
+    claim_types = {node["id"]: node["claim_type"] for node in nodes_with_claims}
+    claim_type_source = {node["id"]: "scoring_item" for node in nodes_with_claims}
+
+    root_id = debate.root_node_id
+    if root_id and root_id not in claim_types:
+        root = next((node for node in nodes if node.id == root_id), None)
+        root_text = (root.claim or "").strip() if root is not None else ""
+        if root_text:
+            try:
+                root_claim_type, _markers = classify_claim_type(root_text)
+            except Exception as exc:  # noqa: BLE001 - provenance is best-effort metadata
+                print(
+                    "[protocol.runner] root claim-type classification failed "
+                    f"(non-fatal, omitting provenance): {exc!r}"
+                )
+            else:
+                claim_types[root_id] = root_claim_type
+                claim_type_source[root_id] = "root_claim_text"
+
     verification_map = verification_statuses(nodes_with_claims)
 
     # verificationSource: audit trail distinguishing a real-verdict rollup
@@ -148,6 +169,7 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     scores_by_node_id = {
         item["node_id"]: item for item in scoring_items if item.get("node_id")
     }
+    semantics_version = DEFAULT_SEMANTICS
     qbaf_output: dict[str, Any] = {}
     try:
         adapted = debate_argument_graph(node_dicts, scores_by_node_id)
@@ -156,7 +178,7 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
             "dialecticalStrengths": strengths,
             "graphFingerprint": adapted.fingerprint,
             "tauSources": dict(adapted.tau_sources),
-            "qbafSemantics": "df-quad-v1",
+            "qbafSemantics": semantics_version,
             "compositionNote": (
                 "v1: tau=judgeStrength|default; verificationModifier=none(P7); "
                 "modelWeight=constant-1.0(P8)"
@@ -190,35 +212,50 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
         # failure, e.g. CyclicGraphError) -- there is nothing to compare.
         convergence = {"converged": None, "reason": "strengths_unavailable", "epsilon": epsilon}
     else:
-        prev_strengths = (previous_run.output or {}).get("dialecticalStrengths") if previous_run else None
+        previous_output = (previous_run.output or {}) if previous_run else {}
+        prev_strengths = previous_output.get("dialecticalStrengths") if previous_run else None
         if previous_run is None or prev_strengths is None:
             convergence = {"converged": None, "reason": "first_evaluation", "epsilon": epsilon}
         else:
-            prev_keys = set(prev_strengths.keys())
-            curr_keys = set(curr_strengths.keys())
-            intersection = prev_keys & curr_keys
-            added = curr_keys - prev_keys
-            removed = prev_keys - curr_keys
-            if not intersection:
+            previous_semantics_value = previous_output.get("semanticsVersion")
+            try:
+                previous_semantics = resolve_semantics(previous_semantics_value)
+            except ValueError:
+                # A stamped but unknown semantics is still honestly different
+                # from this runner's known v1 semantics; never compare across it.
+                previous_semantics = previous_semantics_value
+            if previous_semantics != semantics_version:
                 convergence = {
                     "converged": None,
-                    "reason": "topology_changed",
-                    "nodesCompared": 0,
-                    "nodesAdded": len(added),
-                    "nodesRemoved": len(removed),
+                    "reason": "semantics_changed",
                     "epsilon": epsilon,
                 }
             else:
-                max_delta = max(abs(curr_strengths[k] - prev_strengths[k]) for k in intersection)
-                convergence = {
-                    "converged": max_delta <= epsilon,
-                    "maxDelta": max_delta,
-                    "nodesCompared": len(intersection),
-                    "nodesAdded": len(added),
-                    "nodesRemoved": len(removed),
-                    "epsilon": epsilon,
-                    "comparedAnalyzerRunId": previous_run.id,
-                }
+                prev_keys = set(prev_strengths.keys())
+                curr_keys = set(curr_strengths.keys())
+                intersection = prev_keys & curr_keys
+                added = curr_keys - prev_keys
+                removed = prev_keys - curr_keys
+                if not intersection:
+                    convergence = {
+                        "converged": None,
+                        "reason": "topology_changed",
+                        "nodesCompared": 0,
+                        "nodesAdded": len(added),
+                        "nodesRemoved": len(removed),
+                        "epsilon": epsilon,
+                    }
+                else:
+                    max_delta = max(abs(curr_strengths[k] - prev_strengths[k]) for k in intersection)
+                    convergence = {
+                        "converged": max_delta <= epsilon,
+                        "maxDelta": max_delta,
+                        "nodesCompared": len(intersection),
+                        "nodesAdded": len(added),
+                        "nodesRemoved": len(removed),
+                        "epsilon": epsilon,
+                        "comparedAnalyzerRunId": previous_run.id,
+                    }
 
     branch = _first_branch(db, debate.id)
     run = AnalyzerRun(
@@ -229,8 +266,11 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
             "crossExam": cross_exam_report.to_dict(),
             "verificationStatuses": verification_map,
             "verificationSource": verification_source,
+            "claimTypes": claim_types,
+            "claimTypeSource": claim_type_source,
             "crossExamVersion": cross_exam_report.version,
             "verificationVersion": "verification-v1",
+            "semanticsVersion": semantics_version,
             **qbaf_output,
             "convergence": convergence,
             "convergenceVersion": CONVERGENCE_VERSION,
@@ -251,3 +291,4 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
         debate.config = {**debate.config, "protocol_state": state}
 
     commit_write(db)
+    print(f"qbaf.semantics version={semantics_version} debate={debate.id}")

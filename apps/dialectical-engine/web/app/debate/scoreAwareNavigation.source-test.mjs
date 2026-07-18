@@ -63,8 +63,8 @@ test("DebatePageClient wires score-aware navigation from real scoring payloads",
   );
   assert.match(
     pageSource,
-    /<DebateOutline[\s\S]*selectedNodeId=\{selectedNodeId\}[\s\S]*selectedPathNodeIds=\{selectedPathNodeIds\}[\s\S]*scoringByNodeId=\{scoringByNodeId\}[\s\S]*scoringErrorsByNodeId=\{scoringErrorsByNodeId\}/,
-    "The outline should receive scoring metadata plus selected node/path state from the page"
+    /<DebateCanvas[\s\S]*selectedNodeId=\{selectedNodeId\}[\s\S]*scoringByNodeId=\{scoringByNodeId\}[\s\S]*scoringErrorsByNodeId=\{scoringErrorsByNodeId\}[\s\S]*scoreFilterNodeIds=\{scoreAwareFilterNodeIds\}/,
+    "The tree canvas should receive scoring metadata plus selected and filtered node state from the page"
   );
   assert.match(
     canvasSource,

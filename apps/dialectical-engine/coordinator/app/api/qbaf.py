@@ -14,6 +14,7 @@ from app.orchestration import (
     run_to_record,
 )
 from app.providers import ProviderRegistry
+from app.qbaf.semantics_versions import SEMANTICS_WEIGHTED_V1
 
 router = APIRouter(prefix="/api/qbaf", tags=["qbaf"])
 qbaf_repository: QBAFRunRepository = InMemoryQBAFRunRepository()
@@ -59,6 +60,12 @@ def create_qbaf_run(
     payload: QBAFRunCreate,
     _: Annotated[AuthContext, Depends(require_user_token)],
 ) -> dict:
+    """Create a versioned QBAF run.
+
+    ``dialectical_support`` is the supported response name and must be read
+    together with ``semantics_version``. ``root_confidence`` is retained only
+    as a deprecated compatibility alias.
+    """
     sources = {
         source.reference: source.to_source_record()
         for source in payload.evidence_sources
@@ -69,12 +76,24 @@ def create_qbaf_run(
         evidence_sources=sources,
         seed_evidence=payload.seed_evidence,
     )
-    record = qbaf_repository.save(run_to_record(run, topic=payload.question))
+    record = qbaf_repository.save(
+        run_to_record(
+            run,
+            topic=payload.question,
+            semantics_version=SEMANTICS_WEIGHTED_V1,
+        )
+    )
     return record.to_dict()
 
 
 @router.get("/runs/{run_id}")
 def get_qbaf_run(run_id: str) -> dict:
+    """Return a versioned QBAF run.
+
+    ``dialectical_support`` is the supported response name and must be read
+    together with ``semantics_version``. ``root_confidence`` is retained only
+    as a deprecated compatibility alias.
+    """
     record = qbaf_repository.get(run_id)
     if record is None:
         raise HTTPException(status_code=404, detail="QBAF run not found")

@@ -572,9 +572,8 @@ export default function DebatePageClient({
         );
       });
       events.addEventListener("node_complete", () => refresh());
-      events.addEventListener("node_failed", (event) => {
-        const payload = parseEventData(event);
-        setError(payloadString(payload, "reason") || "Claim generation failed");
+      events.addEventListener("node_failed", () => {
+        setError("Claim generation failed");
       });
       events.addEventListener("synthesis_started", (event) => {
         const payload = parseEventData(event);
@@ -603,7 +602,7 @@ export default function DebatePageClient({
       });
       events.addEventListener("error", (event) => {
         const payload = parseEventData(event);
-        if (payload) setError(payloadString(payload, "message") || "Debate stream error");
+        if (payload) setError("Debate generation failed");
       });
       events.onerror = () => {
         events?.close();
@@ -1167,6 +1166,9 @@ export default function DebatePageClient({
           proClaim={strongestPro}
           conClaim={strongestCon}
           verdict={verdict}
+          verdictGate={
+            process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? debate.synthesis?.verdict_gate : undefined
+          }
           meta={synthesisMeta}
           lean={lean}
           sections={synthesisSections}
@@ -1473,7 +1475,7 @@ function ScoringDiagnosticsDrawer({
   const rows: Array<[string, string | number | boolean | null | undefined]> = [
     ["Frontend state", scoringState.status],
     ["Refresh state", refreshState.status],
-    ["Backend status", data?.status],
+    ["Scoring payload status", data?.status],
     ["Provider", data?.model_metadata?.provider],
     ["Model", data?.model_metadata?.model],
     ["Checked at", data?.model_metadata?.checked_at],

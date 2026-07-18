@@ -71,3 +71,25 @@ async def test_publish_keeps_other_subscribers_when_one_queue_is_full() -> None:
     finally:
         await slow_stream.aclose()
         await active_stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_publish_from_sync_thread_reaches_async_subscriber() -> None:
+    bus = EventBus(queue_size=2)
+    stream = bus.subscribe("debate-1", replay_history=False)
+    try:
+        connected = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+        assert connected == "event: connected\ndata: {}\n\n"
+
+        await asyncio.to_thread(
+            bus.publish_from_sync,
+            "debate-1",
+            "dialectical_exploration",
+            {"record_id": "record-1"},
+        )
+
+        event = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+        assert event.startswith("event: dialectical_exploration\n")
+        assert '"record_id": "record-1"' in event
+    finally:
+        await stream.aclose()

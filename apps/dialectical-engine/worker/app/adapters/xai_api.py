@@ -9,7 +9,7 @@ from app.adapters.streaming_json import parse_json_payload
 
 
 class XaiApiAdapter:
-    model_id = "grok-4"
+    model_id = "grok-4.5"
     role_pool = {"proposer", "opponent"}
 
     async def health_check(self) -> bool:
@@ -20,7 +20,7 @@ class XaiApiAdapter:
         if not api_key:
             raise RuntimeError("XAI_API_KEY is not set or is a placeholder")
         payload = {
-            "model": "grok-4",
+            "model": "grok-4.5",
             "stream": True,
             "max_tokens": max_tokens,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],

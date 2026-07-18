@@ -124,13 +124,13 @@ test("web/lib/types.ts defines VerdictBand and VerdictSummary matching the coord
 
   assert.match(
     source,
-    /export type VerdictBand = "supported" \| "contested" \| "unsupported" \| "unavailable";/,
+    /export type VerdictBand = "supported" \| "contested" \| "unsupported" \| "unavailable" \| "suppressed";/,
     "VerdictBand must match the coordinator's verdict_summary band values exactly"
   );
   assert.match(
     source,
-    /export type VerdictSummary = \{[\s\S]*verdictBand: VerdictBand;[\s\S]*claimLanguage: string;[\s\S]*basis: \{[\s\S]*dialecticalStrength: number \| null;[\s\S]*verificationStatus: string \| null;[\s\S]*convergence: Record<string, unknown> \| null;[\s\S]*\};[\s\S]*verdictThresholdsVersion: string;[\s\S]*\};/,
-    "VerdictSummary must match Task 1's exact wire shape (camelCase, additive)"
+    /export type VerdictSummary = \{[\s\S]*verdictBand: VerdictBand;[\s\S]*claimLanguage: string;[\s\S]*basis: \{[\s\S]*dialecticalStrength: number \| null;[\s\S]*verificationStatus: string \| null;[\s\S]*convergence: Record<string, unknown> \| null;[\s\S]*preGateVerdictBand\?: VerdictBand;[\s\S]*semanticsVersion\?: string;[\s\S]*\};[\s\S]*verdictThresholdsVersion: string;[\s\S]*verdictState\?: "endorsed" \| "endorsed_with_caveat" \| "suppressed_no_evidence";[\s\S]*evidencePresence\?: "none" \| "extracted_unresolved";[\s\S]*suppressionReason\?: VerdictSuppressionReason \| null;[\s\S]*caveats\?: \{[\s\S]*code: "evidence_unverified" \| "claim_type_unknown";[\s\S]*detail: string;[\s\S]*\}\[\];[\s\S]*evidenceGateShadow\?: \{[\s\S]*wouldSuppress: boolean;[\s\S]*reason: VerdictSuppressionReason \| null;[\s\S]*claimType: string \| null;[\s\S]*claimTypeSource: string \| null;[\s\S]*\};[\s\S]*\};/,
+    "VerdictSummary must match the coordinator's Amendment A wire shape (camelCase, additive optional fields)"
   );
   assert.match(
     source,

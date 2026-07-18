@@ -83,9 +83,10 @@ assert(
   /No adaptive depth expansions are recommended/.test(debatePageSource),
   "AdaptiveDepthDryRunPanel should show an honest empty state when the API returns no items"
 );
+const adaptiveDepthDryRunChipSource =
+  debatePageSource.match(/function AdaptiveDepthDryRunChip[\s\S]*?\r?\n}\r?\n/s)?.[0] || "";
 assert(
-  /function formatAdaptiveDepthPressure/.test(debatePageSource) &&
-    /item\.pressure/.test(debatePageSource.match(/function AdaptiveDepthDryRunChip[\s\S]*?\n}\n/s)?.[0] || ""),
+  /formatAdaptiveDepthPressure\(item\.pressure\)/.test(adaptiveDepthDryRunChipSource),
   "AdaptiveDepthDryRunChip should visualize branch pressure from each dry-run item"
 );
 assert(

@@ -1180,16 +1180,16 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
             self.settings = {
                 "routing": {
                     "decomposer": {"primary": "mock-local", "fallback": []},
-                    "proposer": {"pool": ["mock-local", "grok-4"], "strategy": "round_robin"},
+                    "proposer": {"pool": ["mock-local", "grok-4.5"], "strategy": "round_robin"},
                 },
-                "configured_models": ["grok-4", "mock-local"],
-                "enabled_models": ["grok-4", "mock-local"],
+                "configured_models": ["grok-4.5", "mock-local"],
+                "enabled_models": ["grok-4.5", "mock-local"],
                 "grok_monthly_cap_usd": 25.0,
                 "grok_monthly_spend_usd": 0.0,
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
-                "model_monthly_caps_usd": {"grok-4": 25.0},
-                "model_monthly_spend_usd": {"grok-4": 0.0, "mock-local": 0.0},
-                "model_pricing_usd_per_million_tokens": {"grok-4": {"input": 1.25, "output": 2.5}},
+                "model_monthly_caps_usd": {"grok-4.5": 25.0},
+                "model_monthly_spend_usd": {"grok-4.5": 0.0, "mock-local": 0.0},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
             }
             self.put_payloads = []
 
@@ -1201,7 +1201,7 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
                 self.settings["enabled_models"] = payload["enabled_models"]
                 self.settings["grok_monthly_cap_usd"] = payload["grok_monthly_cap_usd"]
                 caps = dict(payload["model_monthly_caps_usd"])
-                caps["grok-4"] = payload["grok_monthly_cap_usd"]
+                caps["grok-4.5"] = payload["grok_monthly_cap_usd"]
                 self.settings["model_monthly_caps_usd"] = caps
             return Response(dict(self.settings))
 
@@ -1210,15 +1210,15 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
     detail = module.require_settings_round_trip(client, "user-token")
 
     assert "model cap restored for mock-local" in detail
-    assert client.settings["enabled_models"] == ["grok-4", "mock-local"]
-    assert client.settings["model_monthly_caps_usd"] == {"grok-4": 25.0}
+    assert client.settings["enabled_models"] == ["grok-4.5", "mock-local"]
+    assert client.settings["model_monthly_caps_usd"] == {"grok-4.5": 25.0}
     assert any(payload["model_monthly_caps_usd"].get("mock-local") == 1.0 for payload in client.put_payloads)
     evidence = module.settings_round_trip_evidence(client, "user-token")
     assert module.settings_round_trip_detail(evidence) == (
         "2 configured models; model cap restored for mock-local; Grok cap $25.00"
     )
     assert evidence["configured_model_count"] == 2
-    assert evidence["configured_models"] == ["grok-4", "mock-local"]
+    assert evidence["configured_models"] == ["grok-4.5", "mock-local"]
     assert evidence["cap_model"] == "mock-local"
     assert evidence["temporary_enabled_models"] == ["mock-local"]
     assert evidence["enabled_models_restored"] is True
@@ -1226,7 +1226,7 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
     assert evidence["model_cap_restored"] is True
     assert evidence["temporary_model_cap_usd"] == 1.0
     assert evidence["restored_model_cap_usd"] == 0.0
-    assert evidence["model_monthly_spend_models"] == ["grok-4", "mock-local"]
+    assert evidence["model_monthly_spend_models"] == ["grok-4.5", "mock-local"]
 
 
 def test_require_settings_round_trip_handles_grok_only_routing() -> None:
@@ -1245,15 +1245,15 @@ def test_require_settings_round_trip_handles_grok_only_routing() -> None:
     class Client:
         def __init__(self):
             self.settings = {
-                "routing": {"decomposer": {"primary": "grok-4", "fallback": []}},
-                "configured_models": ["grok-4"],
-                "enabled_models": ["grok-4"],
+                "routing": {"decomposer": {"primary": "grok-4.5", "fallback": []}},
+                "configured_models": ["grok-4.5"],
+                "enabled_models": ["grok-4.5"],
                 "grok_monthly_cap_usd": 25.0,
                 "grok_monthly_spend_usd": 0.0,
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
-                "model_monthly_caps_usd": {"grok-4": 25.0},
-                "model_monthly_spend_usd": {"grok-4": 0.0},
-                "model_pricing_usd_per_million_tokens": {"grok-4": {"input": 1.25, "output": 2.5}},
+                "model_monthly_caps_usd": {"grok-4.5": 25.0},
+                "model_monthly_spend_usd": {"grok-4.5": 0.0},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
             }
 
         def request(self, method, path, **kwargs):  # noqa: ANN001
@@ -1262,12 +1262,12 @@ def test_require_settings_round_trip_handles_grok_only_routing() -> None:
                 payload = kwargs["json"]
                 self.settings["enabled_models"] = payload["enabled_models"]
                 self.settings["grok_monthly_cap_usd"] = payload["grok_monthly_cap_usd"]
-                self.settings["model_monthly_caps_usd"] = {"grok-4": payload["grok_monthly_cap_usd"]}
+                self.settings["model_monthly_caps_usd"] = {"grok-4.5": payload["grok_monthly_cap_usd"]}
             return Response(dict(self.settings))
 
     detail = module.require_settings_round_trip(Client(), "user-token")
 
-    assert "model cap restored for grok-4" in detail
+    assert "model cap restored for grok-4.5" in detail
 
 
 def test_require_settings_round_trip_rejects_missing_model_spend() -> None:
@@ -1287,7 +1287,7 @@ def test_require_settings_round_trip_rejects_missing_model_spend() -> None:
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
                 "model_monthly_caps_usd": {},
                 "model_monthly_spend_usd": {},
-                "model_pricing_usd_per_million_tokens": {"grok-4": {"input": 1.25, "output": 2.5}},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
             }
 
     class Client:

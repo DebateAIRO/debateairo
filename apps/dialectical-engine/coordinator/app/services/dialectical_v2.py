@@ -862,6 +862,19 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
     return pov_node
 
 
+def pending_branch_containers(db: Session, debate_id: str, root_node_id: str) -> list[Node]:
+    return list(
+        db.scalars(
+            select(Node).where(
+                Node.debate_id == debate_id,
+                Node.parent_id == root_node_id,
+                Node.node_type != "EVIDENCE",
+                Node.status != "complete",
+            )
+        ).all()
+    )
+
+
 def persist_v2_synthesis(
     db: Session,
     debate: Debate,
@@ -871,17 +884,8 @@ def persist_v2_synthesis(
     payload: dict[str, Any],
 ) -> None:
     agent_outputs = db.scalars(select(AgentRun).where(AgentRun.debate_id == debate.id).order_by(AgentRun.created_at.asc())).all()
-    incomplete_pov = db.scalar(
-        select(Node)
-        .where(
-            Node.debate_id == debate.id,
-            Node.node_type.in_([node_type for node_type, _label in POV_BRANCHES]),
-            Node.status != "complete",
-        )
-        .limit(1)
-    )
-    if incomplete_pov is not None:
-        raise ValueError("Cannot synthesize until all POV branches are complete")
+    if pending_branch_containers(db, debate.id, debate.root_node_id):
+        raise ValueError("Cannot synthesize until all branches are complete")
     findings = {run.analyzer_type: (run.output.get("findings") or [""])[0] for run in analyzer_runs_for_debate(db, debate.id)}
     synthesis = Synthesis(
         debate_id=debate.id,
@@ -1195,15 +1199,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             "pov_completed",
             {"debate_id": debate.id, "node_id": pov_node.id, "job_id": job.id, "role": job.required_role},
         )
-        incomplete_pov = db.scalar(
-            select(Node)
-            .where(
-                Node.debate_id == debate.id,
-                Node.node_type.in_([node_type for node_type, _label in POV_BRANCHES]),
-                Node.status != "complete",
-            )
-            .limit(1)
-        )
+        pending_branches = pending_branch_containers(db, debate.id, debate.root_node_id)
         existing_synthesis = db.scalar(
             select(Job).where(
                 Job.debate_id == debate.id,
@@ -1211,7 +1207,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
                 Job.status.in_(["pending", "claimed", "running"]),
             )
         )
-        if incomplete_pov is None and existing_synthesis is None:
+        if not pending_branches and existing_synthesis is None:
             queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
         return

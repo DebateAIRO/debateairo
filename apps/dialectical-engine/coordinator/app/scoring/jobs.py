@@ -7,14 +7,18 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import bool_env
 from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
+from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
-from app.providers import ProviderRegistry, detect_codex_scoring_config
+from app.providers import ProviderError, ProviderRegistry, detect_codex_scoring_config
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
     SCORING_ANALYZER_TYPE,
     STALE_SCORING_JOB_ERROR,
+    RegistryScoringProvider,
+    queue_scoring_job,
     score_debate_with_provider_registry,
 )
 
@@ -95,11 +99,29 @@ def run_scoring_job_background(
             except Exception:
                 db.rollback()
                 _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
+                return
         except Exception as exc:
             db.rollback()
             job.status = "failed"
             job.error = str(exc)
             commit_write(db)
+            return
+        lifecycle_kwargs: dict[str, object] = {}
+        if bool_env("DIALECTICAL_EVIDENCE_VERIFICATION", False):
+            try:
+                lifecycle_kwargs["verification_provider"] = RegistryScoringProvider(registry)
+            except ProviderError:
+                # Scoring truth is already durable. Missing verifier transport
+                # must leave lifecycle inputs unavailable rather than inventing
+                # a verdict or retroactively failing the scoring operation.
+                pass
+        reevaluate_lifecycle_after_scoring_completion(
+            db,
+            debate_id=debate.id,
+            job_id=job.id,
+            analyzer_run_id=new_run.id,
+            **lifecycle_kwargs,
+        )
 
 
 def _mark_scoring_job_failed(job_id: str, error: str) -> None:
@@ -188,14 +210,31 @@ def wake_pending_internal_scoring_job(
         .limit(1)
     ).first()
     if job is None:
-        return None
+        if _latest_retryable_stale_scoring_job(db, debate.id) is None:
+            return None
     registry = registry_factory()
     scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
     if not scoring_config.available:
         return None
+    if job is None:
+        job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
     job.status = "claimed"
     job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
     job.error = None
     commit_write(db)
     background_tasks.add_task(background_runner, job.id, debate.id)
     return job
+
+
+def _latest_retryable_stale_scoring_job(db: Session, debate_id: str) -> Job | None:
+    return db.scalars(
+        select(Job)
+        .where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status == "failed",
+            Job.error == STALE_SCORING_JOB_ERROR,
+        )
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .limit(1)
+    ).first()

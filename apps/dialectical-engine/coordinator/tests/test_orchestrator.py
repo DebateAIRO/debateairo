@@ -1,16 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from copy import deepcopy
 from datetime import timedelta
+from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import select
 
 from app.core.auth import hash_token
 from app.core.config import DEFAULT_ROUTING, RUNTIME_SETTINGS_KEY
-from app.core.db import SessionLocal
-from app.models.entities import Debate, Generation, Job, Node, NodeScoringResult, Setting, Synthesis, Worker, now_utc
+from app.core.db import SessionLocal, get_engine
+from app.models.entities import (
+    Debate,
+    Generation,
+    Job,
+    LifecycleDecisionRecord,
+    Node,
+    NodeScoringResult,
+    Setting,
+    Synthesis,
+    Worker,
+    now_utc,
+)
 from app.exploration.policy import ExpansionDecision
 from app.services.orchestrator import (
     StaleJobMutationError,
@@ -19,6 +33,7 @@ from app.services.orchestrator import (
     claim_pending_job,
     complete_job,
     create_debate,
+    exploration_decision_for_node,
     extract_jsonish,
     fail_job,
     markdown_export,
@@ -1019,6 +1034,11 @@ def test_stale_pending_job_claim_does_not_steal_running_job(db) -> None:
     assert db.get(Worker, worker_a_id).current_job_id == job_id
     assert db.get(Worker, worker_b_id).current_job_id is None
 
+    # This concurrency regression intentionally checks out two additional
+    # SQLite connections. Retaining those connections makes the next test's
+    # drop/create schema fixture observe different WAL schema snapshots.
+    get_engine().dispose()
+
 
 def test_archived_running_job_rejects_stale_worker_writes(db) -> None:
     worker = Worker(
@@ -1141,13 +1161,13 @@ def test_disabled_model_pending_job_is_not_claimed_and_reroutes_after_deadline(d
 def test_grok_monthly_cap_excludes_grok_before_issuing_jobs(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
-    routing_engine.roles = {"decomposer": {"primary": "grok-4", "fallback": ["mock-local"]}}
+    routing_engine.roles = {"decomposer": {"primary": "grok-4.5", "fallback": ["mock-local"]}}
     routing_engine.counters.clear()
     try:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["grok-4", "mock-local"],
+            capabilities=["grok-4.5", "mock-local"],
             last_seen=now_utc(),
             status="online",
         )
@@ -1193,13 +1213,13 @@ def test_model_monthly_cap_excludes_model_before_issuing_jobs(db) -> None:
 def test_invalid_persisted_grok_cap_falls_back_for_routing(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
-    routing_engine.roles = {"decomposer": {"primary": "grok-4", "fallback": ["mock-local"]}}
+    routing_engine.roles = {"decomposer": {"primary": "grok-4.5", "fallback": ["mock-local"]}}
     routing_engine.counters.clear()
     try:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["grok-4", "mock-local"],
+            capabilities=["grok-4.5", "mock-local"],
             last_seen=now_utc(),
             status="online",
         )
@@ -1210,7 +1230,7 @@ def test_invalid_persisted_grok_cap_falls_back_for_routing(db) -> None:
         debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
         job = db.scalar(select(Job).where(Job.debate_id == debate.id))
 
-        assert job.required_model == "grok-4"
+        assert job.required_model == "grok-4.5"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -1237,9 +1257,9 @@ def test_explicit_regenerate_model_respects_grok_cap(db) -> None:
     db.commit()
 
     try:
-        asyncio.run(regenerate_node(db, node, "grok-4"))
+        asyncio.run(regenerate_node(db, node, "grok-4.5"))
     except ValueError as exc:
-        assert "grok-4" in str(exc)
+        assert "grok-4.5" in str(exc)
     else:
         raise AssertionError("grok regenerate bypassed monthly cap")
 
@@ -1660,12 +1680,24 @@ def test_argument_generation_delegates_abandonment_to_exploration_policy(db, mon
     assert argue_job is not None
 
     def abandon_decision(_db, _debate, node):
-        return ExpansionDecision(
+        stopping_reason = "low-strength low-impact path is resolved enough to pause"
+        return SimpleNamespace(
             node_id=node.id,
             action="abandon",
             priority=0.8,
-            reasons=("low-strength low-impact path is resolved enough to pause",),
+            reasons=(stopping_reason,),
             keeps_path_active=False,
+            stopping_reason=stopping_reason,
+            input_state="grounded",
+            reason_codes=(),
+            authentic_policy_decision=True,
+            decision_timestamp=now_utc(),
+            current_score_input_hash="a" * 64,
+            scoring_contract_hash="b" * 64,
+            score_record_id="score-record-abandonment",
+            score_run_id="score-run-abandonment",
+            score_run_sequence=1,
+            evidence_snapshot_id="evidence-snapshot-abandonment",
         )
 
     monkeypatch.setattr("app.services.orchestrator.exploration_decision_for_node", abandon_decision)
@@ -1695,6 +1727,847 @@ def test_argument_generation_delegates_abandonment_to_exploration_policy(db, mon
     assert node.stopping_reason == "low-strength low-impact path is resolved enough to pause"
     assert children == []
     assert child_jobs == []
+
+
+def test_production_lifecycle_seam_does_not_construct_neutral_placeholders() -> None:
+    source = inspect.getsource(exploration_decision_for_node)
+
+    assert "decide_lifecycle_for_node" in source
+    assert "_score_signal_for_node" not in source
+    assert "0.5" not in source
+    assert "evidence=None" not in source
+
+
+@pytest.mark.parametrize(
+    ("action", "keeps_path_active", "expected_path_status", "expected_child_count"),
+    (
+        ("continue", True, "active", 2),
+        ("deepen", True, "active", 2),
+        ("challenge", True, "active", 2),
+        ("seek_evidence", True, "active", 0),
+        ("reopen", True, "active", 0),
+        ("abandon", False, "abandoned", 0),
+    ),
+)
+def test_argument_completion_records_and_emits_one_redacted_lifecycle_decision(
+    db,
+    monkeypatch,
+    action,
+    keeps_path_active,
+    expected_path_status,
+    expected_child_count,
+) -> None:
+    worker = Worker(
+        name="lifecycle-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add_all([worker, debate])
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="pending",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        node_id=parent.id,
+        job_type="argue",
+        required_role="proposer",
+        required_model="mock-local",
+        idempotency_key="lifecycle-evaluation-1",
+    )
+    db.add(job)
+    db.commit()
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    decision_timestamp = now_utc()
+    monkeypatch.setattr(
+        "app.services.orchestrator.ensure_default_scoring_for_completed_generation",
+        lambda *_args: {},
+    )
+    stopping_reason = f"correlated lifecycle inputs support {action}"
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, _node: SimpleNamespace(
+            action=action,
+            keeps_path_active=keeps_path_active,
+            stopping_reason=stopping_reason,
+            input_state="grounded",
+            reason_codes=(),
+            authentic_policy_decision=True,
+            decision_timestamp=decision_timestamp,
+            current_score_input_hash="a" * 64,
+            scoring_contract_hash="b" * 64,
+            score_record_id="score-record-1",
+            score_run_id="score-run-1",
+            score_run_sequence=7,
+            evidence_snapshot_id="evidence-snapshot-1",
+        ),
+    )
+    stream = event_bus.subscribe(debate.id, replay_history=False)
+
+    async def complete_and_capture() -> tuple[dict, str]:
+        try:
+            assert await asyncio.wait_for(stream.__anext__(), timeout=0.1) == (
+                "event: connected\ndata: {}\n\n"
+            )
+            await complete_job(
+                db,
+                job,
+                {
+                    "argument": "A completed argument.",
+                    "children": [
+                        {"node_type": "PRO", "claim": "A support candidate."},
+                        {"node_type": "CON", "claim": "A challenge candidate."},
+                    ],
+                },
+                {"latency_ms": 12, "tokens_out": 20},
+            )
+            lifecycle_event = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+            node_event = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+            assert lifecycle_event.startswith("event: dialectical_exploration\n")
+            return json.loads(lifecycle_event.split("data: ", 1)[1]), node_event
+        finally:
+            await stream.aclose()
+
+    payload, node_event = asyncio.run(complete_and_capture())
+    record = db.scalar(select(LifecycleDecisionRecord))
+    children = db.scalars(select(Node).where(Node.parent_id == parent.id)).all()
+
+    assert record is not None
+    assert (record.decision, record.path_status, record.stopping_status) == (
+        action,
+        expected_path_status,
+        action,
+    )
+    assert record.child_spawn_count == expected_child_count
+    assert record.idempotency_key == job.idempotency_key
+    assert payload == {
+        "schema_version": "lifecycle-decision-record/v1",
+        "record_id": record.id,
+        "idempotency_key": job.idempotency_key,
+        "debate_id": debate.id,
+        "node_id": parent.id,
+        "decision": action,
+        "stopping_reason": stopping_reason,
+        "input_states": {
+            "aggregate": "grounded",
+            "score": {"availability": "present", "freshness": "fresh"},
+            "evidence": {"availability": "present", "freshness": "fresh"},
+        },
+        "path_status": expected_path_status,
+        "stopping_status": action,
+        "persistence_result": "created",
+        "child_spawn_count": expected_child_count,
+    }
+    assert len(children) == expected_child_count
+    assert node_event.startswith("event: node_complete\n")
+    assert all(
+        forbidden not in json.dumps(payload).lower()
+        for forbidden in ("prompt", "model_output", "evidence_text", "secret")
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "reason_codes",
+        "input_state",
+        "expected_score_freshness",
+        "expected_evidence_freshness",
+    ),
+    (
+        (("score_stale",), "stale", "stale", "fresh"),
+        (("scoring_contract_mismatch",), "mismatched", "unknown", "unknown"),
+        (
+            ("score_stale", "present_value_missing"),
+            "malformed",
+            "stale",
+            "unknown",
+        ),
+    ),
+)
+def test_lifecycle_event_preserves_only_component_freshness_proven_by_reason_codes(
+    db,
+    monkeypatch,
+    reason_codes,
+    input_state,
+    expected_score_freshness,
+    expected_evidence_freshness,
+) -> None:
+    worker = Worker(
+        name="partially-grounded-lifecycle-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add_all([worker, debate])
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="pending",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        node_id=parent.id,
+        job_type="argue",
+        required_role="proposer",
+        required_model="mock-local",
+    )
+    db.add(job)
+    db.commit()
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    monkeypatch.setattr(
+        "app.services.orchestrator.ensure_default_scoring_for_completed_generation",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, _node: SimpleNamespace(
+            action="continue",
+            keeps_path_active=True,
+            stopping_reason=f"lifecycle inputs unavailable: {reason_codes[0]}",
+            input_state=input_state,
+            reason_codes=reason_codes,
+            authentic_policy_decision=False,
+            decision_timestamp=now_utc(),
+            current_score_input_hash="a" * 64,
+            scoring_contract_hash="b" * 64,
+            score_record_id="stale-score-record",
+            score_run_id="stale-score-run",
+            score_run_sequence=3,
+            evidence_snapshot_id="fresh-evidence-snapshot",
+        ),
+    )
+    stream = event_bus.subscribe(debate.id, replay_history=False)
+
+    async def complete_and_capture() -> dict:
+        try:
+            assert await asyncio.wait_for(stream.__anext__(), timeout=0.1) == (
+                "event: connected\ndata: {}\n\n"
+            )
+            await complete_job(
+                db,
+                job,
+                {"argument": "A completed argument.", "children": []},
+                {"latency_ms": 12, "tokens_out": 20},
+            )
+            lifecycle_event = await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+            assert lifecycle_event.startswith("event: dialectical_exploration\n")
+            return json.loads(lifecycle_event.split("data: ", 1)[1])
+        finally:
+            await stream.aclose()
+
+    payload = asyncio.run(complete_and_capture())
+    record = db.scalar(select(LifecycleDecisionRecord))
+
+    assert record is not None
+    assert (record.score_availability, record.score_freshness) == (
+        "present",
+        expected_score_freshness,
+    )
+    assert (record.evidence_availability, record.evidence_freshness) == (
+        "present",
+        expected_evidence_freshness,
+    )
+    assert payload["input_states"] == {
+        "aggregate": input_state,
+        "score": {"availability": "present", "freshness": expected_score_freshness},
+        "evidence": {
+            "availability": "present",
+            "freshness": expected_evidence_freshness,
+        },
+    }
+
+
+def test_lifecycle_persistence_failure_is_recoverable_by_caller_rollback(
+    db,
+    monkeypatch,
+) -> None:
+    worker = Worker(
+        name="rollback-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add_all([worker, debate])
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="pending",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        node_id=parent.id,
+        job_type="argue",
+        required_role="proposer",
+        required_model="mock-local",
+    )
+    db.add(job)
+    db.commit()
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    monkeypatch.setattr(
+        "app.services.orchestrator.ensure_default_scoring_for_completed_generation",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, _node: SimpleNamespace(
+            action="continue",
+            keeps_path_active=True,
+            stopping_reason="grounded continuation",
+            input_state="grounded",
+            reason_codes=(),
+            authentic_policy_decision=True,
+            decision_timestamp=now_utc(),
+            current_score_input_hash="a" * 64,
+            scoring_contract_hash="b" * 64,
+            score_record_id="score-record-1",
+            score_run_id="score-run-1",
+            score_run_sequence=1,
+            evidence_snapshot_id="evidence-snapshot-1",
+        ),
+    )
+
+    def fail_persistence(*_args, **_kwargs):
+        raise RuntimeError("decision persistence unavailable")
+
+    monkeypatch.setattr(
+        "app.exploration.decision_repository.persist_lifecycle_decision",
+        fail_persistence,
+    )
+
+    with pytest.raises(RuntimeError, match="decision persistence unavailable"):
+        asyncio.run(
+            complete_job(
+                db,
+                job,
+                {
+                    "argument": "A completed argument.",
+                    "children": [
+                        {"node_type": "PRO", "claim": "A support candidate."},
+                    ],
+                },
+                {"latency_ms": 12, "tokens_out": 20},
+            )
+        )
+
+    db.rollback()
+    restored_job = db.get(Job, job.id)
+    restored_parent = db.get(Node, parent.id)
+    assert restored_job is not None and restored_job.status == "running"
+    assert restored_parent is not None and restored_parent.status == "pending"
+    assert db.scalars(select(Generation).where(Generation.node_id == parent.id)).all() == []
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == []
+    assert db.scalars(select(LifecycleDecisionRecord)).all() == []
+
+
+def test_lifecycle_replay_does_not_duplicate_record_event_children_or_jobs(
+    db,
+    monkeypatch,
+) -> None:
+    from app.exploration.decision_repository import (
+        LifecycleDecisionSnapshot,
+        persist_lifecycle_decision,
+    )
+
+    worker = Worker(
+        name="replay-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add_all([worker, debate])
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="pending",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        node_id=parent.id,
+        job_type="argue",
+        required_role="proposer",
+        required_model="mock-local",
+    )
+    db.add(job)
+    db.commit()
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    decision_timestamp = now_utc()
+    decision = SimpleNamespace(
+        action="continue",
+        keeps_path_active=True,
+        stopping_reason="grounded continuation",
+        input_state="grounded",
+        reason_codes=(),
+        authentic_policy_decision=True,
+        decision_timestamp=decision_timestamp,
+        current_score_input_hash="a" * 64,
+        scoring_contract_hash="b" * 64,
+        score_record_id="score-record-1",
+        score_run_id="score-run-1",
+        score_run_sequence=1,
+        evidence_snapshot_id="evidence-snapshot-1",
+    )
+    candidates = [
+        {"node_type": "PRO", "claim": "A support candidate."},
+        {"node_type": "CON", "claim": "A challenge candidate."},
+    ]
+    assert spawn_child_argument_jobs(
+        db,
+        debate,
+        parent,
+        candidates,
+        decision=decision,
+    ) == 2
+    first = persist_lifecycle_decision(
+        db,
+        snapshot=LifecycleDecisionSnapshot(
+            schema_version="lifecycle-decision-record/v1",
+            idempotency_key=job.idempotency_key,
+            debate_id=debate.id,
+            node_id=parent.id,
+            decision="continue",
+            stopping_reason="grounded continuation",
+            path_status="active",
+            stopping_status="continue",
+            input_state="grounded",
+            reason_codes=(),
+            score_availability="present",
+            score_freshness="fresh",
+            evidence_availability="present",
+            evidence_freshness="fresh",
+            current_score_input_hash="a" * 64,
+            scoring_contract_hash="b" * 64,
+            score_record_id="score-record-1",
+            score_run_id="score-run-1",
+            score_run_sequence=1,
+            evidence_snapshot_id="evidence-snapshot-1",
+            decision_timestamp=decision_timestamp,
+            child_spawn_count=2,
+        ),
+    )
+    db.commit()
+    monkeypatch.setattr(
+        "app.services.orchestrator.ensure_default_scoring_for_completed_generation",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda *_args: decision,
+    )
+    stream = event_bus.subscribe(debate.id, replay_history=False)
+
+    async def complete_and_capture() -> str:
+        try:
+            assert await asyncio.wait_for(stream.__anext__(), timeout=0.1) == (
+                "event: connected\ndata: {}\n\n"
+            )
+            await complete_job(
+                db,
+                job,
+                {"argument": "A completed argument.", "children": candidates},
+                {"latency_ms": 12, "tokens_out": 20},
+            )
+            return await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+        finally:
+            await stream.aclose()
+
+    event = asyncio.run(complete_and_capture())
+    records = db.scalars(select(LifecycleDecisionRecord)).all()
+    children = db.scalars(select(Node).where(Node.parent_id == parent.id)).all()
+    child_jobs = db.scalars(
+        select(Job).where(Job.node_id.in_([child.id for child in children]))
+    ).all()
+
+    assert event.startswith("event: node_complete\n")
+    assert records == [first.record]
+    assert first.record.child_spawn_count == 2
+    assert len(children) == 2
+    assert len(child_jobs) == 2
+
+
+def test_continuing_lifecycle_retry_does_not_duplicate_children_or_jobs(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add(debate)
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="continue",
+            priority=0.4,
+            reasons=("correlated lifecycle inputs support continuation",),
+            keeps_path_active=True,
+        ),
+    )
+    candidates = [
+        {"node_type": "PRO", "claim": "A generated support candidate."},
+        {"node_type": "CON", "claim": "A generated challenge candidate."},
+    ]
+
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    db.flush()
+
+    children = db.scalars(select(Node).where(Node.parent_id == parent.id)).all()
+    child_jobs = db.scalars(select(Job).where(Job.node_id.in_([child.id for child in children]))).all()
+    assert len(children) == 2
+    assert len(child_jobs) == 2
+    assert parent.path_status == "active"
+    assert parent.stopping_status == "continue"
+    assert parent.stopping_reason == "correlated lifecycle inputs support continuation"
+
+
+def test_abandoned_parent_with_active_continue_reactivates_before_idempotent_spawn(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add(debate)
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        path_status="abandoned",
+        stopping_status="abandon",
+        stopping_reason="Previously resolved.",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="continue",
+            priority=0.4,
+            reasons=("authenticated inputs keep this path active",),
+            keeps_path_active=True,
+        ),
+    )
+    candidates = [
+        {"node_type": "PRO", "claim": "A generated support candidate."},
+        {"node_type": "CON", "claim": "A generated challenge candidate."},
+    ]
+
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    db.flush()
+
+    children = db.scalars(select(Node).where(Node.parent_id == parent.id)).all()
+    child_jobs = db.scalars(select(Job).where(Job.node_id.in_([child.id for child in children]))).all()
+    assert parent.path_status == "active"
+    assert parent.stopping_status == "continue"
+    assert parent.stopping_reason == "authenticated inputs keep this path active"
+    assert len(children) == 2
+    assert len(child_jobs) == 2
+
+
+def test_abandoned_parent_reopen_retry_reactivates_without_child_jobs(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    db.add(debate)
+    db.flush()
+    parent = Node(
+        debate_id=debate.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        path_status="abandoned",
+        stopping_status="abandon",
+        stopping_reason="Previously resolved.",
+        materialized_path="/0/0",
+    )
+    db.add(parent)
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="reopen",
+            priority=0.8,
+            reasons=("new grounded support warrants reopening the paused path",),
+            keeps_path_active=True,
+        ),
+    )
+    candidates = [{"node_type": "PRO", "claim": "A generated support candidate."}]
+
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    spawn_child_argument_jobs(db, debate, parent, candidates)
+    db.flush()
+
+    assert parent.path_status == "active"
+    assert parent.stopping_status == "reopen"
+    assert parent.stopping_reason == "new grounded support warrants reopening the paused path"
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == []
+    assert db.scalars(select(Job).where(Job.node_id == parent.id)).all() == []
+
+
+def test_authentic_abandonment_is_persisted_at_max_depth_without_spawning(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1, "branching": 2},
+    )
+    parent = Node(
+        debate=debate,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add_all([debate, parent])
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="abandon",
+            priority=0.8,
+            reasons=("authenticated max-depth abandonment",),
+            keeps_path_active=False,
+        ),
+    )
+
+    spawn_child_argument_jobs(
+        db,
+        debate,
+        parent,
+        [{"node_type": "CON", "claim": "Must not be spawned."}],
+    )
+    db.flush()
+
+    assert parent.path_status == "abandoned"
+    assert parent.stopping_status == "abandon"
+    assert parent.stopping_reason == "authenticated max-depth abandonment"
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == []
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
+
+
+def test_active_continuation_is_persisted_at_max_depth_without_spawning(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1, "branching": 2},
+    )
+    parent = Node(
+        debate=debate,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        stopping_status="active",
+        stopping_reason="Old lifecycle state",
+        materialized_path="/0/0",
+    )
+    db.add_all([debate, parent])
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="continue",
+            priority=0.4,
+            reasons=("authenticated max-depth continuation",),
+            keeps_path_active=True,
+        ),
+    )
+
+    spawn_child_argument_jobs(
+        db,
+        debate,
+        parent,
+        [{"node_type": "CON", "claim": "Must not be spawned."}],
+    )
+    db.flush()
+
+    assert parent.path_status == "active"
+    assert parent.stopping_status == "continue"
+    assert parent.stopping_reason == "authenticated max-depth continuation"
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == []
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
+
+
+def test_authentic_abandonment_is_persisted_before_existing_child_return(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    parent = Node(
+        debate=debate,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    existing_child = Node(
+        debate=debate,
+        parent=parent,
+        node_type="CON",
+        depth=2,
+        position=0,
+        claim="An existing challenge.",
+        status="pending",
+        materialized_path="/0/0/0",
+    )
+    db.add_all([debate, parent, existing_child])
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="abandon",
+            priority=0.8,
+            reasons=("authenticated abandonment with an existing child",),
+            keeps_path_active=False,
+        ),
+    )
+
+    spawn_child_argument_jobs(
+        db,
+        debate,
+        parent,
+        [{"node_type": "PRO", "claim": "Must not be duplicated."}],
+    )
+    db.flush()
+
+    assert parent.path_status == "abandoned"
+    assert parent.stopping_status == "abandon"
+    assert parent.stopping_reason == "authenticated abandonment with an existing child"
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == [existing_child]
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
+
+
+def test_malformed_child_candidate_fails_safe_after_lifecycle_persistence(db, monkeypatch) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 2, "branching": 2},
+    )
+    parent = Node(
+        debate=debate,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Cleaner air.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add_all([debate, parent])
+    db.flush()
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.exploration_decision_for_node",
+        lambda _db, _debate, current: ExpansionDecision(
+            node_id=current.id,
+            action="continue",
+            priority=0.4,
+            reasons=("authenticated continuation",),
+            keeps_path_active=True,
+        ),
+    )
+
+    spawn_child_argument_jobs(db, debate, parent, [{"node_type": "PRO"}])
+    db.flush()
+
+    assert parent.path_status == "active"
+    assert parent.stopping_status == "continue"
+    assert parent.stopping_reason == "authenticated continuation"
+    assert db.scalars(select(Node).where(Node.parent_id == parent.id)).all() == []
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
 
 
 def test_interior_regeneration_replaces_visible_descendants(db) -> None:
@@ -1972,6 +2845,99 @@ def test_retryable_failure_keeps_worker_degraded_while_retrying(db) -> None:
     assert retry.id == job.id
     assert worker.status == "online"
     assert worker.current_job_id == job.id
+
+
+def test_node_failure_event_omits_private_worker_reason(db) -> None:
+    private_reason = "SYNTHETIC_SECRET_SENTINEL_NODE_FAILURE_9f5f"
+    worker = Worker(
+        name="failure-boundary-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    assert job.node_id is not None
+    stream = event_bus.subscribe(debate.id, replay_history=False)
+
+    async def fail_and_capture() -> str:
+        try:
+            assert await asyncio.wait_for(stream.__anext__(), timeout=0.1) == (
+                "event: connected\ndata: {}\n\n"
+            )
+            await fail_job(db, job, private_reason, retryable=True)
+            return await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+        finally:
+            await stream.aclose()
+
+    event = asyncio.run(fail_and_capture())
+    payload = json.loads(event.split("data: ", 1)[1])
+    db.refresh(job)
+
+    assert event.startswith("event: node_failed\n")
+    assert payload == {
+        "node_id": job.node_id,
+        "code": "claim_generation_failed",
+        "reason": "Claim generation failed",
+        "retry_in_s": 5,
+    }
+    assert private_reason not in event
+    assert job.error == private_reason
+
+
+def test_generic_failure_event_omits_private_worker_reason(db) -> None:
+    private_reason = "SYNTHETIC_SECRET_SENTINEL_GENERIC_FAILURE_3c2a"
+    worker = Worker(
+        name="generic-failure-boundary-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1, "branching": 2},
+    )
+    job = Job(
+        debate=debate,
+        node_id=None,
+        job_type="synthesize",
+        required_role="synthesizer",
+        required_model="mock-local",
+    )
+    db.add_all([worker, debate, job])
+    db.commit()
+    job = claim_pending_job(db, worker)
+    assert job is not None
+    stream = event_bus.subscribe(debate.id, replay_history=False)
+
+    async def fail_and_capture() -> str:
+        try:
+            assert await asyncio.wait_for(stream.__anext__(), timeout=0.1) == (
+                "event: connected\ndata: {}\n\n"
+            )
+            await fail_job(db, job, private_reason, retryable=False)
+            return await asyncio.wait_for(stream.__anext__(), timeout=0.1)
+        finally:
+            await stream.aclose()
+
+    event = asyncio.run(fail_and_capture())
+    payload = json.loads(event.split("data: ", 1)[1])
+    db.refresh(job)
+
+    assert event.startswith("event: error\n")
+    assert payload == {
+        "scope": "synthesize",
+        "code": "debate_generation_failed",
+        "message": "Debate generation failed",
+        "retry_in_s": 5,
+    }
+    assert private_reason not in event
+    assert job.error == private_reason
 
 
 def test_expired_job_requeue_clears_previous_worker_current_job(db) -> None:

@@ -1,5 +1,7 @@
 "use client";
 
+import type { Synthesis } from "@/lib/types";
+
 export type SynthesisView = {
   ready: boolean;
   pending: boolean;
@@ -9,12 +11,18 @@ export type SynthesisView = {
   proClaim: string;
   conClaim: string;
   verdict: string;
+  verdictGate?: Synthesis["verdict_gate"];
   meta: string;
   lean?: { pct: number; label: string } | null;
   sections?: { title: string; items: string[] }[];
 };
 
 export function SynthesisPanel(view: SynthesisView) {
+  const verdictBody =
+    view.verdictGate?.state === "suppressed_no_evidence"
+      ? "Endorsed verdict withheld — no evidence in this run."
+      : view.verdict || "Pending";
+
   return (
     <aside className="synthPanel scroll" aria-label="Synthesis">
       <div className="synthInner">
@@ -56,7 +64,7 @@ export function SynthesisPanel(view: SynthesisView) {
                 <span className="synthCardLabel verdict">Verdict</span>
                 {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
               </div>
-              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{view.verdict || "Pending"}</div>
+              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
               {view.lean ? (
                 <div className="synthLean">
                   <span className="synthLeanLabel">Leans</span>

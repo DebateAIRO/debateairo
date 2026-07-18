@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import re
+
 from fastapi.testclient import TestClient
 
 from app.api import qbaf as qbaf_api
 from app.main import app
 from app.metareasoning import StoppingDecision
-from app.orchestration import InMemoryQBAFRunRepository, Neo4jQBAFRunRepository, OrchestratorRun, run_to_record
+from app.orchestration import (
+    InMemoryQBAFRunRepository,
+    Neo4jQBAFRunRepository,
+    OrchestratorRun,
+    QBAFRunRecord,
+    run_to_record,
+)
 from app.qbaf import ClaimNode, QBAFGraph
 
 
@@ -113,6 +121,7 @@ def test_neo4j_qbaf_run_repository_uses_injected_driver() -> None:
 
     assert reloaded == record
     assert driver.session_obj.queries[0][0].strip().startswith("MERGE")
+    assert driver.session_obj.queries[0][1]["semantics_version"] == "df-quad-v1"
 
 
 def test_qbaf_api_starts_persists_and_fetches_run(db, monkeypatch) -> None:
@@ -151,6 +160,89 @@ def test_qbaf_api_starts_persists_and_fetches_run(db, monkeypatch) -> None:
     fetch = client.get(f"/api/qbaf/runs/{body['id']}")
     assert fetch.status_code == 200
     assert fetch.json() == body
+
+
+def test_qbaf_api_returns_semantics_version_and_dialectical_support_alias(db, monkeypatch) -> None:
+    repository = InMemoryQBAFRunRepository()
+    fake_orchestrator = FakeOrchestrator(sample_run())
+    monkeypatch.setattr(qbaf_api, "qbaf_repository", repository)
+    monkeypatch.setattr(qbaf_api, "build_orchestrator", lambda max_iterations: fake_orchestrator)
+
+    response = TestClient(app).post(
+        "/api/qbaf/runs",
+        headers=USER_HEADERS,
+        json={"question": "Remote work improves productivity"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["semantics_version"] == "df-quad-weighted-v1"
+    assert body["dialectical_support"] == body["root_confidence"] == 0.8
+    fetch = TestClient(app).get(f"/api/qbaf/runs/{body['id']}")
+    assert fetch.status_code == 200
+    assert fetch.json()["semantics_version"] == "df-quad-weighted-v1"
+
+
+def test_no_probability_or_truth_confidence_wording_on_qbaf_values(db, monkeypatch) -> None:
+    repository = InMemoryQBAFRunRepository()
+    fake_orchestrator = FakeOrchestrator(sample_run())
+    monkeypatch.setattr(qbaf_api, "qbaf_repository", repository)
+    monkeypatch.setattr(qbaf_api, "build_orchestrator", lambda max_iterations: fake_orchestrator)
+
+    response = TestClient(app).post(
+        "/api/qbaf/runs",
+        headers=USER_HEADERS,
+        json={"question": "Remote work improves productivity"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dialectical_support"] == body["root_confidence"]
+    assert body["semantics_version"] == "df-quad-weighted-v1"
+
+    human_readable_values: list[str] = []
+
+    def collect_strings(value, path: tuple[str, ...] = ()) -> None:
+        if isinstance(value, str):
+            if not path or path[-1] not in {"topic", "text"}:
+                human_readable_values.append(value)
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                collect_strings(item, (*path, key))
+            return
+        if isinstance(value, list):
+            for item in value:
+                collect_strings(item, path)
+
+    collect_strings(body)
+    assert re.search(
+        r"probabilit|truth[ -]?confidence|likelihood",
+        "\n".join(human_readable_values),
+        re.IGNORECASE,
+    ) is None
+
+
+def test_qbaf_endpoint_docstrings_deprecate_root_confidence_in_favor_of_dialectical_support() -> None:
+    for endpoint in (qbaf_api.create_qbaf_run, qbaf_api.get_qbaf_run):
+        docstring = endpoint.__doc__ or ""
+        assert "root_confidence" in docstring
+        assert "deprecated" in docstring.lower()
+        assert "dialectical_support" in docstring
+        assert "semantics_version" in docstring
+
+
+def test_qbaf_run_record_pins_missing_legacy_semantics_stamp_to_v1() -> None:
+    record = QBAFRunRecord(
+        id="legacy-run",
+        topic="Legacy topic",
+        graph={"root_id": "root"},
+        root_confidence=0.5,
+        trace={},
+        created_at=run_to_record(sample_run(), topic="timestamp source").created_at,
+    )
+
+    assert record.to_dict()["semantics_version"] == "df-quad-v1"
 
 
 def test_qbaf_api_requires_auth_for_starting_run(db) -> None:

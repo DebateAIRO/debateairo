@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import select
 
-from app.models.entities import AnalyzerRun, JudgeOutputArtifact, Node
+from app.models.entities import AnalyzerRun, JudgeOutputArtifact, Node, next_analyzer_run_seq
 from app.protocol.runner import run_protocol_analysis
 from app.protocol.state import protocol_state_of
 from app.qbaf.dfquad import CyclicGraphError
@@ -266,6 +266,21 @@ def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, eviden
     db.commit()
 
 
+def _persist_protocol_analysis_fixture(db, debate, *, output: dict) -> AnalyzerRun:
+    """Persist a prior protocol row with deterministic sequence ordering."""
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=service.first_branch(db, debate.id).id,
+        analyzer_type="protocol_analysis",
+        output=output,
+        status="complete",
+        provenance={"scoring_source": "protocol_analysis_test_fixture"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+    return run
+
+
 def test_verification_statuses_uses_real_verdict_when_available(db) -> None:
     real_codex_worker(db)
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
@@ -392,6 +407,86 @@ def test_run_protocol_analysis_persists_one_protocol_analysis_run(db) -> None:
     assert run.output["crossExamVersion"] == "cross-exam-v1"
     assert run.output["verificationVersion"] == "verification-v1"
     assert run.provenance["scoring_source"] == "protocol_analysis"
+
+
+def test_protocol_analysis_output_stamps_semantics_version(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["semanticsVersion"] == "df-quad-v1"
+    assert run.output["qbafSemantics"] == "df-quad-v1"
+
+
+def test_protocol_analysis_persists_root_claim_type_on_normal_v2_completion(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(
+        db,
+        "Measured global surface temperature data show a warming of 1.1 degrees Celsius since 1900.",
+        {},
+    )
+
+    complete_worker_v2_pipeline(db, debate, worker)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["claimTypes"][debate.root_node_id] == "empirical"
+    assert run.output["claimTypeSource"][debate.root_node_id] == "root_claim_text"
+
+
+def test_normal_completion_unmatched_topic_persists_honest_unknown_type(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Cities and their downtowns.", {})
+
+    complete_worker_v2_pipeline(db, debate, worker)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["claimTypes"][debate.root_node_id] == "unknown"
+    assert run.output["claimTypeSource"][debate.root_node_id] == "root_claim_text"
+
+
+def test_protocol_analysis_output_persists_claim_type_maps(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    _seed_scored_pro_con_nodes(db, debate)
+    scoring_items = _latest_node_scoring_items(db, debate.id)
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    claim_types = run.output["claimTypes"]
+    claim_type_source = run.output["claimTypeSource"]
+    scored_ids = {item["node_id"] for item in scoring_items}
+    assert set(claim_types) == scored_ids | {debate.root_node_id}
+    assert set(run.output["verificationStatuses"]) == scored_ids
+    for item in scoring_items:
+        node_id = item["node_id"]
+        assert claim_types[node_id] == item["claim"]["claim_type"]
+        assert claim_type_source[node_id] == "scoring_item"
+    assert claim_type_source[debate.root_node_id] == "root_claim_text"
+
+
+def test_root_claim_type_classification_failure_is_graceful(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    with patch("app.protocol.runner.classify_claim_type", side_effect=RuntimeError("classifier unavailable")):
+        run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run is not None
+    assert debate.root_node_id not in run.output["claimTypes"]
+    assert debate.root_node_id not in run.output["claimTypeSource"]
+
+
+def test_protocol_analysis_logs_semantics_version(db, capsys) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    run_protocol_analysis(db, debate)
+
+    assert f"qbaf.semantics version=df-quad-v1 debate={debate.id}" in capsys.readouterr().out
 
 
 def test_protocol_analysis_run_does_not_trip_judge_artifact_listener(db) -> None:
@@ -565,6 +660,65 @@ def test_second_evaluation_computes_max_delta_against_previous_run(db) -> None:
     assert convergence["nodesCompared"] == len(first_run.output["dialecticalStrengths"])
     assert convergence["maxDelta"] == pytest.approx(0.2, abs=1e-6)
     assert convergence["converged"] is (convergence["maxDelta"] <= 0.05)
+
+
+def test_convergence_none_when_semantics_version_changes(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    _seed_scored_pro_con_nodes(db, debate)
+    run_protocol_analysis(db, debate)
+    baseline = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == "protocol_analysis")
+        .order_by(AnalyzerRun.seq.desc())
+    ).first()
+    prior = _persist_protocol_analysis_fixture(
+        db,
+        debate,
+        output={
+            "dialecticalStrengths": dict(baseline.output["dialecticalStrengths"]),
+            "semanticsVersion": "df-quad-weighted-v1",
+        },
+    )
+
+    run_protocol_analysis(db, debate)
+
+    current = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == "protocol_analysis")
+        .order_by(AnalyzerRun.seq.desc())
+    ).first()
+    assert current.id != prior.id
+    assert current.output["convergence"]["converged"] is None
+    assert current.output["convergence"]["reason"] == "semantics_changed"
+    assert current.output["convergence"]["epsilon"] == 0.05
+
+
+def test_convergence_pins_missing_previous_semantics_stamp_to_v1(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    _seed_scored_pro_con_nodes(db, debate)
+    run_protocol_analysis(db, debate)
+    baseline = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == "protocol_analysis")
+        .order_by(AnalyzerRun.seq.desc())
+    ).first()
+    _persist_protocol_analysis_fixture(
+        db,
+        debate,
+        output={"dialecticalStrengths": dict(baseline.output["dialecticalStrengths"])},
+    )
+
+    run_protocol_analysis(db, debate)
+
+    current = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == "protocol_analysis")
+        .order_by(AnalyzerRun.seq.desc())
+    ).first()
+    assert current.output["convergence"]["converged"] is True
+    assert "reason" not in current.output["convergence"]
 
 
 def test_convergence_epsilon_is_config_overridable(db) -> None:

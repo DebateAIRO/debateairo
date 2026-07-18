@@ -8,7 +8,7 @@ from app.core.auth import hash_token
 from app.core.db import get_engine
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, Synthesis, Worker, now_utc
 from app.scoring.verdict import verdict_summary
-from app.services.serialization import debate_to_dict, iso
+from app.services.serialization import debate_to_dict, iso, synthesis_to_dict
 
 
 def test_iso_serializes_naive_datetimes_as_utc() -> None:
@@ -455,7 +455,11 @@ def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analy
 
     visible = debate_to_dict(db, db.get(Debate, debate.id))
 
-    expected = verdict_summary(latest_run.output, root_node_id=root.id)
+    expected = verdict_summary(
+        latest_run.output,
+        root_node_id=root.id,
+        evidence_presence="none",
+    )
     assert visible["verdict"] == expected
     assert visible["verdict"]["verdictBand"] == "supported"
 
@@ -477,3 +481,138 @@ def test_debate_detail_verdict_unavailable_when_no_protocol_analysis_run(db) -> 
 
     assert visible["verdict"]["verdictBand"] == "unavailable"
     assert visible["analyzer_runs"] == []
+
+
+def test_debate_to_dict_includes_evidence_presence_and_state(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    evidence = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="EVIDENCE",
+        depth=1,
+        position=0,
+        claim="A transport study reported fewer collisions after a car ban.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(evidence)
+    db.flush()
+    debate.root_node_id = root.id
+
+    no_evidence_debate = Debate(topic="Should schools ban phones?", status="complete", config={"max_depth": 0})
+    db.add(no_evidence_debate)
+    db.flush()
+    no_evidence_root = Node(
+        debate_id=no_evidence_debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=no_evidence_debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(no_evidence_root)
+    db.flush()
+    no_evidence_debate.root_node_id = no_evidence_root.id
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    no_evidence_visible = debate_to_dict(db, db.get(Debate, no_evidence_debate.id))
+
+    assert visible["evidencePresence"] == "extracted_unresolved"
+    assert "evidence_state" not in visible["tree"]
+    evidence_child = visible["tree"]["children"][0]
+    assert evidence_child["id"] == evidence.id
+    assert evidence_child["evidence_state"] == "extracted_source_unresolved"
+    assert no_evidence_visible["evidencePresence"] == "none"
+    assert no_evidence_visible["tree"]["id"] == no_evidence_root.id
+
+
+def test_synthesis_verdict_gate_mirrors_top_level_verdict_state(db, monkeypatch, caplog) -> None:
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    caplog.set_level("INFO", logger="app.services.serialization")
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Measured global surface temperature data show a warming trend.",
+        status="complete",
+        config={"max_depth": 1},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="The measurements are consistent across datasets.",
+        strongest_con="Historical coverage is uneven.",
+        verdict="The persisted synthesis text must remain unchanged.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.synthesis_id = synthesis.id
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "root_claim_text"},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["verdict"]["verdictState"] == "suppressed_no_evidence"
+    assert payload["synthesis"]["verdict_gate"]["state"] == payload["verdict"]["verdictState"]
+    assert payload["synthesis"]["verdict_gate"]["reason"] == payload["verdict"]["suppressionReason"]
+    assert payload["synthesis"]["verdict"] == "The persisted synthesis text must remain unchanged."
+    assert (
+        f"verdict.evidence_gate debate={debate.id} state=suppressed_no_evidence "
+        "would_suppress=true evidence=none claim_type=empirical "
+        "claim_type_source=root_claim_text"
+    ) in caplog.messages
+
+
+def test_synthesis_to_dict_without_verdict_gate_param_keeps_legacy_shape(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(topic="Should public transit be free?", status="complete", config={})
+    db.add(debate)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="It expands access.",
+        strongest_con="It needs funding.",
+        verdict="Pilot it.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+
+    payload = synthesis_to_dict(db, synthesis)
+
+    assert payload is not None
+    assert payload["verdict"] == "Pilot it."
+    assert "verdict_gate" not in payload

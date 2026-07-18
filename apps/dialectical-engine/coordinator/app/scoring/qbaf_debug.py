@@ -7,13 +7,16 @@ honest {"unavailable_reason": ...} block instead of crashing scoring.
 """
 from __future__ import annotations
 
+import os
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Debate, Node
 from app.qbaf.debate_adapter import debate_argument_graph
+from app.qbaf.semantics_versions import DEFAULT_SEMANTICS
 
-SEMANTICS_VERSION = "df-quad-v1"
+SEMANTICS_VERSION = DEFAULT_SEMANTICS
 
 
 def _debate_node_rows(db: Session, debate_id: str) -> list[dict]:
@@ -56,13 +59,16 @@ def qbaf_debug_block(db: Session, debate: Debate, scoring_payload: dict) -> dict
     try:
         nodes = _debate_node_rows(db, debate.id)
         scores = _scores_by_node_id(scoring_payload)
-        adapted = debate_argument_graph(nodes, scores)
+        semantics = os.getenv("DIALECTICAL_QBAF_DEBUG_SEMANTICS", SEMANTICS_VERSION)
+        adapted = debate_argument_graph(nodes, scores, semantics=semantics)
         strengths = adapted.graph.compute_strengths()
         return {
             "fingerprint": adapted.fingerprint,
             "strengths": strengths,
             "tau_sources": dict(adapted.tau_sources),
-            "semantics": SEMANTICS_VERSION,
+            "semantics": adapted.semantics,
+            "attacks": list(adapted.graph.attacks),
+            "supports": list(adapted.graph.supports),
         }
     except Exception as exc:  # noqa: BLE001 - debug feature must never crash scoring
         return {"unavailable_reason": str(exc)}

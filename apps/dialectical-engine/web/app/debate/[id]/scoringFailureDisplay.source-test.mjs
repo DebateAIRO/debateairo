@@ -26,8 +26,8 @@ test("scoring provider/API failures and per-node scoring errors surface non-cras
   );
   assert.match(
     typesSource,
-    /export type NodeScoringError = \{[\s\S]*node_id: string;[\s\S]*status: "unavailable";[\s\S]*reason: string;/,
-    "Per-node scoring errors should carry the exact unavailable reason shown in UI"
+    /export type NodeScoringError = \{[\s\S]*node_id: string;[\s\S]*status: "unavailable" \| "no_independent_judge";[\s\S]*reason: string;/,
+    "Per-node scoring errors should carry the exact unavailable/no-independent-judge status and reason shown in UI"
   );
   assert.match(
     debatePageSource,

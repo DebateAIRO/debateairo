@@ -8,7 +8,7 @@ const apiPath = join(root, "lib", "api.ts");
 const modelsPath = join(root, "lib", "models.ts");
 const debatePagePath = join(root, "app", "debate", "[id]", "DebatePageClient.tsx");
 
-test("frontend correctness helpers keep local labels, SSR token storage, and refresh ordering safe", () => {
+test("frontend correctness helpers keep local labels, SSR token storage, and scoring-by-default wiring safe", () => {
   const apiSource = readFileSync(apiPath, "utf8");
   const modelsSource = readFileSync(modelsPath, "utf8");
   const debatePageSource = readFileSync(debatePagePath, "utf8");
@@ -25,9 +25,9 @@ test("frontend correctness helpers keep local labels, SSR token storage, and ref
     "setStoredToken should no-op during SSR before touching window.localStorage"
   );
 
-  assert.ok(
-    debatePageSource.indexOf('const scoringRefreshBusy = scoringRefreshState.status === "starting";') <
-      debatePageSource.indexOf("function scoringRefreshDisabledReason()"),
-    "scoringRefreshBusy should be declared before scoringRefreshDisabledReason reads it"
+  assert.match(
+    debatePageSource,
+    /const scoringVisibility = useMemo\([\s\S]*?formatScoringVisibilityState\(\{\s*enabled: true,\s*hasActionToken: Boolean\(actionToken\),\s*scoringStatus: scoringState\.status,\s*refreshStatus: scoringRefreshState\.status,\s*response: scoringState\.data,\s*error: scoringRefreshState\.error \|\| scoringState\.error\s*\}\),\s*\[actionToken, scoringRefreshState\.error, scoringRefreshState\.status, scoringState\]/,
+    "scoring visibility should stay enabled by default and update from persisted scoring and refresh state"
   );
 });

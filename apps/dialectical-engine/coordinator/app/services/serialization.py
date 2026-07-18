@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -8,6 +9,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.argument_claim.node_adapter import argument_claim_from_node
+from app.core.config import bool_env
+from app.evidence.presence import EVIDENCE_STATE_EXTRACTED, evidence_presence
 from app.models.entities import (
     AgentCapability,
     AgentOutput,
@@ -35,6 +38,7 @@ from app.scoring.verdict import verdict_summary
 # Confirmed live by attempting the direct import first. Keep this literal in
 # sync with app/protocol/runner.py:PROTOCOL_ANALYSIS_TYPE.
 PROTOCOL_ANALYSIS_TYPE = "protocol_analysis"
+LOGGER = logging.getLogger(__name__)
 
 
 STREAMING_JOB_STATUSES = {"claimed", "running"}
@@ -186,6 +190,8 @@ def node_to_dict(
             for child in sorted(children_by_parent.get(node.id, []), key=lambda item: item.position)
         ],
     }
+    if node.node_type == "EVIDENCE":
+        payload["evidence_state"] = EVIDENCE_STATE_EXTRACTED
     return payload
 
 
@@ -193,12 +199,13 @@ def synthesis_to_dict(
     db: Session,
     synthesis: Synthesis | None,
     worker_names_by_id: dict[str, str] | None = None,
+    verdict_gate: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not synthesis:
         return None
     if worker_names_by_id is None:
         worker_names_by_id = _worker_names_by_id(db, {synthesis.worker_id})
-    return {
+    payload = {
         "id": synthesis.id,
         "debate_id": synthesis.debate_id,
         "strongest_pro": synthesis.strongest_pro,
@@ -213,6 +220,9 @@ def synthesis_to_dict(
         "worker_name": _worker_name(worker_names_by_id, synthesis.worker_id),
         "created_at": iso(synthesis.created_at),
     }
+    if verdict_gate is not None:
+        payload["verdict_gate"] = verdict_gate
+    return payload
 
 
 def branch_to_dict(branch: DebateBranch) -> dict[str, Any]:
@@ -425,6 +435,48 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     provenance_records = list(
         db.scalars(select(ProvenanceRecord).where(ProvenanceRecord.debate_id == debate.id).order_by(ProvenanceRecord.created_at.asc())).all()
     )
+    debate_evidence_presence = evidence_presence(nodes)
+    protocol_output = (
+        latest_protocol_analysis_run.output
+        if latest_protocol_analysis_run and isinstance(latest_protocol_analysis_run.output, dict)
+        else None
+    )
+    verdict = verdict_summary(
+        protocol_output,
+        root_node_id=root.id if root else None,
+        evidence_presence=debate_evidence_presence,
+        gate_enabled=bool_env("DIALECTICAL_VERDICT_EVIDENCE_GATE", False),
+    )
+    verdict_gate = {
+        "state": verdict["verdictState"],
+        "reason": verdict["suppressionReason"],
+    }
+    claim_types = protocol_output.get("claimTypes") if protocol_output else None
+    claim_type_sources = protocol_output.get("claimTypeSource") if protocol_output else None
+    claim_type = (
+        claim_types.get(root.id)
+        if isinstance(claim_types, dict) and root is not None
+        else None
+    )
+    claim_type_source = (
+        claim_type_sources.get(root.id)
+        if isinstance(claim_type_sources, dict) and root is not None
+        else None
+    )
+    shadow = verdict.get("evidenceGateShadow")
+    would_suppress = verdict["verdictState"] == "suppressed_no_evidence" or (
+        isinstance(shadow, dict) and shadow.get("wouldSuppress") is True
+    )
+    LOGGER.info(
+        "verdict.evidence_gate debate=%s state=%s would_suppress=%s evidence=%s "
+        "claim_type=%s claim_type_source=%s",
+        debate.id,
+        verdict["verdictState"],
+        str(would_suppress).lower(),
+        debate_evidence_presence,
+        claim_type,
+        claim_type_source,
+    )
     return {
         "id": debate.id,
         "topic": debate.topic,
@@ -436,7 +488,12 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         "created_at": iso(debate.created_at),
         "completed_at": iso(debate.completed_at),
         "tree": node_to_dict(db, root, children_by_parent, streaming_jobs_by_node, worker_names_by_id) if root else None,
-        "synthesis": synthesis_to_dict(db, synthesis, worker_names_by_id),
+        "synthesis": synthesis_to_dict(
+            db,
+            synthesis,
+            worker_names_by_id,
+            verdict_gate=verdict_gate,
+        ),
         "active_synthesis": active_synthesis_summary(db, active_synthesis_job, worker_names_by_id)
         if active_synthesis_job
         else None,
@@ -446,10 +503,7 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         # `root` is the same already-resolved Node variable used by "tree"
         # above (line 349 in the pre-Task-1 file); root.id is the ROOT_CLAIM
         # node id that keys dialecticalStrengths/verificationStatuses.
-        "verdict": verdict_summary(
-            latest_protocol_analysis_run.output if latest_protocol_analysis_run else None,
-            root_node_id=root.id if root else None,
-        ),
+        "verdict": verdict,
         "selected_skills": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "skill"],
         "selected_agents": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "agent"],
         "agent_outputs": [agent_output_to_dict(output) for output in agent_outputs],
@@ -459,4 +513,5 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         "workers": sorted(worker_names),
         "models": sorted(models),
         "node_count": len(nodes),
+        "evidencePresence": debate_evidence_presence,
     }

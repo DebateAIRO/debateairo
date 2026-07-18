@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -262,6 +263,21 @@ def test_scoring_cache_migration_applies_cleanly_to_empty_database(tmp_path, mon
         assert "ix_judge_output_artifacts_analyzer_run_id" in judge_artifact_indexes
     finally:
         migrated_engine.dispose()
+
+
+def test_alembic_upgrade_preserves_preexisting_application_logger(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "migration-logger.sqlite3"
+    coordinator_dir = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("DIALECTICAL_HOME", str(tmp_path))
+    monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{db_path}")
+    app_logger = logging.getLogger("app.services.migration_boundary_test")
+    monkeypatch.setattr(app_logger, "disabled", False)
+
+    config = Config(str(coordinator_dir / "alembic.ini"))
+    config.set_main_option("script_location", str(coordinator_dir / "migrations"))
+    command.upgrade(config, "head")
+
+    assert app_logger.disabled is False
 
 
 def test_nodes_table_has_evidence_metadata_json_column(db) -> None:

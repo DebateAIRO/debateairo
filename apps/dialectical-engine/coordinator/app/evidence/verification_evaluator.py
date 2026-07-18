@@ -37,22 +37,25 @@ families) are identical to Phase 6's, just re-expressed at this call site
 per the plan's explicit sanction ("apply the lineage guard directly").
 
 UNVERIFIED #6 (JudgeContract registration, RESOLVED): no new JudgeContract is
-registered for judge_role="verifier". `judge_registry.active_contract` is
+registered for judge_role="verifier". The role-specific prompt and strict
+response schema are versioned through `ScoringProviderRequest`, while
+`judge_registry.active_contract` is
 used by claim scoring purely for contract-hash-keyed CACHE identity and
 audit-trail parity across repeated scoring attempts of the SAME node
 (`NodeScoringResult`/`JudgeOutputArtifact` cache lookups). The verification
 evaluator has no cache lookup of its own (each evidence node is verified at
 most once by its caller, per Task 3's wiring) and persists directly to a
 fresh `AnalyzerRun` row every time it runs -- there is no cache-identity
-concern to key on a contract_hash for. Registering a contract now would be
-premature: the verifier's judge prompt/schema does not exist yet either (see
-UNVERIFIED #6's other half, flagged in the report) or contract-hash cache-
-busting semantics to design. This can be added later without a migration
+concern to key on a contract_hash for. Registering a contract now would add
+cache-busting semantics that this uncached evaluator does not consume. This
+can be added later without a migration
 (AnalyzerRun.provenance is free-form JSON) if/when a verifier JudgeContract
 is authored.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import datetime
 import json
 from json import JSONDecodeError
 
@@ -62,6 +65,10 @@ from sqlalchemy import select
 
 from app.core.config import bool_env
 from app.core.write_lock import commit_write
+from app.evidence.lifecycle_input_repository import (
+    build_verification_lifecycle_snapshot,
+    persist_evidence_lifecycle_snapshot,
+)
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Node, next_analyzer_run_seq
 from app.providers import ProviderError
 from app.scoring.judges import ScoringProvider, ScoringProviderRequest
@@ -107,20 +114,125 @@ def _active_generation(db: Session, node: Node) -> Generation | None:
     return db.get(Generation, node.active_generation_id)
 
 
-def _parse_verifier_verdict(raw_output: str) -> tuple[str | None, str | None]:
-    """Parse a verifier judge response. Returns (verdict, error_reason) where
-    exactly one is None. Never coerces an unrecognized shape to "supported" --
-    honest "unparseable_verdict" reason on any deviation."""
+def _authoritative_evidence_payload(parsed: dict) -> dict | None:
+    evidence = parsed.get("evidence")
+    if not isinstance(evidence, dict) or set(evidence) != {
+        "status",
+        "base_score",
+        "uncertainty",
+        "entailment",
+        "caveats",
+    }:
+        return None
+    if evidence.get("status") != "grounded" or evidence.get("entailment") != "SUPPORTS":
+        return None
+    base_score = evidence.get("base_score")
+    uncertainty = evidence.get("uncertainty")
+    caveats = evidence.get("caveats")
+    if (
+        isinstance(base_score, bool)
+        or not isinstance(base_score, int | float)
+        or not 0.0 <= float(base_score) <= 1.0
+        or isinstance(uncertainty, bool)
+        or not isinstance(uncertainty, int | float)
+        or not 0.0 <= float(uncertainty) <= 1.0
+        or not isinstance(caveats, list)
+        or not all(isinstance(caveat, str) for caveat in caveats)
+    ):
+        return None
+    return {
+        "status": "grounded",
+        "base_score": float(base_score),
+        "uncertainty": float(uncertainty),
+        "entailment": "SUPPORTS",
+        "caveats": caveats,
+        "evaluator_id": EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        "evaluator_version": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
+    }
+
+
+def _parse_verifier_verdict(
+    raw_output: str,
+) -> tuple[str | None, str | None, dict | None]:
+    """Parse a verdict and any complete lifecycle-authoritative evidence."""
     try:
         parsed = json.loads(raw_output)
     except JSONDecodeError:
-        return None, "unparseable_verdict"
+        return None, "unparseable_verdict", None
     if not isinstance(parsed, dict):
-        return None, "unparseable_verdict"
+        return None, "unparseable_verdict", None
     verdict = parsed.get("verdict")
     if verdict not in _VALID_VERDICTS:
-        return None, "unparseable_verdict"
-    return verdict, None
+        return None, "unparseable_verdict", None
+    authoritative_evidence = (
+        _authoritative_evidence_payload(parsed) if verdict == "supported" else None
+    )
+    return verdict, None, authoritative_evidence
+
+
+def _persist_verification_attempt(
+    db: Session,
+    *,
+    debate: Debate,
+    claim_node: Node,
+    evidence_node: Node,
+    judge_role: str,
+    status: str,
+    reason: str | None,
+    lineage_metadata: dict,
+    checked_at: datetime | str | None = None,
+    authoritative_evidence: Mapping[str, object] | None = None,
+    commit: bool = True,
+) -> None:
+    """Persist one verifier attempt and its honest lifecycle projection."""
+
+    branch = _first_branch(db, debate.id)
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={
+            "evidenceNodeId": evidence_node.id,
+            "claimNodeId": claim_node.id,
+            "status": status,
+            "reason": reason,
+            "evaluatorVersion": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
+            **lineage_metadata,
+        },
+        status="complete",
+        provenance={"judge_role": judge_role},
+    )
+    # Assigning the sequence flushes the run and materializes created_at.
+    next_analyzer_run_seq(db, run)
+    assert run.seq is not None
+    assert run.created_at is not None
+    evidence_kind = "unclassified"
+    if isinstance(evidence_node.evidence_metadata, dict):
+        raw_kind = evidence_node.evidence_metadata.get("evidenceKind")
+        if isinstance(raw_kind, str) and raw_kind.strip():
+            evidence_kind = raw_kind.strip()
+    snapshot = build_verification_lifecycle_snapshot(
+        debate_id=debate.id,
+        claim_node_id=claim_node.id,
+        evidence_node_id=evidence_node.id,
+        evidence_generation_id=evidence_node.active_generation_id or "",
+        evidence_text=evidence_node.claim,
+        evidence_kind=evidence_kind,
+        verification_run_id=run.id,
+        sequence=run.seq,
+        verification_status=status,
+        verification_reason=reason,
+        recorded_at=run.created_at,
+        checked_at=checked_at,
+        authoritative_evidence=authoritative_evidence,
+    )
+    persist_evidence_lifecycle_snapshot(
+        db,
+        snapshot=snapshot,
+        verification_status=status,
+    )
+    if commit:
+        commit_write(db)
 
 
 def evaluate_evidence_verdict(
@@ -131,6 +243,7 @@ def evaluate_evidence_verdict(
     provider: ScoringProvider,
     *,
     judge_role: str = "verifier",
+    commit: bool = True,
 ) -> dict:
     """Evaluate ONE evidence node's verdict via a real judge-provider call.
 
@@ -155,7 +268,24 @@ def evaluate_evidence_verdict(
     scrubbed_model = _public_metadata_text(getattr(provider, "model", None))
     arguer_family = lineage_family(claim_generation.model_id if claim_generation else None)
     judge_family = lineage_family(scrubbed_model)
+    provider_name = _public_metadata_text(getattr(provider, "provider", None))
+    lineage_metadata = judge_lineage_metadata(
+        arguer_model_id=claim_generation.model_id if claim_generation else None,
+        judge_provider=provider_name,
+        judge_model_id=scrubbed_model,
+    )
     if arguer_family is not None and judge_family is not None and arguer_family == judge_family:
+        _persist_verification_attempt(
+            db,
+            debate=debate,
+            claim_node=claim_node,
+            evidence_node=evidence_node,
+            judge_role=judge_role,
+            status="unverifiable",
+            reason="no_independent_judge",
+            lineage_metadata=lineage_metadata,
+            commit=commit,
+        )
         return {"status": "unverifiable", "reason": "no_independent_judge"}
 
     evidence_kind = None
@@ -166,51 +296,59 @@ def evaluate_evidence_verdict(
         claim=normalize_claim(node_id=claim_node.id, raw_text=claim_node.claim),
         argument_text=claim_generation.argument if claim_generation else None,
         judge_role=judge_role,
+        prompt_version=EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
         metadata={"evidence_text": evidence_node.claim, "evidence_kind": evidence_kind},
     )
 
     try:
         result = provider.judge_node(request)
     except TimeoutError:
+        _persist_verification_attempt(
+            db,
+            debate=debate,
+            claim_node=claim_node,
+            evidence_node=evidence_node,
+            judge_role=judge_role,
+            status="unverifiable",
+            reason="verification_judge_call_timed_out",
+            lineage_metadata=lineage_metadata,
+            commit=commit,
+        )
         return {"status": "unverifiable", "reason": "verification_judge_call_timed_out"}
     except ProviderError:
+        _persist_verification_attempt(
+            db,
+            debate=debate,
+            claim_node=claim_node,
+            evidence_node=evidence_node,
+            judge_role=judge_role,
+            status="unverifiable",
+            reason="verification_judge_call_failed",
+            lineage_metadata=lineage_metadata,
+            commit=commit,
+        )
         return {"status": "unverifiable", "reason": "verification_judge_call_failed"}
 
-    verdict, error_reason = _parse_verifier_verdict(result.raw_output)
+    verdict, error_reason, authoritative_evidence = _parse_verifier_verdict(result.raw_output)
 
     # Same scrub applied at the guard above -- reuse it here rather than the
     # raw provider attributes, so no secret-like provider/model string is ever
     # echoed into judge_lineage_metadata or the persisted AnalyzerRun.output.
-    provider_name = _public_metadata_text(getattr(provider, "provider", None))
-    model_name = scrubbed_model
-    lineage_metadata = judge_lineage_metadata(
-        arguer_model_id=claim_generation.model_id if claim_generation else None,
-        judge_provider=provider_name,
-        judge_model_id=model_name,
-    )
-
     final_status = verdict if verdict is not None else "unverifiable"
     final_reason = error_reason  # None on success, honest reason string on failure
 
-    branch = _first_branch(db, debate.id)
-    run = AnalyzerRun(
-        debate_id=debate.id,
-        branch_id=branch.id,
-        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
-        output={
-            "evidenceNodeId": evidence_node.id,
-            "claimNodeId": claim_node.id,
-            "status": final_status,
-            "reason": final_reason,
-            "evaluatorVersion": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
-            **lineage_metadata,
-        },
-        status="complete",
-        provenance={"judge_role": judge_role},
+    _persist_verification_attempt(
+        db,
+        debate=debate,
+        claim_node=claim_node,
+        evidence_node=evidence_node,
+        judge_role=judge_role,
+        status=final_status,
+        reason=final_reason,
+        lineage_metadata=lineage_metadata,
+        checked_at=result.checked_at,
+        authoritative_evidence=authoritative_evidence,
+        commit=commit,
     )
-    # next_analyzer_run_seq assigns run.seq, db.add()s, and db.flush()es
-    # as one lock-covered critical section (see app.models.entities).
-    next_analyzer_run_seq(db, run)
-    commit_write(db)
 
     return {"status": final_status, "reason": final_reason}

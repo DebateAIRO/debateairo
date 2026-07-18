@@ -276,7 +276,7 @@ class ExplorationPolicy:
         return (
             score.strength < self.weak_strength_threshold
             and score.impact < self.low_impact_threshold
-            and score.uncertainty < self.resolved_uncertainty_threshold
+            and score.uncertainty <= self.resolved_uncertainty_threshold
             and evidence.status == EvidenceStatus.GROUNDED
             and evidence.uncertainty < self.resolved_uncertainty_threshold
         )

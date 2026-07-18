@@ -119,7 +119,7 @@ def test_worker_status_detail_requires_specific_capabilities() -> None:
                 worker_row(
                     "adesso-mbp",
                     worker_id="22222222-2222-4222-8222-222222222222",
-                    capabilities=["codex-gpt-5.5", "grok-4"],
+                    capabilities=["codex-gpt-5.5", "grok-4.5"],
                 )
             ]
         },
@@ -193,9 +193,9 @@ def test_worker_status_detail_rejects_non_production_capabilities_when_requested
 def test_parse_required_capabilities_accepts_csv_and_repeated_flags() -> None:
     module = load_module(ROOT / "scripts" / "verify_worker_visible.py", "dialectical_verify_worker_parse_caps")
 
-    assert module.parse_required_capabilities(["codex-gpt-5.5, grok-4", "codex-gpt-5.5", ""]) == [
+    assert module.parse_required_capabilities(["codex-gpt-5.5, grok-4.5", "codex-gpt-5.5", ""]) == [
         "codex-gpt-5.5",
-        "grok-4",
+        "grok-4.5",
     ]
 
 
@@ -344,7 +344,7 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs" in register_script
     assert "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs" in register_script
     assert "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" in register_script
-    assert "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4" in register_script
+    assert "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" in register_script
     assert register_script.index("Worker B registration requires a named Cloudflare hostname") < register_script.index(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )
@@ -392,7 +392,7 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert "Worker B real-model setup requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs" in real_models_script
     assert "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs" in real_models_script
     assert "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" in real_models_script
-    assert "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4" in real_models_script
+    assert "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" in real_models_script
     assert real_models_script.index("Worker B real-model setup requires a named Cloudflare hostname") < real_models_script.index(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )

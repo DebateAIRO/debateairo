@@ -904,7 +904,7 @@ async def test_detect_adapters_keeps_grok_cli_primary_over_xai_fallback(monkeypa
 
     adapters = await detect_adapters(WorkerConfig(enable_mock=False, enable_real_adapters=True))
 
-    assert type(adapters["grok-4"]) is GrokCliAdapter
+    assert type(adapters["grok-4.5"]) is GrokCliAdapter
 
 
 @pytest.mark.asyncio
@@ -925,7 +925,7 @@ async def test_detect_adapters_falls_back_to_xai_when_grok_cli_lacks_prompt_flag
 
     adapters = await detect_adapters(WorkerConfig(enable_mock=False, enable_real_adapters=True))
 
-    assert type(adapters["grok-4"]) is XaiApiAdapter
+    assert type(adapters["grok-4.5"]) is XaiApiAdapter
 
 
 @pytest.mark.asyncio

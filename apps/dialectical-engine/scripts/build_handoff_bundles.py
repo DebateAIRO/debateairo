@@ -174,7 +174,7 @@ def worker_register_script(public_url: str, worker_name: str) -> str:
                 esac
                 case "$capability" in
                     gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4) NEEDS_XAI_API_KEY=1 ;;
+                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_ALLOWED_MODELS="${{SEEN_ALLOWED_MODELS}}$capability,"
                 ;;
@@ -205,7 +205,7 @@ def worker_register_script(public_url: str, worker_name: str) -> str:
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4" >&2
+        echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
         exit 2
     fi
 
@@ -305,7 +305,7 @@ def worker_real_models_script(public_url: str, worker_name: str) -> str:
                 esac
                 case "$capability" in
                     gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4) NEEDS_XAI_API_KEY=1 ;;
+                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_REQUIRED_CAPABILITIES="${{SEEN_REQUIRED_CAPABILITIES}}$capability,"
                 REQUIRED_CAPABILITY_COUNT=$((REQUIRED_CAPABILITY_COUNT + 1))
@@ -339,7 +339,7 @@ def worker_real_models_script(public_url: str, worker_name: str) -> str:
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4" >&2
+        echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
         exit 2
     fi
 
@@ -2274,7 +2274,7 @@ def worker_a_real_models_script(public_url: str) -> str:
                 esac
                 case "$capability" in
                     gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4) NEEDS_XAI_API_KEY=1 ;;
+                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_REQUIRED_CAPABILITIES="${{SEEN_REQUIRED_CAPABILITIES}}$capability,"
                 REQUIRED_CAPABILITY_COUNT=$((REQUIRED_CAPABILITY_COUNT + 1))
@@ -2308,7 +2308,7 @@ def worker_a_real_models_script(public_url: str) -> str:
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4" >&2
+        echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
         exit 2
     fi
 

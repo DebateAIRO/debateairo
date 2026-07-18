@@ -1,58 +1,152 @@
 ---
 name: heartbeat-protocol
-description: Claude adapter for the DebateAI shared Kanban heartbeat protocol. Use when Hermes routes a [Claude] ticket or V invokes the Claude coding loop. Hermes acts as cockpit broker — Claude sources routing, tenant, branch, and file contracts from Kanban/Hermes, not from V.
+description: Claude adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Hermes directly reviews each numbered-stage artifact and runs verified same-terminal /compact after every durable Claude planning/review/rework sequence.
+version: 2.2.0
 ---
 
-# Claude Heartbeat Protocol Adapter
+# Claude Heartbeat Protocol
 
-This Claude skill is intentionally thin. The shared protocol spine lives in repo docs so Hermes, Claude, and Codex follow the same rules.
+## Read order
 
-Read in this order:
-
-1. This SKILL.md
+1. This skill
 2. `docs/agent-protocols/debateai-heartbeat-protocol.md`
 3. `docs/agent-protocols/claude-heartbeat-adapter.md`
-4. The current Kanban ticket body and Hermes comments
+4. Current stage/ticket body and every comment in chronological order
 
-## Claude role
+The latest applicable Hermes/human comment is current routing law. Do not act from status alone.
+
+## Role
 
 ```text
-V      = commander / product decision maker — Claude does NOT ask V for ticket IDs, branches, file contracts, or routing.
-Hermes = cockpit broker / reviewer / Done gate / Blocked authority — Claude's primary interface.
-Claude = isolated parallel lane worker for [Claude] tickets.
-Kanban = current source of truth.
+Claude Step 2 = Plan.md artifact worker
+Claude Step 4 = FinalPlan.md artifact worker in a different CLI PTY
+Claude reviewer = independent read-only peer/specialist reviewer
+Codex GPT-5.6 Sol = sole coding worker
+Hermes = non-delegable numbered-stage reviewer, cockpit, human-review router, Done/Blocked authority
 ```
 
-**Hermes is the cockpit broker by default.** When V invokes `/heartbeat-protocol`:
-- Hermes infers the active tenant/workstream and routes Claude through Kanban.
-- Claude reads all routing, branch, file contract, and ticket info from Kanban ticket bodies and Hermes comments.
-- If confused, Claude asks Hermes through Kanban (`CLAUDE HEARTBEAT` with `needs Hermes: yes`) — not V.
+Claude does not implement production/test/migration/configuration code under the current law.
 
-## Non-negotiables
+## On launch or wakeup
 
-- Work only `[Claude]` tickets.
-- Read the ticket body and comments before editing.
-- Respect `Allowed to edit` and `Forbidden` file contracts.
-- Do not touch Codex-owned files.
-- Do not mark tickets Done.
-- Do not push without explicit V approval.
-- Do not delete product/database data.
-- Do not create fake runtime product data.
-- Use `CLAUDE HEARTBEAT`, `CLAUDE BLOCKED`, and `READY FOR HERMES REVIEW` exactly as defined in the shared docs.
-- When Hermes declares `LIVE MONITORING ACTIVE`, also keep the named V-visible live-output channel updated with short progress lines. If Hermes provides only a `.hermes/live/` fallback file, write there and report that path in heartbeats.
+1. Read the assigned stage/ticket and all comments.
+2. Record `comments read through: <latest id/timestamp>`.
+3. Determine from comments whether the role is artifact worker, reviewer, rework, or waiting.
+4. Confirm stage, artifact path, upstream artifacts, original session, forbidden code/runtime actions, reviewer identity, and human gate.
+5. Continue this stage session's current work before accepting anything else.
+6. Post `WORKER CLAIM` for artifact work.
+7. Repeat the comment scan before artifact edits, each heartbeat, review verdict, Hermes handoff, and revision.
 
-## Self-blocking prevention
+## Artifact-worker flow
 
-If a valid active `[Claude]` ticket exists, do NOT block the whole goal because of:
-- worktree path confusion
-- branch uncertainty when the branch is declared in the ticket
-- prior completed ticket state
-- local implementation friction
+```text
+WORKER CLAIM
+→ author only Plan.md or FinalPlan.md
+→ verify artifact contract
+→ READY FOR HERMES STAGE REVIEW
+→ Hermes directly reviews the full artifact
+   ├─ HERMES STAGE REVIEW CHANGES REQUESTED → same Claude session revises
+   └─ HERMES STAGE REVIEW PASS → next numbered stage may launch
+→ stop editing
+```
 
-Instead: continue the active ticket, fix the smallest local slice, or post `CLAUDE HEARTBEAT` with `needs Hermes: yes`. Ask Hermes through Kanban — not V.
+Step 2 requires Hermes H2 PASS before Grok Step 3. Step 4 requires Hermes H4
+PASS before Grok Step 5. An agent-only approval never substitutes for Hermes's
+review.
 
-## ScheduleWakeup note
+## Post-dialogue checkpoint compaction
 
-If running in a scheduler-capable Claude environment, use the one-minute heartbeat loop described in `docs/agent-protocols/claude-heartbeat-adapter.md`. End the loop only when the Claude chain is complete or a V-level blocker exists.
+After every durable Claude planning, review, or correction handoff—and after
+substantive Hermes↔Claude ping-pong—keep this PTY open and idle. Hermes first
+verifies the artifact/comment/log and decisions are durable, then sends:
 
-Kanban ticket bodies and Hermes comments override this adapter for current mission details.
+```text
+/compact Preserve the original V request, mission and stage/ticket, owned artifact scope, accepted decisions, evidence paths, latest comment cursor, unresolved findings, safety constraints, and next gate. Drop superseded drafts and tool chatter.
+```
+
+Hermes verifies completion and records `CLAUDE COMPACTION CHECKPOINT`:
+
+```text
+READY FOR HERMES STAGE REVIEW → compact stage PTY → Hermes stage review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+If substantive dialogue follows the checkpoint, compact again at the next
+stable handoff. Never compact while work/tools/generation are in flight and do
+not exit merely because the conversation became chatty.
+
+On `HERMES STAGE REVIEW CHANGES REQUESTED`, Hermes resumes this exact stage PTY,
+reuses the successful handoff checkpoint when no later substantive dialogue
+occurred, or sends/verifies `/compact` again when it did, and then supplies the
+review packet. Claude revises and posts a new
+`READY FOR HERMES STAGE REVIEW` packet.
+
+## Reviewer flow
+
+When assigned as reviewer, Claude is read-only:
+
+- read all comments and `READY FOR PEER REVIEW` evidence;
+- inspect the artifact/diff and independently verify;
+- never edit the reviewed change;
+- post `PEER REVIEW CHANGES REQUESTED` on RED;
+- post `PEER REVIEW APPROVED` and then `READY FOR HERMES REVIEW` on GREEN;
+- route findings to the same original worker/session;
+- never review work authored by this same Claude session.
+
+Claude may review Codex code but may not modify it.
+
+## Hermes/human correction flow
+
+When the ticket returns to `ready` with Hermes/human comments:
+
+1. Resume the exact original Claude stage session.
+2. Hermes sends and verifies `/compact`.
+3. Read all comments after the prior handoff.
+4. Post `REWORK ACKNOWLEDGED` with the triggering comment and findings.
+5. Modify only the assigned artifact.
+6. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes.
+7. Peer re-review only if Hermes explicitly requests it.
+8. Repeat in this same stage session if returned again.
+
+If the session is lost, post `CLAUDE BLOCKED` with `session_continuity`. Replacement requires `WORKER CONTINUITY OVERRIDE`.
+
+## Required comment markers
+
+Recognize and obey:
+
+```text
+WORKER CLAIM
+CLAUDE HEARTBEAT
+CLAUDE BLOCKED
+CLAUDE COMPACTION CHECKPOINT
+COMPACTION BLOCKED
+READY FOR PEER REVIEW
+PEER REVIEW CHANGES REQUESTED
+PEER REVIEW APPROVED
+READY FOR HERMES REVIEW
+READY FOR HERMES STAGE REVIEW
+HERMES STAGE REVIEW PASS
+HERMES STAGE REVIEW CHANGES REQUESTED
+HERMES CHANGES REQUESTED
+READY FOR HUMAN REVIEW
+HUMAN REVIEW PASSED
+HUMAN REVIEW CHANGES REQUESTED
+REWORK ACKNOWLEDGED
+REWORK READY FOR HERMES REVIEW
+WORKER CONTINUITY OVERRIDE
+```
+
+Every outgoing marker includes the latest `comments read through` cursor.
+
+## Polling and hard rules
+
+- At each one-minute heartbeat, read new comments before acting.
+- Step 2 and Step 4 use different Hermes-managed Claude CLI PTYs.
+- Same-stage revision uses the same PTY after verified `/compact`.
+- Every durable planning/review/rework handoff is followed by verified
+  same-terminal `/compact` before parking or review.
+- `ready` may mean rework; inspect comments before claiming.
+- Numbered-stage artifact work stops at `READY FOR HERMES STAGE REVIEW`; Hermes itself must PASS it before the next stage.
+- Separate ticket-review assignments still use `READY FOR PEER REVIEW` and reviewer GREEN `READY FOR HERMES REVIEW`.
+- Do not code, mark Done, push, delete database/product data, create fake runtime data, reveal secrets, cross file contracts, or ignore ticket comments.

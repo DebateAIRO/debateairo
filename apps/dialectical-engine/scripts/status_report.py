@@ -375,7 +375,7 @@ DEFAULT_FINAL_REQUIRED_CAPABILITIES = ("codex-gpt-5.5", "gemini-2.5-flash")
 FINAL_PRODUCTION_WORKER_NAMES = ("mac-mini", "adesso-mbp")
 API_KEY_MODEL_REQUIREMENTS = {
     "gemini-2.5-flash": "GEMINI_API_KEY",
-    "grok-4": "XAI_API_KEY",
+    "grok-4.5": "XAI_API_KEY",
 }
 PRODUCTION_ACCEPTANCE_EXPECTATIONS = {
     "two-worker": {
@@ -1376,7 +1376,7 @@ HANDOFF_WORKER_A_REAL_MODELS_MARKERS = {
     "Worker A real-model setup requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs",
     "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
     "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-    "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+    "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
     "GEMINI_API_KEY_FOR_INSTALL=",
     "XAI_API_KEY_FOR_INSTALL=",
     "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A",
@@ -1428,7 +1428,7 @@ WORKER_B_REGISTER_SCRIPT_MARKERS = {
     "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs",
     "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs",
     "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-    "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+    "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
     'USER_TOKEN="${USER_TOKEN:-}"',
     "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration",
     'export DIALECTICAL_ALLOWED_MODELS="$ALLOWED_MODELS"',
@@ -1463,7 +1463,7 @@ WORKER_B_REAL_MODELS_SCRIPT_MARKERS = {
     "not duplicate model IDs",
     "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
     "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-    "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+    "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
     "GEMINI_API_KEY_FOR_INSTALL=",
     "XAI_API_KEY_FOR_INSTALL=",
     'USER_TOKEN="${USER_TOKEN:-}"',
@@ -2137,7 +2137,7 @@ def real_adapters_summary() -> str:
     grok_markers = [
         "PROMPT_FLAG_PATTERN",
         "class GrokCliAdapter(SubprocessStreamingAdapter):",
-        'model_id = "grok-4"',
+        'model_id = "grok-4.5"',
         "async def health_check(self) -> bool:",
         "asyncio.create_subprocess_exec(",
         '"--help",',
@@ -2233,7 +2233,7 @@ def gemini_api_summary() -> str:
     ]
     xai_markers = [
         "class XaiApiAdapter:",
-        'model_id = "grok-4"',
+        'model_id = "grok-4.5"',
         "from app.adapters.credentials import configured_api_key",
         'configured_api_key("XAI_API_KEY")',
         '"https://api.x.ai/v1/chat/completions"',
@@ -2262,7 +2262,7 @@ def gemini_api_summary() -> str:
         "os.getenv(variable)",
         'adapter_api_env.get(variable)',
         'detected.append("gemini-2.5-flash")',
-        'detected.append("grok-4")',
+        'detected.append("grok-4.5")',
         'pass_check("adapter-credential:gemini-api", f"GEMINI_API_KEY is set in {source}")',
         'pass_check("adapter-credential:xai-api", f"XAI_API_KEY is set in {source}")',
         'launch-agent:worker:env:{variable}',
@@ -2586,7 +2586,7 @@ def handoff_generator_summary() -> str:
         "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs",
         "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs",
         "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-        "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+        "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
         'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
         'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
         'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2609,7 +2609,7 @@ def handoff_generator_summary() -> str:
         "Worker B real-model setup requires non-empty model IDs in ALLOWED_MODELS",
         "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
         "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-        "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+        "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
         'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
         'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
         'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2788,7 +2788,7 @@ def handoff_generator_summary() -> str:
         "Worker A real-model setup requires non-empty model IDs in ALLOWED_MODELS",
         "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
         "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-        "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4",
+        "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
         "GEMINI_API_KEY_FOR_INSTALL=",
         "XAI_API_KEY_FOR_INSTALL=",
         "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A",
@@ -2914,7 +2914,7 @@ def handoff_generator_summary() -> str:
         "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
     register_xai_guard_index = register_section.find(
-        "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+        "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
     )
     register_token_notice_index = register_section.find(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
@@ -2984,7 +2984,7 @@ def handoff_generator_summary() -> str:
         "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
     real_models_xai_guard_index = real_models_section.find(
-        "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+        "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
     )
     real_models_token_notice_index = real_models_section.find(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
@@ -3149,7 +3149,7 @@ def handoff_generator_summary() -> str:
         "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
     worker_a_xai_guard_index = worker_a_section.find(
-        "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4"
+        "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
     )
     worker_a_named_tunnel_preflight_guard_index = worker_a_section.find(
         "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A"
@@ -4376,7 +4376,7 @@ def bundle_worker_b_register_summary(path: Path, nested_member: str | None = Non
     gemini_guard_index = script.find(
         "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
-    xai_guard_index = script.find("Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4")
+    xai_guard_index = script.find("Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5")
     token_notice_index = script.find(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )
@@ -4453,7 +4453,7 @@ def bundle_worker_b_real_models_summary(path: Path, nested_member: str | None = 
     gemini_guard_index = script.find(
         "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
-    xai_guard_index = script.find("Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4")
+    xai_guard_index = script.find("Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5")
     token_notice_index = script.find(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )
@@ -5189,7 +5189,7 @@ def handoff_worker_a_real_models_summary(path: Path = HANDOFF_BUNDLE) -> str:
     gemini_key_index = script.find(
         "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
     )
-    xai_key_index = script.find("Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4")
+    xai_key_index = script.find("Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5")
     named_tunnel_preflight_guard_index = script.find(
         "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A"
     )
@@ -7648,8 +7648,8 @@ def add_settings_roundtrip_evidence_issues(issues: list[str], payload: dict[str,
             "settings roundtrip evidence missing spend models: "
             + ", ".join(missing_spend_models)
         )
-    if "grok-4" in configured_models and "grok-4" not in pricing_models:
-        issues.append("settings roundtrip evidence missing grok-4 pricing")
+    if "grok-4.5" in configured_models and "grok-4.5" not in pricing_models:
+        issues.append("settings roundtrip evidence missing grok-4.5 pricing")
 
 
 def add_auth_boundary_row_issues(

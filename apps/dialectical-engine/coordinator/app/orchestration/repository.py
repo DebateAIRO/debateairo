@@ -6,6 +6,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from app.orchestration.recursive import OrchestratorRun
+from app.qbaf.semantics_versions import resolve_semantics
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class QBAFRunRecord:
     root_confidence: float
     trace: dict[str, Any]
     created_at: datetime
+    semantics_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -23,6 +25,8 @@ class QBAFRunRecord:
             "topic": self.topic,
             "graph": self.graph,
             "root_confidence": self.root_confidence,
+            "dialectical_support": self.root_confidence,
+            "semantics_version": resolve_semantics(self.semantics_version),
             "trace": self.trace,
             "created_at": self.created_at.isoformat(),
         }
@@ -79,6 +83,7 @@ class Neo4jQBAFRunRepository:
             SET run.topic = $topic,
                 run.graph = $graph,
                 run.root_confidence = $root_confidence,
+                run.semantics_version = $semantics_version,
                 run.trace = $trace,
                 run.created_at = $created_at
             """,
@@ -111,7 +116,13 @@ class Neo4jQBAFRunRepository:
         return [_record_from_params(dict(row["record"])) for row in result]
 
 
-def run_to_record(run: OrchestratorRun, *, topic: str, run_id: str | None = None) -> QBAFRunRecord:
+def run_to_record(
+    run: OrchestratorRun,
+    *,
+    topic: str,
+    run_id: str | None = None,
+    semantics_version: str | None = None,
+) -> QBAFRunRecord:
     return QBAFRunRecord(
         id=run_id or uuid4().hex,
         topic=topic,
@@ -129,6 +140,7 @@ def run_to_record(run: OrchestratorRun, *, topic: str, run_id: str | None = None
             ],
         },
         created_at=datetime.now(timezone.utc),
+        semantics_version=resolve_semantics(semantics_version),
     )
 
 
@@ -138,6 +150,7 @@ def _record_to_params(record: QBAFRunRecord) -> dict[str, Any]:
         "topic": record.topic,
         "graph": record.graph,
         "root_confidence": record.root_confidence,
+        "semantics_version": resolve_semantics(record.semantics_version),
         "trace": record.trace,
         "created_at": record.created_at.isoformat(),
     }
@@ -151,4 +164,5 @@ def _record_from_params(params: dict[str, Any]) -> QBAFRunRecord:
         root_confidence=float(params["root_confidence"]),
         trace=dict(params["trace"]),
         created_at=datetime.fromisoformat(str(params["created_at"])),
+        semantics_version=resolve_semantics(params.get("semantics_version")),
     )

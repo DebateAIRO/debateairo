@@ -1,200 +1,505 @@
 # DebateAI Shared Heartbeat Protocol
 
-This is the shared protocol spine for DebateAI multi-agent work. It is intentionally agent-neutral: Hermes, Codex, and Claude all read this first, then read their adapter.
+This is the agent-neutral protocol spine for DebateAI multi-agent work. Hermes, Codex, Claude, and Grok read this before their own adapter.
 
 ## Operating model
 
 ```text
-V talks to Hermes.
-Hermes manages Kanban, tickets, dependencies, blocker routing, review gates, and final QA truth.
-Codex and Claude work assigned Kanban tickets and report through Kanban comments/heartbeats.
-Kanban is the durable shared state.
-When V asks for visible live monitoring, Hermes also opens a dedicated live-output channel for each active agent so V can watch progress without repeatedly asking for status.
+V → Hermes cockpit
+Hermes → tickets, dependencies, comments, review routing, human-review packets, Done/Blocked
+Codex → sole coding worker while the current model law is active
+Claude/Grok → planning-artifact workers and independent read-only reviewers
+Kanban → durable shared state
 ```
 
-V should only be interrupted for real product, architecture, security, destructive-action, or scope decisions. Routine operational issues belong to Hermes/Kanban.
+V should only be interrupted for real product, architecture, security, destructive-action, scope, or human acceptance decisions. Routine routing and review communication belong in ticket comments.
+
+## Binding stage and coding law
+
+```text
+H0 Hermes intake
+G1 Grok Research.md        — fresh Hermes-managed Grok CLI PTY
+C2 Claude Plan.md          — fresh Hermes-managed Claude CLI PTY
+G3 Grok PlanReview.md      — different fresh Grok CLI PTY
+C4 Claude FinalPlan.md     — different fresh Claude CLI PTY
+G5 Grok VerticalSlices.md  — third fresh Grok CLI PTY
+H6 Hermes Kanban routing
+Implementation             — Codex GPT-5.6 Sol only, fresh CLI PTY per ticket
+```
+
+A revision stays with the original stage/ticket worker and resumable CLI session. For Claude/Grok stage revisions, Hermes sends `/compact`, verifies completion, then supplies the review comments. Do not silently substitute agents.
+
+## Binding post-dialogue checkpoint compaction
+
+After every durable planning, coding, review, or correction sequence—and after
+any substantive Hermes↔agent ping-pong—Hermes runs the CLI compaction command
+inside that same interactive PTY before parking it or proceeding with review:
+
+```text
+Claude Code 2.1.205: /compact <preservation focus>
+Grok Build 0.2.93:   /compact <preservation context>
+Codex CLI 0.144.0:   /compact
+```
+
+The current Grok installation uses `/compact [context]`; re-check after CLI
+upgrades. Codex's installed menu documents `/compact` without arguments, so
+all durable state must be externalized before running it.
+
+Before compaction, save the artifact/diff, complete or record checks, post the
+handoff/comment, write accepted decisions and unresolved findings to durable
+state, and wait for the prompt to become idle. Never compact while an edit,
+tool call, model response, or test is still in flight.
+
+Sequence placement:
+
+```text
+numbered stage handoff → compact same stage PTY → Hermes stage gate
+READY FOR PEER REVIEW → compact same Codex worker PTY → peer review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+Record `CLAUDE COMPACTION CHECKPOINT`, `GROK COMPACTION CHECKPOINT`, or
+`CODEX COMPACTION CHECKPOINT` with the session, completed sequence, durable
+state paths, command, success evidence, post-compact state, and comment cursor.
+If substantive dialogue occurs after a checkpoint, compact again at the next
+stable handoff. A checkpoint after the final substantive turn satisfies the
+pre-revision compaction requirement; do not run empty duplicates.
+
+## Binding Hermes numbered-stage review gates
+
+Hermes itself reviews every completed numbered planning artifact after Step 1.
+An agent or specialist review may add evidence but cannot replace the Hermes
+gate.
+
+```text
+G1 Research.md
+  → Hermes handoff-integrity check only; no substantive Research review
+Step 2 / C2 Plan.md
+  → HERMES STAGE REVIEW PASS required before G3
+Step 3 / G3 PlanReview.md
+  → HERMES STAGE REVIEW PASS required before C4
+Step 4 / C4 FinalPlan.md
+  → HERMES STAGE REVIEW PASS required before G5
+Step 5 / G5 VerticalSlices.md
+  → HERMES STAGE REVIEW PASS required before H6
+Step 6 / H6 Kanban ticketization
+  → HERMES STEP 6 SELF-AUDIT PASS required before any Codex launch
+```
+
+For Steps 2–5, the stage owner posts `READY FOR HERMES STAGE REVIEW`.
+Hermes reads the original request, complete artifact, approved upstream
+artifacts, cited material evidence, and applicable comments. Hermes records
+either `HERMES STAGE REVIEW PASS` or
+`HERMES STAGE REVIEW CHANGES REQUESTED`. The next stage remains blocked on
+CHANGES REQUESTED; the original stage session revises after verified
+`/compact` and returns a new review packet.
+
+Step 1's exemption is narrow: Hermes still verifies that `Research.md` exists,
+is readable, names its evidence, records its Grok session/path, and exposes no
+safety/destructive-data decision. Later stages may return a discovered
+research gap to the original Step 1 Grok session.
+
+The H6 self-audit verifies slice-to-ticket coverage, dependencies, Codex-only
+implementation ownership, file contracts, comment/rework rules, review/human
+gates, a deliberately small Ready queue, and the prohibition on database
+deletion without V's specific approval.
 
 ## Roles
 
+- **V / Human reviewer:** product and acceptance authority.
+- **Hermes:** cockpit broker, status/comment router, evidence gate, human-review coordinator, and sole Done/Blocked authority.
+- **Worker:** assigned ticket owner. Codex is the only coding worker under the current law; Claude/Grok may own planning or review artifacts.
+- **Peer reviewer:** different agent/session from the worker; reads evidence and comments, never writes the fix.
+- **Kanban:** durable source of ticket scope, comments, review state, and routing decisions.
+
+## Ticket ownership and continuity
+
+Hermes must establish before launch:
+
 ```text
-V        = commander / product decision maker
-Hermes   = cockpit / traffic controller / reviewer / Done gate / Blocked authority
-Codex    = primary implementation coordinator for [Codex] tickets
-Claude   = isolated parallel lane worker for [Claude] tickets
-Kanban   = source of truth for current work state
+Assigned agent: <Codex|Claude|Grok>
+Original worker session: <CLI session id when known>
+Rework owner: same as Assigned agent / Original worker session
+Lane starter: yes|no
+Previous ticket: <id — title>|none
+Allowed to edit:
+Forbidden:
+Verification:
+Human review required: yes|no
 ```
+
+Current mode rules:
+
+- Production/test/migration/configuration implementation tickets are `[Codex]` only.
+- `[Claude]` and `[Grok]` tickets are planning, review, audit, or verification work unless V explicitly changes the coding law.
+- Rework returns to the same original worker and session.
+- Session loss does not silently authorize a replacement. Hermes must comment `WORKER CONTINUITY OVERRIDE` with the reason, evidence, replacement identity, and preserved context.
 
 ## Source-of-truth order
 
-When instructions conflict, follow this order:
-
 1. Safety and explicit V direction.
-2. Current Kanban ticket body and Hermes Kanban comments.
-3. This shared protocol and the agent-specific adapter.
-4. Repo guidance such as `AGENTS.md` and `.claude/skills/**/SKILL.md`.
-5. Chat prompts and prior memory.
+2. Latest applicable Hermes/human decision comment on the current ticket.
+3. Current ticket body and all comments in chronological order.
+4. This shared protocol and the agent-specific adapter.
+5. Repo guidance such as `AGENTS.md` and vendor skill files.
+6. Chat prompts and prior memory.
 
-If conflict remains, post a heartbeat asking Hermes for routing. Do not silently guess across file contracts.
+A newer comment may supersede an older comment, but agents must not cherry-pick. If comments conflict and no explicit supersession exists, post a blocker for Hermes.
 
-## Universal hard rules
+## Mandatory ticket-comment scan
 
-All agents must:
+Every worker, reviewer, and Hermes must read the full ticket body plus all comments:
 
-- Work only the currently assigned ticket/lane.
-- Read the full ticket body before editing: parents, children, dispatch packet, allowed files, forbidden files, verification, branch/worktree notes.
-- Treat Kanban ticket bodies/comments as the current mission contract.
-- Respect file ownership: one writer per file/hunk at a time.
-- Keep sibling lanes independent unless Hermes explicitly routes integration.
-- Use heartbeats for progress and blockers.
-- Keep the V-visible live-output channel current when Hermes declares live monitoring active.
-- Handoff with `READY FOR HERMES REVIEW`.
-- Let Hermes decide Done, Blocked resolution, and gate completion.
-- Preserve product behavior unless the ticket explicitly changes it.
-- Use test fixtures only for tests; never create fake runtime product data.
-- Redact secrets, tokens, auth headers, cookies, prompts, raw provider payloads, and private data.
+1. before claim/resume;
+2. before the first edit or review action;
+3. on every heartbeat/wakeup;
+4. after any status transition;
+5. before requesting peer review;
+6. before posting a review verdict or Hermes handoff;
+7. before rework after a ticket returns to `ready`;
+8. before human-review routing or Done.
 
-All agents must not:
+Every claim, heartbeat, review, and handoff records:
 
-- Mark their own tickets Done.
-- Push to remote without explicit V approval.
-- Delete database data or product data without explicit V approval for that specific deletion.
-- Touch files outside the ticket's allowed file contract.
-- Cross into another agent's lane without Hermes routing.
-- Add production observability infrastructure unless the ticket explicitly includes it.
+```text
+comments read through: <latest comment id or timestamp>
+```
 
-## Heartbeat format
+`ready` does not necessarily mean new work. It may mean Hermes or the human returned the ticket with required modifications. Read comments before acting.
 
-Use the agent-specific marker: `CODEX HEARTBEAT` or `CLAUDE HEARTBEAT`.
+## Logical review state machine
+
+Kanban may not have native peer-review, Hermes-review, or human-review columns. These comment markers are therefore binding logical states:
+
+```text
+ready
+  → WORKER CLAIM
+  → running / worker implements or authors artifact
+  → READY FOR PEER REVIEW
+  → independent reviewer
+      ├─ PEER REVIEW CHANGES REQUESTED → same worker/session fixes → peer re-review
+      └─ PEER REVIEW APPROVED + READY FOR HERMES REVIEW
+           → Hermes review
+               ├─ HERMES CHANGES REQUESTED → status ready + same worker/session
+               │    → REWORK ACKNOWLEDGED
+               │    → REWORK READY FOR HERMES REVIEW
+               │    → Hermes review again
+               └─ READY FOR HUMAN REVIEW / V MANUAL QA PACKET
+                    ├─ HUMAN REVIEW CHANGES REQUESTED → status ready + same worker/session
+                    └─ HUMAN REVIEW PASSED → Hermes Done
+```
+
+For an internal ticket whose contract explicitly says `Human review required: no`, Hermes may complete after independent review and direct verification. User-facing, UX-sensitive, feature-level, or closure tickets default to human review.
+
+## Flow requirements
+
+### 1. Worker claim and work
+
+The assigned worker reads all comments, records its session identity, claims the ticket, and posts `WORKER CLAIM`. It then works only the ticket/file contract and keeps comment scans current.
+
+### 2. Worker asks for peer review
+
+First-pass work ends with `READY FOR PEER REVIEW`, not `READY FOR HERMES REVIEW`. The worker attaches diff/artifact, RED/GREEN evidence where applicable, exact checks, risks, and the latest comment cursor.
+
+### 3. Independent reviewer gate
+
+The reviewer must be a different agent/session and read-only for the reviewed change.
+
+- On rejection, post `PEER REVIEW CHANGES REQUESTED` with concrete evidence. Return findings to the same worker/session. The reviewer does not write the fix.
+- On approval, post `PEER REVIEW APPROVED`, then `READY FOR HERMES REVIEW`. The reviewer—not the original worker—advances first-pass work to Hermes.
+
+### 4. Hermes gate
+
+Hermes reads the complete comment chain and verifies actual evidence.
+
+- If changes are required, post `HERMES CHANGES REQUESTED`, set the ticket to `ready`, preserve assignment and original session, and name the exact comment/findings the worker must address.
+- If human review is required, post `READY FOR HUMAN REVIEW` plus a `V MANUAL QA PACKET` and place a routing hold so no worker reclaims it while V reviews.
+- If the contract explicitly waives human review and acceptance is proven, Hermes may complete with evidence.
+
+### 5. Same-worker rework loop
+
+A ticket returned to `ready` is reclaimed by the same worker/session. The worker posts `REWORK ACKNOWLEDGED`, addresses every listed finding, and then posts `REWORK READY FOR HERMES REVIEW` directly to Hermes. Peer re-review is optional only when Hermes's comment explicitly requests it; otherwise the correction loop returns directly to Hermes as V specified.
+
+Hermes again chooses human review, another `ready` rework loop, or evidence-backed completion when human review was explicitly waived.
+
+### 6. Human review
+
+Hermes relays the human packet to V and writes V's verdict back to the ticket.
+
+- Pass: `HUMAN REVIEW PASSED`; Hermes completes Done.
+- Changes: `HUMAN REVIEW CHANGES REQUESTED`; Hermes records actionable findings, returns the ticket to `ready`, and preserves the same rework owner/session.
+
+## Required comment templates
+
+### Post-dialogue compaction checkpoint
+
+```text
+<AGENT> COMPACTION CHECKPOINT:
+- mission/stage/ticket:
+- CLI session id:
+- sequence completed:
+- durable artifact/diff/comment paths:
+- command used: /compact <context> | /compact
+- last substantive turn included: yes
+- success evidence:
+- post-compact state: parked | awaiting_review | ready_for_revision | complete
+- comments read through: <id/timestamp | not ticketed>
+```
+
+If compaction fails, use `COMPACTION BLOCKED` with the CLI/version/session,
+command, raw error, durable-state locations, and smallest safe recovery. Never
+silently replace the session.
+
+### Numbered-stage handoff/gate
+
+Step 1 uses:
+
+```text
+RESEARCH HANDOFF COMPLETE:
+- mission/step:
+- Grok CLI session:
+- Research.md path:
+- sources/evidence named:
+- assumptions/risks:
+- comments read through: <id/timestamp | not ticketed>
+```
+
+Steps 2–5 use:
+
+```text
+READY FOR HERMES STAGE REVIEW:
+- mission/step:
+- owner CLI session:
+- artifact path:
+- upstream artifacts used:
+- checks/evidence:
+- assumptions/risks:
+- comments read through: <id/timestamp | not ticketed>
+```
+
+Hermes records `HERMES STAGE REVIEW PASS` or
+`HERMES STAGE REVIEW CHANGES REQUESTED` with the artifact, evidence inspected,
+stage-contract verdict, exact findings/required changes, original owner/session,
+and whether the next stage remains blocked. Step 6 records
+`HERMES STEP 6 SELF-AUDIT PASS` or its CHANGES REQUESTED counterpart.
+
+### WORKER CLAIM
+
+```text
+WORKER CLAIM:
+- agent:
+- ticket:
+- worker CLI session id:
+- branch/worktree:
+- assignment type: first_pass | rework
+- comments read through:
+- next action:
+```
+
+### Heartbeat
+
+Use `CODEX HEARTBEAT`, `CLAUDE HEARTBEAT`, or `GROK HEARTBEAT`.
 
 ```text
 <AGENT> HEARTBEAT:
 - current ticket:
-- state: working | ready_for_review | blocked | idle | stalled
+- state: working | awaiting_peer_review | awaiting_hermes | awaiting_human | blocked | idle | stalled
+- worker/reviewer CLI session id:
 - branch/worktree:
 - last command/check:
-- files changed:
-- files intentionally owned:
-- subagents/workstreams active/completed:
+- files/artifact changed:
+- comments read through:
+- live-output channel/path:
 - needs Hermes: yes/no
 ```
 
-Post heartbeats while working, waiting for review, blocked, or idle due to routing uncertainty.
-
-## V-visible live-output channel
-
-Kanban remains the durable source of truth, but V should not need to ask Hermes for routine status while agents are running.
-
-When Hermes routes one or more agents and declares `LIVE MONITORING ACTIVE`, Hermes must create one dedicated live-output channel per active agent/ticket. The channel may be a separate visible terminal/chat/session, a named agent run whose stdout is visible to V, or another explicit UI surface V can keep open. If the runtime cannot create a separate chat/session, Hermes must fall back to a visible log file under `.hermes/live/` and state that fallback in the routing packet.
-
-Required live channel naming:
+### READY FOR PEER REVIEW
 
 ```text
-DebateAI <AGENT> <ticket-id> live
+READY FOR PEER REVIEW:
+- worker:
+- worker CLI session id:
+- ticket:
+- branch/worktree:
+- commit SHA if committed:
+- files/artifact changed:
+- RED/GREEN evidence if code:
+- tests/checks with exact output:
+- allowed-scope evidence:
+- risks/open questions:
+- comments read through:
 ```
 
-Agents must write short, V-readable progress lines to that channel at startup, at meaningful milestones, before/after long commands, on blockers, and at handoff. Do not stream secrets, raw auth tokens, cookies, private prompts, or unredacted provider payloads.
-
-Live update format:
+### PEER REVIEW CHANGES REQUESTED
 
 ```text
-[HH:MM] <AGENT> <ticket-id> — <state>: <one-line action/result/next step>
+PEER REVIEW CHANGES REQUESTED:
+- reviewer:
+- reviewer CLI session id:
+- ticket:
+- verdict: RED
+- findings with severity and evidence:
+- required modifications:
+- required verification:
+- route to: same original worker/session
+- comments read through:
 ```
 
-Examples:
+### PEER REVIEW APPROVED and READY FOR HERMES REVIEW
 
 ```text
-[16:42] CODEX t_123 — working: running focused scoring UI tests
-[16:47] CLAUDE t_456 — audit: found possible API/schema mismatch, checking callers
-[16:50] CODEX t_123 — blocked: app port 3010 unavailable; trying alternate port 3020
+PEER REVIEW APPROVED:
+- reviewer:
+- reviewer CLI session id:
+- ticket:
+- verdict: GREEN
+- evidence inspected:
+- checks independently run:
+- residual risks:
+- comments read through:
+
+READY FOR HERMES REVIEW:
+- sent by reviewer:
+- original worker/session:
+- ticket:
+- branch/worktree:
+- commit SHA if committed:
+- files/artifact changed:
+- worker evidence:
+- reviewer evidence:
+- human review required by contract: yes/no
+- recommended Hermes action:
 ```
 
-Live-output rules:
+### HERMES CHANGES REQUESTED
 
-- Live output is for V visibility only; it does not replace Kanban comments, heartbeats, blockers, or READY FOR HERMES REVIEW.
-- Every heartbeat/blocker/handoff still goes to Kanban.
-- For long-running commands, post a line before starting and a line with exit code/result after completion.
-- If an agent uses subagents/workstreams, summarize them in the same live channel rather than making V chase hidden logs.
-- If the live channel fails, post a Kanban heartbeat noting `live-output degraded` and the fallback path.
+```text
+HERMES CHANGES REQUESTED:
+- ticket:
+- verdict: return_to_ready
+- original worker/session:
+- findings with evidence:
+- required modifications:
+- required verification:
+- comments worker must read through:
+- peer re-review required: yes/no
+- assignment preserved: yes
+```
+
+Hermes then sets the ticket to `ready` without changing the assigned worker.
+
+### REWORK ACKNOWLEDGED and REWORK READY FOR HERMES REVIEW
+
+```text
+REWORK ACKNOWLEDGED:
+- worker/session:
+- ticket:
+- triggering Hermes/human comment:
+- findings understood:
+- comments read through:
+
+REWORK READY FOR HERMES REVIEW:
+- worker/session:
+- ticket:
+- triggering findings addressed one by one:
+- files/artifact changed:
+- RED/GREEN evidence if code:
+- exact checks/output:
+- residual risks:
+- comments read through:
+```
+
+### READY FOR HUMAN REVIEW
+
+```text
+READY FOR HUMAN REVIEW:
+- ticket:
+- Hermes verdict:
+- worker/reviewer evidence summary:
+- environment/URL:
+- exact steps for V:
+- expected result:
+- known caveats:
+- pass/fail response needed:
+```
+
+Hermes also writes either `HUMAN REVIEW PASSED` or `HUMAN REVIEW CHANGES REQUESTED` after V responds.
 
 ## Blocked format
 
-Use the agent-specific marker: `CODEX BLOCKED` or `CLAUDE BLOCKED`.
+Use `CODEX BLOCKED`, `CLAUDE BLOCKED`, or `GROK BLOCKED`.
 
 ```text
 <AGENT> BLOCKED:
 - active ticket:
-- blocker type: local | dependency | process | safety | architecture | file_contract | verification
+- blocker type: dependency | process | safety | architecture | file_contract | verification | session_continuity
 - exact blocker:
 - file/ownership conflict if any:
+- comments read through:
 - proposed smallest unblock:
 - needs Hermes: yes/no
 ```
 
-Only use Blocked for true blockers:
+Use Blocked only for a true blocker: forbidden files, destructive data, missing dependency, architecture/product decision, secret/private-data risk, impossible verification, contradictory routing, or lost required session continuity. Local friction is not a goal blocker.
 
-- forbidden files appear required;
-- destructive data action is needed;
-- dependency is missing or not Done;
-- architecture/product decision is required;
-- secret/private-data risk is unclear;
-- verification is impossible with available repo/tooling;
-- Kanban routing is absent or contradictory.
+## V-visible live-output channel
 
-Do not block the whole goal for local implementation friction, generated worktree path confusion, branch uncertainty when the branch is declared, or prior completed ticket state. Fix the smallest local slice or post a heartbeat with `needs Hermes: yes`.
-
-## Handoff format
-
-Use this exact marker when implementation is ready for Hermes:
+When Hermes declares `LIVE MONITORING ACTIVE`, each active worker/reviewer maintains a dedicated channel or `.hermes/live/` fallback:
 
 ```text
-READY FOR HERMES REVIEW:
-- agent:
-- ticket:
-- branch:
-- worktree/path:
-- commit SHA if committed:
-- files changed:
-- tests/checks run with exact output:
-- scope/allowed-file evidence:
-- privacy/redaction evidence if relevant:
-- collision check result:
-- subagents/workstreams used:
-- risks/blockers:
-- recommended Hermes action:
+DebateAI <AGENT> <ticket-id> <worker|reviewer> live
+[HH:MM] <AGENT> <ticket-id> — <state>: <one-line action/result/next step>
 ```
 
-After handoff, the implementation agent waits for Hermes. Hermes reviews, completes, blocks with exact reasons, or promotes the next ticket.
+Live output does not replace comments. Claims, heartbeats, review requests, verdicts, Hermes decisions, and human verdicts still go to the ticket.
 
-## Same-file and parallelism rule
-
-Parallelism means non-overlapping file ownership, not multiple agents editing the same thing faster.
+## Parallelism and file ownership
 
 - One writer per file/hunk.
-- Read-only audit/planning can run in parallel with implementation.
-- If overlap appears, pause the lower-priority lane and post a heartbeat/blocker naming the path and proposed serialization.
-- Avoid simultaneous heavy builds/tests on V's laptop. Run targeted checks sequentially when in doubt.
+- Reviewer sessions are read-only.
+- Sibling implementation tickets may run in parallel only with non-overlapping file contracts.
+- Planning/audit can run in parallel when read-only and cheap.
+- Avoid simultaneous heavy builds/tests on V's laptop; serialize them when in doubt.
+- A ticket returned for changes remains assigned to its original worker. Do not give it to an idle different worker merely for speed.
+
+## Universal safety rules
+
+Agents must not:
+
+- mark their own ticket Done;
+- push without explicit V approval;
+- delete database/product data without V's explicit approval for that deletion;
+- cross file contracts;
+- create fake runtime product data;
+- reveal secrets, tokens, cookies, private prompts, raw provider payloads, or private data;
+- let a reviewer edit the change it reviews;
+- ignore a newer ticket comment because an older prompt is more convenient.
 
 ## Hermes cockpit responsibilities
 
-Hermes should:
+Hermes must:
 
-- Create/repair Kanban tickets and file contracts when missing.
-- Assign tickets to the correct agent.
-- When routing active Codex/Claude work for V, open or declare the live-output channel(s) before launching the agent process.
-- Promote the next safe ticket only when dependencies are satisfied.
-- Comment guidance directly on tickets when agents self-block or lack routing.
-- Review handoffs with real commands/evidence.
-- Complete Done gates and remove temporary heartbeat watchers when a wave is clean.
-- Interrupt V only for decisions Hermes cannot safely make.
+1. create/repair tickets, dependencies, owner tags, file contracts, review requirements, and human-gate requirements;
+2. record worker/reviewer CLI session handles;
+3. ensure workers and reviewers scan comments at every boundary;
+4. keep the same worker/session on rework;
+5. launch a genuinely separate read-only reviewer for first-pass work;
+6. reject a `READY FOR HERMES REVIEW` posted by the original first-pass worker without peer-review evidence;
+7. verify comments, diff/artifact, tests, runtime evidence, and reviewer evidence;
+8. route either to human review or back to `ready` with an actionable comment;
+9. copy human verdicts into the ticket;
+10. own Done/Blocked and interrupt V only for real decisions.
 
-## Agent self-block prevention
+## Stop conditions
 
-If an active ticket exists, agents should continue that ticket unless a true blocker exists. Worktree path weirdness is not a goal blocker. Use the declared branch/worktree if available, or the already-used lane worktree, and report the actual path in handoff.
+Stop and ask Hermes through comments when:
 
-Hermes may add a ticket comment titled:
-
-```text
-HERMES ROUTING GUIDANCE — DO NOT SELF-BLOCK THE GOAL
-```
-
-When that appears, the agent must follow it as current routing law.
+- assignment/owner/session identity is missing or contradictory;
+- a returned `ready` ticket appears assigned to a different worker without `WORKER CONTINUITY OVERRIDE`;
+- comments conflict without explicit supersession;
+- allowed files or verification are absent;
+- a required parent is not Done;
+- destructive or secret-bearing work is required;
+- review independence cannot be established;
+- the original session is lost and no continuity decision exists.

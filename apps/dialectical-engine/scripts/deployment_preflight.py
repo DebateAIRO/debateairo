@@ -36,7 +36,7 @@ GROK_PROMPT_FLAG_PATTERN = re.compile(r"(?<!\S)(?:-p|--prompt)(?:[=\s,]|$)")
 ADAPTER_API_ENV_VARS = ("GEMINI_API_KEY", "XAI_API_KEY")
 API_KEY_MODEL_REQUIREMENTS = {
     "gemini-2.5-flash": "GEMINI_API_KEY",
-    "grok-4": "XAI_API_KEY",
+    "grok-4.5": "XAI_API_KEY",
 }
 INSTALLED_AGENT_SPECS = {
     "coordinator": {
@@ -645,13 +645,13 @@ def grok_cli_prompt_flag_check(path: str) -> tuple[Check, bool]:
             timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return warn_check("adapter-command:grok-4", f"{path}; help check failed: {exc}"), False
+        return warn_check("adapter-command:grok-4.5", f"{path}; help check failed: {exc}"), False
 
     help_text = f"{result.stdout}\n{result.stderr}"
     if result.returncode == 0 and GROK_PROMPT_FLAG_PATTERN.search(help_text):
-        return pass_check("adapter-command:grok-4", f"{path}; supports -p prompt mode"), True
+        return pass_check("adapter-command:grok-4.5", f"{path}; supports -p prompt mode"), True
     return (
-        warn_check("adapter-command:grok-4", f"{path}; does not advertise noninteractive -p/--prompt mode"),
+        warn_check("adapter-command:grok-4.5", f"{path}; does not advertise noninteractive -p/--prompt mode"),
         False,
     )
 
@@ -672,7 +672,7 @@ def real_adapter_checks(allow_no_real_adapters: bool, adapter_api_env: dict[str,
         ("claude", "claude-sonnet-4-6"),
         ("codex", "codex-gpt-5.5"),
         ("gemini", "gemini-2.5-flash"),
-        ("grok", "grok-4"),
+        ("grok", "grok-4.5"),
     ):
         path = shutil.which(command)
         if path:
@@ -708,7 +708,7 @@ def real_adapter_checks(allow_no_real_adapters: bool, adapter_api_env: dict[str,
             checks.append(warn_check(f"adapter-command:{model}", f"{command} not found on PATH"))
 
     if source := adapter_api_credential_source("XAI_API_KEY", adapter_api_env):
-        detected.append("grok-4")
+        detected.append("grok-4.5")
         checks.append(pass_check("adapter-credential:xai-api", f"XAI_API_KEY is set in {source}"))
         checks.append(warn_check("adapter-auth:xai-api", "API key is present but no model request was made"))
     else:

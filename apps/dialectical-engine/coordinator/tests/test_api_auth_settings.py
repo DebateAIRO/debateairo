@@ -821,9 +821,9 @@ def test_settings_api_persists_enabled_models_and_filters_created_jobs(db) -> No
     assert "mock-local" in response.json()["configured_models"]
     assert response.json()["grok_monthly_spend_usd"] == 0
     assert response.json()["grok_pricing_usd_per_million_tokens"] == {"input": 1.25, "output": 2.5}
-    assert response.json()["model_monthly_caps_usd"]["grok-4"] == 25.0
+    assert response.json()["model_monthly_caps_usd"]["grok-4.5"] == 25.0
     assert response.json()["model_monthly_spend_usd"]["codex-gpt-5.5"] == 0
-    assert response.json()["model_pricing_usd_per_million_tokens"]["grok-4"] == {"input": 1.25, "output": 2.5}
+    assert response.json()["model_pricing_usd_per_million_tokens"]["grok-4.5"] == {"input": 1.25, "output": 2.5}
     persisted = db.get(Setting, RUNTIME_SETTINGS_KEY)
     assert persisted is not None
     assert persisted.value["enabled_models"] == ["codex-gpt-5.5"]
@@ -866,9 +866,9 @@ def test_settings_api_persists_model_monthly_caps(db) -> None:
     legacy = client.put("/api/settings", headers=USER_HEADERS, json={"grok_monthly_cap_usd": 7})
 
     assert legacy.status_code == 200
-    assert legacy.json()["model_monthly_caps_usd"]["grok-4"] == 7
+    assert legacy.json()["model_monthly_caps_usd"]["grok-4.5"] == 7
     db.expire_all()
-    assert db.get(Setting, RUNTIME_SETTINGS_KEY).value["model_monthly_caps_usd"]["grok-4"] == 7
+    assert db.get(Setting, RUNTIME_SETTINGS_KEY).value["model_monthly_caps_usd"]["grok-4.5"] == 7
 
 
 def test_debate_create_rejects_invalid_config_values(db) -> None:

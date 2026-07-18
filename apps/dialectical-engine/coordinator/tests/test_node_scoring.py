@@ -1739,6 +1739,51 @@ def test_single_node_judge_prompt_contract_includes_json_schema_expectations() -
     assert "Never invent evidence" in messages[0]["content"]
 
 
+def test_verifier_prompt_requests_the_lifecycle_authoritative_verdict_schema() -> None:
+    messages = render_single_node_judge_prompt(
+        ScoringProviderRequest(
+            claim=base_claim(
+                node_id="claim-1",
+                raw_text="A cited study reports 10% adoption.",
+                evidence_refs=["https://example.com/study"],
+            ),
+            argument_text="The parent argument cites a study as support.",
+            judge_role="verifier",
+            metadata={
+                "evidence_text": "The cited study reports 10% adoption.",
+                "evidence_kind": "statistical",
+            },
+        )
+    )
+
+    payload = json.loads(messages[1]["content"])
+    schema = payload["instructions"]["schema"]
+
+    assert payload["instructions"]["output"] == "evidence verification verdict JSON only"
+    assert schema["required"] == ["verdict"]
+    assert schema["properties"]["verdict"]["enum"] == [
+        "supported",
+        "contradicted",
+        "unverifiable",
+    ]
+    evidence_schema = schema["properties"]["evidence"]
+    assert evidence_schema["required"] == [
+        "status",
+        "base_score",
+        "uncertainty",
+        "entailment",
+        "caveats",
+    ]
+    assert evidence_schema["properties"]["status"]["const"] == "grounded"
+    assert evidence_schema["properties"]["entailment"]["const"] == "SUPPORTS"
+    verdict_condition = schema["allOf"][0]
+    assert verdict_condition["then"]["required"] == ["evidence"]
+    assert verdict_condition["else"]["not"]["required"] == ["evidence"]
+    assert payload["claim_argument_text"] == "The parent argument cites a study as support."
+    assert payload["evidence_text"] == "The cited study reports 10% adoption."
+    assert "Only return grounded evidence values when the verdict is supported" in messages[0]["content"]
+
+
 def test_parse_judge_json_returns_assessment_for_valid_structured_output() -> None:
     result = parse_judge_json(json.dumps(base_assessment().model_dump(mode="json")))
 
@@ -6946,7 +6991,7 @@ def test_scoring_jobs_api_authenticated_refresh_completes_inline_and_persists_jo
     assert scoring_payload["items"][0]["node_id"] == root.id
 
 
-def test_scoring_api_expires_stale_internal_scoring_job_without_reusing_it(db, monkeypatch) -> None:
+def test_scoring_api_requeues_stale_internal_scoring_job_without_reusing_it(db, monkeypatch) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
     root = Node(
@@ -6990,18 +7035,30 @@ def test_scoring_api_expires_stale_internal_scoring_job_without_reusing_it(db, m
 
     assert response.status_code == 200
     body = response.json()
-    assert "active_scoring_job_id" not in body
     assert body["status"] == "unavailable"
-    assert body["reason"] == "No scoring judge outputs are available for this debate."
-    assert len(fake_provider.calls) == 0
+    assert body["reason"] == "Judge outputs are being generated."
+    assert body["active_scoring_job_status"] == "running"
+    assert len(fake_provider.calls) == 1
 
     db.expire_all()
     refreshed_job = db.get(Job, job.id)
     assert refreshed_job is not None
     assert refreshed_job.status == "failed"
     assert refreshed_job.error == "Stale scoring job expired before judge outputs were produced."
-    assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all() == []
-    assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
+    jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate").order_by(Job.created_at.asc())
+    ).all()
+    assert len(jobs) == 2
+    fresh_job = jobs[1]
+    assert fresh_job.id != job.id
+    assert fresh_job.status == "complete"
+    assert fresh_job.error is None
+    assert body["active_scoring_job_id"] == fresh_job.id
+    analyzer_runs = db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()
+    assert len(analyzer_runs) == 1
+    persisted_payload = TestClient(app).get(f"/api/debates/{debate.id}/scoring").json()
+    assert persisted_payload["status"] == "available"
+    assert persisted_payload["items"][0]["node_id"] == root.id
 
 
 def test_scoring_jobs_api_authenticated_refresh_failure_stays_honest_unavailable(db, monkeypatch) -> None:

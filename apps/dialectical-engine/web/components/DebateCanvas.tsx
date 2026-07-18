@@ -25,6 +25,23 @@ import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 // for the honesty contract (missing score is never treated as low strength).
 const VERDICT_FIRST_UI_ENABLED = process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true";
 
+function isSetAsidePath(node: DebateNode): boolean {
+  const pathStatus = node.path_status?.trim().toLowerCase();
+  const stoppingStatus = node.stopping_status?.trim().toLowerCase();
+  return (
+    pathStatus === "abandoned" ||
+    stoppingStatus === "abandon" ||
+    stoppingStatus === "abandoned"
+  );
+}
+
+function withoutSetAsidePaths(node: DebateNode): DebateNode {
+  const children = node.children
+    .filter((child) => !isSetAsidePath(child))
+    .map(withoutSetAsidePaths);
+  return { ...node, children };
+}
+
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
   onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
@@ -62,6 +79,7 @@ export function DebateCanvas({
   canvasRef
 }: DebateCanvasProps) {
   const [heights, setHeights] = useState<Record<string, number>>({});
+  const [showSetAsidePaths, setShowSetAsidePaths] = useState(true);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const heightOf = useCallback(
@@ -70,7 +88,8 @@ export function DebateCanvas({
     [heights, expanded]
   );
 
-  const layout = layoutTree(root, heightOf);
+  const visibleRoot = showSetAsidePaths ? root : withoutSetAsidePaths(root);
+  const layout = layoutTree(visibleRoot, heightOf);
 
   // Measure rendered cards and re-layout when their real heights differ.
   useLayoutEffect(() => {
@@ -97,10 +116,35 @@ export function DebateCanvas({
       return Object.keys(filtered).length === Object.keys(current).length ? current : filtered;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [root]);
+  }, [root, showSetAsidePaths]);
 
   return (
     <div className="canvas scroll" ref={canvasRef}>
+      <label
+        style={{
+          position: "sticky",
+          top: 12,
+          left: 12,
+          zIndex: 4,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          margin: 12,
+          padding: "7px 10px",
+          border: "1px solid var(--line-2)",
+          borderRadius: 8,
+          background: "var(--surface)",
+          color: "var(--text-2)",
+          boxShadow: "var(--shadow-card)"
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={showSetAsidePaths}
+          onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
+        />
+        Show set-aside paths
+      </label>
       <div className="canvasInner" style={{ width: layout.width, height: layout.height }}>
         <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
           {layout.connectors.map((c) => (
@@ -174,6 +218,7 @@ function CanvasCard({
   const generation = node.active_generation;
   const model = generation ? modelMeta(generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
+  const setAside = isSetAsidePath(node);
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -225,6 +270,7 @@ function CanvasCard({
       className="nodeWrap"
       style={cardStyle}
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
+      data-set-aside={setAside ? "true" : undefined}
     >
       <div
         ref={registerRef}
@@ -237,6 +283,21 @@ function CanvasCard({
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
             <span className="scrutinyDot" style={{ background: scrutiny.color }} />
             <span style={{ color: scrutiny.color }}>{scrutiny.label}</span>
+          </span>
+        ) : null}
+
+        {setAside ? (
+          <span
+            className="roleBadge"
+            style={{
+              display: "inline-flex",
+              marginBottom: 7,
+              color: "var(--text-2)",
+              background: "var(--surface-sunken)",
+              borderColor: "var(--line-2)"
+            }}
+          >
+            Set aside
           </span>
         ) : null}
 

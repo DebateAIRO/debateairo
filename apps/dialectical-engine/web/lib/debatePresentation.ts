@@ -1,6 +1,10 @@
 import type { ArgumentClaimView, DebateNode } from "./types";
 import { toArgumentClaimStatus } from "./debateTreeUtils";
 
+export function formatDialecticalSupport(value: number, semanticsVersion: string): string {
+  return `Dialectical support under semantics version ${semanticsVersion}: ${value}`;
+}
+
 export type Role = "root" | "pro" | "con" | "pov";
 export type ClaimRenderState = "root" | "pending" | "streaming" | "done" | "empty" | "abandoned";
 

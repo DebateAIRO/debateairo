@@ -199,15 +199,15 @@ def test_required_worker_api_key_checks_fail_when_required_key_is_missing(monkey
     module = load_deployment_preflight_module()
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    checks = checks_by_name(module.required_worker_api_key_checks("gemini-2.5-flash,grok-4", {}))
+    checks = checks_by_name(module.required_worker_api_key_checks("gemini-2.5-flash,grok-4.5", {}))
 
     assert checks["worker-api-key:gemini-2.5-flash"].status == "FAIL"
     assert "GEMINI_API_KEY is not set in the installed worker launchd environment" in checks[
         "worker-api-key:gemini-2.5-flash"
     ].detail
-    assert checks["worker-api-key:grok-4"].status == "FAIL"
+    assert checks["worker-api-key:grok-4.5"].status == "FAIL"
     assert "XAI_API_KEY is not set in the installed worker launchd environment" in checks[
-        "worker-api-key:grok-4"
+        "worker-api-key:grok-4.5"
     ].detail
 
 
@@ -619,10 +619,10 @@ def test_real_adapter_checks_accept_grok_cli_prompt_mode(monkeypatch) -> None:
 
     checks = checks_by_name(module.real_adapter_checks(allow_no_real_adapters=False))
 
-    assert checks["adapter-command:grok-4"].status == "PASS"
-    assert "supports -p prompt mode" in checks["adapter-command:grok-4"].detail
+    assert checks["adapter-command:grok-4.5"].status == "PASS"
+    assert "supports -p prompt mode" in checks["adapter-command:grok-4.5"].detail
     assert checks["real-adapter-invocation"].status == "PASS"
-    assert checks["real-adapter-invocation"].detail.startswith("grok-4;")
+    assert checks["real-adapter-invocation"].detail.startswith("grok-4.5;")
 
 
 def test_real_adapter_checks_do_not_count_grok_cli_without_prompt_mode(monkeypatch) -> None:
@@ -635,10 +635,10 @@ def test_real_adapter_checks_do_not_count_grok_cli_without_prompt_mode(monkeypat
 
     checks = checks_by_name(module.real_adapter_checks(allow_no_real_adapters=False))
 
-    assert checks["adapter-command:grok-4"].status == "WARN"
-    assert "does not advertise noninteractive" in checks["adapter-command:grok-4"].detail
-    assert checks["adapter-auth:grok-4"].status == "WARN"
-    assert "XAI_API_KEY" in checks["adapter-auth:grok-4"].detail
+    assert checks["adapter-command:grok-4.5"].status == "WARN"
+    assert "does not advertise noninteractive" in checks["adapter-command:grok-4.5"].detail
+    assert checks["adapter-auth:grok-4.5"].status == "WARN"
+    assert "XAI_API_KEY" in checks["adapter-auth:grok-4.5"].detail
     assert checks["real-adapter-invocation"].status == "FAIL"
 
 
@@ -676,7 +676,7 @@ def test_real_adapter_checks_count_launchd_api_keys_when_shell_env_is_absent(mon
     assert checks["adapter-credential:xai-api"].status == "PASS"
     assert checks["adapter-credential:xai-api"].detail == "XAI_API_KEY is set in worker launchd environment"
     assert checks["real-adapter-invocation"].status == "PASS"
-    assert checks["real-adapter-invocation"].detail.startswith("gemini-2.5-flash, grok-4;")
+    assert checks["real-adapter-invocation"].detail.startswith("gemini-2.5-flash, grok-4.5;")
 
 
 def test_real_adapter_checks_ignore_placeholder_api_keys(monkeypatch) -> None:

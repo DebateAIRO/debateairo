@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -24,7 +25,7 @@ test("frontend status presentation uses one shared abandoned-status normalizer",
   assert.match(presentation, /import \{ toArgumentClaimStatus \} from "\.\/debateTreeUtils";/);
   assert.match(scoring, /import \{ toArgumentClaimStatus \} from "\.\/debateTreeUtils";/);
   assert.match(drawer, /import \{ isAbandonedArgumentStatus \} from "@\/lib\/debateTreeUtils";/);
-  assert.match(tree, /import \{ isAbandonedArgumentStatus \} from "@\/lib\/debateTreeUtils";/);
+  assert.match(tree, /import \{[^}]*\bisAbandonedArgumentStatus\b[^}]*\} from "@\/lib\/debateTreeUtils";/);
 
   const duplicateInlineChecks = [presentation, scoring, drawer, tree].filter((source) =>
     /s === "abandoned" \|\| s === "stale" \|\| s === "paused" \|\| s === "stopped"/.test(source)

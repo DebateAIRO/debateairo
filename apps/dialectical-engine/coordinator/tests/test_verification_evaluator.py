@@ -195,6 +195,7 @@ def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(d
     assert len(fake_provider.requests) == 1
     request = fake_provider.requests[0]
     assert request.judge_role == "verifier"
+    assert request.prompt_version == "evidence-verification-v1"
     assert request.metadata["evidence_text"] == evidence_node.claim
     assert request.metadata["evidence_kind"] == "statistical"
 

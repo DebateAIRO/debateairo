@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import RUNTIME_SETTINGS_KEY, bool_env, load_settings
 from app.core.write_lock import commit_write, flush_write
+
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
 from app.services.events import event_bus
 from app.services.prompts import render_prompt
@@ -35,6 +36,10 @@ SWARM_DEFAULT_MODEL_ID = "codex-gpt-5.5"
 MAX_STREAM_DELTA_CHARS = 16_384
 MAX_STREAM_BUFFER_CHARS = 200_000
 MUTABLE_JOB_STATUSES = {"claimed", "running"}
+PUBLIC_NODE_FAILURE_CODE = "claim_generation_failed"
+PUBLIC_NODE_FAILURE_MESSAGE = "Claim generation failed"
+PUBLIC_DEBATE_FAILURE_CODE = "debate_generation_failed"
+PUBLIC_DEBATE_FAILURE_MESSAGE = "Debate generation failed"
 V2_POV_ROLES = {
     "SCIENTIFIC_POV": "Scientific POV",
     "STATISTICAL_POV": "Statistical POV",
@@ -385,7 +390,13 @@ def _candidate_child_claims(result: Any) -> list[dict[str, str]]:
     return candidates
 
 
-def _score_signal_for_node(node: Node) -> ScoreSignal:
+def _score_signal_for_node(node: Node):
+    """Construct the legacy LIP-00 negative example for contract tests only.
+
+    Production orchestration never calls this helper.  It remains importable
+    so the persistence contract can prove that the old all-neutral shape is
+    non-authoritative and cannot pass the lifecycle mapper.
+    """
     from app.exploration.policy import ScoreSignal
 
     return ScoreSignal(
@@ -402,32 +413,82 @@ def _score_signal_for_node(node: Node) -> ScoreSignal:
 
 
 def exploration_decision_for_node(db: Session, debate: Debate, node: Node):
-    from app.exploration.policy import ExplorationPolicy
+    if db is None or debate is None:
+        # LIP-00's read-only negative contract invokes this seam without a
+        # persistence context.  Fail safe explicitly; do not reinterpret the
+        # legacy neutral helper above as authenticated policy input.
+        from app.exploration.policy import ExpansionDecision
 
-    return ExplorationPolicy().decide(
-        score=_score_signal_for_node(node),
-        evidence=None,
-        path_state="abandoned" if node.path_status == "abandoned" else "active",
+        return ExpansionDecision(
+            node_id=node.id,
+            action="continue",
+            priority=0.0,
+            reasons=("lifecycle inputs unavailable: persistence context missing",),
+            keeps_path_active=True,
+        )
+    from app.exploration.lifecycle_decision_service import decide_lifecycle_for_node
+
+    return decide_lifecycle_for_node(
+        db,
+        debate=debate,
+        node=node,
+        decision_timestamp=now_utc(),
     )
 
 
-def spawn_child_argument_jobs(db: Session, debate: Debate, parent: Node, child_candidates: list[dict[str, str]]) -> None:
+def spawn_child_argument_jobs(
+    db: Session,
+    debate: Debate,
+    parent: Node,
+    child_candidates: list[dict[str, str]],
+    *,
+    decision: Any | None = None,
+) -> int:
     max_depth = int(debate.config.get("max_depth", 2))
-    if parent.depth >= max_depth:
-        return
-    existing = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.status != "stale").limit(1))
-    if existing:
-        return
-    decision = exploration_decision_for_node(db, debate, parent)
+    if decision is None:
+        decision = exploration_decision_for_node(db, debate, parent)
+    authentic_decision = bool(getattr(decision, "authentic_policy_decision", True))
+    if not authentic_decision and (
+        parent.path_status == "abandoned" or parent.depth >= max_depth
+    ):
+        return 0
     parent.stopping_status = decision.action
-    parent.stopping_reason = "; ".join(decision.reasons) if decision.reasons else None
-    if decision.action == "abandon" or not decision.keeps_path_active:
-        parent.path_status = "abandoned"
-        return
+    stopping_reason = getattr(decision, "stopping_reason", None)
+    if not isinstance(stopping_reason, str) or not stopping_reason.strip():
+        reasons = getattr(decision, "reasons", ())
+        stopping_reason = "; ".join(reasons) if reasons else f"lifecycle action: {decision.action}"
+    parent.stopping_reason = stopping_reason
+    keeps_path_active = bool(decision.keeps_path_active) and decision.action != "abandon"
+    parent.path_status = "active" if keeps_path_active else "abandoned"
+    if not keeps_path_active:
+        return 0
+    if parent.depth >= max_depth:
+        return 0
     if decision.action not in {"continue", "deepen", "challenge"}:
-        return
+        return 0
+    existing = db.scalar(
+        select(Node)
+        .where(
+            Node.parent_id == parent.id,
+            Node.node_type != "EVIDENCE",
+            Node.status != "stale",
+        )
+        .limit(1)
+    )
+    if existing:
+        return 0
     branching = int(debate.config.get("branching", 2))
-    for position, candidate in enumerate(child_candidates[:branching]):
+    selected_candidates = child_candidates[:branching]
+    if any(
+        not isinstance(candidate, dict)
+        or candidate.get("node_type") not in {"PRO", "CON"}
+        or not isinstance(candidate.get("claim"), str)
+        or not candidate["claim"].strip()
+        for candidate in selected_candidates
+    ):
+        return 0
+    child_spawn_count = 0
+    for position, candidate in enumerate(selected_candidates):
         node_type = candidate["node_type"]
         child = Node(
             debate_id=debate.id,
@@ -450,6 +511,137 @@ def spawn_child_argument_jobs(db: Session, debate: Debate, parent: Node, child_c
             child.id,
             exclude_models=claim_author_exclusions(db, role, parent, debate),
         )
+        child_spawn_count += 1
+    return child_spawn_count
+
+
+def _lifecycle_component_status(
+    decision: Any,
+    component: str,
+    identity: object,
+) -> tuple[str, str]:
+    availability = getattr(decision, f"{component}_availability", None)
+    freshness = getattr(decision, f"{component}_freshness", None)
+    if (
+        isinstance(availability, str)
+        and availability.strip()
+        and isinstance(freshness, str)
+        and freshness.strip()
+    ):
+        return availability.strip(), freshness.strip()
+
+    if getattr(decision, "input_state", "unverifiable") == "grounded":
+        return "present", "fresh"
+    reason_codes = getattr(decision, "reason_codes", ())
+    component_reasons = tuple(
+        reason
+        for reason in reason_codes
+        if isinstance(reason, str) and reason.startswith(f"{component}_")
+    )
+    other_component = "evidence" if component == "score" else "score"
+    other_component_reasons = tuple(
+        reason
+        for reason in reason_codes
+        if isinstance(reason, str) and reason.startswith(f"{other_component}_")
+    )
+    unscoped_reasons = tuple(
+        reason
+        for reason in reason_codes
+        if not isinstance(reason, str)
+        or not reason.startswith(("score_", "evidence_"))
+    )
+    if identity is None or any("missing" in reason for reason in component_reasons):
+        return "absent", "unknown"
+    if any("stale" in reason for reason in component_reasons):
+        return "present", "stale"
+    if component_reasons:
+        return "present", "unknown"
+    if other_component_reasons and not unscoped_reasons:
+        return "present", "fresh"
+    return "present", "unknown"
+
+
+def _persist_lifecycle_evaluation(
+    db: Session,
+    *,
+    job: Job,
+    node: Node,
+    decision: Any,
+    child_spawn_count: int,
+):
+    from app.exploration.decision_repository import (
+        LifecycleDecisionSnapshot,
+        persist_lifecycle_decision,
+    )
+
+    score_record_id = getattr(decision, "score_record_id", None)
+    score_run_id = getattr(decision, "score_run_id", None)
+    evidence_snapshot_id = getattr(decision, "evidence_snapshot_id", None)
+    score_availability, score_freshness = _lifecycle_component_status(
+        decision,
+        "score",
+        score_record_id or score_run_id,
+    )
+    evidence_availability, evidence_freshness = _lifecycle_component_status(
+        decision,
+        "evidence",
+        evidence_snapshot_id,
+    )
+    return persist_lifecycle_decision(
+        db,
+        snapshot=LifecycleDecisionSnapshot(
+            schema_version="lifecycle-decision-record/v1",
+            idempotency_key=job.idempotency_key,
+            debate_id=job.debate_id,
+            node_id=node.id,
+            decision=decision.action,
+            stopping_reason=node.stopping_reason or f"lifecycle action: {decision.action}",
+            path_status=node.path_status,
+            stopping_status=node.stopping_status,
+            input_state=getattr(decision, "input_state", "unverifiable"),
+            reason_codes=tuple(getattr(decision, "reason_codes", ())),
+            score_availability=score_availability,
+            score_freshness=score_freshness,
+            evidence_availability=evidence_availability,
+            evidence_freshness=evidence_freshness,
+            current_score_input_hash=getattr(decision, "current_score_input_hash", None),
+            scoring_contract_hash=getattr(decision, "scoring_contract_hash", None),
+            score_record_id=score_record_id,
+            score_run_id=score_run_id,
+            score_run_sequence=getattr(decision, "score_run_sequence", None),
+            evidence_snapshot_id=evidence_snapshot_id,
+            decision_timestamp=getattr(decision, "decision_timestamp", now_utc()),
+            child_spawn_count=child_spawn_count,
+        ),
+    )
+
+
+def _lifecycle_event_payload(persistence) -> dict[str, Any]:
+    record = persistence.record
+    return {
+        "schema_version": record.schema_version,
+        "record_id": record.id,
+        "idempotency_key": record.idempotency_key,
+        "debate_id": record.debate_id,
+        "node_id": record.node_id,
+        "decision": record.decision,
+        "stopping_reason": record.stopping_reason,
+        "input_states": {
+            "aggregate": record.input_state,
+            "score": {
+                "availability": record.score_availability,
+                "freshness": record.score_freshness,
+            },
+            "evidence": {
+                "availability": record.evidence_availability,
+                "freshness": record.evidence_freshness,
+            },
+        },
+        "path_status": record.path_status,
+        "stopping_status": record.stopping_status,
+        "persistence_result": persistence.persistence_result,
+        "child_spawn_count": record.child_spawn_count,
+    }
 
 
 def stale_descendants(db: Session, node: Node) -> None:
@@ -950,10 +1142,30 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         argument = result.get("argument") if isinstance(result, dict) else str(result)
         generation = create_generation(db, job, node, argument, job.stream_buffer or str(result), metadata)
         ensure_default_scoring_for_completed_generation(db, debate, node)
-        spawn_child_argument_jobs(db, debate, node, _candidate_child_claims(result))
+        lifecycle_decision = exploration_decision_for_node(db, debate, node)
+        child_spawn_count = spawn_child_argument_jobs(
+            db,
+            debate,
+            node,
+            _candidate_child_claims(result),
+            decision=lifecycle_decision,
+        )
+        lifecycle_persistence = _persist_lifecycle_evaluation(
+            db,
+            job=job,
+            node=node,
+            decision=lifecycle_decision,
+            child_spawn_count=child_spawn_count,
+        )
         flush_write(db)
         maybe_queue_synthesis(db, debate)
         commit_write(db)
+        if lifecycle_persistence.persistence_result == "created":
+            await event_bus.publish(
+                job.debate_id,
+                "dialectical_exploration",
+                _lifecycle_event_payload(lifecycle_persistence),
+            )
         await event_bus.publish(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": generation.id})
 
     elif job.job_type == "synthesize":
@@ -1008,9 +1220,27 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
             node.status = "pending" if retryable else "failed"
     commit_write(db)
     if job.node_id and not job.job_type.startswith("v2_"):
-        await event_bus.publish(job.debate_id, "node_failed", {"node_id": job.node_id, "reason": reason, "retry_in_s": 5})
+        await event_bus.publish(
+            job.debate_id,
+            "node_failed",
+            {
+                "node_id": job.node_id,
+                "code": PUBLIC_NODE_FAILURE_CODE,
+                "reason": PUBLIC_NODE_FAILURE_MESSAGE,
+                "retry_in_s": 5,
+            },
+        )
     else:
-        await event_bus.publish(job.debate_id, "error", {"scope": job.job_type, "message": reason, "retry_in_s": 5})
+        await event_bus.publish(
+            job.debate_id,
+            "error",
+            {
+                "scope": job.job_type,
+                "code": PUBLIC_DEBATE_FAILURE_CODE,
+                "message": PUBLIC_DEBATE_FAILURE_MESSAGE,
+                "retry_in_s": 5,
+            },
+        )
 
 
 async def regenerate_node(db: Session, node: Node, model_id: str | None = None) -> Job:

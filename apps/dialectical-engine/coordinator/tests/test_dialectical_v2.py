@@ -551,6 +551,171 @@ def test_synthesis_queues_only_after_all_pov_branches_complete(db) -> None:
     assert synthesis_job.required_model == "codex-gpt-5.5"
 
 
+@pytest.mark.parametrize("branch_status", ["pending", "stale"])
+def test_synthesis_queue_gate_blocks_on_incomplete_non_pov_branch_node(db, branch_status: str) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    for _ in range(3):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, worker_pov_output(worker, job.id, job.required_role), {"latency_ms": 12}))
+
+    root = db.get(entities.Node, debate.root_node_id)
+    assert root is not None
+    # LENS is a synthetic dynamic-container stand-in for this test only; it is
+    # deliberately not production vocabulary or a template branch type.
+    db.add(
+        entities.Node(
+            debate_id=debate.id,
+            parent_id=root.id,
+            node_type="LENS",
+            depth=1,
+            position=4,
+            claim="Synthetic dynamic branch container",
+            status=branch_status,
+            materialized_path=f"{root.materialized_path}/4",
+        )
+    )
+    db.commit()
+
+    final_pov = claim_for_worker(db, worker)
+    assert final_pov.job_type == "v2_pov"
+    asyncio.run(complete_job(db, final_pov, worker_pov_output(worker, final_pov.id, final_pov.required_role), {"latency_ms": 12}))
+
+    synthesis_jobs = db.scalars(
+        select(entities.Job).where(
+            entities.Job.debate_id == debate.id,
+            entities.Job.job_type == "v2_synthesize",
+        )
+    ).all()
+    assert synthesis_jobs == []
+
+
+def test_persist_synthesis_hard_guard_blocks_on_incomplete_non_pov_branch_node(db) -> None:
+    service = v2_service()
+    models = v2_models()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    for _ in range(4):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, worker_pov_output(worker, job.id, job.required_role), {"latency_ms": 12}))
+
+    synthesis_job = claim_for_worker(db, worker)
+    assert synthesis_job.job_type == "v2_synthesize"
+    branch = db.scalar(select(models["DebateBranch"]).where(models["DebateBranch"].debate_id == debate.id))
+    assert branch is not None
+    root = db.get(entities.Node, debate.root_node_id)
+    assert root is not None
+    # LENS is a synthetic dynamic-container stand-in for this test only.
+    db.add(
+        entities.Node(
+            debate_id=debate.id,
+            parent_id=root.id,
+            node_type="LENS",
+            depth=1,
+            position=4,
+            claim="Synthetic dynamic branch container",
+            status="pending",
+            materialized_path=f"{root.materialized_path}/4",
+        )
+    )
+    db.commit()
+    payload = service.validate_synthesis_contract(worker_non_adjudicating_synthesis(worker, synthesis_job.id))
+
+    with pytest.raises(ValueError, match="Cannot synthesize until"):
+        service.persist_v2_synthesis(db, debate, branch, synthesis_job, worker, payload)
+
+
+def test_synthesis_gate_equivalent_for_standard_pov_trees(db) -> None:
+    service = v2_service()
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    pov_types = [node_type for node_type, _label in service.POV_BRANCHES]
+    pov_nodes = db.scalars(
+        select(entities.Node).where(
+            entities.Node.debate_id == debate.id,
+            entities.Node.node_type.in_(pov_types),
+        )
+    ).all()
+
+    def frozen_pov_pending_ids() -> set[str]:
+        return set(
+            db.scalars(
+                select(entities.Node.id).where(
+                    entities.Node.debate_id == debate.id,
+                    entities.Node.node_type.in_(pov_types),
+                    entities.Node.status != "complete",
+                )
+            ).all()
+        )
+
+    def structural_pending_ids() -> set[str]:
+        return {
+            node.id
+            for node in service.pending_branch_containers(
+                db,
+                debate.id,
+                debate.root_node_id,
+            )
+        }
+
+    assert frozen_pov_pending_ids() == structural_pending_ids() == {node.id for node in pov_nodes}
+
+    for node in pov_nodes:
+        node.status = "complete"
+    db.flush()
+    assert frozen_pov_pending_ids() == structural_pending_ids() == set()
+
+    pov_nodes[0].status = "stale"
+    db.flush()
+    assert frozen_pov_pending_ids() == structural_pending_ids() == {pov_nodes[0].id}
+
+
+@pytest.mark.parametrize("evidence_status", ["completed", "pending"])
+def test_evidence_child_of_root_never_blocks_synthesis(db, evidence_status: str) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    root = db.get(entities.Node, debate.root_node_id)
+    assert root is not None
+    db.add(
+        entities.Node(
+            debate_id=debate.id,
+            parent_id=root.id,
+            node_type="EVIDENCE",
+            depth=1,
+            position=4,
+            claim="Direct root evidence must not participate in the branch-completeness gate.",
+            status=evidence_status,
+            materialized_path=f"{root.materialized_path}/4",
+        )
+    )
+    db.commit()
+
+    for _ in range(4):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, worker_pov_output(worker, job.id, job.required_role), {"latency_ms": 12}))
+
+    synthesis_job = claim_for_worker(db, worker)
+    assert synthesis_job.job_type == "v2_synthesize"
+    asyncio.run(
+        complete_job(
+            db,
+            synthesis_job,
+            worker_non_adjudicating_synthesis(worker, synthesis_job.id),
+            {"latency_ms": 13},
+        )
+    )
+
+    assert db.get(Debate, debate.id).status == "complete"
+
+
 def test_failed_stale_synthesis_job_does_not_block_required_v2_synthesis_queue(db) -> None:
     service = v2_service()
     worker = real_codex_worker(db)

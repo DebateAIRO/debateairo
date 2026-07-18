@@ -292,6 +292,112 @@ Index(
 )
 
 
+class EvidenceLifecycleSnapshot(Base):
+    """Immutable evidence input presented to the lifecycle v1 mapper.
+
+    ``payload`` preserves the exact JSON-like mapper envelope.  The scalar
+    columns are an audit/query projection only; they never repair malformed
+    or legacy payload data.  ``identity_sha256`` represents the contract's
+    full evidence/run identity and makes repeated byte-equivalent writes
+    idempotent while forcing conflicting content to fail loudly.
+    """
+
+    __tablename__ = "evidence_lifecycle_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            "sequence IS NULL OR sequence > 0",
+            name="ck_evidence_lifecycle_snapshots_positive_sequence",
+        ),
+        Index("ix_evidence_lifecycle_snapshots_debate_id", "debate_id"),
+        Index("ix_evidence_lifecycle_snapshots_node_id", "node_id"),
+        Index("ix_evidence_lifecycle_snapshots_evidence_node_id", "evidence_node_id"),
+        Index("ix_evidence_lifecycle_snapshots_verification_status", "verification_status"),
+        Index("ix_evidence_lifecycle_snapshots_created_at", "created_at"),
+        Index(
+            "ux_evidence_lifecycle_snapshots_identity",
+            "identity_sha256",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    schema_version: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    debate_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    node_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    evidence_node_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    claim_node_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    generation_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    reference: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    evidence_kind: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    availability: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    verification_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    unavailability_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_kind: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    source_record_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    run_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    sequence: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    producer: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    observed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    identity_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class LifecycleDecisionRecord(Base):
+    """Immutable, redacted audit record for one lifecycle evaluation."""
+
+    __tablename__ = "lifecycle_decision_records"
+    __table_args__ = (
+        CheckConstraint(
+            "score_run_sequence IS NULL OR score_run_sequence > 0",
+            name="ck_lifecycle_decision_records_positive_score_sequence",
+        ),
+        CheckConstraint(
+            "child_spawn_count >= 0",
+            name="ck_lifecycle_decision_records_nonnegative_child_count",
+        ),
+        Index("ix_lifecycle_decision_records_debate_id", "debate_id"),
+        Index("ix_lifecycle_decision_records_node_id", "node_id"),
+        Index("ix_lifecycle_decision_records_decision", "decision"),
+        Index("ix_lifecycle_decision_records_created_at", "created_at"),
+        Index(
+            "ux_lifecycle_decision_records_idempotency_key",
+            "idempotency_key",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    schema_version: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    snapshot_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    debate_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    node_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    stopping_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    path_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    stopping_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    input_state: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason_codes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    score_availability: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    score_freshness: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    evidence_availability: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    evidence_freshness: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    current_score_input_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    scoring_contract_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    score_record_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    score_run_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    score_run_sequence: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    evidence_snapshot_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    decision_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    child_spawn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class CapabilityMatch(Base):
     __tablename__ = "capability_matches"
 

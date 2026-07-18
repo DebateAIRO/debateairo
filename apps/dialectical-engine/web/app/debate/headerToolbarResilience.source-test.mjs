@@ -8,8 +8,8 @@ const globalsSource = readFileSync("app/globals.css", "utf8");
 test("debate header keeps default scoring status and view controls in the top toolbar", () => {
   assert.match(
     pageSource,
-    /<div className="debateTopActions">[\s\S]*?<div className="topSwitch">[\s\S]*<span>Scoring<\/span>[\s\S]*aria-label="Open scoring diagnostics"[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*Tree[\s\S]*Outline/s,
-    "Default scoring status, diagnostics, and Tree/Outline controls should remain in the same toolbar action cluster"
+    /<div className="debateTopActions">[\s\S]*?<div className="topSwitch">[\s\S]*?<span>Scoring<\/span>[\s\S]*?className="topSwitchStatus"[\s\S]*?aria-label="Open scoring diagnostics"[\s\S]*?<\/div>[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*?aria-pressed=\{view === "thread"\}[\s\S]*?Thread[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "split"\}[\s\S]*?Split[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "tree"\}[\s\S]*?Tree[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "map"\}[\s\S]*?Map[\s\S]*?<\/button>[\s\S]*?<\/div>[\s\S]*?<\/header>/s,
+    "Default scoring status, diagnostics, and Thread/Split/Tree/Map view controls should remain in the same toolbar action cluster"
   );
   assert.doesNotMatch(
     pageSource,

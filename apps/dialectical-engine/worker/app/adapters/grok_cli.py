@@ -9,7 +9,7 @@ PROMPT_FLAG_PATTERN = re.compile(r"(?<!\S)(?:-p|--prompt)(?:[=\s,]|$)")
 
 
 class GrokCliAdapter(SubprocessStreamingAdapter):
-    model_id = "grok-4"
+    model_id = "grok-4.5"
     role_pool = {"proposer", "opponent"}
     executable = "grok"
 
