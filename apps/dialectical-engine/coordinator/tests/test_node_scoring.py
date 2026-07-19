@@ -401,6 +401,92 @@ def test_manual_investigation_api_rejects_v1_regeneration_for_v2_debate_nodes(db
     assert db.get(Node, node.id).status == "complete"
 
 
+def test_manual_investigation_api_rejects_root_regeneration_for_v2_debates(db) -> None:
+    # W3 (carried from the W0 review): the ROOT_CLAIM branch still rerouted a
+    # v2 debate's root into v1 `decompose` regeneration -- the same corruption
+    # family W0 closed for PRO/CON. The endpoint reports an honest unavailable.
+    hole = ScoringHole(
+        type="missing_evidence",
+        severity="high",
+        description="No retrieval-backed source was provided.",
+        source="evidence_auditor",
+    )
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="SCIENTIFIC_POV",
+        depth=1,
+        position=0,
+        claim="Mechanism POV",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(pov)
+    db.flush()
+    marker_job = Job(
+        debate_id=debate.id,
+        job_type="v2_pov",
+        required_role="Mechanism POV",
+        required_model="codex-gpt-5.5",
+        node_id=pov.id,
+        status="complete",
+        deadline=now_utc(),
+    )
+    db.add(marker_job)
+    scoring_item = explicit_depth_pressure_payload(node_id=root.id, holes=[hole]).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            status="complete",
+            output={"status": "available", "items": [scoring_item]},
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/manual-investigations",
+        headers=USER_HEADERS,
+        json={
+            "debate_id": debate.id,
+            "node_id": root.id,
+            "action": "find_evidence",
+            "hole": hole.model_dump(mode="json"),
+            "reason": "User wants DebateAI to investigate this evidence gap.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "unavailable"
+    assert "v2 debate" in body["reason"]
+    assert body["job_id"] is None
+    db.expire_all()
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "decompose")).all() == []
+    assert db.get(Node, root.id).status == "complete"
+    assert db.get(Node, pov.id).status == "complete"
+
+
 def test_manual_investigation_api_does_not_queue_when_hole_is_not_in_scoring_payload(db) -> None:
     scored_hole = ScoringHole(
         type="missing_evidence",

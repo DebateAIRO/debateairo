@@ -1698,6 +1698,45 @@ def test_regenerate_node_rejects_v1_argue_regeneration_inside_v2_debates(db) -> 
     assert pov_job.job_type == "v2_pov"
 
 
+def test_regenerate_node_rejects_root_regeneration_inside_v2_debates(db) -> None:
+    # W3 (carried from the W0 review): the ROOT_CLAIM branch still routed a v2
+    # debate's root regen into v1 `decompose` -- the same corruption family W0
+    # closed for PRO/CON (a v1 decompose completion rebuilds v1 children and
+    # its argue chain can replace the v2 synthesis). Refuse honestly instead.
+    pov = _v2_pov_node(db, claim="Mechanism POV")
+    debate = db.get(Debate, pov.debate_id)
+    root = db.get(Node, debate.root_node_id)
+    # The v2 marker: every v2 debate queues v2_* jobs synchronously at creation.
+    db.add(
+        Job(
+            debate_id=debate.id,
+            job_type="v2_pov",
+            required_role="Mechanism POV",
+            required_model="codex-gpt-5.5",
+            node_id=pov.id,
+            status="complete",
+            deadline=now_utc(),
+        )
+    )
+    db.commit()
+
+    with pytest.raises(ValueError, match="v2 debate"):
+        asyncio.run(regenerate_node(db, root))
+
+    db.refresh(root)
+    db.refresh(debate)
+    db.refresh(pov)
+    assert root.status == "complete"
+    assert root.claim == debate.topic
+    assert debate.status == "complete"
+    # No v1 decompose job was created and the POV subtree was not staled.
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "decompose")).all() == []
+    assert pov.status == "complete"
+    # POV-branch regeneration stays the supported v2 route.
+    pov_job = asyncio.run(regenerate_node(db, pov))
+    assert pov_job.job_type == "v2_pov"
+
+
 def test_decomposition_respects_branching_limit(db) -> None:
     worker = Worker(
         name="mac-mini",

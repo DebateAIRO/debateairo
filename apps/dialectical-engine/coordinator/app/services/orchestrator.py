@@ -1485,6 +1485,14 @@ async def regenerate_node(db: Session, node: Node, model_id: str | None = None) 
     active_generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     online_models = online_capabilities(db)
     if node.node_type == "ROOT_CLAIM":
+        # v1-reroute guard, root edition (W3, carried from the W0 review): a
+        # v1 `decompose` job on a v2 tree rebuilds v1 PRO/CON children and its
+        # argue chain can queue a v1 `synthesize` that replaces the debate's
+        # v2 synthesis -- same corruption family as the PRO/CON guard below.
+        if debate_uses_v2_pipeline(db, debate.id):
+            raise ValueError(
+                "Root regeneration is not supported inside a v2 debate; regenerate a POV branch node instead"
+            )
         role = "decomposer"
         job_type = "decompose"
     elif node.node_type in V2_POV_ROLES:
