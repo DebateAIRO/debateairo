@@ -8,6 +8,7 @@ const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
   contested: "Contested",
   unsupported: "Weakly supported",
   unavailable: "Analysis unavailable",
+  insufficient_scoring: "Not enough judge scoring",
   suppressed: "Verdict withheld"
 };
 
@@ -28,7 +29,9 @@ function formatConvergence(convergence: VerdictSummary["basis"]["convergence"]):
 export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined }) {
   if (!verdict) return null;
 
-  const bandLabel = BAND_LABELS[verdict.verdictBand];
+  // Unknown/future bands must never crash the banner: fall back to rendering
+  // the raw band value verbatim (honest, never a fabricated label).
+  const bandLabel = BAND_LABELS[verdict.verdictBand] ?? verdict.verdictBand;
   const suppressed = verdict.verdictState === "suppressed_no_evidence";
 
   return (
@@ -81,6 +84,10 @@ export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined
         </span>
         <span className="verdictDetailRow">
           verification status: {verdict.basis.verificationStatus ?? "not available"}
+        </span>
+        <span className="verdictDetailRow">
+          judge-score coverage:{" "}
+          {typeof verdict.basis.tauCoverage === "number" ? verdict.basis.tauCoverage : "not available"}
         </span>
         <span className="verdictDetailRow">
           convergence (dialectical, semantics version {verdict.basis.semanticsVersion ?? "not available"}):{" "}

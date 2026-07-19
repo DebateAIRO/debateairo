@@ -124,8 +124,8 @@ test("web/lib/types.ts defines VerdictBand and VerdictSummary matching the coord
 
   assert.match(
     source,
-    /export type VerdictBand = "supported" \| "contested" \| "unsupported" \| "unavailable" \| "suppressed";/,
-    "VerdictBand must match the coordinator's verdict_summary band values exactly"
+    /export type VerdictBand = "supported" \| "contested" \| "unsupported" \| "unavailable" \| "insufficient_scoring" \| "suppressed";/,
+    "VerdictBand must match the coordinator's verdict_summary band values exactly (W2 adds insufficient_scoring)"
   );
   assert.match(
     source,

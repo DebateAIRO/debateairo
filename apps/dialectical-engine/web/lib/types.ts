@@ -351,6 +351,9 @@ export type Synthesis = {
   verdict_gate?: {
     state: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
     reason: VerdictSuppressionReason | null;
+    // W2 additive: mirrors the top-level verdict's served band (same single
+    // coordinator derivation; "verdictBand" stays the band's sole wire key name).
+    verdictBand?: VerdictBand;
   } | null;
   upstream_agent_output_ids?: string[];
   upstream_agent_run_ids?: string[];
@@ -510,7 +513,7 @@ export type DebateConfig = Record<string, unknown> & {
 // UI must render nothing (honest absence), never a fabricated verdict.
 // ---------------------------------------------------------------------------
 
-export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "suppressed";
+export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "insufficient_scoring" | "suppressed";
 
 export type VerdictSummary = {
   verdictBand: VerdictBand;
@@ -521,6 +524,8 @@ export type VerdictSummary = {
     convergence: Record<string, unknown> | null;
     preGateVerdictBand?: VerdictBand;
     semanticsVersion?: string;
+    tauCoverage?: number;
+    tauSourceMajority?: "judge_strength" | "default";
   };
   verdictThresholdsVersion: string;
   verdictState?: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
