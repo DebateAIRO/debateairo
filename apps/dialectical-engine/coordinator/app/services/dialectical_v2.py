@@ -965,15 +965,36 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
 
 
 def pending_branch_containers(db: Session, debate_id: str, root_node_id: str) -> list[Node]:
+    # A terminally failed branch (W1: node.status == "failed",
+    # stopping_reason "generation_exhausted") is no longer pending: it must
+    # stop blocking synthesis so the surviving branches can complete the
+    # debate. Synthesis stays count-agnostic over whatever branches remain.
     return list(
         db.scalars(
             select(Node).where(
                 Node.debate_id == debate_id,
                 Node.parent_id == root_node_id,
                 Node.node_type != "EVIDENCE",
-                Node.status != "complete",
+                Node.status.notin_(["complete", "failed"]),
             )
         ).all()
+    )
+
+
+def has_completed_branch_container(db: Session, debate_id: str, root_node_id: str) -> bool:
+    """True when at least one non-EVIDENCE branch under the root completed."""
+    return (
+        db.scalar(
+            select(Node.id)
+            .where(
+                Node.debate_id == debate_id,
+                Node.parent_id == root_node_id,
+                Node.node_type != "EVIDENCE",
+                Node.status == "complete",
+            )
+            .limit(1)
+        )
+        is not None
     )
 
 

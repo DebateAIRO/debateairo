@@ -285,6 +285,9 @@ def backfill_existing_schema() -> None:
         "nodes": {
             "metadata": "JSON",
         },
+        "jobs": {
+            "timeout_attempts": "INTEGER",
+        },
     }
     db_engine = get_engine()
     with db_engine.connect() as connection:

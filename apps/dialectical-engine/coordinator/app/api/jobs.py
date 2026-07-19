@@ -118,4 +118,6 @@ async def fail(
         await fail_job(db, job, payload.reason, payload.retryable)
     except StaleJobMutationError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {"status": "queued" if payload.retryable else "failed"}
+    # A retryable failure may still land terminal when the job's attempt
+    # budget is exhausted -- report the real outcome, not the request's wish.
+    return {"status": "queued" if job.status == "pending" else "failed"}

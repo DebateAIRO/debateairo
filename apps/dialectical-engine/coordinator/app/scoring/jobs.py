@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import bool_env
@@ -13,6 +13,7 @@ from app.core.write_lock import commit_write
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
+from app.services.orchestrator import max_job_attempts
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
     SCORING_ANALYZER_TYPE,
@@ -212,6 +213,13 @@ def wake_pending_internal_scoring_job(
     if job is None:
         if _latest_retryable_stale_scoring_job(db, debate.id) is None:
             return None
+        # W1 bounded failure lifecycle: stale expiries are timeout-class, so
+        # the stale-requeue channel gets the doubled (half-weight) budget --
+        # 2x DIALECTICAL_MAX_JOB_ATTEMPTS consecutive stale failures since the
+        # last successful scoring run, then the channel stops requeuing.
+        # Scores are advisory: nothing here ever touches debate.status.
+        if _consecutive_stale_scoring_failures(db, debate.id) >= 2 * max_job_attempts():
+            return None
     registry = registry_factory()
     scoring_config = detect_scoring_provider_config(
         registry.agents, role="judge", providers=registry.providers
@@ -226,6 +234,30 @@ def wake_pending_internal_scoring_job(
     commit_write(db)
     background_tasks.add_task(background_runner, job.id, debate.id)
     return job
+
+
+def _consecutive_stale_scoring_failures(db: Session, debate_id: str) -> int:
+    """Stale-failed scoring jobs since the last successful scoring run."""
+    last_complete_at = db.scalar(
+        select(func.max(Job.created_at)).where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status == "complete",
+        )
+    )
+    query = (
+        select(func.count())
+        .select_from(Job)
+        .where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status == "failed",
+            Job.error == STALE_SCORING_JOB_ERROR,
+        )
+    )
+    if last_complete_at is not None:
+        query = query.where(Job.created_at > last_complete_at)
+    return int(db.scalar(query) or 0)
 
 
 def _latest_retryable_stale_scoring_job(db: Session, debate_id: str) -> Job | None:

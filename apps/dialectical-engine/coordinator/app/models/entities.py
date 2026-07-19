@@ -152,6 +152,10 @@ class Job(Base):
     idempotency_key: Mapped[str] = mapped_column(String(36), default=uuid_str, unique=True)
     stream_buffer: Mapped[str] = mapped_column(Text, default="")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # How many of `attempts` ended in a timeout-class outcome (deadline expiry,
+    # worker vanished/restarted). Nullable for legacy rows (additive ALTER
+    # backfill leaves NULL); readers must treat NULL as 0.
+    timeout_attempts: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
