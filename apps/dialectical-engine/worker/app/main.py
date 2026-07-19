@@ -42,6 +42,7 @@ def parse_result(job: dict[str, Any], text: str) -> Any:
         "v2_agent_argument",
         "v2_plan",
         "v2_pov",
+        "v2_expand",
         "v2_agent_run",
         "v2_synthesize",
     }:

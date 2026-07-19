@@ -34,9 +34,11 @@ from app.evidence.extraction import persist_evidence_nodes
 from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
 from app.services.orchestrator import (
+    cancel_active_synthesis_jobs,
     capable_online_workers,
     create_generation,
     create_job,
+    debate_uses_v2_pipeline,
     merged_debate_config,
     routing_allowed_models,
     sanitize_text,
@@ -54,6 +56,11 @@ MODEL_ID = "coordinator-deterministic-v2"
 WORKER_LABEL = "coordinator"
 V2_CODEX_MODEL_ID = "codex-gpt-5.5"
 NO_REAL_CODEX_WORKER_ERROR = "No real Codex worker online for Dialectical V2 artifact generation"
+# W3: the job families that generate argument-tree nodes for a v2 debate.
+# Any outstanding job of these types anywhere in the tree blocks synthesis
+# (whole-tree quiescence -- see pending_generation_nodes).
+V2_GENERATION_JOB_TYPES = ("v2_pov", "v2_expand")
+OUTSTANDING_JOB_STATUSES = ("pending", "claimed", "running")
 POV_BRANCHES = (
     ("SCIENTIFIC_POV", "Scientific POV"),
     ("STATISTICAL_POV", "Statistical POV"),
@@ -663,6 +670,111 @@ def queue_next_capability_job(
     return queue_v2_job(db, debate, "v2_agent_argument", "v2_agent", model_id, debate.root_node_id)
 
 
+def branch_lens_label(db: Session, node: Node) -> str:
+    """Label of the depth-1 branch container above `node` (the node's own
+    claim when it IS the container). Identity lives in the claim/label,
+    NEVER in node_type: sibling node_types are not unique (dynamic
+    perspectives cycle the legacy POV vocabulary)."""
+    current: Node | None = node
+    seen: set[str] = set()
+    while current is not None and current.depth > 1 and current.parent_id and current.id not in seen:
+        seen.add(current.id)
+        current = db.get(Node, current.parent_id)
+    return str((current.claim if current is not None else "") or "").strip()
+
+
+def queue_v2_expand_job(
+    db: Session,
+    debate: Debate,
+    node: Node,
+    polarity: str,
+    reason: str,
+    model_id: str | None = None,
+) -> Job:
+    """Queue ONE single-node expansion under `node` (the W3 primitive).
+
+    Creates a pending placeholder child Node (depth = node.depth + 1,
+    node_type = polarity) plus a `v2_expand` Job targeting the PLACEHOLDER --
+    never the parent -- through the same queue_v2_job machinery every other
+    v2 generation job uses. The job payload carries the parent node id, the
+    child polarity, the branch's lens label, and the decision reason (all
+    used by the prompt render). Terminal failure therefore degrades only the
+    child path (W1 node-scoped handling); the parent is never touched.
+
+    Nothing calls this on the default path yet: expansion is manually
+    queueable in W3, and W4 wires adaptive decisions to it. Returns the Job
+    (job.node_id is the placeholder child's id). Commits.
+    """
+    polarity = str(polarity or "").strip().upper()
+    if polarity not in {"PRO", "CON"}:
+        raise ValueError("Expansion polarity must be PRO or CON")
+    reason = sanitize_text(str(reason or ""), 2_000)
+    if not reason:
+        raise ValueError("Expansion reason is required")
+    if node.debate_id != debate.id:
+        raise ValueError("Expansion node does not belong to this debate")
+    if node.node_type in {"ROOT_CLAIM", "EVIDENCE"}:
+        raise ValueError("Expansion target must be an argument node below the root")
+    if node.status != "complete" or not node.active_generation_id:
+        raise ValueError("Expansion target must be a completed argument node")
+    if not debate_uses_v2_pipeline(db, debate.id):
+        raise ValueError("Expansion is only supported on v2-pipeline debates")
+
+    model = (model_id or "").strip()
+    if not model:
+        # Reuse the model that authored the parent (the regen precedent);
+        # fall back to the debate's default v2 model.
+        active_generation = db.get(Generation, node.active_generation_id)
+        model = str(getattr(active_generation, "model_id", "") or "") or V2_CODEX_MODEL_ID
+
+    # Next free argument-child slot: EVIDENCE siblings live at an offset
+    # range (see app/evidence/extraction.py) and stale siblings keep their
+    # old slots, so both are excluded from the allocation.
+    siblings = db.scalars(select(Node).where(Node.parent_id == node.id)).all()
+    position = (
+        max(
+            (
+                sibling.position
+                for sibling in siblings
+                if sibling.node_type != "EVIDENCE" and sibling.status != "stale"
+            ),
+            default=-1,
+        )
+        + 1
+    )
+    # Placeholder label, replaced by the generated title at completion.
+    # Non-empty because every serialized node flows through ArgumentClaim,
+    # which requires non-empty text; descriptive of the REQUEST, never fake
+    # generated content.
+    placeholder_label = "Additional supporting argument" if polarity == "PRO" else "Additional challenging argument"
+    child = Node(
+        debate_id=debate.id,
+        parent_id=node.id,
+        node_type=polarity,
+        depth=node.depth + 1,
+        position=position,
+        claim=placeholder_label,
+        status="pending",
+        materialized_path=f"{node.materialized_path}/{position}",
+    )
+    db.add(child)
+    flush_write(db)
+    # An in-flight synthesis would race the persist-time quiescence guard and
+    # die a nonretryable death there (failing the debate). Supersede it
+    # instead -- the regen precedent -- and the expand completion tail queues
+    # a fresh v2_synthesize once the tree is quiescent again.
+    cancel_active_synthesis_jobs(db, debate.id, "Expansion superseded synthesis")
+    job = queue_v2_job(db, debate, "v2_expand", "v2_expander", model, child.id)
+    job.payload = {
+        "parent_node_id": node.id,
+        "polarity": polarity,
+        "lens_label": branch_lens_label(db, node),
+        "reason": reason,
+    }
+    commit_write(db)
+    return job
+
+
 def analyzer_output(question: str, analyzer_type: str, classification: dict[str, Any]) -> dict[str, Any]:
     tags = ", ".join(classification["domain_tags"][:5]) or "general"
     if analyzer_type == "Statistical Analyzer":
@@ -832,19 +944,27 @@ def create_completed_node(
     job: Job,
     provenance: dict[str, Any],
     prompt_rendered: str,
+    node: Node | None = None,
 ) -> Node:
-    node = Node(
-        debate_id=debate.id,
-        parent_id=parent.id,
-        node_type=node_type,
-        depth=parent.depth + 1,
-        position=position,
-        claim=title,
-        status="pending",
-        materialized_path=f"{parent.materialized_path}/{position}",
-    )
-    db.add(node)
-    flush_write(db)
+    # W3: when `node` is given (a pending placeholder created at queue time,
+    # e.g. a v2_expand child), it is completed in place instead of creating a
+    # new row -- same generation/provenance/status machinery either way, and
+    # replays cannot mint a second sibling.
+    if node is None:
+        node = Node(
+            debate_id=debate.id,
+            parent_id=parent.id,
+            node_type=node_type,
+            depth=parent.depth + 1,
+            position=position,
+            claim=title,
+            status="pending",
+            materialized_path=f"{parent.materialized_path}/{position}",
+        )
+        db.add(node)
+        flush_write(db)
+    else:
+        node.claim = title
     create_generation(
         db,
         job,
@@ -965,6 +1085,47 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
     return pov_node
 
 
+def materialize_expand_child(
+    db: Session,
+    debate: Debate,
+    job: Job,
+    payload: dict[str, str],
+    provenance: dict[str, Any],
+) -> Node:
+    """Complete a v2_expand job's pending placeholder child in place.
+
+    The job targets the PLACEHOLDER (created by queue_v2_expand_job), never
+    the parent: the parent's claim/label/content are never touched (the
+    corruption class W0 closed). Reuses the same completed-node machinery the
+    POV materializer uses (create_completed_node with the existing node
+    passed in), so a replayed completion cannot mint a second child even
+    before the job state machine rejects it.
+    """
+    if not job.node_id:
+        raise ValueError("Expand job must target its pending child node")
+    child = db.get(Node, job.node_id)
+    if not child:
+        raise ValueError("Expand child node not found")
+    parent = db.get(Node, child.parent_id) if child.parent_id else None
+    if not parent:
+        raise ValueError("Expand parent node not found")
+    create_completed_node(
+        db,
+        debate,
+        parent,
+        node_type=child.node_type,
+        position=child.position,
+        title=payload["title"],
+        content=payload["content"],
+        job=job,
+        provenance=provenance,
+        prompt_rendered=job.stream_buffer or json.dumps(payload),
+        node=child,
+    )
+    extract_and_persist_evidence_for_completed_node(db, debate, child)
+    return child
+
+
 def pending_branch_containers(db: Session, debate_id: str, root_node_id: str) -> list[Node]:
     # A terminally failed branch (W1: node.status == "failed",
     # stopping_reason "generation_exhausted") is no longer pending: it must
@@ -980,6 +1141,35 @@ def pending_branch_containers(db: Session, debate_id: str, root_node_id: str) ->
             )
         ).all()
     )
+
+
+def pending_generation_nodes(db: Session, debate_id: str, root_node_id: str) -> list[Node]:
+    """Whole-tree quiescence check for v2 synthesis (W3).
+
+    A debate may synthesize only when it is quiescent: no branch container is
+    still pending AND no node anywhere in the tree has an outstanding
+    generation job (v2_pov or v2_expand in pending/claimed/running). W1
+    semantics preserved: terminally failed nodes/jobs are NOT pending, so a
+    poisoned expand child never blocks synthesis forever. Count-agnostic over
+    however many lenses/expansions exist.
+    """
+    pending: dict[str, Node] = {
+        node.id: node for node in pending_branch_containers(db, debate_id, root_node_id)
+    }
+    outstanding_node_ids = db.scalars(
+        select(Job.node_id).where(
+            Job.debate_id == debate_id,
+            Job.job_type.in_(V2_GENERATION_JOB_TYPES),
+            Job.status.in_(OUTSTANDING_JOB_STATUSES),
+            Job.node_id.is_not(None),
+        )
+    ).all()
+    for node_id in outstanding_node_ids:
+        if node_id and node_id not in pending:
+            node = db.get(Node, node_id)
+            if node is not None:
+                pending[node_id] = node
+    return list(pending.values())
 
 
 def has_completed_branch_container(db: Session, debate_id: str, root_node_id: str) -> bool:
@@ -1008,8 +1198,10 @@ def persist_v2_synthesis(
     payload: dict[str, Any],
 ) -> None:
     agent_outputs = db.scalars(select(AgentRun).where(AgentRun.debate_id == debate.id).order_by(AgentRun.created_at.asc())).all()
-    if pending_branch_containers(db, debate.id, debate.root_node_id):
-        raise ValueError("Cannot synthesize until all branches are complete")
+    # W3: whole-tree quiescence re-check -- outstanding v2_pov/v2_expand jobs
+    # anywhere in the tree block synthesis, not just pending branch containers.
+    if pending_generation_nodes(db, debate.id, debate.root_node_id):
+        raise ValueError("Cannot synthesize until all branches and expansions are complete")
     findings = {run.analyzer_type: (run.output.get("findings") or [""])[0] for run in analyzer_runs_for_debate(db, debate.id)}
     synthesis = Synthesis(
         debate_id=debate.id,
@@ -1166,6 +1358,49 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             "Create one strongest Pro and one strongest Con, and for each create one nested Pro and one nested Con. "
             "Every generated card must have a short title and concise content.\n\n"
             f"Context JSON:\n{json.dumps(pov_context, default=str)}"
+        )
+    elif job.job_type == "v2_expand":
+        if not job.node_id:
+            raise ValueError("Expand job must target its pending child node")
+        child = db.get(Node, job.node_id)
+        if not child:
+            raise ValueError("Expand child node not found")
+        parent = db.get(Node, child.parent_id) if child.parent_id else None
+        if not parent:
+            raise ValueError("Expand parent node not found")
+        expand_payload = job.payload if isinstance(job.payload, dict) else {}
+        parent_generation = db.get(Generation, parent.active_generation_id) if parent.active_generation_id else None
+        lens_label = str(expand_payload.get("lens_label") or "").strip() or branch_lens_label(db, parent)
+        lens_description = POV_LENS_DESCRIPTIONS.get(lens_label) or DYNAMIC_LENS_DESCRIPTIONS.get(lens_label, "")
+        polarity = child.node_type
+        stance = "supports" if polarity == "PRO" else "challenges"
+        expand_context = {
+            **base_context,
+            "parent_argument": {
+                "title": parent.claim,
+                "content": parent_generation.argument if parent_generation else "",
+            },
+            "lens": lens_label,
+            "lens_description": lens_description,
+            "polarity": polarity,
+            "expansion_reason": str(expand_payload.get("reason") or ""),
+            "output_contract": {
+                "title": "short title for the new argument",
+                "content": "concise argument content",
+            },
+        }
+        system = (
+            "You are a Codex-backed Dialectical Engine V2 expansion worker. "
+            "Return exactly one strict JSON object. Do not include markdown or status wrappers."
+        )
+        user = (
+            f"Generate exactly one new {polarity} argument that {stance} the parent argument below, "
+            f"reasoned through the {lens_label} lens. "
+            f"Lens instructions: {lens_description} "
+            f"This expansion was requested because: {expand_context['expansion_reason']} "
+            "Use real reasoning from this model call only; do not use placeholders or canned examples. "
+            "Return one JSON object with a short title and concise content.\n\n"
+            f"Context JSON:\n{json.dumps(expand_context, default=str)}"
         )
     elif job.job_type == "v2_agent_run":
         if not agent_run:
@@ -1334,7 +1569,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             "pov_completed",
             {"debate_id": debate.id, "node_id": pov_node.id, "job_id": job.id, "role": job.required_role},
         )
-        pending_branches = pending_branch_containers(db, debate.id, debate.root_node_id)
+        pending_branches = pending_generation_nodes(db, debate.id, debate.root_node_id)
         existing_synthesis = db.scalar(
             select(Job).where(
                 Job.debate_id == debate.id,
@@ -1343,6 +1578,37 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if not pending_branches and existing_synthesis is None:
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+        commit_write(db)
+        return
+
+    if job.job_type == "v2_expand":
+        # Deliberately minimal output contract: one {title, content} object.
+        payload = require_title_content(result if isinstance(result, dict) else {}, "Expansion output")
+        provenance = (
+            result.get("provenance")
+            if isinstance(result, dict) and isinstance(result.get("provenance"), dict)
+            else {}
+        )
+        child = materialize_expand_child(db, debate, job, payload, provenance)
+        record_provenance(db, debate.id, branch.id, "expand_node", child.id, provenance)
+        publish_event(
+            debate.id,
+            "expand_completed",
+            {"debate_id": debate.id, "node_id": child.id, "parent_node_id": child.parent_id, "job_id": job.id},
+        )
+        # Existing web vocabulary for "a node's generation completed" -- the
+        # tree refreshes live without any new client wiring.
+        publish_event(debate.id, "node_complete", {"node_id": child.id, "generation_id": child.active_generation_id})
+        pending_nodes = pending_generation_nodes(db, debate.id, debate.root_node_id)
+        existing_synthesis = db.scalar(
+            select(Job).where(
+                Job.debate_id == debate.id,
+                Job.job_type == "v2_synthesize",
+                Job.status.in_(["pending", "claimed", "running"]),
+            )
+        )
+        if not pending_nodes and existing_synthesis is None:
             queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
         return

@@ -44,8 +44,9 @@ V2_POV_ROLES = {
 # only their branch (node failed + stopping_reason) instead of failing the
 # debate. Everything else (root-generation `decompose`, synthesize-class,
 # and the v2 capability chain targeting the root) keeps the honest
-# debate-level terminal `failed`.
-NODE_DEGRADABLE_JOB_TYPES = {"argue", "v2_pov"}
+# debate-level terminal `failed`. v2_expand (W3) targets its pending
+# placeholder child, so terminal failure marks only that child path failed.
+NODE_DEGRADABLE_JOB_TYPES = {"argue", "v2_pov", "v2_expand"}
 GENERATION_EXHAUSTED_STOPPING_REASON = "generation_exhausted"
 DEFAULT_MAX_JOB_ATTEMPTS = 4
 LOGGER = logging.getLogger(__name__)
@@ -1223,17 +1224,20 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
     failed job and no active jobs, so effective_debate_status derives an
     honest terminal "failed" instead of a synthesis over nothing.
     """
-    if job.job_type == "v2_pov":
+    if job.job_type in ("v2_pov", "v2_expand"):
         from app.services.dialectical_v2 import (
             has_completed_branch_container,
-            pending_branch_containers,
+            pending_generation_nodes,
             queue_v2_job,
         )
 
         if not debate.root_node_id:
             return
         flush_write(db)
-        if pending_branch_containers(db, debate.id, debate.root_node_id):
+        # W3 whole-tree quiescence: outstanding v2_pov/v2_expand jobs anywhere
+        # in the tree keep blocking synthesis (the failed job itself is
+        # already terminal at this point, so it never blocks).
+        if pending_generation_nodes(db, debate.id, debate.root_node_id):
             return
         if not has_completed_branch_container(db, debate.id, debate.root_node_id):
             return

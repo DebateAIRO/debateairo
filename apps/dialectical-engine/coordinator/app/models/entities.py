@@ -156,6 +156,10 @@ class Job(Base):
     # worker vanished/restarted). Nullable for legacy rows (additive ALTER
     # backfill leaves NULL); readers must treat NULL as 0.
     timeout_attempts: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+    # W3: job-type-specific creation context (e.g. v2_expand's parent node id,
+    # polarity, lens label, and decision reason). Nullable for legacy rows
+    # (additive ALTER backfill leaves NULL); readers must treat NULL as {}.
+    payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 

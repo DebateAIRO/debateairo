@@ -287,6 +287,7 @@ def backfill_existing_schema() -> None:
         },
         "jobs": {
             "timeout_attempts": "INTEGER",
+            "payload": "JSON",
         },
     }
     db_engine = get_engine()

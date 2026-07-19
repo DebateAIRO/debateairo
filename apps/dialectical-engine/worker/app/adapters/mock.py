@@ -66,6 +66,16 @@ class MockAdapter:
                     },
                 }
             )
+        if "v2 expansion worker" in lower:
+            polarity_match = re.search(r"one new (PRO|CON) argument", user)
+            polarity = polarity_match.group(1) if polarity_match else "PRO"
+            stance = "supporting" if polarity == "PRO" else "challenging"
+            return json.dumps(
+                {
+                    "title": f"Additional {stance} consideration",
+                    "content": f"A further {stance} line of reasoning about {topic} grounded in the requested lens.",
+                }
+            )
         if "json" in lower and "children" in lower:
             return json.dumps(
                 {
