@@ -249,7 +249,7 @@ function CanvasCard({
           borderColor: "oklch(0.8 0.012 70)",
           boxShadow: "var(--shadow-card)"
         }
-      : state === "empty" || state === "abandoned"
+      : state === "empty" || state === "abandoned" || state === "failed"
         ? {
             background: "var(--surface-sunken)",
             borderColor: "var(--line-2)"
@@ -260,7 +260,7 @@ function CanvasCard({
           };
 
   function openIfDone() {
-    if (state === "done" || state === "abandoned") onOpenNode(node.id);
+    if (state === "done" || state === "abandoned" || state === "failed") onOpenNode(node.id);
   }
 
   const openNodeDetails = () => onOpenNode(node.id);
@@ -286,7 +286,7 @@ function CanvasCard({
           </span>
         ) : null}
 
-        {setAside ? (
+        {setAside && state !== "failed" ? (
           <span
             className="roleBadge"
             style={{
@@ -338,6 +338,17 @@ function CanvasCard({
             <div>
               <div className="nodeAbandonedLabel">Stopped path</div>
               <div className="nodeAbandonedClaim">{node.claim || "Abandoned argument"}</div>
+            </div>
+          </div>
+        ) : state === "failed" ? (
+          <div className="nodeAbandoned">
+            <span className="nodeAbandonedMark" aria-hidden>⚠</span>
+            <div>
+              <div className="nodeAbandonedLabel">Failed branch</div>
+              <div className="nodeAbandonedClaim">{node.claim || "Generation failed"}</div>
+              <div className="metaLine" style={{ marginTop: 5 }}>
+                Generation failed. The debate continued without this branch.
+              </div>
             </div>
           </div>
         ) : (

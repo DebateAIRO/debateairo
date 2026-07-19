@@ -23,6 +23,14 @@ test("SSE failure handlers render stable public copy without worker payload text
 
   assert.match(nodeFailureHandler, /setError\("Claim generation failed"\)/);
   assert.doesNotMatch(nodeFailureHandler, /payloadString\([^)]*,\s*"reason"\)|\.reason\b/);
+  // W1: a TERMINAL node failure (payload.terminal === true) refreshes so the
+  // degraded tree renders its failed-branch card; the stable public copy
+  // stays, and no other payload text is ever displayed.
+  assert.match(
+    nodeFailureHandler,
+    /\.terminal === true\) refresh\(\);/,
+    "Terminal node failures must refresh the degraded tree"
+  );
   assert.match(genericFailureHandler, /setError\("Debate generation failed"\)/);
   assert.match(
     genericFailureHandler,

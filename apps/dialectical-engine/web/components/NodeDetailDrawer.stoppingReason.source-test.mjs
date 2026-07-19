@@ -60,9 +60,12 @@ test("the canvas defaults set-aside paths to visible and offers a real hide/show
     /<input[\s\S]*type="checkbox"[\s\S]*checked=\{showSetAsidePaths\}[\s\S]*setShowSetAsidePaths\(event\.currentTarget\.checked\)[\s\S]*Show set-aside paths/,
     "The visible checkbox should control the filter state"
   );
+  // W1: terminally failed branches carry path_status "abandoned" too, but the
+  // deliberate-sounding "Set aside" badge is suppressed there in favor of the
+  // failed-branch card.
   assert.match(
     canvasSource,
-    /const setAside = isSetAsidePath\(node\);[\s\S]*data-set-aside=\{setAside \? "true" : undefined\}[\s\S]*\{setAside \? \([\s\S]*Set aside/,
+    /const setAside = isSetAsidePath\(node\);[\s\S]*data-set-aside=\{setAside \? "true" : undefined\}[\s\S]*\{setAside && state !== "failed" \? \([\s\S]*Set aside/,
     "Canvas cards should expose a lifecycle-derived set-aside badge"
   );
 });

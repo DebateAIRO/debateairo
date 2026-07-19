@@ -593,8 +593,12 @@ export default function DebatePageClient({
         );
       });
       events.addEventListener("node_complete", () => refresh());
-      events.addEventListener("node_failed", () => {
+      events.addEventListener("node_failed", (event) => {
+        const payload = parseEventData(event);
         setError("Claim generation failed");
+        // Terminal branch failure: the debate continues degraded, so pull the
+        // fresh tree (failed-branch card) instead of leaving a stale spinner.
+        if (payload && (payload as { terminal?: unknown }).terminal === true) refresh();
       });
       events.addEventListener("synthesis_started", (event) => {
         const payload = parseEventData(event);
@@ -685,7 +689,9 @@ export default function DebatePageClient({
       if (node.node_type !== "ROOT_CLAIM") {
         total += 1;
         const state = renderStateOf(node);
-        if (state === "done" || state === "empty") done += 1;
+        // "failed" is terminal too: a degraded debate must not report a
+        // forever-stuck progress percentage.
+        if (state === "done" || state === "empty" || state === "failed") done += 1;
       }
       (node.children || []).forEach(walk);
     };

@@ -6,7 +6,7 @@ export function formatDialecticalSupport(value: number, semanticsVersion: string
 }
 
 export type Role = "root" | "pro" | "con" | "pov";
-export type ClaimRenderState = "root" | "pending" | "streaming" | "done" | "empty" | "abandoned";
+export type ClaimRenderState = "root" | "pending" | "streaming" | "done" | "empty" | "abandoned" | "failed";
 
 export type RolePalette = {
   text: string;
@@ -108,6 +108,11 @@ export function roleLabel(node: DebateNode): string {
 
 export function renderStateOf(node: DebateNode): ClaimRenderState {
   if (node.node_type === "ROOT_CLAIM") return "root";
+  // Terminal generation failure (backend stopping_reason
+  // "generation_exhausted"): the branch is honestly failed, never a normal
+  // claim card. Checked on the raw status because the domain status mapping
+  // has no failed member.
+  if ((node.status ?? "").trim().toLowerCase() === "failed") return "failed";
   const status = toArgumentClaimStatus(node.status);
   if (status === "abandoned") return "abandoned";
   if (status === "pending") return "pending";
@@ -171,6 +176,7 @@ export function estimateHeight(node: DebateNode, state: ClaimRenderState, expand
     return 96 + lines * 26;
   }
   if (state === "abandoned") return 76;
+  if (state === "failed") return 92;
   if (state === "empty") return 92;
   if (state === "pending" || state === "streaming") return 138;
   const claimLines = Math.max(1, Math.ceil((node.claim?.length || 0) / 38));

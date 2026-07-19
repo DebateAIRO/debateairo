@@ -95,10 +95,11 @@ test("nodes remain fully rendered and clickable -- no conditional return/filter 
   const source = readFileSync(canvasPath, "utf8");
 
   // openIfDone must remain gated purely on state, not on low-strength.
+  // (W1 added the terminal "failed" state to the open set -- still state-only.)
   assert.match(
     source,
-    /function openIfDone\(\) \{\s*if \(state === "done" \|\| state === "abandoned"\) onOpenNode\(node\.id\);\s*\}/,
-    "openIfDone must remain unchanged -- low-strength must never affect click/open behavior"
+    /function openIfDone\(\) \{\s*if \(state === "done" \|\| state === "abandoned" \|\| state === "failed"\) onOpenNode\(node\.id\);\s*\}/,
+    "openIfDone must remain state-gated only -- low-strength must never affect click/open behavior"
   );
 
   assert.doesNotMatch(
