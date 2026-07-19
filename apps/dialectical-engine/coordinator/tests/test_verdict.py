@@ -22,13 +22,13 @@ def test_verdict_unavailable_when_no_protocol_output() -> None:
 
 
 def test_verdict_unavailable_when_no_root_node_id() -> None:
-    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.9}}, root_node_id=None)
+    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.9}, "tauCoverage": 1.0}, root_node_id=None)
     assert result["verdictBand"] == "unavailable"
 
 
 def test_verdict_supported_band_from_real_strength() -> None:
     output = {
-        "dialecticalStrengths": {"node-1": 0.8},
+        "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
         "verificationStatuses": {"node-1": "verified"},
         "convergence": {"converged": True, "reason": None},
     }
@@ -43,7 +43,7 @@ def test_verdict_supported_band_from_real_strength() -> None:
 def test_verdict_state_suppressed_no_evidence_for_proven_empirical_claim() -> None:
     result = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "claimTypes": {"node-1": "empirical"},
             "claimTypeSource": {"node-1": "root_claim_text"},
         },
@@ -75,7 +75,7 @@ def test_non_empirical_claim_types_never_suppressed_in_v1() -> None:
     for claim_type in ("normative", "definitional"):
         result = verdict_summary(
             {
-                "dialecticalStrengths": {"node-1": 0.8},
+                "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
                 "claimTypes": {"node-1": claim_type},
                 "claimTypeSource": {"node-1": "root_claim_text"},
             },
@@ -93,7 +93,7 @@ def test_missing_or_unknown_claim_type_never_suppressed_and_never_fabricated() -
     for claim_types in ({}, {"node-1": "unknown"}):
         result = verdict_summary(
             {
-                "dialecticalStrengths": {"node-1": 0.8},
+                "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
                 "claimTypes": claim_types,
             },
             root_node_id="node-1",
@@ -118,7 +118,7 @@ def test_missing_or_unknown_claim_type_never_suppressed_and_never_fabricated() -
 def test_verification_status_does_not_decide_eligibility() -> None:
     non_empirical_verified = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "verificationStatuses": {"node-1": "verified"},
             "claimTypes": {"node-1": "normative"},
         },
@@ -128,7 +128,7 @@ def test_verification_status_does_not_decide_eligibility() -> None:
     )
     empirical_pending = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "verificationStatuses": {"node-1": "pending_verification"},
             "claimTypes": {"node-1": "empirical"},
         },
@@ -145,7 +145,7 @@ def test_verification_status_does_not_decide_eligibility() -> None:
 def test_empirical_extracted_unresolved_gets_evidence_unverified_caveat_not_suppression() -> None:
     result = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "claimTypes": {"node-1": "empirical"},
             "claimTypeSource": {"node-1": "scoring_item"},
         },
@@ -169,7 +169,7 @@ def test_empirical_extracted_unresolved_gets_evidence_unverified_caveat_not_supp
 
 def test_flag_off_shadow_mode_keeps_legacy_fields_identical() -> None:
     output = {
-        "dialecticalStrengths": {"node-1": 0.8},
+        "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
         "verificationStatuses": {"node-1": "pending"},
         "convergence": {"converged": False, "reason": "topology_changed"},
         "semanticsVersion": "df-quad-weighted-v1",
@@ -240,7 +240,7 @@ def test_flag_off_shadow_mode_keeps_legacy_fields_identical() -> None:
 def test_claim_language_labels_dialectical_support_under_semantics_version() -> None:
     stamped = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "semanticsVersion": "df-quad-weighted-v1",
         },
         root_node_id="node-1",
@@ -252,7 +252,7 @@ def test_claim_language_labels_dialectical_support_under_semantics_version() -> 
     assert stamped["basis"]["semanticsVersion"] == "df-quad-weighted-v1"
 
     historical = verdict_summary(
-        {"dialecticalStrengths": {"node-1": 0.5}},
+        {"dialecticalStrengths": {"node-1": 0.5}, "tauCoverage": 1.0},
         root_node_id="node-1",
     )
     assert (
@@ -271,7 +271,7 @@ def test_claim_language_labels_dialectical_support_under_semantics_version() -> 
 
 def test_t4_label_migration_changes_only_claim_language_and_semantics_version() -> None:
     protocol_output = {
-        "dialecticalStrengths": {"node-1": 0.8},
+        "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
         "verificationStatuses": {"node-1": "pending"},
         "convergence": {"converged": False, "reason": "topology_changed"},
         "semanticsVersion": "df-quad-weighted-v1",
@@ -317,7 +317,7 @@ def test_t4_label_migration_changes_only_claim_language_and_semantics_version() 
         "basis": {
             key: value
             for key, value in migrated["basis"].items()
-            if key not in {"semanticsVersion", "preGateVerdictBand"}
+            if key not in {"semanticsVersion", "preGateVerdictBand", "tauCoverage", "tauSourceMajority"}
         },
     }
     assert json.dumps(restored_legacy_shape, separators=(",", ":")) == json.dumps(
@@ -327,22 +327,22 @@ def test_t4_label_migration_changes_only_claim_language_and_semantics_version() 
 
 
 def test_verdict_unsupported_band() -> None:
-    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.2}}, root_node_id="node-1")
+    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.2}, "tauCoverage": 1.0}, root_node_id="node-1")
     assert result["verdictBand"] == "unsupported"
 
 
 def test_verdict_contested_band_midpoint() -> None:
-    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.5}}, root_node_id="node-1")
+    result = verdict_summary({"dialecticalStrengths": {"node-1": 0.5}, "tauCoverage": 1.0}, root_node_id="node-1")
     assert result["verdictBand"] == "contested"
 
 
 def test_verdict_pending_vs_pending_verification_are_not_conflated() -> None:
     pending = verdict_summary(
-        {"dialecticalStrengths": {"node-1": 0.7}, "verificationStatuses": {"node-1": "pending"}},
+        {"dialecticalStrengths": {"node-1": 0.7}, "tauCoverage": 1.0, "verificationStatuses": {"node-1": "pending"}},
         root_node_id="node-1",
     )
     pending_verification = verdict_summary(
-        {"dialecticalStrengths": {"node-1": 0.7}, "verificationStatuses": {"node-1": "pending_verification"}},
+        {"dialecticalStrengths": {"node-1": 0.7}, "tauCoverage": 1.0, "verificationStatuses": {"node-1": "pending_verification"}},
         root_node_id="node-1",
     )
     assert pending["basis"]["verificationStatus"] == "pending"
@@ -367,7 +367,7 @@ def test_verdict_never_raises_on_malformed_input() -> None:
 def test_malformed_claim_type_is_treated_as_unknown_instead_of_raising() -> None:
     result = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "claimTypes": {"node-1": ["empirical"]},
         },
         root_node_id="node-1",
@@ -384,7 +384,7 @@ def test_malformed_claim_type_is_treated_as_unknown_instead_of_raising() -> None
 def test_malformed_claim_type_source_is_not_echoed_into_suppression_reason() -> None:
     result = verdict_summary(
         {
-            "dialecticalStrengths": {"node-1": 0.8},
+            "dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 1.0,
             "claimTypes": {"node-1": "empirical"},
             "claimTypeSource": {"node-1": ["root_claim_text"]},
         },
@@ -395,3 +395,99 @@ def test_malformed_claim_type_source_is_not_echoed_into_suppression_reason() -> 
 
     assert result["verdictState"] == "suppressed_no_evidence"
     assert result["suppressionReason"]["claimTypeSource"] is None
+
+
+# ---------------------------------------------------------------------------
+# W2: tauCoverage-gated verdict honesty. A strength-based band may only be
+# served when enough argument nodes carry judge scores; below the declared
+# threshold the honest band is "insufficient_scoring", with the REAL strength
+# still beside it in the basis (never band-only).
+# ---------------------------------------------------------------------------
+
+
+def test_verdict_thresholds_version_bumped_for_tau_coverage_gate() -> None:
+    assert VERDICT_THRESHOLDS_VERSION == "verdict-v2"
+
+
+def test_missing_tau_coverage_reads_as_insufficient_scoring() -> None:
+    # All pre-W2 stored protocol runs lack tauCoverage: they were computed
+    # over all-default taus, so 0.0 coverage is the honest reading and the
+    # old "supported" topology artifact must no longer be served.
+    result = verdict_summary(
+        {"dialecticalStrengths": {"node-1": 0.97}},
+        root_node_id="node-1",
+    )
+    assert result["verdictBand"] == "insufficient_scoring"
+    # Band always sits beside the real strength in the basis.
+    assert result["basis"]["dialecticalStrength"] == 0.97
+    assert result["basis"]["tauCoverage"] == 0.0
+    assert result["basis"]["tauSourceMajority"] == "default"
+    assert "0.97" in result["claimLanguage"]
+    assert "dialectical support under semantics version df-quad-v1" in result["claimLanguage"]
+    assert result["verdictThresholdsVersion"] == "verdict-v2"
+
+
+def test_tau_coverage_threshold_boundary() -> None:
+    below = verdict_summary(
+        {"dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 0.49},
+        root_node_id="node-1",
+    )
+    at_threshold = verdict_summary(
+        {"dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": 0.5},
+        root_node_id="node-1",
+    )
+    assert below["verdictBand"] == "insufficient_scoring"
+    assert below["basis"]["tauCoverage"] == 0.49
+    assert below["basis"]["tauSourceMajority"] == "default"
+    assert at_threshold["verdictBand"] == "supported"
+    assert at_threshold["basis"]["tauCoverage"] == 0.5
+    assert at_threshold["basis"]["tauSourceMajority"] == "judge_strength"
+
+
+def test_malformed_tau_coverage_treated_as_zero_coverage() -> None:
+    for malformed in ("1.0", True, 1.5, -0.2, None, ["1.0"]):
+        result = verdict_summary(
+            {"dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": malformed},
+            root_node_id="node-1",
+        )
+        assert result["verdictBand"] == "insufficient_scoring", repr(malformed)
+        assert result["basis"]["tauCoverage"] == 0.0
+        assert result["basis"]["dialecticalStrength"] == 0.8
+
+
+def test_insufficient_scoring_keeps_honest_suffixes() -> None:
+    result = verdict_summary(
+        {
+            "dialecticalStrengths": {"node-1": 0.8},
+            "verificationStatuses": {"node-1": "pending_verification"},
+            "convergence": {"converged": False, "reason": None},
+        },
+        root_node_id="node-1",
+    )
+    assert result["verdictBand"] == "insufficient_scoring"
+    assert "Verification is still pending." in result["claimLanguage"]
+    assert "Not yet converged." in result["claimLanguage"]
+
+
+def test_evidence_gate_suppression_still_wins_over_insufficient_scoring() -> None:
+    result = verdict_summary(
+        {
+            "dialecticalStrengths": {"node-1": 0.8},
+            "claimTypes": {"node-1": "empirical"},
+            "claimTypeSource": {"node-1": "root_claim_text"},
+        },
+        root_node_id="node-1",
+        evidence_presence="none",
+        gate_enabled=True,
+    )
+    assert result["verdictBand"] == "suppressed"
+    assert result["basis"]["preGateVerdictBand"] == "insufficient_scoring"
+    assert result["basis"]["dialecticalStrength"] == 0.8
+
+
+def test_insufficient_scoring_never_raises_on_malformed_output() -> None:
+    result = verdict_summary(
+        {"dialecticalStrengths": {"node-1": 0.8}, "tauCoverage": {"nested": "junk"}},
+        root_node_id="node-1",
+    )
+    assert result["verdictBand"] == "insufficient_scoring"

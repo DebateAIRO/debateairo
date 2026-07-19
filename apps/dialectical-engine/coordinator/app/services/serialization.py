@@ -516,6 +516,11 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     verdict_gate = {
         "state": verdict["verdictState"],
         "reason": verdict["suppressionReason"],
+        # W2 additive: the synthesis verdict_gate mirrors the SAME band
+        # verdict_summary served (single derivation point above; "verdictBand"
+        # stays the band's sole wire key NAME) so the coverage gate is never
+        # re-derived -- or contradicted -- downstream.
+        "verdictBand": verdict["verdictBand"],
     }
     claim_types = protocol_output.get("claimTypes") if protocol_output else None
     claim_type_sources = protocol_output.get("claimTypeSource") if protocol_output else None

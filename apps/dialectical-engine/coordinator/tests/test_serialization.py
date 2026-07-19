@@ -443,6 +443,7 @@ def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analy
         analyzer_type="protocol_analysis",
         output={
             "dialecticalStrengths": {root.id: 0.8},
+            "tauCoverage": 1.0,
             "verificationStatuses": {root.id: "verified"},
             "convergence": {"converged": True, "reason": None, "epsilon": 0.05},
         },
@@ -468,6 +469,38 @@ def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analy
     assert len(visible["analyzer_runs"]) == 2
     assert visible["branch_lineage"][0]["id"] == branch.id
     assert visible["node_count"] == 1
+
+
+def test_debate_detail_unscored_protocol_run_serves_insufficient_scoring(db) -> None:
+    # W2: a stored protocol run WITHOUT tauCoverage (every pre-existing
+    # artifact -- computed over all-default taus) must serve the honest
+    # insufficient_scoring band, with the real strength still in the basis.
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.97},
+                "verificationStatuses": {root.id: "pending_verification"},
+                "convergence": {"converged": None, "reason": "first_evaluation", "epsilon": 0.05},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["verdict"]["verdictBand"] == "insufficient_scoring"
+    assert visible["verdict"]["basis"]["dialecticalStrength"] == 0.97
+    assert visible["verdict"]["basis"]["tauCoverage"] == 0.0
+    assert visible["verdict"]["basis"]["tauSourceMajority"] == "default"
 
 
 def test_debate_detail_verdict_unavailable_when_no_protocol_analysis_run(db) -> None:
@@ -587,6 +620,10 @@ def test_synthesis_verdict_gate_mirrors_top_level_verdict_state(db, monkeypatch,
     assert payload["verdict"]["verdictState"] == "suppressed_no_evidence"
     assert payload["synthesis"]["verdict_gate"]["state"] == payload["verdict"]["verdictState"]
     assert payload["synthesis"]["verdict_gate"]["reason"] == payload["verdict"]["suppressionReason"]
+    # W2: verdict_gate mirrors the served band too (additive key; verdictBand
+    # stays the band's sole wire key NAME, mirrored from the single
+    # verdict_summary derivation -- never derived separately).
+    assert payload["synthesis"]["verdict_gate"]["verdictBand"] == payload["verdict"]["verdictBand"]
     assert payload["synthesis"]["verdict"] == "The persisted synthesis text must remain unchanged."
     assert (
         f"verdict.evidence_gate debate={debate.id} state=suppressed_no_evidence "
