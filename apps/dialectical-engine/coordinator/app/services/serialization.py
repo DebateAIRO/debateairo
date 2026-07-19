@@ -515,9 +515,18 @@ def _completion_state(effective_status: str, nodes: list[Node]) -> str:
 
 def _completion_reason_code(state: str, nodes: list[Node], debate: Debate) -> str | None:
     if state in ("complete-with-failed-branches", "failed"):
-        for node in nodes:
-            if node.status != "failed":
-                continue
+        # `nodes` comes from an un-ordered query (debate_to_dict); every
+        # reachable pipeline path today writes the identical bare code
+        # GENERATION_EXHAUSTED_STOPPING_REASON to every failed node, so which
+        # one is picked first is currently immaterial -- but sort explicitly
+        # (materialized_path, then id) so the choice is deterministic rather
+        # than depending on incidental DB row order, in case a future
+        # failure path ever introduces a second distinct reason.
+        failed_nodes = sorted(
+            (node for node in nodes if node.status == "failed"),
+            key=lambda node: (node.materialized_path or "", node.id),
+        )
+        for node in failed_nodes:
             reason = (node.stopping_reason or "").strip()
             if reason:
                 # The real, already-persisted node-scoped reason (in every

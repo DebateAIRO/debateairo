@@ -903,6 +903,73 @@ def test_completion_block_complete_with_failed_branch_maps_generation_exhausted(
     assert payload["completion"]["humanReason"] != "generation_exhausted"
 
 
+def test_completion_block_reason_pick_is_deterministic_across_multiple_failed_nodes(db) -> None:
+    # `nodes` is queried without an ORDER BY (debate_to_dict); the reason
+    # scan must not depend on incidental DB row order. Two failed nodes with
+    # DISTINCT reasons (an artificial fixture -- every reachable pipeline
+    # path today writes the identical "generation_exhausted" to every failed
+    # node, but the pick must still be well-defined and stable) prove the
+    # earlier materialized_path always wins, regardless of insertion order.
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1},
+        completed_at=now_utc(),
+    )
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    # Insert the LATER-path node first, so an unsorted scan of insertion
+    # order would pick it (and its reason) over the earlier one.
+    later_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="CON",
+        depth=1,
+        position=1,
+        claim="A second failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="a_later_reason",
+        path_status="abandoned",
+        materialized_path="0/1",
+    )
+    db.add(later_child)
+    db.flush()
+    earlier_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="A failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="generation_exhausted",
+        path_status="abandoned",
+        materialized_path="0/0",
+    )
+    db.add(earlier_child)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="",
+        strongest_con="",
+        verdict="Complete over survivors.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.synthesis_id = synthesis.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["completion"]["reasonCode"] == "generation_exhausted"
+
+
 def test_completion_block_failed_debate_carries_the_node_reason(db) -> None:
     debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1})
     db.add(debate)

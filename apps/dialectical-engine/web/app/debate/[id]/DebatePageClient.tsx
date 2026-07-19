@@ -1003,7 +1003,7 @@ export default function DebatePageClient({
               {statusLabel(debate.status)}
             </span>
             {debate.completion?.humanReason ? (
-              <span className="topSwitchStatus" role="status">
+              <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
                 {debate.completion.humanReason}
               </span>
             ) : null}

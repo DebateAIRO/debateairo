@@ -1074,6 +1074,10 @@ a:focus-visible {
   min-width: 0;
   max-width: clamp(88px, 12vw, 180px);
   overflow: hidden;
+  /* Explicit (not inherited from .topSwitch): this class is also used
+     outside .topSwitch, e.g. the W5a completion.humanReason line in the
+     debate top bar, which has no ancestor establishing nowrap. */
+  white-space: nowrap;
   text-overflow: ellipsis;
   color: oklch(0.48 0.04 70);
   text-transform: none;
