@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import bearer_token, require_user_token
 from app.core.db import get_db
 from app.core.write_lock import commit_write
+from app.exploration.expansion_dispatch import adaptive_expansion_enabled, admit_and_spawn
 from app.models.entities import Debate, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
@@ -381,25 +382,93 @@ async def approve_adaptive_depth_expansion(
         approval_reason=payload.approval_reason,
     )
     commit_write(db)
-    # W0 honesty fix (B4): approved "expand" items are recorded for audit but
-    # deliberately queue NO work. The old route (regenerate_node) was not an
-    # expansion -- it staled the node's whole subtree and rerouted v2 debates
-    # through the destructive v1 argue/synthesize pipeline. The real expansion
-    # primitive arrives in a later wave; until then the outcome is honest.
-    response.status_code = status.HTTP_200_OK
+    if not adaptive_expansion_enabled():
+        # W0 honesty fix (B4): approved "expand" items are recorded for audit
+        # but deliberately queue NO work. The old route (regenerate_node) was
+        # not an expansion -- it staled the node's whole subtree and rerouted
+        # v2 debates through the destructive v1 argue/synthesize pipeline.
+        # W4's real expansion path below is flag-gated (default OFF); with
+        # the flag off the outcome stays exactly this honest W0 shape.
+        response.status_code = status.HTTP_200_OK
+        return {
+            "debate_id": debate.id,
+            "status": "recorded",
+            "selected_node_ids": requested_node_ids,
+            "queued_node_ids": [],
+            "unavailable_node_ids": unavailable_node_ids,
+            "jobs": [],
+            "outcomes": [
+                {"node_id": item.node_id, "applied": False, "reason": "expansion_not_yet_supported"}
+                for item in recorded_items
+            ],
+            "audit_record_id": audit_record.id,
+        }
+
+    # W4 (flag ON): explicit user approval is categorical grounding -- queue
+    # REAL v2_expand jobs through the same primitive, budgets, and capacity
+    # admission as the adaptive dispatcher. The dry-run's depth-pressure
+    # reasons are scrutiny signals (unanswered challenges, high-severity
+    # holes), so an approved expansion probes the node with a CON child.
+    outcomes: list[dict] = []
+    jobs_payload: list[dict] = []
+    queued_node_ids: list[str] = []
+    for item in recorded_items:
+        node = db.get(Node, item.node_id)
+        job, outcome = admit_and_spawn(
+            db,
+            debate,
+            node,
+            polarity="CON",
+            reason=_user_approved_expansion_reason(item, payload.approval_reason),
+        )
+        if job is None:
+            outcomes.append({"node_id": item.node_id, "applied": False, "reason": outcome})
+            continue
+        # Audit linkage travels with the job (additive payload key).
+        job.payload = {**(job.payload or {}), "approval_audit_id": audit_record.id}
+        queued_node_ids.append(item.node_id)
+        jobs_payload.append({"node_id": item.node_id, "job_id": job.id, "status": "queued"})
+        outcomes.append(
+            {"node_id": item.node_id, "applied": True, "reason": "expansion_queued", "job_id": job.id}
+        )
+    # Real applied outcomes join the audit record written above.
+    audit_record.metadata_json = {**audit_record.metadata_json, "applied_outcomes": outcomes}
+    commit_write(db)
+
+    if not queued_node_ids:
+        refusals = sorted({str(outcome.get("reason")) for outcome in outcomes})
+        response.status_code = status.HTTP_200_OK
+        return {
+            "debate_id": debate.id,
+            "status": "unavailable",
+            "selected_node_ids": requested_node_ids,
+            "queued_node_ids": [],
+            "unavailable_node_ids": unavailable_node_ids or requested_node_ids,
+            "jobs": [],
+            "outcomes": outcomes,
+            "audit_record_id": audit_record.id,
+            "reason": "No approved expansion could be queued ({}).".format(", ".join(refusals)),
+        }
+    response.status_code = status.HTTP_202_ACCEPTED
     return {
         "debate_id": debate.id,
-        "status": "recorded",
+        "status": "queued" if len(queued_node_ids) == len(recorded_items) and not unavailable_node_ids else "partial",
         "selected_node_ids": requested_node_ids,
-        "queued_node_ids": [],
+        "queued_node_ids": queued_node_ids,
         "unavailable_node_ids": unavailable_node_ids,
-        "jobs": [],
-        "outcomes": [
-            {"node_id": item.node_id, "applied": False, "reason": "expansion_not_yet_supported"}
-            for item in recorded_items
-        ],
+        "jobs": jobs_payload,
+        "outcomes": outcomes,
         "audit_record_id": audit_record.id,
     }
+
+
+def _user_approved_expansion_reason(item: AdaptiveDepthDryRunItem, approval_reason: str | None) -> str:
+    parts = [reason.strip() for reason in item.reasons if isinstance(reason, str) and reason.strip()]
+    summary = "; ".join(parts) or "adaptive depth pressure flagged this node for expansion"
+    approved = (approval_reason or "").strip()
+    if approved:
+        return f"User-approved adaptive expansion ({approved}): {summary}"
+    return f"User-approved adaptive expansion: {summary}"
 
 
 def _unique_nonempty_node_ids(node_ids: list[str]) -> list[str]:

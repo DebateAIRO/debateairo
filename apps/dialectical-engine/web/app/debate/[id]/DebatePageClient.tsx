@@ -1649,7 +1649,7 @@ function AdaptiveDepthDryRunPanel({
           disabled={actionDisabled}
           onClick={() => onApprove(actionableItems.map((item) => item.node_id))}
         >
-          {actionBusy ? "Starting expansions" : "Approve and run selected expansions"}
+          {actionBusy ? "Submitting approvals" : "Approve selected expansions"}
         </button>
         {actionMessage ? (
           <span className="progressCount adaptiveDepthActionMessage">

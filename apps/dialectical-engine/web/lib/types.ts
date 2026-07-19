@@ -324,7 +324,9 @@ export type DebateAdaptiveDepthApprovalResponse = {
   queued_node_ids: string[];
   unavailable_node_ids: string[];
   jobs: { node_id: string; job_id: string; status: ScoringJobStatus }[];
-  outcomes?: { node_id: string; applied: boolean; reason: string }[];
+  // job_id is present on applied outcomes when the coordinator's adaptive
+  // expansion flag is on and real work was queued.
+  outcomes?: { node_id: string; applied: boolean; reason: string; job_id?: string }[];
   audit_record_id?: string | null;
   reason?: string | null;
 };

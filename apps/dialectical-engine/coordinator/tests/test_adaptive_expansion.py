@@ -569,3 +569,134 @@ def test_maybe_queue_rescore_reuses_active_scoring_jobs(db) -> None:
     db.commit()
     assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry) is None
     assert len(score_jobs(db, debate.id)) == 1
+
+
+# ---------------------------------------------------------------------------
+# User-approved expansions go real (flag ON) -- W0 carried item
+# ---------------------------------------------------------------------------
+
+
+def _seed_expand_dry_run(db, debate, node) -> None:
+    from app.scoring.models import RecommendedInvestigation, ScoringHole
+    from app.services.dialectical_v2 import first_branch
+
+    from test_node_scoring import explicit_depth_pressure_payload
+
+    item = explicit_depth_pressure_payload(
+        node_id=node.id,
+        holes=[
+            ScoringHole(
+                type="assumption_risk",
+                severity="high",
+                description="The argument depends on an unstated adoption assumption.",
+                source="critic",
+            )
+        ],
+        impact=0.75,
+        uncertainty=0.5,
+        recommended_investigations=[
+            RecommendedInvestigation(
+                action="challenge",
+                reason="A priority-one challenge marks an unanswered attack.",
+                priority=1,
+                target_node_id=node.id,
+            )
+        ],
+    ).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=first_branch(db, debate.id).id,
+            analyzer_type="node_scoring",
+            output={"status": "available", "items": [item], "producer": "stored-judge-output"},
+            status="complete",
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    db.commit()
+
+
+def test_user_approved_expansion_queues_real_v2_expand_job_flag_on(db, monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    from app.models.entities import ProvenanceRecord
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    _seed_expand_dry_run(db, debate, target)
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/adaptive-depth/approvals",
+        headers={"Authorization": "Bearer user_test_token"},
+        json={
+            "debate_id": debate.id,
+            "selected_node_ids": [target.id],
+            "approval_reason": "Reviewer approved the expand recommendation.",
+        },
+    )
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "queued"
+    assert body["queued_node_ids"] == [target.id]
+    assert body["unavailable_node_ids"] == []
+    assert len(body["jobs"]) == 1 and body["jobs"][0]["status"] == "queued"
+    assert body["outcomes"] == [
+        {
+            "node_id": target.id,
+            "applied": True,
+            "reason": "expansion_queued",
+            "job_id": body["jobs"][0]["job_id"],
+        }
+    ]
+    db.expire_all()
+    jobs = expand_jobs(db, debate.id)
+    assert [job.id for job in jobs] == [body["jobs"][0]["job_id"]]
+    payload = jobs[0].payload or {}
+    # User approval is categorical grounding: real work, CON polarity, audit
+    # linkage and the approval rationale in the payload.
+    assert payload["parent_node_id"] == target.id
+    assert payload["polarity"] == "CON"
+    assert payload["approval_audit_id"] == body["audit_record_id"]
+    assert payload["reason"].startswith(
+        "User-approved adaptive expansion (Reviewer approved the expand recommendation.)"
+    )
+    child = db.get(Node, jobs[0].node_id)
+    assert child.parent_id == target.id and child.node_type == "CON" and child.status == "pending"
+    audit = db.get(ProvenanceRecord, body["audit_record_id"])
+    assert audit.metadata_json["applied_outcomes"] == body["outcomes"]
+
+
+def test_user_approved_expansion_refuses_budget_honestly_flag_on(db, monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "0")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    _seed_expand_dry_run(db, debate, target)
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/adaptive-depth/approvals",
+        headers={"Authorization": "Bearer user_test_token"},
+        json={"debate_id": debate.id, "selected_node_ids": [target.id]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "unavailable"
+    assert body["queued_node_ids"] == []
+    assert body["jobs"] == []
+    assert body["outcomes"] == [
+        {"node_id": target.id, "applied": False, "reason": "budget_exhausted"}
+    ]
+    assert "budget_exhausted" in body["reason"]
+    assert body["audit_record_id"] is not None
+    db.expire_all()
+    assert expand_jobs(db, debate.id) == []
