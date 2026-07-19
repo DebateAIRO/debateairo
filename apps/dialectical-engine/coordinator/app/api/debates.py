@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 import subprocess
 from typing import Annotated, Any, Optional
 
@@ -8,13 +8,13 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth import AuthContext, require_user_token
 from app.core.db import get_db
 from app.models.entities import Debate, Generation, Node, Synthesis
-from app.services.events import event_bus
+from app.services.events import Event, event_bus
 from app.services.dialectical_v2 import create_dialectical_debate
 from app.services.orchestrator import archive_debate as archive_debate_state
 from app.services.orchestrator import markdown_export
@@ -133,7 +133,33 @@ async def debate_events(
     debate = db.get(Debate, debate_id)
     if not debate or debate.status == "archived":
         raise HTTPException(status_code=404, detail="Debate not found")
-    return StreamingResponse(event_bus.subscribe(debate_id, replay_history=replay_history), media_type="text/event-stream")
+    # W5b snapshot-on-subscribe: the event bus is in-memory, so after a
+    # coordinator restart a reconnecting subscriber would otherwise stay
+    # blind until a poll. The DB-derived snapshot (emitted right after
+    # `connected`, before any history/live events) carries the debate's
+    # current status so clients can trigger their existing refresh path.
+    # Additive event type -- consumers that only know the pre-W5b vocabulary
+    # ignore it.
+    snapshot = {
+        "debate_id": debate.id,
+        "status": effective_debate_status(db, debate),
+        "node_count": int(
+            db.scalar(select(func.count(Node.id)).where(Node.debate_id == debate.id)) or 0
+        ),
+        "synthesis_id": debate.synthesis_id,
+        "completed_at": iso(debate.completed_at),
+    }
+
+    async def stream_with_snapshot() -> AsyncIterator[str]:
+        subscription = event_bus.subscribe(debate_id, replay_history=replay_history)
+        first = True
+        async for chunk in subscription:
+            yield chunk
+            if first:
+                first = False
+                yield Event(event="snapshot", data=snapshot).encode()
+
+    return StreamingResponse(stream_with_snapshot(), media_type="text/event-stream")
 
 
 @router.get("/{debate_id}/export.md", response_class=PlainTextResponse)

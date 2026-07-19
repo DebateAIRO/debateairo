@@ -54,6 +54,14 @@ test("SSE failure handlers render stable public copy without worker payload text
     /events\.onerror = \(\) => \{\s*events\?\.close\(\);\s*refresh\(\);\s*scheduleReconnect\(\);\s*\};/,
     "Transport errors must still refresh and schedule reconnection"
   );
+  // W5b: the server emits a DB-derived `snapshot` event on every subscribe
+  // (restart recovery -- the event bus is in-memory). The client must route
+  // it through the existing refresh path and never render payload text.
+  assert.match(
+    debatePageSource,
+    /events\.addEventListener\("snapshot", \(\) => refresh\(\)\);/,
+    "Snapshot-on-subscribe must trigger the existing refresh path"
+  );
   assert.match(
     debatePageSource,
     /\{error \? \([\s\S]*?<div className="error">\{error\}<\/div>/,

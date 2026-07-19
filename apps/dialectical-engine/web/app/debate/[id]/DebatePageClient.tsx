@@ -565,6 +565,11 @@ export default function DebatePageClient({
         refresh();
       };
       events.addEventListener("tree_ready", () => refresh());
+      // W5b snapshot-on-subscribe: the coordinator's event bus is in-memory,
+      // so after a restart the stream would stay silent until a poll. The
+      // server emits a DB-derived snapshot on every subscribe; recover by
+      // pulling fresh state through the existing refresh path.
+      events.addEventListener("snapshot", () => refresh());
       events.addEventListener("node_started", (event) => {
         const payload = parseEventData(event);
         const nodeId = payloadString(payload, "node_id");
