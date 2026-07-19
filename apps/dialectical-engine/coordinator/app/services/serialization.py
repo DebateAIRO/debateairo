@@ -567,6 +567,68 @@ def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) 
     }
 
 
+def _latest_protocol_output(db: Session, debate_id: str) -> dict[str, Any] | None:
+    """Output of the latest persisted protocol_analysis run, or None.
+
+    Phase 9 Task 1 query shape; Phase 11 Task 1 made AnalyzerRun.seq the
+    primary sort key (created_at/id remain only as a defensive fallback for
+    legacy rows where seq IS NULL).
+    """
+    latest_protocol_analysis_run = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate_id, AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE)
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+        .limit(1)
+    ).first()
+    if latest_protocol_analysis_run and isinstance(latest_protocol_analysis_run.output, dict):
+        return latest_protocol_analysis_run.output
+    return None
+
+
+def derive_debate_verdict(
+    db: Session,
+    debate: Debate,
+    *,
+    nodes: list[Node] | None = None,
+    root: Node | None = None,
+) -> dict[str, Any]:
+    """The single verdict derivation path (W2 rule), shared surface (W5b).
+
+    Assembles the EXACT inputs debate_to_dict serves verdict_summary -- the
+    latest persisted protocol_analysis output, the resolved root node id, the
+    debate's evidence presence, and the live gate flag -- so read-only
+    consumers (the /api/ops/verdict-shadow telemetry feed) can never drift
+    from the wire verdict. Returns {"verdict", "protocol_output",
+    "evidence_presence", "root_node_id"}. `nodes`/`root` accept
+    debate_to_dict's already-loaded rows to avoid duplicate queries.
+    """
+    if nodes is None:
+        nodes = list(
+            db.scalars(
+                select(Node).where(
+                    Node.debate_id == debate.id,
+                    or_(Node.status != "stale", Node.path_status != "active", Node.stopping_status != "active"),
+                )
+            ).all()
+        )
+    if root is None:
+        root = db.get(Node, debate.root_node_id) if debate.root_node_id else None
+    protocol_output = _latest_protocol_output(db, debate.id)
+    debate_evidence_presence = evidence_presence(nodes)
+    verdict = verdict_summary(
+        protocol_output,
+        root_node_id=root.id if root else None,
+        evidence_presence=debate_evidence_presence,
+        gate_enabled=bool_env("DIALECTICAL_VERDICT_EVIDENCE_GATE", False),
+    )
+    return {
+        "verdict": verdict,
+        "protocol_output": protocol_output,
+        "evidence_presence": debate_evidence_presence,
+        "root_node_id": root.id if root else None,
+    }
+
+
 def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     nodes = list(
         db.scalars(
@@ -622,24 +684,6 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     analyzer_runs = list(
         db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id).order_by(AnalyzerRun.created_at.asc())).all()
     )
-    # Phase 9 Task 1: latest protocol_analysis run, reusing the query shape
-    # confirmed at app/protocol/runner.py:174-179 (order_by created_at.desc(),
-    # id.desc(), limit 1).
-    #
-    # Phase 11 Task 1: the id-desc tiebreak hazard documented here previously
-    # (created_at is coarse wall-clock -- especially on Windows -- and id is
-    # a random UUID4, so two same-tick protocol_analysis runs could resolve
-    # non-deterministically) is now FIXED by the application-assigned
-    # monotonic AnalyzerRun.seq column (migration 0011), which is the primary
-    # sort key below. created_at.desc()/id.desc() remain only as a defensive
-    # fallback for legacy rows where seq IS NULL (should not occur after
-    # backfill).
-    latest_protocol_analysis_run = db.scalars(
-        select(AnalyzerRun)
-        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE)
-        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
-        .limit(1)
-    ).first()
     matches = list(
         db.scalars(select(CapabilityMatch).where(CapabilityMatch.debate_id == debate.id).order_by(CapabilityMatch.created_at.asc())).all()
     )
@@ -661,18 +705,13 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     provenance_records = list(
         db.scalars(select(ProvenanceRecord).where(ProvenanceRecord.debate_id == debate.id).order_by(ProvenanceRecord.created_at.asc())).all()
     )
-    debate_evidence_presence = evidence_presence(nodes)
-    protocol_output = (
-        latest_protocol_analysis_run.output
-        if latest_protocol_analysis_run and isinstance(latest_protocol_analysis_run.output, dict)
-        else None
-    )
-    verdict = verdict_summary(
-        protocol_output,
-        root_node_id=root.id if root else None,
-        evidence_presence=debate_evidence_presence,
-        gate_enabled=bool_env("DIALECTICAL_VERDICT_EVIDENCE_GATE", False),
-    )
+    # W5b: verdict inputs assembled by the shared single-derivation helper
+    # (see derive_debate_verdict) -- byte-identical to the previous inline
+    # block; the ops shadow endpoint consumes the same helper.
+    verdict_context = derive_debate_verdict(db, debate, nodes=nodes, root=root)
+    verdict = verdict_context["verdict"]
+    protocol_output = verdict_context["protocol_output"]
+    debate_evidence_presence = verdict_context["evidence_presence"]
     verdict_gate = {
         "state": verdict["verdictState"],
         "reason": verdict["suppressionReason"],

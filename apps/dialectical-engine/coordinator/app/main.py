@@ -1,21 +1,64 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import time
 from collections import defaultdict, deque
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import debates, jobs, nodes, qbaf, scoring, settings, workers
+from app.api import debates, jobs, nodes, ops, qbaf, scoring, settings, workers
 from app.core.auth import ensure_user_token
 from app.core.config import load_settings
-from app.core.db import SessionLocal, init_db
+from app.core.db import SessionLocal, get_engine, init_db
+from app.core.instance_lock import acquire_single_instance_lock, release_single_instance_lock
+from app.services.reaper import reaper_loop
 
 settings_obj = load_settings()
 RATE_LIMIT_WINDOW_SECONDS = 60
-app = FastAPI(title="Dialectical Engine Coordinator", version="0.1.0")
+
+
+def run_startup_tasks() -> None:
+    init_db()
+    with SessionLocal() as db:
+        settings.apply_persisted_runtime_settings(db)
+        token = ensure_user_token(db, settings_obj.user_token)
+    if token:
+        print("Dialectical Engine user token (shown once):", token, flush=True)
+
+
+@asynccontextmanager
+async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
+    # W5b single-instance guard: refuse to become a second writer on this
+    # database BEFORE touching the schema. Raising here fails startup fast
+    # with the lock error (override: DIALECTICAL_ALLOW_MULTI_INSTANCE=1).
+    instance_lock_key = acquire_single_instance_lock(str(get_engine().url))
+    reaper_stop = asyncio.Event()
+    reaper_task: asyncio.Task[None] | None = None
+    try:
+        run_startup_tasks()
+        # W5b reaper: with zero polling workers an expired claim would sit
+        # forever (the claim-path reaper only runs when a worker polls).
+        reaper_task = asyncio.create_task(reaper_loop(reaper_stop), name="dialectical-reaper")
+        app_.state.reaper_task = reaper_task
+        yield
+    finally:
+        reaper_stop.set()
+        if reaper_task is not None:
+            try:
+                await asyncio.wait_for(reaper_task, timeout=5)
+            except (asyncio.TimeoutError, TimeoutError):  # pragma: no cover - hung sweep
+                reaper_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await reaper_task
+        release_single_instance_lock(instance_lock_key)
+
+
+app = FastAPI(title="Dialectical Engine Coordinator", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings_obj.web_origin, "http://localhost:3000", "http://127.0.0.1:3000"],
@@ -31,6 +74,7 @@ app.include_router(jobs.router)
 app.include_router(settings.router)
 app.include_router(qbaf.router)
 app.include_router(scoring.router)
+app.include_router(ops.router)
 
 _public_hits: dict[str, deque[float]] = defaultdict(deque)
 
@@ -81,16 +125,6 @@ async def public_rate_limit(
             return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429)
         bucket.append(now)
     return await call_next(request)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    with SessionLocal() as db:
-        settings.apply_persisted_runtime_settings(db)
-        token = ensure_user_token(db, settings_obj.user_token)
-    if token:
-        print("Dialectical Engine user token (shown once):", token, flush=True)
 
 
 @app.get("/healthz")
