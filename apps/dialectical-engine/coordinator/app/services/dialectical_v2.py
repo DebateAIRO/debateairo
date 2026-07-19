@@ -31,6 +31,13 @@ from app.models.entities import (
 )
 from app.core.config import bool_env
 from app.evidence.extraction import persist_evidence_nodes
+from app.exploration.expansion_dispatch import (
+    STOPPED_QUIESCENT_NO_DECISIONS,
+    adaptive_expansion_enabled,
+    maybe_queue_rescore_after_expansion,
+    record_adaptive_stop,
+    stopped_because_of,
+)
 from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
 from app.services.orchestrator import (
@@ -690,6 +697,8 @@ def queue_v2_expand_job(
     polarity: str,
     reason: str,
     model_id: str | None = None,
+    *,
+    decision_record_id: str | None = None,
 ) -> Job:
     """Queue ONE single-node expansion under `node` (the W3 primitive).
 
@@ -765,12 +774,18 @@ def queue_v2_expand_job(
     # a fresh v2_synthesize once the tree is quiescent again.
     cancel_active_synthesis_jobs(db, debate.id, "Expansion superseded synthesis")
     job = queue_v2_job(db, debate, "v2_expand", "v2_expander", model, child.id)
-    job.payload = {
+    payload: dict[str, Any] = {
         "parent_node_id": node.id,
         "polarity": polarity,
         "lens_label": branch_lens_label(db, node),
         "reason": reason,
     }
+    if decision_record_id:
+        # W4 idempotency linkage: the audited lifecycle decision that spawned
+        # this job travels in the payload, committed atomically with the job,
+        # so a dispatch replay can never double-spawn for the same decision.
+        payload["decision_record_id"] = decision_record_id
+    job.payload = payload
     commit_write(db)
     return job
 
@@ -1247,6 +1262,17 @@ def persist_v2_synthesis(
     scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
     if scoring_node is not None:
         ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
+    if adaptive_expansion_enabled():
+        try:
+            # W4: every completed adaptive debate carries a non-empty
+            # stopped_because. When no dispatch pass recorded one yet (e.g.
+            # the debate's first completion, before any post-completion
+            # scoring/dispatch ran), the honest state is a quiescent tree
+            # with no decisions demanding growth. Never overwrites a reason
+            # a dispatch pass or failure path already recorded.
+            record_adaptive_stop(db, debate, STOPPED_QUIESCENT_NO_DECISIONS, overwrite=False)
+        except Exception as exc:
+            print(f"[dialectical_v2] adaptive stopped_because backstop failed (non-fatal): {exc!r}")
     commit_write(db)
     publish_event(debate.id, "synthesis_completed", {"debate_id": debate.id, "synthesis_id": synthesis.id, "job_id": job.id})
     publish_event(debate.id, "debate_complete", {"debate_id": debate.id})
@@ -1494,6 +1520,18 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             }
             for node in db.scalars(select(Node).where(Node.debate_id == debate.id).order_by(Node.materialized_path.asc())).all()
         ]
+        # W4 (flag-gated; flag-off renders stay byte-identical even when a
+        # stale adaptive_expansion config key exists): a completed adaptive
+        # debate's synthesis gets the recorded stopping context.
+        adaptive_context = ""
+        if adaptive_expansion_enabled():
+            stopped_because = stopped_because_of(debate)
+            if stopped_because:
+                adaptive_context = (
+                    "Adaptive expansion context: automatic tree growth for this debate "
+                    f"stopped (reason: {stopped_because}). "
+                    "Treat the argument tree as final under that stopping condition.\n"
+                )
         user = (
             "Return a non-adjudicating synthesis JSON with exactly this shape: "
             '{"title":"Synthesis","content":"...","tensions":["..."],"agreements":["..."],'
@@ -1501,6 +1539,7 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             '"provenance":{"model_id":"...","worker_id":"...","prompt_id":"...","job_id":"..."}}. '
             "Summarize tensions, agreements, evidence gaps, and key takeaways. "
             "Do not declare a winner and do not say Pro wins or Con wins. Do not return status wrappers.\n"
+            f"{adaptive_context}"
             f"Context JSON:\n{json.dumps({**base_context, 'agent_runs': completed_runs, 'tree_nodes': tree_nodes}, default=str)}"
         )
     else:
@@ -1611,6 +1650,19 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         if not pending_nodes and existing_synthesis is None:
             queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
         commit_write(db)
+        # W4 adaptive loop: a completed expansion wakes a debate-scoped
+        # re-score (judge scores -> protocol re-run -> lifecycle
+        # reevaluation -> possibly another dispatch round), only once the
+        # tree is quiescent again and only with the flag on. Strictly
+        # best-effort: any failure here leaves the flag-off behavior
+        # (synthesis queued above) untouched, so the loop can never wedge
+        # the debate.
+        if not pending_nodes and adaptive_expansion_enabled():
+            try:
+                if maybe_queue_rescore_after_expansion(db, debate) is not None:
+                    trigger_internal_scoring_after_completion(debate.id)
+            except Exception as exc:
+                print(f"[dialectical_v2] adaptive re-score trigger failed (non-fatal): {exc!r}")
         return
 
     if job.job_type == "v2_agent_run":

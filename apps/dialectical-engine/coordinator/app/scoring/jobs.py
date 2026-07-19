@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import bool_env
 from app.core.db import SessionLocal
 from app.core.write_lock import commit_write, hold_write_lock
+from app.exploration.expansion_dispatch import adaptive_expansion_enabled, expansion_dispatch
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
 from app.protocol.runner import run_protocol_analysis
@@ -145,6 +146,20 @@ def run_scoring_job_background(
                     "post-scoring protocol analysis re-run failed (non-fatal) debate=%s",
                     debate_id,
                 )
+            # W4: adaptive expansion dispatch consumes this run's fresh
+            # authenticated lifecycle decisions AFTER both the reevaluation
+            # and the protocol re-run. Flag-checked at the call site (a
+            # disabled deployment never invokes dispatch at all) and
+            # best-effort: a dispatch failure never breaks scoring
+            # completion or the lifecycle tail.
+            if adaptive_expansion_enabled():
+                try:
+                    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=new_run.id)
+                except Exception:
+                    LOGGER.exception(
+                        "adaptive expansion dispatch failed (non-fatal) debate=%s",
+                        debate_id,
+                    )
 
 
 def _mark_scoring_job_failed(job_id: str, error: str) -> None:

@@ -1239,6 +1239,21 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
         # already terminal at this point, so it never blocks).
         if pending_generation_nodes(db, debate.id, debate.root_node_id):
             return
+        if job.job_type == "v2_expand":
+            # W4 (flag-gated): a terminally failed expand child ends the
+            # adaptive round -- growth stopped because generation was
+            # exhausted on the failed path. Recorded before synthesis is
+            # queued over the survivors, so the loop never wedges and the
+            # synthesis prompt can carry the stopping context. Joins the
+            # caller's terminal-failure transaction (commit-then-publish).
+            from app.exploration.expansion_dispatch import (
+                STOPPED_GENERATION_EXHAUSTED,
+                adaptive_expansion_enabled,
+                record_adaptive_stop,
+            )
+
+            if adaptive_expansion_enabled():
+                record_adaptive_stop(db, debate, STOPPED_GENERATION_EXHAUSTED)
         if not has_completed_branch_container(db, debate.id, debate.root_node_id):
             return
         existing_synthesis = db.scalar(
