@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import threading
 import urllib.request
 from datetime import date, datetime
 from pathlib import Path
@@ -113,6 +114,16 @@ def _raise_source_read_timeout(signum: int, frame: object) -> None:
     raise SourceReadTimeout
 
 
+def _sigalrm_available() -> bool:
+    """SIGALRM/setitimer exist only on POSIX and only work on the main thread.
+
+    W5b cross-platform guard: anywhere else (Windows, worker threads) the
+    direct read path routes through the killable-subprocess reader below,
+    which enforces the same timeout portably.
+    """
+    return hasattr(signal, "SIGALRM") and threading.current_thread() is threading.main_thread()
+
+
 def path_matches_or_contains(parent: Path, candidate: Path) -> bool:
     try:
         resolved_parent = parent.resolve()
@@ -192,6 +203,11 @@ def read_text(
         text = read_text_in_subprocess(path, encoding=encoding, errors=errors, timeout_s=timeout_s)
         _READ_TEXT_CACHE[cache_key] = text
         return text
+    if not _sigalrm_available():
+        # No SIGALRM (Windows) or off the main thread: the subprocess reader
+        # enforces the same timeout portably. Uncached, matching the direct
+        # read path's fresh-read semantics.
+        return read_text_in_subprocess(path, encoding=encoding, errors=errors, timeout_s=timeout_s)
     old_handler = signal.getsignal(signal.SIGALRM)
     signal.signal(signal.SIGALRM, _raise_source_read_timeout)
     old_timer = signal.setitimer(signal.ITIMER_REAL, timeout_s)
