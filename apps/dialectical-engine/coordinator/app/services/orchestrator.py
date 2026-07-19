@@ -835,7 +835,15 @@ def reset_job_target_for_retry(db: Session, job: Job) -> None:
             node.status = "pending"
 
 
-def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> None:
+def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """Requeue-or-terminalize every job actively held by `worker`.
+
+    Returns the (debate_id, event, payload) terminal events to publish --
+    per terminalize_job_failure's contract, the caller must commit first,
+    then publish (this function never publishes itself: both callers
+    (app/api/workers.py) share one transaction across possibly-multiple
+    workers and must commit that transaction before any event goes out).
+    """
     jobs = db.scalars(
         select(Job).where(
             Job.worker_id == worker.id,
@@ -845,8 +853,7 @@ def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> 
     terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     for job in jobs:
         terminal_events.extend(requeue_or_terminalize_timed_out_job(db, job, reason))
-    if terminal_events:
-        _publish_events_sync(terminal_events)
+    return terminal_events
 
 
 def archive_debate(db: Session, debate: Debate) -> None:
@@ -951,6 +958,13 @@ def ensure_mutable_claim(db: Session, job: Job) -> None:
 
 
 def claim_pending_job(db: Session, worker: Worker) -> Job | None:
+    # Collected up front (not published) so every terminal event -- orphan
+    # release included -- goes out only after the commit that persists it,
+    # per terminalize_job_failure's "commit, then publish" contract. A
+    # pre-commit publish would let a refresh()-triggering terminal SSE race a
+    # not-yet-committed tree, and a rollback after publish would emit a
+    # phantom terminal-failure event.
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     if worker.current_job_id:
         orphaned = db.get(Job, worker.current_job_id)
         if (
@@ -958,17 +972,17 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
             and orphaned.worker_id == worker.id
             and orphaned.status in {"claimed", "running"}
         ):
-            orphan_events = requeue_or_terminalize_timed_out_job(
-                db, orphaned, "Worker restarted while job was active"
+            terminal_events.extend(
+                requeue_or_terminalize_timed_out_job(db, orphaned, "Worker restarted while job was active")
             )
-            if orphan_events:
-                _publish_events_sync(orphan_events)
         else:
             worker.current_job_id = None
 
     if worker.status != "online":
         worker.last_seen = now_utc()
         commit_write(db)
+        if terminal_events:
+            _publish_events_sync(terminal_events)
         return None
 
     capabilities = worker_capability_set(worker)
@@ -988,7 +1002,6 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
             Job.job_type != "score_debate",
         )
     ).all()
-    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     for job in expired:
         terminal_events.extend(requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired"))
     if terminal_events:

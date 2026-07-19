@@ -17,6 +17,7 @@ from app.core.write_lock import commit_write
 from app.models.entities import Worker, now_utc
 from app.services.dialectical_v2 import v2_generation_readiness
 from app.services.orchestrator import (
+    _publish_events_sync,
     claim_pending_job,
     mark_worker_seen,
     publish_job_started,
@@ -86,11 +87,12 @@ def register_worker(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     token: str | None = None
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     worker = db.scalar(select(Worker).where(Worker.name == name))
     if worker:
         if payload.rotate_token:
             token = new_secret_token("worker")
-            requeue_active_jobs_for_worker(db, worker, "Worker token rotated")
+            terminal_events = requeue_active_jobs_for_worker(db, worker, "Worker token rotated")
             worker.token_hash = hash_token(token)
         worker.capabilities = capabilities
         worker.status = "online"
@@ -107,6 +109,12 @@ def register_worker(
         db.add(worker)
     commit_write(db)
     db.refresh(worker)
+    # Commit first, then publish -- terminalize_job_failure's contract (see
+    # orchestrator.requeue_active_jobs_for_worker). A pre-commit publish
+    # would let a refresh()-triggering terminal SSE race a not-yet-committed
+    # tree.
+    if terminal_events:
+        _publish_events_sync(terminal_events)
     return {"worker_id": worker.id, "worker_token": token, "name": worker.name, "capabilities": worker.capabilities}
 
 
@@ -148,6 +156,7 @@ def backend_status(db: Annotated[Session, Depends(get_db)]) -> dict[str, object]
     settings = load_settings()
     offline_cutoff = now_utc() - timedelta(seconds=settings.worker_offline_seconds)
     rows = list(db.scalars(select(Worker).order_by(Worker.name.asc())).all())
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     for worker in rows:
         last_seen_is_aware = (
             worker.last_seen.tzinfo is not None
@@ -155,9 +164,15 @@ def backend_status(db: Annotated[Session, Depends(get_db)]) -> dict[str, object]
         )
         comparable_cutoff = offline_cutoff if last_seen_is_aware else offline_cutoff.replace(tzinfo=None)
         if worker.last_seen < comparable_cutoff and (worker.status != "offline" or worker.current_job_id):
-            requeue_active_jobs_for_worker(db, worker, "Worker offline")
+            terminal_events.extend(requeue_active_jobs_for_worker(db, worker, "Worker offline"))
             worker.status = "offline"
     commit_write(db)
+    # Commit first, then publish -- terminalize_job_failure's contract (see
+    # orchestrator.requeue_active_jobs_for_worker). A pre-commit publish
+    # would let a refresh()-triggering terminal SSE race a not-yet-committed
+    # tree.
+    if terminal_events:
+        _publish_events_sync(terminal_events)
     return {
         "v2_generation_readiness": asdict(v2_generation_readiness(db)),
         "workers": [
