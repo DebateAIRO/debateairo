@@ -24,6 +24,7 @@ import type {
   DebateScoringResponse,
   DepthPressure,
   InvestigationAction,
+  LifecycleDecision,
   NodeFeedbackSummary,
   NodeScoringPayload,
   RecommendedInvestigation,
@@ -714,6 +715,15 @@ export default function DebatePageClient({
     () => indexScoringResponse(scoringState.data),
     [scoringState.data]
   );
+  // W5a: bounded (latest-per-node) decision provenance, indexed for the
+  // drawer's "Path decision" line. Absent on older cached/SSR payloads.
+  const lifecycleDecisionByNodeId = useMemo(() => {
+    const map = new Map<string, LifecycleDecision>();
+    for (const decision of debate?.lifecycleDecisions ?? []) {
+      map.set(decision.nodeId, decision);
+    }
+    return map;
+  }, [debate?.lifecycleDecisions]);
   const { feedbackSummaryByNodeId, currentUserFeedbackByNodeId } = useMemo(
     () => indexScoringResponse(scoringState.data),
     [scoringState.data]
@@ -992,6 +1002,11 @@ export default function DebatePageClient({
               <span className="dot" />
               {statusLabel(debate.status)}
             </span>
+            {debate.completion?.humanReason ? (
+              <span className="topSwitchStatus" role="status">
+                {debate.completion.humanReason}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="debateTopActions">
@@ -1220,6 +1235,7 @@ export default function DebatePageClient({
           scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
+          lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
           feedbackSubmitState={
             feedbackSubmitState.nodeId === detailNode.id
               ? { status: feedbackSubmitState.status, error: feedbackSubmitState.error }

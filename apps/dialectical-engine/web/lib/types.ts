@@ -66,6 +66,13 @@ export type DebateNode = {
   path_status?: string;
   stopping_status?: string;
   stopping_reason?: string | null;
+  /**
+   * W5a additive: plain-language copy of stopping_reason via the coordinator's
+   * shared reason-code map (closes the "set aside because: generation_exhausted"
+   * raw-code rough edge). Absent on older cached/SSR payloads -- callers must
+   * fall back to stopping_reason, never assume presence.
+   */
+  stopping_reason_human?: string | null;
   materialized_path: string;
   active_generation_id: string | null;
   active_generation: Generation | null;
@@ -545,6 +552,40 @@ export type VerdictSummary = {
   };
 };
 
+// ---------------------------------------------------------------------------
+// W5a: decision provenance -- why the tree grew, why it stopped, what failed.
+// Matches coordinator/app/services/serialization.py's debate_to_dict() shape
+// exactly (camelCase, additive). Older cached payloads may lack these keys
+// entirely -- optional fields, honest absence, never a fabricated value.
+// ---------------------------------------------------------------------------
+
+/** One node's latest lifecycle decision (bounded -- never the full audit
+ * trail, which stays in the coordinator's lifecycle_decision_records). */
+export type LifecycleDecision = {
+  nodeId: string;
+  decision: string;
+  signalClass: "categorical" | "scalar" | null;
+  reason: string | null;
+  childSpawnCount: number;
+  outcome: "spawned" | "annotate_only" | "budget_exhausted" | "deferred_no_capacity" | (string & {});
+  decidedAt: string;
+};
+
+/** The claim-type + matched-markers derivation that selected this debate's
+ * lens set, persisted only for new dynamic-perspectives debates. */
+export type DebateDerivation = {
+  claimType: string | null;
+  markers: string[];
+  lensSet: string[];
+};
+
+/** Why the debate stopped, in plain language. */
+export type DebateCompletion = {
+  state: "complete" | "complete-with-failed-branches" | "failed" | "generating" | (string & {});
+  reasonCode: string | null;
+  humanReason: string | null;
+};
+
 export type DebateDetail = {
   id: string;
   topic: string;
@@ -568,6 +609,9 @@ export type DebateDetail = {
   agent_runs: AgentRun[];
   skills_used: string[];
   provenance_records: ProvenanceRecord[];
+  lifecycleDecisions?: LifecycleDecision[];
+  derivation?: DebateDerivation;
+  completion?: DebateCompletion;
   workers: string[];
   models: string[];
   node_count: number;

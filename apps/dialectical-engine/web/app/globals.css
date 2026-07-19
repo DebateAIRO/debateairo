@@ -1860,7 +1860,8 @@ a:focus-visible {
   margin-top: 8px;
 }
 .drawerScoringUnavailable,
-.drawerScoringRationale {
+.drawerScoringRationale,
+.drawerPathDecision {
   border: 1px solid var(--line);
   background: var(--surface-sunken);
   border-radius: 8px;
@@ -1876,7 +1877,8 @@ a:focus-visible {
   color: var(--text-2);
 }
 .drawerScoringUnavailable p,
-.drawerScoringRationale p {
+.drawerScoringRationale p,
+.drawerPathDecision p {
   margin: 7px 0 0;
   font-family: var(--font-serif);
   font-size: 13.5px;

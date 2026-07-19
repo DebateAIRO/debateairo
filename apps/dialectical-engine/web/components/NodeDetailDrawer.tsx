@@ -7,6 +7,7 @@ import type {
   CurrentUserFeedbackVote,
   DebateNode,
   Generation,
+  LifecycleDecision,
   NodeFeedbackSummary,
   NodeScoringError,
   NodeScoringPayload,
@@ -39,6 +40,40 @@ function isSetAsidePath(node: DebateNode): boolean {
   );
 }
 
+const DECISION_KIND_LABELS: Record<string, string> = {
+  continue: "continue",
+  deepen: "deepen this path",
+  seek_evidence: "seek evidence",
+  challenge: "challenge",
+  abandon: "abandon",
+  reopen: "reopen"
+};
+
+function decisionKindLabel(decision: string): string {
+  return DECISION_KIND_LABELS[decision] ?? decision;
+}
+
+/**
+ * W5a: honest causality phrasing for a node's latest lifecycle decision.
+ * childSpawnCount > 0 is the ground truth for "this decision caused growth"
+ * (see coordinator serialization.py's _decision_outcome) -- only then may the
+ * copy say the expansion HAPPENED BECAUSE of the decision. Every other
+ * decision (annotate-only, scalar-grounded, budget/capacity refused) steered
+ * nothing, so the copy stays in "noted" register, never implying causation.
+ */
+function pathDecisionCopy(decision: LifecycleDecision): string {
+  const reason = decision.reason?.trim();
+  const kind = decisionKindLabel(decision.decision);
+  if (decision.childSpawnCount > 0) {
+    return reason
+      ? `This path expanded because ${reason} (decision: ${kind}).`
+      : `This path expanded because of a ${kind} decision.`;
+  }
+  return reason
+    ? `Noted (decision: ${kind}): ${reason}. This did not change the tree.`
+    : `Noted: a ${kind} decision was recorded. This did not change the tree.`;
+}
+
 export function NodeDetailDrawer({
   node,
   scoring,
@@ -46,6 +81,7 @@ export function NodeDetailDrawer({
   feedbackSummary,
   currentUserFeedback,
   feedbackSubmitState,
+  lifecycleDecision,
   token,
   onClose,
   onChallenge,
@@ -62,6 +98,7 @@ export function NodeDetailDrawer({
   feedbackSummary?: NodeFeedbackSummary;
   currentUserFeedback?: CurrentUserFeedbackVote;
   feedbackSubmitState?: { status: "idle" | "submitting" | "error"; error: string | null };
+  lifecycleDecision?: LifecycleDecision;
   token: string | null;
   onClose: () => void;
   onChallenge: (anchor: HTMLElement, text: string) => void;
@@ -76,7 +113,7 @@ export function NodeDetailDrawer({
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
   const isAbandoned = isAbandonedArgumentStatus(node.status);
-  const stoppingReason = node.stopping_reason?.trim();
+  const stoppingReason = (node.stopping_reason_human ?? node.stopping_reason)?.trim();
 
   const [history, setHistory] = useState<Generation[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(0);
@@ -191,6 +228,12 @@ export function NodeDetailDrawer({
               {isSetAsidePath(node) && stoppingReason ? (
                 <p>set aside because: {stoppingReason}</p>
               ) : null}
+            </div>
+          ) : null}
+          {lifecycleDecision ? (
+            <div className="drawerPathDecision" role="status">
+              <div className="drawerSectionTitle">Path decision</div>
+              <p>{pathDecisionCopy(lifecycleDecision)}</p>
             </div>
           ) : null}
           <div className="drawerClaim">{node.claim}</div>
