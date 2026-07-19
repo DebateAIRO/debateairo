@@ -1243,6 +1243,24 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
         )
 
 
+def debate_uses_v2_pipeline(db: Session, debate_id: str) -> bool:
+    """True when the debate was built by the v2 pipeline.
+
+    Every v2 debate queues v2_* jobs synchronously at creation and job rows
+    are never deleted, so their presence is a durable structural marker.
+    (DebateBranch is NOT usable here: scoring backfills a branch for scored
+    v1 debates via current_scoring_branch.)
+    """
+    return (
+        db.scalar(
+            select(Job.id)
+            .where(Job.debate_id == debate_id, Job.job_type.startswith("v2_", autoescape=True))
+            .limit(1)
+        )
+        is not None
+    )
+
+
 async def regenerate_node(db: Session, node: Node, model_id: str | None = None) -> Job:
     if model_id is not None:
         model_id = model_id.strip()
@@ -1266,6 +1284,14 @@ async def regenerate_node(db: Session, node: Node, model_id: str | None = None) 
         role = claim_label or V2_POV_ROLES[node.node_type]
         job_type = "v2_pov"
     else:
+        # v1-reroute guard (W0/B4): a v1 `argue` job on a v2 tree completes
+        # through complete_job's v1 branch and can queue a v1 `synthesize`
+        # that replaces the debate's v2 synthesis, bypassing the v2 branch-
+        # completeness gate and provenance. Refuse instead of corrupting.
+        if debate_uses_v2_pipeline(db, debate.id):
+            raise ValueError(
+                "Argument regeneration is not supported inside a v2 debate; regenerate the POV branch node instead"
+            )
         role = role_for_node(node.node_type)
         job_type = "argue"
     parent = db.get(Node, node.parent_id) if node.parent_id else None

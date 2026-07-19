@@ -304,6 +304,103 @@ def test_manual_investigation_api_queues_real_node_regeneration_for_scored_hole(
     assert job.status == "pending"
 
 
+def test_manual_investigation_api_rejects_v1_regeneration_for_v2_debate_nodes(db) -> None:
+    # W0 (B4): on a v2-pipeline debate, manual investigation must not reroute
+    # a PRO/CON node through v1 `argue` regeneration (which would corrupt the
+    # debate via v1 synthesis). The endpoint reports an honest unavailable.
+    hole = ScoringHole(
+        type="missing_evidence",
+        severity="high",
+        description="No retrieval-backed source was provided.",
+        source="evidence_auditor",
+    )
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="SCIENTIFIC_POV",
+        depth=1,
+        position=0,
+        claim="Mechanism POV",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(pov)
+    db.flush()
+    node = Node(
+        debate_id=debate.id,
+        parent_id=pov.id,
+        node_type="PRO",
+        depth=2,
+        position=0,
+        claim="Strongest mechanism pro.",
+        status="complete",
+        materialized_path="/0/0/0",
+    )
+    db.add(node)
+    db.flush()
+    marker_job = Job(
+        debate_id=debate.id,
+        job_type="v2_pov",
+        required_role="Mechanism POV",
+        required_model="codex-gpt-5.5",
+        node_id=pov.id,
+        status="complete",
+        deadline=now_utc(),
+    )
+    db.add(marker_job)
+    scoring_item = explicit_depth_pressure_payload(node_id=node.id, holes=[hole]).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            status="complete",
+            output={"status": "available", "items": [scoring_item]},
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/manual-investigations",
+        headers=USER_HEADERS,
+        json={
+            "debate_id": debate.id,
+            "node_id": node.id,
+            "action": "find_evidence",
+            "hole": hole.model_dump(mode="json"),
+            "reason": "User wants DebateAI to investigate this evidence gap.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "unavailable"
+    assert "v2 debate" in body["reason"]
+    assert body["job_id"] is None
+    db.expire_all()
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue")).all() == []
+    assert db.get(Node, node.id).status == "complete"
+
+
 def test_manual_investigation_api_does_not_queue_when_hole_is_not_in_scoring_payload(db) -> None:
     scored_hole = ScoringHole(
         type="missing_evidence",
@@ -6542,7 +6639,7 @@ def test_scoring_api_adaptive_depth_dry_run_reports_unavailable_without_stored_s
     assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
 
 
-def test_scoring_api_approve_adaptive_depth_run_queues_real_regeneration_for_selected_expand_nodes(db) -> None:
+def test_scoring_api_approve_adaptive_depth_records_approval_without_queueing_expansion(db) -> None:
     worker = Worker(
         name="mac-mini",
         token_hash=hash_token("worker-token"),
@@ -6639,13 +6736,17 @@ def test_scoring_api_approve_adaptive_depth_run_queues_real_regeneration_for_sel
         },
     )
 
-    assert response.status_code == 202
+    assert response.status_code == 200
     body = response.json()
     assert body["debate_id"] == debate.id
-    assert body["status"] == "queued"
+    assert body["status"] == "recorded"
     assert body["selected_node_ids"] == [high_node.id]
-    assert body["queued_node_ids"] == [high_node.id]
+    assert body["queued_node_ids"] == []
     assert body["unavailable_node_ids"] == []
+    assert body["jobs"] == []
+    assert body["outcomes"] == [
+        {"node_id": high_node.id, "applied": False, "reason": "expansion_not_yet_supported"}
+    ]
     assert set(body) == {
         "debate_id",
         "status",
@@ -6653,19 +6754,14 @@ def test_scoring_api_approve_adaptive_depth_run_queues_real_regeneration_for_sel
         "queued_node_ids",
         "unavailable_node_ids",
         "jobs",
+        "outcomes",
         "audit_record_id",
     }
-    assert len(body["jobs"]) == 1
     db.expire_all()
-    job = db.get(Job, body["jobs"][0]["job_id"])
-    assert job is not None
-    assert job.debate_id == debate.id
-    assert job.node_id == high_node.id
-    assert job.job_type == "argue"
-    assert job.required_role == "proposer"
-    assert job.required_model == "mock-local"
-    assert job.status == "pending"
-    assert db.get(Node, high_node.id).status == "pending"
+    # The honest outcome: the approval is recorded, but no work is queued and
+    # no node is touched (regenerate_node was destructive v1 regeneration).
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id)).all() == []
+    assert db.get(Node, high_node.id).status == "complete"
     assert db.get(Node, medium_node.id).status == "complete"
     records = db.scalars(
         select(ProvenanceRecord)
@@ -6679,6 +6775,141 @@ def test_scoring_api_approve_adaptive_depth_run_queues_real_regeneration_for_sel
     assert records[0].metadata_json["approval_reason"] == (
         "Reviewer approved the high-pressure adaptive depth recommendation."
     )
+
+
+def test_scoring_api_approve_adaptive_depth_expand_leaves_v2_subtree_untouched(db) -> None:
+    # W0 acceptance (B4): approving an "expand" item on a v2 debate must leave
+    # every existing node/subtree untouched (no stale, no regen job) while the
+    # audit record is still written and the response is honest about it.
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        id="v2-root",
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        id="v2-pov",
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="SCIENTIFIC_POV",
+        depth=1,
+        position=0,
+        claim="Mechanism POV",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    pro = Node(
+        id="v2-pro",
+        debate_id=debate.id,
+        parent_id=pov.id,
+        node_type="PRO",
+        depth=2,
+        position=0,
+        claim="Strongest mechanism pro.",
+        status="complete",
+        materialized_path="/0/0/0",
+    )
+    nested = Node(
+        id="v2-nested-pro",
+        debate_id=debate.id,
+        parent_id=pro.id,
+        node_type="PRO",
+        depth=3,
+        position=0,
+        claim="Nested support.",
+        status="complete",
+        materialized_path="/0/0/0/0",
+    )
+    db.add_all([pov, pro, nested])
+    db.flush()
+    branch = DebateBranch(debate_id=debate.id, root_node_id=root.id, status="active")
+    marker_job = Job(
+        debate_id=debate.id,
+        job_type="v2_pov",
+        required_role="Mechanism POV",
+        required_model="codex-gpt-5.5",
+        node_id=pov.id,
+        status="complete",
+        deadline=now_utc(),
+    )
+    db.add_all([branch, marker_job])
+    db.flush()
+    expand_item = explicit_depth_pressure_payload(
+        node_id=pro.id,
+        holes=[
+            ScoringHole(
+                type="assumption_risk",
+                severity="high",
+                description="The argument depends on an unstated adoption assumption.",
+                source="critic",
+            )
+        ],
+        impact=0.75,
+        uncertainty=0.5,
+        recommended_investigations=[
+            RecommendedInvestigation(
+                action="challenge",
+                reason="A priority-one challenge marks an unanswered attack.",
+                priority=1,
+                target_node_id=pro.id,
+            )
+        ],
+    ).model_dump(mode="json")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={"status": "available", "items": [expand_item], "producer": "stored-judge-output"},
+            status="complete",
+            provenance={"scoring_source": "judge_outputs"},
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/adaptive-depth/approvals",
+        headers=USER_HEADERS,
+        json={
+            "debate_id": debate.id,
+            "selected_node_ids": [pro.id],
+            "approval_reason": "Reviewer approved the v2 expand recommendation.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "recorded"
+    assert body["queued_node_ids"] == []
+    assert body["jobs"] == []
+    assert body["outcomes"] == [{"node_id": pro.id, "applied": False, "reason": "expansion_not_yet_supported"}]
+    db.expire_all()
+    # Whole subtree untouched: statuses intact, nothing staled anywhere.
+    for node_id in (root.id, pov.id, pro.id, nested.id):
+        assert db.get(Node, node_id).status == "complete"
+    assert db.scalars(select(Node).where(Node.debate_id == debate.id, Node.status == "stale")).all() == []
+    # No new jobs: only the pre-existing v2 marker job remains.
+    assert [job.id for job in db.scalars(select(Job).where(Job.debate_id == debate.id)).all()] == [marker_job.id]
+    refreshed = db.get(Debate, debate.id)
+    assert refreshed.status == "complete"
+    # Audit record still written through the existing machinery.
+    records = db.scalars(
+        select(ProvenanceRecord)
+        .where(ProvenanceRecord.debate_id == debate.id, ProvenanceRecord.artifact_kind == "adaptive_expansion")
+    ).all()
+    assert len(records) == 1
+    assert records[0].id == body["audit_record_id"]
+    assert records[0].metadata_json["selected_node_ids"] == [pro.id]
 
 
 def test_scoring_api_approve_adaptive_depth_run_rejects_over_limit_before_queueing(db, monkeypatch) -> None:

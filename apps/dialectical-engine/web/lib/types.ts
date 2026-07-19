@@ -317,11 +317,14 @@ export type DebateAdaptiveDepthApprovalRequest = {
 
 export type DebateAdaptiveDepthApprovalResponse = {
   debate_id: string;
-  status: "queued" | "partial" | "unavailable";
+  // "recorded": approval audited, but no expansion work exists yet (W0/B4
+  // honesty fix) -- "queued"/"partial" kept for older coordinator responses.
+  status: "recorded" | "queued" | "partial" | "unavailable";
   selected_node_ids: string[];
   queued_node_ids: string[];
   unavailable_node_ids: string[];
   jobs: { node_id: string; job_id: string; status: ScoringJobStatus }[];
+  outcomes?: { node_id: string; applied: boolean; reason: string }[];
   audit_record_id?: string | null;
   reason?: string | null;
 };

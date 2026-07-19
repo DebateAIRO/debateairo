@@ -97,6 +97,7 @@ type AdaptiveDepthDryRunAsyncState =
 type AdaptiveDepthApprovalState =
   | { status: "idle"; error: null }
   | { status: "starting"; error: null }
+  | { status: "recorded"; error: null }
   | { status: "queued"; error: null }
   | { status: "unavailable"; error: string }
   | { status: "error"; error: string };
@@ -883,6 +884,13 @@ export default function DebatePageClient({
         });
         return;
       }
+      if (result.status === "recorded") {
+        // Honest outcome (W0/B4): the approval is audited but no expansion
+        // work is queued yet -- never claim jobs were started.
+        setAdaptiveDepthApprovalState({ status: "recorded", error: null });
+        showToast("Expansion approval recorded — automatic expansion is not yet supported");
+        return;
+      }
       setAdaptiveDepthApprovalState({ status: "queued", error: null });
       showToast(`Queued ${result.queued_node_ids.length} adaptive expansion${result.queued_node_ids.length === 1 ? "" : "s"}`);
       await refresh();
@@ -1601,11 +1609,13 @@ function AdaptiveDepthDryRunPanel({
     ? "Unlock actions to approve adaptive expansion."
     : actionableItems.length === 0
       ? "No selected expand recommendations are available."
-      : approvalState.status === "queued"
-        ? "Adaptive expansion jobs queued."
-        : approvalState.status === "unavailable" || approvalState.status === "error"
-          ? approvalState.error
-          : null;
+      : approvalState.status === "recorded"
+        ? "Approval recorded. Automatic expansion is not yet supported."
+        : approvalState.status === "queued"
+          ? "Adaptive expansion jobs queued."
+          : approvalState.status === "unavailable" || approvalState.status === "error"
+            ? approvalState.error
+            : null;
   return (
     <section
       className="progressStrip adaptiveDepthStrip"

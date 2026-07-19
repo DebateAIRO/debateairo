@@ -316,7 +316,9 @@ def get_adaptive_depth_dry_run(
     return payload
 
 
-@router.post("/{debate_id}/scoring/adaptive-depth/approvals", status_code=status.HTTP_202_ACCEPTED)
+# 200 (not 202): since the W0/B4 honesty fix nothing is "accepted for
+# processing" here -- the approval is recorded synchronously and no work runs.
+@router.post("/{debate_id}/scoring/adaptive-depth/approvals", status_code=status.HTTP_200_OK)
 async def approve_adaptive_depth_expansion(
     debate_id: str,
     payload: AdaptiveDepthApprovalRequest,
@@ -355,44 +357,47 @@ async def approve_adaptive_depth_expansion(
             unavailable_node_ids=requested_node_ids,
         )
 
-    jobs = []
-    queued_items = []
+    recorded_items = []
     unavailable_node_ids = []
     for item in selectable_items:
         node = db.get(Node, item.node_id)
         if not node or node.debate_id != debate.id or node.status == "stale":
             unavailable_node_ids.append(item.node_id)
             continue
-        try:
-            job = await regenerate_node(db, node)
-        except ValueError:
-            unavailable_node_ids.append(item.node_id)
-            continue
-        queued_items.append(item)
-        jobs.append({"node_id": item.node_id, "job_id": job.id, "status": public_scoring_job_status(job.status)})
+        recorded_items.append(item)
 
-    if not jobs:
+    if not recorded_items:
         response.status_code = status.HTTP_200_OK
         return _adaptive_depth_approval_unavailable(
             payload,
-            "No selected adaptive depth nodes could be queued for expansion.",
+            "No selected adaptive depth nodes could be approved for expansion.",
             unavailable_node_ids=requested_node_ids,
         )
 
     audit_record = record_approved_adaptive_expansion(
         db,
         debate,
-        queued_items,
+        recorded_items,
         approval_reason=payload.approval_reason,
     )
     commit_write(db)
+    # W0 honesty fix (B4): approved "expand" items are recorded for audit but
+    # deliberately queue NO work. The old route (regenerate_node) was not an
+    # expansion -- it staled the node's whole subtree and rerouted v2 debates
+    # through the destructive v1 argue/synthesize pipeline. The real expansion
+    # primitive arrives in a later wave; until then the outcome is honest.
+    response.status_code = status.HTTP_200_OK
     return {
         "debate_id": debate.id,
-        "status": "queued" if not unavailable_node_ids else "partial",
+        "status": "recorded",
         "selected_node_ids": requested_node_ids,
-        "queued_node_ids": [item.node_id for item in queued_items],
+        "queued_node_ids": [],
         "unavailable_node_ids": unavailable_node_ids,
-        "jobs": jobs,
+        "jobs": [],
+        "outcomes": [
+            {"node_id": item.node_id, "applied": False, "reason": "expansion_not_yet_supported"}
+            for item in recorded_items
+        ],
         "audit_record_id": audit_record.id,
     }
 
