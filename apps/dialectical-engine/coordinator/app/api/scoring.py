@@ -317,8 +317,10 @@ def get_adaptive_depth_dry_run(
     return payload
 
 
-# 200 (not 202): since the W0/B4 honesty fix nothing is "accepted for
-# processing" here -- the approval is recorded synchronously and no work runs.
+# Default 200 (the W0/B4 honesty fix): with DIALECTICAL_ADAPTIVE_EXPANSION
+# off, nothing is "accepted for processing" -- the approval is recorded
+# synchronously and no work runs. With the flag on, W4 queues real
+# v2_expand work and the applied path answers 202 explicitly.
 @router.post("/{debate_id}/scoring/adaptive-depth/approvals", status_code=status.HTTP_200_OK)
 async def approve_adaptive_depth_expansion(
     debate_id: str,
