@@ -29,6 +29,7 @@ from app.scoring.service import (
     fail_unavailable_scoring_job,
     feedback_summary_for_nodes,
 )
+from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import regenerate_node
 
 router = APIRouter(prefix="/api/debates", tags=["scoring"])
@@ -102,6 +103,14 @@ def get_scoring_job_status(
 def _expire_stale_scoring_job(db: Session, job: Job) -> None:
     if job.status not in ACTIVE_SCORING_JOB_STATUSES or job.deadline >= now_utc():
         return
+    record_job_transition(
+        db,
+        job,
+        from_status=job.status,
+        to_status="failed",
+        channel="scoring_stale",
+        reason=STALE_SCORING_JOB_ERROR,
+    )
     job.status = "failed"
     job.error = STALE_SCORING_JOB_ERROR
     commit_write(db)

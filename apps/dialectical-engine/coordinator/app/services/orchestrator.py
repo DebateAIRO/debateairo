@@ -15,6 +15,7 @@ from app.core.write_lock import commit_write, flush_write
 
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
 from app.services.events import event_bus
+from app.services.job_ledger import record_job_transition
 from app.services.prompts import render_prompt
 from app.services.routing import routing_engine
 from app.services.serialization import debate_to_dict, iso
@@ -241,6 +242,7 @@ def create_job(
         deadline=make_deadline(),
     )
     db.add(job)
+    record_job_transition(db, job, from_status=None, to_status="pending", channel="create")
     return job
 
 
@@ -646,6 +648,9 @@ def cancel_active_jobs_for_nodes(db: Session, node_ids: list[str], reason: str) 
         )
     ).all()
     for job in jobs:
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="cancel", reason=reason
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = reason
@@ -665,6 +670,9 @@ def cancel_active_synthesis_jobs(db: Session, debate_id: str, reason: str) -> No
         )
     ).all()
     for job in jobs:
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="cancel", reason=reason
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = reason
@@ -804,6 +812,14 @@ def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> 
 def archive_debate(db: Session, debate: Debate) -> None:
     debate.status = "archived"
     for job in pending_or_running_jobs(db, debate.id):
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="failed",
+            channel="archive",
+            reason="Debate archived",
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = "Debate archived"
@@ -888,6 +904,14 @@ def try_claim_pending_job(db: Session, job: Job, worker: Worker, now: Any) -> bo
         return False
     worker.current_job_id = job.id
     mark_worker_seen(worker, now)
+    record_job_transition(
+        db,
+        job,
+        from_status="pending",
+        to_status="running",
+        channel="claim",
+        reason=f"claimed by worker {worker.id}",
+    )
     commit_write(db)
     db.refresh(job)
     return True
@@ -1090,7 +1114,11 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         worker.current_job_id = None
         worker.last_seen = now_utc()
         worker.status = "online"
+    previous_job_status = job.status
     job.status = "complete"
+    record_job_transition(
+        db, job, from_status=previous_job_status, to_status="complete", channel="complete"
+    )
 
     if job.job_type == "decompose":
         node = db.get(Node, job.node_id)
@@ -1292,7 +1320,16 @@ def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[st
     keeps the honest debate-level terminal "failed". Returns the
     (debate_id, event, payload) tuples to publish after commit.
     """
+    previous_job_status = job.status
     job.status = "failed"
+    record_job_transition(
+        db,
+        job,
+        from_status=previous_job_status,
+        to_status="failed",
+        channel="terminalize",
+        reason=reason,
+    )
     job.error = sanitize_text(reason, 2_000) or "Job failed"
     # Keep job.worker_id for attribution (which worker last held the poison
     # job); only free the worker itself to take new work.
@@ -1360,9 +1397,18 @@ def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> 
     remains, otherwise applies the shared terminal handling. Returns events
     to publish (empty when requeued).
     """
+    previous_job_status = job.status
     job.timeout_attempts = (job.timeout_attempts or 0) + 1
     if job_attempts_exhausted(job):
         return terminalize_job_failure(db, job, f"{reason} (retry budget exhausted)")
+    record_job_transition(
+        db,
+        job,
+        from_status=previous_job_status,
+        to_status="pending",
+        channel="timeout_requeue",
+        reason=reason,
+    )
     job.status = "pending"
     release_job_claim(db, job)
     reset_job_target_for_retry(db, job)
@@ -1381,6 +1427,14 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
             worker.current_job_id = None
             worker.status = "degraded" if retryable else worker.status
     if retryable and not job_attempts_exhausted(job):
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="pending",
+            channel="worker_fail",
+            reason=job.error,
+        )
         job.status = "pending"
         release_job_claim(db, job)
         job.stream_buffer = ""

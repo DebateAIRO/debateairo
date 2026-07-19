@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
@@ -11,12 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import bool_env
 from app.core.db import SessionLocal
+from app.core.oplog import log_event
 from app.core.write_lock import commit_write, hold_write_lock
 from app.exploration.expansion_dispatch import adaptive_expansion_enabled, expansion_dispatch
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
 from app.protocol.runner import run_protocol_analysis
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
+from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import max_job_attempts
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
@@ -68,6 +71,10 @@ def run_scoring_job_background(
         if not job or not debate or debate.status == "archived":
             return
         registry = registry_factory()
+        run_started = time.monotonic()
+        record_job_transition(
+            db, job, from_status=job.status, to_status="running", channel="scoring_run"
+        )
         job.status = "running"
         job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
         job.error = None
@@ -99,6 +106,9 @@ def run_scoring_job_background(
             # db.flush()es as one lock-covered critical section (see
             # app.models.entities) -- do not db.add() this row separately.
             next_analyzer_run_seq(db, new_run)
+            record_job_transition(
+                db, job, from_status="running", to_status="complete", channel="scoring_complete"
+            )
             job.status = "complete"
             job.error = None
             try:
@@ -107,11 +117,37 @@ def run_scoring_job_background(
                 db.rollback()
                 _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
                 return
+            log_event(
+                LOGGER,
+                "scoring.run",
+                debate_id=debate_id,
+                job_id=job_id,
+                job_type="score_debate",
+                outcome="complete",
+                duration_ms=int((time.monotonic() - run_started) * 1000),
+            )
         except Exception as exc:
             db.rollback()
+            record_job_transition(
+                db,
+                job,
+                from_status="running",
+                to_status="failed",
+                channel="scoring_fail",
+                reason=str(exc),
+            )
             job.status = "failed"
             job.error = str(exc)
             commit_write(db)
+            log_event(
+                LOGGER,
+                "scoring.run",
+                debate_id=debate_id,
+                job_id=job_id,
+                job_type="score_debate",
+                outcome="failed",
+                duration_ms=int((time.monotonic() - run_started) * 1000),
+            )
             return
         lifecycle_kwargs: dict[str, object] = {}
         if bool_env("DIALECTICAL_EVIDENCE_VERIFICATION", False):
@@ -153,12 +189,30 @@ def run_scoring_job_background(
             # best-effort: a dispatch failure never breaks scoring
             # completion or the lifecycle tail.
             if adaptive_expansion_enabled():
+                dispatch_started = time.monotonic()
                 try:
                     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=new_run.id)
                 except Exception:
                     LOGGER.exception(
                         "adaptive expansion dispatch failed (non-fatal) debate=%s",
                         debate_id,
+                    )
+                    log_event(
+                        LOGGER,
+                        "expansion.dispatch",
+                        debate_id=debate_id,
+                        analyzer_run_id=new_run.id,
+                        outcome="error",
+                        duration_ms=int((time.monotonic() - dispatch_started) * 1000),
+                    )
+                else:
+                    log_event(
+                        LOGGER,
+                        "expansion.dispatch",
+                        debate_id=debate_id,
+                        analyzer_run_id=new_run.id,
+                        outcome="completed",
+                        duration_ms=int((time.monotonic() - dispatch_started) * 1000),
                     )
 
 
@@ -167,6 +221,9 @@ def _mark_scoring_job_failed(job_id: str, error: str) -> None:
         job = db.get(Job, job_id)
         if job is None:
             return
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="scoring_fail", reason=error
+        )
         job.status = "failed"
         job.error = error
         job.deadline = now_utc()
@@ -237,6 +294,14 @@ def wake_pending_internal_scoring_job(
             )
         ).all()
         for stale_job in stale_jobs:
+            record_job_transition(
+                db,
+                stale_job,
+                from_status=stale_job.status,
+                to_status="failed",
+                channel="scoring_stale",
+                reason=STALE_SCORING_JOB_ERROR,
+            )
             stale_job.status = "failed"
             stale_job.error = STALE_SCORING_JOB_ERROR
         if stale_jobs:
@@ -271,6 +336,9 @@ def wake_pending_internal_scoring_job(
             return None
         if job is None:
             job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
+        record_job_transition(
+            db, job, from_status=job.status, to_status="claimed", channel="scoring_wake"
+        )
         job.status = "claimed"
         job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
         job.error = None

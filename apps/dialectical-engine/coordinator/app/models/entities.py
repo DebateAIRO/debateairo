@@ -166,6 +166,38 @@ class Job(Base):
     debate: Mapped[Debate] = relationship("Debate", back_populates="jobs")
 
 
+class JobTransition(Base):
+    """W5b append-only job state-change ledger (observability, not control).
+
+    One row per job transition (create/claim/complete/fail/requeue/
+    terminalize and the scoring-lifecycle channels), written best-effort at
+    the existing transition points via
+    app.services.job_ledger.record_job_transition -- a ledger write failure
+    never fails the transition itself. Plain string columns, deliberately no
+    foreign keys: a constraint error here must not be able to roll back the
+    real state change it describes. Rows are never updated or deleted.
+    """
+
+    __tablename__ = "job_transitions"
+    __table_args__ = (
+        Index("ix_job_transitions_job_id", "job_id"),
+        Index("ix_job_transitions_debate_id", "debate_id"),
+        Index("ix_job_transitions_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    job_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    debate_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    job_type: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    # NULL from_status = job creation (no prior state existed).
+    from_status: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Which code path drove the transition (see job_ledger channel vocabulary).
+    channel: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class DebateBranch(Base):
     __tablename__ = "debate_branches"
 
