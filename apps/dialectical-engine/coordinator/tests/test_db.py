@@ -227,6 +227,50 @@ def test_node_scoring_results_schema_is_initialized(db) -> None:
     } <= indexes
 
 
+def test_pool_retains_connections_for_next_test(db) -> None:
+    """First half of an order-dependence regression pair (with the test below).
+
+    Holding several engine connections at once leaves the pool with multiple
+    idle connections afterwards -- the same footprint the scoring API tests
+    leave behind (request session + background-runner session + fixture
+    session). Without the db fixture's pool dispose, the NEXT test's
+    drop_all/create_all rebuild rotates through these pooled connections,
+    stranding one whose SQLite per-connection schema cache predates the
+    rebuild; its first PRAGMA (e.g. Inspector.get_indexes -> index_list)
+    then reports the mid-rebuild schema (no indexes).
+    """
+    conns = [db.bind.connect() for _ in range(3)]
+    for conn in conns:
+        conn.exec_driver_sql("SELECT 1").fetchall()
+    for conn in conns:
+        conn.close()
+    assert db.bind.pool.checkedin() >= 3
+
+
+def test_schema_inspection_is_immune_to_pooled_connections_from_prior_tests(db) -> None:
+    """Second half of the regression pair: must run directly after the pool
+    growth above. Re-asserts the node_scoring_results index contract via the
+    same get_table_names -> get_columns -> get_indexes Inspector sequence the
+    schema test uses -- the exact sequence that lands get_indexes on a
+    stale-schema pooled connection when the db fixture does not dispose the
+    pool between tests.
+    """
+    inspector = inspect(db.bind)
+
+    assert "node_scoring_results" in set(inspector.get_table_names())
+    assert {"debate_id", "node_id", "input_hash"} <= {
+        column["name"] for column in inspector.get_columns("node_scoring_results")
+    }
+
+    indexes = {index["name"] for index in inspector.get_indexes("node_scoring_results")}
+    assert {
+        "ix_node_scoring_results_debate_id",
+        "ix_node_scoring_results_node_id",
+        "ix_node_scoring_results_status",
+        "ux_node_scoring_results_cache_identity",
+    } <= indexes
+
+
 def test_scoring_cache_migration_applies_cleanly_to_empty_database(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "migration.sqlite3"
     coordinator_dir = Path(__file__).resolve().parents[1]

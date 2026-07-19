@@ -22,6 +22,15 @@ from app.core.db import Base, SessionLocal, engine, init_db
 
 @pytest.fixture()
 def db():
+    # Per-connection SQLite state survives in the engine's pool across tests
+    # and breaks order-independence: PRAGMAs set by a test on a pooled
+    # connection outlive it (the connect-time pragma listener only fires on
+    # fresh connects), and the drop_all/create_all rebuild below rotates
+    # through the FIFO pool, leaving connections whose cached schema predates
+    # the rebuild -- their first PRAGMA (e.g. index_list during inspection)
+    # then answers from the stale cache. Dispose the pool so every test runs
+    # on fresh connections.
+    engine.dispose()
     init_db()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
