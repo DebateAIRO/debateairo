@@ -176,7 +176,16 @@ def test_setup_status_windows_dry_run_uses_cmd_safe_full_sequence() -> None:
 
     assert proc.returncode == 0, proc.stdout
     assert 'DYLD_LIBRARY_PATH=""' not in proc.stdout
-    assert f'--output "{os.environ["TEMP"]}/ManualSetup_TODO.md"' in proc.stdout
+    # The Makefile only prefixes the manual-setup output with %TEMP% on an
+    # actual Windows host (the `ifeq ($(OS),Windows_NT)` branch, which also
+    # switches SHELL to cmd.exe). On any other host OS the else-branch default
+    # applies, so compute the platform-appropriate expected path rather than
+    # requiring a Windows-only env var to exist.
+    if os.name == "nt":
+        expected_output = f'{os.environ["TEMP"]}/ManualSetup_TODO.md'
+    else:
+        expected_output = "ManualSetup_TODO.md"
+    assert f'--output "{expected_output}"' in proc.stdout
     expected_steps = [
         "scripts/local_single_machine_check.py",
         "scripts/local_single_machine_check.py --probe-models",
