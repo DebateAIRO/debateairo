@@ -1639,6 +1639,14 @@ def _expire_stale_scoring_jobs(db: Session, debate_id: str) -> None:
         )
     ).all()
     for job in stale_jobs:
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="failed",
+            channel="scoring_stale",
+            reason=STALE_SCORING_JOB_ERROR,
+        )
         job.status = "failed"
         job.error = STALE_SCORING_JOB_ERROR
     if stale_jobs:

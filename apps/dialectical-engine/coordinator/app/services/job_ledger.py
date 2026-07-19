@@ -80,7 +80,15 @@ def record_job_transition(
             # Python-side uuid default early keeps the ledger row linkable
             # and is exactly what the flush would have assigned.
             job.id = uuid_str()
-        clean_reason = (reason or "").strip()[:MAX_REASON_CHARS] or None
+        # Local import: app.services.orchestrator imports this module at
+        # top level (record_job_transition is called from every transition
+        # site), so a module-level import here would be circular. Routing
+        # through the same sanitize_text as job.error keeps every ledger
+        # row in the same curated string class as the job rows themselves,
+        # instead of the raw/sanitized mix the call sites otherwise produce.
+        from app.services.orchestrator import sanitize_text
+
+        clean_reason = sanitize_text(reason or "", MAX_REASON_CHARS) or None
         db.add(
             JobTransition(
                 job_id=job.id,

@@ -20,7 +20,8 @@ from app.core.auth import hash_token
 from app.main import app  # noqa: F401 - warm up the import graph
 from app.models.entities import Debate, Job, JobTransition, Worker, now_utc
 from app.scoring.jobs import wake_pending_internal_scoring_job
-from app.scoring.service import STALE_SCORING_JOB_ERROR
+from app.scoring.service import STALE_SCORING_JOB_ERROR, get_debate_scoring
+from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import (
     claim_pending_job,
     complete_job,
@@ -156,6 +157,68 @@ def test_scoring_wake_and_stale_expiry_are_audited(db) -> None:
     assert stale.error == STALE_SCORING_JOB_ERROR
     wake_trail = [(row.from_status, row.to_status, row.channel) for row in _transitions(db, job.id)]
     assert wake_trail[-1] == ("pending", "claimed", "scoring_wake")
+
+
+def test_expire_stale_scoring_jobs_records_scoring_stale_transition(db) -> None:
+    """The _expire_stale_scoring_jobs choke point (app/scoring/service.py),
+    reached via the debate-scoring read path, must leave the same
+    scoring_stale ledger trail as its wake-loop and status-poll siblings.
+    """
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={})
+    db.add(debate)
+    db.flush()
+    stale = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="mock-judge",
+        status="running",
+        deadline=now_utc() - timedelta(minutes=5),
+    )
+    db.add(stale)
+    db.commit()
+
+    payload = get_debate_scoring(db, debate.id)
+
+    assert payload is not None
+    assert stale.status == "failed"
+    assert stale.error == STALE_SCORING_JOB_ERROR
+    trail = [(row.job_id, row.from_status, row.to_status, row.channel, row.reason) for row in _transitions(db, stale.id)]
+    assert trail == [(stale.id, "running", "failed", "scoring_stale", STALE_SCORING_JOB_ERROR)]
+
+
+def test_record_job_transition_sanitizes_and_bounds_reason(db) -> None:
+    """The choke point sanitizes reason the same way job.error is sanitized
+    elsewhere (terminalize_job_failure, fail_job): whitespace collapsed and
+    bounded to MAX_REASON_CHARS, so every ledger row carries the same
+    curated string class regardless of which call site's reason was raw.
+    """
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={})
+    db.add(debate)
+    db.flush()
+    job = Job(
+        debate_id=debate.id,
+        job_type="score_debate",
+        required_role="judge",
+        required_model="mock-judge",
+        status="running",
+        deadline=now_utc(),
+    )
+    db.add(job)
+    db.flush()
+
+    dirty_reason = "line one\n\n\twith\ttabs   and   spaces " + ("x" * 3000)
+    record_job_transition(
+        db, job, from_status="running", to_status="failed", channel="scoring_fail", reason=dirty_reason
+    )
+    db.commit()
+
+    row = _transitions(db, job.id)[-1]
+    assert row.reason is not None
+    assert "\n" not in row.reason
+    assert "\t" not in row.reason
+    assert "  " not in row.reason
+    assert len(row.reason) <= 2_000
 
 
 def test_hot_path_transitions_emit_parseable_json_log_lines(db, caplog) -> None:
