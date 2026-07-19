@@ -21,7 +21,12 @@ from app.scoring.judges import ScoringProvider
 from app.services.events import event_bus
 
 
-_ARGUMENT_NODE_TYPES = {"ROOT", "PRO", "CON"}
+# "ROOT_CLAIM" is the real root node_type at every creation site
+# (orchestrator.create_debate, dialectical_v2.create_dialectical_debate,
+# single_shot) -- see app/qbaf/debate_adapter.py for the canonical node-type
+# vocabulary. The former "ROOT" entry matched nothing and silently made the
+# root permanently lifecycle-ineligible (W0 fix B5).
+_ARGUMENT_NODE_TYPES = {"ROOT_CLAIM", "PRO", "CON"}
 _REEVALUATION_KEY = "lifecycle_reevaluation"
 _REEVALUATION_SCHEMA_VERSION = "scoring-completion-lifecycle/v1"
 
