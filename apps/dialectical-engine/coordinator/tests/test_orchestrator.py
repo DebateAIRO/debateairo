@@ -1579,6 +1579,80 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
     assert worker.current_job_id is None
 
 
+def _v2_pov_node(db, *, claim: str, node_type: str = "SCIENTIFIC_POV") -> Node:
+    worker = Worker(
+        name="codex-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type=node_type,
+        depth=1,
+        position=0,
+        claim=claim,
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(pov)
+    db.flush()
+    generation = Generation(
+        node_id=pov.id,
+        model_id="codex-gpt-5.5",
+        role=claim,
+        argument="POV assessment.",
+        prompt_version="v2",
+        prompt_rendered="prompt",
+        latency_ms=10,
+        is_active=True,
+        worker_id=worker.id,
+    )
+    db.add(generation)
+    db.flush()
+    pov.active_generation_id = generation.id
+    db.commit()
+    return pov
+
+
+def test_v2_pov_regeneration_derives_role_from_dynamic_claim(db) -> None:
+    # Dynamic perspectives recycle legacy POV node_types; identity lives in
+    # Node.claim. The regen job role must come from the actual label, never
+    # from the node_type->legacy-label map.
+    pov = _v2_pov_node(db, claim="Mechanism POV")
+
+    job = asyncio.run(regenerate_node(db, pov))
+
+    assert job.job_type == "v2_pov"
+    assert job.required_role == "Mechanism POV"
+
+
+def test_v2_pov_regeneration_falls_back_to_legacy_label_when_claim_blank(db) -> None:
+    pov = _v2_pov_node(db, claim="   ")
+
+    job = asyncio.run(regenerate_node(db, pov))
+
+    assert job.job_type == "v2_pov"
+    assert job.required_role == "Scientific POV"
+
+
 def test_decomposition_respects_branching_limit(db) -> None:
     worker = Worker(
         name="mac-mini",

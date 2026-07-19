@@ -900,7 +900,12 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         generation.worker_id = str(provenance.get("worker_id") or job.worker_id)
         generation.model_id = str(provenance.get("model_id") or job.required_model)
         generation.role = job.required_role
-    pov_node.claim = job.required_role
+    # Never overwrite an existing non-empty label: the POV node's claim IS the
+    # perspective's identity (dynamic lenses recycle legacy node_types), and
+    # job.required_role may lag it (e.g. a legacy-labelled regen job). At
+    # creation claim == required_role, so this is a no-op there.
+    if not (pov_node.claim or "").strip():
+        pov_node.claim = job.required_role
     pov_node.status = "complete"
 
     pro_node = create_completed_node(

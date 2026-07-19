@@ -1257,7 +1257,13 @@ async def regenerate_node(db: Session, node: Node, model_id: str | None = None) 
         role = "decomposer"
         job_type = "decompose"
     elif node.node_type in V2_POV_ROLES:
-        role = V2_POV_ROLES[node.node_type]
+        # Dynamic perspectives recycle the legacy POV node_types (they are NOT
+        # unique among siblings); the lens identity lives in the node's
+        # claim/label. Derive the regen role from the actual label so the job
+        # and its materialization keep the dynamic identity; fall back to the
+        # legacy label only when the claim is blank.
+        claim_label = (node.claim or "").strip()
+        role = claim_label or V2_POV_ROLES[node.node_type]
         job_type = "v2_pov"
     else:
         role = role_for_node(node.node_type)

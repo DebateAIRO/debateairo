@@ -33,7 +33,7 @@ from app.services.dialectical_v2 import (
     pending_branch_containers,
     render_v2_job_prompt,
 )
-from app.services.orchestrator import claim_pending_job, complete_job
+from app.services.orchestrator import claim_pending_job, complete_job, regenerate_node
 from app.services.serialization import debate_to_dict
 
 FLAG = "DIALECTICAL_DYNAMIC_PERSPECTIVES"
@@ -364,6 +364,97 @@ def test_node_payload_label_null_for_legacy_quartet_and_non_pov_nodes(db, monkey
     for stance in completed["children"]:  # PRO/CON cards are not lenses
         if stance["node_type"] in {"PRO", "CON"}:
             assert stance["label"] is None
+
+
+# ---------------------------------------------------------------------------
+# Regeneration preserves dynamic lens identity (W0 fix B3)
+# ---------------------------------------------------------------------------
+# Dynamic perspectives reuse legacy POV node_types; the lens identity lives in
+# Node.claim. Regeneration must derive the job role from the ACTUAL claim (not
+# the node_type->legacy-label map) and materialization must never overwrite an
+# existing non-empty dynamic label with job.required_role.
+
+
+def _complete_all_pending_pov_jobs(db, worker: Worker, debate: Debate) -> int:
+    completed = 0
+    while True:
+        job = claim_pending_job(db, worker)
+        if job is None or job.job_type != "v2_pov":
+            break
+        asyncio.run(complete_job(db, job, generic_pov_output(worker, job.id, job.required_role), {"latency_ms": 5}))
+        completed += 1
+    return completed
+
+
+def test_regenerated_dynamic_pov_keeps_lens_identity_through_materialization(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    worker = codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+    assert _complete_all_pending_pov_jobs(db, worker, debate) == 3
+    mechanism = db.scalar(
+        select(Node).where(
+            Node.debate_id == debate.id, Node.parent_id == debate.root_node_id, Node.position == 0
+        )
+    )
+    assert (mechanism.node_type, mechanism.claim) == ("SCIENTIFIC_POV", "Mechanism POV")
+
+    # Two rounds: identity must round-trip through regen + materialization
+    # every time (the legacy bug corrupted on completion and compounded).
+    for _round in range(2):
+        regen_job = asyncio.run(regenerate_node(db, mechanism))
+        assert regen_job.job_type == "v2_pov"
+        assert regen_job.required_role == "Mechanism POV"
+        _system, user_prompt = render_v2_job_prompt(db, regen_job)
+        assert "Mechanism POV" in user_prompt
+        assert DYNAMIC_LENS_DESCRIPTIONS["Mechanism POV"] in user_prompt
+
+        claimed = claim_pending_job(db, worker)
+        assert claimed is not None and claimed.id == regen_job.id
+        asyncio.run(
+            complete_job(db, claimed, generic_pov_output(worker, claimed.id, "Mechanism POV"), {"latency_ms": 5})
+        )
+        db.refresh(mechanism)
+        assert mechanism.node_type == "SCIENTIFIC_POV"
+        assert mechanism.claim == "Mechanism POV"
+
+
+def test_regenerating_duplicate_node_type_sibling_keeps_labels_distinct(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    worker = codex_worker(db)
+
+    # "mixed" topic: 5 perspectives; the cycle wraps, so "Scientific POV" and
+    # "Integrative POV" SHARE node_type SCIENTIFIC_POV. node_type is not an
+    # identity key -- regenerating the Integrative branch must not relabel it.
+    debate = service.create_dialectical_debate(db, "Studies show that banning cars causes fewer accidents", {})
+    assert _complete_all_pending_pov_jobs(db, worker, debate) == 5
+    integrative = db.scalar(
+        select(Node).where(Node.debate_id == debate.id, Node.parent_id == debate.root_node_id, Node.position == 4)
+    )
+    assert (integrative.node_type, integrative.claim) == ("SCIENTIFIC_POV", "Integrative POV")
+
+    regen_job = asyncio.run(regenerate_node(db, integrative))
+    assert regen_job.required_role == "Integrative POV"
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.id == regen_job.id
+    asyncio.run(
+        complete_job(db, claimed, generic_pov_output(worker, claimed.id, "Integrative POV"), {"latency_ms": 5})
+    )
+
+    siblings = list(
+        db.scalars(
+            select(Node)
+            .where(Node.debate_id == debate.id, Node.parent_id == debate.root_node_id)
+            .order_by(Node.position)
+        ).all()
+    )
+    assert [node.claim for node in siblings] == [
+        "Scientific POV",
+        "Statistical POV",
+        "Ethical POV",
+        "Practical POV",
+        "Integrative POV",
+    ]
 
 
 # ---------------------------------------------------------------------------
