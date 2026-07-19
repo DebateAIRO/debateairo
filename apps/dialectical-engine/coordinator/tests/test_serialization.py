@@ -637,6 +637,131 @@ def test_synthesis_verdict_gate_mirrors_top_level_verdict_state(db, monkeypatch,
     ) in caplog.messages
 
 
+# ---------------------------------------------------------------------------
+# W6: flag-ON honesty, exercised through the real env var (not just the pure
+# verdict_summary(gate_enabled=...) param) at the serialization boundary --
+# closing the gap between the unit-level pins in tests/test_verdict.py and
+# what actually ships on the wire when DIALECTICAL_VERDICT_EVIDENCE_GATE=1.
+# No flag default changes here; the env var is scoped to each test only.
+# ---------------------------------------------------------------------------
+
+
+def test_env_gate_on_preserves_pregate_band_for_suppressed_scored_debate(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Measured rainfall totals rose across the basin this decade.",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "tauCoverage": 1.0,
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "root_claim_text"},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    # Scored (tauCoverage above threshold) -> the pre-gate read is the real
+    # "supported" band; the gate then withholds it. The honest basis for a
+    # withheld verdict never loses the pre-gate reading.
+    assert verdict["basis"]["preGateVerdictBand"] == "supported"
+    assert verdict["verdictBand"] == "suppressed"
+    assert verdict["verdictState"] == "suppressed_no_evidence"
+    assert verdict["basis"]["dialecticalStrength"] == 0.8
+
+
+def test_env_gate_on_never_suppresses_unknown_claim_type(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Should the city widen Elm Street?",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "tauCoverage": 1.0,
+                # No claimTypes entry at all for the root -- an unclassified
+                # claim type must never be treated as gate-eligible.
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    assert verdict["verdictBand"] == "supported"
+    assert verdict["verdictState"] == "endorsed_with_caveat"
+    assert verdict["suppressionReason"] is None
+    assert [caveat["code"] for caveat in verdict["caveats"]] == ["claim_type_unknown"]
+
+
+def test_env_gate_on_and_unscored_debate_compose_without_contradiction(db, monkeypatch) -> None:
+    # The precedence itself is already pinned at the pure-function level
+    # (test_verdict.py::test_evidence_gate_suppression_still_wins_over_insufficient_scoring);
+    # this pins the SAME composition through the real env var at the actual
+    # wire boundary, on a debate that never received judge scores at all.
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Measured river discharge fell below the historical average.",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.97},
+                # No tauCoverage key -- an unscored debate reads as 0.0
+                # coverage, i.e. the pre-gate band is "insufficient_scoring".
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "root_claim_text"},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    assert verdict["basis"]["preGateVerdictBand"] == "insufficient_scoring"
+    assert verdict["verdictBand"] == "suppressed"
+    assert verdict["verdictState"] == "suppressed_no_evidence"
+    assert verdict["basis"]["dialecticalStrength"] == 0.97
+
+
 def test_synthesis_to_dict_without_verdict_gate_param_keeps_legacy_shape(db) -> None:
     worker = add_worker(db)
     debate = Debate(topic="Should public transit be free?", status="complete", config={})
