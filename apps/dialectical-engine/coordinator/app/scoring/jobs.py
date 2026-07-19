@@ -12,7 +12,7 @@ from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
-from app.providers import ProviderError, ProviderRegistry, detect_codex_scoring_config
+from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
     SCORING_ANALYZER_TYPE,
@@ -213,7 +213,9 @@ def wake_pending_internal_scoring_job(
         if _latest_retryable_stale_scoring_job(db, debate.id) is None:
             return None
     registry = registry_factory()
-    scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
+    scoring_config = detect_scoring_provider_config(
+        registry.agents, role="judge", providers=registry.providers
+    )
     if not scoring_config.available:
         return None
     if job is None:
