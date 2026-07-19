@@ -26,6 +26,8 @@
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>MaterializeDatalessFiles</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/tmp/dialectical-web.out.log</string>
   <key>StandardErrorPath</key>

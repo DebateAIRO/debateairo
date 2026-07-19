@@ -100,6 +100,40 @@ def test_mock_adapter_matches_real_decomposer_prompt_contract() -> None:
     assert result["children"][0]["node_type"] == "PRO"
 
 
+def test_mock_adapter_matches_v2_pov_contract() -> None:
+    adapter = MockAdapter(token_delay_seconds=0)
+    text = adapter.generate(
+        "You are a Codex-backed Dialectical Engine V2 POV worker. Return exactly one strict JSON object.",
+        'Generate the Ethical POV branch. Context JSON: {"output_contract":{"title":"...","strongest_pro":{},"strongest_con":{}}}',
+    )
+
+    result = parse_result({"job_type": "v2_pov"}, text)
+
+    assert result["title"] == "Ethical POV assessment"
+    for stance_name in ("strongest_pro", "strongest_con"):
+        stance = result[stance_name]
+        assert stance["title"] and stance["content"]
+        assert stance["pro"]["title"] and stance["pro"]["content"]
+        assert stance["con"]["title"] and stance["con"]["content"]
+
+
+def test_mock_adapter_matches_v2_synthesis_contract() -> None:
+    adapter = MockAdapter(token_delay_seconds=0)
+    text = adapter.generate(
+        "You are a Codex-backed Dialectical Engine V2 artifact worker.",
+        'Return a non-adjudicating synthesis JSON with "evidence_gaps" and "key_takeaways".',
+    )
+
+    result = parse_result({"job_type": "v2_synthesize"}, text)
+
+    assert result["title"] == "Synthesis"
+    assert result["content"]
+    assert result["tensions"]
+    assert result["agreements"]
+    assert result["evidence_gaps"]
+    assert result["key_takeaways"]
+
+
 def test_mock_adapter_model_id_can_be_named() -> None:
     assert MockAdapter("mock-alpha").model_id == "mock-alpha"
 

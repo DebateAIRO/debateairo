@@ -2929,7 +2929,7 @@ def test_generic_failure_event_omits_private_worker_reason(db) -> None:
     payload = json.loads(event.split("data: ", 1)[1])
     db.refresh(job)
 
-    assert event.startswith("event: error\n")
+    assert event.startswith("event: debate_failed\n")
     assert payload == {
         "scope": "synthesize",
         "code": "debate_generation_failed",

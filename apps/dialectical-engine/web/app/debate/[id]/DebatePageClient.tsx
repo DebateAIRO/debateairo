@@ -452,6 +452,10 @@ export default function DebatePageClient({
     }
   }, [id]);
 
+  const debateTerminal = debate
+    ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
+    : false;
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -530,6 +534,8 @@ export default function DebatePageClient({
   }, []);
 
   useEffect(() => {
+    if (debateTerminal) return;
+
     let events: EventSource | null = null;
     let timer: number | null = null;
     let stopped = false;
@@ -614,7 +620,7 @@ export default function DebatePageClient({
         setSynthesisDraft(null);
         refresh();
       });
-      events.addEventListener("error", (event) => {
+      events.addEventListener("debate_failed", (event) => {
         const payload = parseEventData(event);
         if (payload) setError("Debate generation failed");
       });
@@ -631,7 +637,7 @@ export default function DebatePageClient({
       events?.close();
       if (timer) window.clearTimeout(timer);
     };
-  }, [id, refresh]);
+  }, [debateTerminal, id, refresh]);
 
   const exportUrl = useMemo(() => `${API_BASE}/api/debates/${id}/export.md`, [id]);
   const synthesisRaw = synthesisDraft?.raw || "";

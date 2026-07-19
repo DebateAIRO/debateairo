@@ -22,6 +22,8 @@
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>MaterializeDatalessFiles</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/tmp/dialectical-lmstudio-worker.out.log</string>
   <key>StandardErrorPath</key>

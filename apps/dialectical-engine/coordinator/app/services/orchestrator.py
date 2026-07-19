@@ -1233,7 +1233,7 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
     else:
         await event_bus.publish(
             job.debate_id,
-            "error",
+            "debate_failed",
             {
                 "scope": job.job_type,
                 "code": PUBLIC_DEBATE_FAILURE_CODE,
