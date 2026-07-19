@@ -229,3 +229,112 @@ def test_expansion_action_type_exposes_declared_actions(action: ExpansionAction)
 def test_expansion_decision_rejects_unknown_action() -> None:
     with pytest.raises(ValueError, match="action must be one of"):
         ExpansionDecision(node_id="node-1", action="delete", priority=0.5)
+
+
+# ---------------------------------------------------------------------------
+# W4: structural signal classification (categorical-only steering law).
+# There is no calibrated ground truth for scalar judge scores
+# (app/scoring/calibration.py), so any decision whose grounding consulted a
+# scalar score/threshold must be classed "scalar" (and can then never spawn
+# work at the dispatch boundary). Classification is structural: it derives
+# from WHICH predicates fired, never from judgment about their values.
+# ---------------------------------------------------------------------------
+
+
+def test_challenge_from_adverse_evidence_status_is_categorical() -> None:
+    decision = decide(
+        score_signal(claim_type="causal"),
+        evidence_signal(status=EvidenceStatus.REFUTED, entailment=EntailmentLabel.REFUTES),
+    )
+
+    assert decision.action == "challenge"
+    assert decision.signal_class == "categorical"
+
+
+def test_challenge_from_high_severity_contradiction_flag_is_categorical() -> None:
+    decision = decide(score_signal(fatal_flags=("contradiction:high",)))
+
+    assert decision.action == "challenge"
+    assert decision.signal_class == "categorical"
+
+
+def test_seek_evidence_from_claim_type_and_unresolved_status_is_categorical() -> None:
+    # Empirical claim + MISSING evidence status: both predicates categorical.
+    # Uncertainty/impact stay below the scalar abandon-blocker thresholds so
+    # no scalar-grounded reason joins the decision.
+    decision = decide(
+        score_signal(claim_type="empirical", uncertainty=0.2, impact=0.4, evidence_quality=0.9),
+        evidence_signal(status=EvidenceStatus.MISSING),
+    )
+
+    assert decision.action == "seek_evidence"
+    assert decision.signal_class == "categorical"
+
+
+def test_seek_evidence_via_weak_evidence_quality_threshold_is_scalar() -> None:
+    # Evidence status is resolved (GROUNDED): the seek reason fires only
+    # through the evidence_quality < threshold comparison -- scalar-grounded.
+    decision = decide(
+        score_signal(claim_type="empirical", evidence_quality=0.1, uncertainty=0.2, impact=0.4),
+        evidence_signal(status=EvidenceStatus.GROUNDED),
+    )
+
+    assert decision.action == "seek_evidence"
+    assert decision.signal_class == "scalar"
+
+
+def test_seek_evidence_with_scalar_uncertainty_blocker_fails_closed_to_scalar() -> None:
+    # The categorical seek reason fires, but the appended abandon blocker
+    # consults uncertainty/impact thresholds: one scalar consult anywhere in
+    # the recorded grounding fails the whole decision closed to scalar.
+    decision = decide(
+        score_signal(claim_type="empirical", uncertainty=0.5, impact=0.6, evidence_quality=0.9),
+        evidence_signal(status=EvidenceStatus.MISSING),
+    )
+
+    assert decision.action == "seek_evidence"
+    assert decision.signal_class == "scalar"
+
+
+def test_deepen_from_assumption_risk_threshold_is_scalar() -> None:
+    decision = decide(
+        score_signal(claim_type="normative", assumption_risk=0.7, uncertainty=0.2, impact=0.4)
+    )
+
+    assert decision.action == "deepen"
+    assert decision.signal_class == "scalar"
+
+
+def test_continue_and_abandon_are_scalar() -> None:
+    continued = decide(score_signal(claim_type="definitional"))
+    abandoned = decide(
+        score_signal(strength=0.12, uncertainty=0.08, impact=0.09, evidence_quality=0.64),
+        evidence_signal(status=EvidenceStatus.GROUNDED, base_score=0.14, uncertainty=0.08),
+    )
+
+    assert continued.action == "continue"
+    assert continued.signal_class == "scalar"
+    assert abandoned.action == "abandon"
+    assert abandoned.signal_class == "scalar"
+
+
+def test_reopen_is_scalar() -> None:
+    decision = ExplorationPolicy().decide(
+        score=score_signal(strength=0.67, uncertainty=0.22, impact=0.42),
+        evidence=evidence_signal(status=EvidenceStatus.GROUNDED, base_score=0.76, uncertainty=0.14),
+        path_state="abandoned",
+    )
+
+    assert decision.action == "reopen"
+    assert decision.signal_class == "scalar"
+
+
+def test_expansion_decision_signal_class_defaults_fail_closed_to_scalar() -> None:
+    decision = ExpansionDecision(node_id="node-1", action="challenge", priority=0.9)
+
+    assert decision.signal_class == "scalar"
+
+
+def test_expansion_decision_rejects_unknown_signal_class() -> None:
+    with pytest.raises(ValueError, match="signal_class"):
+        ExpansionDecision(node_id="node-1", action="challenge", priority=0.9, signal_class="vibes")

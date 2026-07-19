@@ -82,6 +82,10 @@ class LifecycleDecisionOutcome:
     score_run_id: str | None = None
     score_run_sequence: int | None = None
     evidence_snapshot_id: str | None = None
+    # W4 categorical-only steering law (see app.exploration.policy): the
+    # policy's structural classification travels with the outcome so the
+    # persisted decision record can carry it. Fail-closed default: scalar.
+    signal_class: str = "scalar"
 
 
 def _utc(value: datetime) -> datetime:
@@ -510,4 +514,5 @@ def decide_lifecycle_for_node(
         score_run_id=current_run.run_id if current_run is not None else None,
         score_run_sequence=current_run.sequence if current_run is not None else None,
         evidence_snapshot_id=evidence.snapshot_id,
+        signal_class=decision.signal_class,
     )

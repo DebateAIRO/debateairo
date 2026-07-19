@@ -9,7 +9,22 @@ from app.scoring.models import ClaimType, NodeScoringPayload
 
 ExpansionAction = Literal["continue", "deepen", "seek_evidence", "challenge", "abandon", "reopen"]
 PathState = Literal["active", "abandoned"]
+SignalClass = Literal["categorical", "scalar"]
 EXPANSION_ACTIONS = {"continue", "deepen", "seek_evidence", "challenge", "abandon", "reopen"}
+# W4 categorical-only steering law: there is NO calibrated ground truth for
+# scalar judge scores (app/scoring/calibration.py -- weights are declared
+# cold-start/config values, never learned), so a decision may steer real work
+# only when its grounding consulted exclusively categorical predicates:
+# evidence status, entailment verdicts, fatal flags, claim-type evidence
+# requirements (explicit user approval is categorical too, but lives outside
+# this policy). Any consult of a scalar score/threshold anywhere in the
+# decision's recorded grounding fails the whole decision closed to "scalar".
+# Classification is structural (derived from which predicates fired), never a
+# judgment about the values themselves. Priorities are ranking metadata, not
+# grounding, and do not participate.
+CATEGORICAL_SIGNAL = "categorical"
+SCALAR_SIGNAL = "scalar"
+SIGNAL_CLASSES = {CATEGORICAL_SIGNAL, SCALAR_SIGNAL}
 
 EVIDENCE_REQUIRED_CLAIM_TYPES = {"empirical", "causal"}
 UNRESOLVED_EVIDENCE_STATUSES = {
@@ -124,6 +139,9 @@ class ExpansionDecision:
     priority: float
     reasons: tuple[str, ...] = field(default_factory=tuple)
     keeps_path_active: bool = True
+    # Fail-closed default: an unclassified decision is treated as
+    # scalar-grounded and can therefore never steer real work.
+    signal_class: SignalClass = SCALAR_SIGNAL
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "node_id", _non_empty(self.node_id, "node_id"))
@@ -131,6 +149,8 @@ class ExpansionDecision:
             raise ValueError(f"action must be one of {sorted(EXPANSION_ACTIONS)}")
         object.__setattr__(self, "priority", _unit_interval(self.priority, "priority"))
         object.__setattr__(self, "reasons", tuple(str(reason) for reason in self.reasons))
+        if self.signal_class not in SIGNAL_CLASSES:
+            raise ValueError(f"signal_class must be one of {sorted(SIGNAL_CLASSES)}")
 
 
 class ExplorationPolicy:
@@ -177,7 +197,8 @@ class ExplorationPolicy:
                 score,
                 "reopen",
                 priority=max(score.impact, score.strength),
-                reasons=("new grounded support warrants reopening the paused path",),
+                # _should_reopen consults base_score/strength thresholds.
+                reasons=(("new grounded support warrants reopening the paused path", SCALAR_SIGNAL),),
                 keeps_path_active=True,
             )
 
@@ -214,7 +235,8 @@ class ExplorationPolicy:
                 score,
                 "abandon",
                 priority=max(0.1, 1.0 - score.strength),
-                reasons=("low-strength low-impact path is resolved enough to pause",),
+                # _can_abandon consults strength/impact/uncertainty thresholds.
+                reasons=(("low-strength low-impact path is resolved enough to pause", SCALAR_SIGNAL),),
                 keeps_path_active=False,
             )
 
@@ -222,52 +244,73 @@ class ExplorationPolicy:
             score,
             "continue",
             priority=max(score.impact, score.uncertainty, 1.0 - score.strength),
-            reasons=("no expansion pressure crosses policy thresholds",),
+            # The fallback is grounded in the absence of threshold crossings.
+            reasons=(("no expansion pressure crosses policy thresholds", SCALAR_SIGNAL),),
         )
 
-    def _challenge_reasons(self, score: ScoreSignal, evidence: EvidenceSignal | None) -> tuple[str, ...]:
-        reasons: list[str] = []
+    def _challenge_reasons(
+        self, score: ScoreSignal, evidence: EvidenceSignal | None
+    ) -> tuple[tuple[str, str], ...]:
+        reasons: list[tuple[str, str]] = []
         if evidence and (
             evidence.status in ADVERSE_EVIDENCE_STATUSES
             or evidence.entailment == EntailmentLabel.REFUTES
         ):
-            reasons.append("evidence refutes or contradicts the claim")
+            # Evidence status / entailment verdict: categorical predicates.
+            reasons.append(("evidence refutes or contradicts the claim", CATEGORICAL_SIGNAL))
         if any(flag.startswith("contradiction:high") for flag in score.fatal_flags):
-            reasons.append("high-severity contradiction should be challenged")
+            # Fatal-flag membership: categorical predicate.
+            reasons.append(("high-severity contradiction should be challenged", CATEGORICAL_SIGNAL))
         return tuple(reasons)
 
-    def _seek_evidence_reasons(self, score: ScoreSignal, evidence: EvidenceSignal | None) -> list[str]:
-        reasons: list[str] = []
+    def _seek_evidence_reasons(
+        self, score: ScoreSignal, evidence: EvidenceSignal | None
+    ) -> list[tuple[str, str]]:
+        reasons: list[tuple[str, str]] = []
         requires_evidence = score.claim_type in EVIDENCE_REQUIRED_CLAIM_TYPES
         unresolved_evidence = evidence is None or evidence.status in UNRESOLVED_EVIDENCE_STATUSES
         weak_evidence = score.evidence_quality < self.evidence_quality_threshold
         if requires_evidence and (unresolved_evidence or weak_evidence):
-            reasons.append(f"{score.claim_type} evidence is not grounded")
+            # Categorical only when the claim-type requirement plus the
+            # unresolved evidence STATUS fired it; if it fired solely through
+            # the evidence_quality threshold, the grounding is scalar.
+            reasons.append(
+                (
+                    f"{score.claim_type} evidence is not grounded",
+                    CATEGORICAL_SIGNAL if unresolved_evidence else SCALAR_SIGNAL,
+                )
+            )
         if "find_evidence" in score.recommended_actions and weak_evidence:
-            reasons.append("scoring recommended evidence investigation")
+            # Requires the evidence_quality threshold consult: scalar.
+            reasons.append(("scoring recommended evidence investigation", SCALAR_SIGNAL))
         return reasons
 
-    def _deepen_reasons(self, score: ScoreSignal) -> tuple[str, ...]:
-        reasons: list[str] = []
+    def _deepen_reasons(self, score: ScoreSignal) -> tuple[tuple[str, str], ...]:
+        # Every deepen predicate consults a scalar threshold (assumption
+        # risk / uncertainty x impact) or a scoring recommendation that is
+        # not in the categorical vocabulary: scalar-grounded throughout.
+        reasons: list[tuple[str, str]] = []
         if (
             score.claim_type == "normative"
             and score.assumption_risk >= self.high_assumption_risk_threshold
         ):
-            reasons.append("normative claim has unresolved assumptions")
+            reasons.append(("normative claim has unresolved assumptions", SCALAR_SIGNAL))
         if score.uncertainty >= self.high_uncertainty_threshold and score.impact >= self.high_impact_threshold:
-            reasons.append("high-impact claim remains uncertain")
+            reasons.append(("high-impact claim remains uncertain", SCALAR_SIGNAL))
         if "decompose" in score.recommended_actions:
-            reasons.append("scoring recommended decomposition")
+            reasons.append(("scoring recommended decomposition", SCALAR_SIGNAL))
         return tuple(reasons)
 
-    def _abandon_blockers(self, score: ScoreSignal, evidence: EvidenceSignal | None) -> list[str]:
-        blockers: list[str] = []
+    def _abandon_blockers(
+        self, score: ScoreSignal, evidence: EvidenceSignal | None
+    ) -> list[tuple[str, str]]:
+        blockers: list[tuple[str, str]] = []
         if evidence is None or evidence.status in UNRESOLVED_EVIDENCE_STATUSES:
-            blockers.append("abandon blocked until evidence status is resolved")
+            blockers.append(("abandon blocked until evidence status is resolved", CATEGORICAL_SIGNAL))
         if score.uncertainty >= self.high_uncertainty_threshold and score.impact >= self.high_impact_threshold:
-            blockers.append("abandon blocked while high-impact uncertainty remains")
+            blockers.append(("abandon blocked while high-impact uncertainty remains", SCALAR_SIGNAL))
         if score.fatal_flags:
-            blockers.append("abandon blocked until fatal flags are challenged")
+            blockers.append(("abandon blocked until fatal flags are challenged", CATEGORICAL_SIGNAL))
         return blockers
 
     def _can_abandon(self, score: ScoreSignal, evidence: EvidenceSignal | None) -> bool:
@@ -297,13 +340,22 @@ class ExplorationPolicy:
         action: ExpansionAction,
         *,
         priority: float,
-        reasons: tuple[str, ...],
+        reasons: tuple[tuple[str, str], ...],
         keeps_path_active: bool = True,
     ) -> ExpansionDecision:
+        # Structural classification: categorical iff every recorded grounding
+        # reason is categorical (fail-closed to scalar on any scalar consult
+        # or on an empty grounding).
+        signal_class = (
+            CATEGORICAL_SIGNAL
+            if reasons and all(reason_class == CATEGORICAL_SIGNAL for _, reason_class in reasons)
+            else SCALAR_SIGNAL
+        )
         return ExpansionDecision(
             node_id=score.node_id,
             action=action,
             priority=min(1.0, max(0.0, priority)),
-            reasons=reasons,
+            reasons=tuple(reason for reason, _ in reasons),
             keeps_path_active=keeps_path_active,
+            signal_class=signal_class,
         )

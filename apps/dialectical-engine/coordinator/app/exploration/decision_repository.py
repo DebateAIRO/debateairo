@@ -34,7 +34,13 @@ _COMPONENT_STATUS_PAIRS = {
     "in_progress": {"unknown"},
     "terminal_unverifiable": {"unknown"},
 }
-_CHILD_SPAWNING_ACTIONS = {"continue", "deepen", "challenge"}
+# W4: seek_evidence joined the child-spawning vocabulary -- the adaptive
+# dispatcher's decision->work mapping spawns a PRO child for it (challenge
+# spawns a CON child). Snapshots are still always persisted with
+# child_spawn_count=0 at decision time; real counts are written by the
+# dispatcher after it queues work.
+_CHILD_SPAWNING_ACTIONS = {"continue", "deepen", "challenge", "seek_evidence"}
+_SIGNAL_CLASSES = {"categorical", "scalar"}
 _STOPPING_STATUSES = set(EXPANSION_ACTIONS) | {"active"}
 _REASON_CODE_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -64,6 +70,13 @@ class LifecycleDecisionSnapshot:
     evidence_snapshot_id: str | None
     decision_timestamp: datetime
     child_spawn_count: int
+    # W4 additive fields. signal_class is the policy's structural
+    # classification (fail-closed default "scalar" for legacy callers);
+    # config_override is honest-but-empty provenance for a future explicit
+    # scalar-override path that is deliberately NOT built yet -- nothing may
+    # set it in W4.
+    signal_class: str = "scalar"
+    config_override: str | None = None
 
 
 @dataclass(frozen=True)
@@ -278,14 +291,20 @@ def _normalized(snapshot: LifecycleDecisionSnapshot) -> dict[str, object]:
         "evidence_snapshot_id": evidence_snapshot_id,
         "decision_timestamp": _utc(snapshot.decision_timestamp),
         "child_spawn_count": child_spawn_count,
+        "signal_class": _choice(snapshot.signal_class, "signal_class", _SIGNAL_CLASSES),
+        "config_override": _optional_nonblank(snapshot.config_override, "config_override"),
     }
 
 
 def _snapshot_sha256(values: dict[str, object]) -> str:
+    # signal_class/config_override are excluded from the replay identity:
+    # pre-W4 rows carry hashes computed without them, and (like
+    # child_spawn_count) they belong to the dispatch lifecycle layered on top
+    # of the decision, not to the decision's input identity.
     identity_values = {
         key: value
         for key, value in values.items()
-        if key not in {"idempotency_key", "child_spawn_count"}
+        if key not in {"idempotency_key", "child_spawn_count", "signal_class", "config_override"}
     }
     identity_values["decision_timestamp"] = values["decision_timestamp"].isoformat()
     encoded = json.dumps(

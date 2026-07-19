@@ -403,6 +403,14 @@ class LifecycleDecisionRecord(Base):
     evidence_snapshot_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     decision_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     child_spawn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # W4 additive columns (nullable: historical rows honestly carry no
+    # classification/outcome). signal_class in {"categorical","scalar"};
+    # NULL is treated as scalar (fail-closed) at the dispatch boundary.
+    # config_override stays NULL until an explicit override path exists.
+    # dispatch_outcome is written only by the adaptive dispatcher.
+    signal_class: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    config_override: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    dispatch_outcome: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

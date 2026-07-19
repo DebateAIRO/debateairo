@@ -352,3 +352,50 @@ def test_additive_migration_matches_create_all_and_keeps_legacy_tables(
         assert create_all_indexes == migrated_indexes
     finally:
         create_all_engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# W4: signal_class (categorical-only steering law) -- additive persistence.
+# ---------------------------------------------------------------------------
+
+
+def test_signal_class_defaults_fail_closed_to_scalar(db) -> None:
+    result = persist_lifecycle_decision(db, snapshot=_snapshot())
+    db.flush()
+
+    assert result.record.signal_class == "scalar"
+    assert result.record.config_override is None
+    assert result.record.dispatch_outcome is None
+
+
+def test_signal_class_categorical_persists(db) -> None:
+    result = persist_lifecycle_decision(
+        db,
+        snapshot=_snapshot(idempotency_key="evaluation-categorical", signal_class="categorical"),
+    )
+    db.flush()
+
+    assert result.record.signal_class == "categorical"
+
+
+def test_signal_class_rejects_unknown_values(db) -> None:
+    with pytest.raises(ValueError, match="signal_class"):
+        persist_lifecycle_decision(db, snapshot=_snapshot(signal_class="vibes"))
+
+
+def test_config_override_rejects_blank_provenance(db) -> None:
+    with pytest.raises(ValueError, match="config_override"):
+        persist_lifecycle_decision(db, snapshot=_snapshot(config_override="   "))
+
+
+def test_signal_class_is_not_part_of_replay_identity(db) -> None:
+    # Pre-W4 rows carry a snapshot_sha256 computed without signal_class /
+    # config_override; replaying the same decision with the classification
+    # present must resolve as the same identity, never a conflict.
+    first = persist_lifecycle_decision(db, snapshot=_snapshot())
+    db.flush()
+
+    replay = persist_lifecycle_decision(db, snapshot=_snapshot(signal_class="categorical"))
+
+    assert replay.persistence_result == "replayed"
+    assert replay.record is first.record
