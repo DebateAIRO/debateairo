@@ -4760,6 +4760,13 @@ def test_node_failure_sse_report_summary_marks_retryable_failure(tmp_path: Path,
 
 def test_node_failure_sse_report_issues_require_payload_and_requeue_proof(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # This test rewrites the same report path mid-test to assert on a second,
+    # mutated payload. read_text() caches reads of paths nested under the repo
+    # root (to avoid repeat subprocess reads of offloaded/dataless files) and
+    # never invalidates that cache within a process, so the second read would
+    # otherwise still see the first payload. DIALECTICAL_STATUS_DIRECT_READ=1
+    # is the script's own escape hatch for exactly this case.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "local_cluster_check.py"
     source.write_text("source", encoding="utf-8")
@@ -4891,6 +4898,11 @@ def test_node_failure_sse_report_issues_require_payload_and_requeue_proof(tmp_pa
 
 def test_current_job_report_issues_require_uuid_current_job_id(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # See the comment in test_node_failure_sse_report_issues_require_payload_
+    # and_requeue_proof: this test rewrites the same report path mid-test, so
+    # it needs the direct-read escape hatch to avoid read_text()'s stale
+    # per-process cache for paths under the repo root.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "local_cluster_check.py"
     source.write_text("source", encoding="utf-8")
@@ -4929,6 +4941,11 @@ def test_current_job_report_issues_require_uuid_current_job_id(tmp_path: Path, m
 
 def test_current_job_report_issues_require_worker_row_consistency(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # See the comment in test_node_failure_sse_report_issues_require_payload_
+    # and_requeue_proof: this test rewrites the same report path mid-test, so
+    # it needs the direct-read escape hatch to avoid read_text()'s stale
+    # per-process cache for paths under the repo root.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "local_cluster_check.py"
     source.write_text("source", encoding="utf-8")
@@ -5045,6 +5062,11 @@ def test_inflight_failover_report_issues_require_worker_rows_and_final_debate(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # See the comment in test_node_failure_sse_report_issues_require_payload_
+    # and_requeue_proof: this test rewrites the same report path mid-test, so
+    # it needs the direct-read escape hatch to avoid read_text()'s stale
+    # per-process cache for paths under the repo root.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "local_cluster_check.py"
     source.write_text("source", encoding="utf-8")
@@ -5160,6 +5182,11 @@ def test_restart_persistence_report_issues_require_stable_restart_fingerprint(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # See the comment in test_node_failure_sse_report_issues_require_payload_
+    # and_requeue_proof: this test rewrites the same report path mid-test, so
+    # it needs the direct-read escape hatch to avoid read_text()'s stale
+    # per-process cache for paths under the repo root.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "local_cluster_check.py"
     source.write_text("source", encoding="utf-8")
@@ -15430,6 +15457,11 @@ def test_strict_production_issues_include_phase_debate_id_gaps(
 
 def test_dev_smoke_report_issues_require_passed_current_complete_report(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    # See the comment in test_node_failure_sse_report_issues_require_payload_
+    # and_requeue_proof: this test rewrites the same report path mid-test, so
+    # it needs the direct-read escape hatch to avoid read_text()'s stale
+    # per-process cache for paths under the repo root.
+    monkeypatch.setenv("DIALECTICAL_STATUS_DIRECT_READ", "1")
     module = load_status_report_module()
     source = tmp_path / "dev_smoke_check.py"
     source.write_text("source", encoding="utf-8")
