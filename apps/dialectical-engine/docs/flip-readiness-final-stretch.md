@@ -312,6 +312,12 @@ Via `GET /api/ops/jobs?limit=N` (bearer user token; `limit` 1–500, default
   without wedging debates, per the wedge-free design invariant (synthesis
   queueing at the expand tail stays unconditional regardless of scoring
   outcome).
+- **Live-viewer caveat:** with `DIALECTICAL_ADAPTIVE_EXPANSION=1`, an
+  automatic expansion round can add new nodes (and re-run synthesis) to a
+  debate that already reads as complete, and an already-open viewer tab will
+  NOT live-update — the web client intentionally never resubscribes SSE on a
+  terminal debate (`DebatePageClient.tsx`'s `debateTerminal` gate). Soak
+  reviewers should refresh the tab when checking expansion results.
 
 **No soak has been run on this branch.** The above describes what to look
 at, not observed values.

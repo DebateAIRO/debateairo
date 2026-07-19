@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
+// NOTE: deliberately placed outside app/debate/[id]/ (see
+// headerToolbarResilience.source-test.mjs / lifecycleDecisions.source-test.mjs
+// for the same established pattern) -- the bracketed directory name is not
+// reliably picked up by `node --test` when it is itself the argument path, so
+// this file lives one level up and reads sources via a relative path instead.
 const root = process.cwd();
 const debatePagePath = join(root, "app", "debate", "[id]", "DebatePageClient.tsx");
 const apiPath = join(root, "lib", "api.ts");
