@@ -6,7 +6,7 @@ decision below (G-A, G-B, G-D, adaptive default-ON) belongs to V, made on
 evidence gathered after this branch ships — this document exists so that
 evidence, the checklist, and the exact mechanics of each flip are ready when
 V asks for them. See `refactor-plan-final-stretch-v1.md` §6 (W6), §8
-(open questions), and §5.4 (judge ruling: "Flip the honesty flags now? No...
+(open questions), and §5 ruling 4 (judge ruling: "Flip the honesty flags now? No...
 Flips move to the final wave") for the governing decisions this document
 implements.
 
@@ -335,7 +335,7 @@ concern today since neither has shipped.
 
 ## Execution order
 
-Per the plan (§6 W6, §8 Q3-Q5, §5.4): every flip above is a V decision,
+Per the plan (§6 W6, §8 Q3-Q5, §5 ruling 4): every flip above is a V decision,
 executed only after V reviews the corresponding telemetry section above.
 This document schedules none of them — it is the checklist V uses when they
 choose to.
