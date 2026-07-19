@@ -21,6 +21,7 @@ from app.models.entities import (
     DebateBranch,
     Generation,
     Job,
+    LifecycleDecisionRecord,
     Node,
     ProvenanceRecord,
     SkillCapability,
@@ -194,6 +195,22 @@ def active_synthesis_summary(
     }
 
 
+def _humanize_reason(code: str | None) -> str | None:
+    # Lazy import (W5a): app.exploration.reason_copy itself has zero
+    # app-internal imports, but importing ANY submodule of the
+    # app.exploration PACKAGE first runs app/exploration/__init__.py, which
+    # imports app.exploration.policy -> app.scoring.models -> (package init)
+    # app.scoring.service -> app.services.orchestrator -> this module. A
+    # module-level import here would add a new edge into that already-latent
+    # cycle (present pre-W5a via this file's own `from app.scoring.verdict
+    # import verdict_summary` below) at a point BEFORE this module finishes
+    # defining itself. A call-time import is safe: every caller of this
+    # function only runs once app.services.serialization has fully loaded.
+    from app.exploration.reason_copy import humanize_reason
+
+    return humanize_reason(code)
+
+
 # Legacy quartet node_type -> curated label pairs. Duplicated here as a literal
 # (rather than imported from app.services.dialectical_v2.POV_BRANCHES) because
 # dialectical_v2 imports app.services.orchestrator, which imports this module --
@@ -250,6 +267,13 @@ def node_to_dict(
         "path_status": node.path_status,
         "stopping_status": node.stopping_status,
         "stopping_reason": node.stopping_reason,
+        # W5a additive: plain-language copy of stopping_reason via the shared
+        # reason-code map (app.exploration.reason_copy). Closes the
+        # W1-deferred drawer polish ("set aside because: generation_exhausted"
+        # -> mapped copy) without changing the pre-existing stopping_reason
+        # value above. None when stopping_reason itself is absent -- no
+        # fabrication.
+        "stopping_reason_human": _humanize_reason(node.stopping_reason),
         "active_generation": active_generation,
         "children": [
             node_to_dict(db, child, children_by_parent, streaming_jobs_by_node, worker_names_by_id)
@@ -407,6 +431,133 @@ def provenance_to_dict(record: ProvenanceRecord) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# W5a: decision provenance -- why the tree grew, why it stopped, what failed.
+# ---------------------------------------------------------------------------
+
+
+def _decision_outcome(record: LifecycleDecisionRecord) -> str:
+    """Honest, bounded outcome bucket for one lifecycle decision record.
+
+    ``child_spawn_count`` is the ground truth for "did this decision cause
+    growth" -- it is written atomically with ``dispatch_outcome="spawned"``
+    (app.exploration.expansion_dispatch.expansion_dispatch), so keying off it
+    directly is robust even against the dormant v1 argue path (validate-A
+    claim 6) that can also write a real count outside the dispatcher. A
+    decision that spawned nothing is honestly "annotate_only" regardless of
+    the finer-grained dispatch_outcome reason (scalar signal, target no
+    longer expandable, never yet dispatched/flag off) -- those are audit-trail
+    detail, not product-facing causality; budget/capacity refusals are kept
+    distinct because they answer "why did growth stop", not just "did it".
+    """
+    if (record.child_spawn_count or 0) > 0:
+        return "spawned"
+    # Lazy import: app.exploration.expansion_dispatch's module body is a safe
+    # leaf (no risky module-level imports of its own), but importing it at
+    # serialization.py's module level would sit one hop from the documented
+    # app.scoring -> app.services.orchestrator -> app.services.serialization
+    # cycle via any future import added there. Matches the lazy-import
+    # convention expansion_dispatch.py itself already uses for the same reason.
+    from app.exploration.expansion_dispatch import OUTCOME_BUDGET_EXHAUSTED, OUTCOME_DEFERRED_NO_CAPACITY
+
+    if record.dispatch_outcome == OUTCOME_BUDGET_EXHAUSTED:
+        return "budget_exhausted"
+    if record.dispatch_outcome == OUTCOME_DEFERRED_NO_CAPACITY:
+        return "deferred_no_capacity"
+    return "annotate_only"
+
+
+def _lifecycle_decisions_payload(db: Session, debate_id: str) -> list[dict[str, Any]]:
+    """Latest lifecycle decision per node (bounded -- never the full audit
+    trail, which stays in lifecycle_decision_records). Nothing fabricated: a
+    node with no recorded decision simply has no entry."""
+    records = list(
+        db.scalars(
+            select(LifecycleDecisionRecord)
+            .where(LifecycleDecisionRecord.debate_id == debate_id)
+            .order_by(
+                LifecycleDecisionRecord.decision_timestamp.asc(),
+                LifecycleDecisionRecord.created_at.asc(),
+                LifecycleDecisionRecord.id.asc(),
+            )
+        ).all()
+    )
+    latest_by_node: dict[str, LifecycleDecisionRecord] = {}
+    for record in records:
+        # Ascending order -> the last write per node_id is the latest decision.
+        latest_by_node[record.node_id] = record
+    ordered = sorted(latest_by_node.values(), key=lambda item: (item.decision_timestamp, item.id))
+    return [
+        {
+            "nodeId": record.node_id,
+            "decision": record.decision,
+            "signalClass": record.signal_class,
+            "reason": _humanize_reason(record.stopping_reason),
+            "childSpawnCount": record.child_spawn_count,
+            "outcome": _decision_outcome(record),
+            "decidedAt": iso(record.decision_timestamp),
+        }
+        for record in ordered
+    ]
+
+
+# Duplicated literal (same reason as app.exploration.reason_copy's docstring:
+# importing app.services.orchestrator here risks the documented circular
+# import). Keep in sync with app.services.orchestrator.PUBLIC_DEBATE_FAILURE_CODE.
+_DEBATE_GENERATION_FAILED_CODE = "debate_generation_failed"
+
+
+def _completion_state(effective_status: str, nodes: list[Node]) -> str:
+    if effective_status == "complete" and any(node.status == "failed" for node in nodes):
+        return "complete-with-failed-branches"
+    return effective_status
+
+
+def _completion_reason_code(state: str, nodes: list[Node], debate: Debate) -> str | None:
+    if state in ("complete-with-failed-branches", "failed"):
+        for node in nodes:
+            if node.status != "failed":
+                continue
+            reason = (node.stopping_reason or "").strip()
+            if reason:
+                # The real, already-persisted node-scoped reason (in every
+                # reachable pipeline path today: exactly
+                # GENERATION_EXHAUSTED_STOPPING_REASON) -- never fabricated.
+                return reason
+        if state == "failed":
+            # No node-scoped detail available (e.g. a debate-level
+            # decompose/synthesize-class terminal failure): the honest
+            # generic bucket, never the raw private job.error text.
+            return _DEBATE_GENERATION_FAILED_CODE
+        return None
+    # Lazy import: see _decision_outcome's comment above.
+    from app.exploration.expansion_dispatch import stopped_because_of
+
+    return stopped_because_of(debate)
+
+
+def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) -> dict[str, Any]:
+    """Additive `completion` block: why the debate stopped, in plain language.
+
+    state: the honest effective status, refined with "complete-with-failed-
+    branches" when at least one node terminally failed (W1) but synthesis
+    still completed over the survivors.
+    reasonCode: the terminal branch's real stopping reason, the honest
+    generic debate-failure bucket, or the adaptive dispatcher's
+    stopped_because (W4) -- never raw private worker text.
+    humanReason: reasonCode translated via the shared reason-code map.
+    Failed debates always carry a non-empty humanReason (reasonCode is never
+    None when state == "failed").
+    """
+    state = _completion_state(effective_status, nodes)
+    reason_code = _completion_reason_code(state, nodes, debate)
+    return {
+        "state": state,
+        "reasonCode": reason_code,
+        "humanReason": _humanize_reason(reason_code),
+    }
+
+
 def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     nodes = list(
         db.scalars(
@@ -548,10 +699,11 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         claim_type,
         claim_type_source,
     )
-    return {
+    effective_status = effective_debate_status(db, debate, nodes=nodes)
+    payload: dict[str, Any] = {
         "id": debate.id,
         "topic": debate.topic,
-        "status": effective_debate_status(db, debate, nodes=nodes),
+        "status": effective_status,
         "config": debate.config,
         "direct_answer": None,
         "root_node_id": debate.root_node_id,
@@ -585,4 +737,21 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         "models": sorted(models),
         "node_count": len(nodes),
         "evidencePresence": debate_evidence_presence,
+        # W5a additive: bounded (latest-per-node) decision provenance -- see
+        # _lifecycle_decisions_payload. Never the full audit trail.
+        "lifecycleDecisions": _lifecycle_decisions_payload(db, debate.id),
+        # W5a additive: why the debate stopped, in plain language.
+        "completion": _completion_block(debate, effective_status, nodes),
     }
+    perspective_derivation = debate.config.get("perspective_derivation") if isinstance(debate.config, dict) else None
+    if isinstance(perspective_derivation, dict):
+        # W5a additive: only present for debates that actually persisted a
+        # derivation at creation time (new, dynamic-perspectives debates) --
+        # a pre-W5 or flag-off debate serves no `derivation` key at all,
+        # never a fabricated/empty placeholder.
+        payload["derivation"] = {
+            "claimType": perspective_derivation.get("claim_type"),
+            "markers": list(perspective_derivation.get("markers") or []),
+            "lensSet": list(perspective_derivation.get("lens_set") or []),
+        }
+    return payload

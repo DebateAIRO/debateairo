@@ -180,6 +180,77 @@ def test_dynamic_perspectives_helper_is_deterministic() -> None:
 
 
 # ---------------------------------------------------------------------------
+# W5a: the claim_type + matched-markers derivation that selects the lens set
+# is persisted (additively) instead of being discarded, and serialized as
+# `derivation` -- only for NEW debates built via the dynamic path.
+# ---------------------------------------------------------------------------
+
+
+def test_dynamic_creation_persists_the_perspective_derivation(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+
+    stored = debate.config.get("perspective_derivation")
+    assert stored is not None
+    assert stored["claim_type"] == "causal"
+    assert stored["lens_set"] == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+    assert stored["markers"]  # a causal topic must match at least one marker
+
+
+def test_derivation_serializes_and_matches_rendered_branches(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    derivation = payload["derivation"]
+    assert derivation["claimType"] == "causal"
+    assert isinstance(derivation["markers"], list) and derivation["markers"]
+    branch_labels = [child["claim"] for child in payload["tree"]["children"]]
+    assert derivation["lensSet"] == branch_labels == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+
+
+def test_flag_off_creation_serves_no_derivation_key(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "false")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+
+    assert "perspective_derivation" not in debate.config
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    assert "derivation" not in payload
+
+
+def test_pre_w5_debate_serves_no_derivation_key(db) -> None:
+    # Simulates a debate created before this wave: config has no
+    # perspective_derivation at all (not even for a dynamic-perspectives
+    # debate created before W5a landed).
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    assert "derivation" not in payload
+
+
+# ---------------------------------------------------------------------------
 # v2_pov prompt carries the dynamic lens
 # ---------------------------------------------------------------------------
 

@@ -169,6 +169,25 @@ DYNAMIC_LENS_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+def _classify_and_select_perspectives(topic: str) -> tuple[str, list[str], list[tuple[str, str, str]]]:
+    """Single source of truth for the dynamic-perspective derivation.
+
+    Returns (claim_type, matched_markers, [(node_type, label, lens), ...]).
+    Computing the classification exactly once here -- instead of separately
+    inside `dynamic_perspectives` -- lets `create_dialectical_debate` (W5a)
+    persist the SAME derivation that produced the debate's lens set, rather
+    than discarding it and risking drift from a second classification call.
+    """
+    claim_type, markers = classify_claim_type(topic)
+    labelled = _CLAIM_TYPE_PERSPECTIVES.get(claim_type, _FALLBACK_PERSPECTIVES)
+    pov_types = [node_type for node_type, _label in POV_BRANCHES]
+    perspectives = [
+        (pov_types[index % len(pov_types)], label, lens)
+        for index, (label, lens) in enumerate(labelled)
+    ]
+    return claim_type, markers, perspectives
+
+
 def dynamic_perspectives(topic: str) -> list[tuple[str, str, str]]:
     """Return [(node_type, label, lens_description), ...] for `topic`.
 
@@ -178,13 +197,8 @@ def dynamic_perspectives(topic: str) -> list[tuple[str, str, str]]:
     scoring/qbaf/serialization treat each perspective exactly like a legacy POV
     lens.
     """
-    claim_type, _markers = classify_claim_type(topic)
-    labelled = _CLAIM_TYPE_PERSPECTIVES.get(claim_type, _FALLBACK_PERSPECTIVES)
-    pov_types = [node_type for node_type, _label in POV_BRANCHES]
-    return [
-        (pov_types[index % len(pov_types)], label, lens)
-        for index, (label, lens) in enumerate(labelled)
-    ]
+    _claim_type, _markers, perspectives = _classify_and_select_perspectives(topic)
+    return perspectives
 
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -1815,7 +1829,23 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     # path. Only the (node_type, label) source list changes; the per-perspective
     # Node + v2_pov job mechanics are shared.
     if bool_env("DIALECTICAL_DYNAMIC_PERSPECTIVES", True):
-        perspectives = [(node_type, label) for node_type, label, _lens in dynamic_perspectives(topic)]
+        claim_type, markers, selected = _classify_and_select_perspectives(topic)
+        perspectives = [(node_type, label) for node_type, label, _lens in selected]
+        # W5a: persist the derivation that produced this debate's lens set
+        # (additive; NEW debates only -- see serialization.debate_to_dict's
+        # `derivation` key). Reassigned wholesale (not mutated in place):
+        # debate.config is a plain JSON column, not a MutableDict, so an
+        # in-place update would not be tracked as dirty by the ORM (matches
+        # the existing debate.config write pattern used elsewhere, e.g.
+        # app.exploration.expansion_dispatch._write_adaptive_expansion_state).
+        debate.config = {
+            **debate.config,
+            "perspective_derivation": {
+                "claim_type": claim_type,
+                "markers": list(markers),
+                "lens_set": [label for _node_type, label, _lens in selected],
+            },
+        }
     else:
         perspectives = list(POV_BRANCHES)
 
