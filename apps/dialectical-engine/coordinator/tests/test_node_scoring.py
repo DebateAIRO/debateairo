@@ -4195,7 +4195,20 @@ def test_background_scoring_job_relinks_reused_judge_artifact_to_current_job(db)
     assert artifact.raw_output and "RJ03-STABLE-RAW" in artifact.raw_output
     assert artifact.job_id == second_job.id
     assert artifact.analyzer_run_id is not None
-    assert len(db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()) == 2
+    # One node_scoring run per background job. (W2 also appends one
+    # protocol_analysis re-run per completed scoring job, so the count is
+    # scoped by analyzer_type rather than debate-wide.)
+    assert (
+        len(
+            db.scalars(
+                select(AnalyzerRun).where(
+                    AnalyzerRun.debate_id == debate.id,
+                    AnalyzerRun.analyzer_type == "node_scoring",
+                )
+            ).all()
+        )
+        == 2
+    )
 
 
 def test_score_nodes_with_provider_releases_sqlite_write_lock_before_each_provider_call(db) -> None:
@@ -7285,7 +7298,15 @@ def test_scoring_api_requeues_stale_internal_scoring_job_without_reusing_it(db, 
     assert fresh_job.status == "complete"
     assert fresh_job.error is None
     assert body["active_scoring_job_id"] == fresh_job.id
-    analyzer_runs = db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()
+    # Exactly one node_scoring run for the fresh job. (W2 also appends one
+    # protocol_analysis re-run per completed scoring job, so the count is
+    # scoped by analyzer_type rather than debate-wide.)
+    analyzer_runs = db.scalars(
+        select(AnalyzerRun).where(
+            AnalyzerRun.debate_id == debate.id,
+            AnalyzerRun.analyzer_type == "node_scoring",
+        )
+    ).all()
     assert len(analyzer_runs) == 1
     persisted_payload = TestClient(app).get(f"/api/debates/{debate.id}/scoring").json()
     assert persisted_payload["status"] == "available"

@@ -45,6 +45,7 @@ from app.services.orchestrator import (
 from app.protocol.runner import run_protocol_analysis
 from app.protocol.state import advance_phase, initialize_protocol_state, protocol_state_of
 from app.providers import ProviderRegistry
+from app.scoring.jobs import trigger_internal_scoring_after_completion
 from app.scoring.service import ensure_node_scoring_on_completion
 
 
@@ -1057,6 +1058,15 @@ def persist_v2_synthesis(
     commit_write(db)
     publish_event(debate.id, "synthesis_completed", {"debate_id": debate.id, "synthesis_id": synthesis.id, "job_id": job.id})
     publish_event(debate.id, "debate_complete", {"debate_id": debate.id})
+    try:
+        # W2 (B6): the coordinator itself initiates scoring at completion --
+        # no browser poll needed. Fire-and-forget after the commit above;
+        # must never fail or delay synthesis persistence (the trigger is
+        # non-raising; this guard is defense-in-depth, matching the
+        # best-effort style of the protocol-analysis guard above).
+        trigger_internal_scoring_after_completion(debate.id)
+    except Exception as exc:
+        print(f"[dialectical_v2] internal scoring trigger failed (non-fatal): {exc!r}")
 
 
 def record_provenance(
