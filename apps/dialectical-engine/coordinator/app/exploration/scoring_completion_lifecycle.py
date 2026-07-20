@@ -21,7 +21,26 @@ from app.scoring.judges import ScoringProvider
 from app.services.events import event_bus
 
 
-_ARGUMENT_NODE_TYPES = {"ROOT", "PRO", "CON"}
+# "ROOT_CLAIM" is the real root node_type at every creation site
+# (orchestrator.create_debate, dialectical_v2.create_dialectical_debate,
+# single_shot) -- see app/qbaf/debate_adapter.py for the canonical node-type
+# vocabulary. The former "ROOT" entry matched nothing and silently made the
+# root permanently lifecycle-ineligible (W0 fix B5).
+#
+# W4 evidence-verification interlock (explicit policy): categorical
+# evidence-status signals exist only when DIALECTICAL_EVIDENCE_VERIFICATION
+# is ON -- the verification evaluator is the ONLY writer of grounded
+# EvidenceLifecycleSnapshots, and decide_lifecycle_for_node reaches an
+# authenticated (grounded) outcome only through such a snapshot. With the
+# flag OFF (its default), NO authenticated decision can exist here at all,
+# so the fatal-flag / claim-type categorical signals -- which flow through
+# the same grounded-authentication gate -- cannot fire either; the only live
+# categorical steering source is then explicit user approval (the approvals
+# endpoint). No evidence signal is ever fabricated to work around this:
+# fail-safe outcomes stay unauthenticated, are not persisted, and can never
+# spawn (binding: no fake runtime data; verificationStatus never decides
+# gate eligibility).
+_ARGUMENT_NODE_TYPES = {"ROOT_CLAIM", "PRO", "CON"}
 _REEVALUATION_KEY = "lifecycle_reevaluation"
 _REEVALUATION_SCHEMA_VERSION = "scoring-completion-lifecycle/v1"
 
@@ -277,7 +296,14 @@ def reevaluate_lifecycle_after_scoring_completion(
                     score_run_sequence=outcome.score_run_sequence,
                     evidence_snapshot_id=outcome.evidence_snapshot_id,
                     decision_timestamp=outcome.decision_timestamp,
+                    # Always 0 at decision time: real spawning happens in the
+                    # adaptive dispatcher AFTER this reevaluation (W4), which
+                    # writes the real count back onto the record it consumed.
                     child_spawn_count=0,
+                    # Fail-closed: a missing classification reads as scalar
+                    # and therefore can never steer work.
+                    signal_class=getattr(outcome, "signal_class", "scalar"),
+                    config_override=None,
                 ),
             )
             if persistence.persistence_result == "created":

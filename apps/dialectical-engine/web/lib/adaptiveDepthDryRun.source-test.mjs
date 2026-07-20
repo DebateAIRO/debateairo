@@ -118,10 +118,15 @@ assert(
   /const actionableItems = items\.filter\(\(item\) => item\.expansion_hint === "expand"\)/.test(debatePageSource),
   "AdaptiveDepthDryRunPanel should approve and run only dry-run items with expansion_hint=expand"
 );
+// W4 copy reconcile: the web cannot see the coordinator's
+// DIALECTICAL_ADAPTIVE_EXPANSION flag, so the action copy must be honest in
+// BOTH flag states -- approving may or may not run work ("Approve selected
+// expansions", never "Approve and run").
 assert(
-  /Approve and run selected expansions/.test(debatePageSource) &&
+  /Approve selected expansions/.test(debatePageSource) &&
+    !/Approve and run selected expansions/.test(debatePageSource) &&
     /approvalState\.status === "starting"/.test(debatePageSource),
-  "AdaptiveDepthDryRunPanel should expose a clear honest approve-and-run action state"
+  "AdaptiveDepthDryRunPanel should expose a flag-agnostic honest approval action state"
 );
 assert(
   !/progress|percent|eta/i.test(debatePageSource.match(/type AdaptiveDepthApprovalState[\s\S]*?;/s)?.[0] || ""),

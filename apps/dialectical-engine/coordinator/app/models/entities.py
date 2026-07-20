@@ -152,10 +152,50 @@ class Job(Base):
     idempotency_key: Mapped[str] = mapped_column(String(36), default=uuid_str, unique=True)
     stream_buffer: Mapped[str] = mapped_column(Text, default="")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # How many of `attempts` ended in a timeout-class outcome (deadline expiry,
+    # worker vanished/restarted). Nullable for legacy rows (additive ALTER
+    # backfill leaves NULL); readers must treat NULL as 0.
+    timeout_attempts: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+    # W3: job-type-specific creation context (e.g. v2_expand's parent node id,
+    # polarity, lens label, and decision reason). Nullable for legacy rows
+    # (additive ALTER backfill leaves NULL); readers must treat NULL as {}.
+    payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     debate: Mapped[Debate] = relationship("Debate", back_populates="jobs")
+
+
+class JobTransition(Base):
+    """W5b append-only job state-change ledger (observability, not control).
+
+    One row per job transition (create/claim/complete/fail/requeue/
+    terminalize and the scoring-lifecycle channels), written best-effort at
+    the existing transition points via
+    app.services.job_ledger.record_job_transition -- a ledger write failure
+    never fails the transition itself. Plain string columns, deliberately no
+    foreign keys: a constraint error here must not be able to roll back the
+    real state change it describes. Rows are never updated or deleted.
+    """
+
+    __tablename__ = "job_transitions"
+    __table_args__ = (
+        Index("ix_job_transitions_job_id", "job_id"),
+        Index("ix_job_transitions_debate_id", "debate_id"),
+        Index("ix_job_transitions_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    job_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    debate_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    job_type: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    # NULL from_status = job creation (no prior state existed).
+    from_status: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Which code path drove the transition (see job_ledger channel vocabulary).
+    channel: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
 class DebateBranch(Base):
@@ -395,6 +435,14 @@ class LifecycleDecisionRecord(Base):
     evidence_snapshot_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     decision_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     child_spawn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # W4 additive columns (nullable: historical rows honestly carry no
+    # classification/outcome). signal_class in {"categorical","scalar"};
+    # NULL is treated as scalar (fail-closed) at the dispatch boundary.
+    # config_override stays NULL until an explicit override path exists.
+    # dispatch_outcome is written only by the adaptive dispatcher.
+    signal_class: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    config_override: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    dispatch_outcome: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

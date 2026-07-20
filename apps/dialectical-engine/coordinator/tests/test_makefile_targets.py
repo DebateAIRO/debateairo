@@ -60,6 +60,46 @@ def test_make_test_loads_pytest_cov_plugin_module_when_autoload_is_disabled() ->
     assert "-p pytest_cov " not in makefile
 
 
+def test_make_test_env_is_platform_structured() -> None:
+    """W5b: the test entrypoint carries no POSIX-only hard dependency on the
+    default path -- per-platform env lives in TEST_ENV inside the OS branches
+    (cmd-safe `set` chain on Windows, VAR=value prefixes + the optional macOS
+    DYLD workaround on POSIX), and the recipe uses only $(TEST_ENV)."""
+    makefile = (ROOT / "Makefile").read_text()
+    windows_block, remainder = makefile.split("ifeq ($(OS),Windows_NT)", 1)[1].split("\nelse\n", 1)
+    posix_block = remainder.split("\nendif\n", 1)[0]
+
+    assert 'TEST_ENV = set "PYTHONPYCACHEPREFIX=$(TEST_PYCACHE_PREFIX)" && set "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" &&' in windows_block
+    assert "DYLD_LIBRARY_PATH" not in windows_block, "no macOS-only env baked into the Windows branch"
+    assert "TEST_PYCACHE_PREFIX ?= $(TEMP)/dialectical-test-pycache" in windows_block
+    assert 'TEST_ENV = PYTHONPYCACHEPREFIX="$(TEST_PYCACHE_PREFIX)" PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 $(PYTHON_ENV)' in posix_block
+    assert "TEST_PYCACHE_PREFIX ?= /private/tmp/dialectical-test-pycache" in posix_block
+
+    test_target = makefile.split("\ntest:\n", 1)[1].split("\n\n", 1)[0]
+    assert test_target.count("$(TEST_ENV)") == 2, "both pytest invocations route env through TEST_ENV"
+    assert "PYTHONPYCACHEPREFIX=" not in test_target, "no inline POSIX env prefixes in the recipe"
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD" not in test_target
+    # The Windows invocation is documented next to the target.
+    assert "Windows invocation" in makefile
+
+
+def test_make_test_dry_run_expands_platform_env() -> None:
+    proc = subprocess.run(
+        ["make", "-n", "test"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        timeout=30,
+    )
+
+    assert proc.returncode == 0, proc.stdout
+    assert "PYTHONPYCACHEPREFIX=" in proc.stdout
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in proc.stdout
+    assert "-p pytest_cov.plugin" in proc.stdout
+
+
 def test_makefile_exposes_explicit_quick_tunnel_stop_target() -> None:
     makefile = (ROOT / "Makefile").read_text()
 
@@ -176,7 +216,16 @@ def test_setup_status_windows_dry_run_uses_cmd_safe_full_sequence() -> None:
 
     assert proc.returncode == 0, proc.stdout
     assert 'DYLD_LIBRARY_PATH=""' not in proc.stdout
-    assert f'--output "{os.environ["TEMP"]}/ManualSetup_TODO.md"' in proc.stdout
+    # The Makefile only prefixes the manual-setup output with %TEMP% on an
+    # actual Windows host (the `ifeq ($(OS),Windows_NT)` branch, which also
+    # switches SHELL to cmd.exe). On any other host OS the else-branch default
+    # applies, so compute the platform-appropriate expected path rather than
+    # requiring a Windows-only env var to exist.
+    if os.name == "nt":
+        expected_output = f'{os.environ["TEMP"]}/ManualSetup_TODO.md'
+    else:
+        expected_output = "ManualSetup_TODO.md"
+    assert f'--output "{expected_output}"' in proc.stdout
     expected_steps = [
         "scripts/local_single_machine_check.py",
         "scripts/local_single_machine_check.py --probe-models",

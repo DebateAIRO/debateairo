@@ -1579,6 +1579,164 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
     assert worker.current_job_id is None
 
 
+def _v2_pov_node(db, *, claim: str, node_type: str = "SCIENTIFIC_POV") -> Node:
+    worker = Worker(
+        name="codex-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type=node_type,
+        depth=1,
+        position=0,
+        claim=claim,
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(pov)
+    db.flush()
+    generation = Generation(
+        node_id=pov.id,
+        model_id="codex-gpt-5.5",
+        role=claim,
+        argument="POV assessment.",
+        prompt_version="v2",
+        prompt_rendered="prompt",
+        latency_ms=10,
+        is_active=True,
+        worker_id=worker.id,
+    )
+    db.add(generation)
+    db.flush()
+    pov.active_generation_id = generation.id
+    db.commit()
+    return pov
+
+
+def test_v2_pov_regeneration_derives_role_from_dynamic_claim(db) -> None:
+    # Dynamic perspectives recycle legacy POV node_types; identity lives in
+    # Node.claim. The regen job role must come from the actual label, never
+    # from the node_type->legacy-label map.
+    pov = _v2_pov_node(db, claim="Mechanism POV")
+
+    job = asyncio.run(regenerate_node(db, pov))
+
+    assert job.job_type == "v2_pov"
+    assert job.required_role == "Mechanism POV"
+
+
+def test_v2_pov_regeneration_falls_back_to_legacy_label_when_claim_blank(db) -> None:
+    pov = _v2_pov_node(db, claim="   ")
+
+    job = asyncio.run(regenerate_node(db, pov))
+
+    assert job.job_type == "v2_pov"
+    assert job.required_role == "Scientific POV"
+
+
+def test_regenerate_node_rejects_v1_argue_regeneration_inside_v2_debates(db) -> None:
+    # A v1 `argue` job on a v2 tree completes through complete_job's v1 branch
+    # and can queue a v1 `synthesize` that replaces the debate's v2 synthesis.
+    # regenerate_node must refuse the argue route for v2-pipeline debates.
+    pov = _v2_pov_node(db, claim="Mechanism POV")
+    debate = db.get(Debate, pov.debate_id)
+    pro = Node(
+        debate_id=debate.id,
+        parent_id=pov.id,
+        node_type="PRO",
+        depth=2,
+        position=0,
+        claim="Strongest pro.",
+        status="complete",
+        materialized_path="/0/0/0",
+    )
+    db.add(pro)
+    db.flush()
+    # The v2 marker: every v2 debate queues v2_* jobs synchronously at creation.
+    db.add(
+        Job(
+            debate_id=debate.id,
+            job_type="v2_pov",
+            required_role="Mechanism POV",
+            required_model="codex-gpt-5.5",
+            node_id=pov.id,
+            status="complete",
+            deadline=now_utc(),
+        )
+    )
+    db.commit()
+
+    with pytest.raises(ValueError, match="v2 debate"):
+        asyncio.run(regenerate_node(db, pro))
+
+    db.refresh(pro)
+    db.refresh(debate)
+    assert pro.status == "complete"
+    assert debate.status == "complete"
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "argue")).all() == []
+    # POV-branch regeneration stays the supported v2 route.
+    pov_job = asyncio.run(regenerate_node(db, pov))
+    assert pov_job.job_type == "v2_pov"
+
+
+def test_regenerate_node_rejects_root_regeneration_inside_v2_debates(db) -> None:
+    # W3 (carried from the W0 review): the ROOT_CLAIM branch still routed a v2
+    # debate's root regen into v1 `decompose` -- the same corruption family W0
+    # closed for PRO/CON (a v1 decompose completion rebuilds v1 children and
+    # its argue chain can replace the v2 synthesis). Refuse honestly instead.
+    pov = _v2_pov_node(db, claim="Mechanism POV")
+    debate = db.get(Debate, pov.debate_id)
+    root = db.get(Node, debate.root_node_id)
+    # The v2 marker: every v2 debate queues v2_* jobs synchronously at creation.
+    db.add(
+        Job(
+            debate_id=debate.id,
+            job_type="v2_pov",
+            required_role="Mechanism POV",
+            required_model="codex-gpt-5.5",
+            node_id=pov.id,
+            status="complete",
+            deadline=now_utc(),
+        )
+    )
+    db.commit()
+
+    with pytest.raises(ValueError, match="v2 debate"):
+        asyncio.run(regenerate_node(db, root))
+
+    db.refresh(root)
+    db.refresh(debate)
+    db.refresh(pov)
+    assert root.status == "complete"
+    assert root.claim == debate.topic
+    assert debate.status == "complete"
+    # No v1 decompose job was created and the POV subtree was not staled.
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "decompose")).all() == []
+    assert pov.status == "complete"
+    # POV-branch regeneration stays the supported v2 route.
+    pov_job = asyncio.run(regenerate_node(db, pov))
+    assert pov_job.job_type == "v2_pov"
+
+
 def test_decomposition_respects_branching_limit(db) -> None:
     worker = Worker(
         name="mac-mini",
@@ -2929,7 +3087,7 @@ def test_generic_failure_event_omits_private_worker_reason(db) -> None:
     payload = json.loads(event.split("data: ", 1)[1])
     db.refresh(job)
 
-    assert event.startswith("event: error\n")
+    assert event.startswith("event: debate_failed\n")
     assert payload == {
         "scope": "synthesize",
         "code": "debate_generation_failed",

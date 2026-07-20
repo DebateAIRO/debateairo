@@ -1074,6 +1074,10 @@ a:focus-visible {
   min-width: 0;
   max-width: clamp(88px, 12vw, 180px);
   overflow: hidden;
+  /* Explicit (not inherited from .topSwitch): this class is also used
+     outside .topSwitch, e.g. the W5a completion.humanReason line in the
+     debate top bar, which has no ancestor establishing nowrap. */
+  white-space: nowrap;
   text-overflow: ellipsis;
   color: oklch(0.48 0.04 70);
   text-transform: none;
@@ -1860,7 +1864,8 @@ a:focus-visible {
   margin-top: 8px;
 }
 .drawerScoringUnavailable,
-.drawerScoringRationale {
+.drawerScoringRationale,
+.drawerPathDecision {
   border: 1px solid var(--line);
   background: var(--surface-sunken);
   border-radius: 8px;
@@ -1876,7 +1881,8 @@ a:focus-visible {
   color: var(--text-2);
 }
 .drawerScoringUnavailable p,
-.drawerScoringRationale p {
+.drawerScoringRationale p,
+.drawerPathDecision p {
   margin: 7px 0 0;
   font-family: var(--font-serif);
   font-size: 13.5px;

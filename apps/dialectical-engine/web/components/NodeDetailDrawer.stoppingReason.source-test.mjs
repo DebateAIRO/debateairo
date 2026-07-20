@@ -19,18 +19,46 @@ test("DebateNode consumes the served path lifecycle fields", () => {
   assert.match(debateNode, /\bpath_status\?: string;/);
   assert.match(debateNode, /\bstopping_status\?: string;/);
   assert.match(debateNode, /\bstopping_reason\?: string \| null;/);
+  // W5a: additive plain-language copy of stopping_reason. Optional -- older
+  // cached/SSR payloads may lack it entirely (honest absence).
+  assert.match(debateNode, /\bstopping_reason_human\?: string \| null;/);
 });
 
-test("the drawer explains a lifecycle-set-aside path with its real nonblank reason", () => {
+test("the drawer explains a lifecycle-set-aside path with the mapped human reason, falling back to the raw served reason", () => {
   assert.match(
     drawerSource,
     /function isSetAsidePath\(node: DebateNode\): boolean \{[\s\S]*node\.path_status\?\.trim\(\)\.toLowerCase\(\)[\s\S]*node\.stopping_status\?\.trim\(\)\.toLowerCase\(\)[\s\S]*pathStatus === "abandoned"[\s\S]*stoppingStatus === "abandon"[\s\S]*stoppingStatus === "abandoned"[\s\S]*\}/,
     "The drawer should identify a set-aside path from served lifecycle fields"
   );
+  // W5a: closes the "set aside because: generation_exhausted" raw-code rough
+  // edge -- prefer the mapped stopping_reason_human, but fall back to the raw
+  // stopping_reason so an older payload without the new key renders exactly
+  // as it always did (byte-identical tolerance of absence).
   assert.match(
     drawerSource,
-    /const stoppingReason = node\.stopping_reason\?\.trim\(\);[\s\S]*\{isSetAsidePath\(node\) && stoppingReason \? \([\s\S]*set aside because: \{stoppingReason\}/,
-    "The exact explanation should render only for a set-aside path with a nonblank served reason"
+    /const stoppingReason = \(node\.stopping_reason_human \?\? node\.stopping_reason\)\?\.trim\(\);[\s\S]*\{isSetAsidePath\(node\) && stoppingReason \? \([\s\S]*set aside because: \{stoppingReason\}/,
+    "The exact explanation should render only for a set-aside path with a nonblank reason, preferring the mapped copy"
+  );
+});
+
+test("the drawer shows a causality-honest Path decision line for any node with a served lifecycle decision", () => {
+  assert.match(
+    drawerSource,
+    /lifecycleDecision\?: LifecycleDecision;/,
+    "NodeDetailDrawer must accept the per-node lifecycle decision as a prop"
+  );
+  assert.match(
+    drawerSource,
+    /\{lifecycleDecision \? \([\s\S]*Path decision[\s\S]*\{pathDecisionCopy\(lifecycleDecision\)\}/,
+    "A decided node must render a Path decision line"
+  );
+  // Causality honesty: only childSpawnCount > 0 may claim the decision
+  // caused expansion; everything else uses annotate-not-cause ("noted")
+  // phrasing that steers nothing.
+  assert.match(
+    drawerSource,
+    /function pathDecisionCopy\(decision: LifecycleDecision\): string \{[\s\S]*if \(decision\.childSpawnCount > 0\) \{[\s\S]*expanded because[\s\S]*\}[\s\S]*Noted/,
+    "Path decision copy must be honest about causality (expanded-because vs noted)"
   );
 });
 
@@ -60,9 +88,12 @@ test("the canvas defaults set-aside paths to visible and offers a real hide/show
     /<input[\s\S]*type="checkbox"[\s\S]*checked=\{showSetAsidePaths\}[\s\S]*setShowSetAsidePaths\(event\.currentTarget\.checked\)[\s\S]*Show set-aside paths/,
     "The visible checkbox should control the filter state"
   );
+  // W1: terminally failed branches carry path_status "abandoned" too, but the
+  // deliberate-sounding "Set aside" badge is suppressed there in favor of the
+  // failed-branch card.
   assert.match(
     canvasSource,
-    /const setAside = isSetAsidePath\(node\);[\s\S]*data-set-aside=\{setAside \? "true" : undefined\}[\s\S]*\{setAside \? \([\s\S]*Set aside/,
+    /const setAside = isSetAsidePath\(node\);[\s\S]*data-set-aside=\{setAside \? "true" : undefined\}[\s\S]*\{setAside && state !== "failed" \? \([\s\S]*Set aside/,
     "Canvas cards should expose a lifecycle-derived set-aside badge"
   );
 });

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
 from datetime import timedelta
 from typing import Any
@@ -8,16 +10,16 @@ from typing import Any
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.core.config import RUNTIME_SETTINGS_KEY, bool_env, load_settings
+from app.core.config import RUNTIME_SETTINGS_KEY, int_env, load_settings
 from app.core.write_lock import commit_write, flush_write
 
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
 from app.services.events import event_bus
+from app.services.job_ledger import record_job_transition
 from app.services.prompts import render_prompt
 from app.services.routing import routing_engine
 from app.services.serialization import debate_to_dict, iso
 from app.services.spend import capped_model_ids
-from app.services.swarm_planner import plan_swarm
 
 
 DEFAULT_DEBATE_CONFIG = {
@@ -26,13 +28,6 @@ DEFAULT_DEBATE_CONFIG = {
     "max_tokens": 800,
 }
 ROLE_OVERRIDE_KEYS = ("role_overrides", "roles", "routing")
-# Mirrors app.services.dialectical_v2.V2_CODEX_MODEL_ID (the debate's default
-# arguer model). Duplicated as a literal rather than imported: dialectical_v2
-# imports from this module, so importing back would create a circular
-# import. Swarm planning at create_debate time queries real online workers
-# for this exact model id -- never fabricated, no import needed to keep this
-# in sync since dialectical_v2's constant is itself a fixed literal.
-SWARM_DEFAULT_MODEL_ID = "codex-gpt-5.5"
 MAX_STREAM_DELTA_CHARS = 16_384
 MAX_STREAM_BUFFER_CHARS = 200_000
 MUTABLE_JOB_STATUSES = {"claimed", "running"}
@@ -46,6 +41,16 @@ V2_POV_ROLES = {
     "ETHICAL_POV": "Ethical POV",
     "PRACTICAL_POV": "Practical POV",
 }
+# W1 bounded failure lifecycle: job families whose terminal failure degrades
+# only their branch (node failed + stopping_reason) instead of failing the
+# debate. Everything else (root-generation `decompose`, synthesize-class,
+# and the v2 capability chain targeting the root) keeps the honest
+# debate-level terminal `failed`. v2_expand (W3) targets its pending
+# placeholder child, so terminal failure marks only that child path failed.
+NODE_DEGRADABLE_JOB_TYPES = {"argue", "v2_pov", "v2_expand"}
+GENERATION_EXHAUSTED_STOPPING_REASON = "generation_exhausted"
+DEFAULT_MAX_JOB_ATTEMPTS = 4
+LOGGER = logging.getLogger(__name__)
 
 
 class StaleJobMutationError(ValueError):
@@ -63,12 +68,11 @@ def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
         if key in incoming:
             raw_role_overrides = incoming.pop(key)
             break
-    # The caller's raw "swarm" request (e.g. {"requestedPerspectives": N}) is
-    # never persisted verbatim -- it is popped here so that flag-off (or
-    # no-request) leaves debate.config byte-identical to today (no "swarm"
-    # key at all). create_debate reads the popped raw request separately and,
-    # only when DIALECTICAL_SWARM is on, replaces it with a real
-    # worker-derived descriptor via plan_swarm.
+    # Retired swarm feature (W3): the caller's raw "swarm" request is still
+    # popped so it is never persisted into debate.config -- keeps payloads
+    # byte-identical to the dead-flag era (no "swarm" key at all). The
+    # DIALECTICAL_SWARM descriptor planning and its dispatch seam were
+    # removed with zero production callers.
     incoming.pop("swarm", None)
     merged = {**DEFAULT_DEBATE_CONFIG, **incoming}
     merged["max_depth"] = bounded_config_int(merged, "max_depth", 2, 1, 5)
@@ -79,30 +83,6 @@ def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
 
         merged["role_overrides"] = validate_routing(raw_role_overrides)
     return merged
-
-
-def _requested_swarm_perspectives(config: dict[str, Any] | None) -> int | None:
-    """Read the caller's requested swarm perspective count, honestly.
-
-    Returns None when the caller did not request a swarm at all (no
-    "swarm" key, or the key isn't a dict). Returns a validated int
-    otherwise -- invalid/non-numeric input defaults to 0 (an honest
-    no-op request, never a fabricated count), mirroring
-    convergence_epsilon's invalid-input-falls-back-to-default discipline
-    in app/protocol/runner.py.
-    """
-    if not isinstance(config, dict):
-        return None
-    swarm_request = config.get("swarm")
-    if not isinstance(swarm_request, dict):
-        return None
-    raw_requested = swarm_request.get("requestedPerspectives", 0)
-    if isinstance(raw_requested, bool) or not isinstance(raw_requested, (int, float)):
-        return 0
-    try:
-        return int(raw_requested)
-    except (TypeError, ValueError, OverflowError):
-        return 0
 
 
 def bounded_config_int(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
@@ -207,6 +187,27 @@ def make_deadline() -> Any:
     return now_utc() + timedelta(seconds=max(settings.worker_poll_seconds * 2, settings.job_fallback_seconds))
 
 
+def max_job_attempts() -> int:
+    """Retry budget per job (env-tunable, read at decision time)."""
+    return int_env("DIALECTICAL_MAX_JOB_ATTEMPTS", DEFAULT_MAX_JOB_ATTEMPTS, 1, 100)
+
+
+def job_attempts_exhausted(job: Job) -> bool:
+    """True when this job has consumed its retry budget.
+
+    ``Job.attempts`` counts claims; every claim ends in exactly one of
+    complete, worker-reported /fail, or a timeout-class outcome (deadline
+    expiry, worker vanished/restarted) tracked in ``Job.timeout_attempts``.
+    Timeout-class attempts count at HALF weight so a transient outage does not
+    burn the budget at the same rate as a deterministic crash: a pure crash
+    loop terminates exactly at the budget, a pure timeout loop at twice it.
+    """
+    attempts = job.attempts or 0
+    timeout_attempts = min(job.timeout_attempts or 0, attempts)
+    weighted = attempts - 0.5 * timeout_attempts
+    return weighted >= max_job_attempts()
+
+
 def create_job(
     db: Session,
     debate_id: str,
@@ -241,6 +242,7 @@ def create_job(
         deadline=make_deadline(),
     )
     db.add(job)
+    record_job_transition(db, job, from_status=None, to_status="pending", channel="create")
     return job
 
 
@@ -248,7 +250,6 @@ def create_debate(db: Session, topic: str, config: dict[str, Any] | None = None)
     topic = sanitize_text(topic, 2_000)
     if not topic:
         raise ValueError("Topic is required")
-    requested_perspectives = _requested_swarm_perspectives(config)
     debate = Debate(topic=topic, status="generating", config=merged_debate_config(config))
     db.add(debate)
     flush_write(db)
@@ -266,28 +267,6 @@ def create_debate(db: Session, topic: str, config: dict[str, Any] | None = None)
     flush_write(db)
     debate.root_node_id = root.id
     create_job(db, debate.id, "decompose", "decomposer", root.id)
-
-    # Swarm descriptor: flag-gated, additive, never blocks debate creation.
-    # Flag off (default) or no swarm requested -> debate.config gets no
-    # "swarm" key at all, byte-identical to pre-swarm behavior. Flag on with
-    # a request -> plan_swarm derives assignments ONLY from real online,
-    # capable Worker rows (never fabricated); fewer real workers than
-    # requested yields an honest partial assignment + recorded shortfall;
-    # zero real workers yields empty assignments + full shortfall -- debate
-    # creation still succeeds either way, since the swarm is a descriptor,
-    # not a blocker. Any unexpected failure here fails closed: no swarm
-    # descriptor is written and the existing non-swarm flow proceeds
-    # untouched (never a half-written descriptor).
-    if bool_env("DIALECTICAL_SWARM", False) and requested_perspectives is not None:
-        try:
-            capable_workers = capable_online_workers(db, SWARM_DEFAULT_MODEL_ID)
-            swarm_descriptor = plan_swarm(
-                requested_perspectives=requested_perspectives, capable_workers=capable_workers
-            )
-            debate.config = {**debate.config, "swarm": swarm_descriptor}
-        except Exception as exc:
-            print(f"[orchestrator] swarm planning failed (non-fatal, fail-closed): {exc!r}")
-
     commit_write(db)
     db.refresh(debate)
     return debate
@@ -669,6 +648,9 @@ def cancel_active_jobs_for_nodes(db: Session, node_ids: list[str], reason: str) 
         )
     ).all()
     for job in jobs:
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="cancel", reason=reason
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = reason
@@ -688,6 +670,9 @@ def cancel_active_synthesis_jobs(db: Session, debate_id: str, reason: str) -> No
         )
     ).all()
     for job in jobs:
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="cancel", reason=reason
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = reason
@@ -803,25 +788,38 @@ def reset_job_target_for_retry(db: Session, job: Job) -> None:
             node.status = "pending"
 
 
-def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> None:
+def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """Requeue-or-terminalize every job actively held by `worker`.
+
+    Returns the (debate_id, event, payload) terminal events to publish --
+    per terminalize_job_failure's contract, the caller must commit first,
+    then publish (this function never publishes itself: both callers
+    (app/api/workers.py) share one transaction across possibly-multiple
+    workers and must commit that transaction before any event goes out).
+    """
     jobs = db.scalars(
         select(Job).where(
             Job.worker_id == worker.id,
             Job.status.in_(["claimed", "running"]),
         )
     ).all()
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     for job in jobs:
-        release_job_claim(db, job)
-        reset_job_target_for_retry(db, job)
-        job.status = "pending"
-        job.error = reason
-        job.stream_buffer = ""
-        job.deadline = make_deadline()
+        terminal_events.extend(requeue_or_terminalize_timed_out_job(db, job, reason))
+    return terminal_events
 
 
 def archive_debate(db: Session, debate: Debate) -> None:
     debate.status = "archived"
     for job in pending_or_running_jobs(db, debate.id):
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="failed",
+            channel="archive",
+            reason="Debate archived",
+        )
         release_job_claim(db, job)
         job.status = "failed"
         job.error = "Debate archived"
@@ -906,6 +904,14 @@ def try_claim_pending_job(db: Session, job: Job, worker: Worker, now: Any) -> bo
         return False
     worker.current_job_id = job.id
     mark_worker_seen(worker, now)
+    record_job_transition(
+        db,
+        job,
+        from_status="pending",
+        to_status="running",
+        channel="claim",
+        reason=f"claimed by worker {worker.id}",
+    )
     commit_write(db)
     db.refresh(job)
     return True
@@ -921,6 +927,13 @@ def ensure_mutable_claim(db: Session, job: Job) -> None:
 
 
 def claim_pending_job(db: Session, worker: Worker) -> Job | None:
+    # Collected up front (not published) so every terminal event -- orphan
+    # release included -- goes out only after the commit that persists it,
+    # per terminalize_job_failure's "commit, then publish" contract. A
+    # pre-commit publish would let a refresh()-triggering terminal SSE race a
+    # not-yet-committed tree, and a rollback after publish would emit a
+    # phantom terminal-failure event.
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     if worker.current_job_id:
         orphaned = db.get(Job, worker.current_job_id)
         if (
@@ -928,18 +941,17 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
             and orphaned.worker_id == worker.id
             and orphaned.status in {"claimed", "running"}
         ):
-            orphaned.status = "pending"
-            release_job_claim(db, orphaned)
-            reset_job_target_for_retry(db, orphaned)
-            orphaned.stream_buffer = ""
-            orphaned.error = "Worker restarted while job was active"
-            orphaned.deadline = make_deadline()
+            terminal_events.extend(
+                requeue_or_terminalize_timed_out_job(db, orphaned, "Worker restarted while job was active")
+            )
         else:
             worker.current_job_id = None
 
     if worker.status != "online":
         worker.last_seen = now_utc()
         commit_write(db)
+        if terminal_events:
+            _publish_events_sync(terminal_events)
         return None
 
     capabilities = worker_capability_set(worker)
@@ -948,16 +960,22 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
         capabilities &= allowed_models
     now = now_utc()
     reroute_unavailable_pending_jobs(db, now)
+    # score_debate is excluded: scoring runs in a coordinator background
+    # thread with its own expiry handling (_expire_stale_scoring_jobs);
+    # resetting it to pending here would fight that state machine and flip a
+    # complete debate back to "generating" via reset_job_target_for_retry.
     expired = db.scalars(
-        select(Job).where(Job.status.in_(["claimed", "running"]), Job.deadline < now)
+        select(Job).where(
+            Job.status.in_(["claimed", "running"]),
+            Job.deadline < now,
+            Job.job_type != "score_debate",
+        )
     ).all()
     for job in expired:
-        job.status = "pending"
-        release_job_claim(db, job)
-        reset_job_target_for_retry(db, job)
-        job.stream_buffer = ""
-        job.error = "Job deadline expired"
-        job.deadline = make_deadline()
+        terminal_events.extend(requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired"))
+    if terminal_events:
+        commit_write(db)
+        _publish_events_sync(terminal_events)
     flush_write(db)
 
     jobs = list(
@@ -1096,7 +1114,11 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         worker.current_job_id = None
         worker.last_seen = now_utc()
         worker.status = "online"
+    previous_job_status = job.status
     job.status = "complete"
+    record_job_transition(
+        db, job, from_status=previous_job_status, to_status="complete", channel="complete"
+    )
 
     if job.job_type == "decompose":
         node = db.get(Node, job.node_id)
@@ -1197,43 +1219,166 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
     return debate_to_dict(db, debate)
 
 
-async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
-    ensure_mutable_claim(db, job)
-    job.error = sanitize_text(reason, 2_000)
-    job.status = "pending" if retryable else "failed"
+def _log_event_publish_exception(task: asyncio.Task[None]) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        LOGGER.exception("Failed to publish orchestrator failure event")
+
+
+def _publish_events_sync(events: list[tuple[str, str, dict[str, Any]]]) -> None:
+    """Publish (debate_id, event, payload) tuples from sync coordinator paths.
+
+    Mirrors dialectical_v2.publish_event (not imported: circular import):
+    fire-and-forget on a running loop, blocking asyncio.run otherwise.
+    """
+    for debate_id, event, payload in events:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(event_bus.publish(debate_id, event, payload))
+        else:
+            task = asyncio.create_task(event_bus.publish(debate_id, event, payload))
+            task.add_done_callback(_log_event_publish_exception)
+
+
+def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job) -> None:
+    """After a terminal branch failure, let the survivors reach synthesis.
+
+    Count-agnostic: synthesis is queued over however many branches survive.
+    When NO branch survives, nothing is queued -- the debate is left with a
+    failed job and no active jobs, so effective_debate_status derives an
+    honest terminal "failed" instead of a synthesis over nothing.
+    """
+    if job.job_type in ("v2_pov", "v2_expand"):
+        from app.services.dialectical_v2 import (
+            has_completed_branch_container,
+            pending_generation_nodes,
+            queue_v2_job,
+        )
+
+        if not debate.root_node_id:
+            return
+        flush_write(db)
+        # W3 whole-tree quiescence: outstanding v2_pov/v2_expand jobs anywhere
+        # in the tree keep blocking synthesis (the failed job itself is
+        # already terminal at this point, so it never blocks).
+        if pending_generation_nodes(db, debate.id, debate.root_node_id):
+            return
+        if job.job_type == "v2_expand":
+            # W4 (flag-gated): a terminally failed expand child ends the
+            # adaptive round -- growth stopped because generation was
+            # exhausted on the failed path. Recorded before synthesis is
+            # queued over the survivors, so the loop never wedges and the
+            # synthesis prompt can carry the stopping context. Joins the
+            # caller's terminal-failure transaction (commit-then-publish).
+            from app.exploration.expansion_dispatch import (
+                STOPPED_GENERATION_EXHAUSTED,
+                adaptive_expansion_enabled,
+                record_adaptive_stop,
+            )
+
+            if adaptive_expansion_enabled():
+                record_adaptive_stop(db, debate, STOPPED_GENERATION_EXHAUSTED)
+        if not has_completed_branch_container(db, debate.id, debate.root_node_id):
+            return
+        existing_synthesis = db.scalar(
+            select(Job)
+            .where(
+                Job.debate_id == debate.id,
+                Job.job_type == "v2_synthesize",
+                Job.status.in_(["pending", "claimed", "running"]),
+            )
+            .limit(1)
+        )
+        if existing_synthesis is None:
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", job.required_model, None)
+        return
+    # v1 argue: never route a v1 synthesis into a v2 tree, and only
+    # synthesize when at least one argument survived.
+    if debate_uses_v2_pipeline(db, debate.id):
+        return
+    flush_write(db)
+    survivor = db.scalar(
+        select(Node.id)
+        .where(Node.debate_id == debate.id, Node.node_type.in_(["PRO", "CON"]), Node.status == "complete")
+        .limit(1)
+    )
+    if survivor is None:
+        return
+    maybe_queue_synthesis(db, debate)
+
+
+def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """Shared terminal-failure handling for every requeue channel.
+
+    Node-degradable families (argue, v2_pov) degrade only their branch: the
+    node is marked failed with stopping_reason "generation_exhausted", the
+    path is abandoned, and debate.status is NOT touched. Every other family
+    keeps the honest debate-level terminal "failed". Returns the
+    (debate_id, event, payload) tuples to publish after commit.
+    """
+    previous_job_status = job.status
+    job.status = "failed"
+    record_job_transition(
+        db,
+        job,
+        from_status=previous_job_status,
+        to_status="failed",
+        channel="terminalize",
+        reason=reason,
+    )
+    job.error = sanitize_text(reason, 2_000) or "Job failed"
+    # Keep job.worker_id for attribution (which worker last held the poison
+    # job); only free the worker itself to take new work.
     if job.worker_id:
         worker = db.get(Worker, job.worker_id)
-        if worker:
+        if worker and worker.current_job_id == job.id:
             worker.current_job_id = None
-            worker.status = "degraded" if retryable else worker.status
-    if retryable:
-        release_job_claim(db, job)
-        job.stream_buffer = ""
-        job.deadline = make_deadline()
-    else:
-        debate = db.get(Debate, job.debate_id)
-        if debate:
-            debate.status = "failed"
-    if job.node_id and not job.job_type.startswith("v2_"):
-        node = db.get(Node, job.node_id)
-        if node:
-            node.status = "pending" if retryable else "failed"
-    commit_write(db)
-    if job.node_id and not job.job_type.startswith("v2_"):
-        await event_bus.publish(
-            job.debate_id,
-            "node_failed",
-            {
-                "node_id": job.node_id,
-                "code": PUBLIC_NODE_FAILURE_CODE,
-                "reason": PUBLIC_NODE_FAILURE_MESSAGE,
-                "retry_in_s": 5,
-            },
+    debate = db.get(Debate, job.debate_id)
+    node = db.get(Node, job.node_id) if job.node_id else None
+    events: list[tuple[str, str, dict[str, Any]]] = []
+    if job.job_type in NODE_DEGRADABLE_JOB_TYPES and node is not None and debate is not None:
+        node.status = "failed"
+        node.stopping_status = "stop"
+        node.stopping_reason = GENERATION_EXHAUSTED_STOPPING_REASON
+        node.path_status = "abandoned"
+        _queue_synthesis_after_branch_failure(db, debate, job)
+        events.append(
+            (
+                job.debate_id,
+                "node_failed",
+                {
+                    "node_id": node.id,
+                    "code": PUBLIC_NODE_FAILURE_CODE,
+                    "reason": PUBLIC_NODE_FAILURE_MESSAGE,
+                    "terminal": True,
+                },
+            )
         )
-    else:
-        await event_bus.publish(
+        return events
+    if debate is not None and debate.status != "archived":
+        debate.status = "failed"
+    if node is not None and not job.job_type.startswith("v2_"):
+        node.status = "failed"
+        events.append(
+            (
+                job.debate_id,
+                "node_failed",
+                {
+                    "node_id": node.id,
+                    "code": PUBLIC_NODE_FAILURE_CODE,
+                    "reason": PUBLIC_NODE_FAILURE_MESSAGE,
+                    "terminal": True,
+                },
+            )
+        )
+    events.append(
+        (
             job.debate_id,
-            "error",
+            "debate_failed",
             {
                 "scope": job.job_type,
                 "code": PUBLIC_DEBATE_FAILURE_CODE,
@@ -1241,6 +1386,109 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
                 "retry_in_s": 5,
             },
         )
+    )
+    return events
+
+
+def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """Timeout-class requeue (deadline expiry / worker vanished).
+
+    Consumes half-weight budget; requeues with a fresh deadline while budget
+    remains, otherwise applies the shared terminal handling. Returns events
+    to publish (empty when requeued).
+    """
+    previous_job_status = job.status
+    job.timeout_attempts = (job.timeout_attempts or 0) + 1
+    if job_attempts_exhausted(job):
+        return terminalize_job_failure(db, job, f"{reason} (retry budget exhausted)")
+    record_job_transition(
+        db,
+        job,
+        from_status=previous_job_status,
+        to_status="pending",
+        channel="timeout_requeue",
+        reason=reason,
+    )
+    job.status = "pending"
+    release_job_claim(db, job)
+    reset_job_target_for_retry(db, job)
+    job.stream_buffer = ""
+    job.error = reason
+    job.deadline = make_deadline()
+    return []
+
+
+async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
+    ensure_mutable_claim(db, job)
+    job.error = sanitize_text(reason, 2_000)
+    if job.worker_id:
+        worker = db.get(Worker, job.worker_id)
+        if worker:
+            worker.current_job_id = None
+            worker.status = "degraded" if retryable else worker.status
+    if retryable and not job_attempts_exhausted(job):
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="pending",
+            channel="worker_fail",
+            reason=job.error,
+        )
+        job.status = "pending"
+        release_job_claim(db, job)
+        job.stream_buffer = ""
+        job.deadline = make_deadline()
+        if job.node_id and not job.job_type.startswith("v2_"):
+            node = db.get(Node, job.node_id)
+            if node:
+                node.status = "pending"
+        commit_write(db)
+        if job.node_id and not job.job_type.startswith("v2_"):
+            await event_bus.publish(
+                job.debate_id,
+                "node_failed",
+                {
+                    "node_id": job.node_id,
+                    "code": PUBLIC_NODE_FAILURE_CODE,
+                    "reason": PUBLIC_NODE_FAILURE_MESSAGE,
+                    "retry_in_s": 5,
+                },
+            )
+        else:
+            await event_bus.publish(
+                job.debate_id,
+                "debate_failed",
+                {
+                    "scope": job.job_type,
+                    "code": PUBLIC_DEBATE_FAILURE_CODE,
+                    "message": PUBLIC_DEBATE_FAILURE_MESSAGE,
+                    "retry_in_s": 5,
+                },
+            )
+        return
+    events = terminalize_job_failure(db, job, job.error or "Job failed")
+    commit_write(db)
+    for debate_id, event, payload in events:
+        await event_bus.publish(debate_id, event, payload)
+
+
+def debate_uses_v2_pipeline(db: Session, debate_id: str) -> bool:
+    """True when the debate was built by the v2 pipeline.
+
+    Every v2 debate queues v2_* jobs synchronously at creation and job rows
+    are never deleted, so their presence is a durable structural marker.
+    (DebateBranch is NOT usable here: scoring backfills a branch for scored
+    v1 debates via current_scoring_branch.)
+    """
+    return (
+        db.scalar(
+            select(Job.id)
+            .where(Job.debate_id == debate_id, Job.job_type.startswith("v2_", autoescape=True))
+            .limit(1)
+        )
+        is not None
+    )
 
 
 async def regenerate_node(db: Session, node: Node, model_id: str | None = None) -> Job:
@@ -1254,12 +1502,34 @@ async def regenerate_node(db: Session, node: Node, model_id: str | None = None) 
     active_generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     online_models = online_capabilities(db)
     if node.node_type == "ROOT_CLAIM":
+        # v1-reroute guard, root edition (W3, carried from the W0 review): a
+        # v1 `decompose` job on a v2 tree rebuilds v1 PRO/CON children and its
+        # argue chain can queue a v1 `synthesize` that replaces the debate's
+        # v2 synthesis -- same corruption family as the PRO/CON guard below.
+        if debate_uses_v2_pipeline(db, debate.id):
+            raise ValueError(
+                "Root regeneration is not supported inside a v2 debate; regenerate a POV branch node instead"
+            )
         role = "decomposer"
         job_type = "decompose"
     elif node.node_type in V2_POV_ROLES:
-        role = V2_POV_ROLES[node.node_type]
+        # Dynamic perspectives recycle the legacy POV node_types (they are NOT
+        # unique among siblings); the lens identity lives in the node's
+        # claim/label. Derive the regen role from the actual label so the job
+        # and its materialization keep the dynamic identity; fall back to the
+        # legacy label only when the claim is blank.
+        claim_label = (node.claim or "").strip()
+        role = claim_label or V2_POV_ROLES[node.node_type]
         job_type = "v2_pov"
     else:
+        # v1-reroute guard (W0/B4): a v1 `argue` job on a v2 tree completes
+        # through complete_job's v1 branch and can queue a v1 `synthesize`
+        # that replaces the debate's v2 synthesis, bypassing the v2 branch-
+        # completeness gate and provenance. Refuse instead of corrupting.
+        if debate_uses_v2_pipeline(db, debate.id):
+            raise ValueError(
+                "Argument regeneration is not supported inside a v2 debate; regenerate the POV branch node instead"
+            )
         role = role_for_node(node.node_type)
         job_type = "argue"
     parent = db.get(Node, node.parent_id) if node.parent_id else None

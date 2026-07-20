@@ -58,6 +58,7 @@ from app.scoring.parser import parse_judge_json
 from app.scoring.prompts import render_single_node_judge_prompt
 from app.scoring.qbaf_debug import qbaf_debug_block
 from app.scoring.reducer import adaptive_depth_dry_run, reduce_assessments
+from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import create_job
 
 
@@ -104,6 +105,14 @@ def fail_unavailable_scoring_job(
     reason: str = UNAVAILABLE_SCORING_JOB_ERROR,
 ) -> Job:
     job = queue_scoring_job(db, debate, model_id=model_id, judge_role=judge_role)
+    record_job_transition(
+        db,
+        job,
+        from_status=job.status,
+        to_status="failed",
+        channel="scoring_unavailable",
+        reason=reason,
+    )
     job.status = "failed"
     job.error = reason
     job.deadline = now_utc()
@@ -1630,6 +1639,14 @@ def _expire_stale_scoring_jobs(db: Session, debate_id: str) -> None:
         )
     ).all()
     for job in stale_jobs:
+        record_job_transition(
+            db,
+            job,
+            from_status=job.status,
+            to_status="failed",
+            channel="scoring_stale",
+            reason=STALE_SCORING_JOB_ERROR,
+        )
         job.status = "failed"
         job.error = STALE_SCORING_JOB_ERROR
     if stale_jobs:

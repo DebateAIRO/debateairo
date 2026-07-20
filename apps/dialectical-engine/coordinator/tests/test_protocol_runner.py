@@ -577,6 +577,66 @@ def test_run_protocol_analysis_computes_dialectical_strengths_for_scored_debate(
     assert "qbafUnavailableReason" not in run.output
 
 
+def test_protocol_analysis_records_tau_coverage_fraction_of_argument_nodes(db) -> None:
+    # W2: tauCoverage is the 0..1 fraction of ARGUMENT nodes (every non-
+    # EVIDENCE node) whose tau came from a persisted judge strength. The
+    # fixed-quartet debate has root + 4 POV containers; seeding scored PRO +
+    # CON children makes 7 argument nodes with exactly 2 judged.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    _seed_scored_pro_con_nodes(db, debate)
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["tauCoverage"] == pytest.approx(2 / 7)
+    pro = db.scalars(select(Node).where(Node.debate_id == debate.id, Node.node_type == "PRO")).one()
+    con = db.scalars(select(Node).where(Node.debate_id == debate.id, Node.node_type == "CON")).one()
+    assert run.output["tauSources"][pro.id] == "judge_strength"
+    assert run.output["tauSources"][con.id] == "judge_strength"
+    assert run.output["tauSources"][debate.root_node_id] == "default"
+
+
+def test_protocol_analysis_tau_coverage_zero_for_unscored_debate(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["tauCoverage"] == 0.0
+    assert all(source == "default" for source in run.output["tauSources"].values())
+
+
+def test_evidence_nodes_do_not_dilute_tau_coverage(db) -> None:
+    # EVIDENCE nodes are _NO_EDGE extracted substrings whose taus never
+    # compose into the root strength -- they must not appear in the coverage
+    # denominator.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    _seed_scored_pro_con_nodes(db, debate)
+    pro = db.scalars(select(Node).where(Node.debate_id == debate.id, Node.node_type == "PRO")).one()
+    evidence = Node(
+        debate_id=debate.id,
+        parent_id=pro.id,
+        node_type="EVIDENCE",
+        depth=2,
+        position=0,
+        claim="a transport study reported fewer collisions",
+        status="complete",
+        materialized_path="/0/10/0",
+    )
+    db.add(evidence)
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["tauCoverage"] == pytest.approx(2 / 7)
+    # The evidence node still gets an honest per-node tau source entry.
+    assert run.output["tauSources"][evidence.id] == "default"
+
+
 def test_run_protocol_analysis_records_qbaf_unavailable_reason_on_cycle(db) -> None:
     real_codex_worker(db)
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})

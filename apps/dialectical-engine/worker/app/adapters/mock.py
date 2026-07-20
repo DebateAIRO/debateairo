@@ -32,6 +32,50 @@ class MockAdapter:
         claim = self._tag(user, "claim") or self._tag(user, "topic") or "the topic"
         topic = self._tag(user, "topic") or claim
         lower = system.lower()
+        combined = f"{system}\n{user}".lower()
+        if "v2 pov worker" in lower or ("output_contract" in combined and '"strongest_pro"' in combined):
+            pov_match = re.search(r"generate the (.*?) branch", user, flags=re.IGNORECASE)
+            pov = pov_match.group(1).strip() if pov_match else "Selected perspective"
+            return json.dumps(
+                {
+                    "title": f"{pov} assessment",
+                    "content": f"This {pov.lower()} lens identifies the central tradeoffs around {topic}.",
+                    "strongest_pro": {
+                        "title": "Strongest supporting case",
+                        "content": "The proposal offers a plausible path to measurable public benefit.",
+                        "pro": {
+                            "title": "Support for the benefit",
+                            "content": "Clear implementation milestones could make the expected benefit testable.",
+                        },
+                        "con": {
+                            "title": "Challenge to the benefit",
+                            "content": "The benefit depends on assumptions that may not hold across every affected group.",
+                        },
+                    },
+                    "strongest_con": {
+                        "title": "Strongest opposing case",
+                        "content": "Transition costs and unintended effects could outweigh the intended gains.",
+                        "pro": {
+                            "title": "Support for the risk",
+                            "content": "Complex enforcement and uneven impacts make the downside credible.",
+                        },
+                        "con": {
+                            "title": "Challenge to the risk",
+                            "content": "Phased adoption and safeguards could reduce the most serious downside.",
+                        },
+                    },
+                }
+            )
+        if "v2 expansion worker" in lower:
+            polarity_match = re.search(r"one new (PRO|CON) argument", user)
+            polarity = polarity_match.group(1) if polarity_match else "PRO"
+            stance = "supporting" if polarity == "PRO" else "challenging"
+            return json.dumps(
+                {
+                    "title": f"Additional {stance} consideration",
+                    "content": f"A further {stance} line of reasoning about {topic} grounded in the requested lens.",
+                }
+            )
         if "json" in lower and "children" in lower:
             return json.dumps(
                 {
@@ -43,7 +87,18 @@ class MockAdapter:
                     ],
                 }
             )
-        if "synthes" in lower:
+        if "synthes" in combined:
+            if "non-adjudicating synthesis" in combined or '"evidence_gaps"' in combined:
+                return json.dumps(
+                    {
+                        "title": "Synthesis",
+                        "content": "The debate turns on whether the expected benefits can be delivered with credible safeguards for transition costs and uncertainty.",
+                        "tensions": ["Expected public benefit versus transition and enforcement risk."],
+                        "agreements": ["Implementation quality and measurable outcomes matter."],
+                        "evidence_gaps": ["More context-specific evidence is needed about costs and affected groups."],
+                        "key_takeaways": ["A phased, measurable approach best addresses both sides' strongest concerns."],
+                    }
+                )
             return json.dumps(
                 {
                     "strongest_pro": "The pro side identifies concrete benefits and a path to implementation.",

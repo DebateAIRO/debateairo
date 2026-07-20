@@ -174,10 +174,26 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     try:
         adapted = debate_argument_graph(node_dicts, scores_by_node_id)
         strengths = adapted.graph.compute_strengths()
+        # W2: aggregate judge-score coverage over ARGUMENT nodes -- every
+        # non-EVIDENCE node (ROOT_CLAIM, PRO, CON, POV containers all carry a
+        # tau that composes into the root strength; EVIDENCE nodes are
+        # no-edge extracted substrings whose taus never reach the verdict).
+        # 0..1 fraction whose tau came from a persisted judge strength rather
+        # than DEFAULT_TAU; consumed by verdict_summary's coverage gate.
+        argument_node_ids = [
+            str(node["id"]) for node in node_dicts if str(node["node_type"]) != "EVIDENCE"
+        ]
+        judged_count = sum(
+            1
+            for node_id in argument_node_ids
+            if adapted.tau_sources.get(node_id) == "judge_strength"
+        )
+        tau_coverage = judged_count / len(argument_node_ids) if argument_node_ids else 0.0
         qbaf_output = {
             "dialecticalStrengths": strengths,
             "graphFingerprint": adapted.fingerprint,
             "tauSources": dict(adapted.tau_sources),
+            "tauCoverage": tau_coverage,
             "qbafSemantics": semantics_version,
             "compositionNote": (
                 "v1: tau=judgeStrength|default; verificationModifier=none(P7); "

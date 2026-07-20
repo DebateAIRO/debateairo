@@ -66,6 +66,13 @@ export type DebateNode = {
   path_status?: string;
   stopping_status?: string;
   stopping_reason?: string | null;
+  /**
+   * W5a additive: plain-language copy of stopping_reason via the coordinator's
+   * shared reason-code map (closes the "set aside because: generation_exhausted"
+   * raw-code rough edge). Absent on older cached/SSR payloads -- callers must
+   * fall back to stopping_reason, never assume presence.
+   */
+  stopping_reason_human?: string | null;
   materialized_path: string;
   active_generation_id: string | null;
   active_generation: Generation | null;
@@ -317,11 +324,16 @@ export type DebateAdaptiveDepthApprovalRequest = {
 
 export type DebateAdaptiveDepthApprovalResponse = {
   debate_id: string;
-  status: "queued" | "partial" | "unavailable";
+  // "recorded": approval audited, but no expansion work exists yet (W0/B4
+  // honesty fix) -- "queued"/"partial" kept for older coordinator responses.
+  status: "recorded" | "queued" | "partial" | "unavailable";
   selected_node_ids: string[];
   queued_node_ids: string[];
   unavailable_node_ids: string[];
   jobs: { node_id: string; job_id: string; status: ScoringJobStatus }[];
+  // job_id is present on applied outcomes when the coordinator's adaptive
+  // expansion flag is on and real work was queued.
+  outcomes?: { node_id: string; applied: boolean; reason: string; job_id?: string }[];
   audit_record_id?: string | null;
   reason?: string | null;
 };
@@ -348,6 +360,9 @@ export type Synthesis = {
   verdict_gate?: {
     state: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
     reason: VerdictSuppressionReason | null;
+    // W2 additive: mirrors the top-level verdict's served band (same single
+    // coordinator derivation; "verdictBand" stays the band's sole wire key name).
+    verdictBand?: VerdictBand;
   } | null;
   upstream_agent_output_ids?: string[];
   upstream_agent_run_ids?: string[];
@@ -507,7 +522,7 @@ export type DebateConfig = Record<string, unknown> & {
 // UI must render nothing (honest absence), never a fabricated verdict.
 // ---------------------------------------------------------------------------
 
-export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "suppressed";
+export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "insufficient_scoring" | "suppressed";
 
 export type VerdictSummary = {
   verdictBand: VerdictBand;
@@ -518,6 +533,8 @@ export type VerdictSummary = {
     convergence: Record<string, unknown> | null;
     preGateVerdictBand?: VerdictBand;
     semanticsVersion?: string;
+    tauCoverage?: number;
+    tauSourceMajority?: "judge_strength" | "default";
   };
   verdictThresholdsVersion: string;
   verdictState?: "endorsed" | "endorsed_with_caveat" | "suppressed_no_evidence";
@@ -533,6 +550,40 @@ export type VerdictSummary = {
     claimType: string | null;
     claimTypeSource: string | null;
   };
+};
+
+// ---------------------------------------------------------------------------
+// W5a: decision provenance -- why the tree grew, why it stopped, what failed.
+// Matches coordinator/app/services/serialization.py's debate_to_dict() shape
+// exactly (camelCase, additive). Older cached payloads may lack these keys
+// entirely -- optional fields, honest absence, never a fabricated value.
+// ---------------------------------------------------------------------------
+
+/** One node's latest lifecycle decision (bounded -- never the full audit
+ * trail, which stays in the coordinator's lifecycle_decision_records). */
+export type LifecycleDecision = {
+  nodeId: string;
+  decision: string;
+  signalClass: "categorical" | "scalar" | null;
+  reason: string | null;
+  childSpawnCount: number;
+  outcome: "spawned" | "annotate_only" | "budget_exhausted" | "deferred_no_capacity" | (string & {});
+  decidedAt: string;
+};
+
+/** The claim-type + matched-markers derivation that selected this debate's
+ * lens set, persisted only for new dynamic-perspectives debates. */
+export type DebateDerivation = {
+  claimType: string | null;
+  markers: string[];
+  lensSet: string[];
+};
+
+/** Why the debate stopped, in plain language. */
+export type DebateCompletion = {
+  state: "complete" | "complete-with-failed-branches" | "failed" | "generating" | (string & {});
+  reasonCode: string | null;
+  humanReason: string | null;
 };
 
 export type DebateDetail = {
@@ -558,6 +609,9 @@ export type DebateDetail = {
   agent_runs: AgentRun[];
   skills_used: string[];
   provenance_records: ProvenanceRecord[];
+  lifecycleDecisions?: LifecycleDecision[];
+  derivation?: DebateDerivation;
+  completion?: DebateCompletion;
   workers: string[];
   models: string[];
   node_count: number;

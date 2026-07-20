@@ -100,6 +100,87 @@ def test_mock_adapter_matches_real_decomposer_prompt_contract() -> None:
     assert result["children"][0]["node_type"] == "PRO"
 
 
+def test_mock_adapter_matches_v2_pov_contract() -> None:
+    adapter = MockAdapter(token_delay_seconds=0)
+    text = adapter.generate(
+        "You are a Codex-backed Dialectical Engine V2 POV worker. Return exactly one strict JSON object.",
+        'Generate the Ethical POV branch. Context JSON: {"output_contract":{"title":"...","strongest_pro":{},"strongest_con":{}}}',
+    )
+
+    result = parse_result({"job_type": "v2_pov"}, text)
+
+    assert result["title"] == "Ethical POV assessment"
+    for stance_name in ("strongest_pro", "strongest_con"):
+        stance = result[stance_name]
+        assert stance["title"] and stance["content"]
+        assert stance["pro"]["title"] and stance["pro"]["content"]
+        assert stance["con"]["title"] and stance["con"]["content"]
+
+
+def test_mock_adapter_matches_v2_synthesis_contract() -> None:
+    adapter = MockAdapter(token_delay_seconds=0)
+    text = adapter.generate(
+        "You are a Codex-backed Dialectical Engine V2 artifact worker.",
+        'Return a non-adjudicating synthesis JSON with "evidence_gaps" and "key_takeaways".',
+    )
+
+    result = parse_result({"job_type": "v2_synthesize"}, text)
+
+    assert result["title"] == "Synthesis"
+    assert result["content"]
+    assert result["tensions"]
+    assert result["agreements"]
+    assert result["evidence_gaps"]
+    assert result["key_takeaways"]
+
+
+@pytest.mark.parametrize(
+    ("polarity", "stance"),
+    [("PRO", "supporting"), ("CON", "challenging")],
+)
+def test_mock_adapter_matches_v2_expand_contract(polarity: str, stance: str) -> None:
+    adapter = MockAdapter(token_delay_seconds=0)
+    text = adapter.generate(
+        "You are a Codex-backed Dialectical Engine V2 expansion worker. Return exactly one strict JSON object.",
+        f"Generate exactly one new {polarity} argument that supports or challenges the parent argument below, "
+        'reasoned through the Ethical POV lens. Context JSON: {"output_contract":{"title":"...","content":"..."}}',
+    )
+
+    result = parse_result({"job_type": "v2_expand"}, text)
+
+    # Deliberately minimal contract: a single {title, content} JSON object.
+    assert set(result) == {"title", "content"}
+    assert result["title"] == f"Additional {stance} consideration"
+    assert result["content"]
+
+
+def test_enrich_v2_result_stamps_runtime_provenance_for_v2_expand() -> None:
+    job = {"id": "job-4", "job_type": "v2_expand", "required_model": "codex-gpt-5.5"}
+    result = {"title": "Additional consideration", "content": "A further line of reasoning."}
+
+    enriched = enrich_v2_result(job, result, "worker-1")
+
+    assert enriched["provenance"] == {
+        "model_id": "codex-gpt-5.5",
+        "worker_id": "worker-1",
+        "prompt_id": "prompt-job-4",
+        "job_id": "job-4",
+    }
+
+
+def test_codex_expand_prompt_selects_no_output_schema() -> None:
+    # v2_expand has no strict codex output schema; the selector must not
+    # strap another v2 schema onto the expansion prompt (that would make the
+    # minimal {title, content} contract unproducible for the real adapter).
+    schema = codex_cli_module.output_schema_for_prompt(
+        "You are a Codex-backed Dialectical Engine V2 expansion worker. Return exactly one strict JSON object.",
+        "Generate exactly one new PRO argument that supports the parent argument below, reasoned through the "
+        'Scientific POV lens. Context JSON: {"output_contract":{"title":"...","content":"..."}}',
+    )
+
+    assert schema is None
+
+
 def test_mock_adapter_model_id_can_be_named() -> None:
     assert MockAdapter("mock-alpha").model_id == "mock-alpha"
 

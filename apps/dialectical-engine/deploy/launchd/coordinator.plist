@@ -28,6 +28,8 @@
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>MaterializeDatalessFiles</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/tmp/dialectical-coordinator.out.log</string>
   <key>StandardErrorPath</key>

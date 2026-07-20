@@ -243,6 +243,67 @@ def test_user_auth_required_for_archive_regenerate_and_history(db) -> None:
     assert db.get(Debate, debate.id).status == "archived"
 
 
+def test_v2_root_regenerate_returns_honest_400(db) -> None:
+    # W3 (carried from the W0 review): a v2 debate's ROOT_CLAIM regen must not
+    # reroute into v1 `decompose` -- the API surfaces the guard as HTTP 400.
+    worker = Worker(
+        name="codex-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["codex-gpt-5.5"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Does social media use cause depression?", status="complete", config={"max_depth": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    pov = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="SCIENTIFIC_POV",
+        depth=1,
+        position=0,
+        claim="Mechanism POV",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    db.add(pov)
+    db.flush()
+    # The v2 marker: every v2 debate queues v2_* jobs synchronously at creation.
+    db.add(
+        Job(
+            debate_id=debate.id,
+            job_type="v2_pov",
+            required_role="Mechanism POV",
+            required_model="codex-gpt-5.5",
+            node_id=pov.id,
+            status="complete",
+            deadline=now_utc(),
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).post(f"/api/nodes/{root.id}/regenerate", headers=USER_HEADERS, json={})
+
+    assert response.status_code == 400
+    assert "v2 debate" in response.json()["detail"]
+    db.expire_all()
+    assert db.get(Node, root.id).status == "complete"
+    assert db.get(Debate, debate.id).status == "complete"
+    assert db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "decompose")).all() == []
+
+
 def test_archive_cancels_active_jobs_and_blocks_node_mutations(db) -> None:
     _public_hits.clear()
     worker = Worker(

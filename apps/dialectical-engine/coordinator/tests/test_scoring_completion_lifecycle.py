@@ -19,7 +19,7 @@ def _seed_scoring_job(db) -> tuple[str, str, str]:
     node = Node(
         id="lifecycle-root",
         debate=debate,
-        node_type="ROOT",
+        node_type="ROOT_CLAIM",
         depth=0,
         position=0,
         claim="Durable scores should trigger lifecycle reevaluation.",
@@ -89,7 +89,7 @@ def _persist_completed_operation(db) -> tuple[str, str, str, dict[str, Node]]:
     debate = Debate(topic="Exact lifecycle operation", status="complete")
     other_debate = Debate(topic="Unrelated debate", status="complete")
     nodes = {
-        "root": Node(id="eligible-root", debate=debate, node_type="ROOT", depth=0, position=0, claim="Root", status="complete"),
+        "root": Node(id="eligible-root", debate=debate, node_type="ROOT_CLAIM", depth=0, position=0, claim="Root", status="complete"),
         "pro": Node(id="eligible-pro", debate=debate, node_type="PRO", depth=1, position=0, claim="Pro", status="complete"),
         "con": Node(id="eligible-con", debate=debate, node_type="CON", depth=1, position=1, claim="Con", status="complete"),
         "stale": Node(id="stale-pro", debate=debate, node_type="PRO", depth=1, position=2, claim="Stale", status="stale"),
@@ -206,7 +206,7 @@ def test_scoring_completion_reevaluates_only_exact_eligible_run_nodes(db, monkey
 
 def test_scoring_completion_rejects_noncanonical_lowercase_node_kind(db, monkeypatch) -> None:
     debate_id, job_id, run_id, nodes = _persist_completed_operation(db)
-    nodes["root"].node_type = "root"
+    nodes["root"].node_type = "root_claim"
     db.commit()
     decided_node_ids: list[str] = []
 
@@ -231,6 +231,81 @@ def test_scoring_completion_rejects_noncanonical_lowercase_node_kind(db, monkeyp
     run = db.get(AnalyzerRun, run_id)
     assert run is not None
     assert run.provenance["lifecycle_reevaluation"]["node_ids"] == decided_node_ids
+
+
+def test_scoring_completion_root_filter_uses_production_root_claim_vocabulary(db, monkeypatch) -> None:
+    # W0 (B5): every production creation site writes node_type "ROOT_CLAIM"
+    # (orchestrator.create_debate, dialectical_v2.create_dialectical_debate,
+    # single_shot); "ROOT" exists nowhere. The node-type filter must pass the
+    # real root and must not resurrect the dead legacy "ROOT" literal.
+    debate = Debate(topic="Root vocabulary", status="complete")
+    real_root = Node(
+        id="real-root",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Real production root",
+        status="complete",
+    )
+    legacy_root = Node(
+        id="legacy-root",
+        debate=debate,
+        node_type="ROOT",
+        depth=0,
+        position=1,
+        claim="Fictional legacy root type",
+        status="complete",
+    )
+    db.add_all([debate, real_root, legacy_root])
+    db.flush()
+    debate.root_node_id = real_root.id
+    branch = DebateBranch(debate_id=debate.id, root_node_id=real_root.id, status="active")
+    job = queue_scoring_job(db, debate, model_id="fixture-model")
+    job.status = "complete"
+    db.add(branch)
+    db.flush()
+    for node_id in (real_root.id, legacy_root.id):
+        _add_artifact(db, debate_id=debate.id, node_id=node_id, job_id=job.id)
+    db.flush()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        status="complete",
+        output={"debate_id": debate.id, "items": []},
+        provenance={
+            "scoring_source": "judge_outputs",
+            "job_id": job.id,
+            "node_ids": [real_root.id, legacy_root.id],
+        },
+        seq=1,
+    )
+    db.add(run)
+    db.commit()
+    decided_node_ids: list[str] = []
+
+    def fail_safe_decision(_db, *, debate, node, decision_timestamp):
+        decided_node_ids.append(node.id)
+        return SimpleNamespace(authentic_policy_decision=False)
+
+    monkeypatch.setattr(
+        scoring_completion_lifecycle,
+        "decide_lifecycle_for_node",
+        fail_safe_decision,
+    )
+
+    scoring_completion_lifecycle.reevaluate_lifecycle_after_scoring_completion(
+        db,
+        debate_id=debate.id,
+        job_id=job.id,
+        analyzer_run_id=run.id,
+    )
+
+    assert decided_node_ids == [real_root.id]
+    refreshed_run = db.get(AnalyzerRun, run.id)
+    assert refreshed_run is not None
+    assert refreshed_run.provenance["lifecycle_reevaluation"]["node_ids"] == [real_root.id]
 
 
 def test_scoring_completion_fail_safe_preserves_existing_lifecycle_and_spawns_nothing(db, monkeypatch) -> None:
@@ -664,7 +739,7 @@ def test_scoring_completion_hook_failure_preserves_durable_scoring_truth(db, mon
     root = Node(
         id="failure-root",
         debate=debate,
-        node_type="ROOT",
+        node_type="ROOT_CLAIM",
         depth=0,
         position=0,
         claim="Root survives hook rollback.",
@@ -870,7 +945,7 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
     claim = Node(
         id="completion-claim",
         debate=debate,
-        node_type="ROOT",
+        node_type="ROOT_CLAIM",
         depth=0,
         position=0,
         claim="A study at https://example.com reports 10% adoption.",

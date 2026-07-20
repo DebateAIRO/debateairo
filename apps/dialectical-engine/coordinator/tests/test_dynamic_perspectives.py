@@ -33,7 +33,7 @@ from app.services.dialectical_v2 import (
     pending_branch_containers,
     render_v2_job_prompt,
 )
-from app.services.orchestrator import claim_pending_job, complete_job
+from app.services.orchestrator import claim_pending_job, complete_job, regenerate_node
 from app.services.serialization import debate_to_dict
 
 FLAG = "DIALECTICAL_DYNAMIC_PERSPECTIVES"
@@ -177,6 +177,77 @@ def test_dynamic_perspectives_helper_is_deterministic() -> None:
     b = dynamic_perspectives("Does social media use cause depression?")
     assert a == b
     assert [nt for nt, _label, _lens in a] == ["SCIENTIFIC_POV", "STATISTICAL_POV", "ETHICAL_POV"]
+
+
+# ---------------------------------------------------------------------------
+# W5a: the claim_type + matched-markers derivation that selects the lens set
+# is persisted (additively) instead of being discarded, and serialized as
+# `derivation` -- only for NEW debates built via the dynamic path.
+# ---------------------------------------------------------------------------
+
+
+def test_dynamic_creation_persists_the_perspective_derivation(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+
+    stored = debate.config.get("perspective_derivation")
+    assert stored is not None
+    assert stored["claim_type"] == "causal"
+    assert stored["lens_set"] == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+    assert stored["markers"]  # a causal topic must match at least one marker
+
+
+def test_derivation_serializes_and_matches_rendered_branches(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    derivation = payload["derivation"]
+    assert derivation["claimType"] == "causal"
+    assert isinstance(derivation["markers"], list) and derivation["markers"]
+    branch_labels = [child["claim"] for child in payload["tree"]["children"]]
+    assert derivation["lensSet"] == branch_labels == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+
+
+def test_flag_off_creation_serves_no_derivation_key(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "false")
+    codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+
+    assert "perspective_derivation" not in debate.config
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    assert "derivation" not in payload
+
+
+def test_pre_w5_debate_serves_no_derivation_key(db) -> None:
+    # Simulates a debate created before this wave: config has no
+    # perspective_derivation at all (not even for a dynamic-perspectives
+    # debate created before W5a landed).
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 2})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    assert "derivation" not in payload
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +435,97 @@ def test_node_payload_label_null_for_legacy_quartet_and_non_pov_nodes(db, monkey
     for stance in completed["children"]:  # PRO/CON cards are not lenses
         if stance["node_type"] in {"PRO", "CON"}:
             assert stance["label"] is None
+
+
+# ---------------------------------------------------------------------------
+# Regeneration preserves dynamic lens identity (W0 fix B3)
+# ---------------------------------------------------------------------------
+# Dynamic perspectives reuse legacy POV node_types; the lens identity lives in
+# Node.claim. Regeneration must derive the job role from the ACTUAL claim (not
+# the node_type->legacy-label map) and materialization must never overwrite an
+# existing non-empty dynamic label with job.required_role.
+
+
+def _complete_all_pending_pov_jobs(db, worker: Worker, debate: Debate) -> int:
+    completed = 0
+    while True:
+        job = claim_pending_job(db, worker)
+        if job is None or job.job_type != "v2_pov":
+            break
+        asyncio.run(complete_job(db, job, generic_pov_output(worker, job.id, job.required_role), {"latency_ms": 5}))
+        completed += 1
+    return completed
+
+
+def test_regenerated_dynamic_pov_keeps_lens_identity_through_materialization(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    worker = codex_worker(db)
+
+    debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
+    assert _complete_all_pending_pov_jobs(db, worker, debate) == 3
+    mechanism = db.scalar(
+        select(Node).where(
+            Node.debate_id == debate.id, Node.parent_id == debate.root_node_id, Node.position == 0
+        )
+    )
+    assert (mechanism.node_type, mechanism.claim) == ("SCIENTIFIC_POV", "Mechanism POV")
+
+    # Two rounds: identity must round-trip through regen + materialization
+    # every time (the legacy bug corrupted on completion and compounded).
+    for _round in range(2):
+        regen_job = asyncio.run(regenerate_node(db, mechanism))
+        assert regen_job.job_type == "v2_pov"
+        assert regen_job.required_role == "Mechanism POV"
+        _system, user_prompt = render_v2_job_prompt(db, regen_job)
+        assert "Mechanism POV" in user_prompt
+        assert DYNAMIC_LENS_DESCRIPTIONS["Mechanism POV"] in user_prompt
+
+        claimed = claim_pending_job(db, worker)
+        assert claimed is not None and claimed.id == regen_job.id
+        asyncio.run(
+            complete_job(db, claimed, generic_pov_output(worker, claimed.id, "Mechanism POV"), {"latency_ms": 5})
+        )
+        db.refresh(mechanism)
+        assert mechanism.node_type == "SCIENTIFIC_POV"
+        assert mechanism.claim == "Mechanism POV"
+
+
+def test_regenerating_duplicate_node_type_sibling_keeps_labels_distinct(db, monkeypatch) -> None:
+    monkeypatch.setenv(FLAG, "true")
+    worker = codex_worker(db)
+
+    # "mixed" topic: 5 perspectives; the cycle wraps, so "Scientific POV" and
+    # "Integrative POV" SHARE node_type SCIENTIFIC_POV. node_type is not an
+    # identity key -- regenerating the Integrative branch must not relabel it.
+    debate = service.create_dialectical_debate(db, "Studies show that banning cars causes fewer accidents", {})
+    assert _complete_all_pending_pov_jobs(db, worker, debate) == 5
+    integrative = db.scalar(
+        select(Node).where(Node.debate_id == debate.id, Node.parent_id == debate.root_node_id, Node.position == 4)
+    )
+    assert (integrative.node_type, integrative.claim) == ("SCIENTIFIC_POV", "Integrative POV")
+
+    regen_job = asyncio.run(regenerate_node(db, integrative))
+    assert regen_job.required_role == "Integrative POV"
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.id == regen_job.id
+    asyncio.run(
+        complete_job(db, claimed, generic_pov_output(worker, claimed.id, "Integrative POV"), {"latency_ms": 5})
+    )
+
+    siblings = list(
+        db.scalars(
+            select(Node)
+            .where(Node.debate_id == debate.id, Node.parent_id == debate.root_node_id)
+            .order_by(Node.position)
+        ).all()
+    )
+    assert [node.claim for node in siblings] == [
+        "Scientific POV",
+        "Statistical POV",
+        "Ethical POV",
+        "Practical POV",
+        "Integrative POV",
+    ]
 
 
 # ---------------------------------------------------------------------------

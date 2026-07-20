@@ -1,18 +1,26 @@
 from __future__ import annotations
 
+import logging
+import threading
+import time
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import bool_env
 from app.core.db import SessionLocal
-from app.core.write_lock import commit_write
+from app.core.oplog import log_event
+from app.core.write_lock import commit_write, hold_write_lock
+from app.exploration.expansion_dispatch import adaptive_expansion_enabled, expansion_dispatch
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
-from app.providers import ProviderError, ProviderRegistry, detect_codex_scoring_config
+from app.protocol.runner import run_protocol_analysis
+from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
+from app.services.job_ledger import record_job_transition
+from app.services.orchestrator import max_job_attempts
 from app.scoring.service import (
     JUDGE_OUTPUT_SOURCE,
     SCORING_ANALYZER_TYPE,
@@ -21,6 +29,8 @@ from app.scoring.service import (
     queue_scoring_job,
     score_debate_with_provider_registry,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
@@ -61,6 +71,10 @@ def run_scoring_job_background(
         if not job or not debate or debate.status == "archived":
             return
         registry = registry_factory()
+        run_started = time.monotonic()
+        record_job_transition(
+            db, job, from_status=job.status, to_status="running", channel="scoring_run"
+        )
         job.status = "running"
         job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
         job.error = None
@@ -92,6 +106,9 @@ def run_scoring_job_background(
             # db.flush()es as one lock-covered critical section (see
             # app.models.entities) -- do not db.add() this row separately.
             next_analyzer_run_seq(db, new_run)
+            record_job_transition(
+                db, job, from_status="running", to_status="complete", channel="scoring_complete"
+            )
             job.status = "complete"
             job.error = None
             try:
@@ -100,11 +117,37 @@ def run_scoring_job_background(
                 db.rollback()
                 _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
                 return
+            log_event(
+                LOGGER,
+                "scoring.run",
+                debate_id=debate_id,
+                job_id=job_id,
+                job_type="score_debate",
+                outcome="complete",
+                duration_ms=int((time.monotonic() - run_started) * 1000),
+            )
         except Exception as exc:
             db.rollback()
+            record_job_transition(
+                db,
+                job,
+                from_status="running",
+                to_status="failed",
+                channel="scoring_fail",
+                reason=str(exc),
+            )
             job.status = "failed"
             job.error = str(exc)
             commit_write(db)
+            log_event(
+                LOGGER,
+                "scoring.run",
+                debate_id=debate_id,
+                job_id=job_id,
+                job_type="score_debate",
+                outcome="failed",
+                duration_ms=int((time.monotonic() - run_started) * 1000),
+            )
             return
         lifecycle_kwargs: dict[str, object] = {}
         if bool_env("DIALECTICAL_EVIDENCE_VERIFICATION", False):
@@ -115,13 +158,62 @@ def run_scoring_job_background(
                 # must leave lifecycle inputs unavailable rather than inventing
                 # a verdict or retroactively failing the scoring operation.
                 pass
-        reevaluate_lifecycle_after_scoring_completion(
-            db,
-            debate_id=debate.id,
-            job_id=job.id,
-            analyzer_run_id=new_run.id,
-            **lifecycle_kwargs,
-        )
+        try:
+            reevaluate_lifecycle_after_scoring_completion(
+                db,
+                debate_id=debate.id,
+                job_id=job.id,
+                analyzer_run_id=new_run.id,
+                **lifecycle_kwargs,
+            )
+        finally:
+            # W2: judge scores are durable (committed above) -- re-run
+            # protocol analysis so the next verdict read consumes real taus
+            # (appends a NEW protocol_analysis run; stored runs are never
+            # rewritten). Best-effort both ways: a re-run failure never breaks
+            # scoring completion or the lifecycle tail, and a lifecycle-tail
+            # exception (which still propagates, as before) never skips the
+            # re-run. run_protocol_analysis is itself non-raising; the except
+            # is defense-in-depth.
+            try:
+                run_protocol_analysis(db, debate)
+            except Exception:
+                LOGGER.exception(
+                    "post-scoring protocol analysis re-run failed (non-fatal) debate=%s",
+                    debate_id,
+                )
+            # W4: adaptive expansion dispatch consumes this run's fresh
+            # authenticated lifecycle decisions AFTER both the reevaluation
+            # and the protocol re-run. Flag-checked at the call site (a
+            # disabled deployment never invokes dispatch at all) and
+            # best-effort: a dispatch failure never breaks scoring
+            # completion or the lifecycle tail.
+            if adaptive_expansion_enabled():
+                dispatch_started = time.monotonic()
+                try:
+                    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=new_run.id)
+                except Exception:
+                    LOGGER.exception(
+                        "adaptive expansion dispatch failed (non-fatal) debate=%s",
+                        debate_id,
+                    )
+                    log_event(
+                        LOGGER,
+                        "expansion.dispatch",
+                        debate_id=debate_id,
+                        analyzer_run_id=new_run.id,
+                        outcome="error",
+                        duration_ms=int((time.monotonic() - dispatch_started) * 1000),
+                    )
+                else:
+                    log_event(
+                        LOGGER,
+                        "expansion.dispatch",
+                        debate_id=debate_id,
+                        analyzer_run_id=new_run.id,
+                        outcome="completed",
+                        duration_ms=int((time.monotonic() - dispatch_started) * 1000),
+                    )
 
 
 def _mark_scoring_job_failed(job_id: str, error: str) -> None:
@@ -129,6 +221,9 @@ def _mark_scoring_job_failed(job_id: str, error: str) -> None:
         job = db.get(Job, job_id)
         if job is None:
             return
+        record_job_transition(
+            db, job, from_status=job.status, to_status="failed", channel="scoring_fail", reason=error
+        )
         job.status = "failed"
         job.error = error
         job.deadline = now_utc()
@@ -184,46 +279,176 @@ def wake_pending_internal_scoring_job(
     registry_factory: RegistryFactory = ProviderRegistry,
     background_runner: Callable[[str, str], None] = run_scoring_job_background,
 ) -> Job | None:
-    stale_jobs = db.scalars(
-        select(Job).where(
-            Job.debate_id == debate.id,
-            Job.job_type == "score_debate",
-            Job.status == "pending",
-            Job.deadline < now_utc(),
-        )
-    ).all()
-    for stale_job in stale_jobs:
-        stale_job.status = "failed"
-        stale_job.error = STALE_SCORING_JOB_ERROR
-    if stale_jobs:
-        commit_write(db)
+    # W2 idempotency: the find-and-claim below runs under the process-wide
+    # write lock so the browser-poll thread(s) and the internal completion
+    # trigger can never both observe the same pending job and double-run it.
+    # The RLock is reentrant, so the nested commit_write/flush_write calls
+    # inside this section are safe no-op re-entries.
+    with hold_write_lock():
+        stale_jobs = db.scalars(
+            select(Job).where(
+                Job.debate_id == debate.id,
+                Job.job_type == "score_debate",
+                Job.status == "pending",
+                Job.deadline < now_utc(),
+            )
+        ).all()
+        for stale_job in stale_jobs:
+            record_job_transition(
+                db,
+                stale_job,
+                from_status=stale_job.status,
+                to_status="failed",
+                channel="scoring_stale",
+                reason=STALE_SCORING_JOB_ERROR,
+            )
+            stale_job.status = "failed"
+            stale_job.error = STALE_SCORING_JOB_ERROR
+        if stale_jobs:
+            commit_write(db)
 
-    job = db.scalars(
-        select(Job)
-        .where(
-            Job.debate_id == debate.id,
-            Job.job_type == "score_debate",
-            Job.status == "pending",
-            Job.deadline >= now_utc(),
+        job = db.scalars(
+            select(Job)
+            .where(
+                Job.debate_id == debate.id,
+                Job.job_type == "score_debate",
+                Job.status == "pending",
+                Job.deadline >= now_utc(),
+            )
+            .order_by(Job.created_at.desc(), Job.id.desc())
+            .limit(1)
+        ).first()
+        if job is None:
+            if _latest_retryable_stale_scoring_job(db, debate.id) is None:
+                return None
+            # W1 bounded failure lifecycle: stale expiries are timeout-class, so
+            # the stale-requeue channel gets the doubled (half-weight) budget --
+            # 2x DIALECTICAL_MAX_JOB_ATTEMPTS consecutive stale failures since the
+            # last successful scoring run, then the channel stops requeuing.
+            # Scores are advisory: nothing here ever touches debate.status.
+            if _consecutive_stale_scoring_failures(db, debate.id) >= 2 * max_job_attempts():
+                return None
+        registry = registry_factory()
+        scoring_config = detect_scoring_provider_config(
+            registry.agents, role="judge", providers=registry.providers
         )
-        .order_by(Job.created_at.desc(), Job.id.desc())
-        .limit(1)
-    ).first()
-    if job is None:
-        if _latest_retryable_stale_scoring_job(db, debate.id) is None:
+        if not scoring_config.available:
             return None
-    registry = registry_factory()
-    scoring_config = detect_codex_scoring_config(registry.agents, role="judge")
-    if not scoring_config.available:
-        return None
-    if job is None:
-        job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
-    job.status = "claimed"
-    job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
-    job.error = None
-    commit_write(db)
+        if job is None:
+            job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
+        record_job_transition(
+            db, job, from_status=job.status, to_status="claimed", channel="scoring_wake"
+        )
+        job.status = "claimed"
+        job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
+        job.error = None
+        commit_write(db)
     background_tasks.add_task(background_runner, job.id, debate.id)
     return job
+
+
+class _CollectedBackgroundTasks:
+    """Minimal BackgroundTasks stand-in for the internal (no-request) drive:
+    collect tasks during the wake, run them after the driving session closed
+    -- the same run-after-response discipline FastAPI applies."""
+
+    def __init__(self) -> None:
+        self._tasks: list[tuple[Callable[..., None], tuple[Any, ...]]] = []
+
+    def add_task(self, func: Callable[..., None], *args: Any) -> None:
+        self._tasks.append((func, args))
+
+    def run_all(self) -> None:
+        for func, args in self._tasks:
+            func(*args)
+
+
+def drive_internal_scoring_for_debate(
+    debate_id: str,
+    *,
+    registry_factory: RegistryFactory = ProviderRegistry,
+    background_runner: Callable[[str, str], None] = run_scoring_job_background,
+) -> str | None:
+    """One bounded wake of the debate's scoring state machine -- no HTTP.
+
+    Reuses wake_pending_internal_scoring_job end-to-end: same pending-job
+    claim dedup, same W1 stale-failure budget, same provider-absence bail-out
+    (a test env without a scoring provider degrades to a silent no-op).
+    Exactly one wake per call -- retries stay owned by later browser polls.
+    Returns the claimed scoring job's id, or None when nothing was woken.
+    """
+    tasks = _CollectedBackgroundTasks()
+    with SessionLocal() as db:
+        debate = db.get(Debate, debate_id)
+        if debate is None or debate.status == "archived":
+            return None
+        job = wake_pending_internal_scoring_job(
+            db,
+            debate,
+            tasks,
+            registry_factory=registry_factory,
+            background_runner=background_runner,
+        )
+        job_id = job.id if job is not None else None
+    tasks.run_all()
+    return job_id
+
+
+def trigger_internal_scoring_after_completion(debate_id: str) -> threading.Thread | None:
+    """Fire-and-forget internal scoring trigger for v2 completion (W2, B6).
+
+    Best-effort is binding: never raises and never blocks the caller beyond
+    starting a daemon thread -- completion/synthesis persistence must not be
+    failed or delayed by scoring. On any failure (including inside the
+    thread) the debate simply keeps the synthesis-time analysis. Returns the
+    started thread (production callers ignore it; tests join it).
+    """
+
+    def _run() -> None:
+        try:
+            drive_internal_scoring_for_debate(debate_id)
+        except Exception:
+            LOGGER.exception(
+                "internal scoring drive failed (non-fatal) debate=%s", debate_id
+            )
+
+    try:
+        thread = threading.Thread(
+            target=_run,
+            name=f"internal-scoring-{debate_id}",
+            daemon=True,
+        )
+        thread.start()
+        return thread
+    except Exception:
+        LOGGER.exception(
+            "internal scoring trigger failed (non-fatal) debate=%s", debate_id
+        )
+        return None
+
+
+def _consecutive_stale_scoring_failures(db: Session, debate_id: str) -> int:
+    """Stale-failed scoring jobs since the last successful scoring run."""
+    last_complete_at = db.scalar(
+        select(func.max(Job.created_at)).where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status == "complete",
+        )
+    )
+    query = (
+        select(func.count())
+        .select_from(Job)
+        .where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status == "failed",
+            Job.error == STALE_SCORING_JOB_ERROR,
+        )
+    )
+    if last_complete_at is not None:
+        query = query.where(Job.created_at > last_complete_at)
+    return int(db.scalar(query) or 0)
 
 
 def _latest_retryable_stale_scoring_job(db: Session, debate_id: str) -> Job | None:

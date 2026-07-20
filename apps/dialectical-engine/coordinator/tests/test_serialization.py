@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import event
 
 from app.core.auth import hash_token
 from app.core.db import get_engine
+from app.exploration.decision_repository import (
+    LIFECYCLE_DECISION_SCHEMA_VERSION,
+    LifecycleDecisionSnapshot,
+    persist_lifecycle_decision,
+)
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, Node, Synthesis, Worker, now_utc
 from app.scoring.verdict import verdict_summary
 from app.services.serialization import debate_to_dict, iso, synthesis_to_dict
@@ -443,6 +448,7 @@ def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analy
         analyzer_type="protocol_analysis",
         output={
             "dialecticalStrengths": {root.id: 0.8},
+            "tauCoverage": 1.0,
             "verificationStatuses": {root.id: "verified"},
             "convergence": {"converged": True, "reason": None, "epsilon": 0.05},
         },
@@ -468,6 +474,38 @@ def test_debate_detail_verdict_matches_verdict_summary_for_latest_protocol_analy
     assert len(visible["analyzer_runs"]) == 2
     assert visible["branch_lineage"][0]["id"] == branch.id
     assert visible["node_count"] == 1
+
+
+def test_debate_detail_unscored_protocol_run_serves_insufficient_scoring(db) -> None:
+    # W2: a stored protocol run WITHOUT tauCoverage (every pre-existing
+    # artifact -- computed over all-default taus) must serve the honest
+    # insufficient_scoring band, with the real strength still in the basis.
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.97},
+                "verificationStatuses": {root.id: "pending_verification"},
+                "convergence": {"converged": None, "reason": "first_evaluation", "epsilon": 0.05},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["verdict"]["verdictBand"] == "insufficient_scoring"
+    assert visible["verdict"]["basis"]["dialecticalStrength"] == 0.97
+    assert visible["verdict"]["basis"]["tauCoverage"] == 0.0
+    assert visible["verdict"]["basis"]["tauSourceMajority"] == "default"
 
 
 def test_debate_detail_verdict_unavailable_when_no_protocol_analysis_run(db) -> None:
@@ -587,12 +625,141 @@ def test_synthesis_verdict_gate_mirrors_top_level_verdict_state(db, monkeypatch,
     assert payload["verdict"]["verdictState"] == "suppressed_no_evidence"
     assert payload["synthesis"]["verdict_gate"]["state"] == payload["verdict"]["verdictState"]
     assert payload["synthesis"]["verdict_gate"]["reason"] == payload["verdict"]["suppressionReason"]
+    # W2: verdict_gate mirrors the served band too (additive key; verdictBand
+    # stays the band's sole wire key NAME, mirrored from the single
+    # verdict_summary derivation -- never derived separately).
+    assert payload["synthesis"]["verdict_gate"]["verdictBand"] == payload["verdict"]["verdictBand"]
     assert payload["synthesis"]["verdict"] == "The persisted synthesis text must remain unchanged."
     assert (
         f"verdict.evidence_gate debate={debate.id} state=suppressed_no_evidence "
         "would_suppress=true evidence=none claim_type=empirical "
         "claim_type_source=root_claim_text"
     ) in caplog.messages
+
+
+# ---------------------------------------------------------------------------
+# W6: flag-ON honesty, exercised through the real env var (not just the pure
+# verdict_summary(gate_enabled=...) param) at the serialization boundary --
+# closing the gap between the unit-level pins in tests/test_verdict.py and
+# what actually ships on the wire when DIALECTICAL_VERDICT_EVIDENCE_GATE=1.
+# No flag default changes here; the env var is scoped to each test only.
+# ---------------------------------------------------------------------------
+
+
+def test_env_gate_on_preserves_pregate_band_for_suppressed_scored_debate(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Measured rainfall totals rose across the basin this decade.",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "tauCoverage": 1.0,
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "root_claim_text"},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    # Scored (tauCoverage above threshold) -> the pre-gate read is the real
+    # "supported" band; the gate then withholds it. The honest basis for a
+    # withheld verdict never loses the pre-gate reading.
+    assert verdict["basis"]["preGateVerdictBand"] == "supported"
+    assert verdict["verdictBand"] == "suppressed"
+    assert verdict["verdictState"] == "suppressed_no_evidence"
+    assert verdict["basis"]["dialecticalStrength"] == 0.8
+
+
+def test_env_gate_on_never_suppresses_unknown_claim_type(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Should the city widen Elm Street?",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "tauCoverage": 1.0,
+                # No claimTypes entry at all for the root -- an unclassified
+                # claim type must never be treated as gate-eligible.
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    assert verdict["verdictBand"] == "supported"
+    assert verdict["verdictState"] == "endorsed_with_caveat"
+    assert verdict["suppressionReason"] is None
+    assert [caveat["code"] for caveat in verdict["caveats"]] == ["claim_type_unknown"]
+
+
+def test_env_gate_on_and_unscored_debate_compose_without_contradiction(db, monkeypatch) -> None:
+    # The precedence itself is already pinned at the pure-function level
+    # (test_verdict.py::test_evidence_gate_suppression_still_wins_over_insufficient_scoring);
+    # this pins the SAME composition through the real env var at the actual
+    # wire boundary, on a debate that never received judge scores at all.
+    monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
+    debate = Debate(
+        topic="Measured river discharge fell below the historical average.",
+        status="complete",
+        config={"max_depth": 0},
+    )
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.97},
+                # No tauCoverage key -- an unscored debate reads as 0.0
+                # coverage, i.e. the pre-gate band is "insufficient_scoring".
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "root_claim_text"},
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    verdict = visible["verdict"]
+
+    assert verdict["basis"]["preGateVerdictBand"] == "insufficient_scoring"
+    assert verdict["verdictBand"] == "suppressed"
+    assert verdict["verdictState"] == "suppressed_no_evidence"
+    assert verdict["basis"]["dialecticalStrength"] == 0.97
 
 
 def test_synthesis_to_dict_without_verdict_gate_param_keeps_legacy_shape(db) -> None:
@@ -616,3 +783,479 @@ def test_synthesis_to_dict_without_verdict_gate_param_keeps_legacy_shape(db) -> 
     assert payload is not None
     assert payload["verdict"] == "Pilot it."
     assert "verdict_gate" not in payload
+
+
+# ---------------------------------------------------------------------------
+# W5a: decision provenance -- lifecycleDecisions, completion, and the
+# pre/post additive-only key-diff proof.
+# ---------------------------------------------------------------------------
+
+
+def _lifecycle_snapshot(
+    *,
+    idempotency_key: str,
+    node_id: str,
+    debate_id: str,
+    decision_timestamp: datetime,
+    decision: str = "challenge",
+    stopping_reason: str = "evidence refutes or contradicts the claim",
+    signal_class: str = "categorical",
+    child_spawn_count: int = 0,
+) -> LifecycleDecisionSnapshot:
+    return LifecycleDecisionSnapshot(
+        schema_version=LIFECYCLE_DECISION_SCHEMA_VERSION,
+        idempotency_key=idempotency_key,
+        debate_id=debate_id,
+        node_id=node_id,
+        decision=decision,
+        stopping_reason=stopping_reason,
+        path_status="active",
+        stopping_status=decision,
+        input_state="grounded",
+        reason_codes=(),
+        score_availability="present",
+        score_freshness="fresh",
+        evidence_availability="present",
+        evidence_freshness="fresh",
+        current_score_input_hash="a" * 64,
+        scoring_contract_hash="b" * 64,
+        score_record_id="score-record-1",
+        score_run_id="score-run-1",
+        score_run_sequence=1,
+        evidence_snapshot_id="evidence-snapshot-1",
+        decision_timestamp=decision_timestamp,
+        child_spawn_count=child_spawn_count,
+        signal_class=signal_class,
+    )
+
+
+def _root(db, debate: Debate) -> Node:
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    return root
+
+
+def test_lifecycle_decisions_bounded_to_latest_per_node(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    node = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Fewer cars would reduce street danger.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(node)
+    db.flush()
+    db.commit()
+
+    persist_lifecycle_decision(
+        db,
+        snapshot=_lifecycle_snapshot(
+            idempotency_key="eval-1",
+            node_id=node.id,
+            debate_id=debate.id,
+            decision="continue",
+            stopping_reason="no expansion pressure crosses policy thresholds",
+            signal_class="scalar",
+            decision_timestamp=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        ),
+    )
+    persist_lifecycle_decision(
+        db,
+        snapshot=_lifecycle_snapshot(
+            idempotency_key="eval-2",
+            node_id=node.id,
+            debate_id=debate.id,
+            decision="challenge",
+            stopping_reason="evidence refutes or contradicts the claim",
+            signal_class="categorical",
+            decision_timestamp=datetime(2026, 7, 2, tzinfo=timezone.utc),
+        ),
+    )
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    decisions = payload["lifecycleDecisions"]
+    assert len(decisions) == 1  # bounded: latest only, not the full audit trail
+    entry = decisions[0]
+    assert entry["nodeId"] == node.id
+    assert entry["decision"] == "challenge"
+    assert entry["signalClass"] == "categorical"
+    assert entry["reason"] == "evidence refutes or contradicts the claim"
+    assert entry["childSpawnCount"] == 0
+    assert entry["outcome"] == "annotate_only"
+    assert entry["decidedAt"]
+
+
+def test_lifecycle_decisions_outcome_buckets_are_honest(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    node_ids: dict[str, str] = {}
+    for label in ("spawned", "budget", "capacity", "annotate"):
+        node = Node(
+            debate_id=debate.id,
+            parent_id=root.id,
+            node_type="PRO",
+            depth=1,
+            position=len(node_ids),
+            claim=f"{label} branch",
+            status="complete",
+            materialized_path=f"0/{len(node_ids)}",
+        )
+        db.add(node)
+        db.flush()
+        node_ids[label] = node.id
+    db.commit()
+
+    records = {}
+    for label, node_id in node_ids.items():
+        persistence = persist_lifecycle_decision(
+            db,
+            snapshot=_lifecycle_snapshot(
+                idempotency_key=f"eval-{label}",
+                node_id=node_id,
+                debate_id=debate.id,
+                decision="seek_evidence",
+                stopping_reason="empirical evidence is not grounded",
+                signal_class="categorical",
+                decision_timestamp=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            ),
+        )
+        records[label] = persistence.record
+    # child_spawn_count/dispatch_outcome are written by the adaptive
+    # dispatcher AFTER decision-time persistence (W4) -- mirror that here.
+    records["spawned"].dispatch_outcome = "spawned"
+    records["spawned"].child_spawn_count = 1
+    records["budget"].dispatch_outcome = "budget_exhausted"
+    records["capacity"].dispatch_outcome = "deferred_no_capacity"
+    records["annotate"].dispatch_outcome = "annotate_only_scalar_signal"
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    outcome_by_node = {entry["nodeId"]: entry["outcome"] for entry in payload["lifecycleDecisions"]}
+
+    assert outcome_by_node[node_ids["spawned"]] == "spawned"
+    assert outcome_by_node[node_ids["budget"]] == "budget_exhausted"
+    assert outcome_by_node[node_ids["capacity"]] == "deferred_no_capacity"
+    assert outcome_by_node[node_ids["annotate"]] == "annotate_only"
+
+
+def test_lifecycle_decisions_empty_when_debate_has_none(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={})
+    db.add(debate)
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["lifecycleDecisions"] == []
+
+
+def test_completion_block_plain_complete_debate_has_no_reason(db) -> None:
+    debate = Debate(topic="Xbox or PS5?", status="complete", config={})
+    db.add(debate)
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["completion"] == {"state": "complete", "reasonCode": None, "humanReason": None}
+
+
+def test_completion_block_complete_with_failed_branch_maps_generation_exhausted(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1},
+        completed_at=now_utc(),
+    )
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    failed_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="A failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="generation_exhausted",
+        path_status="abandoned",
+        materialized_path="0/0",
+    )
+    db.add(failed_child)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="",
+        strongest_con="",
+        verdict="Complete over survivors.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.synthesis_id = synthesis.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["status"] == "complete"
+    assert payload["completion"]["state"] == "complete-with-failed-branches"
+    assert payload["completion"]["reasonCode"] == "generation_exhausted"
+    assert payload["completion"]["humanReason"]
+    assert payload["completion"]["humanReason"] != "generation_exhausted"
+
+
+def test_completion_block_reason_pick_is_deterministic_across_multiple_failed_nodes(db) -> None:
+    # `nodes` is queried without an ORDER BY (debate_to_dict); the reason
+    # scan must not depend on incidental DB row order. Two failed nodes with
+    # DISTINCT reasons (an artificial fixture -- every reachable pipeline
+    # path today writes the identical "generation_exhausted" to every failed
+    # node, but the pick must still be well-defined and stable) prove the
+    # earlier materialized_path always wins, regardless of insertion order.
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1},
+        completed_at=now_utc(),
+    )
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    # Insert the LATER-path node first, so an unsorted scan of insertion
+    # order would pick it (and its reason) over the earlier one.
+    later_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="CON",
+        depth=1,
+        position=1,
+        claim="A second failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="a_later_reason",
+        path_status="abandoned",
+        materialized_path="0/1",
+    )
+    db.add(later_child)
+    db.flush()
+    earlier_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="A failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="generation_exhausted",
+        path_status="abandoned",
+        materialized_path="0/0",
+    )
+    db.add(earlier_child)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="",
+        strongest_con="",
+        verdict="Complete over survivors.",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.synthesis_id = synthesis.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["completion"]["reasonCode"] == "generation_exhausted"
+
+
+def test_completion_block_failed_debate_carries_the_node_reason(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    failed_child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="A failed branch",
+        status="failed",
+        stopping_status="stop",
+        stopping_reason="generation_exhausted",
+        path_status="abandoned",
+        materialized_path="0/0",
+    )
+    db.add(failed_child)
+    db.flush()
+    db.add(
+        Job(
+            debate_id=debate.id,
+            node_id=failed_child.id,
+            job_type="argue",
+            required_role="proposer",
+            required_model="mock-local",
+            status="failed",
+            error="Job deadline expired (retry budget exhausted)",
+        )
+    )
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["status"] == "failed"
+    assert payload["completion"]["state"] == "failed"
+    assert payload["completion"]["reasonCode"] == "generation_exhausted"
+    assert payload["completion"]["humanReason"]
+
+
+def test_completion_block_failed_debate_without_node_reason_uses_the_honest_generic_code(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    db.add(
+        Job(
+            debate_id=debate.id,
+            node_id=root.id,
+            job_type="decompose",
+            required_role="decomposer",
+            required_model="mock-local",
+            status="failed",
+            error="some private worker exception text that must never leak",
+        )
+    )
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["status"] == "failed"
+    assert payload["completion"] == {
+        "state": "failed",
+        "reasonCode": "debate_generation_failed",
+        "humanReason": "Debate generation failed and could not be completed.",
+    }
+    assert "some private worker exception text" not in str(payload["completion"])
+
+
+def test_completion_block_adaptive_stopped_because(db) -> None:
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="complete",
+        config={"adaptive_expansion": {"rounds_completed": 1, "stopped_because": "budget_exhausted"}},
+    )
+    db.add(debate)
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert payload["completion"]["state"] == "complete"
+    assert payload["completion"]["reasonCode"] == "budget_exhausted"
+    assert payload["completion"]["humanReason"]
+
+
+# The exact top-level debate_to_dict / node_to_dict key sets as they existed
+# immediately before this wave (captured from git history at HEAD -- see
+# w5a-report.md). W5a is additive-only: every one of these keys must still be
+# present, unchanged, and the ONLY new keys allowed are the ones this wave
+# introduces.
+_PRE_W5A_DEBATE_KEYS = {
+    "id", "topic", "status", "config", "direct_answer", "root_node_id", "synthesis_id",
+    "created_at", "completed_at", "tree", "synthesis", "active_synthesis", "branch_lineage",
+    "analyzer_runs", "verdict", "selected_skills", "selected_agents", "agent_outputs",
+    "agent_runs", "skills_used", "provenance_records", "workers", "models", "node_count",
+    "evidencePresence",
+}
+_PRE_W5A_NODE_KEYS = {
+    "id", "debate_id", "parent_id", "node_type", "depth", "position", "claim", "status",
+    "materialized_path", "active_generation_id", "label", "argument_claim", "path_status",
+    "stopping_status", "stopping_reason", "active_generation", "children",
+}
+
+
+def test_debate_payload_pre_existing_keys_are_byte_identical(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(
+        topic="Should cities ban cars?",
+        status="generating",
+        config={"max_depth": 1},
+        completed_at=now_utc(),
+    )
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Fewer cars would reduce street danger.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(child)
+    db.flush()
+    synthesis = Synthesis(
+        debate_id=debate.id,
+        strongest_pro="P",
+        strongest_con="C",
+        verdict="V",
+        model_id="mock-local",
+        worker_id=worker.id,
+    )
+    db.add(synthesis)
+    db.flush()
+    debate.synthesis_id = synthesis.id
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+
+    top_level_keys = set(payload.keys())
+    assert _PRE_W5A_DEBATE_KEYS <= top_level_keys
+    assert top_level_keys - _PRE_W5A_DEBATE_KEYS == {"lifecycleDecisions", "completion"}
+
+    root_keys = set(payload["tree"].keys())
+    assert _PRE_W5A_NODE_KEYS <= root_keys
+    assert root_keys - _PRE_W5A_NODE_KEYS == {"stopping_reason_human"}
+
+    child_keys = set(payload["tree"]["children"][0].keys())
+    assert _PRE_W5A_NODE_KEYS <= child_keys
+    assert child_keys - _PRE_W5A_NODE_KEYS == {"stopping_reason_human"}
+
+    # Pre-existing VALUES stay exactly what they always were.
+    assert payload["status"] == "complete"
+    assert payload["tree"]["stopping_reason"] is None
+    assert payload["tree"]["children"][0]["stopping_reason"] is None
+    # New keys carry honest absence for a debate with nothing to report.
+    assert payload["tree"]["stopping_reason_human"] is None
+    assert payload["lifecycleDecisions"] == []
+    assert payload["completion"] == {"state": "complete", "reasonCode": None, "humanReason": None}
+    assert "derivation" not in payload

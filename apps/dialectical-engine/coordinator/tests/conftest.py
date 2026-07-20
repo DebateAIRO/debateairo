@@ -38,3 +38,21 @@ def db():
         ensure_user_token(session, "user_test_token")
         yield session
 
+
+@pytest.fixture(autouse=True)
+def _no_internal_scoring_thread(monkeypatch):
+    """Test-suite baseline: v2 completion's fire-and-forget internal scoring
+    trigger (W2, app.scoring.jobs.trigger_internal_scoring_after_completion)
+    is stubbed to a no-op. The repo's config/agents.yaml configures a real
+    judge agent, so without this stub every completed v2 pipeline would spawn
+    a daemon thread that claims the debate's pending scoring job and attempts
+    REAL codex scoring -- racing test teardown and mutating job/analyzer rows
+    nondeterministically. Tests that exercise the trigger itself monkeypatch
+    it back (or call drive_internal_scoring_for_debate directly) -- see
+    tests/test_scoring_verdict_refresh.py.
+    """
+    monkeypatch.setattr(
+        "app.services.dialectical_v2.trigger_internal_scoring_after_completion",
+        lambda debate_id: None,
+    )
+

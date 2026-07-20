@@ -30,11 +30,18 @@ from typing import Any
 
 from app.qbaf.semantics_versions import DEFAULT_SEMANTICS
 
-VERDICT_THRESHOLDS_VERSION = "verdict-v1"
+VERDICT_THRESHOLDS_VERSION = "verdict-v2"
 GATE_ELIGIBLE_CLAIM_TYPES = frozenset({"empirical"})
 
 _SUPPORTED_THRESHOLD = 0.65
 _UNSUPPORTED_THRESHOLD = 0.35
+# W2 (verdict-v1 -> verdict-v2): minimum 0..1 fraction of argument nodes whose
+# tau came from persisted judge scores (protocol run's "tauCoverage") before a
+# strength-based band may be served. Below it the honest band is
+# "insufficient_scoring" -- the strength of an all-default-tau run is a
+# topology artifact, not evidence. Declared, not learned, like the band
+# thresholds above; the version bump marks its introduction.
+_TAU_COVERAGE_MIN = 0.5
 
 _UNAVAILABLE_CLAIM_LANGUAGE = "No protocol analysis is available yet for this debate."
 _SUPPRESSED_CLAIM_LANGUAGE = (
@@ -234,7 +241,28 @@ def verdict_summary(
         f"{round(strength, 2)}"
     )
 
-    if strength >= _SUPPORTED_THRESHOLD:
+    raw_tau_coverage = protocol_output.get("tauCoverage")
+    if (
+        isinstance(raw_tau_coverage, (int, float))
+        and not isinstance(raw_tau_coverage, bool)
+        and 0.0 <= float(raw_tau_coverage) <= 1.0
+    ):
+        tau_coverage = float(raw_tau_coverage)
+    else:
+        # Stored runs without the W2 tauCoverage field (every pre-existing
+        # artifact) were computed over all-default taus, and a malformed
+        # value proves nothing -- 0.0 is the honest reading, never a guess.
+        tau_coverage = 0.0
+    tau_source_majority = "judge_strength" if tau_coverage >= _TAU_COVERAGE_MIN else "default"
+
+    if tau_coverage < _TAU_COVERAGE_MIN:
+        band = "insufficient_scoring"
+        claim_language = (
+            "No verdict is served: too few argument nodes carry judge scores "
+            f"(tau coverage {round(tau_coverage, 2)}, below the declared minimum "
+            f"{_TAU_COVERAGE_MIN}). Structural reading for transparency ({support_label})."
+        )
+    elif strength >= _SUPPORTED_THRESHOLD:
         band = "supported"
         claim_language = f"The root claim is strongly supported ({support_label})."
     elif strength <= _UNSUPPORTED_THRESHOLD:
@@ -258,6 +286,11 @@ def verdict_summary(
             "verificationStatus": verification_status,
             "convergence": convergence,
             "semanticsVersion": semantics_version,
+            # W2 additive: the coverage the band was gated on, plus the run's
+            # tau-source majority -- the band always sits beside the real
+            # strength AND the real coverage, never alone.
+            "tauCoverage": tau_coverage,
+            "tauSourceMajority": tau_source_majority,
         },
         "verdictThresholdsVersion": VERDICT_THRESHOLDS_VERSION,
     }

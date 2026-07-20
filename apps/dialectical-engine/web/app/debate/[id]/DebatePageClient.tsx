@@ -24,6 +24,7 @@ import type {
   DebateScoringResponse,
   DepthPressure,
   InvestigationAction,
+  LifecycleDecision,
   NodeFeedbackSummary,
   NodeScoringPayload,
   RecommendedInvestigation,
@@ -97,6 +98,7 @@ type AdaptiveDepthDryRunAsyncState =
 type AdaptiveDepthApprovalState =
   | { status: "idle"; error: null }
   | { status: "starting"; error: null }
+  | { status: "recorded"; error: null }
   | { status: "queued"; error: null }
   | { status: "unavailable"; error: string }
   | { status: "error"; error: string };
@@ -452,6 +454,10 @@ export default function DebatePageClient({
     }
   }, [id]);
 
+  const debateTerminal = debate
+    ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
+    : false;
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -530,6 +536,8 @@ export default function DebatePageClient({
   }, []);
 
   useEffect(() => {
+    if (debateTerminal) return;
+
     let events: EventSource | null = null;
     let timer: number | null = null;
     let stopped = false;
@@ -557,6 +565,11 @@ export default function DebatePageClient({
         refresh();
       };
       events.addEventListener("tree_ready", () => refresh());
+      // W5b snapshot-on-subscribe: the coordinator's event bus is in-memory,
+      // so after a restart the stream would stay silent until a poll. The
+      // server emits a DB-derived snapshot on every subscribe; recover by
+      // pulling fresh state through the existing refresh path.
+      events.addEventListener("snapshot", () => refresh());
       events.addEventListener("node_started", (event) => {
         const payload = parseEventData(event);
         const nodeId = payloadString(payload, "node_id");
@@ -586,8 +599,12 @@ export default function DebatePageClient({
         );
       });
       events.addEventListener("node_complete", () => refresh());
-      events.addEventListener("node_failed", () => {
+      events.addEventListener("node_failed", (event) => {
+        const payload = parseEventData(event);
         setError("Claim generation failed");
+        // Terminal branch failure: the debate continues degraded, so pull the
+        // fresh tree (failed-branch card) instead of leaving a stale spinner.
+        if (payload && (payload as { terminal?: unknown }).terminal === true) refresh();
       });
       events.addEventListener("synthesis_started", (event) => {
         const payload = parseEventData(event);
@@ -614,7 +631,7 @@ export default function DebatePageClient({
         setSynthesisDraft(null);
         refresh();
       });
-      events.addEventListener("error", (event) => {
+      events.addEventListener("debate_failed", (event) => {
         const payload = parseEventData(event);
         if (payload) setError("Debate generation failed");
       });
@@ -631,7 +648,7 @@ export default function DebatePageClient({
       events?.close();
       if (timer) window.clearTimeout(timer);
     };
-  }, [id, refresh]);
+  }, [debateTerminal, id, refresh]);
 
   const exportUrl = useMemo(() => `${API_BASE}/api/debates/${id}/export.md`, [id]);
   const synthesisRaw = synthesisDraft?.raw || "";
@@ -678,7 +695,9 @@ export default function DebatePageClient({
       if (node.node_type !== "ROOT_CLAIM") {
         total += 1;
         const state = renderStateOf(node);
-        if (state === "done" || state === "empty") done += 1;
+        // "failed" is terminal too: a degraded debate must not report a
+        // forever-stuck progress percentage.
+        if (state === "done" || state === "empty" || state === "failed") done += 1;
       }
       (node.children || []).forEach(walk);
     };
@@ -701,6 +720,15 @@ export default function DebatePageClient({
     () => indexScoringResponse(scoringState.data),
     [scoringState.data]
   );
+  // W5a: bounded (latest-per-node) decision provenance, indexed for the
+  // drawer's "Path decision" line. Absent on older cached/SSR payloads.
+  const lifecycleDecisionByNodeId = useMemo(() => {
+    const map = new Map<string, LifecycleDecision>();
+    for (const decision of debate?.lifecycleDecisions ?? []) {
+      map.set(decision.nodeId, decision);
+    }
+    return map;
+  }, [debate?.lifecycleDecisions]);
   const { feedbackSummaryByNodeId, currentUserFeedbackByNodeId } = useMemo(
     () => indexScoringResponse(scoringState.data),
     [scoringState.data]
@@ -877,6 +905,13 @@ export default function DebatePageClient({
         });
         return;
       }
+      if (result.status === "recorded") {
+        // Honest outcome (W0/B4): the approval is audited but no expansion
+        // work is queued yet -- never claim jobs were started.
+        setAdaptiveDepthApprovalState({ status: "recorded", error: null });
+        showToast("Expansion approval recorded — automatic expansion is not yet supported");
+        return;
+      }
       setAdaptiveDepthApprovalState({ status: "queued", error: null });
       showToast(`Queued ${result.queued_node_ids.length} adaptive expansion${result.queued_node_ids.length === 1 ? "" : "s"}`);
       await refresh();
@@ -972,6 +1007,11 @@ export default function DebatePageClient({
               <span className="dot" />
               {statusLabel(debate.status)}
             </span>
+            {debate.completion?.humanReason ? (
+              <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
+                {debate.completion.humanReason}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="debateTopActions">
@@ -1200,6 +1240,7 @@ export default function DebatePageClient({
           scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
+          lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
           feedbackSubmitState={
             feedbackSubmitState.nodeId === detailNode.id
               ? { status: feedbackSubmitState.status, error: feedbackSubmitState.error }
@@ -1595,11 +1636,13 @@ function AdaptiveDepthDryRunPanel({
     ? "Unlock actions to approve adaptive expansion."
     : actionableItems.length === 0
       ? "No selected expand recommendations are available."
-      : approvalState.status === "queued"
-        ? "Adaptive expansion jobs queued."
-        : approvalState.status === "unavailable" || approvalState.status === "error"
-          ? approvalState.error
-          : null;
+      : approvalState.status === "recorded"
+        ? "Approval recorded. Automatic expansion is not yet supported."
+        : approvalState.status === "queued"
+          ? "Adaptive expansion jobs queued."
+          : approvalState.status === "unavailable" || approvalState.status === "error"
+            ? approvalState.error
+            : null;
   return (
     <section
       className="progressStrip adaptiveDepthStrip"
@@ -1627,7 +1670,7 @@ function AdaptiveDepthDryRunPanel({
           disabled={actionDisabled}
           onClick={() => onApprove(actionableItems.map((item) => item.node_id))}
         >
-          {actionBusy ? "Starting expansions" : "Approve and run selected expansions"}
+          {actionBusy ? "Submitting approvals" : "Approve selected expansions"}
         </button>
         {actionMessage ? (
           <span className="progressCount adaptiveDepthActionMessage">
