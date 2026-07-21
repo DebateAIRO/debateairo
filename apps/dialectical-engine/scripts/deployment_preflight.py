@@ -645,13 +645,13 @@ def grok_cli_prompt_flag_check(path: str) -> tuple[Check, bool]:
             timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return warn_check("adapter-command:grok-4.5", f"{path}; help check failed: {exc}"), False
+        return warn_check("adapter-command:grok-4.5-high-loop", f"{path}; help check failed: {exc}"), False
 
     help_text = f"{result.stdout}\n{result.stderr}"
     if result.returncode == 0 and GROK_PROMPT_FLAG_PATTERN.search(help_text):
-        return pass_check("adapter-command:grok-4.5", f"{path}; supports -p prompt mode"), True
+        return pass_check("adapter-command:grok-4.5-high-loop", f"{path}; supports -p prompt mode"), True
     return (
-        warn_check("adapter-command:grok-4.5", f"{path}; does not advertise noninteractive -p/--prompt mode"),
+        warn_check("adapter-command:grok-4.5-high-loop", f"{path}; does not advertise noninteractive -p/--prompt mode"),
         False,
     )
 
@@ -669,10 +669,10 @@ def real_adapter_checks(allow_no_real_adapters: bool, adapter_api_env: dict[str,
     detected: list[str] = []
     adapter_api_env = adapter_api_env or {}
     for command, model in (
-        ("claude", "claude-sonnet-4-6"),
-        ("codex", "codex-gpt-5.5"),
-        ("gemini", "gemini-2.5-flash"),
-        ("grok", "grok-4.5"),
+        ("claude", "claude-sonnet-5-high-loop"),
+        ("codex", "gpt-5.6sol-medium"),
+        ("agy", "gemini-3.5-flash-loop"),
+        ("grok", "grok-4.5-high-loop"),
     ):
         path = shutil.which(command)
         if path:

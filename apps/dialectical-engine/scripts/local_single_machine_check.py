@@ -32,9 +32,10 @@ DEFAULT_DOMAIN = "dezbatere.ro"
 DEFAULT_DB = Path("~/.dialectical/db.sqlite3").expanduser()
 DEFAULT_GEMINI_SETTINGS = Path("~/.gemini/settings.json").expanduser()
 GOOGLE_OAUTH_AUTH_TYPE = "oauth-personal"
-CODEX_CLI_MODEL = "gpt-5.5"
-CLAUDE_MODEL = "claude-sonnet-4-6"
-GEMINI_MODEL = "gemini-2.5-flash"
+CODEX_CLI_MODEL = "gpt-5.6-sol"
+CLAUDE_CLI_MODEL = "claude-sonnet-5"
+GROK_CLI_MODEL = "grok-4.5"
+GEMINI_CLI_MODEL = "gemini-3.5-flash-high"
 DEFAULT_LM_STUDIO_CAPABILITY = "lmstudio:google_gemma-4-e4b-it"
 DEFAULT_CLOUDFLARED_DIR = Path("~/.cloudflared").expanduser()
 HEALTH_CHECK_USER_AGENT = "Mozilla/5.0 (compatible; DialecticalHealthCheck/1.0; +https://dezbatere.ro)"
@@ -202,7 +203,8 @@ def cli_status(probe_models: bool) -> dict[str, object]:
     for name, version_command in {
         "claude": ["claude", "--version"],
         "codex": ["codex", "--version"],
-        "gemini": ["gemini", "--version"],
+        "grok": ["grok", "--version"],
+        "gemini": ["agy", "--version"],
         "lms": ["lms", "--version"],
     }.items():
         path = command_path(name)
@@ -216,11 +218,21 @@ def cli_status(probe_models: bool) -> dict[str, object]:
             unavailable = platform_not_applicable(
                 "active model auth probes are only supported by the single-Mac setup"
             )
-            for name in ("claude", "codex", "gemini"):
+            for name in ("claude", "codex", "grok", "gemini"):
                 status[name]["probe"] = dict(unavailable)
         else:
             status["claude"]["probe"] = run(
-                ["claude", "-p", "--model", CLAUDE_MODEL, "--max-turns", "1", "Reply with exactly: ok"],
+                [
+                    "claude",
+                    "-p",
+                    "--model",
+                    CLAUDE_CLI_MODEL,
+                    "--effort",
+                    "high",
+                    "--max-turns",
+                    "1",
+                    "Reply with exactly: ok",
+                ],
                 timeout=20,
             )
             status["codex"]["probe"] = run(
@@ -232,14 +244,37 @@ def cli_status(probe_models: bool) -> dict[str, object]:
                     "read-only",
                     "--model",
                     CODEX_CLI_MODEL,
+                    "--config",
+                    "model_reasoning_effort=medium",
                     "Reply with exactly: ok",
                 ],
                 timeout=60,
             )
+            status["grok"]["probe"] = run(
+                [
+                    "grok",
+                    "--single",
+                    "Reply with exactly: ok",
+                    "--model",
+                    GROK_CLI_MODEL,
+                    "--reasoning-effort",
+                    "high",
+                    "--output-format",
+                    "plain",
+                ],
+                timeout=60,
+            )
             status["gemini"]["probe"] = run(
-                ["gemini", "-m", GEMINI_MODEL, "-p", "Reply with exactly: ok"],
-                timeout=30,
-                env={"GOOGLE_GENAI_USE_GCA": "true"},
+                [
+                    "agy",
+                    "--print",
+                    "Reply with exactly: ok",
+                    "--model",
+                    GEMINI_CLI_MODEL,
+                    "--effort",
+                    "high",
+                ],
+                timeout=60,
             )
     return status
 

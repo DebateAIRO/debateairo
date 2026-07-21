@@ -38,9 +38,10 @@ def default_codex_command() -> str:
 
 
 class CodexCliAdapter(SubprocessStreamingAdapter):
-    model_id = "codex-gpt-5.5"
-    capability_aliases = ("gpt-5.5",)
-    cli_model = "gpt-5.5"
+    model_id = "gpt-5.6sol-medium"
+    capability_aliases = ("gpt-5.6-sol",)
+    cli_model = "gpt-5.6-sol"
+    reasoning_effort = "medium"
     role_pool = {"decomposer", "proposer", "opponent", "synthesizer"}
     executable = "codex"
 
@@ -87,6 +88,8 @@ class CodexCliAdapter(SubprocessStreamingAdapter):
             str(last_message_path),
             "--model",
             self.cli_model,
+            "--config",
+            f"model_reasoning_effort={self.reasoning_effort}",
             "-",
         ]
         schema = output_schema_for_prompt(system, user)

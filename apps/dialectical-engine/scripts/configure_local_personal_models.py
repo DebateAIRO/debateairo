@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -24,13 +25,20 @@ from app.config import update_config_file  # noqa: E402
 
 DEFAULT_DB = Path("~/.dialectical/db.sqlite3").expanduser()
 DEFAULT_WORKER_CONFIG = Path("~/.dialectical-worker/config.toml").expanduser()
+DEFAULT_CLAUDE_LOOP_CONFIG = Path("~/.dialectical-worker/claude-subscription-loop.toml").expanduser()
+DEFAULT_GROK_LOOP_CONFIG = Path("~/.dialectical-worker/grok-subscription-loop.toml").expanduser()
+DEFAULT_GEMINI_LOOP_CONFIG = Path("~/.dialectical-worker/gemini-subscription-loop.toml").expanduser()
 DEFAULT_REPORT = Path("/private/tmp/dialectical-local-personal-models.json")
 DEFAULT_LM_STUDIO_URL = "http://127.0.0.1:1234"
 
-CODEX_MODEL = "codex-gpt-5.5"
-CODEX_CLI_MODEL = "gpt-5.5"
-CLAUDE_MODEL = "claude-sonnet-4-6"
-GEMINI_MODEL = "gemini-2.5-flash"
+CODEX_MODEL = "gpt-5.6sol-medium"
+CODEX_CLI_MODEL = "gpt-5.6-sol"
+CLAUDE_MODEL = "claude-sonnet-5-high-loop"
+CLAUDE_CLI_MODEL = "claude-sonnet-5"
+GROK_MODEL = "grok-4.5-high-loop"
+GROK_CLI_MODEL = "grok-4.5"
+GEMINI_MODEL = "gemini-3.5-flash-loop"
+GEMINI_CLI_MODEL = "gemini-3.5-flash-high"
 LM_STUDIO_MODEL = "google_gemma-4-e4b-it"
 LM_STUDIO_CAPABILITY = f"lmstudio:{LM_STUDIO_MODEL}"
 
@@ -108,18 +116,51 @@ def probe_cli_models() -> dict[str, dict[str, Any]]:
                 "read-only",
                 "--model",
                 CODEX_CLI_MODEL,
+                "--config",
+                "model_reasoning_effort=medium",
                 "Reply with exactly: ok",
             ],
             timeout=60,
         ),
         CLAUDE_MODEL: run(
-            ["claude", "-p", "--model", CLAUDE_MODEL, "--max-turns", "1", "Reply with exactly: ok"],
+            [
+                "claude",
+                "-p",
+                "--model",
+                CLAUDE_CLI_MODEL,
+                "--effort",
+                "high",
+                "--max-turns",
+                "1",
+                "Reply with exactly: ok",
+            ],
             timeout=30,
         ),
+        GROK_MODEL: run(
+            [
+                "grok",
+                "--single",
+                "Reply with exactly: ok",
+                "--model",
+                GROK_CLI_MODEL,
+                "--reasoning-effort",
+                "high",
+                "--output-format",
+                "plain",
+            ],
+            timeout=60,
+        ),
         GEMINI_MODEL: run(
-            ["gemini", "-m", GEMINI_MODEL, "-p", "Reply with exactly: ok"],
-            timeout=30,
-            env={"GOOGLE_GENAI_USE_GCA": "true"},
+            [
+                "agy",
+                "--print",
+                "Reply with exactly: ok",
+                "--model",
+                GEMINI_CLI_MODEL,
+                "--effort",
+                "high",
+            ],
+            timeout=60,
         ),
     }
     for model, result in probes.items():
@@ -141,6 +182,20 @@ def probe_lm_studio(base_url: str, model: str) -> dict[str, Any]:
         return {"ok": True, "url": url, "model_ids": model_ids, "ready": model in model_ids}
     except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
         return {"ok": False, "url": url, "ready": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def loop_worker_registered(config_path: Path, advertised_model: str) -> bool:
+    try:
+        payload = tomllib.loads(config_path.expanduser().read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+    allowed_models = payload.get("allowed_models")
+    return bool(
+        str(payload.get("worker_id") or "").strip()
+        and str(payload.get("worker_token") or "").strip()
+        and isinstance(allowed_models, list)
+        and advertised_model in allowed_models
+    )
 
 
 def load_runtime_settings(db: sqlite3.Connection) -> dict[str, Any]:
@@ -209,6 +264,9 @@ def main() -> int:
     )
     parser.add_argument("--database", type=Path, default=DEFAULT_DB)
     parser.add_argument("--worker-config", type=Path, default=DEFAULT_WORKER_CONFIG)
+    parser.add_argument("--claude-loop-config", type=Path, default=DEFAULT_CLAUDE_LOOP_CONFIG)
+    parser.add_argument("--grok-loop-config", type=Path, default=DEFAULT_GROK_LOOP_CONFIG)
+    parser.add_argument("--gemini-loop-config", type=Path, default=DEFAULT_GEMINI_LOOP_CONFIG)
     parser.add_argument("--lm-studio-url", default=DEFAULT_LM_STUDIO_URL)
     parser.add_argument("--report-path", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--restart-worker", action="store_true")
@@ -218,9 +276,22 @@ def main() -> int:
     cli_probes = probe_cli_models()
     lm_studio = probe_lm_studio(args.lm_studio_url, LM_STUDIO_MODEL)
 
-    cli_ready = [model for model in (CODEX_MODEL, CLAUDE_MODEL, GEMINI_MODEL) if cli_probes[model].get("ready")]
+    loop_registration = {
+        CLAUDE_MODEL: loop_worker_registered(args.claude_loop_config, CLAUDE_MODEL),
+        GROK_MODEL: loop_worker_registered(args.grok_loop_config, GROK_MODEL),
+        GEMINI_MODEL: loop_worker_registered(args.gemini_loop_config, GEMINI_MODEL),
+    }
+    cli_ready = [CODEX_MODEL] if cli_probes[CODEX_MODEL].get("ready") else []
+    cli_ready.extend(
+        model
+        for model in (CLAUDE_MODEL, GROK_MODEL, GEMINI_MODEL)
+        if cli_probes[model].get("ready") and loop_registration[model]
+    )
     enabled_models = unique([*cli_ready, LM_STUDIO_CAPABILITY] if lm_studio.get("ready") else cli_ready)
-    worker_allowed_models = unique([*cli_ready, LM_STUDIO_CAPABILITY] if lm_studio.get("ready") else cli_ready)
+    main_worker_ready = [CODEX_MODEL] if cli_probes[CODEX_MODEL].get("ready") else []
+    worker_allowed_models = unique(
+        [*main_worker_ready, LM_STUDIO_CAPABILITY] if lm_studio.get("ready") else main_worker_ready
+    )
 
     with sqlite3.connect(args.database) as db:
         runtime_before = load_runtime_settings(db)
@@ -240,6 +311,7 @@ def main() -> int:
         "ok": CODEX_MODEL in enabled_models and LM_STUDIO_CAPABILITY in enabled_models,
         "dry_run": args.dry_run,
         "cli_probes": cli_probes,
+        "loop_registration": loop_registration,
         "lm_studio": lm_studio,
         "enabled_models_before": runtime_before.get("enabled_models"),
         "enabled_models_after": enabled_models,
@@ -258,7 +330,11 @@ def main() -> int:
     print("Main worker allowed models:")
     for model in worker_allowed_models:
         print(f"- {model}")
-    not_ready = [model for model, result in cli_probes.items() if not result.get("ready")]
+    not_ready = [
+        model
+        for model, result in cli_probes.items()
+        if not result.get("ready") or (model in loop_registration and not loop_registration[model])
+    ]
     if not_ready:
         print("Not enabled yet:")
         for model in not_ready:

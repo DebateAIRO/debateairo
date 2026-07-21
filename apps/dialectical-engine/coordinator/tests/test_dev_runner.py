@@ -140,14 +140,14 @@ def test_v2_worker_judge_smoke_rejects_mock_worker_readiness() -> None:
             "v2_generation_readiness": {
                 "ready": True,
                 "reason_code": "ready",
-                "required_model": "codex-gpt-5.5",
+                "required_model": "gpt-5.6sol-medium",
                 "online_worker_names": ["mock-local"],
             },
             "workers": [
                 {
                     "name": "mock-local",
                     "status": "online",
-                    "capabilities": ["mock-local", "codex-gpt-5.5"],
+                    "capabilities": ["mock-local", "gpt-5.6sol-medium"],
                 }
             ],
         },
@@ -170,14 +170,14 @@ def test_v2_worker_judge_smoke_does_not_pass_without_scoring_lifecycle_proof() -
                 "v2_generation_readiness": {
                     "ready": True,
                     "reason_code": "ready",
-                    "required_model": "codex-gpt-5.5",
+                    "required_model": "gpt-5.6sol-medium",
                     "online_worker_names": ["VLADWORKS"],
                 },
                 "workers": [
                     {
                         "name": "VLADWORKS",
                         "status": "online",
-                        "capabilities": ["codex-gpt-5.5"],
+                        "capabilities": ["gpt-5.6sol-medium"],
                     }
                 ],
             }
@@ -212,14 +212,14 @@ def test_v2_worker_judge_smoke_does_not_pass_without_db_persistence_proof(tmp_pa
                 "v2_generation_readiness": {
                     "ready": True,
                     "reason_code": "ready",
-                    "required_model": "codex-gpt-5.5",
+                    "required_model": "gpt-5.6sol-medium",
                     "online_worker_names": ["VLADWORKS"],
                 },
                 "workers": [
                     {
                         "name": "VLADWORKS",
                         "status": "online",
-                        "capabilities": ["codex-gpt-5.5"],
+                        "capabilities": ["gpt-5.6sol-medium"],
                     }
                 ],
             }
@@ -293,7 +293,7 @@ def test_v2_worker_judge_smoke_requires_persisted_judge_artifacts(tmp_path) -> N
                 'run-1',
                 'judge',
                 'codex',
-                'codex-gpt-5.5',
+                'gpt-5.6sol-medium',
                 '{"score":0.7}',
                 '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
                 'available',
@@ -308,14 +308,14 @@ def test_v2_worker_judge_smoke_requires_persisted_judge_artifacts(tmp_path) -> N
                 "v2_generation_readiness": {
                     "ready": True,
                     "reason_code": "ready",
-                    "required_model": "codex-gpt-5.5",
+                    "required_model": "gpt-5.6sol-medium",
                     "online_worker_names": ["VLADWORKS"],
                 },
                 "workers": [
                     {
                         "name": "VLADWORKS",
                         "status": "online",
-                        "capabilities": ["codex-gpt-5.5"],
+                        "capabilities": ["gpt-5.6sol-medium"],
                     }
                 ],
             }

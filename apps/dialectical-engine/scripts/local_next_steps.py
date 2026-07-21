@@ -11,9 +11,10 @@ DEFAULT_CHECK_REPORT = Path("/private/tmp/dialectical-local-single-machine-check
 DEFAULT_ACCEPTANCE_REPORT = Path("/private/tmp/dialectical-local-single-machine-acceptance.json")
 DEFAULT_AUTH_REPORT = Path("/private/tmp/dialectical-model-auth-check.json")
 DEFAULT_GEMINI_SETTINGS = Path("~/.gemini/settings.json").expanduser()
-CLAUDE_MODEL = "claude-sonnet-4-6"
-CODEX_MODEL = "codex-gpt-5.5"
-GEMINI_MODEL = "gemini-2.5-flash"
+CLAUDE_MODEL = "claude-sonnet-5-high-loop"
+CODEX_MODEL = "gpt-5.6sol-medium"
+GROK_MODEL = "grok-4.5-high-loop"
+GEMINI_MODEL = "gemini-3.5-flash-loop"
 LMSTUDIO_MODEL = "lmstudio:google_gemma-4-e4b-it"
 
 
@@ -161,6 +162,8 @@ def main() -> int:
         ready.append("Codex CLI model is enabled")
     if CLAUDE_MODEL in capabilities:
         ready.append("Claude CLI model is enabled")
+    if GROK_MODEL in capabilities:
+        ready.append("Grok CLI model is enabled")
     if GEMINI_MODEL in capabilities:
         ready.append("Gemini CLI model is enabled")
     elif gemini_google_auth_configured:
@@ -189,11 +192,11 @@ def main() -> int:
         gemini_text = probe_text(auth_cli, "gemini")
         if gemini_google_auth_configured or "timed out" in gemini_text or gemini_oauth_configured():
             todo.append(
-                f"Gemini: {auth_detail(auth_cli, 'gemini')}; run `gemini` in a normal Terminal, finish Login with Google, then `make refresh-local-models`"
+                f"Gemini: {auth_detail(auth_cli, 'gemini')}; run `agy` in a normal Terminal, finish login, then `make refresh-local-models`"
             )
         else:
             todo.append(
-                f"Gemini: {auth_detail(auth_cli, 'gemini')}; run `make configure-gemini-google-auth`, then `gemini` and finish Login with Google"
+                f"Gemini: {auth_detail(auth_cli, 'gemini')}; run `agy` and finish login"
             )
     if dns.get("delegated_to_romarg"):
         todo.append(

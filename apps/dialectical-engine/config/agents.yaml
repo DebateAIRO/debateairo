@@ -6,7 +6,7 @@ agents:
   proponent: {}
   opponent: {}
   judge:
-    model: gpt-5.5
+    model: gpt-5.6sol-medium
     temperature: 0.0
   specialist: {}
   methodologist: {}

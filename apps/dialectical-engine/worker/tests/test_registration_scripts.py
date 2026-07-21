@@ -48,7 +48,7 @@ def test_register_worker_respects_allowed_models(tmp_path: Path, monkeypatch) ->
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5", "gemini-2.5-flash"]}
+        return {model: object() for model in config.allowed_models or ["gemini-2.5-flash", "gpt-5.6sol-medium"]}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -82,17 +82,17 @@ def test_register_worker_respects_allowed_models(tmp_path: Path, monkeypatch) ->
         name="adesso-mbp",
         config=str(config_path),
         enable_mock=False,
-        allowed_models=" codex-gpt-5.5, gemini-2.5-flash, codex-gpt-5.5, ",
+        allowed_models=" gpt-5.6sol-medium, gemini-2.5-flash, gpt-5.6sol-medium, ",
     )
 
     asyncio.run(module.run(args))
 
-    assert captured["detected_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["registered_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["detected_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
+    assert captured["registered_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
     assert captured["register_persist"] is False
     assert captured["register_save_path"] is None
-    assert captured["saved_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["saved_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
     assert captured["saved_path"] == config_path
     assert captured["closed"] is True
 
@@ -119,10 +119,10 @@ def test_register_worker_rejects_empty_detected_capabilities(tmp_path: Path, mon
         name="adesso-mbp",
         config=str(tmp_path / "worker.toml"),
         enable_mock=False,
-        allowed_models="codex-gpt-5.5",
+        allowed_models="gpt-5.6sol-medium",
     )
 
-    with pytest.raises(RuntimeError, match="no healthy adapters detected for allowed models: codex-gpt-5.5"):
+    with pytest.raises(RuntimeError, match="no healthy adapters detected for allowed models: gpt-5.6sol-medium"):
         asyncio.run(module.run(args))
 
 
@@ -158,7 +158,7 @@ def test_register_worker_named_https_guard_rejects_quick_tunnel_before_token(tmp
         name="adesso-mbp",
         config=str(tmp_path / "worker.toml"),
         enable_mock=False,
-        allowed_models="codex-gpt-5.5",
+        allowed_models="gpt-5.6sol-medium",
         require_named_https=True,
     )
 
@@ -172,7 +172,7 @@ def test_register_worker_reuses_matching_registration_without_user_token(monkeyp
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5"]}
+        return {model: object() for model in config.allowed_models or ["gpt-5.6sol-medium"]}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -222,7 +222,7 @@ def test_register_worker_reuses_matching_registration_without_user_token(monkeyp
         name="adesso-mbp",
         config=str(config_path),
         enable_mock=False,
-        allowed_models="codex-gpt-5.5",
+        allowed_models="gpt-5.6sol-medium",
         require_named_https=False,
     )
 
@@ -232,8 +232,8 @@ def test_register_worker_reuses_matching_registration_without_user_token(monkeyp
     assert captured["client_worker_token"] == "worker-secret"
     assert captured["register_user_token"] is None
     assert captured["register_worker_id"] == "worker-existing"
-    assert captured["register_capabilities"] == ["codex-gpt-5.5"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5"]
+    assert captured["register_capabilities"] == ["gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gpt-5.6sol-medium"]
     assert captured["register_persist"] is False
     assert captured["register_save_path"] is None
     assert captured["saved_worker_id"] == "worker-existing"
@@ -248,7 +248,7 @@ def test_install_worker_respects_allowed_models(monkeypatch) -> None:
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5", "gemini-2.5-flash"]}
+        return {model: object() for model in config.allowed_models or ["gemini-2.5-flash", "gpt-5.6sol-medium"]}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -283,17 +283,17 @@ def test_install_worker_respects_allowed_models(monkeypatch) -> None:
         python="/python",
         install_service=False,
         enable_mock=False,
-        allowed_models=" codex-gpt-5.5, gemini-2.5-flash, codex-gpt-5.5, ",
+        allowed_models=" gpt-5.6sol-medium, gemini-2.5-flash, gpt-5.6sol-medium, ",
     )
 
     asyncio.run(module.run(args))
 
-    assert captured["detected_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["registered_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["detected_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
+    assert captured["registered_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
     assert captured["register_persist"] is False
     assert captured["register_save_path"] is None
-    assert captured["saved_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["saved_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
     assert captured["saved_path"] is None
     assert captured["closed"] is True
 
@@ -319,7 +319,7 @@ def test_install_worker_reuses_matching_registration_without_user_token(monkeypa
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5", "gemini-2.5-flash"]}
+        return {model: object() for model in config.allowed_models or ["gemini-2.5-flash", "gpt-5.6sol-medium"]}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -370,23 +370,23 @@ def test_install_worker_reuses_matching_registration_without_user_token(monkeypa
         python="/python",
         install_service=False,
         enable_mock=False,
-        allowed_models="codex-gpt-5.5,gemini-2.5-flash",
+        allowed_models="gpt-5.6sol-medium,gemini-2.5-flash",
     )
 
     asyncio.run(module.run(args))
 
-    assert captured["detected_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["detected_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
     assert captured["client_worker_id"] == "worker-existing"
     assert captured["client_worker_token"] == "worker-secret"
     assert captured["register_user_token"] is None
     assert captured["register_worker_id"] == "worker-existing"
-    assert captured["register_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["register_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
     assert captured["register_persist"] is False
     assert captured["register_save_path"] is None
     assert captured["saved_worker_id"] == "worker-existing"
     assert captured["saved_worker_token"] == "worker-secret"
-    assert captured["saved_allowed_models"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["saved_allowed_models"] == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
     assert captured["saved_path"] is None
     assert captured["closed"] is True
 
@@ -397,7 +397,7 @@ def test_install_worker_preserves_existing_allowlist_when_allowed_models_omitted
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {model: object() for model in config.allowed_models or ["codex-gpt-5.5", "gemini-2.5-flash"]}
+        return {model: object() for model in config.allowed_models or ["gemini-2.5-flash", "gpt-5.6sol-medium"]}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -428,7 +428,7 @@ def test_install_worker_preserves_existing_allowlist_when_allowed_models_omitted
             name="adesso-mbp",
             worker_id="worker-existing",
             worker_token="worker-secret",
-            allowed_models=["codex-gpt-5.5"],
+            allowed_models=["gpt-5.6sol-medium"],
         ),
     )
     monkeypatch.setattr(module, "detect_adapters", fake_detect_adapters)
@@ -446,11 +446,11 @@ def test_install_worker_preserves_existing_allowlist_when_allowed_models_omitted
 
     asyncio.run(module.run(args))
 
-    assert captured["detected_allowed_models"] == ["codex-gpt-5.5"]
-    assert captured["registered_capabilities"] == ["codex-gpt-5.5"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5"]
+    assert captured["detected_allowed_models"] == ["gpt-5.6sol-medium"]
+    assert captured["registered_capabilities"] == ["gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gpt-5.6sol-medium"]
     assert captured["register_user_token"] is None
-    assert captured["saved_allowed_models"] == ["codex-gpt-5.5"]
+    assert captured["saved_allowed_models"] == ["gpt-5.6sol-medium"]
     assert captured["closed"] is True
 
 
@@ -460,7 +460,7 @@ def test_install_worker_clears_existing_allowlist_when_allowed_models_empty(monk
 
     async def fake_detect_adapters(config):
         captured["detected_allowed_models"] = config.allowed_models
-        return {"codex-gpt-5.5": object(), "gemini-2.5-flash": object()}
+        return {"gpt-5.6sol-medium": object(), "gemini-2.5-flash": object()}
 
     class FakeCoordinatorClient:
         def __init__(self, config) -> None:
@@ -487,7 +487,7 @@ def test_install_worker_clears_existing_allowlist_when_allowed_models_empty(monk
             name="adesso-mbp",
             worker_id="worker-existing",
             worker_token="worker-secret",
-            allowed_models=["codex-gpt-5.5"],
+            allowed_models=["gpt-5.6sol-medium"],
         ),
     )
     monkeypatch.setattr(module, "detect_adapters", fake_detect_adapters)
@@ -506,8 +506,8 @@ def test_install_worker_clears_existing_allowlist_when_allowed_models_empty(monk
     asyncio.run(module.run(args))
 
     assert captured["detected_allowed_models"] is None
-    assert captured["registered_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
-    assert captured["heartbeat_capabilities"] == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert captured["registered_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
+    assert captured["heartbeat_capabilities"] == ["gemini-2.5-flash", "gpt-5.6sol-medium"]
     assert captured["saved_allowed_models"] is None
     assert captured["closed"] is True
 
@@ -535,10 +535,10 @@ def test_install_worker_rejects_empty_detected_capabilities(monkeypatch) -> None
         python="/python",
         install_service=False,
         enable_mock=False,
-        allowed_models="codex-gpt-5.5",
+        allowed_models="gpt-5.6sol-medium",
     )
 
-    with pytest.raises(RuntimeError, match="no healthy adapters detected for allowed models: codex-gpt-5.5"):
+    with pytest.raises(RuntimeError, match="no healthy adapters detected for allowed models: gpt-5.6sol-medium"):
         asyncio.run(module.run(args))
 
 
@@ -560,7 +560,7 @@ def test_install_worker_named_https_guard_rejects_local_url_before_token(monkeyp
         python="/python",
         install_service=False,
         enable_mock=False,
-        allowed_models="codex-gpt-5.5",
+        allowed_models="gpt-5.6sol-medium",
         require_named_https=True,
     )
 

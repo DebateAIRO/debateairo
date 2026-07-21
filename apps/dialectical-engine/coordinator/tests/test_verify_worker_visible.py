@@ -24,7 +24,7 @@ def worker_row(
         "id": worker_id,
         "name": name,
         "status": status,
-        "capabilities": capabilities if capabilities is not None else ["codex-gpt-5.5"],
+        "capabilities": capabilities if capabilities is not None else ["gpt-5.6sol-medium"],
         "current_job_id": current_job_id,
         "last_seen": last_seen,
     }
@@ -50,7 +50,7 @@ def test_worker_visibility_detail_requires_named_online_worker_with_capabilities
                 worker_row(
                     "adesso-mbp",
                     worker_id="22222222-2222-4222-8222-222222222222",
-                    capabilities=["codex-gpt-5.5", "mock-local"],
+                    capabilities=["gpt-5.6sol-medium", "mock-local"],
                 ),
             ]
         },
@@ -119,33 +119,33 @@ def test_worker_status_detail_requires_specific_capabilities() -> None:
                 worker_row(
                     "adesso-mbp",
                     worker_id="22222222-2222-4222-8222-222222222222",
-                    capabilities=["codex-gpt-5.5", "grok-4.5"],
+                    capabilities=["gpt-5.6sol-medium", "grok-4.5-high-loop"],
                 )
             ]
         },
         "adesso-mbp",
         "online",
         require_capabilities=True,
-        required_capabilities=["codex-gpt-5.5"],
+        required_capabilities=["gpt-5.6sol-medium"],
     )
 
-    assert detail == "adesso-mbp:online (2 capabilities; required codex-gpt-5.5)"
+    assert detail == "adesso-mbp:online (2 capabilities; required gpt-5.6sol-medium)"
 
-    with pytest.raises(module.VisibilityError, match="missing required capabilities: gemini-2.5-flash"):
+    with pytest.raises(module.VisibilityError, match="missing required capabilities: gemini-3.5-flash-loop"):
         module.worker_status_detail(
             {
                 "workers": [
                     worker_row(
                         "adesso-mbp",
                         worker_id="22222222-2222-4222-8222-222222222222",
-                        capabilities=["codex-gpt-5.5"],
+                        capabilities=["gpt-5.6sol-medium"],
                     )
                 ]
             },
             "adesso-mbp",
             "online",
             require_capabilities=True,
-            required_capabilities=["gemini-2.5-flash"],
+            required_capabilities=["gemini-3.5-flash-loop"],
         )
 
 
@@ -162,14 +162,14 @@ def test_worker_status_detail_rejects_non_production_capabilities_when_requested
                     worker_row(
                         "adesso-mbp",
                         worker_id="22222222-2222-4222-8222-222222222222",
-                        capabilities=["codex-gpt-5.5", "mock-local"],
+                        capabilities=["gpt-5.6sol-medium", "mock-local"],
                     )
                 ]
             },
             "adesso-mbp",
             "online",
             require_capabilities=True,
-            required_capabilities=["codex-gpt-5.5"],
+            required_capabilities=["gpt-5.6sol-medium"],
             reject_non_production_capabilities=True,
         )
 
@@ -180,7 +180,7 @@ def test_worker_status_detail_rejects_non_production_capabilities_when_requested
                     worker_row(
                         "adesso-mbp",
                         worker_id="22222222-2222-4222-8222-222222222222",
-                        capabilities=["codex-gpt-5.5", "<model-id>"],
+                        capabilities=["gpt-5.6sol-medium", "<model-id>"],
                     )
                 ]
             },
@@ -193,9 +193,9 @@ def test_worker_status_detail_rejects_non_production_capabilities_when_requested
 def test_parse_required_capabilities_accepts_csv_and_repeated_flags() -> None:
     module = load_module(ROOT / "scripts" / "verify_worker_visible.py", "dialectical_verify_worker_parse_caps")
 
-    assert module.parse_required_capabilities(["codex-gpt-5.5, grok-4.5", "codex-gpt-5.5", ""]) == [
-        "codex-gpt-5.5",
-        "grok-4.5",
+    assert module.parse_required_capabilities(["gpt-5.6sol-medium, grok-4.5-high-loop", "gpt-5.6sol-medium", ""]) == [
+        "gpt-5.6sol-medium",
+        "grok-4.5-high-loop",
     ]
 
 
@@ -252,7 +252,7 @@ def test_main_reports_visibility_error_without_traceback(
 @pytest.mark.parametrize(
     ("payload", "match"),
     [
-        ({"workers": [{"name": "mac-mini", "status": "online", "capabilities": ["codex-gpt-5.5"]}]}, "missing"),
+        ({"workers": [{"name": "mac-mini", "status": "online", "capabilities": ["gpt-5.6sol-medium"]}]}, "missing"),
         (
             {
                 "workers": [
@@ -293,8 +293,8 @@ def test_worker_visibility_detail_rejects_non_visible_worker(payload: dict[str, 
         ({"id": "not-a-uuid"}, "id is not a UUID"),
         ({"current_job_id": "not-a-uuid"}, "current_job_id is not a UUID"),
         ({"last_seen": "2026-05-24T08:00:00"}, "last_seen missing timezone"),
-        ({"capabilities": ["codex-gpt-5.5", "codex-gpt-5.5"]}, "duplicate capability"),
-        ({"capabilities": ["codex-gpt-5.5", ""]}, "capability 2 is blank"),
+        ({"capabilities": ["gpt-5.6sol-medium", "gpt-5.6sol-medium"]}, "duplicate capability"),
+        ({"capabilities": ["gpt-5.6sol-medium", ""]}, "capability 2 is blank"),
     ],
 )
 def test_worker_status_detail_rejects_malformed_target_row(
@@ -332,7 +332,7 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     switch_script = module.worker_switch_url_script()
     production_acceptance_script = module.production_acceptance_script("https://current.example.com", "adesso-mbp")
 
-    assert 'ALLOWED_MODELS="${ALLOWED_MODELS:-codex-gpt-5.5}"' in register_script
+    assert 'ALLOWED_MODELS="${ALLOWED_MODELS:-gpt-5.6sol-medium}"' in register_script
     assert 'ALLOW_QUICK_TUNNEL_REGISTRATION="${ALLOW_QUICK_TUNNEL_REGISTRATION:-0}"' in register_script
     assert "WORKER_REQUIRE_NAMED_HTTPS=1" in register_script
     assert "Worker B registration requires an HTTPS named Cloudflare coordinator URL" in register_script
@@ -343,8 +343,8 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert "Worker B registration requires real model IDs in ALLOWED_MODELS, not placeholders" in register_script
     assert "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs" in register_script
     assert "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs" in register_script
-    assert "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" in register_script
-    assert "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" in register_script
+    assert "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop" in register_script
+    assert "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop" in register_script
     assert register_script.index("Worker B registration requires a named Cloudflare hostname") < register_script.index(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )
@@ -381,7 +381,7 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert 'WORKER_REQUIRE_NAMED_HTTPS="$WORKER_REQUIRE_NAMED_HTTPS"' in register_script
     assert 'make verify-worker-visible COORDINATOR_URL="$COORDINATOR_URL" WORKER_NAME="$WORKER_NAME"' in register_script
     assert 'WORKER_VISIBLE_TIMEOUT="${WORKER_VISIBLE_TIMEOUT:-120}"' in register_script
-    assert 'ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-codex-gpt-5.5,gemini-2.5-flash}}"' in real_models_script
+    assert 'ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"' in real_models_script
     assert "Worker B real-model setup requires an HTTPS named Cloudflare coordinator URL" in real_models_script
     assert "Worker B real-model setup requires a real named Cloudflare hostname, not a placeholder" in real_models_script
     assert "Worker B real-model setup requires a public named Cloudflare hostname, not a local URL" in real_models_script
@@ -391,8 +391,8 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert "Worker B real-model setup requires real model IDs in ALLOWED_MODELS, not mock model IDs" in real_models_script
     assert "Worker B real-model setup requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs" in real_models_script
     assert "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs" in real_models_script
-    assert "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" in real_models_script
-    assert "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" in real_models_script
+    assert "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop" in real_models_script
+    assert "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop" in real_models_script
     assert real_models_script.index("Worker B real-model setup requires a named Cloudflare hostname") < real_models_script.index(
         "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
     )
@@ -458,7 +458,7 @@ def test_worker_b_handoff_scripts_verify_public_worker_visibility() -> None:
     assert "WORKER_REJECT_NON_PRODUCTION_CAPABILITIES=1" in switch_script
     assert 'WORKER_STATUS_TIMEOUT="${WORKER_STATUS_TIMEOUT:-180}"' in production_acceptance_script
     assert (
-        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"'
+        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"'
         in production_acceptance_script
     )
     assert (
@@ -629,7 +629,7 @@ def test_handoff_final_helpers_reject_url_mismatch_with_named_config() -> None:
         in worker_a_script
     )
     assert (
-        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"'
+        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"'
         in sequence_script
     )
     assert (

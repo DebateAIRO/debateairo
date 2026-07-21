@@ -435,7 +435,7 @@ def test_evaluator_hook_persists_provenance_without_fabricating_grounded_values(
     claim_generation = Generation(
         id="claim-generation-hook",
         node_id=claim.id,
-        model_id="claude-sonnet-5",
+        model_id="claude-sonnet-5-high-loop",
         role="pro",
         argument="The argument",
         worker_id=worker.id,
@@ -443,7 +443,7 @@ def test_evaluator_hook_persists_provenance_without_fabricating_grounded_values(
     evidence_generation = Generation(
         id="evidence-generation-hook",
         node_id=evidence.id,
-        model_id="claude-sonnet-5",
+        model_id="claude-sonnet-5-high-loop",
         role="pro",
         argument=evidence.claim,
         worker_id=worker.id,

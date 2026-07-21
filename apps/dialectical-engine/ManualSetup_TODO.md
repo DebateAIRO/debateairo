@@ -14,7 +14,7 @@ Tracking issue: https://github.com/DebateAIRO/debateairo/issues/5
 - [x] Coordinator is reachable at `http://127.0.0.1:8000`.
 - [x] Web app is reachable at `http://127.0.0.1:3000` with static assets.
 - [x] At least one local worker is online.
-- [x] `codex-gpt-5.5` is enabled on the local worker.
+- [x] `gpt-5.6sol-medium` is enabled on the local worker.
 - [x] `lmstudio:google_gemma-4-e4b-it` is enabled and loaded.
 - [ ] `make local-single-machine-acceptance` passes.
 - [ ] Temporary Cloudflare quick tunnel currently works.

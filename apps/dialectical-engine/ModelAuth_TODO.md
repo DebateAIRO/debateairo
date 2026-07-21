@@ -4,18 +4,15 @@ Goal: use personal subscriptions locally without adding paid API keys unless you
 
 ## Current Status
 
-- Codex CLI works non-interactively with underlying Codex model `gpt-5.5`; the
-  worker advertises this as `codex-gpt-5.5`.
-- Claude Code works non-interactively with `claude-sonnet-4-6` after Claude
-  subscription login.
-- Gemini CLI is installed and configured to prefer Google-account OAuth
-  (`oauth-personal`). The working Flash model through the current local CLI is
-  `gemini-2.5-flash`; `gemini-3.5-flash` returned `ModelNotFoundError`.
-- The worker launchd template sets `GOOGLE_GENAI_USE_GCA=true`, so after
-  Gemini OAuth succeeds, the service keeps using Google-account auth instead of
-  requiring `GEMINI_API_KEY`.
-- The local model probes and Gemini worker adapter also set
-  `GOOGLE_GENAI_USE_GCA=true` when invoking `gemini`.
+- Codex CLI works non-interactively with underlying Codex model `gpt-5.6-sol`; the
+  worker advertises this as `gpt-5.6sol-medium`.
+- Claude Code works non-interactively with `claude-sonnet-5 --effort high`; the
+  loop advertises `claude-sonnet-5-high-loop`.
+- Grok CLI exposes raw model `grok-4.5`; the loop uses
+  `--reasoning-effort high` and advertises `grok-4.5-high-loop`. The current
+  OAuth token must be refreshed with `grok login` after a 401 expiry.
+- Antigravity CLI (`agy`) exposes `gemini-3.5-flash-high`; the loop invokes it
+  noninteractively and advertises `gemini-3.5-flash-loop`.
 - LM Studio is working through the local HTTP server with `google_gemma-4-e4b-it`.
 
 ## Claude Code
@@ -40,48 +37,38 @@ claude auth login --claudeai
 `claude auth login --console` unless you intentionally want Anthropic Console
 API billing.
 
-Then verify Sonnet 4.6:
+Then verify Sonnet 5 at high effort:
 
 ```sh
-claude -p --model claude-sonnet-4-6 --max-turns 1 'Reply with exactly: ok'
+claude -p --model claude-sonnet-5 --effort high --max-turns 1 'Reply with exactly: ok'
 ```
 
 Expected output includes `ok`. If it still returns `401 Invalid authentication credentials`, run:
 
 ```sh
 claude setup-token
-claude -p --model claude-sonnet-4-6 --max-turns 1 'Reply with exactly: ok'
+claude -p --model claude-sonnet-5 --effort high --max-turns 1 'Reply with exactly: ok'
 ```
 
-## Gemini CLI
+## Antigravity Gemini CLI
 
-Use only Google-account auth for this simplified phase. Do not set `GEMINI_API_KEY` unless paid API usage is intended.
-
-This installed Gemini CLI does not expose a `gemini auth` command. Configure it
-for Google-account OAuth, then run the interactive CLI once:
+Use the authenticated Antigravity CLI rather than the older `gemini` command:
 
 ```sh
-make configure-gemini-google-auth
-gemini
+agy
 ```
 
-In the interactive Gemini CLI, choose `Login with Google` if prompted, complete
-the browser OAuth flow, then quit Gemini. Run this from a normal Terminal, not
+Complete the browser login if prompted, then quit. Run this from a normal Terminal, not
 from a sandboxed command runner, because the OAuth flow needs to open/listen on
 a local callback port.
 
 Then verify:
 
 ```sh
-gemini -m gemini-2.5-flash -p 'Reply with exactly: ok'
+agy --print 'Reply with exactly: ok' --model gemini-3.5-flash-high --effort high
 ```
 
-Expected output includes `ok`. The local CLI also accepts
-`GOOGLE_GENAI_USE_GCA=true` for Google-account auth, but the project helper uses
-the settings file so launchd/non-interactive probes see the same auth method.
-
-Current local status: the auth method is `oauth-personal`, the browser OAuth
-flow is complete, and the non-interactive Gemini probe succeeds.
+Expected output is `ok`.
 
 ## Recheck
 

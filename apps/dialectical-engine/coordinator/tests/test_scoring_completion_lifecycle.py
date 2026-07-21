@@ -886,7 +886,7 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
 
     class CompletionProvider:
         provider = "fixture-judge"
-        model = "gpt-5.5"
+        model = "gpt-5.6-sol"
 
         def __init__(self) -> None:
             self.verifier_calls = 0
@@ -974,7 +974,7 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
     claim_generation = Generation(
         id="completion-claim-generation",
         node_id=claim.id,
-        model_id="claude-sonnet-5",
+        model_id="claude-sonnet-5-high-loop",
         role="pro",
         argument=claim.claim,
         worker_id=worker.id,
@@ -982,7 +982,7 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
     evidence_generation = Generation(
         id="completion-evidence-generation",
         node_id=evidence.id,
-        model_id="claude-sonnet-5",
+        model_id="claude-sonnet-5-high-loop",
         role="pro",
         argument=evidence.claim,
         worker_id=worker.id,
@@ -992,7 +992,7 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
     claim.active_generation_id = claim_generation.id
     evidence.active_generation_id = evidence_generation.id
     debate.root_node_id = claim.id
-    job = queue_scoring_job(db, debate, model_id="gpt-5.5")
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6-sol")
     db.commit()
 
     provider = CompletionProvider()

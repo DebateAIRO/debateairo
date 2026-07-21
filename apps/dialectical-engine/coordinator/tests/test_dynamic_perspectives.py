@@ -44,7 +44,7 @@ def codex_worker(db) -> Worker:
     worker = Worker(
         name="codex-worker",
         token_hash="test-token",
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -72,7 +72,7 @@ def generic_pov_output(worker: Worker, job_id: str, pov: str) -> dict:
             "con": {"title": f"{pov} con limitation", "content": f"Detail limiting the {pov} con."},
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,

@@ -36,13 +36,13 @@ def test_agent_config_loads_defaults_and_openai_model_from_settings(monkeypatch)
 
 
 def test_agent_config_pins_scoring_judge_to_supported_codex_cli_model(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_MODEL", "codex-gpt-5.5")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5.6sol-medium")
 
     configs = load_agent_configs(ENGINE_ROOT / "config" / "agents.yaml")
 
-    assert configs["proponent"].model == "codex-gpt-5.5"
+    assert configs["proponent"].model == "gpt-5.6sol-medium"
     assert configs["judge"].provider == "codex"
-    assert configs["judge"].model == "gpt-5.5"
+    assert configs["judge"].model == "gpt-5.6sol-medium"
 
 
 def test_registry_uses_fake_provider_without_changing_call_path() -> None:
@@ -85,14 +85,14 @@ def test_registry_rejects_unknown_role() -> None:
 
 def test_codex_scoring_config_detection_reports_available_judge_config() -> None:
     status = detect_codex_scoring_config(
-        {"judge": AgentConfig(provider="codex", model="codex-gpt-5.5", temperature=0.0)}
+        {"judge": AgentConfig(provider="codex", model="gpt-5.6sol-medium", temperature=0.0)}
     )
 
     assert status.model_dump() == {
         "available": True,
         "role": "judge",
         "provider": "codex",
-        "model": "codex-gpt-5.5",
+        "model": "gpt-5.6sol-medium",
         "reason": None,
     }
 
@@ -150,7 +150,7 @@ def test_codex_provider_builds_cli_command_without_live_call() -> None:
 
     command = provider.command(
         [{"role": "system", "content": "sys"}, {"role": "user", "content": "user"}],
-        model="gpt-5.5",
+        model="gpt-5.6sol-medium",
         max_tokens=200,
         response_format="json",
     )
@@ -159,7 +159,8 @@ def test_codex_provider_builds_cli_command_without_live_call() -> None:
     assert "--ignore-rules" in command
     assert command[command.index("--sandbox") + 1] == "read-only"
     assert "--model" in command
-    assert "gpt-5.5" in command
+    assert "gpt-5.6-sol" in command
+    assert "model_reasoning_effort=medium" in command
     assert "Return only valid JSON." in command[-1]
     assert "Keep the answer under 200 tokens." in command[-1]
 
@@ -200,7 +201,7 @@ def test_codex_provider_uses_resolved_cli_path_for_generation(monkeypatch) -> No
     monkeypatch.setattr("app.providers.codex_cli.shutil.which", lambda executable: "C:\\Users\\vladm\\AppData\\Roaming\\npm\\codex.CMD")
     monkeypatch.setattr("app.providers.codex_cli.subprocess.run", fake_run)
 
-    provider.generate([{"role": "user", "content": "score"}], model="gpt-5.5")
+    provider.generate([{"role": "user", "content": "score"}], model="gpt-5.6-sol")
 
     assert captured["command"][0] == "C:\\Users\\vladm\\AppData\\Roaming\\npm\\codex.CMD"
 
@@ -224,7 +225,7 @@ def test_codex_provider_reads_clean_last_message_output(monkeypatch) -> None:
     monkeypatch.setattr("app.providers.codex_cli.shutil.which", lambda executable: "codex.cmd")
     monkeypatch.setattr("app.providers.codex_cli.subprocess.run", fake_run)
 
-    response = provider.generate([{"role": "user", "content": "score"}], model="gpt-5.5")
+    response = provider.generate([{"role": "user", "content": "score"}], model="gpt-5.6-sol")
 
     assert response.text == '{"status":"unavailable","reason":"fixture"}'
     assert response.raw["stdout"] == "noisy transcript"
@@ -258,7 +259,7 @@ def test_codex_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
             "error sending request"
         ),
     ):
-        provider.generate([{"role": "user", "content": "score"}], model="codex-gpt-5.5")
+        provider.generate([{"role": "user", "content": "score"}], model="gpt-5.6sol-medium")
 
 
 def test_proposal_engine_modules_outside_providers_do_not_reference_vendors() -> None:

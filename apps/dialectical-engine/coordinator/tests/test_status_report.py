@@ -69,23 +69,23 @@ def acceptance_results(
         "workers-offline": "adesso-mbp",
         "worker-status-payload": "2 workers; 2 capabilities; 0 busy",
         "tree-skeleton": "3 nodes",
-        "role-overrides": "decomposer primary codex-gpt-5.5; persisted and used by root job",
+        "role-overrides": "decomposer primary gpt-5.6sol-medium; persisted and used by root job",
         "tree-skeleton-timing": "1.00s <= 120s",
         "synthesis": "Initial verdict.",
         "generated-node-metadata": "2 argument nodes; 2 models; 2 workers",
         "generated-workers": "mac-mini, adesso-mbp",
         "regenerated-workers": "mac-mini, adesso-mbp",
-        "generated-models": "codex-gpt-5.5, claude-sonnet-4-6",
-        "regenerated-models": "codex-gpt-5.5, claude-sonnet-4-6",
+        "generated-models": "gpt-5.6sol-medium, claude-sonnet-5-high-loop",
+        "regenerated-models": "gpt-5.6sol-medium, claude-sonnet-5-high-loop",
         "regenerate-request": f"job {REGENERATE_JOB_ID} for node {ARGUMENT_NODE_IDS[0]}",
         "regenerate-history": "2 generations; archived previous; active current",
-        "regeneration-model-switch": "codex-gpt-5.5 -> claude-sonnet-4-6",
+        "regeneration-model-switch": "gpt-5.6sol-medium -> claude-sonnet-5-high-loop",
         "regenerated-node-metadata": "2 argument nodes; 2 models; 2 workers",
         "regenerate-synthesis": REGENERATED_SYNTHESIS_ID,
         "markdown-export": "1234 bytes; attachment; 2 generations; 1 archived",
         "create-debate": PRODUCTION_DEBATE_ID,
         "persistence": f"revisited {PRODUCTION_DEBATE_ID}; exact detail match",
-        "settings-roundtrip": "2 configured models; model cap restored for codex-gpt-5.5; Grok cap $25.00",
+        "settings-roundtrip": "2 configured models; model cap restored for gpt-5.6sol-medium; Grok cap $25.00",
         "web-home": (
             "https://current.example.com/ returned HTML with "
             f"/debate/{PRODUCTION_DEBATE_ID} for Should the EU ban gas cars by 2035?"
@@ -195,7 +195,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
         "generated_model_ids": generated_model_ids,
         "regenerated_model_ids": generated_model_ids,
         "regeneration_model_switch": {
-            "old_model": "codex-gpt-5.5",
+            "old_model": "gpt-5.6sol-medium",
             "new_model": generated_model_ids[-1],
         },
         "observed_worker_names": observed_worker_names,
@@ -212,7 +212,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
         "regenerated-models": ", ".join(generated_model_ids) or "none",
         "create-debate": debate_id,
         "persistence": f"revisited {debate_id}; exact detail match",
-        "regeneration-model-switch": f"codex-gpt-5.5 -> {generated_model_ids[-1]}",
+        "regeneration-model-switch": f"gpt-5.6sol-medium -> {generated_model_ids[-1]}",
         "web-debate-detail": (
             f"{base_url}/debate/{debate_id} returned server-rendered detail with "
             f"{len(set(generated_worker_names))} workers; {len(set(generated_model_ids))} models"
@@ -263,8 +263,8 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
         }
 
     def sse_evidence(prefix: str) -> dict[str, object]:
-        node_model_id = "codex-gpt-5.5" if prefix == "generated" else generated_model_ids[-1]
-        synthesis_model_id = "codex-gpt-5.5" if prefix == "generated" else generated_model_ids[-1]
+        node_model_id = "gpt-5.6sol-medium" if prefix == "generated" else generated_model_ids[-1]
+        synthesis_model_id = "gpt-5.6sol-medium" if prefix == "generated" else generated_model_ids[-1]
         node_generation_id = GENERATED_GENERATION_IDS[0] if prefix == "generated" else REGENERATED_GENERATION_IDS[0]
         initial = prefix == "generated"
         synthesis_payload = (
@@ -342,7 +342,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
                 [
                     {
                         "node_id": ARGUMENT_NODE_IDS[0],
-                        "model_id": "codex-gpt-5.5",
+                        "model_id": "gpt-5.6sol-medium",
                         "worker_id": "11111111-1111-4111-8111-111111111111",
                         "role": "proposer",
                     },
@@ -354,7 +354,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
                     },
                     {
                         "node_id": ROOT_NODE_ID,
-                        "model_id": "codex-gpt-5.5",
+                        "model_id": "gpt-5.6sol-medium",
                         "worker_id": "11111111-1111-4111-8111-111111111111",
                         "role": "decomposer",
                     },
@@ -407,9 +407,9 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
         return {
             "configured_model_count": len(generated_model_ids),
             "configured_models": generated_model_ids,
-            "cap_model": "codex-gpt-5.5",
+            "cap_model": "gpt-5.6sol-medium",
             "original_enabled_models": generated_model_ids,
-            "temporary_enabled_models": ["codex-gpt-5.5"],
+            "temporary_enabled_models": ["gpt-5.6sol-medium"],
             "restored_enabled_models": generated_model_ids,
             "enabled_models_restored": True,
             "original_grok_cap_usd": 25.0,
@@ -473,7 +473,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
             "requested_branching": payload["branching"],
             "config_max_depth": payload["depth"],
             "config_branching": payload["branching"],
-            "decomposer_override_model": "codex-gpt-5.5",
+            "decomposer_override_model": "gpt-5.6sol-medium",
             "created_at": "2026-05-24T00:00:00+00:00",
             "root_node_id": ROOT_NODE_ID,
         }
@@ -509,12 +509,12 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
 
     def role_override_evidence() -> dict[str, object]:
         return {
-            "expected_model": "codex-gpt-5.5",
-            "persisted_primary": "codex-gpt-5.5",
+            "expected_model": "gpt-5.6sol-medium",
+            "persisted_primary": "gpt-5.6sol-medium",
             "persisted_fallback": [],
             "root_node_id": ROOT_NODE_ID,
             "root_generation_id": ROOT_GENERATION_ID,
-            "root_generation_model_id": "codex-gpt-5.5",
+            "root_generation_model_id": "gpt-5.6sol-medium",
             "persisted": True,
             "root_job_used_override": True,
         }
@@ -676,7 +676,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
             "strongest_pro": "Initial pro.",
             "strongest_con": "Initial con.",
             "verdict": "Initial verdict.",
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": "11111111-1111-4111-8111-111111111111",
             "worker_name": "mac-mini",
             "created_at": "2026-05-24T00:00:00+00:00",
@@ -836,7 +836,7 @@ def production_acceptance_payload(module, phase: str, base_url: str = "https://c
             },
             "archived_generation": {
                 "id": GENERATED_GENERATION_IDS[0],
-                "model_id": "codex-gpt-5.5",
+                "model_id": "gpt-5.6sol-medium",
                 "worker_id": "11111111-1111-4111-8111-111111111111",
                 "worker_name": "mac-mini",
                 "role": "proposer",
@@ -1367,16 +1367,18 @@ def test_gemini_api_summary_reports_api_adapter_detection_and_preflight(
         "\n".join(
                 [
                     "class GeminiCliAdapter(SubprocessStreamingAdapter):",
-                    'model_id = "gemini-2.5-flash"',
+                    'model_id = "gemini-3.5-flash-loop"',
+                    'cli_model = "gemini-3.5-flash-high"',
+                    'executable = "agy"',
                     "async def health_check(self) -> bool:",
                     "await super().health_check()",
                     "asyncio.create_subprocess_exec(",
-                    '"gemini",',
-                    '"-m",',
-                    "self.model_id",
+                    '"agy",',
+                    '"--print",',
+                    "self.cli_model",
                     '"Respond with exactly OK.",',
-                    '"--output-format",',
-                    '"text",',
+                    '"--effort",',
+                    '"high",',
                 "await asyncio.wait_for(process.communicate(), timeout=30)",
                 "return process.returncode == 0 and bool(stdout.strip())",
             ]
@@ -1517,9 +1519,10 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
     claude.write_text(
         "\n".join(
                 [
-                    "class ClaudeCliAdapter(SubprocessStreamingAdapter):",
-                    'model_id = "claude-sonnet-4-6"',
-                    'return ["claude", "-p", prompt, "--model", self.model_id, "--output-format", "stream-json", "--verbose"]',
+                        "class ClaudeCliAdapter(SubprocessStreamingAdapter):",
+                        'model_id = "claude-sonnet-5-high-loop"',
+                        'cli_model = "claude-sonnet-5"',
+                        'return ["claude", "-p", prompt, "--model", self.cli_model, "--effort", "high", "--output-format", "stream-json", "--verbose"]',
                     "claude_stream_json_delta",
                 ]
         ),
@@ -1530,8 +1533,8 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
         "\n".join(
                 [
                     "class CodexCliAdapter(SubprocessStreamingAdapter):",
-                    'model_id = "codex-gpt-5.5"',
-                    'cli_model = "gpt-5.5"',
+                    'model_id = "gpt-5.6sol-medium"',
+                    'cli_model = "gpt-5.6-sol"',
                     "Keep the answer under {max_tokens} tokens.",
                     'return ["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "--model", self.cli_model, prompt]',
                 ]
@@ -1543,13 +1546,15 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
         "\n".join(
             [
                 "PROMPT_FLAG_PATTERN",
-                "class GrokCliAdapter(SubprocessStreamingAdapter):",
-                'model_id = "grok-4.5"',
+                    "class GrokCliAdapter(SubprocessStreamingAdapter):",
+                    'model_id = "grok-4.5-high-loop"',
+                    'cli_model = "grok-4.5"',
                 "async def health_check(self) -> bool:",
                 "asyncio.create_subprocess_exec(",
                 '"--help",',
                 "PROMPT_FLAG_PATTERN.search(help_text)",
-                'return ["grok", "-p", prompt]',
+                    'return ["grok", "-p", prompt, "--model", self.cli_model, "--reasoning-effort",',
+                    '"high",]',
             ]
         ),
         encoding="utf-8",
@@ -2027,7 +2032,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker B registration requires a real named Cloudflare hostname, not a placeholder",
                 "Worker B registration requires a public named Cloudflare hostname, not a local URL",
                 "Worker B registration requires a named Cloudflare hostname",
-                'ALLOWED_MODELS="${{ALLOWED_MODELS:-codex-gpt-5.5}}"',
+                'ALLOWED_MODELS="${{ALLOWED_MODELS:-gpt-5.6sol-medium}}"',
                 "SEEN_ALLOWED_MODELS=,",
                 "NEEDS_GEMINI_API_KEY=0",
                 "NEEDS_XAI_API_KEY=0",
@@ -2052,7 +2057,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 'WORKER_REQUIRED_CAPABILITIES="$ALLOWED_MODELS"',
                 "WORKER_REJECT_NON_PRODUCTION_CAPABILITIES=1",
                 "def worker_real_models_script(public_url: str, worker_name: str) -> str:",
-                'ALLOWED_MODELS="${{ALLOWED_MODELS:-${{REAL_MODEL_CAPABILITIES:-codex-gpt-5.5,gemini-2.5-flash}}}}"',
+                'ALLOWED_MODELS="${{ALLOWED_MODELS:-${{REAL_MODEL_CAPABILITIES:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}}}"',
                 "Worker B real-model setup requires an HTTPS named Cloudflare coordinator URL",
                 "Worker B real-model setup requires a real named Cloudflare hostname, not a placeholder",
                 "Worker B real-model setup requires a public named Cloudflare hostname, not a local URL",
@@ -2090,7 +2095,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 'REQUIRE_DIFFERENT_REGEN_MODEL="${{REQUIRE_DIFFERENT_REGEN_MODEL:-1}}"',
                 'ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL="${{ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL:-0}}"',
                 "production acceptance requires different-model regeneration proof",
-                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}}}"',
+                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}}}"',
                 "export WORKER_REQUIRED_CAPABILITIES",
                 "WORKER_REJECT_NON_PRODUCTION_CAPABILITIES=1",
                 'ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR="${{ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR:-0}}"',
@@ -2311,9 +2316,9 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0",
                 "SKIP_STRICT_REPORT_VALIDATION=0",
                 "ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0",
-                "WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash",
-                "ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash",
-                "GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>",
+                "WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop",
+                "ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop",
+                "# Gemini loop uses existing agy CLI authentication.",
                 'shutil.copy2(verifier, root / "verify_public_endpoint.py")',
                 "def named_tunnel_readme() -> str:",
                 "This template replaces the temporary `trycloudflare.com` quick tunnel",
@@ -2341,7 +2346,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "make setup-named-tunnel TUNNEL_NAME=dialectical TUNNEL_HOSTNAME=<public-hostname>",
                 'COORDINATOR_URL="${{COORDINATOR_URL:-${{CONFIG_PUBLIC_URL:-{public_url}}}}}"',
                 'PUBLIC_URL="${{PUBLIC_URL:-$COORDINATOR_URL}}"',
-                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}}}"',
+                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}}}"',
                 "export WORKER_REQUIRED_CAPABILITIES",
                 'PREFLIGHT_FLAGS="${{PREFLIGHT_FLAGS:---require-installed-services --require-registered-worker --require-worker-api-keys-for-models $WORKER_REQUIRED_CAPABILITIES}}"',
                 'REFRESH_LOCAL_PROOF="${{REFRESH_LOCAL_PROOF:-1}}"',
@@ -2440,7 +2445,7 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 'ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL="${{ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL:-0}}"',
                 'SKIP_STRICT_REPORT_VALIDATION="${{SKIP_STRICT_REPORT_VALIDATION:-0}}"',
                 'ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL="${{ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL:-0}}"',
-                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}}}"',
+                'WORKER_REQUIRED_CAPABILITIES="${{WORKER_REQUIRED_CAPABILITIES:-${{ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}}}"',
                 'ALLOW_QUICK_TUNNEL_ACCEPTANCE="${{ALLOW_QUICK_TUNNEL_ACCEPTANCE:-0}}"',
                 'ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR="${{ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR:-0}}"',
                 'REPORT_PYTHON="${{REPORT_PYTHON:-python3}}"',
@@ -2894,7 +2899,7 @@ def test_worker_status_endpoint_issues_require_structured_rows(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             }
@@ -2955,7 +2960,7 @@ def test_worker_status_endpoint_issues_require_typed_worker_fields(
                 "id": 7,
                 "name": 42,
                 "status": False,
-                "capabilities": ["codex-gpt-5.5", True, "", "codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium", True, "", "gpt-5.6sol-medium"],
                 "current_job_id": {"job": "id"},
                 "last_seen": "2026-05-24T00:00:00+00:00",
             }
@@ -2970,7 +2975,7 @@ def test_worker_status_endpoint_issues_require_typed_worker_fields(
     assert "workers[1] current_job_id is not a string" in issues
     assert "workers[1] capabilities[2] is not a string" in issues
     assert "workers[1] capabilities[3] is blank" in issues
-    assert "workers[1] duplicate capability: codex-gpt-5.5" in issues
+    assert "workers[1] duplicate capability: gpt-5.6sol-medium" in issues
 
 
 def test_public_local_endpoint_parity_requires_same_coordinator_state(
@@ -2986,7 +2991,7 @@ def test_public_local_endpoint_parity_requires_same_coordinator_state(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             }
@@ -2998,7 +3003,7 @@ def test_public_local_endpoint_parity_requires_same_coordinator_state(
                 "id": "99999999-9999-4999-8999-999999999999",
                 "name": "other-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             }
@@ -3012,7 +3017,7 @@ def test_public_local_endpoint_parity_requires_same_coordinator_state(
                 "status": "complete",
                 "created_at": "2026-05-24T00:00:00+00:00",
                 "completed_at": "2026-05-24T00:00:01+00:00",
-                "models": ["codex-gpt-5.5"],
+                "models": ["gpt-5.6sol-medium"],
             }
         ]
     }
@@ -3024,7 +3029,7 @@ def test_public_local_endpoint_parity_requires_same_coordinator_state(
                 "status": "complete",
                 "created_at": "2026-05-24T00:00:00+00:00",
                 "completed_at": "2026-05-24T00:00:01+00:00",
-                "models": ["codex-gpt-5.5"],
+                "models": ["gpt-5.6sol-medium"],
             }
         ]
     }
@@ -3038,7 +3043,7 @@ def test_public_local_endpoint_parity_requires_same_coordinator_state(
         "completed_at": "2026-05-24T00:00:01+00:00",
         "node_count": 3,
         "workers": ["mac-mini"],
-        "models": ["codex-gpt-5.5"],
+        "models": ["gpt-5.6sol-medium"],
     }
     public_detail_payload = {**detail_payload, "synthesis_id": "synthesis-2"}
 
@@ -3091,7 +3096,7 @@ def test_worker_status_parity_rejects_matching_malformed_worker_rows(
                 "id": 7,
                 "name": 42,
                 "status": False,
-                "capabilities": ["codex-gpt-5.5", True],
+                "capabilities": ["gpt-5.6sol-medium", True],
                 "current_job_id": {"job": "id"},
                 "last_seen": "2026-05-24T00:00:00+00:00",
             }
@@ -3123,7 +3128,7 @@ def test_debate_list_parity_rejects_matching_malformed_rows(
                 "status": None,
                 "created_at": "2026-05-24T00:00:00+00:00",
                 "completed_at": None,
-                "models": ["codex-gpt-5.5", True],
+                "models": ["gpt-5.6sol-medium", True],
             }
         ]
     }
@@ -3153,7 +3158,7 @@ def test_debate_detail_parity_rejects_matching_malformed_detail(
         "completed_at": None,
         "node_count": 3,
         "workers": ["mac-mini", True],
-        "models": ["codex-gpt-5.5", False],
+        "models": ["gpt-5.6sol-medium", False],
     }
 
     issues = module.debate_detail_parity_issues(payload, payload)
@@ -3302,7 +3307,7 @@ def test_production_worker_endpoint_issues_accept_ready_workers(tmp_path: Path, 
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3310,7 +3315,7 @@ def test_production_worker_endpoint_issues_accept_ready_workers(tmp_path: Path, 
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["gemini-2.5-flash", "codex-gpt-5.5"],
+                "capabilities": ["gemini-3.5-flash-loop", "gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3319,8 +3324,8 @@ def test_production_worker_endpoint_issues_accept_ready_workers(tmp_path: Path, 
 
     assert module.production_worker_endpoint_issues(payload) == []
     assert module.production_worker_endpoint_detail(payload) == (
-        "mac-mini:online [codex-gpt-5.5, gemini-2.5-flash]; "
-        "adesso-mbp:online [codex-gpt-5.5, gemini-2.5-flash]"
+        "mac-mini:online [gemini-3.5-flash-loop, gpt-5.6sol-medium]; "
+        "adesso-mbp:online [gemini-3.5-flash-loop, gpt-5.6sol-medium]"
     )
 
 
@@ -3336,20 +3341,20 @@ def test_production_worker_endpoint_issues_report_missing_worker_and_capability(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
             {
                 "name": "extra-worker",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
             },
         ]
     }
 
     assert module.production_worker_endpoint_issues(payload) == [
-        "mac-mini missing capabilities: gemini-2.5-flash",
+        "mac-mini missing capabilities: gemini-3.5-flash-loop",
         "missing worker row: adesso-mbp",
         "unexpected workers: extra-worker",
     ]
@@ -3360,7 +3365,7 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,grok-4.5-high-loop")
     module = load_status_report_module()
     payload = {
         "workers": [
@@ -3368,7 +3373,7 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "grok-4.5"],
+                "capabilities": ["gpt-5.6sol-medium", "grok-4.5-high-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3376,14 +3381,14 @@ def test_production_worker_endpoint_issues_honor_final_capability_override(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["grok-4.5", "codex-gpt-5.5"],
+                "capabilities": ["grok-4.5-high-loop", "gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
         ]
     }
 
-    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4.5"]
+    assert module.final_required_capabilities() == ["gpt-5.6sol-medium", "grok-4.5-high-loop"]
     assert module.production_worker_endpoint_issues(payload) == []
 
 
@@ -3399,7 +3404,7 @@ def test_production_worker_endpoint_issues_reject_malformed_expected_names_and_c
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3407,7 +3412,7 @@ def test_production_worker_endpoint_issues_reject_malformed_expected_names_and_c
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3417,14 +3422,14 @@ def test_production_worker_endpoint_issues_reject_malformed_expected_names_and_c
     assert module.production_worker_endpoint_issues(
         payload,
         expected_worker_names=["mac-mini", 42, "", "mac-mini", "adesso-mbp"],
-        required_capabilities=["codex-gpt-5.5", 42, "", "codex-gpt-5.5", "gemini-2.5-flash"],
+        required_capabilities=["gpt-5.6sol-medium", 42, "", "gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
     ) == [
         "expected worker names[2] is not a string",
         "expected worker names[3] is blank",
         "expected worker names duplicates mac-mini",
         "required capabilities[2] is not a string",
         "required capabilities[3] is blank",
-        "required capabilities duplicates codex-gpt-5.5",
+        "required capabilities duplicates gpt-5.6sol-medium",
     ]
 
 
@@ -3440,7 +3445,7 @@ def test_production_worker_endpoint_issues_reject_mock_and_placeholder_capabilit
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash", "mock-local"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop", "mock-local"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3448,7 +3453,7 @@ def test_production_worker_endpoint_issues_reject_mock_and_placeholder_capabilit
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash", "<second-model>"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop", "<second-model>"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3473,14 +3478,14 @@ def test_production_worker_endpoint_issues_require_structured_worker_fields(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "last_seen": "not-a-date",
             },
             {
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": "job-1",
                 "last_seen": "2026-05-24T00:00:01",
             },
@@ -3507,7 +3512,7 @@ def test_production_worker_endpoint_issues_require_typed_worker_fields(
                 "id": 7,
                 "name": "mac-mini",
                 "status": False,
-                "capabilities": ["codex-gpt-5.5", True, "", "codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium", True, "", "gpt-5.6sol-medium"],
                 "current_job_id": {"job": "id"},
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3515,7 +3520,7 @@ def test_production_worker_endpoint_issues_require_typed_worker_fields(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": 42,
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3529,8 +3534,8 @@ def test_production_worker_endpoint_issues_require_typed_worker_fields(
     assert "mac-mini current_job_id is not a string" in issues
     assert "mac-mini capabilities[2] is not a string" in issues
     assert "mac-mini capabilities[3] is blank" in issues
-    assert "mac-mini duplicate capability: codex-gpt-5.5" in issues
-    assert "mac-mini missing capabilities: gemini-2.5-flash" in issues
+    assert "mac-mini duplicate capability: gpt-5.6sol-medium" in issues
+    assert "mac-mini missing capabilities: gemini-3.5-flash-loop" in issues
     assert "workers[2] name is not a string" in issues
     assert "missing worker row: adesso-mbp" in issues
 
@@ -3547,14 +3552,14 @@ def test_production_worker_endpoint_issues_require_stable_worker_ids(
                 "id": "not-a-uuid",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
             {
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3579,7 +3584,7 @@ def test_production_worker_endpoint_issues_reject_worker_a_id_mismatch(
                 "id": "99999999-9999-4999-8999-999999999999",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3587,7 +3592,7 @@ def test_production_worker_endpoint_issues_reject_worker_a_id_mismatch(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3615,7 +3620,7 @@ def test_production_worker_endpoint_issues_reject_worker_b_report_id_mismatch(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3623,7 +3628,7 @@ def test_production_worker_endpoint_issues_reject_worker_b_report_id_mismatch(
                 "id": "99999999-9999-4999-8999-999999999999",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3651,7 +3656,7 @@ def test_production_worker_endpoint_issues_reject_malformed_expected_worker_ids(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3659,7 +3664,7 @@ def test_production_worker_endpoint_issues_reject_malformed_expected_worker_ids(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3696,7 +3701,7 @@ def test_production_worker_endpoint_issues_report_duplicate_worker_rows(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3704,7 +3709,7 @@ def test_production_worker_endpoint_issues_report_duplicate_worker_rows(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3712,7 +3717,7 @@ def test_production_worker_endpoint_issues_report_duplicate_worker_rows(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:02+00:00",
             },
@@ -3737,7 +3742,7 @@ def test_production_worker_endpoint_issues_reject_unexpected_non_online_workers(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3745,7 +3750,7 @@ def test_production_worker_endpoint_issues_reject_unexpected_non_online_workers(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3761,7 +3766,7 @@ def test_production_worker_endpoint_issues_reject_unexpected_non_online_workers(
                 "id": "44444444-4444-4444-8444-444444444444",
                 "name": "spare-mac",
                 "status": "degraded",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:03+00:00",
             },
@@ -3785,7 +3790,7 @@ def test_production_worker_endpoint_issues_reject_malformed_worker_rows(
                 "id": "11111111-1111-4111-8111-111111111111",
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -3793,7 +3798,7 @@ def test_production_worker_endpoint_issues_reject_malformed_worker_rows(
                 "id": "22222222-2222-4222-8222-222222222222",
                 "name": "adesso-mbp",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "capabilities": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -3801,7 +3806,7 @@ def test_production_worker_endpoint_issues_reject_malformed_worker_rows(
             {
                 "id": "33333333-3333-4333-8333-333333333333",
                 "status": "offline",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:02+00:00",
             },
@@ -3832,7 +3837,7 @@ def test_debate_list_endpoint_issues_require_timezone_aware_timestamps(
                     "status": "complete",
                     "created_at": "2026-05-20T17:51:49.002205",
                     "completed_at": "2026-05-20T17:54:35.709146",
-                    "models": ["codex-gpt-5.5"],
+                    "models": ["gpt-5.6sol-medium"],
                 }
             ]
         },
@@ -3847,7 +3852,7 @@ def test_debate_list_endpoint_issues_require_timezone_aware_timestamps(
                     "status": "complete",
                     "created_at": "2026-05-20T17:51:49.002205+00:00",
                     "completed_at": None,
-                    "models": ["codex-gpt-5.5"],
+                    "models": ["gpt-5.6sol-medium"],
                 }
             ]
         }
@@ -3876,7 +3881,7 @@ def test_debate_list_endpoint_issues_require_typed_identity_and_models(
                     "status": None,
                     "created_at": "2026-05-20T17:51:49.002205+00:00",
                     "completed_at": None,
-                    "models": ["codex-gpt-5.5", "codex-gpt-5.5", "", 42],
+                    "models": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42],
                 }
             ]
         }
@@ -3885,7 +3890,7 @@ def test_debate_list_endpoint_issues_require_typed_identity_and_models(
     assert "debate list item 1 id is not a string" in issues
     assert "debate 1 topic is not a string" in issues
     assert "debate 1 status is not a string" in issues
-    assert "debate 1 models duplicates codex-gpt-5.5" in issues
+    assert "debate 1 models duplicates gpt-5.6sol-medium" in issues
     assert "debate 1 models[3] is blank" in issues
     assert "debate 1 models[4] is not a string" in issues
 
@@ -3906,7 +3911,7 @@ def test_print_production_worker_readiness_result_reports_blockers(
                     "id": "11111111-1111-4111-8111-111111111111",
                     "name": "mac-mini",
                     "status": "online",
-                    "capabilities": ["codex-gpt-5.5"],
+                    "capabilities": ["gpt-5.6sol-medium"],
                     "current_job_id": None,
                     "last_seen": "2026-05-24T00:00:00+00:00",
                 }
@@ -3921,7 +3926,7 @@ def test_print_production_worker_readiness_result_reports_blockers(
 
     assert ok is False
     assert issues == [
-        "mac-mini missing capabilities: gemini-2.5-flash",
+        "mac-mini missing capabilities: gemini-3.5-flash-loop",
         "missing worker row: adesso-mbp",
     ]
     assert "public production workers: blocked" in capsys.readouterr().out
@@ -4540,7 +4545,7 @@ def test_debate_detail_summary_reports_status_and_nodes(tmp_path: Path, monkeypa
             "created_at": "2026-05-24T00:00:00+00:00",
             "completed_at": None,
             "workers": ["mac-mini"],
-            "models": ["codex-gpt-5.5"],
+            "models": ["gpt-5.6sol-medium"],
             "tree": {
                 "id": "node-1",
                 "active_generation": {
@@ -4570,7 +4575,7 @@ def test_debate_detail_summary_requires_typed_metadata_lists(tmp_path: Path, mon
                 "created_at": "2026-05-24T00:00:00+00:00",
                 "completed_at": None,
                 "workers": ["mac-mini", "mac-mini", "", 42],
-                "models": ["codex-gpt-5.5", "codex-gpt-5.5", "", False],
+                "models": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", False],
             },
             "debate-1",
             "A topic",
@@ -4580,7 +4585,7 @@ def test_debate_detail_summary_requires_typed_metadata_lists(tmp_path: Path, mon
         assert "debate detail workers duplicates mac-mini" in message
         assert "debate detail workers[3] is blank" in message
         assert "debate detail workers[4] is not a string" in message
-        assert "debate detail models duplicates codex-gpt-5.5" in message
+        assert "debate detail models duplicates gpt-5.6sol-medium" in message
         assert "debate detail models[3] is blank" in message
         assert "debate detail models[4] is not a string" in message
     else:
@@ -4621,7 +4626,7 @@ def test_debate_detail_summary_rejects_timezone_less_timestamps(
                 },
                 "synthesis": {"id": "synthesis-1", "created_at": "2026-05-24T00:00:04"},
                 "workers": ["mac-mini"],
-                "models": ["codex-gpt-5.5"],
+                "models": ["gpt-5.6sol-medium"],
             },
             "debate-1",
             "A topic",
@@ -4683,12 +4688,12 @@ def test_markdown_export_timestamp_issues_require_timezone_aware_timestamps(
                 "",
                 "**Created:** 2026-05-24T00:00:00+00:00 - **Workers:** mac-mini",
                 "",
-                "- **Active** `generation-1` - *codex-gpt-5.5* "
+                "- **Active** `generation-1` - *gpt-5.6sol-medium* "
                 "(worker: mac-mini, role: proposer, created: 2026-05-24T00:00:01+00:00)",
             ]
         )
     ) == []
-    monkeypatch.setattr(module, "fetch_json", lambda url: {"workers": ["mac-mini"], "models": ["codex-gpt-5.5"]})
+    monkeypatch.setattr(module, "fetch_json", lambda url: {"workers": ["mac-mini"], "models": ["gpt-5.6sol-medium"]})
     monkeypatch.setattr(
         module,
         "fetch_text",
@@ -4702,8 +4707,8 @@ def test_markdown_export_timestamp_issues_require_timezone_aware_timestamps(
                 "## Tree",
                 "## Generation History",
                 "**Workers:** mac-mini",
-                "**Models:** codex-gpt-5.5",
-                "- **Active** `generation-1` - *codex-gpt-5.5* "
+                "**Models:** gpt-5.6sol-medium",
+                "- **Active** `generation-1` - *gpt-5.6sol-medium* "
                 "(worker: mac-mini, role: proposer, created: 2026-05-24T00:00:01)",
             ]
         ),
@@ -5663,7 +5668,7 @@ fi
 		PUBLIC_URL="${PUBLIC_URL:-$COORDINATOR_URL}"
 			echo "final production check requires COORDINATOR_URL to match installed named Cloudflare tunnel config"
 			echo "final production check requires PUBLIC_URL to match installed named Cloudflare tunnel config"
-			WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"
+			WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 			export WORKER_REQUIRED_CAPABILITIES
 			PREFLIGHT_FLAGS="${PREFLIGHT_FLAGS:---require-installed-services --require-registered-worker --require-worker-api-keys-for-models $WORKER_REQUIRED_CAPABILITIES}"
 REFRESH_LOCAL_PROOF="${REFRESH_LOCAL_PROOF:-1}"
@@ -5731,7 +5736,7 @@ def strict_handoff_worker_a_real_models_script() -> bytes:
 set -eu
 : "${ENGINE_DIR:?set ENGINE_DIR to the dialectical-engine checkout on the Mac mini}"
 LOCAL_COORDINATOR_URL="${LOCAL_COORDINATOR_URL:-http://localhost:8000}"
-ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-codex-gpt-5.5,gemini-2.5-flash}}"
+ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 CLOUDFLARED_CONFIG="${CLOUDFLARED_CONFIG:-$HOME/.cloudflared/config.yml}"
 RUN_NAMED_TUNNEL_PREFLIGHT="${RUN_NAMED_TUNNEL_PREFLIGHT:-1}"
 ALLOW_SKIP_NAMED_TUNNEL_PREFLIGHT_FOR_REHEARSAL="${ALLOW_SKIP_NAMED_TUNNEL_PREFLIGHT_FOR_REHEARSAL:-0}"
@@ -5921,7 +5926,7 @@ set -eu
 : "${ENGINE_DIR:?set ENGINE_DIR to the dialectical-engine checkout on the Mac mini}"
 WORKER_A_NAME="${WORKER_A_NAME:-mac-mini}"
 	WORKER_B_NAME="${WORKER_B_NAME:-adesso-mbp}"
-	WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"
+	WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 	export WORKER_REQUIRED_CAPABILITIES
 	RUN_PREFLIGHT="${RUN_PREFLIGHT:-1}"
 	ALLOW_SKIP_PREFLIGHT_FOR_REHEARSAL="${ALLOW_SKIP_PREFLIGHT_FOR_REHEARSAL:-0}"
@@ -6081,7 +6086,7 @@ REQUIRE_DIFFERENT_REGEN_MODEL="${REQUIRE_DIFFERENT_REGEN_MODEL:-1}"
 ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL="${ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL:-0}"
 SKIP_STRICT_REPORT_VALIDATION="${SKIP_STRICT_REPORT_VALIDATION:-0}"
 ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL="${ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL:-0}"
-WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"
+WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 ALLOW_QUICK_TUNNEL_ACCEPTANCE="${ALLOW_QUICK_TUNNEL_ACCEPTANCE:-0}"
 ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR="${ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR:-0}"
 REPORT_PYTHON="${REPORT_PYTHON:-python3}"
@@ -6834,7 +6839,7 @@ fi
 		PUBLIC_URL="${PUBLIC_URL:-$COORDINATOR_URL}"
 			echo "final production check requires COORDINATOR_URL to match installed named Cloudflare tunnel config"
 			echo "final production check requires PUBLIC_URL to match installed named Cloudflare tunnel config"
-			WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"
+			WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 			export WORKER_REQUIRED_CAPABILITIES
 			PREFLIGHT_FLAGS="${PREFLIGHT_FLAGS:---require-installed-services --require-registered-worker --require-worker-api-keys-for-models $WORKER_REQUIRED_CAPABILITIES}"
 REFRESH_LOCAL_PROOF="${REFRESH_LOCAL_PROOF:-1}"
@@ -7114,7 +7119,7 @@ echo "production acceptance requires a public named Cloudflare hostname, not a l
 echo "production acceptance requires a named Cloudflare hostname"
 REQUIRE_DIFFERENT_REGEN_MODEL="${REQUIRE_DIFFERENT_REGEN_MODEL:-1}"
 ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL="${ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL:-0}"
-WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"
+WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 export WORKER_REQUIRED_CAPABILITIES
 ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR="${ALLOW_NONSTANDARD_ACCEPTANCE_REPORT_DIR:-0}"
 TWO_WORKER_ACCEPTANCE_REPORT="${TWO_WORKER_ACCEPTANCE_REPORT:-$ACCEPTANCE_REPORT_DIR/dialectical-acceptance-two-worker.json}"
@@ -7362,7 +7367,7 @@ echo "Worker B registration requires an HTTPS named Cloudflare coordinator URL"
 echo "Worker B registration requires a real named Cloudflare hostname, not a placeholder"
 echo "Worker B registration requires a public named Cloudflare hostname, not a local URL"
 echo "Worker B registration requires a named Cloudflare hostname"
-ALLOWED_MODELS="${ALLOWED_MODELS:-codex-gpt-5.5}"
+ALLOWED_MODELS="${ALLOWED_MODELS:-gpt-5.6sol-medium}"
 PUBLIC_ENDPOINT_PYTHON="${PUBLIC_ENDPOINT_PYTHON:-python3}"
 PUBLIC_ENDPOINT_SCRIPT="${PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}"
 PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"
@@ -7395,7 +7400,7 @@ make verify-worker-visible WORKER_REQUIRED_CAPABILITIES="$ALLOWED_MODELS" WORKER
 def strict_real_models_worker_script() -> bytes:
     return b"""#!/bin/sh
 set -eu
-ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-codex-gpt-5.5,gemini-2.5-flash}}"
+ALLOWED_MODELS="${ALLOWED_MODELS:-${REAL_MODEL_CAPABILITIES:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"
 WORKER_REQUIRE_NAMED_HTTPS=1
 PUBLIC_ENDPOINT_PYTHON="${PUBLIC_ENDPOINT_PYTHON:-python3}"
 PUBLIC_ENDPOINT_SCRIPT="${PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}"
@@ -7460,9 +7465,9 @@ def strict_worker_b_env_example() -> bytes:
         b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
         b"SKIP_STRICT_REPORT_VALIDATION=0\n"
         b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-        b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-        b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-        b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+        b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+        b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+        b"# Gemini loop uses existing agy CLI authentication.\n"
         b"XAI_API_KEY=<optional-xai-api-key>\n"
     )
 
@@ -7840,9 +7845,9 @@ def test_bundle_worker_b_acceptance_summary_reports_strict_defaults(tmp_path: Pa
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -7877,9 +7882,9 @@ def test_bundle_worker_b_acceptance_summary_requires_typed_report_list_validatio
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -7918,9 +7923,9 @@ def test_bundle_worker_b_acceptance_summary_requires_typed_report_base_url_valid
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -7959,9 +7964,9 @@ def test_bundle_worker_b_acceptance_summary_requires_typed_report_web_base_url_v
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8004,9 +8009,9 @@ def test_bundle_worker_b_acceptance_summary_requires_typed_report_time_and_id_va
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8048,9 +8053,9 @@ def test_bundle_worker_b_acceptance_summary_requires_topic_and_shape_metadata_va
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8087,9 +8092,9 @@ def test_bundle_worker_b_acceptance_summary_requires_typed_expected_workers_vali
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8130,9 +8135,9 @@ def test_bundle_worker_b_acceptance_summary_requires_result_row_validation(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8175,9 +8180,9 @@ def test_bundle_worker_b_acceptance_summary_requires_result_row_field_allowlist_
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8220,9 +8225,9 @@ def test_bundle_worker_b_acceptance_summary_requires_required_result_name_valida
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8266,9 +8271,9 @@ def test_bundle_worker_b_acceptance_summary_requires_top_level_field_allowlist_v
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8318,9 +8323,9 @@ def test_bundle_worker_b_acceptance_summary_requires_structured_report_value_val
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8394,9 +8399,9 @@ def test_bundle_worker_b_acceptance_summary_requires_result_value_consistency_va
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8452,9 +8457,9 @@ def test_bundle_worker_b_acceptance_summary_requires_worker_status_payload_valid
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8518,9 +8523,9 @@ def test_bundle_worker_b_acceptance_summary_requires_worker_row_validation(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8588,9 +8593,9 @@ def test_bundle_worker_b_acceptance_summary_requires_regeneration_model_switch_v
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8636,9 +8641,9 @@ def test_bundle_worker_b_acceptance_summary_requires_exported_required_capabilit
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8697,9 +8702,9 @@ def test_bundle_worker_b_acceptance_summary_requires_report_locality_guard(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8741,9 +8746,9 @@ def test_bundle_worker_b_acceptance_summary_requires_nonstandard_report_guard_be
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8787,9 +8792,9 @@ def test_bundle_worker_b_acceptance_summary_requires_phase_chronology_guard(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8822,9 +8827,9 @@ def test_status_main_validates_worker_b_acceptance_bundle(tmp_path: Path, monkey
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -8979,7 +8984,7 @@ def test_bundle_worker_b_acceptance_summary_reports_stale_defaults(tmp_path: Pat
     assert "ALLOW_QUICK_TUNNEL_ACCEPTANCE=0" in summary
     assert 'REQUIRE_DIFFERENT_REGEN_MODEL="${REQUIRE_DIFFERENT_REGEN_MODEL:-1}"' in summary
     assert (
-        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-codex-gpt-5.5,gemini-2.5-flash}}"'
+        'WORKER_REQUIRED_CAPABILITIES="${WORKER_REQUIRED_CAPABILITIES:-${ALLOWED_MODELS:-gpt-5.6sol-medium,gemini-3.5-flash-loop}}"'
         in summary
     )
     assert 'ACCEPTANCE_PHASE="$MODE"' in summary
@@ -8988,9 +8993,9 @@ def test_bundle_worker_b_acceptance_summary_reports_stale_defaults(tmp_path: Pat
     assert "ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0" in summary
     assert "SKIP_STRICT_REPORT_VALIDATION=0" in summary
     assert "ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0" in summary
-    assert "WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash" in summary
-    assert "ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash" in summary
-    assert "GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>" in summary
+    assert "WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop" in summary
+    assert "ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop" in summary
+    assert "# Gemini loop uses existing agy CLI authentication." in summary
     assert "XAI_API_KEY=<optional-xai-api-key>" in summary
 
 
@@ -9012,9 +9017,9 @@ def test_bundle_worker_b_acceptance_summary_checks_nested_handoff_worker_bundle(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9052,9 +9057,9 @@ def test_bundle_worker_b_acceptance_summary_reports_prompt_before_guard_stale(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9093,9 +9098,9 @@ def test_bundle_worker_b_acceptance_summary_reports_prompt_before_capability_gua
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9129,9 +9134,9 @@ def test_bundle_worker_b_acceptance_summary_reports_prompt_before_different_mode
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9170,9 +9175,9 @@ def test_bundle_worker_b_acceptance_summary_reports_prompt_before_rehearsal_stri
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9212,9 +9217,9 @@ def test_bundle_worker_b_acceptance_summary_reports_prompt_before_phase_order_gu
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9251,9 +9256,9 @@ def test_bundle_worker_b_acceptance_summary_reports_current_validation_before_ac
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9287,9 +9292,9 @@ def test_bundle_worker_b_acceptance_summary_reports_misordered_strict_skip_guard
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9323,9 +9328,9 @@ def test_bundle_worker_b_acceptance_summary_reports_report_replacement_before_pr
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9358,9 +9363,9 @@ def test_bundle_worker_b_acceptance_summary_reports_exported_user_token_stale(
                 b"ALLOW_DISABLE_DIFFERENT_REGEN_MODEL_FOR_REHEARSAL=0\n"
                 b"SKIP_STRICT_REPORT_VALIDATION=0\n"
                 b"ALLOW_SKIP_STRICT_REPORT_VALIDATION_FOR_REHEARSAL=0\n"
-                b"WORKER_REQUIRED_CAPABILITIES=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"ALLOWED_MODELS=codex-gpt-5.5,gemini-2.5-flash\n"
-                b"GEMINI_API_KEY=<google-ai-studio-api-key-for-gemini-2.5-flash>\n"
+                b"WORKER_REQUIRED_CAPABILITIES=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"ALLOWED_MODELS=gpt-5.6sol-medium,gemini-3.5-flash-loop\n"
+                b"# Gemini loop uses existing agy CLI authentication.\n"
                 b"XAI_API_KEY=<optional-xai-api-key>\n"
             ),
         },
@@ -9997,10 +10002,10 @@ def test_acceptance_report_issues_rejects_malformed_structured_name_lists(
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
     payload["observed_worker_names"] = ["mac-mini", "mac-mini", "", 42]
-    payload["generated_model_ids"] = ["codex-gpt-5.5", "codex-gpt-5.5", "", None]
+    payload["generated_model_ids"] = ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", None]
     worker_name = payload["online_workers"][0]["name"]
     payload["online_workers"][0]["operator_note"] = "ignored-before-validation"
-    payload["online_workers"][0]["capabilities"] = ["codex-gpt-5.5", "codex-gpt-5.5", "", 7]
+    payload["online_workers"][0]["capabilities"] = ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 7]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -10015,11 +10020,11 @@ def test_acceptance_report_issues_rejects_malformed_structured_name_lists(
     assert any("observed_worker_names duplicates mac-mini" in issue for issue in issues)
     assert any("observed_worker_names[3] is blank" in issue for issue in issues)
     assert any("observed_worker_names[4] is not a string" in issue for issue in issues)
-    assert any("generated_model_ids duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("generated_model_ids duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("generated_model_ids[3] is blank" in issue for issue in issues)
     assert any("generated_model_ids[4] is not a string" in issue for issue in issues)
     assert any(f"online_workers.{worker_name} unexpected fields: operator_note" in issue for issue in issues)
-    assert any(f"online_workers.{worker_name} duplicate capability: codex-gpt-5.5" in issue for issue in issues)
+    assert any(f"online_workers.{worker_name} duplicate capability: gpt-5.6sol-medium" in issue for issue in issues)
     assert any(f"online_workers.{worker_name} capabilities[3] is blank" in issue for issue in issues)
     assert any(f"online_workers.{worker_name} capabilities[4] is not a string" in issue for issue in issues)
 
@@ -10048,7 +10053,7 @@ def test_acceptance_report_structured_names_ignores_non_string_values(
     module = load_status_report_module()
     payload = {
         "observed_worker_names": [" mac-mini ", "", 42, None, "adesso-mbp"],
-        "observed_model_ids": [" codex-gpt-5.5 ", True, "gemini-2.5-flash"],
+        "observed_model_ids": [" gpt-5.6sol-medium ", True, "gemini-3.5-flash-loop"],
     }
 
     assert module.acceptance_report_structured_names(payload, "observed_worker_names") == {
@@ -10056,8 +10061,8 @@ def test_acceptance_report_structured_names_ignores_non_string_values(
         "adesso-mbp",
     }
     assert module.acceptance_report_structured_names(payload, "observed_model_ids") == {
-        "codex-gpt-5.5",
-        "gemini-2.5-flash",
+        "gpt-5.6sol-medium",
+        "gemini-3.5-flash-loop",
     }
 
 
@@ -10226,15 +10231,15 @@ def test_acceptance_report_issues_requires_structured_settings_roundtrip_evidenc
     payload = production_acceptance_payload(module, "two-worker")
     for result in payload["results"]:
         if result["name"] == "settings-roundtrip":
-            result["detail"] = "2 configured models; model cap restored for codex-gpt-5.5; Grok cap $25.00"
+            result["detail"] = "2 configured models; model cap restored for gpt-5.6sol-medium; Grok cap $25.00"
             result["evidence"] = {
                 "operator_note": "ignored-before-validation",
                 "configured_model_count": 3,
-                "configured_models": ["codex-gpt-5.5", "claude-sonnet-4-6", "codex-gpt-5.5", "", 42],
+                "configured_models": ["gpt-5.6sol-medium", "claude-sonnet-5-high-loop", "gpt-5.6sol-medium", "", 42],
                 "cap_model": "phantom-model",
-                "original_enabled_models": ["codex-gpt-5.5", "claude-sonnet-4-6", "claude-sonnet-4-6", "", 42],
-                "temporary_enabled_models": ["codex-gpt-5.5", "", False],
-                "restored_enabled_models": ["codex-gpt-5.5"],
+                "original_enabled_models": ["gpt-5.6sol-medium", "claude-sonnet-5-high-loop", "claude-sonnet-5-high-loop", "", 42],
+                "temporary_enabled_models": ["gpt-5.6sol-medium", "", False],
+                "restored_enabled_models": ["gpt-5.6sol-medium"],
                 "enabled_models_restored": False,
                 "original_grok_cap_usd": 25.0,
                 "temporary_grok_cap_usd": 25.0,
@@ -10244,7 +10249,7 @@ def test_acceptance_report_issues_requires_structured_settings_roundtrip_evidenc
                 "temporary_model_cap_usd": 10.0,
                 "restored_model_cap_usd": 11.0,
                 "model_cap_restored": False,
-                "model_monthly_spend_models": ["codex-gpt-5.5", "codex-gpt-5.5", "", None],
+                "model_monthly_spend_models": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", None],
                 "model_pricing_models": [],
                 "grok_pricing_input": -1.0,
                 "grok_pricing_output": 2.5,
@@ -10262,13 +10267,13 @@ def test_acceptance_report_issues_requires_structured_settings_roundtrip_evidenc
     )
 
     assert any("settings roundtrip evidence unexpected fields: operator_note" in issue for issue in issues)
-    assert any("settings roundtrip evidence configured_models duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("settings roundtrip evidence configured_models duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("settings roundtrip evidence configured_models[4] is blank" in issue for issue in issues)
     assert any("settings roundtrip evidence configured_models[5] is not a string" in issue for issue in issues)
     assert any("settings roundtrip evidence configured_model_count=3, want 2" in issue for issue in issues)
     assert any("settings roundtrip result detail does not match cap_model" in issue for issue in issues)
     assert any("settings roundtrip evidence cap_model is not configured: phantom-model" in issue for issue in issues)
-    assert any("settings roundtrip evidence original_enabled_models duplicates claude-sonnet-4-6" in issue for issue in issues)
+    assert any("settings roundtrip evidence original_enabled_models duplicates claude-sonnet-5-high-loop" in issue for issue in issues)
     assert any("settings roundtrip evidence original_enabled_models[4] is blank" in issue for issue in issues)
     assert any("settings roundtrip evidence original_enabled_models[5] is not a string" in issue for issue in issues)
     assert any("settings roundtrip evidence restored_enabled_models mismatch" in issue for issue in issues)
@@ -10284,12 +10289,12 @@ def test_acceptance_report_issues_requires_structured_settings_roundtrip_evidenc
     assert any("settings roundtrip evidence restored_model_cap_usd mismatch" in issue for issue in issues)
     assert any("settings roundtrip evidence model_cap_restored is not true" in issue for issue in issues)
     assert any("settings roundtrip evidence model_monthly_caps_models missing" in issue for issue in issues)
-    assert any("settings roundtrip evidence model_monthly_spend_models duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("settings roundtrip evidence model_monthly_spend_models duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("settings roundtrip evidence model_monthly_spend_models[3] is blank" in issue for issue in issues)
     assert any("settings roundtrip evidence model_monthly_spend_models[4] is not a string" in issue for issue in issues)
     assert any("settings roundtrip evidence model_pricing_models missing" in issue for issue in issues)
-    assert any("settings roundtrip evidence missing cap models: claude-sonnet-4-6, codex-gpt-5.5" in issue for issue in issues)
-    assert any("settings roundtrip evidence missing spend models: claude-sonnet-4-6" in issue for issue in issues)
+    assert any("settings roundtrip evidence missing cap models: claude-sonnet-5-high-loop, gpt-5.6sol-medium" in issue for issue in issues)
+    assert any("settings roundtrip evidence missing spend models: claude-sonnet-5-high-loop" in issue for issue in issues)
 
 
 def test_acceptance_report_issues_requires_typed_settings_cap_model_evidence(
@@ -10881,7 +10886,7 @@ def test_acceptance_report_issues_rejects_malformed_top_level_production_fields(
     payload["skip_web_checks"] = 0
     payload["skip_sse_check"] = None
     payload["error"] = False
-    payload["regeneration_model_switch"] = "codex-gpt-5.5 -> gemini-2.5-flash"
+    payload["regeneration_model_switch"] = "gpt-5.6sol-medium -> gemini-3.5-flash-loop"
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -11024,15 +11029,15 @@ def test_acceptance_report_issues_rejects_placeholder_model_ids_for_production_s
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    payload["observed_model_ids"] = ["codex-gpt-5.5", "<second-model>"]
-    payload["generated_model_ids"] = ["codex-gpt-5.5", "<second-model>"]
-    payload["regenerated_model_ids"] = ["codex-gpt-5.5", "<second-model>"]
-    payload["regeneration_model_switch"] = {"old_model": "codex-gpt-5.5", "new_model": "<second-model>"}
+    payload["observed_model_ids"] = ["gpt-5.6sol-medium", "<second-model>"]
+    payload["generated_model_ids"] = ["gpt-5.6sol-medium", "<second-model>"]
+    payload["regenerated_model_ids"] = ["gpt-5.6sol-medium", "<second-model>"]
+    payload["regeneration_model_switch"] = {"old_model": "gpt-5.6sol-medium", "new_model": "<second-model>"}
     for result in payload["results"]:
         if result["name"] in {"generated-models", "regenerated-models"}:
-            result["detail"] = "codex-gpt-5.5, <second-model>"
+            result["detail"] = "gpt-5.6sol-medium, <second-model>"
         elif result["name"] == "regeneration-model-switch":
-            result["detail"] = "codex-gpt-5.5 -> <second-model>"
+            result["detail"] = "gpt-5.6sol-medium -> <second-model>"
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -11088,7 +11093,7 @@ def test_acceptance_report_issues_requires_observed_model_ids_to_match_evidence(
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    payload["observed_model_ids"] = ["codex-gpt-5.5", "claude-opus-4.7"]
+    payload["observed_model_ids"] = ["gpt-5.6sol-medium", "claude-opus-4.7"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -11100,7 +11105,7 @@ def test_acceptance_report_issues_requires_observed_model_ids_to_match_evidence(
         require_production_scope=True,
     )
 
-    assert any("observed model ids missing generated values: gemini-2.5-flash" in issue for issue in issues)
+    assert any("observed model ids missing generated values: gemini-3.5-flash-loop" in issue for issue in issues)
     assert any("observed model ids include ungenerated values: claude-opus-4.7" in issue for issue in issues)
 
 
@@ -11115,7 +11120,7 @@ def test_acceptance_report_issues_requires_final_required_capability_evidence(
     payload = production_acceptance_payload(module, "two-worker")
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,grok-4.5-high-loop")
 
     issues = module.acceptance_report_issues(
         report,
@@ -11125,9 +11130,9 @@ def test_acceptance_report_issues_requires_final_required_capability_evidence(
         require_production_scope=True,
     )
 
-    assert any("final required model ids missing observed evidence: grok-4.5" in issue for issue in issues)
+    assert any("final required model ids missing observed evidence: grok-4.5-high-loop" in issue for issue in issues)
     assert any(
-        "online worker row adesso-mbp missing final required capabilities: grok-4.5" in issue
+        "online worker row adesso-mbp missing final required capabilities: grok-4.5-high-loop" in issue
         for issue in issues
     )
 
@@ -11233,7 +11238,7 @@ def test_acceptance_report_issues_does_not_use_result_details_as_structured_mode
 
     assert any("observed model ids missing" in issue for issue in issues)
     assert any("generated model ids missing" in issue for issue in issues)
-    assert any("final required model ids missing observed evidence: codex-gpt-5.5, gemini-2.5-flash" in issue for issue in issues)
+    assert any("final required model ids missing observed evidence: gemini-3.5-flash-loop, gpt-5.6sol-medium" in issue for issue in issues)
     assert any("generated model ids result detail mismatch: structured none" in issue for issue in issues)
 
 
@@ -11251,8 +11256,8 @@ def test_acceptance_report_issues_requires_generated_result_values_to_match_stru
             result["detail"] = "mac-mini"
             result["evidence"] = ["mac-mini"]
         elif result["name"] == "generated-models":
-            result["detail"] = "codex-gpt-5.5"
-            result["evidence"] = ["codex-gpt-5.5"]
+            result["detail"] = "gpt-5.6sol-medium"
+            result["evidence"] = ["gpt-5.6sol-medium"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -11284,7 +11289,7 @@ def test_acceptance_report_issues_rejects_malformed_result_value_evidence_lists(
         if result["name"] == "generated-workers":
             result["evidence"] = ["mac-mini", "adesso-mbp", "mac-mini", "", {"name": "phantom"}]
         elif result["name"] == "generated-models":
-            result["evidence"] = ["codex-gpt-5.5", "gemini-2.5-flash", "codex-gpt-5.5", "", 123]
+            result["evidence"] = ["gpt-5.6sol-medium", "gemini-3.5-flash-loop", "gpt-5.6sol-medium", "", 123]
         elif result["name"] == "workers-online":
             duplicate_worker = result["evidence"][0]["name"]
             result["evidence"].append(copy.deepcopy(result["evidence"][0]))
@@ -11305,7 +11310,7 @@ def test_acceptance_report_issues_rejects_malformed_result_value_evidence_lists(
     assert any("generated workers result evidence duplicates mac-mini" in issue for issue in issues)
     assert any("generated workers result evidence[4] is blank" in issue for issue in issues)
     assert any("generated workers result evidence[5] is not a string" in issue for issue in issues)
-    assert any("generated model ids result evidence duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("generated model ids result evidence duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("generated model ids result evidence[4] is blank" in issue for issue in issues)
     assert any("generated model ids result evidence[5] is not a string" in issue for issue in issues)
     assert any(f"online worker rows result evidence duplicates {duplicate_worker}" in issue for issue in issues)
@@ -11873,7 +11878,7 @@ def test_acceptance_report_issues_requires_structured_public_surface_evidence(
                         "status": 42,
                         "created_at": "2026-05-24T00:00:00+00:00",
                         "completed_at": None,
-                        "models": ["codex-gpt-5.5"],
+                        "models": ["gpt-5.6sol-medium"],
                     },
                 ],
             }
@@ -11964,7 +11969,7 @@ def test_acceptance_report_issues_requires_public_list_current_debate_evidence(
         if result["name"] == "public-list":
             result["evidence"]["items"][0]["topic"] = "A stale public debate"
             result["evidence"]["items"][0]["status"] = "generating"
-            result["evidence"]["items"][0]["models"] = ["codex-gpt-5.5"]
+            result["evidence"]["items"][0]["models"] = ["gpt-5.6sol-medium"]
             break
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
@@ -11980,7 +11985,7 @@ def test_acceptance_report_issues_requires_public_list_current_debate_evidence(
     assert any("public list evidence current debate topic mismatch" in issue for issue in issues)
     assert any("public list evidence current debate status is not complete" in issue for issue in issues)
     assert any(
-        "public list evidence current debate models missing observed model ids: gemini-2.5-flash" in issue
+        "public list evidence current debate models missing observed model ids: gemini-3.5-flash-loop" in issue
         for issue in issues
     )
 
@@ -12034,9 +12039,9 @@ def test_acceptance_report_issues_requires_web_home_current_debate_evidence(
             result["evidence"]["current_topic_present"] = False
             result["evidence"]["current_status"] = "generating"
             result["evidence"]["current_status_present"] = False
-            result["evidence"]["current_model_ids"] = ["codex-gpt-5.5"]
+            result["evidence"]["current_model_ids"] = ["gpt-5.6sol-medium"]
             result["evidence"]["current_model_markers_present"] = {
-                "codex-gpt-5.5": False,
+                "gpt-5.6sol-medium": False,
                 "spare-model": True,
             }
             break
@@ -12062,7 +12067,7 @@ def test_acceptance_report_issues_requires_web_home_current_debate_evidence(
         "web home evidence current_model_markers_present unexpected fields: spare-model" in issue
         for issue in issues
     )
-    assert any("web home evidence missing current model marker: codex-gpt-5.5" in issue for issue in issues)
+    assert any("web home evidence missing current model marker: gpt-5.6sol-medium" in issue for issue in issues)
 
 
 def test_acceptance_report_issues_requires_typed_web_home_url_evidence(
@@ -12125,7 +12130,7 @@ def test_acceptance_report_issues_requires_structured_worker_status_payload_evid
                         "id": "",
                         "name": "mac-mini",
                         "status": "offline",
-                        "capabilities": ["codex-gpt-5.5", "codex-gpt-5.5", "", 42],
+                        "capabilities": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42],
                         "operator_note": "ignored-before-validation",
                         "last_seen": "not-a-date",
                     },
@@ -12154,7 +12159,7 @@ def test_acceptance_report_issues_requires_structured_worker_status_payload_evid
     assert any("worker status payload evidence unexpected fields: operator_note" in issue for issue in issues)
     assert any("worker status payload evidence workers[1] missing id" in issue for issue in issues)
     assert any("worker status payload evidence mac-mini unexpected fields: operator_note" in issue for issue in issues)
-    assert any("worker status payload evidence mac-mini duplicate capability: codex-gpt-5.5" in issue for issue in issues)
+    assert any("worker status payload evidence mac-mini duplicate capability: gpt-5.6sol-medium" in issue for issue in issues)
     assert any("worker status payload evidence mac-mini capabilities[3] is blank" in issue for issue in issues)
     assert any(
         "worker status payload evidence mac-mini capabilities[4] is not a string" in issue
@@ -12232,13 +12237,13 @@ def test_acceptance_report_issues_requires_structured_debate_lifecycle_evidence(
                 ],
             }
         elif result["name"] == "role-overrides":
-            result["detail"] = "decomposer primary codex-gpt-5.5; persisted and used by root job"
+            result["detail"] = "decomposer primary gpt-5.6sol-medium; persisted and used by root job"
             result["evidence"] = {
                 "operator_note": "ignored-before-validation",
                 "expected_model": "phantom-model",
-                "persisted_primary": "codex-gpt-5.5",
-                "persisted_fallback": ["codex-gpt-5.5", "codex-gpt-5.5", "", 42],
-                "root_generation_model_id": "claude-sonnet-4-6",
+                "persisted_primary": "gpt-5.6sol-medium",
+                "persisted_fallback": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42],
+                "root_generation_model_id": "claude-sonnet-5-high-loop",
                 "persisted": False,
                 "root_job_used_override": False,
                 "root_node_id": "",
@@ -12262,7 +12267,7 @@ def test_acceptance_report_issues_requires_structured_debate_lifecycle_evidence(
                 "node_count": 0,
                 "synthesis_id": "",
                 "root_node_id": "",
-                "model_ids": ["codex-gpt-5.5", "codex-gpt-5.5", "", 42, "phantom-model"],
+                "model_ids": ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42, "phantom-model"],
                 "worker_names": ["mac-mini", "mac-mini", "", 42, "spare-mac"],
                 "active_generation_ids": [
                     ROOT_GENERATION_ID,
@@ -12315,7 +12320,7 @@ def test_acceptance_report_issues_requires_structured_debate_lifecycle_evidence(
     assert any("role override evidence unexpected fields: operator_note" in issue for issue in issues)
     assert any("role override evidence expected_model is not observed: phantom-model" in issue for issue in issues)
     assert any("role override evidence persisted_primary mismatch" in issue for issue in issues)
-    assert any("role override evidence persisted_fallback duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("role override evidence persisted_fallback duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("role override evidence persisted_fallback[3] is blank" in issue for issue in issues)
     assert any("role override evidence persisted_fallback[4] is not a string" in issue for issue in issues)
     assert any("role override evidence root_generation_model_id mismatch" in issue for issue in issues)
@@ -12332,7 +12337,7 @@ def test_acceptance_report_issues_requires_structured_debate_lifecycle_evidence(
     assert any("persistence evidence node_count must be positive" in issue for issue in issues)
     assert any("persistence evidence status is not complete" in issue for issue in issues)
     assert any("persistence evidence topic mismatch" in issue for issue in issues)
-    assert any("persistence evidence model_ids duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("persistence evidence model_ids duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("persistence evidence model_ids[3] is blank" in issue for issue in issues)
     assert any("persistence evidence model_ids[4] is not a string" in issue for issue in issues)
     assert any("persistence model evidence mismatch" in issue for issue in issues)
@@ -12530,8 +12535,8 @@ def test_acceptance_report_issues_requires_regeneration_switch_to_match_result_e
     payload = production_acceptance_payload(module, "two-worker")
     for result in payload["results"]:
         if result["name"] == "regeneration-model-switch":
-            result["detail"] = "codex-gpt-5.5 -> codex-gpt-5.5"
-            result["evidence"] = {"old_model": "codex-gpt-5.5", "new_model": "codex-gpt-5.5"}
+            result["detail"] = "gpt-5.6sol-medium -> gpt-5.6sol-medium"
+            result["evidence"] = {"old_model": "gpt-5.6sol-medium", "new_model": "gpt-5.6sol-medium"}
             break
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
@@ -12595,15 +12600,15 @@ def test_acceptance_report_issues_requires_regeneration_switch_to_match_history(
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
     payload["regeneration_model_switch"] = {
-        "old_model": "claude-sonnet-4-6",
-        "new_model": "codex-gpt-5.5",
+        "old_model": "claude-sonnet-5-high-loop",
+        "new_model": "gpt-5.6sol-medium",
     }
     for result in payload["results"]:
         if result["name"] == "regeneration-model-switch":
-            result["detail"] = "claude-sonnet-4-6 -> codex-gpt-5.5"
+            result["detail"] = "claude-sonnet-5-high-loop -> gpt-5.6sol-medium"
             result["evidence"] = {
-                "old_model": "claude-sonnet-4-6",
-                "new_model": "codex-gpt-5.5",
+                "old_model": "claude-sonnet-5-high-loop",
+                "new_model": "gpt-5.6sol-medium",
             }
             break
     report = tmp_path / "acceptance.json"
@@ -13159,7 +13164,7 @@ def test_acceptance_report_issues_requires_structured_web_debate_detail_evidence
             result["evidence"]["localhost_export_link"] = True
             result["evidence"]["synthesis_markers"] = False
             result["evidence"]["worker_names"] = ["mac-mini", "mac-mini", "", 42, "spare-mac"]
-            result["evidence"]["model_ids"] = ["codex-gpt-5.5", "codex-gpt-5.5", "", 42, "claude-opus-4.7"]
+            result["evidence"]["model_ids"] = ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42, "claude-opus-4.7"]
             result["evidence"]["worker_count"] = 3
             result["evidence"]["model_count"] = 3
             break
@@ -13192,7 +13197,7 @@ def test_acceptance_report_issues_requires_structured_web_debate_detail_evidence
     assert any("web debate detail evidence worker_names[4] is not a string" in issue for issue in issues)
     assert any("web debate detail worker evidence mismatch" in issue for issue in issues)
     assert any("web debate detail worker name is not observed: spare-mac" in issue for issue in issues)
-    assert any("web debate detail evidence model_ids duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("web debate detail evidence model_ids duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("web debate detail evidence model_ids[3] is blank" in issue for issue in issues)
     assert any("web debate detail evidence model_ids[4] is not a string" in issue for issue in issues)
     assert any("web debate detail model evidence mismatch" in issue for issue in issues)
@@ -13222,7 +13227,7 @@ def test_acceptance_report_issues_requires_structured_markdown_export_evidence(
             result["evidence"]["filename_debate_id"] = False
             result["evidence"]["synthesis_section"] = False
             result["evidence"]["worker_names"] = ["mac-mini", "mac-mini", "", 42, "spare-mac"]
-            result["evidence"]["model_ids"] = ["codex-gpt-5.5", "codex-gpt-5.5", "", 42, "claude-opus-4.7"]
+            result["evidence"]["model_ids"] = ["gpt-5.6sol-medium", "gpt-5.6sol-medium", "", 42, "claude-opus-4.7"]
             result["evidence"]["history_generation_ids"] = [
                 GENERATED_GENERATION_IDS[1],
                 GENERATED_GENERATION_IDS[1],
@@ -13266,7 +13271,7 @@ def test_acceptance_report_issues_requires_structured_markdown_export_evidence(
     assert any("markdown export evidence worker_names[4] is not a string" in issue for issue in issues)
     assert any("markdown export worker evidence mismatch" in issue for issue in issues)
     assert any("markdown export worker name is not observed: spare-mac" in issue for issue in issues)
-    assert any("markdown export evidence model_ids duplicates codex-gpt-5.5" in issue for issue in issues)
+    assert any("markdown export evidence model_ids duplicates gpt-5.6sol-medium" in issue for issue in issues)
     assert any("markdown export evidence model_ids[3] is blank" in issue for issue in issues)
     assert any("markdown export evidence model_ids[4] is not a string" in issue for issue in issues)
     assert any("markdown export model evidence mismatch" in issue for issue in issues)
@@ -13303,7 +13308,7 @@ def test_acceptance_report_issues_rejects_unexpected_worker_evidence_for_product
         {
             "name": "spare-mac",
             "status": "online",
-            "capabilities": ["claude-sonnet-4-6", "codex-gpt-5.5"],
+            "capabilities": ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
             "current_job_id": None,
             "last_seen": "2026-05-24T00:00:00+00:00",
         }
@@ -13913,7 +13918,7 @@ def test_acceptance_report_issues_requires_regenerate_history_metadata_consisten
             evidence["nodes"][0]["worker_name"] = "adesso-mbp"
             evidence["nodes"][0]["role"] = "opponent"
         elif result["name"] == "regenerated-node-metadata":
-            evidence["nodes"][0]["model_id"] = "codex-gpt-5.5"
+            evidence["nodes"][0]["model_id"] = "gpt-5.6sol-medium"
             evidence["nodes"][0]["worker_id"] = "22222222-2222-4222-8222-222222222222"
             evidence["nodes"][0]["worker_name"] = "adesso-mbp"
             evidence["nodes"][0]["role"] = "opponent"
@@ -13948,7 +13953,7 @@ def test_acceptance_report_issues_requires_sse_start_metadata_consistency(
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    other_model = next((model for model in payload["generated_model_ids"] if model != "codex-gpt-5.5"), "gemini-2.5-flash")
+    other_model = next((model for model in payload["generated_model_ids"] if model != "gpt-5.6sol-medium"), "gemini-3.5-flash-loop")
     other_worker_id = "22222222-2222-4222-8222-222222222222"
     for result in payload["results"]:
         evidence = result["evidence"]
@@ -13959,10 +13964,10 @@ def test_acceptance_report_issues_requires_sse_start_metadata_consistency(
             evidence["synthesis_started_payloads"][0]["model_id"] = other_model
             evidence["synthesis_started_payloads"][0]["worker_id"] = other_worker_id
         elif result["name"] == "regenerate-sse-stream":
-            evidence["node_started_payloads"][0]["model_id"] = "codex-gpt-5.5"
+            evidence["node_started_payloads"][0]["model_id"] = "gpt-5.6sol-medium"
             evidence["node_started_payloads"][0]["worker_id"] = other_worker_id
             evidence["node_started_payloads"][0]["role"] = "opponent"
-            evidence["synthesis_started_payloads"][0]["model_id"] = "codex-gpt-5.5"
+            evidence["synthesis_started_payloads"][0]["model_id"] = "gpt-5.6sol-medium"
             evidence["synthesis_started_payloads"][0]["worker_id"] = other_worker_id
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
@@ -14137,7 +14142,7 @@ def test_acceptance_report_issues_requires_online_worker_model_capabilities_for_
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    payload["online_workers"][0]["capabilities"] = ["codex-gpt-5.5"]
+    payload["online_workers"][0]["capabilities"] = ["gpt-5.6sol-medium"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -14150,7 +14155,7 @@ def test_acceptance_report_issues_requires_online_worker_model_capabilities_for_
     )
 
     assert any(
-        "online worker row adesso-mbp missing observed model capabilities: gemini-2.5-flash" in issue
+        "online worker row adesso-mbp missing observed model capabilities: gemini-3.5-flash-loop" in issue
         for issue in issues
     )
 
@@ -14164,7 +14169,7 @@ def test_acceptance_report_issues_requires_offline_worker_model_capabilities_for
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "failover-one-worker")
-    payload["offline_workers"][0]["capabilities"] = ["codex-gpt-5.5"]
+    payload["offline_workers"][0]["capabilities"] = ["gpt-5.6sol-medium"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -14177,7 +14182,7 @@ def test_acceptance_report_issues_requires_offline_worker_model_capabilities_for
     )
 
     assert any(
-        "offline worker row adesso-mbp missing observed model capabilities: gemini-2.5-flash" in issue
+        "offline worker row adesso-mbp missing observed model capabilities: gemini-3.5-flash-loop" in issue
         for issue in issues
     )
 
@@ -14191,8 +14196,8 @@ def test_acceptance_report_issues_rejects_placeholder_or_mock_online_capabilitie
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    payload["online_workers"][0]["capabilities"] = ["codex-gpt-5.5", "<second-model>"]
-    payload["online_workers"][1]["capabilities"] = ["codex-gpt-5.5", "mock-beta"]
+    payload["online_workers"][0]["capabilities"] = ["gpt-5.6sol-medium", "<second-model>"]
+    payload["online_workers"][1]["capabilities"] = ["gpt-5.6sol-medium", "mock-beta"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -14217,7 +14222,7 @@ def test_acceptance_report_issues_rejects_placeholder_or_mock_offline_capabiliti
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "failover-one-worker")
-    payload["offline_workers"][0]["capabilities"] = ["codex-gpt-5.5", "<second-model>", "mock-beta"]
+    payload["offline_workers"][0]["capabilities"] = ["gpt-5.6sol-medium", "<second-model>", "mock-beta"]
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
 
@@ -14331,7 +14336,7 @@ def test_acceptance_report_issues_rejects_expected_offline_worker_online_row(
         {
             "name": "adesso-mbp",
             "status": "online",
-            "capabilities": ["codex-gpt-5.5"],
+            "capabilities": ["gpt-5.6sol-medium"],
             "current_job_id": None,
             "last_seen": "2026-05-24T00:00:00+00:00",
         }
@@ -14359,10 +14364,10 @@ def test_acceptance_report_issues_requires_real_regeneration_switch_detail(
     source = tmp_path / "acceptance_check.py"
     source.write_text("# source\n")
     payload = production_acceptance_payload(module, "two-worker")
-    payload["regeneration_model_switch"] = {"old_model": "codex-gpt-5.5", "new_model": "codex-gpt-5.5"}
+    payload["regeneration_model_switch"] = {"old_model": "gpt-5.6sol-medium", "new_model": "gpt-5.6sol-medium"}
     for result in payload["results"]:
         if result["name"] == "regeneration-model-switch":
-            result["detail"] = "codex-gpt-5.5 -> codex-gpt-5.5"
+            result["detail"] = "gpt-5.6sol-medium -> gpt-5.6sol-medium"
             break
     report = tmp_path / "acceptance.json"
     report.write_text(json.dumps(payload))
@@ -14375,7 +14380,7 @@ def test_acceptance_report_issues_requires_real_regeneration_switch_detail(
         require_production_scope=True,
     )
 
-    assert any("regeneration model switch used same model: codex-gpt-5.5" in issue for issue in issues)
+    assert any("regeneration model switch used same model: gpt-5.6sol-medium" in issue for issue in issues)
 
 
 def test_acceptance_report_issues_reports_failed_stale_phase_and_checks(
@@ -14600,7 +14605,7 @@ def test_strict_production_issues_include_worker_launchd_api_key_gaps(tmp_path: 
         module,
         "final_worker_launchd_api_key_issues",
         lambda *args, **kwargs: [
-            "Worker A launchd API key missing for gemini-2.5-flash: "
+            "Worker A launchd API key missing for gemini-3.5-flash-loop: "
             "GEMINI_API_KEY is not set in the installed worker launchd environment; "
             "rerun make install-worker with GEMINI_API_KEY present"
         ],
@@ -14614,7 +14619,7 @@ def test_strict_production_issues_include_worker_launchd_api_key_gaps(tmp_path: 
     )
 
     assert issues == [
-        "Worker A launchd API key missing for gemini-2.5-flash: "
+        "Worker A launchd API key missing for gemini-3.5-flash-loop: "
         "GEMINI_API_KEY is not set in the installed worker launchd environment; "
         "rerun make install-worker with GEMINI_API_KEY present"
     ]
@@ -14628,7 +14633,7 @@ def test_strict_production_issues_include_worker_config_capability_gaps(tmp_path
         module,
         "final_worker_config_capability_issues",
         lambda *args, **kwargs: [
-            "Worker A config allowed_models missing final required capabilities: gemini-2.5-flash"
+            "Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop"
         ],
     )
 
@@ -14639,7 +14644,7 @@ def test_strict_production_issues_include_worker_config_capability_gaps(tmp_path
         local_issues_by_name={},
     )
 
-    assert issues == ["Worker A config allowed_models missing final required capabilities: gemini-2.5-flash"]
+    assert issues == ["Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop"]
 
 
 def test_strict_production_issues_include_worker_config_topology_gaps(tmp_path: Path, monkeypatch) -> None:
@@ -14667,7 +14672,7 @@ def test_strict_production_issues_rejects_single_final_required_capability(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium")
     module = load_status_report_module()
     stub_successful_strict_production_checks(module, monkeypatch)
 
@@ -14688,7 +14693,7 @@ def test_final_required_capability_issues_reject_placeholder_and_mock_models(
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     module = load_status_report_module()
 
-    issues = module.final_required_capability_issues(["codex-gpt-5.5", "<second-model>", "mock-alpha"])
+    issues = module.final_required_capability_issues(["gpt-5.6sol-medium", "<second-model>", "mock-alpha"])
 
     assert "final required capabilities include placeholder model ids: <second-model>" in issues
     assert "final required capabilities include mock model ids: mock-alpha" in issues
@@ -14701,12 +14706,12 @@ def test_final_required_capability_issues_reject_blank_duplicate_and_untyped_mod
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     module = load_status_report_module()
 
-    issues = module.final_required_capability_issues(["codex-gpt-5.5", "", 42, "codex-gpt-5.5"])
+    issues = module.final_required_capability_issues(["gpt-5.6sol-medium", "", 42, "gpt-5.6sol-medium"])
 
     assert issues == [
         "final required capabilities[2] is blank",
         "final required capabilities[3] is not a string",
-        "final required capabilities duplicates codex-gpt-5.5",
+        "final required capabilities duplicates gpt-5.6sol-medium",
         "final required capabilities must list at least two distinct real model ids",
     ]
 
@@ -14718,7 +14723,7 @@ def test_strict_production_issues_reject_duplicate_final_required_capabilities(
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     monkeypatch.setenv(
         "WORKER_REQUIRED_CAPABILITIES",
-        "codex-gpt-5.5,,gemini-2.5-flash,codex-gpt-5.5",
+        "gpt-5.6sol-medium,,gemini-3.5-flash-loop,gpt-5.6sol-medium",
     )
     module = load_status_report_module()
     stub_successful_strict_production_checks(module, monkeypatch)
@@ -14732,12 +14737,13 @@ def test_strict_production_issues_reject_duplicate_final_required_capabilities(
 
     assert issues == [
         "final required capabilities[2] is blank",
-        "final required capabilities duplicates codex-gpt-5.5",
+        "final required capabilities duplicates gpt-5.6sol-medium",
     ]
 
 
 def test_final_worker_launchd_api_key_summary_reports_ready_keys(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-2.5-flash")
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
@@ -14751,6 +14757,7 @@ def test_final_worker_launchd_api_key_summary_reports_ready_keys(tmp_path: Path,
 
 def test_final_worker_launchd_api_key_summary_rejects_shell_only_key(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-2.5-flash")
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
@@ -14775,7 +14782,7 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "codex-gpt-5.5,grok-4.5")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,grok-4.5")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
@@ -14783,7 +14790,7 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
         plistlib.dump({"EnvironmentVariables": {"XAI_API_KEY": "xai-secret"}}, file)
     monkeypatch.setattr(module, "INSTALLED_WORKER_LAUNCHD_PLIST", plist_path)
 
-    assert module.final_required_capabilities() == ["codex-gpt-5.5", "grok-4.5"]
+    assert module.final_required_capabilities() == ["gpt-5.6sol-medium", "grok-4.5"]
     assert module.final_worker_launchd_api_key_issues() == []
     assert module.final_worker_launchd_api_key_summary() == "ready (XAI_API_KEY for grok-4.5)"
 
@@ -14992,7 +14999,7 @@ def test_final_worker_config_capability_summary_reports_ready_allowlist(
     module = load_status_report_module()
     config_path = tmp_path / "worker.toml"
     config_path.write_text(
-        'allowed_models = ["codex-gpt-5.5", "gemini-2.5-flash"]\n',
+        'allowed_models = ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"]\n',
         encoding="utf-8",
     )
     plist_path = tmp_path / "com.dialectical.worker.plist"
@@ -15001,7 +15008,7 @@ def test_final_worker_config_capability_summary_reports_ready_allowlist(
     monkeypatch.setattr(module, "INSTALLED_WORKER_LAUNCHD_PLIST", plist_path)
 
     assert module.final_worker_config_capability_issues() == []
-    assert module.final_worker_config_capability_summary() == "ready (allowed_models=codex-gpt-5.5,gemini-2.5-flash)"
+    assert module.final_worker_config_capability_summary() == "ready (allowed_models=gpt-5.6sol-medium,gemini-3.5-flash-loop)"
 
 
 def test_final_worker_config_capability_summary_rejects_missing_final_allowlist(
@@ -15011,7 +15018,7 @@ def test_final_worker_config_capability_summary_rejects_missing_final_allowlist(
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     module = load_status_report_module()
     config_path = tmp_path / "worker.toml"
-    config_path.write_text('allowed_models = ["codex-gpt-5.5"]\n', encoding="utf-8")
+    config_path.write_text('allowed_models = ["gpt-5.6sol-medium"]\n', encoding="utf-8")
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
         plistlib.dump({"EnvironmentVariables": {"DIALECTICAL_WORKER_CONFIG": str(config_path)}}, file)
@@ -15019,8 +15026,8 @@ def test_final_worker_config_capability_summary_rejects_missing_final_allowlist(
 
     issues = module.final_worker_config_capability_issues()
 
-    assert issues == ["Worker A config allowed_models missing final required capabilities: gemini-2.5-flash"]
-    assert "blocked (Worker A config allowed_models missing final required capabilities: gemini-2.5-flash)" == (
+    assert issues == ["Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop"]
+    assert "blocked (Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop)" == (
         module.final_worker_config_capability_summary()
     )
 
@@ -15032,14 +15039,14 @@ def test_final_worker_config_capability_summary_rejects_launchd_allowed_model_ov
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     module = load_status_report_module()
     config_path = tmp_path / "worker.toml"
-    config_path.write_text('allowed_models = ["codex-gpt-5.5", "gemini-2.5-flash"]\n', encoding="utf-8")
+    config_path.write_text('allowed_models = ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"]\n', encoding="utf-8")
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
         plistlib.dump(
             {
                 "EnvironmentVariables": {
                     "DIALECTICAL_WORKER_CONFIG": str(config_path),
-                    "DIALECTICAL_ALLOWED_MODELS": "codex-gpt-5.5,<second-model>,mock-local",
+                    "DIALECTICAL_ALLOWED_MODELS": "gpt-5.6sol-medium,<second-model>,mock-local",
                 }
             },
             file,
@@ -15049,7 +15056,7 @@ def test_final_worker_config_capability_summary_rejects_launchd_allowed_model_ov
     issues = module.final_worker_config_capability_issues()
 
     assert issues == [
-        "Worker A launchd DIALECTICAL_ALLOWED_MODELS missing final required capabilities: gemini-2.5-flash",
+        "Worker A launchd DIALECTICAL_ALLOWED_MODELS missing final required capabilities: gemini-3.5-flash-loop",
         "Worker A launchd DIALECTICAL_ALLOWED_MODELS include placeholder model ids: <second-model>",
         "Worker A launchd DIALECTICAL_ALLOWED_MODELS include mock model ids: mock-local",
     ]
@@ -15072,7 +15079,7 @@ def test_final_worker_config_capability_summary_rejects_non_string_config_allowl
 
     assert issues == [
         "Worker A config allowed_models[1] is not a string",
-        "Worker A config allowed_models missing final required capabilities: codex-gpt-5.5, gemini-2.5-flash",
+        "Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop, gpt-5.6sol-medium",
     ]
     assert module.final_worker_config_capability_summary().startswith(
         "blocked (Worker A config allowed_models[1] is not a string;"
@@ -15087,7 +15094,7 @@ def test_final_worker_config_capability_summary_rejects_blank_and_duplicate_conf
     module = load_status_report_module()
     config_path = tmp_path / "worker.toml"
     config_path.write_text(
-        'allowed_models = ["codex-gpt-5.5", "", "codex-gpt-5.5", "gemini-2.5-flash"]\n',
+        'allowed_models = ["gpt-5.6sol-medium", "", "gpt-5.6sol-medium", "gemini-3.5-flash-loop"]\n',
         encoding="utf-8",
     )
     plist_path = tmp_path / "com.dialectical.worker.plist"
@@ -15099,11 +15106,11 @@ def test_final_worker_config_capability_summary_rejects_blank_and_duplicate_conf
 
     assert issues == [
         "Worker A config allowed_models[2] is blank",
-        "Worker A config allowed_models duplicates codex-gpt-5.5",
+        "Worker A config allowed_models duplicates gpt-5.6sol-medium",
     ]
     assert module.final_worker_config_capability_summary() == (
         "blocked (Worker A config allowed_models[2] is blank; "
-        "Worker A config allowed_models duplicates codex-gpt-5.5)"
+        "Worker A config allowed_models duplicates gpt-5.6sol-medium)"
     )
 
 
@@ -15114,7 +15121,7 @@ def test_final_worker_config_capability_summary_rejects_non_string_launchd_allow
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
     module = load_status_report_module()
     config_path = tmp_path / "worker.toml"
-    config_path.write_text('allowed_models = ["codex-gpt-5.5", "gemini-2.5-flash"]\n', encoding="utf-8")
+    config_path.write_text('allowed_models = ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"]\n', encoding="utf-8")
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
         plistlib.dump(
@@ -15134,7 +15141,7 @@ def test_final_worker_config_capability_summary_rejects_non_string_launchd_allow
         "Worker A launchd DIALECTICAL_ALLOWED_MODELS is not a string",
         (
             "Worker A launchd DIALECTICAL_ALLOWED_MODELS missing final required capabilities: "
-            "codex-gpt-5.5, gemini-2.5-flash"
+            "gemini-3.5-flash-loop, gpt-5.6sol-medium"
         ),
     ]
 
@@ -15910,7 +15917,7 @@ def test_known_blockers_report_only_evidence_backed_gaps(tmp_path: Path, monkeyp
         module,
         "final_worker_launchd_api_key_issues",
         lambda *args, **kwargs: [
-            "Worker A launchd API key missing for gemini-2.5-flash: "
+            "Worker A launchd API key missing for gemini-3.5-flash-loop: "
             "GEMINI_API_KEY is not set in the installed worker launchd environment; "
             "rerun make install-worker with GEMINI_API_KEY present"
         ],
@@ -15919,7 +15926,7 @@ def test_known_blockers_report_only_evidence_backed_gaps(tmp_path: Path, monkeyp
         module,
         "final_worker_config_capability_issues",
         lambda *args, **kwargs: [
-            "Worker A config allowed_models missing final required capabilities: gemini-2.5-flash"
+            "Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop"
         ],
     )
     monkeypatch.setattr(
@@ -15949,8 +15956,8 @@ def test_known_blockers_report_only_evidence_backed_gaps(tmp_path: Path, monkeyp
         "Named tunnel service not running: missing",
         "Quick tunnel service still running: running, pid 456",
         "Worker A config coordinator_url must point to the local Mac mini coordinator",
-        "Worker A config allowed_models missing final required capabilities: gemini-2.5-flash",
-        "Worker A launchd API key missing for gemini-2.5-flash: "
+        "Worker A config allowed_models missing final required capabilities: gemini-3.5-flash-loop",
+        "Worker A launchd API key missing for gemini-3.5-flash-loop: "
         "GEMINI_API_KEY is not set in the installed worker launchd environment; "
         "rerun make install-worker with GEMINI_API_KEY present",
         "Production acceptance reports incomplete: "

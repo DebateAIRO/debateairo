@@ -61,7 +61,7 @@ from app.scoring.service import ensure_node_scoring_on_completion
 DEFAULT_ANALYZERS = ("Statistical Analyzer", "Scientific Analyzer", "Psychological Analyzer")
 MODEL_ID = "coordinator-deterministic-v2"
 WORKER_LABEL = "coordinator"
-V2_CODEX_MODEL_ID = "codex-gpt-5.5"
+V2_CODEX_MODEL_ID = "gpt-5.6sol-medium"
 NO_REAL_CODEX_WORKER_ERROR = "No real Codex worker online for Dialectical V2 artifact generation"
 # W3: the job families that generate argument-tree nodes for a v2 debate.
 # Any outstanding job of these types anywhere in the tree blocks synthesis

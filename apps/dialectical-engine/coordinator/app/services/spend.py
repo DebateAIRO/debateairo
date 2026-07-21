@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import RUNTIME_SETTINGS_KEY, load_settings
 from app.models.entities import Generation, Setting, now_utc
 
-GROK_MODEL_ID = "grok-4.5"
+GROK_MODEL_ID = "grok-4.5-high-loop"
 GROK_INPUT_USD_PER_MILLION_TOKENS = 1.25
 GROK_OUTPUT_USD_PER_MILLION_TOKENS = 2.50
 MODEL_PRICING_USD_PER_MILLION_TOKENS = {

@@ -45,7 +45,8 @@ class CodexCliProvider:
             prompt = f"{prompt}\n\nReturn only valid JSON."
         if max_tokens is not None:
             prompt = f"{prompt}\n\nKeep the answer under {max_tokens} tokens."
-        return [
+        cli_model = "gpt-5.6-sol" if model == "gpt-5.6sol-medium" else model
+        command = [
             self.executable,
             "exec",
             "--skip-git-repo-check",
@@ -53,9 +54,12 @@ class CodexCliProvider:
             "--sandbox",
             "read-only",
             "--model",
-            model,
+            cli_model,
             prompt,
         ]
+        if model == "gpt-5.6sol-medium":
+            command[-1:-1] = ["--config", "model_reasoning_effort=medium"]
+        return command
 
     def generate(
         self,

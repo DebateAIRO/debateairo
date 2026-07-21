@@ -293,7 +293,7 @@ test("formatScoringVisibilityState treats active backend scoring jobs as in prog
         items: [],
         active_scoring_job_id: "job-1",
         active_scoring_job_status: "running",
-        reason: "Scoring judge call failed: The 'codex-gpt-5.5' model is not supported.",
+        reason: "Scoring judge call failed: The 'gpt-5.6sol-medium' model is not supported.",
       },
       error: null,
     }),

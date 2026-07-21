@@ -34,7 +34,7 @@ def test_worker_config_checks_report_pinned_allowed_models(tmp_path: Path) -> No
         "\n".join(
             [
                 'worker_token = "worker_secret"',
-                'allowed_models = [" codex-gpt-5.5 ", "gemini-2.5-flash", "codex-gpt-5.5", ""]',
+                'allowed_models = [" gpt-5.6sol-medium ", "gemini-3.5-flash-loop", "gpt-5.6sol-medium", ""]',
                 "enable_mock = false",
                 "enable_real_adapters = true",
                 "",
@@ -49,7 +49,7 @@ def test_worker_config_checks_report_pinned_allowed_models(tmp_path: Path) -> No
     assert checks["user-token-not-persisted"].status == "PASS"
     assert checks["worker-config-parse"].status == "PASS"
     assert checks["worker-allowed-models"].status == "PASS"
-    assert checks["worker-allowed-models"].detail == "codex-gpt-5.5, gemini-2.5-flash"
+    assert checks["worker-allowed-models"].detail == "gpt-5.6sol-medium, gemini-3.5-flash-loop"
     assert checks["worker-mock-adapter"].status == "PASS"
     assert checks["worker-real-adapters"].status == "PASS"
 
@@ -174,7 +174,7 @@ def test_required_worker_api_key_checks_pass_when_launchd_has_required_key(monke
 
     checks = checks_by_name(
         module.required_worker_api_key_checks(
-            "codex-gpt-5.5,gemini-2.5-flash",
+            "gpt-5.6sol-medium,gemini-2.5-flash",
             {"GEMINI_API_KEY": "gemini-secret"},
         )
     )
@@ -619,10 +619,10 @@ def test_real_adapter_checks_accept_grok_cli_prompt_mode(monkeypatch) -> None:
 
     checks = checks_by_name(module.real_adapter_checks(allow_no_real_adapters=False))
 
-    assert checks["adapter-command:grok-4.5"].status == "PASS"
-    assert "supports -p prompt mode" in checks["adapter-command:grok-4.5"].detail
+    assert checks["adapter-command:grok-4.5-high-loop"].status == "PASS"
+    assert "supports -p prompt mode" in checks["adapter-command:grok-4.5-high-loop"].detail
     assert checks["real-adapter-invocation"].status == "PASS"
-    assert checks["real-adapter-invocation"].detail.startswith("grok-4.5;")
+    assert checks["real-adapter-invocation"].detail.startswith("grok-4.5-high-loop;")
 
 
 def test_real_adapter_checks_do_not_count_grok_cli_without_prompt_mode(monkeypatch) -> None:
@@ -635,10 +635,10 @@ def test_real_adapter_checks_do_not_count_grok_cli_without_prompt_mode(monkeypat
 
     checks = checks_by_name(module.real_adapter_checks(allow_no_real_adapters=False))
 
-    assert checks["adapter-command:grok-4.5"].status == "WARN"
-    assert "does not advertise noninteractive" in checks["adapter-command:grok-4.5"].detail
-    assert checks["adapter-auth:grok-4.5"].status == "WARN"
-    assert "XAI_API_KEY" in checks["adapter-auth:grok-4.5"].detail
+    assert checks["adapter-command:grok-4.5-high-loop"].status == "WARN"
+    assert "does not advertise noninteractive" in checks["adapter-command:grok-4.5-high-loop"].detail
+    assert checks["adapter-auth:grok-4.5-high-loop"].status == "WARN"
+    assert "XAI_API_KEY" in checks["adapter-auth:grok-4.5-high-loop"].detail
     assert checks["real-adapter-invocation"].status == "FAIL"
 
 

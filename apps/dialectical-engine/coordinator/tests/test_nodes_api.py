@@ -79,7 +79,7 @@ def test_generations_batches_worker_name_lookup_without_per_row_gets() -> None:
         Generation(
             id="generation-b",
             node_id=node.id,
-            model_id="codex-gpt-5.5",
+            model_id="gpt-5.6sol-medium",
             role="skeptic",
             argument="B",
             worker_id=worker_b.id,

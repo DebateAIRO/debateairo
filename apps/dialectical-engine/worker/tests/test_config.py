@@ -59,11 +59,11 @@ def test_worker_config_env_can_enable_mock(tmp_path: Path, monkeypatch) -> None:
 def test_worker_config_allowed_models_can_come_from_env(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "worker.toml"
     monkeypatch.setenv("DIALECTICAL_WORKER_CONFIG", str(config_path))
-    monkeypatch.setenv("DIALECTICAL_ALLOWED_MODELS", " codex-gpt-5.5, gemini-2.5-flash, codex-gpt-5.5, ")
+    monkeypatch.setenv("DIALECTICAL_ALLOWED_MODELS", " gpt-5.6sol-medium, gemini-2.5-flash, gpt-5.6sol-medium, ")
 
     config = load_config()
 
-    assert config.allowed_models == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert config.allowed_models == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
 
 
 def test_worker_config_mock_models_can_come_from_env(tmp_path: Path, monkeypatch) -> None:
@@ -81,7 +81,7 @@ def test_worker_file_model_lists_are_deduped_and_trimmed(tmp_path: Path) -> None
     config_path.write_text(
         "\n".join(
             [
-                'allowed_models = [" codex-gpt-5.5 ", "gemini-2.5-flash", "codex-gpt-5.5", ""]',
+                'allowed_models = [" gpt-5.6sol-medium ", "gemini-2.5-flash", "gpt-5.6sol-medium", ""]',
                 'mock_models = [" mock-alpha ", "mock-beta", "mock-alpha", ""]',
                 "",
             ]
@@ -90,7 +90,7 @@ def test_worker_file_model_lists_are_deduped_and_trimmed(tmp_path: Path) -> None
 
     config = load_file_config(config_path)
 
-    assert config.allowed_models == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert config.allowed_models == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
     assert config.mock_models == ["mock-alpha", "mock-beta"]
 
 
@@ -103,7 +103,7 @@ def test_save_config_does_not_persist_user_token(tmp_path: Path) -> None:
         user_token="user_secret",
         name="worker-a",
         mock_models=["mock-alpha", "mock-beta"],
-        allowed_models=["codex-gpt-5.5"],
+        allowed_models=["gpt-5.6sol-medium"],
     )
 
     save_config(config, config_path)
@@ -113,13 +113,13 @@ def test_save_config_does_not_persist_user_token(tmp_path: Path) -> None:
     assert "worker_secret" in saved
     assert "user_token" not in saved
     assert "user_secret" not in saved
-    assert "codex-gpt-5.5" in saved
+    assert "gpt-5.6sol-medium" in saved
 
     loaded = load_config(config_path)
     assert loaded.worker_token == "worker_secret"
     assert loaded.user_token is None
     assert loaded.mock_models == ["mock-alpha", "mock-beta"]
-    assert loaded.allowed_models == ["codex-gpt-5.5"]
+    assert loaded.allowed_models == ["gpt-5.6sol-medium"]
 
 
 def test_update_config_file_preserves_worker_registration_and_removes_user_token(tmp_path: Path) -> None:
@@ -132,7 +132,7 @@ def test_update_config_file_preserves_worker_registration_and_removes_user_token
                 'worker_token = "worker_secret"',
                 'user_token = "user_secret"',
                 'name = "adesso-mbp"',
-                'allowed_models = ["codex-gpt-5.5"]',
+                'allowed_models = ["gpt-5.6sol-medium"]',
                 "",
             ]
         )
@@ -144,7 +144,7 @@ def test_update_config_file_preserves_worker_registration_and_removes_user_token
     assert updated.worker_id == "worker-1"
     assert updated.worker_token == "worker_secret"
     assert updated.name == "adesso-mbp"
-    assert updated.allowed_models == ["codex-gpt-5.5"]
+    assert updated.allowed_models == ["gpt-5.6sol-medium"]
     saved = config_path.read_text()
     assert "user_token" not in saved
     assert "user_secret" not in saved
@@ -157,7 +157,7 @@ def test_update_config_file_can_change_allowed_models(tmp_path: Path) -> None:
             coordinator_url="https://quick.trycloudflare.com",
             worker_id="worker-1",
             worker_token="worker_secret",
-            allowed_models=["codex-gpt-5.5"],
+            allowed_models=["gpt-5.6sol-medium"],
         ),
         config_path,
     )
@@ -165,10 +165,10 @@ def test_update_config_file_can_change_allowed_models(tmp_path: Path) -> None:
     updated = update_config_file(
         config_path,
         coordinator_url="https://debate.example.com",
-        allowed_models=" codex-gpt-5.5, gemini-2.5-flash, codex-gpt-5.5, ",
+        allowed_models=" gpt-5.6sol-medium, gemini-2.5-flash, gpt-5.6sol-medium, ",
     )
 
-    assert updated.allowed_models == ["codex-gpt-5.5", "gemini-2.5-flash"]
+    assert updated.allowed_models == ["gpt-5.6sol-medium", "gemini-2.5-flash"]
 
 
 def test_update_config_file_can_clear_allowed_models(tmp_path: Path) -> None:
@@ -178,7 +178,7 @@ def test_update_config_file_can_clear_allowed_models(tmp_path: Path) -> None:
             coordinator_url="https://quick.trycloudflare.com",
             worker_id="worker-1",
             worker_token="worker_secret",
-            allowed_models=["codex-gpt-5.5"],
+            allowed_models=["gpt-5.6sol-medium"],
         ),
         config_path,
     )
@@ -213,7 +213,7 @@ class RegisterResponse:
             "worker_id": "worker-1",
             "worker_token": "worker_secret",
             "name": "adesso-mbp",
-            "capabilities": ["codex-gpt-5.5"],
+            "capabilities": ["gpt-5.6sol-medium"],
         }
 
 
@@ -244,7 +244,7 @@ async def test_register_can_defer_config_persistence_to_custom_path(tmp_path: Pa
     client.client = fake_http
 
     try:
-        await client.register(["codex-gpt-5.5"], persist=False)
+        await client.register(["gpt-5.6sol-medium"], persist=False)
     finally:
         await client.aclose()
 
@@ -252,7 +252,7 @@ async def test_register_can_defer_config_persistence_to_custom_path(tmp_path: Pa
         {
             "path": "/api/workers/register",
             "headers": {"Authorization": "Bearer user_secret"},
-            "json": {"name": " adesso-mbp ", "capabilities": ["codex-gpt-5.5"]},
+            "json": {"name": " adesso-mbp ", "capabilities": ["gpt-5.6sol-medium"]},
         }
     ]
     assert not default_path.exists()
@@ -280,7 +280,7 @@ async def test_register_save_path_overrides_default_config_path(tmp_path: Path, 
     client.client = RegisterHttpClient()
 
     try:
-        await client.register(["codex-gpt-5.5"], save_path=custom_path)
+        await client.register(["gpt-5.6sol-medium"], save_path=custom_path)
     finally:
         await client.aclose()
 

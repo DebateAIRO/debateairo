@@ -41,7 +41,7 @@ def codex_worker(db) -> Worker:
     worker = Worker(
         name="codex-worker",
         token_hash="test-token",
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -67,7 +67,7 @@ def generic_pov_output(worker: Worker, job_id: str, pov: str) -> dict:
             "con": {"title": f"{pov} con limitation", "content": f"Detail limiting the {pov} con."},
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -84,7 +84,7 @@ def synthesis_output(worker: Worker, job_id: str) -> dict:
         "evidence_gaps": ["Context-specific cost evidence."],
         "key_takeaways": ["A phased approach addresses both sides."],
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -99,7 +99,7 @@ def expand_worker_result(worker: Worker, job_id: str) -> dict:
         "title": "Additional supporting consideration",
         "content": "A further supporting line of reasoning grounded in the requested lens.",
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -200,7 +200,7 @@ def test_queue_v2_expand_job_creates_placeholder_child_and_payload(db) -> None:
 
     assert job.job_type == "v2_expand"
     assert job.required_role == "v2_expander"
-    assert job.required_model == "codex-gpt-5.5"
+    assert job.required_model == "gpt-5.6sol-medium"
     assert job.status == "pending"
     child = db.get(Node, job.node_id)
     assert child is not None
@@ -389,7 +389,7 @@ def test_v2_expand_travels_real_worker_path_and_adds_exactly_one_child(db, monke
         "Additional supporting consideration "
         "A further supporting line of reasoning grounded in the requested lens."
     )
-    assert generation.model_id == "codex-gpt-5.5"
+    assert generation.model_id == "gpt-5.6sol-medium"
     assert generation.worker_id == worker.id
     assert generation.role == "PRO"
     # Best-effort evidence extraction ran for the completed child.
@@ -462,7 +462,7 @@ def test_pending_expand_blocks_synthesis_at_persist_time(db) -> None:
         debate_id=debate.id,
         job_type="v2_synthesize",
         required_role="v2_synthesizer",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status="running",
         worker_id=worker.id,
         deadline=now_utc(),

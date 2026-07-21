@@ -82,7 +82,7 @@ def persisted_skill_json(debate_id: str) -> dict:
         "quality": {"created_by": "system", "creation_reason": "Seeded reusable policy skill.", "reuse_count": 0},
         "provenance": {
             "created_in_debate_id": debate_id,
-            "created_by_model": "codex-gpt-5.5",
+            "created_by_model": "gpt-5.6sol-medium",
             "created_by_worker_id": "worker-real-1",
             "creation_prompt_id": "prompt-skill-1",
             "job_id": "job-skill-1",
@@ -112,7 +112,7 @@ def persisted_agent_json(debate_id: str) -> dict:
         "quality": {"created_by": "system", "creation_reason": "Seeded reusable scientific agent.", "reuse_count": 0},
         "provenance": {
             "created_in_debate_id": debate_id,
-            "created_by_model": "codex-gpt-5.5",
+            "created_by_model": "gpt-5.6sol-medium",
             "created_by_worker_id": "worker-real-1",
             "creation_prompt_id": "prompt-agent-1",
             "job_id": "job-agent-1",
@@ -124,7 +124,7 @@ def real_codex_worker(db, *, name: str = "codex-worker") -> Worker:
     worker = Worker(
         name=name,
         token_hash="test-token",
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -159,7 +159,7 @@ def worker_agent_output(worker: Worker, job_id: str) -> dict:
         "summary": "The policy has measurable upside but depends on evidence, exemptions, and implementation quality.",
         "confidence": 0.72,
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -173,7 +173,7 @@ def worker_synthesis(worker: Worker, job_id: str) -> dict:
         "strongest_con": "Restrictions can burden access, deliveries, and people with limited mobility options.",
         "verdict": "Treat the proposal as a design-sensitive tradeoff rather than a direct yes/no answer.",
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -262,7 +262,7 @@ def worker_pov_output(worker: Worker, job_id: str, pov: str) -> dict:
             },
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -279,7 +279,7 @@ def worker_non_adjudicating_synthesis(worker: Worker, job_id: str) -> dict:
         "evidence_gaps": ["Baseline rates, population exposure, and implementation details remain under-specified."],
         "key_takeaways": ["Treat the question as evidence-sensitive rather than settled."],
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -315,7 +315,7 @@ def test_create_debate_queues_planner_before_agent_execution(db) -> None:
         "Ethical POV",
         "Practical POV",
     ]
-    assert {job.required_model for job in jobs if job.job_type == "v2_pov"} == {"codex-gpt-5.5"}
+    assert {job.required_model for job in jobs if job.job_type == "v2_pov"} == {"gpt-5.6sol-medium"}
     assert all(job.required_model != "mock-local" for job in jobs)
     assert db.scalar(select(entities.AgentRun).where(entities.AgentRun.debate_id == debate.id)) is None
 
@@ -359,7 +359,7 @@ def test_claimed_v2_planner_does_not_render_as_root_node_generation(db) -> None:
     assert detail["tree"]["active_generation"] is None
     streaming_branch = next(child for child in detail["tree"]["children"] if child["id"] == job.node_id)
     assert streaming_branch["status"] == "generating"
-    assert streaming_branch["active_generation"]["model_id"] == "codex-gpt-5.5"
+    assert streaming_branch["active_generation"]["model_id"] == "gpt-5.6sol-medium"
 
 
 def test_planner_completion_persists_definitions_and_real_agent_runs_before_queueing_agents(db) -> None:
@@ -395,7 +395,7 @@ def test_pov_completion_materializes_title_content_and_nested_pro_con_cards(db) 
     completed_branch = next(child for child in detail["tree"]["children"] if child["claim"] == first_job.required_role)
 
     assert completed_branch["status"] == "complete"
-    assert completed_branch["active_generation"]["model_id"] == "codex-gpt-5.5"
+    assert completed_branch["active_generation"]["model_id"] == "gpt-5.6sol-medium"
     assert completed_branch["active_generation"]["role"] == first_job.required_role
     assert completed_branch["active_generation"]["argument"].startswith(f"{first_job.required_role} assessment")
     assert [child["node_type"] for child in completed_branch["children"]] == ["PRO", "CON"]
@@ -405,7 +405,7 @@ def test_pov_completion_materializes_title_content_and_nested_pro_con_cards(db) 
     ]
     for stance in completed_branch["children"]:
         assert stance["status"] == "complete"
-        assert stance["active_generation"]["model_id"] == "codex-gpt-5.5"
+        assert stance["active_generation"]["model_id"] == "gpt-5.6sol-medium"
         assert [child["node_type"] for child in stance["children"]] == ["PRO", "CON"]
         assert all(child["status"] == "complete" for child in stance["children"])
 
@@ -453,7 +453,7 @@ def worker_pov_output_with_extractable_evidence(worker: Worker, job_id: str, pov
             },
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -548,7 +548,7 @@ def test_synthesis_queues_only_after_all_pov_branches_complete(db) -> None:
 
     synthesis_job = db.scalar(select(entities.Job).where(entities.Job.debate_id == debate.id, entities.Job.job_type == "v2_synthesize"))
     assert synthesis_job is not None
-    assert synthesis_job.required_model == "codex-gpt-5.5"
+    assert synthesis_job.required_model == "gpt-5.6sol-medium"
 
 
 @pytest.mark.parametrize("branch_status", ["pending", "stale"])
@@ -730,7 +730,7 @@ def test_failed_stale_synthesis_job_does_not_block_required_v2_synthesis_queue(d
         debate_id=debate.id,
         job_type="v2_synthesize",
         required_role="v2_synthesizer",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status="failed",
         error="previous synthesis failed",
     )
@@ -777,7 +777,7 @@ def test_non_adjudicating_synthesis_completes_without_declaring_winner(db) -> No
     assert "Both perspectives agree" in detail["synthesis"]["verdict"]
     assert "winner" not in detail["synthesis"]["verdict"].lower()
     assert detail["synthesis"]["provenance"]["tensions"]
-    assert detail["synthesis"]["model_id"] == "codex-gpt-5.5"
+    assert detail["synthesis"]["model_id"] == "gpt-5.6sol-medium"
 
 
 def test_planner_rejects_invalid_json_and_executable_skills(db) -> None:
@@ -839,7 +839,7 @@ def test_pov_pipeline_completes_from_real_jobs_and_returns_breakdown(db) -> None
     assert detail["selected_agents"] == []
     assert detail["selected_skills"] == []
     assert detail["agent_runs"] == []
-    assert detail["synthesis"]["provenance"]["model_id"] == "codex-gpt-5.5"
+    assert detail["synthesis"]["provenance"]["model_id"] == "gpt-5.6sol-medium"
 
 
 def test_agent_and_skill_json_contracts_persist_and_retrieve(db) -> None:
@@ -942,7 +942,7 @@ def test_empty_database_question_creates_full_pipeline_without_direct_answer(db)
     assert detail["agent_outputs"] == []
     assert detail["synthesis"]["upstream_agent_output_ids"] == []
     assert detail["synthesis"]["analyzer_findings"] == {}
-    assert detail["synthesis"]["provenance"]["model_id"] == "codex-gpt-5.5"
+    assert detail["synthesis"]["provenance"]["model_id"] == "gpt-5.6sol-medium"
     assert detail["synthesis"]["provenance"]["worker_id"] == worker.id
     assert {child["node_type"] for child in detail["tree"]["children"]} == {
         "SCIENTIFIC_POV",
@@ -1054,7 +1054,7 @@ def test_agent_output_contract_requires_exactly_five_pros_cons_and_provenance(db
         "summary": "The tradeoff depends on implementation details.",
         "confidence": 0.72,
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": "worker-real-1",
             "prompt_id": "prompt-1",
             "job_id": "job-1",
@@ -1159,7 +1159,7 @@ def test_v2_rejects_mock_worker_alias_advertising_protected_codex_model(db) -> N
     worker = Worker(
         name="mock-worker-codex-alias",
         token_hash="internal",
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -1174,9 +1174,9 @@ def test_v2_rejects_mock_worker_alias_advertising_protected_codex_model(db) -> N
     ("worker_name", "capabilities", "status", "last_seen_offset", "expected_reason_code"),
     [
         (None, [], "online", None, "no_workers"),
-        ("stale-codex", ["codex-gpt-5.5"], "online", timedelta(hours=-2), "stale_real_worker"),
-        ("offline-codex", ["codex-gpt-5.5"], "offline", timedelta(seconds=0), "offline_real_worker"),
-        ("mock-worker-codex-alias", ["codex-gpt-5.5"], "online", timedelta(seconds=0), "mock_or_deterministic_only"),
+        ("stale-codex", ["gpt-5.6sol-medium"], "online", timedelta(hours=-2), "stale_real_worker"),
+        ("offline-codex", ["gpt-5.6sol-medium"], "offline", timedelta(seconds=0), "offline_real_worker"),
+        ("mock-worker-codex-alias", ["gpt-5.6sol-medium"], "online", timedelta(seconds=0), "mock_or_deterministic_only"),
     ],
 )
 def test_v2_generation_readiness_reports_canonical_reason_codes(
@@ -1203,7 +1203,7 @@ def test_v2_generation_readiness_reports_canonical_reason_codes(
     readiness = service.v2_generation_readiness(db)
 
     assert readiness.ready is False
-    assert readiness.required_model == "codex-gpt-5.5"
+    assert readiness.required_model == "gpt-5.6sol-medium"
     assert readiness.reason_code == expected_reason_code
     assert readiness.reason
     assert "token" not in readiness.reason.lower()
@@ -1217,7 +1217,7 @@ def test_v2_generation_readiness_accepts_only_real_online_codex_worker(db) -> No
     readiness = service.v2_generation_readiness(db)
 
     assert readiness.ready is True
-    assert readiness.required_model == "codex-gpt-5.5"
+    assert readiness.required_model == "gpt-5.6sol-medium"
     assert readiness.reason_code == "ready"
     assert readiness.online_worker_names == [worker.name]
     assert readiness.known_worker_names == [worker.name]
@@ -1230,7 +1230,7 @@ def test_v2_creates_worker_jobs_for_pov_branches_and_synthesis(db) -> None:
 
     first_jobs = db.scalars(select(entities.Job).where(entities.Job.debate_id == debate.id, entities.Job.job_type == "v2_pov")).all()
     assert len(first_jobs) == 4
-    assert {job.required_model for job in first_jobs} == {"codex-gpt-5.5"}
+    assert {job.required_model for job in first_jobs} == {"gpt-5.6sol-medium"}
     complete_worker_v2_pipeline(db, debate, worker)
 
     job_types = [
@@ -1292,8 +1292,8 @@ def test_v2_persists_pov_tree_and_synthesis_from_worker_completed_json(db) -> No
     assert agent is None
     assert output is None
     detail = debate_to_dict(db, db.get(Debate, debate.id))
-    assert detail["models"] == ["codex-gpt-5.5"]
-    assert all(child["active_generation"]["model_id"] == "codex-gpt-5.5" for child in detail["tree"]["children"])
+    assert detail["models"] == ["gpt-5.6sol-medium"]
+    assert all(child["active_generation"]["model_id"] == "gpt-5.6sol-medium" for child in detail["tree"]["children"])
     assert {record.artifact_kind for record in provenance_records} >= {"pov_branch", "synthesis"}
 
 

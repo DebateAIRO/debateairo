@@ -49,7 +49,7 @@ def test_real_codex_scoring_smoke_sanitizes_secret_like_output() -> None:
 
     sanitized = module.sanitize_for_output(
         {
-            "safe": "codex-gpt-5.5",
+            "safe": "gpt-5.6sol-medium",
             "api_key": "sk-secret",
             "nested": {
                 "stderr": "Authorization: Bearer secret-token",
@@ -60,7 +60,7 @@ def test_real_codex_scoring_smoke_sanitizes_secret_like_output() -> None:
     )
 
     assert sanitized == {
-        "safe": "codex-gpt-5.5",
+        "safe": "gpt-5.6sol-medium",
         "api_key": "[redacted]",
         "nested": {
             "stderr": "[redacted]",

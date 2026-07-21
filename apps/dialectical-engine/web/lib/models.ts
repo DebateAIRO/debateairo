@@ -22,7 +22,7 @@ const NAMES: Record<string, string> = {
   qwen: "Qwen"
 };
 
-/** Normalize a backend model id (e.g. "claude-sonnet-4", "grok-4.5") to a family key. */
+/** Normalize a backend model id (e.g. "claude-sonnet-4", "grok-4.5-high-loop") to a family key. */
 export function modelKey(modelId: string): string {
   const lower = (modelId || "").toLowerCase();
   if (lower.includes("claude")) return "claude";

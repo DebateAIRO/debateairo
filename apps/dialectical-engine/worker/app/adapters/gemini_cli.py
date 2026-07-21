@@ -1,21 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import os
-
 from app.adapters.subprocess_base import SubprocessStreamingAdapter
 
 
-GOOGLE_ACCOUNT_AUTH_ENV = {"GOOGLE_GENAI_USE_GCA": "true"}
-
-
 class GeminiCliAdapter(SubprocessStreamingAdapter):
-    model_id = "gemini-2.5-flash"
+    model_id = "gemini-3.5-flash-loop"
+    cli_model = "gemini-3.5-flash-high"
     role_pool = {"decomposer", "proposer", "opponent", "synthesizer"}
-    executable = "gemini"
-
-    def env(self) -> dict[str, str]:
-        return GOOGLE_ACCOUNT_AUTH_ENV
+    executable = "agy"
 
     async def health_check(self) -> bool:
         if not await super().health_check():
@@ -23,16 +16,15 @@ class GeminiCliAdapter(SubprocessStreamingAdapter):
         process: asyncio.subprocess.Process | None = None
         try:
             process = await asyncio.create_subprocess_exec(
-                "gemini",
-                "-m",
-                self.model_id,
-                "-p",
+                "agy",
+                "--print",
                 "Respond with exactly OK.",
-                "--output-format",
-                "text",
+                "--model",
+                self.cli_model,
+                "--effort",
+                "high",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**os.environ, **GOOGLE_ACCOUNT_AUTH_ENV},
             )
             stdout, _stderr = await asyncio.wait_for(process.communicate(), timeout=30)
         except (OSError, asyncio.TimeoutError):
@@ -44,4 +36,4 @@ class GeminiCliAdapter(SubprocessStreamingAdapter):
 
     def command(self, system: str, user: str, max_tokens: int) -> list[str]:
         prompt = f"{system}\n\n{user}\n\nMaximum tokens: {max_tokens}"
-        return ["gemini", "-m", self.model_id, "-p", prompt]
+        return ["agy", "--print", prompt, "--model", self.cli_model, "--effort", "high"]

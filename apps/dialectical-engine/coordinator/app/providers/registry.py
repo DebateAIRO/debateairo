@@ -36,7 +36,7 @@ def default_agents_path() -> Path:
 def resolve_config_value(value: Any) -> Any:
     if value == "${OPENAI_MODEL}":
         settings = load_settings()
-        return os.getenv("OPENAI_MODEL") or settings.openai_model or "codex-gpt-5.5"
+        return os.getenv("OPENAI_MODEL") or settings.openai_model or "gpt-5.6sol-medium"
     return value
 
 
@@ -50,7 +50,7 @@ def load_agent_configs(path: Path | None = None) -> dict[str, AgentConfig]:
         merged = {**defaults, **(role_config or {})}
         configs[str(role)] = AgentConfig(
             provider=str(resolve_config_value(merged.get("provider", "codex"))),
-            model=str(resolve_config_value(merged.get("model", "codex-gpt-5.5"))),
+            model=str(resolve_config_value(merged.get("model", "gpt-5.6sol-medium"))),
             temperature=float(resolve_config_value(merged.get("temperature", 0.0))),
             max_tokens=(
                 int(resolve_config_value(merged["max_tokens"]))

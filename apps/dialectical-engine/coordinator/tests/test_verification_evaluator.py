@@ -170,7 +170,7 @@ def _complete_supported_verdict() -> dict:
 
 def test_evaluate_evidence_verdict_is_noop_pending_when_flag_off(db, monkeypatch) -> None:
     monkeypatch.delenv("DIALECTICAL_EVIDENCE_VERIFICATION", raising=False)
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -187,7 +187,7 @@ def test_evaluate_evidence_verdict_is_noop_pending_when_flag_off(db, monkeypatch
 
 def test_evaluate_evidence_verdict_blocks_same_lineage_judge_when_enabled(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="anthropic",
         model="claude-opus-4",
@@ -203,7 +203,7 @@ def test_evaluate_evidence_verdict_blocks_same_lineage_judge_when_enabled(db, mo
 
 def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -239,7 +239,7 @@ def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(d
 
 def test_evaluate_evidence_verdict_honest_unverifiable_on_provider_failure(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     failing_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -255,7 +255,7 @@ def test_evaluate_evidence_verdict_honest_unverifiable_on_provider_failure(db, m
 
 def test_evaluate_evidence_verdict_honest_unverifiable_on_unparseable_verdict(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -270,7 +270,7 @@ def test_evaluate_evidence_verdict_honest_unverifiable_on_unparseable_verdict(db
 
 def test_evaluate_evidence_verdict_honest_unverifiable_on_non_json_output(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -285,7 +285,7 @@ def test_evaluate_evidence_verdict_honest_unverifiable_on_non_json_output(db, mo
 
 def test_evaluate_evidence_verdict_records_contradicted_verdict(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
-    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(db, claim_model_id="claude-sonnet-5-high-loop")
     fake_provider = _FakeProvider(
         provider="codex",
         model="gpt-5.2-codex",
@@ -322,7 +322,7 @@ def test_evaluate_evidence_verdict_unknown_scrubbed_judge_lineage_fails_closed_w
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
     secret_marker = "secret-token-verify-scrub"
     debate, claim_node, evidence_node = _build_claim_and_evidence_node(
-        db, claim_model_id="claude-sonnet-5", id_suffix="scrub"
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="scrub"
     )
     fake_provider = _FakeProvider(
         provider=f"codex --api-key {secret_marker}",
@@ -364,7 +364,7 @@ def test_evaluate_evidence_verdict_unknown_scrubbed_judge_lineage_fails_closed_w
 def test_evaluate_evidence_verdict_honest_unverifiable_on_timeout(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
     debate, claim_node, evidence_node = _build_claim_and_evidence_node(
-        db, claim_model_id="claude-sonnet-5", id_suffix="timeout"
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="timeout"
     )
     timing_out_provider = _FakeProvider(
         provider="codex",
@@ -384,7 +384,7 @@ def test_evaluate_evidence_verdict_unknown_arguer_lineage_fails_closed_without_p
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
     debate, claim_node, evidence_node = _build_claim_and_evidence_node(
-        db, claim_model_id="claude-sonnet-5", id_suffix="unknown-lineage", no_claim_generation=True
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="unknown-lineage", no_claim_generation=True
     )
     fake_provider = _FakeProvider(
         provider="codex",
@@ -419,7 +419,7 @@ def test_evaluate_evidence_verdict_unknown_arguer_lineage_fails_closed_without_p
 def test_evaluate_evidence_verdict_failure_path_still_persists_lineage_metadata(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
     debate, claim_node, evidence_node = _build_claim_and_evidence_node(
-        db, claim_model_id="claude-sonnet-5", id_suffix="failure-lineage"
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="failure-lineage"
     )
     fake_provider = _FakeProvider(
         provider="codex",

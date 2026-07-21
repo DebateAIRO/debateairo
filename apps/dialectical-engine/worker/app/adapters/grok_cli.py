@@ -9,7 +9,8 @@ PROMPT_FLAG_PATTERN = re.compile(r"(?<!\S)(?:-p|--prompt)(?:[=\s,]|$)")
 
 
 class GrokCliAdapter(SubprocessStreamingAdapter):
-    model_id = "grok-4.5"
+    model_id = "grok-4.5-high-loop"
+    cli_model = "grok-4.5"
     role_pool = {"proposer", "opponent"}
     executable = "grok"
 
@@ -41,4 +42,14 @@ class GrokCliAdapter(SubprocessStreamingAdapter):
 
     def command(self, system: str, user: str, max_tokens: int) -> list[str]:
         prompt = f"{system}\n\n{user}\n\nMaximum tokens: {max_tokens}"
-        return ["grok", "-p", prompt]
+        return [
+            "grok",
+            "--single",
+            prompt,
+            "--model",
+            self.cli_model,
+            "--reasoning-effort",
+            "high",
+            "--output-format",
+            "plain",
+        ]

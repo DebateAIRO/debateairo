@@ -48,7 +48,7 @@ def _worker(db, *, name: str = "mac-mini", capabilities: list[str] | None = None
 
 
 def _codex_worker(db, *, name: str = "codex-worker") -> Worker:
-    return _worker(db, name=name, capabilities=["codex-gpt-5.5"])
+    return _worker(db, name=name, capabilities=["gpt-5.6sol-medium"])
 
 
 def _decompose_result() -> dict:
@@ -86,7 +86,7 @@ def _pov_output(worker: Worker, job_id: str, pov: str) -> dict:
             "con": {"title": "con limitation", "content": "Counter-detail that identifies uncertainty."},
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,
@@ -99,7 +99,7 @@ def _synthesis_output(worker: Worker, job_id: str) -> dict:
         "title": "Synthesis",
         "content": "The surviving perspectives agree on evidence quality and diverge on uncertainty.",
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job_id}",
             "job_id": job_id,

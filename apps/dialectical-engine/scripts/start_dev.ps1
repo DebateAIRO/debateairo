@@ -116,7 +116,7 @@ function Write-DevStackReady {
         Write-Output "V2 generation readiness: ready"
         return
     }
-    $Reason = "Real codex-gpt-5.5 worker is required."
+    $Reason = "Real gpt-5.6sol-medium worker is required."
     if ($Readiness -and $Readiness.reason) {
         $Reason = $Readiness.reason
     }

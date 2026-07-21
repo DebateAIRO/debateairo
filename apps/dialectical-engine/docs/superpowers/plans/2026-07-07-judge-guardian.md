@@ -25,9 +25,9 @@
 
 - `coordinator/app/providers/registry.py:100-135` `detect_scoring_provider_config(agents=None, *, role="judge", providers=None)`: loads configs via `load_agent_configs()` if `agents` is `None`; defaults `registered_providers` to **`{"codex": CodexCliProvider()}`** (registry.py:107) — a plain, no-args `CodexCliProvider()`, i.e. `executable="codex"` (its own default), **not** `CodexCliProvider(executable=settings.codex_command)`. That `settings.codex_command`-aware construction only happens in `ProviderRegistry.__init__` (registry.py:150), a different code path entirely. **This contradicts the design brief's claim** that the default registry is built with `executable=settings.codex_command` — flagged loudly below.
 - Three not-found causes, in the order `detect_scoring_provider_config` actually checks them: (1) `configs.get(role) is None` → `"No {role} agent is configured for scoring."`; (2) `not config.model.strip()` → `"Configured {role} model is empty."` (checked BEFORE provider-registered check, note the order); (3) `config.provider not in registered_providers` → `"Configured {role} provider is not registered: {config.provider}."`.
-- `load_agent_configs(path=None)` at registry.py:43-61: `config_path = path or default_agents_path()`; `raw = yaml.safe_load(config_path.read_text()) or {}`; merges `raw["defaults"]` with each `raw["agents"][role]` (role config wins); resolves `${OPENAI_MODEL}` placeholders via `resolve_config_value`; **defaults when a key is absent from both defaults and role config: `provider="codex"`, `model="codex-gpt-5.5"`, `temperature=0.0`, `max_tokens=None`** (registry.py:52-59).
+- `load_agent_configs(path=None)` at registry.py:43-61: `config_path = path or default_agents_path()`; `raw = yaml.safe_load(config_path.read_text()) or {}`; merges `raw["defaults"]` with each `raw["agents"][role]` (role config wins); resolves `${OPENAI_MODEL}` placeholders via `resolve_config_value`; **defaults when a key is absent from both defaults and role config: `provider="codex"`, `model="gpt-5.6sol-medium"`, `temperature=0.0`, `max_tokens=None`** (registry.py:52-59).
 - `default_agents_path()` at registry.py:32-33: **`Path(__file__).resolve().parents[3] / "config" / "agents.yaml"`**, which resolves to `<repo-root>/config/agents.yaml` (verified: file exists at `DebateV2/apps/dialectical-engine/config/agents.yaml`). There is **no env-var override** for this path in `registry.py` and no `DIALECTICAL_HOME`-relative resolution — the design brief's speculation about a `DIALECTICAL_HOME`-based override was speculative and does **not** exist; flagged below.
-- The **real current `config/agents.yaml`** already has a non-empty judge entry: `judge: {model: gpt-5.5, temperature: 0.0}` (no explicit `provider` key — inherits `defaults.provider: codex`). **Model is `gpt-5.5`, not `codex-gpt-5.5`.** The guardian's repair path must never touch this because it's already non-empty — this is a "no-op repair" real-world case, not a hypothetical.
+- The **real current `config/agents.yaml`** already has a non-empty judge entry: `judge: {model: gpt-5.6-sol, temperature: 0.0}` (no explicit `provider` key — inherits `defaults.provider: codex`). **Model is `gpt-5.6-sol`, not `gpt-5.6sol-medium`.** The guardian's repair path must never touch this because it's already non-empty — this is a "no-op repair" real-world case, not a hypothetical.
 - `coordinator/app/core/config.py:80` `Settings.codex_command: str = "codex"`; line 232 `settings.codex_command = clean_string(os.getenv("CODEX_COMMAND"), settings.codex_command)` — env override confirmed as `CODEX_COMMAND`.
 - `coordinator/app/providers/codex_cli.py:22` `CodexCliProvider.__init__(self, executable: str = "codex", timeout_seconds: int = 120)`.
 - `coordinator/app/scoring/judge_registry.py:67-68` `active_contract(role: str) -> JudgeContract` — a plain dict lookup (`_ACTIVE_CONTRACTS[role]`), **raises `KeyError` if the role isn't registered** (currently only `"judge"` is registered, at line 63). The guardian must catch this and report an honest `contract` state rather than crash — the design brief didn't mention this failure mode; flagged below since it changes the contract-check implementation.
@@ -51,7 +51,7 @@
 2. **`default_agents_path()` is a fixed relative-to-`__file__` path, not `DIALECTICAL_HOME`-based**, and has no path-level env override. The brief asked to "find and cite the real default + any env override" and speculated a `DIALECTICAL_HOME` mechanism; no such override exists in `registry.py`. Confirmed by full read of the file.
 3. **The smoke-script import pattern to mirror is `scripts/real_codex_scoring_smoke.py`, not `scripts/v2_worker_judge_smoke.py`.** The latter has zero `sys.path`/`app.*` imports; it is a pure black-box HTTP smoke test. This plan follows `real_codex_scoring_smoke.py`'s pattern instead.
 4. **`active_contract(role)` raises `KeyError` on an unregistered role** rather than returning some sentinel — the guardian must catch this explicitly (not mentioned in the brief) to stay crash-proof.
-5. **The real `config/agents.yaml` judge entry today is non-empty (`model: gpt-5.5`)**, so on a clean run against the real repo file, the guardian's repair path is a no-op and `provider_detection` should already report `available: true` today (assuming `codex` executable is present) — worth knowing when manually smoke-testing this script against the real file, since the "repair" behavior will mostly be exercised by the unit tests against tmp_path fixtures, not by running the script against the live repo config.
+5. **The real `config/agents.yaml` judge entry today is non-empty (`model: gpt-5.6-sol`)**, so on a clean run against the real repo file, the guardian's repair path is a no-op and `provider_detection` should already report `available: true` today (assuming `codex` executable is present) — worth knowing when manually smoke-testing this script against the real file, since the "repair" behavior will mostly be exercised by the unit tests against tmp_path fixtures, not by running the script against the live repo config.
 
 ---
 
@@ -109,7 +109,7 @@ def test_missing_agents_file_repairs_by_creating_minimal_judge_entry(module, tmp
 
     assert agents_path.exists()
     data = yaml.safe_load(agents_path.read_text(encoding="utf-8"))
-    assert data["agents"]["judge"] == {"provider": "codex", "model": "codex-gpt-5.5"}
+    assert data["agents"]["judge"] == {"provider": "codex", "model": "gpt-5.6sol-medium"}
     assert report["agents_config"]["repaired"] is True
     assert report["provider_detection"]["available"] is True
 
@@ -149,7 +149,7 @@ def test_repair_merges_judge_into_existing_yaml_preserving_other_roles(module, t
     assert data["agents"]["opponent"] == {}
     assert data["agents"]["specialist"] == {}
     assert data["defaults"] == {"provider": "codex", "model": "${OPENAI_MODEL}", "temperature": 0.2}
-    assert data["agents"]["judge"] == {"provider": "codex", "model": "codex-gpt-5.5"}
+    assert data["agents"]["judge"] == {"provider": "codex", "model": "gpt-5.6sol-medium"}
     assert report["agents_config"]["repaired"] is True
 
 
@@ -178,7 +178,7 @@ def test_existing_non_empty_judge_entry_is_never_overwritten(module, tmp_path) -
         agents_path,
         {
             "defaults": {"provider": "codex", "model": "${OPENAI_MODEL}", "temperature": 0.2},
-            "agents": {"judge": {"model": "gpt-5.5", "temperature": 0.0}},
+            "agents": {"judge": {"model": "gpt-5.6-sol", "temperature": 0.0}},
         },
     )
     before = agents_path.read_text(encoding="utf-8")
@@ -190,7 +190,7 @@ def test_existing_non_empty_judge_entry_is_never_overwritten(module, tmp_path) -
     assert report["agents_config"]["repaired"] is False
     assert report["agents_config"]["state"] == "ready"
     assert report["provider_detection"]["available"] is True
-    assert report["provider_detection"]["model"] == "gpt-5.5"
+    assert report["provider_detection"]["model"] == "gpt-5.6-sol"
 
 
 # --- empty model on an existing judge entry: repaired ----------------------
@@ -209,7 +209,7 @@ def test_empty_model_on_existing_judge_entry_is_repaired(module, tmp_path) -> No
     report = module.run_guardian(agents_path=agents_path, codex_command="codex", repair=True)
 
     data = yaml.safe_load(agents_path.read_text(encoding="utf-8"))
-    assert data["agents"]["judge"]["model"] == "codex-gpt-5.5"
+    assert data["agents"]["judge"]["model"] == "gpt-5.6sol-medium"
     assert data["agents"]["judge"]["provider"] == "codex"
     assert data["agents"]["judge"]["temperature"] == 0.0
     assert report["agents_config"]["repaired"] is True
@@ -264,7 +264,7 @@ def test_executable_missing_reports_honest_blocked_reason(module, tmp_path, monk
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
     monkeypatch.setattr(module.shutil, "which", lambda _cmd: None)
 
@@ -281,7 +281,7 @@ def test_summary_line_and_human_output_never_crash(module, tmp_path, capsys) -> 
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
 
     exit_code = module.main(["--agents-path", str(agents_path), "--codex-command", "totally-missing-codex-binary"])
@@ -300,7 +300,7 @@ def test_json_mode_dumps_full_report(module, tmp_path, capsys) -> None:
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
 
     module.main(["--agents-path", str(agents_path), "--json"])
@@ -367,7 +367,7 @@ from app.providers.registry import (  # noqa: E402
 from app.scoring.judge_registry import active_contract  # noqa: E402
 
 REPAIR_ROLE = "judge"
-REPAIR_DEFAULTS = {"provider": "codex", "model": "codex-gpt-5.5"}
+REPAIR_DEFAULTS = {"provider": "codex", "model": "gpt-5.6sol-medium"}
 EXECUTABLE_PROBE_TIMEOUT_SECONDS = 10
 
 

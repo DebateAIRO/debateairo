@@ -155,13 +155,13 @@ def test_mock_adapter_matches_v2_expand_contract(polarity: str, stance: str) -> 
 
 
 def test_enrich_v2_result_stamps_runtime_provenance_for_v2_expand() -> None:
-    job = {"id": "job-4", "job_type": "v2_expand", "required_model": "codex-gpt-5.5"}
+    job = {"id": "job-4", "job_type": "v2_expand", "required_model": "gpt-5.6sol-medium"}
     result = {"title": "Additional consideration", "content": "A further line of reasoning."}
 
     enriched = enrich_v2_result(job, result, "worker-1")
 
     assert enriched["provenance"] == {
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "prompt_id": "prompt-job-4",
         "job_id": "job-4",
@@ -227,13 +227,13 @@ def test_estimate_tokens_uses_text_length_for_long_words() -> None:
 
 
 def test_enrich_v2_result_stamps_creation_provenance() -> None:
-    job = {"id": "job-1", "job_type": "v2_skill_create", "required_model": "codex-gpt-5.5"}
+    job = {"id": "job-1", "job_type": "v2_skill_create", "required_model": "gpt-5.6sol-medium"}
     result = {"kind": "skill", "provenance": {"created_by_model": "wrong"}}
 
     enriched = enrich_v2_result(job, result, "worker-1")
 
     assert enriched["provenance"] == {
-        "created_by_model": "codex-gpt-5.5",
+        "created_by_model": "gpt-5.6sol-medium",
         "created_by_worker_id": "worker-1",
         "creation_prompt_id": "prompt-job-1",
         "job_id": "job-1",
@@ -241,13 +241,13 @@ def test_enrich_v2_result_stamps_creation_provenance() -> None:
 
 
 def test_enrich_v2_result_stamps_runtime_provenance() -> None:
-    job = {"id": "job-2", "job_type": "v2_agent_argument", "required_model": "codex-gpt-5.5"}
+    job = {"id": "job-2", "job_type": "v2_agent_argument", "required_model": "gpt-5.6sol-medium"}
     result = {"pros": ["a"] * 5, "cons": ["b"] * 5}
 
     enriched = enrich_v2_result(job, result, "worker-1")
 
     assert enriched["provenance"] == {
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "prompt_id": "prompt-job-2",
         "job_id": "job-2",
@@ -256,14 +256,14 @@ def test_enrich_v2_result_stamps_runtime_provenance() -> None:
 
 @pytest.mark.parametrize("job_type", ["v2_plan", "v2_agent_run", "v2_synthesize"])
 def test_enrich_v2_result_stamps_planner_first_provenance_generically(job_type: str) -> None:
-    job = {"id": "job-3", "job_type": job_type, "required_model": "codex-gpt-5.5"}
+    job = {"id": "job-3", "job_type": job_type, "required_model": "gpt-5.6sol-medium"}
     result = {"payload": {"ok": True}, "provenance": {"source": "model"}}
 
     enriched = enrich_v2_result(job, result, "worker-1")
 
     assert enriched["provenance"] == {
         "source": "model",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "prompt_id": "prompt-job-3",
         "job_id": "job-3",
@@ -278,7 +278,9 @@ def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch) -> None:
         "-p",
         "sys\n\nuser",
         "--model",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
+        "--effort",
+        "high",
         "--output-format",
         "stream-json",
         "--verbose",
@@ -287,13 +289,27 @@ def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch) -> None:
     assert codex_command[:5] == ["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write"]
     assert "--output-schema" not in codex_command
     assert "--model" in codex_command
-    assert "gpt-5.5" in codex_command
+    assert "gpt-5.6-sol" in codex_command
+    assert "model_reasoning_effort=medium" in codex_command
     assert codex_command[-1] == "-"
     assert "sys\n\nuser" in CodexCliAdapter().stdin_text("sys", "user", 10)
     assert "--full-auto" not in codex_command
     assert "-q" not in codex_command
-    assert GeminiCliAdapter().command("sys", "user", 10)[:3] == ["gemini", "-m", "gemini-2.5-flash"]
-    assert GrokCliAdapter().command("sys", "user", 10)[0] == "grok"
+    assert GeminiCliAdapter().command("sys", "user", 10) == [
+        "agy",
+        "--print",
+        "sys\n\nuser\n\nMaximum tokens: 10",
+        "--model",
+        "gemini-3.5-flash-high",
+        "--effort",
+        "high",
+    ]
+    assert GrokCliAdapter().command("sys", "user", 10)[-4:] == [
+        "--reasoning-effort",
+        "high",
+        "--output-format",
+        "plain",
+    ]
 
 
 def test_codex_v2_planner_command_uses_strict_output_schema() -> None:
@@ -320,7 +336,7 @@ def test_codex_v2_pov_command_uses_strict_output_schema() -> None:
     assert "--output-schema" in command
     schema_path = command[command.index("--output-schema") + 1]
     assert schema_path.endswith("codex_v2_pov.schema.json")
-    assert command[command.index("--model") + 1] == "gpt-5.5"
+    assert command[command.index("--model") + 1] == "gpt-5.6-sol"
     assert command[-1] == "-"
 
 
@@ -590,11 +606,18 @@ def grok_help_process(help_text: str, returncode: int = 0):
 
 
 def gemini_probe_process(stdout_text: str = "OK\n", returncode: int = 0):
-    async def fake_exec(*command: str, stdout, stderr, env) -> FakeCliProcess:
-        assert command == ("gemini", "-m", "gemini-2.5-flash", "-p", "Respond with exactly OK.", "--output-format", "text")
+    async def fake_exec(*command: str, stdout, stderr) -> FakeCliProcess:
+        assert command == (
+            "agy",
+            "--print",
+            "Respond with exactly OK.",
+            "--model",
+            "gemini-3.5-flash-high",
+            "--effort",
+            "high",
+        )
         assert stdout == asyncio.subprocess.PIPE
         assert stderr == asyncio.subprocess.PIPE
-        assert env["GOOGLE_GENAI_USE_GCA"] == "true"
         return FakeCliProcess(stdout=stdout_text.encode(), returncode=returncode)
 
     return fake_exec
@@ -602,10 +625,9 @@ def gemini_probe_process(stdout_text: str = "OK\n", returncode: int = 0):
 
 @pytest.mark.asyncio
 async def test_gemini_cli_health_requires_successful_probe(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(subprocess_base.shutil, "which", lambda executable: "/usr/local/bin/gemini")
+    monkeypatch.setattr(subprocess_base.shutil, "which", lambda executable: "/usr/local/bin/agy")
     monkeypatch.setattr(gemini_cli_module.asyncio, "create_subprocess_exec", gemini_probe_process())
 
-    assert GeminiCliAdapter().env() == {"GOOGLE_GENAI_USE_GCA": "true"}
     assert await GeminiCliAdapter().health_check()
 
     monkeypatch.setattr(gemini_cli_module.asyncio, "create_subprocess_exec", gemini_probe_process("", returncode=0))
@@ -985,7 +1007,8 @@ async def test_detect_adapters_keeps_grok_cli_primary_over_xai_fallback(monkeypa
 
     adapters = await detect_adapters(WorkerConfig(enable_mock=False, enable_real_adapters=True))
 
-    assert type(adapters["grok-4.5"]) is GrokCliAdapter
+    assert type(adapters["grok-4.5-high-loop"]) is GrokCliAdapter
+    assert type(adapters["grok-4.5"]) is XaiApiAdapter
 
 
 @pytest.mark.asyncio
@@ -1067,11 +1090,10 @@ async def test_detect_adapters_respects_allowed_models(monkeypatch: pytest.Monke
     monkeypatch.setattr("app.capabilities.discover_ollama_models", no_ollama_models)
 
     adapters = await detect_adapters(
-        WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["codex-gpt-5.5"])
+        WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["gpt-5.6sol-medium"])
     )
 
-    assert set(adapters) == {"codex-gpt-5.5", "gpt-5.5"}
-    assert adapters["gpt-5.5"] is adapters["codex-gpt-5.5"]
+    assert set(adapters) == {"gpt-5.6sol-medium"}
 
 
 @pytest.mark.asyncio
@@ -1093,11 +1115,11 @@ async def test_detect_adapters_allows_codex_scoring_alias(monkeypatch: pytest.Mo
     monkeypatch.setattr("app.capabilities.discover_ollama_models", no_ollama_models)
 
     adapters = await detect_adapters(
-        WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["gpt-5.5"])
+        WorkerConfig(enable_mock=False, enable_real_adapters=True, allowed_models=["gpt-5.6-sol"])
     )
 
-    assert set(adapters) == {"gpt-5.5"}
-    assert adapters["gpt-5.5"].model_id == "codex-gpt-5.5"
+    assert set(adapters) == {"gpt-5.6-sol"}
+    assert adapters["gpt-5.6-sol"].model_id == "gpt-5.6sol-medium"
 
 
 @pytest.mark.asyncio

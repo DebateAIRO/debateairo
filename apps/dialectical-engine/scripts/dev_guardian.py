@@ -26,7 +26,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from _common import DEFAULT_DEV_USER_TOKEN, mask_secret  # noqa: E402
 from v2_worker_judge_smoke import evaluate_v2_worker_judge_smoke, fetch_json as smoke_fetch_json  # noqa: E402
 
-REQUIRED_MODEL = "codex-gpt-5.5"
+REQUIRED_MODEL = "gpt-5.6sol-medium"
 DEFAULT_COORDINATOR_URL = "http://127.0.0.1:8000"
 DEFAULT_WEB_URL = "http://127.0.0.1:3000"
 WORKER_CONFIG_DEFAULT = ROOT / ".dialectical-dev" / "worker-real.toml"

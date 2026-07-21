@@ -16,11 +16,11 @@ acceptance are deferred.
 
 - Coordinator listens on `http://127.0.0.1:8000`.
 - Web proxy listens on `http://127.0.0.1:3000`.
-- Worker `mac-mini` is online and currently advertises `codex-gpt-5.5` and
+- Worker `mac-mini` is online and currently advertises `gpt-5.6sol-medium` and
   native LM Studio capability `lmstudio:google_gemma-4-e4b-it`.
 - Standalone worker `mac-mini-lmstudio` is stopped; it remains available as a
   fallback if the native LM Studio adapter is disabled later.
-- Local routing is configured for `codex-gpt-5.5` plus
+- Local routing is configured for `gpt-5.6sol-medium` plus
   `lmstudio:google_gemma-4-e4b-it`.
 - The account-less quick tunnel currently exposes the app through
   `https://evaluations-postage-proceed-happiness.trycloudflare.com`.
@@ -38,18 +38,21 @@ acceptance are deferred.
 
 Use these in order for the single-machine phase:
 
-1. `codex-gpt-5.5` through the Codex CLI, which invokes Codex model
-   `gpt-5.5`. This is currently proved non-interactive on this Mac.
-2. `claude-sonnet-4-6` through Claude Code after running an interactive
-   `claude auth login --claudeai`.
-3. `gemini-2.5-flash` through Gemini CLI if Google-account auth is configured.
+1. `gpt-5.6sol-medium` through the Codex CLI, which invokes Codex model
+   `gpt-5.6-sol`. This is currently proved non-interactive on this Mac.
+2. `claude-sonnet-5-high-loop` through Claude Code model `claude-sonnet-5`
+   with high effort after running an interactive `claude auth login --claudeai`.
+3. `grok-4.5-high-loop` through Grok CLI model `grok-4.5` with high reasoning
+   effort after `grok login`.
+4. `gemini-3.5-flash-loop` through `agy` model `gemini-3.5-flash-high` if
+   Google-account auth is configured.
    Prefer Google-account
    auth if it is covered by the user's current Google subscription; avoid
    `GEMINI_API_KEY` unless paid API usage is acceptable. The installed worker
    service sets `GOOGLE_GENAI_USE_GCA=true` so the Gemini CLI path stays on
    Google-account auth after OAuth is completed. The local probes and Gemini
    worker adapter also set the same environment flag.
-4. LM Studio `google_gemma-4-e4b-it` through the local OpenAI-compatible server,
+5. LM Studio `google_gemma-4-e4b-it` through the local OpenAI-compatible server,
    preferably through the native worker adapter and with
    `scripts/lmstudio_worker.py` kept as a fallback.
 
@@ -180,15 +183,14 @@ Log in Claude Code interactively:
 
 ```sh
 claude auth login --claudeai
-claude -p --model claude-sonnet-4-6 --max-turns 1 'Reply with exactly: ok'
+claude -p --model claude-sonnet-5 --max-turns 1 'Reply with exactly: ok'
 ```
 
-Configure Gemini CLI only if using Google-account auth:
+Configure Antigravity CLI only if using Google-account auth:
 
 ```sh
-make configure-gemini-google-auth
-gemini
-gemini -m gemini-2.5-flash -p 'Reply with exactly: ok'
+agy
+agy --print 'Reply with exactly: ok' --model gemini-3.5-flash-high --effort high
 ```
 
 Choose `Login with Google` in the interactive CLI if prompted. The CLI may

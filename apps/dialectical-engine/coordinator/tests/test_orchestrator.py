@@ -175,7 +175,7 @@ def test_classic_argue_completion_queues_default_scoring_state(db) -> None:
     assert len(scoring_jobs) == 1
     assert scoring_jobs[0].status == "pending"
     assert scoring_jobs[0].required_role == "judge"
-    assert scoring_jobs[0].required_model == "gpt-5.5"
+    assert scoring_jobs[0].required_model == "gpt-5.6-sol"
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
@@ -254,9 +254,9 @@ def test_markdown_export_formats_structured_v2_synthesis(db) -> None:
     synthesis.strongest_pro = "Synthesis"
     synthesis.strongest_con = ""
     synthesis.verdict = "Structured summary."
-    synthesis.model_id = "codex-gpt-5.5"
+    synthesis.model_id = "gpt-5.6sol-medium"
     synthesis.provenance = {
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": synthesis.worker_id,
         "prompt_id": "prompt",
         "job_id": "job",
@@ -423,7 +423,7 @@ def test_markdown_export_includes_archived_generation_history(db) -> None:
     active_generation_id = node.active_generation_id
     archived = Generation(
         node_id=node.id,
-        model_id="codex-gpt-5.5",
+        model_id="gpt-5.6sol-medium",
         role="proposer",
         argument="Earlier archived argument.",
         prompt_version="v1",
@@ -443,7 +443,7 @@ def test_markdown_export_includes_archived_generation_history(db) -> None:
     assert "**Archived**" in exported
     assert "Earlier archived argument." in exported
     assert "worker: mac-mini" in exported
-    assert "codex-gpt-5.5" in exported
+    assert "gpt-5.6sol-medium" in exported
 
 
 def test_render_job_payload_wraps_claim_in_tags(db) -> None:
@@ -594,9 +594,9 @@ def test_debate_config_accepts_role_overrides() -> None:
     config = merged_debate_config(
         {
             "role_overrides": {
-                "decomposer": {"primary": "codex-gpt-5.5", "fallback": ["mock-local"]},
+                "decomposer": {"primary": "gpt-5.6sol-medium", "fallback": ["mock-local"]},
                 "opponent": {
-                    "pool": ["codex-gpt-5.5", "mock-local", "codex-gpt-5.5"],
+                    "pool": ["gpt-5.6sol-medium", "mock-local", "gpt-5.6sol-medium"],
                     "strategy": "round_robin",
                     "constraint": "not_same_as_claim_author",
                 },
@@ -604,8 +604,8 @@ def test_debate_config_accepts_role_overrides() -> None:
         }
     )
 
-    assert config["role_overrides"]["decomposer"] == {"primary": "codex-gpt-5.5", "fallback": ["mock-local"]}
-    assert config["role_overrides"]["opponent"]["pool"] == ["codex-gpt-5.5", "mock-local"]
+    assert config["role_overrides"]["decomposer"] == {"primary": "gpt-5.6sol-medium", "fallback": ["mock-local"]}
+    assert config["role_overrides"]["opponent"]["pool"] == ["gpt-5.6sol-medium", "mock-local"]
 
 
 def test_debate_config_rejects_invalid_role_overrides() -> None:
@@ -622,11 +622,11 @@ def test_debate_role_overrides_route_initial_job(db) -> None:
     debate = create_debate(
         db,
         "Should cities ban cars?",
-        {"role_overrides": {"decomposer": {"primary": "codex-gpt-5.5", "fallback": ["mock-local"]}}},
+        {"role_overrides": {"decomposer": {"primary": "gpt-5.6sol-medium", "fallback": ["mock-local"]}}},
     )
 
     job = db.scalar(select(Job).where(Job.debate_id == debate.id, Job.job_type == "decompose"))
-    assert job.required_model == "codex-gpt-5.5"
+    assert job.required_model == "gpt-5.6sol-medium"
 
 
 def test_debate_role_overrides_route_child_jobs(db) -> None:
@@ -641,7 +641,7 @@ def test_debate_role_overrides_route_child_jobs(db) -> None:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["mock-local", "codex-gpt-5.5"],
+            capabilities=["mock-local", "gpt-5.6sol-medium"],
             last_seen=now_utc(),
             status="online",
         )
@@ -651,7 +651,7 @@ def test_debate_role_overrides_route_child_jobs(db) -> None:
             config={
                 "max_depth": 2,
                 "branching": 2,
-                "role_overrides": {"opponent": {"pool": ["codex-gpt-5.5"], "strategy": "round_robin"}},
+                "role_overrides": {"opponent": {"pool": ["gpt-5.6sol-medium"], "strategy": "round_robin"}},
             },
         )
         db.add_all([worker, debate])
@@ -686,7 +686,7 @@ def test_debate_role_overrides_route_child_jobs(db) -> None:
         pro_job = db.scalar(select(Job).where(Job.node_id == pro_child.id))
         con_job = db.scalar(select(Job).where(Job.node_id == con_child.id))
         assert pro_job.required_model == "mock-local"
-        assert con_job.required_model == "codex-gpt-5.5"
+        assert con_job.required_model == "gpt-5.6sol-medium"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -743,9 +743,9 @@ def test_opponent_constraint_avoids_claim_author_model_when_alternative_online(d
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
     routing_engine.roles = {
-        "proposer": {"pool": ["mock-local", "codex-gpt-5.5"], "strategy": "round_robin"},
+        "proposer": {"pool": ["mock-local", "gpt-5.6sol-medium"], "strategy": "round_robin"},
         "opponent": {
-            "pool": ["mock-local", "codex-gpt-5.5"],
+            "pool": ["mock-local", "gpt-5.6sol-medium"],
             "strategy": "round_robin",
             "constraint": "not_same_as_claim_author",
         },
@@ -755,7 +755,7 @@ def test_opponent_constraint_avoids_claim_author_model_when_alternative_online(d
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["mock-local", "codex-gpt-5.5"],
+            capabilities=["mock-local", "gpt-5.6sol-medium"],
             last_seen=now_utc(),
             status="online",
         )
@@ -802,7 +802,7 @@ def test_opponent_constraint_avoids_claim_author_model_when_alternative_online(d
         con_child = db.scalar(select(Node).where(Node.parent_id == parent.id, Node.node_type == "CON"))
         assert con_child is not None
         con_job = db.scalar(select(Job).where(Job.node_id == con_child.id))
-        assert con_job.required_model == "codex-gpt-5.5"
+        assert con_job.required_model == "gpt-5.6sol-medium"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -814,7 +814,7 @@ def test_opponent_constraint_does_not_deadlock_single_model(db) -> None:
     routing_engine.roles = {
         "proposer": {"pool": ["mock-local"], "strategy": "round_robin"},
         "opponent": {
-            "pool": ["mock-local", "codex-gpt-5.5"],
+            "pool": ["mock-local", "gpt-5.6sol-medium"],
             "strategy": "round_robin",
             "constraint": "not_same_as_claim_author",
         },
@@ -882,7 +882,7 @@ def test_opponent_reroute_preserves_claim_author_constraint(db) -> None:
     original_counters = deepcopy(routing_engine.counters)
     routing_engine.roles = {
         "opponent": {
-            "pool": ["mock-local", "codex-gpt-5.5", "gemini-2.5-flash"],
+            "pool": ["mock-local", "gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
             "strategy": "round_robin",
             "constraint": "not_same_as_claim_author",
         },
@@ -892,7 +892,7 @@ def test_opponent_reroute_preserves_claim_author_constraint(db) -> None:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["mock-local", "gemini-2.5-flash"],
+            capabilities=["mock-local", "gemini-3.5-flash-loop"],
             last_seen=now_utc(),
             status="online",
         )
@@ -941,7 +941,7 @@ def test_opponent_reroute_preserves_claim_author_constraint(db) -> None:
             node_id=child.id,
             job_type="argue",
             required_role="opponent",
-            required_model="codex-gpt-5.5",
+            required_model="gpt-5.6sol-medium",
             status="pending",
             deadline=now_utc() - timedelta(seconds=1),
         )
@@ -951,7 +951,7 @@ def test_opponent_reroute_preserves_claim_author_constraint(db) -> None:
         claimed = claim_pending_job(db, worker)
 
         assert claimed is not None
-        assert claimed.required_model == "gemini-2.5-flash"
+        assert claimed.required_model == "gemini-3.5-flash-loop"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -966,13 +966,13 @@ def test_enabled_models_setting_filters_routing(db) -> None:
         status="online",
     )
     db.add(worker)
-    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": [" codex-gpt-5.5 ", "codex-gpt-5.5"]}))
+    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": [" gpt-5.6sol-medium ", "gpt-5.6sol-medium"]}))
     db.commit()
 
     debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
     job = db.scalar(select(Job).where(Job.debate_id == debate.id))
 
-    assert job.required_model == "codex-gpt-5.5"
+    assert job.required_model == "gpt-5.6sol-medium"
 
 
 def test_legacy_unknown_enabled_models_do_not_block_routing(db) -> None:
@@ -1131,7 +1131,7 @@ def test_disabled_model_pending_job_is_not_claimed_and_reroutes_after_deadline(d
     worker = Worker(
         name="mac-mini",
         token_hash=hash_token("worker-token"),
-        capabilities=["mock-local", "codex-gpt-5.5"],
+        capabilities=["mock-local", "gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -1140,7 +1140,7 @@ def test_disabled_model_pending_job_is_not_claimed_and_reroutes_after_deadline(d
     job = db.scalar(select(Job).where(Job.debate_id == debate.id))
     assert job.required_model == "mock-local"
 
-    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": ["codex-gpt-5.5"]}))
+    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": ["gpt-5.6sol-medium"]}))
     db.commit()
 
     assert claim_pending_job(db, worker) is None
@@ -1154,20 +1154,20 @@ def test_disabled_model_pending_job_is_not_claimed_and_reroutes_after_deadline(d
 
     assert claimed is not None
     assert claimed.id == job.id
-    assert claimed.required_model == "codex-gpt-5.5"
+    assert claimed.required_model == "gpt-5.6sol-medium"
     assert claimed.worker_id == worker.id
 
 
 def test_grok_monthly_cap_excludes_grok_before_issuing_jobs(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
-    routing_engine.roles = {"decomposer": {"primary": "grok-4.5", "fallback": ["mock-local"]}}
+    routing_engine.roles = {"decomposer": {"primary": "grok-4.5-high-loop", "fallback": ["mock-local"]}}
     routing_engine.counters.clear()
     try:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["grok-4.5", "mock-local"],
+            capabilities=["grok-4.5-high-loop", "mock-local"],
             last_seen=now_utc(),
             status="online",
         )
@@ -1187,18 +1187,18 @@ def test_grok_monthly_cap_excludes_grok_before_issuing_jobs(db) -> None:
 def test_model_monthly_cap_excludes_model_before_issuing_jobs(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
-    routing_engine.roles = {"decomposer": {"primary": "codex-gpt-5.5", "fallback": ["mock-local"]}}
+    routing_engine.roles = {"decomposer": {"primary": "gpt-5.6sol-medium", "fallback": ["mock-local"]}}
     routing_engine.counters.clear()
     try:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["codex-gpt-5.5", "mock-local"],
+            capabilities=["gpt-5.6sol-medium", "mock-local"],
             last_seen=now_utc(),
             status="online",
         )
         db.add(worker)
-        db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"model_monthly_caps_usd": {"codex-gpt-5.5": 0}}))
+        db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"model_monthly_caps_usd": {"gpt-5.6sol-medium": 0}}))
         db.commit()
 
         debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
@@ -1213,13 +1213,13 @@ def test_model_monthly_cap_excludes_model_before_issuing_jobs(db) -> None:
 def test_invalid_persisted_grok_cap_falls_back_for_routing(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
-    routing_engine.roles = {"decomposer": {"primary": "grok-4.5", "fallback": ["mock-local"]}}
+    routing_engine.roles = {"decomposer": {"primary": "grok-4.5-high-loop", "fallback": ["mock-local"]}}
     routing_engine.counters.clear()
     try:
         worker = Worker(
             name="mac-mini",
             token_hash=hash_token("worker-token"),
-            capabilities=["grok-4.5", "mock-local"],
+            capabilities=["grok-4.5-high-loop", "mock-local"],
             last_seen=now_utc(),
             status="online",
         )
@@ -1230,7 +1230,7 @@ def test_invalid_persisted_grok_cap_falls_back_for_routing(db) -> None:
         debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
         job = db.scalar(select(Job).where(Job.debate_id == debate.id))
 
-        assert job.required_model == "grok-4.5"
+        assert job.required_model == "grok-4.5-high-loop"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -1239,7 +1239,7 @@ def test_invalid_persisted_grok_cap_falls_back_for_routing(db) -> None:
 def test_explicit_regenerate_model_must_be_enabled(db) -> None:
     debate = complete_mock_debate(db)
     node = next(node for node in debate.nodes if node.node_type == "PRO")
-    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": ["codex-gpt-5.5"]}))
+    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": ["gpt-5.6sol-medium"]}))
     db.commit()
 
     try:
@@ -1257,9 +1257,9 @@ def test_explicit_regenerate_model_respects_grok_cap(db) -> None:
     db.commit()
 
     try:
-        asyncio.run(regenerate_node(db, node, "grok-4.5"))
+        asyncio.run(regenerate_node(db, node, "grok-4.5-high-loop"))
     except ValueError as exc:
-        assert "grok-4.5" in str(exc)
+        assert "grok-4.5-high-loop" in str(exc)
     else:
         raise AssertionError("grok regenerate bypassed monthly cap")
 
@@ -1267,13 +1267,13 @@ def test_explicit_regenerate_model_respects_grok_cap(db) -> None:
 def test_explicit_regenerate_model_respects_model_cap(db) -> None:
     debate = complete_mock_debate(db)
     node = next(node for node in debate.nodes if node.node_type == "PRO")
-    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"model_monthly_caps_usd": {"codex-gpt-5.5": 0}}))
+    db.add(Setting(key=RUNTIME_SETTINGS_KEY, value={"model_monthly_caps_usd": {"gpt-5.6sol-medium": 0}}))
     db.commit()
 
     try:
-        asyncio.run(regenerate_node(db, node, "codex-gpt-5.5"))
+        asyncio.run(regenerate_node(db, node, "gpt-5.6sol-medium"))
     except ValueError as exc:
-        assert "codex-gpt-5.5" in str(exc)
+        assert "gpt-5.6sol-medium" in str(exc)
     else:
         raise AssertionError("generic model cap was bypassed")
 
@@ -1282,14 +1282,14 @@ def test_regenerate_without_model_prefers_different_online_model(db) -> None:
     original_roles = deepcopy(routing_engine.roles)
     original_counters = deepcopy(routing_engine.counters)
     routing_engine.roles = {
-        "proposer": {"pool": ["mock-local", "codex-gpt-5.5"], "strategy": "round_robin"},
-        "synthesizer": {"primary": "mock-local", "fallback": ["codex-gpt-5.5"]},
+        "proposer": {"pool": ["mock-local", "gpt-5.6sol-medium"], "strategy": "round_robin"},
+        "synthesizer": {"primary": "mock-local", "fallback": ["gpt-5.6sol-medium"]},
     }
     routing_engine.counters.clear()
     try:
         debate = complete_mock_debate(db)
         worker = db.scalar(select(Worker).where(Worker.name == "mac-mini"))
-        worker.capabilities = ["mock-local", "codex-gpt-5.5"]
+        worker.capabilities = ["mock-local", "gpt-5.6sol-medium"]
         node = next(node for node in debate.nodes if node.node_type == "PRO")
         before_generation = db.get(Generation, node.active_generation_id)
 
@@ -1301,7 +1301,7 @@ def test_regenerate_without_model_prefers_different_online_model(db) -> None:
             .order_by(Job.created_at.desc())
         )
         assert before_generation.model_id == "mock-local"
-        assert job.required_model == "codex-gpt-5.5"
+        assert job.required_model == "gpt-5.6sol-medium"
     finally:
         routing_engine.roles = original_roles or deepcopy(DEFAULT_ROUTING)
         routing_engine.counters = original_counters
@@ -1461,7 +1461,7 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
     worker = Worker(
         name="codex-worker",
         token_hash=hash_token("worker-token"),
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -1504,7 +1504,7 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
         db.flush()
         generation = Generation(
             node_id=pov.id,
-            model_id="codex-gpt-5.5",
+            model_id="gpt-5.6sol-medium",
             role=label,
             argument=f"{label} assessment.",
             prompt_version="v2",
@@ -1534,7 +1534,7 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
         strongest_pro="Prior pro.",
         strongest_con="Prior con.",
         verdict="Prior verdict.",
-        model_id="codex-gpt-5.5",
+        model_id="gpt-5.6sol-medium",
         worker_id=worker.id,
     )
     db.add(synthesis)
@@ -1544,7 +1544,7 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
         debate_id=debate.id,
         job_type="v2_synthesize",
         required_role="v2_synthesizer",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status="running",
         worker_id=worker.id,
         deadline=now_utc(),
@@ -1563,7 +1563,7 @@ def test_v2_pov_regeneration_queues_v2_jobs_and_clears_stale_work(db) -> None:
     for job, label in regenerated:
         assert job.job_type == "v2_pov"
         assert job.required_role == label
-        assert job.required_model == "codex-gpt-5.5"
+        assert job.required_model == "gpt-5.6sol-medium"
     for stale_child in stale_children:
         db.refresh(stale_child)
         assert stale_child.status == "stale"
@@ -1583,7 +1583,7 @@ def _v2_pov_node(db, *, claim: str, node_type: str = "SCIENTIFIC_POV") -> Node:
     worker = Worker(
         name="codex-worker",
         token_hash=hash_token("worker-token"),
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -1616,7 +1616,7 @@ def _v2_pov_node(db, *, claim: str, node_type: str = "SCIENTIFIC_POV") -> Node:
     db.flush()
     generation = Generation(
         node_id=pov.id,
-        model_id="codex-gpt-5.5",
+        model_id="gpt-5.6sol-medium",
         role=claim,
         argument="POV assessment.",
         prompt_version="v2",
@@ -1677,7 +1677,7 @@ def test_regenerate_node_rejects_v1_argue_regeneration_inside_v2_debates(db) -> 
             debate_id=debate.id,
             job_type="v2_pov",
             required_role="Mechanism POV",
-            required_model="codex-gpt-5.5",
+            required_model="gpt-5.6sol-medium",
             node_id=pov.id,
             status="complete",
             deadline=now_utc(),
@@ -1712,7 +1712,7 @@ def test_regenerate_node_rejects_root_regeneration_inside_v2_debates(db) -> None
             debate_id=debate.id,
             job_type="v2_pov",
             required_role="Mechanism POV",
-            required_model="codex-gpt-5.5",
+            required_model="gpt-5.6sol-medium",
             node_id=pov.id,
             status="complete",
             deadline=now_utc(),
@@ -2923,7 +2923,7 @@ def test_unavailable_pending_job_reroutes_after_deadline(db) -> None:
     db.add(worker)
     debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
     job = db.scalar(select(Job).where(Job.debate_id == debate.id))
-    job.required_model = "claude-sonnet-4-6"
+    job.required_model = "claude-sonnet-5-high-loop"
     job.deadline = now_utc() - timedelta(seconds=1)
     db.commit()
 
@@ -2945,7 +2945,7 @@ def test_unavailable_pending_job_reroute_counts_only_claim_execution_attempt(db)
     db.add(worker)
     debate = create_debate(db, "Should cities ban cars?", {"max_depth": 1})
     job = db.scalar(select(Job).where(Job.debate_id == debate.id))
-    job.required_model = "claude-sonnet-4-6"
+    job.required_model = "claude-sonnet-5-high-loop"
     job.deadline = now_utc() - timedelta(seconds=1)
     db.commit()
 

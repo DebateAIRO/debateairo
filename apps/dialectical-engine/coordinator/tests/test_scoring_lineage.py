@@ -4,7 +4,7 @@ from app.scoring.lineage import lineage_family, judge_lineage_metadata
 
 
 def test_lineage_family_recognizes_claude() -> None:
-    assert lineage_family("claude-sonnet-5") == "claude"
+    assert lineage_family("claude-sonnet-5-high-loop") == "claude"
     assert lineage_family("claude-opus-4-1") == "claude"
 
 
@@ -30,12 +30,12 @@ def test_lineage_family_of_none_or_empty_is_none() -> None:
 
 def test_judge_lineage_metadata_flags_independent_when_families_differ() -> None:
     meta = judge_lineage_metadata(
-        arguer_model_id="claude-sonnet-5",
+        arguer_model_id="claude-sonnet-5-high-loop",
         judge_provider="codex",
         judge_model_id="gpt-5.2-codex",
     )
     assert meta["judgeLineage"] == {"provider": "codex", "model": "gpt-5.2-codex", "family": "gpt"}
-    assert meta["arguerLineage"] == {"model": "claude-sonnet-5", "family": "claude"}
+    assert meta["arguerLineage"] == {"model": "claude-sonnet-5-high-loop", "family": "claude"}
     assert meta["independent"] is True
     assert meta["independenceReason"] == "independent_lineage"
 
@@ -44,7 +44,7 @@ def test_judge_lineage_metadata_flags_not_independent_when_families_match() -> N
     meta = judge_lineage_metadata(
         arguer_model_id="claude-opus-4-1",
         judge_provider="anthropic",
-        judge_model_id="claude-sonnet-5",
+        judge_model_id="claude-sonnet-5-high-loop",
     )
     assert meta["independent"] is False
     assert meta["independenceReason"] == "same_lineage"

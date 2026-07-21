@@ -200,7 +200,7 @@ def main() -> None:
     parser.add_argument(
         "--allowed-models",
         default=os.getenv("DIALECTICAL_ALLOWED_MODELS"),
-        help="comma-separated model IDs this worker may advertise, for example codex-gpt-5.5",
+        help="comma-separated model IDs this worker may advertise, for example gpt-5.6sol-medium",
     )
     parser.add_argument(
         "--require-named-https",

@@ -92,7 +92,7 @@ def test_only_one_active_generation_per_node_is_enforced(db) -> None:
     db.add(
         Generation(
             node_id=node.id,
-            model_id="codex-gpt-5.5",
+            model_id="gpt-5.6sol-medium",
             role="proposer",
             argument="Archived prior view.",
             prompt_version="v1",
@@ -106,7 +106,7 @@ def test_only_one_active_generation_per_node_is_enforced(db) -> None:
     db.add(
         Generation(
             node_id=node.id,
-            model_id="gemini-2.5-flash",
+            model_id="gemini-3.5-flash-loop",
             role="proposer",
             argument="Second active view.",
             prompt_version="v1",
@@ -528,7 +528,7 @@ def test_init_db_rebuilds_legacy_capability_tables_before_v2_debate_creation(db)
         Worker(
             name="codex-worker",
             token_hash="test-token",
-            capabilities=["codex-gpt-5.5"],
+            capabilities=["gpt-5.6sol-medium"],
             last_seen=now_utc(),
             status="online",
         )

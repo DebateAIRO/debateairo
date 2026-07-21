@@ -32,7 +32,7 @@ CRITICAL_LABELS = (
     "com.dialectical.cloudflared",
 )
 RUNTIME_PATHS = (".venv313", "web/node_modules", "web/.next")
-EXPECTED_WORKERS = ("mac-mini", "claude-max-loop", "gemini-google-loop")
+EXPECTED_WORKERS = ("mac-mini", "claude-sonnet-loop", "grok-high-loop", "gemini-antigravity-loop")
 
 
 @dataclass

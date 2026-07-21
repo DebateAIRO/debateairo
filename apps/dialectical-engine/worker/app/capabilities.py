@@ -94,7 +94,7 @@ async def detect_adapters(config: WorkerConfig) -> dict[str, ModelClient]:
             continue
         seen_adapter_ids.add(adapter.model_id)
         for model_id in adapter_model_ids(adapter):
-            if allowed_models and model_id not in allowed_models and adapter.model_id not in allowed_models:
+            if allowed_models and model_id not in allowed_models:
                 continue
             adapters.setdefault(model_id, adapter)
     return adapters

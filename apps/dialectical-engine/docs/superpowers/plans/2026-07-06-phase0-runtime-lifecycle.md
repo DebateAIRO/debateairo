@@ -422,15 +422,15 @@ def test_non_online_workers_do_not_satisfy_capability_readiness(db_session) -> N
     from app.services.orchestrator import capable_online_workers
 
     for status in ("starting", "recovering_identity", "blocked_auth", "degraded", "offline"):
-        worker = make_worker(db_session, capabilities=["codex-gpt-5.5"], name=f"w-{status}")
+        worker = make_worker(db_session, capabilities=["gpt-5.6sol-medium"], name=f"w-{status}")
         worker.status = status
         worker.last_seen = now_utc()
-    online = make_worker(db_session, capabilities=["codex-gpt-5.5"], name="w-online")
+    online = make_worker(db_session, capabilities=["gpt-5.6sol-medium"], name="w-online")
     online.status = "online"
     online.last_seen = now_utc()
     db_session.flush()
 
-    result = capable_online_workers(db_session, "codex-gpt-5.5")
+    result = capable_online_workers(db_session, "gpt-5.6sol-medium")
     assert [w.name for w in result] == ["w-online"]
 ```
 
@@ -504,8 +504,8 @@ def test_summarize_reports_ready_state() -> None:
     module = load_module()
     line = module.summarize_status(
         {
-            "v2_generation_readiness": {"ready": True, "reason": "Real codex-gpt-5.5 worker is online.", "reason_code": "ready"},
-            "workers": [{"name": "w1", "status": "online", "current_job_id": None, "capabilities": ["codex-gpt-5.5"]}],
+            "v2_generation_readiness": {"ready": True, "reason": "Real gpt-5.6sol-medium worker is online.", "reason_code": "ready"},
+            "workers": [{"name": "w1", "status": "online", "current_job_id": None, "capabilities": ["gpt-5.6sol-medium"]}],
         }
     )
     assert "ready" in line
@@ -516,8 +516,8 @@ def test_summarize_reports_blocked_states_honestly() -> None:
     module = load_module()
     line = module.summarize_status(
         {
-            "v2_generation_readiness": {"ready": False, "reason": "A real codex-gpt-5.5 worker is known but stale or not currently online.", "reason_code": "stale_real_worker"},
-            "workers": [{"name": "w1", "status": "starting", "current_job_id": "j1", "capabilities": ["codex-gpt-5.5"]}],
+            "v2_generation_readiness": {"ready": False, "reason": "A real gpt-5.6sol-medium worker is known but stale or not currently online.", "reason_code": "stale_real_worker"},
+            "workers": [{"name": "w1", "status": "starting", "current_job_id": "j1", "capabilities": ["gpt-5.6sol-medium"]}],
         }
     )
     assert "NOT READY" in line

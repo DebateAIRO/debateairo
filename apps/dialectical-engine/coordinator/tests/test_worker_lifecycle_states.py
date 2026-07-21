@@ -40,16 +40,16 @@ def test_heartbeat_accepts_lifecycle_states(db) -> None:
 
 def test_non_online_workers_do_not_satisfy_capability_readiness(db) -> None:
     for status in ("starting", "recovering_identity", "blocked_auth", "degraded", "offline"):
-        make_worker(db, capabilities=["codex-gpt-5.5"], name=f"w-{status}", status=status)
-    make_worker(db, capabilities=["codex-gpt-5.5"], name="w-online", status="online")
+        make_worker(db, capabilities=["gpt-5.6sol-medium"], name=f"w-{status}", status=status)
+    make_worker(db, capabilities=["gpt-5.6sol-medium"], name="w-online", status="online")
 
-    result = capable_online_workers(db, "codex-gpt-5.5")
+    result = capable_online_workers(db, "gpt-5.6sol-medium")
 
     assert [w.name for w in result] == ["w-online"]
 
 
 def test_online_lone_worker_can_claim_pending_job(db) -> None:
-    worker = make_worker(db, capabilities=["codex-gpt-5.5"], name="claim-online", status="online")
+    worker = make_worker(db, capabilities=["gpt-5.6sol-medium"], name="claim-online", status="online")
     debate = Debate(topic="Can an online lone worker claim?", status="generating")
     db.add(debate)
     db.flush()
@@ -57,7 +57,7 @@ def test_online_lone_worker_can_claim_pending_job(db) -> None:
         debate_id=debate.id,
         job_type="argue",
         required_role="proposer",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status="pending",
     )
     db.add(job)
@@ -75,7 +75,7 @@ def test_online_lone_worker_can_claim_pending_job(db) -> None:
 
 
 def test_non_online_poll_updates_liveness_without_promoting_status(db) -> None:
-    worker = make_worker(db, capabilities=["codex-gpt-5.5"], name="liveness-starting", status="starting")
+    worker = make_worker(db, capabilities=["gpt-5.6sol-medium"], name="liveness-starting", status="starting")
     stale_moment = now_utc()
     worker.last_seen = stale_moment
     db.commit()
@@ -95,7 +95,7 @@ def test_non_online_poll_updates_liveness_without_promoting_status(db) -> None:
 
 def test_non_online_lone_worker_cannot_claim_pending_job(db) -> None:
     for status in ("starting", "recovering_identity", "blocked_auth", "degraded", "offline"):
-        worker = make_worker(db, capabilities=["codex-gpt-5.5"], name=f"claim-{status}", status=status)
+        worker = make_worker(db, capabilities=["gpt-5.6sol-medium"], name=f"claim-{status}", status=status)
         debate = Debate(topic=f"Can a {status} worker claim?", status="generating")
         db.add(debate)
         db.flush()
@@ -103,7 +103,7 @@ def test_non_online_lone_worker_cannot_claim_pending_job(db) -> None:
             debate_id=debate.id,
             job_type="argue",
             required_role="proposer",
-            required_model="codex-gpt-5.5",
+            required_model="gpt-5.6sol-medium",
             status="pending",
         )
         db.add(job)

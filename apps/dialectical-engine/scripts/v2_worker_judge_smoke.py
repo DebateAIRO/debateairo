@@ -16,7 +16,7 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_TIMEOUT_SECONDS = 120
-REQUIRED_MODEL = "codex-gpt-5.5"
+REQUIRED_MODEL = "gpt-5.6sol-medium"
 MOCK_MARKERS = ("mock", "fake", "deterministic", "local")
 
 

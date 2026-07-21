@@ -57,8 +57,8 @@ function SettingsForm({ token }: { token: string }) {
 
   function syncSettings(payload: SettingsPayload) {
     const models = payload.configured_models.length ? payload.configured_models : payload.enabled_models;
-    const caps = payload.model_monthly_caps_usd ?? { "grok-4.5": payload.grok_monthly_cap_usd };
-    const spendByModel = payload.model_monthly_spend_usd ?? { "grok-4.5": payload.grok_monthly_spend_usd };
+    const caps = payload.model_monthly_caps_usd ?? { "grok-4.5-high-loop": payload.grok_monthly_cap_usd };
+    const spendByModel = payload.model_monthly_spend_usd ?? { "grok-4.5-high-loop": payload.grok_monthly_spend_usd };
     setRouting(JSON.stringify(payload.routing, null, 2));
     setRoutingParsed(payload.routing);
     setModelCaps(
@@ -133,8 +133,8 @@ function SettingsForm({ token }: { token: string }) {
       model_monthly_caps_usd: monthlyCaps,
       enabled_models: selectedModels.length === configuredModels.length ? [] : selectedModels
     };
-    if (monthlyCaps["grok-4.5"] !== undefined) {
-      payload.grok_monthly_cap_usd = monthlyCaps["grok-4.5"];
+    if (monthlyCaps["grok-4.5-high-loop"] !== undefined) {
+      payload.grok_monthly_cap_usd = monthlyCaps["grok-4.5-high-loop"];
     }
     try {
       const saved = await apiFetch<SettingsPayload>(

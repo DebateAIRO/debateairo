@@ -60,10 +60,10 @@ def test_coordinator_config_loads_openai_values_from_dotenv(
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
     (tmp_path / ".env").write_text(
         "OPENAI_API_KEY=env-file-key\n"
-        "OPENAI_MODEL=codex-gpt-5.5\n"
+        "OPENAI_MODEL=gpt-5.6sol-medium\n"
     )
 
     settings = load_settings(path=tmp_path / "missing-coordinator.toml")
 
     assert settings.openai_api_key == "env-file-key"
-    assert settings.openai_model == "codex-gpt-5.5"
+    assert settings.openai_model == "gpt-5.6sol-medium"

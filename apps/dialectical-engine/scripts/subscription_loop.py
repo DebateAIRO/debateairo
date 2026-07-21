@@ -21,14 +21,24 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKER_ROOT = ROOT / "worker"
 
 
-CLAUDE_RAW_MODEL = "claude-sonnet-4-6"
-GEMINI_RAW_MODELS = {"gemini-2.5-flash", "gemini-3.5-flash"}
-CLAUDE_LOOP_MODEL = "claude-sonnet-4-6-max-loop"
-GEMINI_LOOP_MODEL = "gemini-2.5-flash-google-loop"
-GEMINI_CLI_MODEL = "gemini-2.5-flash"
+CODEX_RAW_MODELS = {"codex-gpt-5.5", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6sol-medium"}
+CLAUDE_RAW_MODELS = {"claude-sonnet-4-6", "claude-sonnet-5", "claude-sonnet-5-high-loop"}
+GROK_RAW_MODELS = {"grok-4.5", "grok-4.5-high-loop"}
+GEMINI_RAW_MODELS = {
+    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-high",
+    "gemini-3.5-flash-loop",
+}
+CODEX_MODEL = "gpt-5.6sol-medium"
+CLAUDE_RAW_MODEL = "claude-sonnet-5"
+CLAUDE_LOOP_MODEL = "claude-sonnet-5-high-loop"
+GROK_RAW_MODEL = "grok-4.5"
+GROK_LOOP_MODEL = "grok-4.5-high-loop"
+GEMINI_LOOP_MODEL = "gemini-3.5-flash-loop"
+GEMINI_CLI_MODEL = "gemini-3.5-flash-high"
 DEFAULT_COORDINATOR_URL = "https://dezbatere.ro"
 DEFAULT_LOOP_STATE_DIR = Path("/private/tmp/dialectical-subscription-loops")
-GOOGLE_ACCOUNT_AUTH_ENV = {"GOOGLE_GENAI_USE_GCA": "true"}
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
@@ -62,10 +72,15 @@ def replace_subscription_model(
     model: str,
     *,
     claude_loop_model: str = CLAUDE_LOOP_MODEL,
+    grok_loop_model: str = GROK_LOOP_MODEL,
     gemini_loop_model: str = GEMINI_LOOP_MODEL,
 ) -> str:
-    if model == CLAUDE_RAW_MODEL:
+    if model in CODEX_RAW_MODELS:
+        return CODEX_MODEL
+    if model in CLAUDE_RAW_MODELS:
         return claude_loop_model
+    if model in GROK_RAW_MODELS:
+        return grok_loop_model
     if model in GEMINI_RAW_MODELS:
         return gemini_loop_model
     return model
@@ -86,6 +101,7 @@ def subscription_routing(
     routing: dict[str, Any],
     *,
     claude_loop_model: str = CLAUDE_LOOP_MODEL,
+    grok_loop_model: str = GROK_LOOP_MODEL,
     gemini_loop_model: str = GEMINI_LOOP_MODEL,
 ) -> dict[str, Any]:
     updated = deepcopy(routing)
@@ -96,6 +112,7 @@ def subscription_routing(
             role_config["primary"] = replace_subscription_model(
                 role_config["primary"],
                 claude_loop_model=claude_loop_model,
+                grok_loop_model=grok_loop_model,
                 gemini_loop_model=gemini_loop_model,
             )
         if isinstance(role_config.get("fallback"), list):
@@ -104,6 +121,7 @@ def subscription_routing(
                     replace_subscription_model(
                         str(model),
                         claude_loop_model=claude_loop_model,
+                        grok_loop_model=grok_loop_model,
                         gemini_loop_model=gemini_loop_model,
                     )
                     for model in role_config["fallback"]
@@ -116,6 +134,7 @@ def subscription_routing(
                     replace_subscription_model(
                         str(model),
                         claude_loop_model=claude_loop_model,
+                        grok_loop_model=grok_loop_model,
                         gemini_loop_model=gemini_loop_model,
                     )
                     for model in role_config["pool"]
@@ -147,6 +166,8 @@ def provider_advertised_model(provider: str, advertised_model: str | None = None
         return advertised_model
     if provider == "claude":
         return CLAUDE_LOOP_MODEL
+    if provider == "grok":
+        return GROK_LOOP_MODEL
     if provider == "gemini":
         return GEMINI_LOOP_MODEL
     raise ValueError(f"unknown provider: {provider}")
@@ -154,9 +175,11 @@ def provider_advertised_model(provider: str, advertised_model: str | None = None
 
 def provider_worker_name(provider: str) -> str:
     if provider == "claude":
-        return "claude-max-loop"
+        return "claude-sonnet-loop"
+    if provider == "grok":
+        return "grok-high-loop"
     if provider == "gemini":
-        return "gemini-google-loop"
+        return "gemini-antigravity-loop"
     raise ValueError(f"unknown provider: {provider}")
 
 
@@ -370,11 +393,25 @@ async def fail_from_job_file(args: argparse.Namespace) -> int:
 
 
 def build_gemini_command(model: str, prompt: str) -> tuple[list[str], dict[str, str]]:
-    return ["gemini", "-m", model, "-p", prompt, "--output-format", "json"], GOOGLE_ACCOUNT_AUTH_ENV
+    return ["agy", "--print", prompt, "--model", model, "--effort", "high"], {}
 
 
 def build_claude_command(model: str, prompt: str) -> list[str]:
-    return ["claude", "-p", prompt, "--model", model, "--output-format", "text"]
+    return ["claude", "-p", prompt, "--model", model, "--effort", "high", "--output-format", "text"]
+
+
+def build_grok_command(model: str, prompt: str) -> list[str]:
+    return [
+        "grok",
+        "--single",
+        prompt,
+        "--model",
+        model,
+        "--reasoning-effort",
+        "high",
+        "--output-format",
+        "plain",
+    ]
 
 
 def gemini_response_text(stdout: str) -> str:
@@ -401,7 +438,7 @@ async def claude_once(args: argparse.Namespace) -> int:
         coordinator_url=args.coordinator_url,
         worker_name=args.worker_name,
         config_path=config_path,
-        advertised_model=CLAUDE_LOOP_MODEL,
+        advertised_model=args.advertised_model,
     )
     job = await poll_loop_job(config)
     if not job:
@@ -471,6 +508,42 @@ async def gemini_once(args: argparse.Namespace) -> int:
     return await complete_from_job_file(complete_args)
 
 
+async def grok_once(args: argparse.Namespace) -> int:
+    config_path = Path(args.config).expanduser()
+    config = await ensure_loop_worker(
+        provider="grok",
+        coordinator_url=args.coordinator_url,
+        worker_name=args.worker_name,
+        config_path=config_path,
+        advertised_model=args.advertised_model,
+    )
+    job = await poll_loop_job(config)
+    if not job:
+        print("NO_JOB")
+        return 0
+    job_file, response_file = write_job_file(
+        provider="grok",
+        config_path=config_path,
+        job=job,
+        state_dir=Path(args.state_dir),
+    )
+    process = subprocess.run(
+        build_grok_command(args.grok_model, render_model_prompt(job)),
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=args.timeout_seconds,
+        check=False,
+    )
+    if process.returncode != 0:
+        reason = (process.stderr or process.stdout or f"grok exited {process.returncode}").strip()
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
+    response_file.write_text(process.stdout.strip(), encoding="utf-8")
+    complete_args = argparse.Namespace(job_file=str(job_file), response_file=str(response_file))
+    return await complete_from_job_file(complete_args)
+
+
 def user_token(args: argparse.Namespace) -> str:
     token = args.user_token or os.getenv("DIALECTICAL_USER_TOKEN") or os.getenv("USER_TOKEN")
     if not token:
@@ -487,6 +560,7 @@ def configure_routing(args: argparse.Namespace) -> int:
         routing = subscription_routing(
             current.json()["routing"],
             claude_loop_model=args.claude_loop_model,
+            grok_loop_model=args.grok_loop_model,
             gemini_loop_model=args.gemini_loop_model,
         )
         enabled_models = production_enabled_models(routing)
@@ -536,12 +610,29 @@ def start_claude_loop(args: argparse.Namespace) -> int:
         f"./scripts/dezbatere_loop_helper.sh claude-once --coordinator-url {shlex.quote(args.coordinator_url)} "
         f"--worker-name {shlex.quote(args.claude_worker_name)} "
         f"--config {shlex.quote(args.claude_config)} "
+        f"--advertised-model {shlex.quote(args.claude_loop_model)} "
         f"--claude-model {shlex.quote(args.claude_model)}; "
         f"sleep {int(args.interval_seconds)}; "
         "done"
     )
     start_tmux_session(args.claude_session, command)
     print(f"started {args.claude_session}")
+    return 0
+
+
+def start_grok_loop(args: argparse.Namespace) -> int:
+    command = (
+        "while true; do "
+        f"./scripts/dezbatere_loop_helper.sh grok-once --coordinator-url {shlex.quote(args.coordinator_url)} "
+        f"--worker-name {shlex.quote(args.grok_worker_name)} "
+        f"--config {shlex.quote(args.grok_config)} "
+        f"--advertised-model {shlex.quote(args.grok_loop_model)} "
+        f"--grok-model {shlex.quote(args.grok_model)}; "
+        f"sleep {int(args.interval_seconds)}; "
+        "done"
+    )
+    start_tmux_session(args.grok_session, command)
+    print(f"started {args.grok_session}")
     return 0
 
 
@@ -567,7 +658,14 @@ async def ensure_workers_for_start(args: argparse.Namespace) -> None:
         coordinator_url=args.coordinator_url,
         worker_name=args.claude_worker_name,
         config_path=Path(args.claude_config).expanduser(),
-        advertised_model=CLAUDE_LOOP_MODEL,
+        advertised_model=args.claude_loop_model,
+    )
+    await ensure_loop_worker(
+        provider="grok",
+        coordinator_url=args.coordinator_url,
+        worker_name=args.grok_worker_name,
+        config_path=Path(args.grok_config).expanduser(),
+        advertised_model=args.grok_loop_model,
     )
     await ensure_loop_worker(
         provider="gemini",
@@ -583,19 +681,20 @@ def start_loops(args: argparse.Namespace) -> int:
     os.environ.pop("USER_TOKEN", None)
     os.environ.pop("DIALECTICAL_USER_TOKEN", None)
     start_claude_loop(args)
+    start_grok_loop(args)
     start_gemini_loop(args)
     return 0
 
 
 def stop_loops(args: argparse.Namespace) -> int:
-    for session in (args.claude_session, args.gemini_session):
+    for session in (args.claude_session, args.grok_session, args.gemini_session):
         subprocess.run(["tmux", "kill-session", "-t", session], check=False)
         print(f"stopped {session}")
     return 0
 
 
 def status(args: argparse.Namespace) -> int:
-    for session in (args.claude_session, args.gemini_session):
+    for session in (args.claude_session, args.grok_session, args.gemini_session):
         state = "running" if tmux_session_exists(session) else "stopped"
         print(f"{session}: {state}")
     return 0
@@ -633,6 +732,7 @@ def build_parser() -> argparse.ArgumentParser:
     claude_parser.add_argument("--worker-name", default=provider_worker_name("claude"))
     claude_parser.add_argument("--config", default=str(provider_config_path("claude")))
     claude_parser.add_argument("--claude-model", default=CLAUDE_RAW_MODEL)
+    claude_parser.add_argument("--advertised-model", default=CLAUDE_LOOP_MODEL)
     claude_parser.add_argument("--timeout-seconds", type=int, default=600)
     claude_parser.set_defaults(func=lambda args: asyncio.run(claude_once(args)))
 
@@ -645,10 +745,20 @@ def build_parser() -> argparse.ArgumentParser:
     gemini_parser.add_argument("--timeout-seconds", type=int, default=600)
     gemini_parser.set_defaults(func=lambda args: asyncio.run(gemini_once(args)))
 
+    grok_parser = subcommands.add_parser("grok-once")
+    add_common_loop_args(grok_parser)
+    grok_parser.add_argument("--worker-name", default=provider_worker_name("grok"))
+    grok_parser.add_argument("--config", default=str(provider_config_path("grok")))
+    grok_parser.add_argument("--grok-model", default=GROK_RAW_MODEL)
+    grok_parser.add_argument("--advertised-model", default=GROK_LOOP_MODEL)
+    grok_parser.add_argument("--timeout-seconds", type=int, default=600)
+    grok_parser.set_defaults(func=lambda args: asyncio.run(grok_once(args)))
+
     routing_parser = subcommands.add_parser("configure-routing")
     routing_parser.add_argument("--coordinator-url", default=os.getenv("SUBSCRIPTION_LOOP_URL", DEFAULT_COORDINATOR_URL))
     routing_parser.add_argument("--user-token")
     routing_parser.add_argument("--claude-loop-model", default=CLAUDE_LOOP_MODEL)
+    routing_parser.add_argument("--grok-loop-model", default=GROK_LOOP_MODEL)
     routing_parser.add_argument("--gemini-loop-model", default=GEMINI_LOOP_MODEL)
     routing_parser.set_defaults(func=configure_routing)
 
@@ -656,12 +766,18 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("--coordinator-url", default=os.getenv("SUBSCRIPTION_LOOP_URL", DEFAULT_COORDINATOR_URL))
     start_parser.add_argument("--interval-seconds", type=int, default=60)
     start_parser.add_argument("--claude-session", default="dialectical-claude-loop")
+    start_parser.add_argument("--grok-session", default="dialectical-grok-loop")
     start_parser.add_argument("--gemini-session", default="dialectical-gemini-loop")
     start_parser.add_argument("--claude-worker-name", default=provider_worker_name("claude"))
+    start_parser.add_argument("--grok-worker-name", default=provider_worker_name("grok"))
     start_parser.add_argument("--gemini-worker-name", default=provider_worker_name("gemini"))
     start_parser.add_argument("--claude-config", default=str(provider_config_path("claude")))
+    start_parser.add_argument("--grok-config", default=str(provider_config_path("grok")))
     start_parser.add_argument("--gemini-config", default=str(provider_config_path("gemini")))
     start_parser.add_argument("--claude-model", default=CLAUDE_RAW_MODEL)
+    start_parser.add_argument("--grok-model", default=GROK_RAW_MODEL)
+    start_parser.add_argument("--claude-loop-model", default=CLAUDE_LOOP_MODEL)
+    start_parser.add_argument("--grok-loop-model", default=GROK_LOOP_MODEL)
     start_parser.add_argument("--gemini-model", default=GEMINI_CLI_MODEL)
     start_parser.add_argument("--gemini-loop-model", default=GEMINI_LOOP_MODEL)
     start_parser.set_defaults(func=start_loops)
@@ -673,7 +789,18 @@ def build_parser() -> argparse.ArgumentParser:
     start_claude_parser.add_argument("--claude-worker-name", default=provider_worker_name("claude"))
     start_claude_parser.add_argument("--claude-config", default=str(provider_config_path("claude")))
     start_claude_parser.add_argument("--claude-model", default=CLAUDE_RAW_MODEL)
+    start_claude_parser.add_argument("--claude-loop-model", default=CLAUDE_LOOP_MODEL)
     start_claude_parser.set_defaults(func=start_claude_loop)
+
+    start_grok_parser = subcommands.add_parser("start-grok")
+    start_grok_parser.add_argument("--coordinator-url", default=os.getenv("SUBSCRIPTION_LOOP_URL", DEFAULT_COORDINATOR_URL))
+    start_grok_parser.add_argument("--interval-seconds", type=int, default=60)
+    start_grok_parser.add_argument("--grok-session", default="dialectical-grok-loop")
+    start_grok_parser.add_argument("--grok-worker-name", default=provider_worker_name("grok"))
+    start_grok_parser.add_argument("--grok-config", default=str(provider_config_path("grok")))
+    start_grok_parser.add_argument("--grok-model", default=GROK_RAW_MODEL)
+    start_grok_parser.add_argument("--grok-loop-model", default=GROK_LOOP_MODEL)
+    start_grok_parser.set_defaults(func=start_grok_loop)
 
     start_gemini_parser = subcommands.add_parser("start-gemini")
     start_gemini_parser.add_argument("--coordinator-url", default=os.getenv("SUBSCRIPTION_LOOP_URL", DEFAULT_COORDINATOR_URL))
@@ -687,11 +814,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     stop_parser = subcommands.add_parser("stop")
     stop_parser.add_argument("--claude-session", default="dialectical-claude-loop")
+    stop_parser.add_argument("--grok-session", default="dialectical-grok-loop")
     stop_parser.add_argument("--gemini-session", default="dialectical-gemini-loop")
     stop_parser.set_defaults(func=stop_loops)
 
     status_parser = subcommands.add_parser("status")
     status_parser.add_argument("--claude-session", default="dialectical-claude-loop")
+    status_parser.add_argument("--grok-session", default="dialectical-grok-loop")
     status_parser.add_argument("--gemini-session", default="dialectical-gemini-loop")
     status_parser.set_defaults(func=status)
 

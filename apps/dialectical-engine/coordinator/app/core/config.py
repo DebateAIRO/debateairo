@@ -27,36 +27,34 @@ MAX_GROK_MONTHLY_CAP_USD = 1_000_000.0
 DEFAULT_ROUTING: dict[str, dict[str, Any]] = {
     "decomposer": {
         "primary": "mock-local",
-        "fallback": ["claude-sonnet-4-6", "codex-gpt-5.5"],
+        "fallback": ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
     },
     "proposer": {
         "pool": [
             "mock-local",
-            "claude-sonnet-4-6",
-            "codex-gpt-5.5",
-            "gemini-2.5-flash",
-            "grok-4.5",
-            "ollama:qwen-3.6",
-            "ollama:gemma-4-9b",
+            "claude-sonnet-5-high-loop",
+            "gpt-5.6sol-medium",
+            "grok-4.5-high-loop",
+            "gemini-3.5-flash-loop",
+            "lmstudio:google_gemma-4-e4b-it",
         ],
         "strategy": "round_robin",
     },
     "opponent": {
         "pool": [
             "mock-local",
-            "claude-sonnet-4-6",
-            "codex-gpt-5.5",
-            "gemini-2.5-flash",
-            "grok-4.5",
-            "ollama:qwen-3.6",
-            "ollama:gemma-4-9b",
+            "claude-sonnet-5-high-loop",
+            "gpt-5.6sol-medium",
+            "grok-4.5-high-loop",
+            "gemini-3.5-flash-loop",
+            "lmstudio:google_gemma-4-e4b-it",
         ],
         "strategy": "round_robin",
         "constraint": "not_same_as_claim_author",
     },
     "synthesizer": {
         "primary": "mock-local",
-        "fallback": ["claude-sonnet-4-6", "codex-gpt-5.5"],
+        "fallback": ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
     },
 }
 
@@ -75,7 +73,7 @@ class Settings:
     routing: dict[str, dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_ROUTING))
     grok_monthly_cap_usd: float = 25.0
     openai_api_key: str | None = None
-    openai_model: str = "codex-gpt-5.5"
+    openai_model: str = "gpt-5.6sol-medium"
     single_shot_provider: str = "codex"
     codex_command: str = "codex"
 

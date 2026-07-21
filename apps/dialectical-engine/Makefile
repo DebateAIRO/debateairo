@@ -28,7 +28,7 @@ TEST_PYCACHE_PREFIX ?= /private/tmp/dialectical-test-pycache
 TEST_ENV = PYTHONPYCACHEPREFIX="$(TEST_PYCACHE_PREFIX)" PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 $(PYTHON_ENV)
 endif
 
-.PHONY: dev dev-real dev-guardian dev-smoke real-codex-scoring-smoke v2-worker-judge-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
+.PHONY: dev dev-real dev-guardian dev-smoke real-codex-scoring-smoke v2-worker-judge-smoke test acceptance configure-local-single-machine configure-local-personal-models configure-gemini-google-auth refresh-local-models setup-status interactive-manual-setup source-snapshot local-status local-next-steps manual-setup-checklist hosting-status prepare-romarg-nameservers final-single-machine-check lmstudio-worker lmstudio-worker-once install-lmstudio-worker stop-lmstudio-worker probe-lmstudio-job probe-lmstudio-worker-job probe-model-auth local-cluster-check local-single-machine-check local-single-machine-acceptance wait-dezbatere-dns resume-dezbatere-hosting deploy-preflight status install-status-helper handoff-bundles final-production-check production-readiness production-acceptance-sequence install-services install-watchdog watchdog-once setup-named-tunnel setup-dezbatere-tunnel install-tunnel stop-quick-tunnel install-worker register-worker update-worker-config verify-worker-status verify-worker-visible configure-subscription-loop-routing start-subscription-loops start-claude-subscription-loop start-grok-subscription-loop start-gemini-subscription-loop stop-subscription-loops subscription-loop-status bootstrap web-install web-build restart-web rebuild-web-service
 
 LOCAL_CHECK_PYTHON ?= $(PYTHON)
 DEZBATERE_DOMAIN ?= dezbatere.ro
@@ -66,14 +66,20 @@ WORKER_REQUIRE_NAMED_HTTPS ?= 0
 SUBSCRIPTION_LOOP_URL ?= https://dezbatere.ro
 SUBSCRIPTION_LOOP_INTERVAL_SECONDS ?= 60
 CLAUDE_LOOP_SESSION ?= dialectical-claude-loop
+GROK_LOOP_SESSION ?= dialectical-grok-loop
 GEMINI_LOOP_SESSION ?= dialectical-gemini-loop
-CLAUDE_LOOP_WORKER_NAME ?= claude-max-loop
-GEMINI_LOOP_WORKER_NAME ?= gemini-google-loop
+CLAUDE_LOOP_WORKER_NAME ?= claude-sonnet-loop
+GROK_LOOP_WORKER_NAME ?= grok-high-loop
+GEMINI_LOOP_WORKER_NAME ?= gemini-antigravity-loop
 CLAUDE_LOOP_CONFIG ?= ~/.dialectical-worker/claude-subscription-loop.toml
+GROK_LOOP_CONFIG ?= ~/.dialectical-worker/grok-subscription-loop.toml
 GEMINI_LOOP_CONFIG ?= ~/.dialectical-worker/gemini-subscription-loop.toml
-CLAUDE_LOOP_CLI_MODEL ?= claude-sonnet-4-6
-GEMINI_LOOP_CLI_MODEL ?= gemini-2.5-flash
-GEMINI_LOOP_MODEL ?= gemini-2.5-flash-google-loop
+CLAUDE_LOOP_CLI_MODEL ?= claude-sonnet-5
+CLAUDE_LOOP_MODEL ?= claude-sonnet-5-high-loop
+GROK_LOOP_CLI_MODEL ?= grok-4.5
+GROK_LOOP_MODEL ?= grok-4.5-high-loop
+GEMINI_LOOP_CLI_MODEL ?= gemini-3.5-flash-high
+GEMINI_LOOP_MODEL ?= gemini-3.5-flash-loop
 WORKER_ALLOWED_MODELS_ARG = $(if $(filter command line environment override,$(origin ALLOWED_MODELS)),--allowed-models "$(ALLOWED_MODELS)",)
 WORKER_REQUIRE_CAPABILITIES_ARG = $(if $(filter 1 true yes,$(WORKER_REQUIRE_CAPABILITIES)),--require-capabilities,)
 WORKER_REQUIRED_CAPABILITIES_ARG = $(if $(strip $(WORKER_REQUIRED_CAPABILITIES)),--required-capabilities "$(WORKER_REQUIRED_CAPABILITIES)",)
@@ -356,22 +362,25 @@ verify-worker-visible:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/verify_worker_visible.py --base-url "$(COORDINATOR_URL)" --worker-name "$(WORKER_NAME)" --expected-status online --timeout "$(WORKER_VISIBLE_TIMEOUT)" --require-capabilities $(WORKER_REQUIRED_CAPABILITIES_ARG) $(WORKER_REJECT_NON_PRODUCTION_CAPABILITIES_ARG)
 
 configure-subscription-loop-routing:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py configure-routing --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --gemini-loop-model "$(GEMINI_LOOP_MODEL)"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py configure-routing --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --claude-loop-model "$(CLAUDE_LOOP_MODEL)" --grok-loop-model "$(GROK_LOOP_MODEL)" --gemini-loop-model "$(GEMINI_LOOP_MODEL)"
 
 start-subscription-loops:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --claude-session "$(CLAUDE_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)" --claude-worker-name "$(CLAUDE_LOOP_WORKER_NAME)" --gemini-worker-name "$(GEMINI_LOOP_WORKER_NAME)" --claude-config "$(CLAUDE_LOOP_CONFIG)" --gemini-config "$(GEMINI_LOOP_CONFIG)" --claude-model "$(CLAUDE_LOOP_CLI_MODEL)" --gemini-model "$(GEMINI_LOOP_CLI_MODEL)" --gemini-loop-model "$(GEMINI_LOOP_MODEL)"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --claude-session "$(CLAUDE_LOOP_SESSION)" --grok-session "$(GROK_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)" --claude-worker-name "$(CLAUDE_LOOP_WORKER_NAME)" --grok-worker-name "$(GROK_LOOP_WORKER_NAME)" --gemini-worker-name "$(GEMINI_LOOP_WORKER_NAME)" --claude-config "$(CLAUDE_LOOP_CONFIG)" --grok-config "$(GROK_LOOP_CONFIG)" --gemini-config "$(GEMINI_LOOP_CONFIG)" --claude-model "$(CLAUDE_LOOP_CLI_MODEL)" --grok-model "$(GROK_LOOP_CLI_MODEL)" --gemini-model "$(GEMINI_LOOP_CLI_MODEL)" --claude-loop-model "$(CLAUDE_LOOP_MODEL)" --grok-loop-model "$(GROK_LOOP_MODEL)" --gemini-loop-model "$(GEMINI_LOOP_MODEL)"
 
 start-claude-subscription-loop:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start-claude --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --claude-session "$(CLAUDE_LOOP_SESSION)" --claude-worker-name "$(CLAUDE_LOOP_WORKER_NAME)" --claude-config "$(CLAUDE_LOOP_CONFIG)" --claude-model "$(CLAUDE_LOOP_CLI_MODEL)"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start-claude --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --claude-session "$(CLAUDE_LOOP_SESSION)" --claude-worker-name "$(CLAUDE_LOOP_WORKER_NAME)" --claude-config "$(CLAUDE_LOOP_CONFIG)" --claude-model "$(CLAUDE_LOOP_CLI_MODEL)" --claude-loop-model "$(CLAUDE_LOOP_MODEL)"
+
+start-grok-subscription-loop:
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start-grok --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --grok-session "$(GROK_LOOP_SESSION)" --grok-worker-name "$(GROK_LOOP_WORKER_NAME)" --grok-config "$(GROK_LOOP_CONFIG)" --grok-model "$(GROK_LOOP_CLI_MODEL)" --grok-loop-model "$(GROK_LOOP_MODEL)"
 
 start-gemini-subscription-loop:
 	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py start-gemini --coordinator-url "$(SUBSCRIPTION_LOOP_URL)" --interval-seconds "$(SUBSCRIPTION_LOOP_INTERVAL_SECONDS)" --gemini-session "$(GEMINI_LOOP_SESSION)" --gemini-worker-name "$(GEMINI_LOOP_WORKER_NAME)" --gemini-config "$(GEMINI_LOOP_CONFIG)" --gemini-model "$(GEMINI_LOOP_CLI_MODEL)" --gemini-loop-model "$(GEMINI_LOOP_MODEL)"
 
 stop-subscription-loops:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py stop --claude-session "$(CLAUDE_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py stop --claude-session "$(CLAUDE_LOOP_SESSION)" --grok-session "$(GROK_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)"
 
 subscription-loop-status:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py status --claude-session "$(CLAUDE_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)"
+	$(PYTHON_ENV) "$(PYTHON)" scripts/subscription_loop.py status --claude-session "$(CLAUDE_LOOP_SESSION)" --grok-session "$(GROK_LOOP_SESSION)" --gemini-session "$(GEMINI_LOOP_SESSION)"
 
 install-services:
 	pnpm --dir web build

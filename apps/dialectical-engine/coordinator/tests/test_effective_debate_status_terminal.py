@@ -26,7 +26,7 @@ def _job(db, debate: Debate, *, status: str, job_type: str = "v2_pov") -> Job:
         debate_id=debate.id,
         job_type=job_type,
         required_role="Scientific POV",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status=status,
     )
     db.add(job)
@@ -105,7 +105,7 @@ def test_complete_upgrade_preserved_when_synthesis_present(db) -> None:
     db.add(root)
     db.flush()
     debate.root_node_id = root.id
-    worker = Worker(name="mac-mini", token_hash=hash_token("worker-token"), capabilities=["codex-gpt-5.5"], status="online")
+    worker = Worker(name="mac-mini", token_hash=hash_token("worker-token"), capabilities=["gpt-5.6sol-medium"], status="online")
     db.add(worker)
     db.flush()
     synthesis = Synthesis(
@@ -113,7 +113,7 @@ def test_complete_upgrade_preserved_when_synthesis_present(db) -> None:
         strongest_pro="p",
         strongest_con="c",
         verdict="v",
-        model_id="codex-gpt-5.5",
+        model_id="gpt-5.6sol-medium",
         worker_id=worker.id,
     )
     db.add(synthesis)

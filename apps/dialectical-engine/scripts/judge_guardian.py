@@ -47,7 +47,7 @@ except Exception as exc:  # noqa: BLE001 - never crash the guardian on import
     IMPORT_ERROR = f"{exc.__class__.__name__}: {exc}"
 
 REPAIR_ROLE = "judge"
-REPAIR_DEFAULTS = {"provider": "codex", "model": "codex-gpt-5.5"}
+REPAIR_DEFAULTS = {"provider": "codex", "model": "gpt-5.6sol-medium"}
 EXECUTABLE_PROBE_TIMEOUT_SECONDS = 10
 
 

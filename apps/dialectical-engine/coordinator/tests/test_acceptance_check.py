@@ -67,7 +67,7 @@ def test_public_list_evidence_records_archive_rows() -> None:
                 "status": "complete",
                 "created_at": "2026-05-24T00:00:00+00:00",
                 "completed_at": "2026-05-24T00:01:00+00:00",
-                "models": ["codex-gpt-5.5", "claude-sonnet-4-6", "codex-gpt-5.5"],
+                "models": ["gpt-5.6sol-medium", "claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
             }
         ],
     }
@@ -76,7 +76,7 @@ def test_public_list_evidence_records_archive_rows() -> None:
 
     assert module.public_list_detail(evidence) == "1 debates visible without auth"
     assert evidence["debate_count"] == 1
-    assert evidence["items"][0]["models"] == ["claude-sonnet-4-6", "codex-gpt-5.5"]
+    assert evidence["items"][0]["models"] == ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"]
 
 
 def test_public_list_evidence_rejects_archived_rows() -> None:
@@ -131,7 +131,7 @@ def test_require_public_list_current_debate_accepts_current_complete_row() -> No
                 "id": "debate-1",
                 "topic": "Topic",
                 "status": "complete",
-                "models": ["codex-gpt-5.5", "gemini-2.5-flash"],
+                "models": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
             }
         ]
     }
@@ -140,7 +140,7 @@ def test_require_public_list_current_debate_accepts_current_complete_row() -> No
         evidence,
         "debate-1",
         "Topic",
-        {"codex-gpt-5.5", "gemini-2.5-flash"},
+        {"gpt-5.6sol-medium", "gemini-3.5-flash-loop"},
     )
 
 
@@ -150,7 +150,7 @@ def test_require_public_list_current_debate_accepts_current_complete_row() -> No
         (lambda row: row.update({"id": "other-debate"}), "missing current debate"),
         (lambda row: row.update({"topic": "Stale topic"}), "topic mismatch"),
         (lambda row: row.update({"status": "generating"}), "not complete"),
-        (lambda row: row.update({"models": ["codex-gpt-5.5"]}), "missing model badges"),
+        (lambda row: row.update({"models": ["gpt-5.6sol-medium"]}), "missing model badges"),
     ],
 )
 def test_require_public_list_current_debate_rejects_stale_rows(mutator, message: str) -> None:
@@ -159,7 +159,7 @@ def test_require_public_list_current_debate_rejects_stale_rows(mutator, message:
         "id": "debate-1",
         "topic": "Topic",
         "status": "complete",
-        "models": ["codex-gpt-5.5", "gemini-2.5-flash"],
+        "models": ["gpt-5.6sol-medium", "gemini-3.5-flash-loop"],
     }
     mutator(row)
     evidence = {"items": [row]}
@@ -169,7 +169,7 @@ def test_require_public_list_current_debate_rejects_stale_rows(mutator, message:
             evidence,
             "debate-1",
             "Topic",
-            {"codex-gpt-5.5", "gemini-2.5-flash"},
+            {"gpt-5.6sol-medium", "gemini-3.5-flash-loop"},
         )
 
 
@@ -292,7 +292,7 @@ def test_require_synthesis_evidence_returns_structured_fields() -> None:
         "strongest_pro": "Pro text",
         "strongest_con": "Con text",
         "verdict": "Verdict text",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "created_at": "2026-05-24T00:00:00+00:00",
@@ -308,7 +308,7 @@ def test_require_synthesis_evidence_rejects_missing_verdict() -> None:
         "debate_id": "debate-1",
         "strongest_pro": "Pro text",
         "strongest_con": "Con text",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "created_at": "2026-05-24T00:00:00+00:00",
@@ -326,7 +326,7 @@ def test_require_synthesis_evidence_rejects_bad_created_at() -> None:
         "strongest_pro": "Pro text",
         "strongest_con": "Con text",
         "verdict": "Verdict text",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "created_at": "not-a-date",
@@ -344,7 +344,7 @@ def test_require_synthesis_evidence_rejects_created_at_without_timezone() -> Non
         "strongest_pro": "Pro text",
         "strongest_con": "Con text",
         "verdict": "Verdict text",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "created_at": "2026-05-24T00:00:00",
@@ -361,7 +361,7 @@ def test_worker_status_payload_evidence_records_counts_and_rows() -> None:
             "id": WORKER_B_ID,
             "name": "adesso-mbp",
             "status": "offline",
-            "capabilities": ["claude-sonnet-4-6"],
+            "capabilities": ["claude-sonnet-5-high-loop"],
             "current_job_id": None,
             "last_seen": "2026-05-24T00:00:00+00:00",
         },
@@ -369,7 +369,7 @@ def test_worker_status_payload_evidence_records_counts_and_rows() -> None:
             "id": WORKER_A_ID,
             "name": "mac-mini",
             "status": "online",
-            "capabilities": ["codex-gpt-5.5", "claude-sonnet-4-6"],
+            "capabilities": ["gpt-5.6sol-medium", "claude-sonnet-5-high-loop"],
             "current_job_id": JOB_ID,
             "last_seen": "2026-05-24T02:00:01+02:00",
         },
@@ -386,7 +386,7 @@ def test_worker_status_payload_evidence_records_counts_and_rows() -> None:
         "degraded_count": 0,
         "busy_count": 1,
         "capability_count": 2,
-        "capabilities": ["claude-sonnet-4-6", "codex-gpt-5.5"],
+        "capabilities": ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
         "online_worker_names": ["mac-mini"],
         "offline_worker_names": ["adesso-mbp"],
         "degraded_worker_names": [],
@@ -395,7 +395,7 @@ def test_worker_status_payload_evidence_records_counts_and_rows() -> None:
                 "id": WORKER_B_ID,
                 "name": "adesso-mbp",
                 "status": "offline",
-                "capabilities": ["claude-sonnet-4-6"],
+                "capabilities": ["claude-sonnet-5-high-loop"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T00:00:00+00:00",
             },
@@ -403,7 +403,7 @@ def test_worker_status_payload_evidence_records_counts_and_rows() -> None:
                 "id": WORKER_A_ID,
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["claude-sonnet-4-6", "codex-gpt-5.5"],
+                "capabilities": ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"],
                 "current_job_id": JOB_ID,
                 "last_seen": "2026-05-24T00:00:01+00:00",
             },
@@ -432,7 +432,7 @@ def test_worker_status_payload_evidence_rejects_last_seen_without_timezone() -> 
         "id": WORKER_A_ID,
         "name": "mac-mini",
         "status": "online",
-        "capabilities": ["codex-gpt-5.5"],
+        "capabilities": ["gpt-5.6sol-medium"],
         "current_job_id": None,
         "last_seen": "2026-05-24T00:00:01",
     }
@@ -458,7 +458,7 @@ def test_worker_status_payload_evidence_rejects_malformed_worker_identity(
         "id": WORKER_A_ID,
         "name": "mac-mini",
         "status": "online",
-        "capabilities": ["codex-gpt-5.5"],
+        "capabilities": ["gpt-5.6sol-medium"],
         "current_job_id": JOB_ID,
         "last_seen": "2026-05-24T00:00:01+00:00",
     }
@@ -471,9 +471,9 @@ def test_worker_status_payload_evidence_rejects_malformed_worker_identity(
 @pytest.mark.parametrize(
     ("capabilities", "message"),
     [
-        (["codex-gpt-5.5", ""], "Worker mac-mini capability 2 is blank"),
-        (["codex-gpt-5.5", "codex-gpt-5.5"], "Worker mac-mini duplicate capability: codex-gpt-5.5"),
-        (["codex-gpt-5.5", 7], "Worker mac-mini capability 2 is not a string"),
+        (["gpt-5.6sol-medium", ""], "Worker mac-mini capability 2 is blank"),
+        (["gpt-5.6sol-medium", "gpt-5.6sol-medium"], "Worker mac-mini duplicate capability: gpt-5.6sol-medium"),
+        (["gpt-5.6sol-medium", 7], "Worker mac-mini capability 2 is not a string"),
     ],
 )
 def test_worker_status_payload_evidence_rejects_malformed_capabilities(capabilities, message: str) -> None:
@@ -499,7 +499,7 @@ def test_worker_status_evidence_normalizes_timezone_aware_last_seen_to_utc() -> 
                 "id": WORKER_A_ID,
                 "name": "mac-mini",
                 "status": "online",
-                "capabilities": ["codex-gpt-5.5"],
+                "capabilities": ["gpt-5.6sol-medium"],
                 "current_job_id": None,
                 "last_seen": "2026-05-24T02:00:01+02:00",
             }
@@ -519,7 +519,7 @@ def test_worker_status_evidence_rejects_bad_worker_rows() -> None:
                     "id": "worker-1",
                     "name": "mac-mini",
                     "status": "online",
-                    "capabilities": ["codex-gpt-5.5"],
+                    "capabilities": ["gpt-5.6sol-medium"],
                     "current_job_id": None,
                     "last_seen": "2026-05-24T02:00:01+02:00",
                 }
@@ -951,7 +951,7 @@ def test_generation_history_evidence_promotes_active_and_archived_rows() -> None
     module = load_acceptance_module()
     archived = {
         "id": "generation-old",
-        "model_id": "codex-gpt-5.5",
+        "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "role": "proposer",
@@ -964,7 +964,7 @@ def test_generation_history_evidence_promotes_active_and_archived_rows() -> None
     }
     active = {
         "id": "generation-new",
-        "model_id": "claude-sonnet-4-6",
+        "model_id": "claude-sonnet-5-high-loop",
         "worker_id": "worker-1",
         "worker_name": "mac-mini",
         "role": "proposer",
@@ -1042,7 +1042,7 @@ def test_markdown_export_evidence_promotes_headers_sections_and_metadata() -> No
             "## Synthesis\n\n"
             "## Tree\n\n"
             "**Workers:** mac-mini\n"
-            "**Models:** codex-gpt-5.5\n"
+            "**Models:** gpt-5.6sol-medium\n"
             "## Generation History\n"
         ),
     )
@@ -1056,7 +1056,7 @@ def test_markdown_export_evidence_promotes_headers_sections_and_metadata() -> No
         "Topic",
         "debate-1",
         {"mac-mini"},
-        {"codex-gpt-5.5"},
+        {"gpt-5.6sol-medium"},
         history_items,
     )
 
@@ -1070,7 +1070,7 @@ def test_markdown_export_evidence_promotes_headers_sections_and_metadata() -> No
     assert evidence["tree_section"] is True
     assert evidence["generation_history_section"] is True
     assert evidence["worker_names"] == ["mac-mini"]
-    assert evidence["model_ids"] == ["codex-gpt-5.5"]
+    assert evidence["model_ids"] == ["gpt-5.6sol-medium"]
     assert evidence["history_generation_ids"] == ["generation-new", "generation-old"]
     assert evidence["active_generation_ids"] == ["generation-new"]
     assert evidence["archived_generation_ids"] == ["generation-old"]
@@ -1112,7 +1112,7 @@ def test_write_report_promotes_structured_worker_model_evidence(tmp_path: Path) 
                     "id": "worker-mac-mini",
                     "name": "mac-mini",
                     "status": "online",
-                    "capabilities": ["codex-gpt-5.5"],
+                    "capabilities": ["gpt-5.6sol-medium"],
                     "current_job_id": None,
                     "last_seen": "2026-05-24T00:00:00+00:00",
                 }
@@ -1134,12 +1134,12 @@ def test_write_report_promotes_structured_worker_model_evidence(tmp_path: Path) 
         ),
         module.CheckResult("generated-workers", "mac-mini", ["mac-mini"]),
         module.CheckResult("regenerated-workers", "mac-mini", ["mac-mini"]),
-        module.CheckResult("generated-models", "codex-gpt-5.5", ["codex-gpt-5.5"]),
-        module.CheckResult("regenerated-models", "claude-sonnet-4-6", ["claude-sonnet-4-6"]),
+        module.CheckResult("generated-models", "gpt-5.6sol-medium", ["gpt-5.6sol-medium"]),
+        module.CheckResult("regenerated-models", "claude-sonnet-5-high-loop", ["claude-sonnet-5-high-loop"]),
         module.CheckResult(
             "regeneration-model-switch",
-            "codex-gpt-5.5 -> claude-sonnet-4-6",
-            {"old_model": "codex-gpt-5.5", "new_model": "claude-sonnet-4-6"},
+            "gpt-5.6sol-medium -> claude-sonnet-5-high-loop",
+            {"old_model": "gpt-5.6sol-medium", "new_model": "claude-sonnet-5-high-loop"},
         ),
     ]
 
@@ -1153,13 +1153,13 @@ def test_write_report_promotes_structured_worker_model_evidence(tmp_path: Path) 
     assert payload["offline_workers"][0]["id"] == "worker-adesso-mbp"
     assert payload["offline_workers"][0]["name"] == "adesso-mbp"
     assert payload["observed_worker_names"] == ["adesso-mbp", "mac-mini"]
-    assert payload["observed_model_ids"] == ["claude-sonnet-4-6", "codex-gpt-5.5"]
+    assert payload["observed_model_ids"] == ["claude-sonnet-5-high-loop", "gpt-5.6sol-medium"]
     assert payload["regeneration_model_switch"] == {
-        "new_model": "claude-sonnet-4-6",
-        "old_model": "codex-gpt-5.5",
+        "new_model": "claude-sonnet-5-high-loop",
+        "old_model": "gpt-5.6sol-medium",
     }
     switch_result = next(result for result in payload["results"] if result["name"] == "regeneration-model-switch")
-    assert switch_result["evidence"]["new_model"] == "claude-sonnet-4-6"
+    assert switch_result["evidence"]["new_model"] == "claude-sonnet-5-high-loop"
 
 
 def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
@@ -1180,16 +1180,16 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
             self.settings = {
                 "routing": {
                     "decomposer": {"primary": "mock-local", "fallback": []},
-                    "proposer": {"pool": ["mock-local", "grok-4.5"], "strategy": "round_robin"},
+                    "proposer": {"pool": ["mock-local", "grok-4.5-high-loop"], "strategy": "round_robin"},
                 },
-                "configured_models": ["grok-4.5", "mock-local"],
-                "enabled_models": ["grok-4.5", "mock-local"],
+                "configured_models": ["grok-4.5-high-loop", "mock-local"],
+                "enabled_models": ["grok-4.5-high-loop", "mock-local"],
                 "grok_monthly_cap_usd": 25.0,
                 "grok_monthly_spend_usd": 0.0,
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
-                "model_monthly_caps_usd": {"grok-4.5": 25.0},
-                "model_monthly_spend_usd": {"grok-4.5": 0.0, "mock-local": 0.0},
-                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
+                "model_monthly_caps_usd": {"grok-4.5-high-loop": 25.0},
+                "model_monthly_spend_usd": {"grok-4.5-high-loop": 0.0, "mock-local": 0.0},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5-high-loop": {"input": 1.25, "output": 2.5}},
             }
             self.put_payloads = []
 
@@ -1201,7 +1201,7 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
                 self.settings["enabled_models"] = payload["enabled_models"]
                 self.settings["grok_monthly_cap_usd"] = payload["grok_monthly_cap_usd"]
                 caps = dict(payload["model_monthly_caps_usd"])
-                caps["grok-4.5"] = payload["grok_monthly_cap_usd"]
+                caps["grok-4.5-high-loop"] = payload["grok_monthly_cap_usd"]
                 self.settings["model_monthly_caps_usd"] = caps
             return Response(dict(self.settings))
 
@@ -1210,15 +1210,15 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
     detail = module.require_settings_round_trip(client, "user-token")
 
     assert "model cap restored for mock-local" in detail
-    assert client.settings["enabled_models"] == ["grok-4.5", "mock-local"]
-    assert client.settings["model_monthly_caps_usd"] == {"grok-4.5": 25.0}
+    assert client.settings["enabled_models"] == ["grok-4.5-high-loop", "mock-local"]
+    assert client.settings["model_monthly_caps_usd"] == {"grok-4.5-high-loop": 25.0}
     assert any(payload["model_monthly_caps_usd"].get("mock-local") == 1.0 for payload in client.put_payloads)
     evidence = module.settings_round_trip_evidence(client, "user-token")
     assert module.settings_round_trip_detail(evidence) == (
         "2 configured models; model cap restored for mock-local; Grok cap $25.00"
     )
     assert evidence["configured_model_count"] == 2
-    assert evidence["configured_models"] == ["grok-4.5", "mock-local"]
+    assert evidence["configured_models"] == ["grok-4.5-high-loop", "mock-local"]
     assert evidence["cap_model"] == "mock-local"
     assert evidence["temporary_enabled_models"] == ["mock-local"]
     assert evidence["enabled_models_restored"] is True
@@ -1226,7 +1226,7 @@ def test_require_settings_round_trip_verifies_generic_model_caps() -> None:
     assert evidence["model_cap_restored"] is True
     assert evidence["temporary_model_cap_usd"] == 1.0
     assert evidence["restored_model_cap_usd"] == 0.0
-    assert evidence["model_monthly_spend_models"] == ["grok-4.5", "mock-local"]
+    assert evidence["model_monthly_spend_models"] == ["grok-4.5-high-loop", "mock-local"]
 
 
 def test_require_settings_round_trip_handles_grok_only_routing() -> None:
@@ -1245,15 +1245,15 @@ def test_require_settings_round_trip_handles_grok_only_routing() -> None:
     class Client:
         def __init__(self):
             self.settings = {
-                "routing": {"decomposer": {"primary": "grok-4.5", "fallback": []}},
-                "configured_models": ["grok-4.5"],
-                "enabled_models": ["grok-4.5"],
+                "routing": {"decomposer": {"primary": "grok-4.5-high-loop", "fallback": []}},
+                "configured_models": ["grok-4.5-high-loop"],
+                "enabled_models": ["grok-4.5-high-loop"],
                 "grok_monthly_cap_usd": 25.0,
                 "grok_monthly_spend_usd": 0.0,
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
-                "model_monthly_caps_usd": {"grok-4.5": 25.0},
-                "model_monthly_spend_usd": {"grok-4.5": 0.0},
-                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
+                "model_monthly_caps_usd": {"grok-4.5-high-loop": 25.0},
+                "model_monthly_spend_usd": {"grok-4.5-high-loop": 0.0},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5-high-loop": {"input": 1.25, "output": 2.5}},
             }
 
         def request(self, method, path, **kwargs):  # noqa: ANN001
@@ -1262,12 +1262,12 @@ def test_require_settings_round_trip_handles_grok_only_routing() -> None:
                 payload = kwargs["json"]
                 self.settings["enabled_models"] = payload["enabled_models"]
                 self.settings["grok_monthly_cap_usd"] = payload["grok_monthly_cap_usd"]
-                self.settings["model_monthly_caps_usd"] = {"grok-4.5": payload["grok_monthly_cap_usd"]}
+                self.settings["model_monthly_caps_usd"] = {"grok-4.5-high-loop": payload["grok_monthly_cap_usd"]}
             return Response(dict(self.settings))
 
     detail = module.require_settings_round_trip(Client(), "user-token")
 
-    assert "model cap restored for grok-4.5" in detail
+    assert "model cap restored for grok-4.5-high-loop" in detail
 
 
 def test_require_settings_round_trip_rejects_missing_model_spend() -> None:
@@ -1287,7 +1287,7 @@ def test_require_settings_round_trip_rejects_missing_model_spend() -> None:
                 "grok_pricing_usd_per_million_tokens": {"input": 1.25, "output": 2.5},
                 "model_monthly_caps_usd": {},
                 "model_monthly_spend_usd": {},
-                "model_pricing_usd_per_million_tokens": {"grok-4.5": {"input": 1.25, "output": 2.5}},
+                "model_pricing_usd_per_million_tokens": {"grok-4.5-high-loop": {"input": 1.25, "output": 2.5}},
             }
 
     class Client:
@@ -1509,7 +1509,7 @@ def test_web_home_evidence_records_markers() -> None:
         status_code = 200
         text = (
             '<main><h1>Debates</h1><p>Public archive</p><a href="/new">New</a>'
-            '<a href="/debate/1">A topic</a><span>complete</span><span>codex-gpt-5.5</span></main>'
+            '<a href="/debate/1">A topic</a><span>complete</span><span>gpt-5.6sol-medium</span></main>'
         )
         headers = {"content-type": "text/html; charset=utf-8"}
 
@@ -1525,7 +1525,7 @@ def test_web_home_evidence_records_markers() -> None:
         "1",
         "A topic",
         "complete",
-        ["codex-gpt-5.5"],
+        ["gpt-5.6sol-medium"],
     )
 
     assert module.web_home_detail(evidence) == "https://debate.example.com/ returned HTML with /debate/1 for A topic"
@@ -1541,8 +1541,8 @@ def test_web_home_evidence_records_markers() -> None:
     assert evidence["current_topic_present"] is True
     assert evidence["current_status"] == "complete"
     assert evidence["current_status_present"] is True
-    assert evidence["current_model_ids"] == ["codex-gpt-5.5"]
-    assert evidence["current_model_markers_present"] == {"codex-gpt-5.5": True}
+    assert evidence["current_model_ids"] == ["gpt-5.6sol-medium"]
+    assert evidence["current_model_markers_present"] == {"gpt-5.6sol-medium": True}
 
 
 def test_web_auth_gates_evidence_records_each_protected_route() -> None:

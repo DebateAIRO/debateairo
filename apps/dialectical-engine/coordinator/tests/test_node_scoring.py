@@ -360,7 +360,7 @@ def test_manual_investigation_api_rejects_v1_regeneration_for_v2_debate_nodes(db
         debate_id=debate.id,
         job_type="v2_pov",
         required_role="Mechanism POV",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         node_id=pov.id,
         status="complete",
         deadline=now_utc(),
@@ -445,7 +445,7 @@ def test_manual_investigation_api_rejects_root_regeneration_for_v2_debates(db) -
         debate_id=debate.id,
         job_type="v2_pov",
         required_role="Mechanism POV",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         node_id=pov.id,
         status="complete",
         deadline=now_utc(),
@@ -1594,13 +1594,13 @@ def test_queue_scoring_job_uses_existing_background_job_system(db) -> None:
     db.add(debate)
     db.flush()
 
-    job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
 
     persisted = db.get(Job, job.id)
     assert persisted is not None
     assert persisted.job_type == "score_debate"
     assert persisted.required_role == "judge"
-    assert persisted.required_model == "codex-gpt-5.5"
+    assert persisted.required_model == "gpt-5.6sol-medium"
     assert persisted.debate_id == debate.id
     assert persisted.node_id is None
     assert persisted.status == "pending"
@@ -1614,14 +1614,14 @@ def test_worker_poll_does_not_claim_score_debate_jobs(db) -> None:
     worker = Worker(
         name="VLADWORKS",
         token_hash=hash_token("worker-token"),
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
     debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
     db.add_all([worker, debate])
     db.flush()
-    job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
     db.commit()
 
     claimed = claim_pending_job(db, worker)
@@ -2621,7 +2621,7 @@ def test_score_node_with_provider_records_judge_and_arguer_lineage(db) -> None:
     generation = Generation(
         id="generation-1",
         node=node,
-        model_id="claude-sonnet-5",
+        model_id="claude-sonnet-5-high-loop",
         role="pro",
         argument="Employees are less likely to leave when commutes are removed.",
         worker_id=worker.id,
@@ -2633,7 +2633,7 @@ def test_score_node_with_provider_records_judge_and_arguer_lineage(db) -> None:
     payload = score_node_with_provider(db, debate, node.id, GptJudgeProvider())
 
     assert payload["judgeLineage"] == {"provider": "codex", "model": "gpt-5.2-codex", "family": "gpt"}
-    assert payload["arguerLineage"] == {"model": "claude-sonnet-5", "family": "claude"}
+    assert payload["arguerLineage"] == {"model": "claude-sonnet-5-high-loop", "family": "claude"}
     assert payload["independent"] is True
     assert payload["independenceReason"] == "independent_lineage"
     cached = db.query(NodeScoringResult).filter_by(
@@ -2644,7 +2644,7 @@ def test_score_node_with_provider_records_judge_and_arguer_lineage(db) -> None:
         model="gpt-5.2-codex",
     ).one()
     assert cached.result["judgeLineage"]["family"] == "gpt"
-    assert cached.result["arguerLineage"]["model"] == "claude-sonnet-5"
+    assert cached.result["arguerLineage"]["model"] == "claude-sonnet-5-high-loop"
     assert cached.result["independent"] is True
 
 
@@ -5028,7 +5028,7 @@ def _lineage_guard_debate_and_node(db, *, arguer_model_id: str | None) -> tuple[
 
 def test_lineage_guard_off_by_default_scores_even_with_same_lineage(db, monkeypatch) -> None:
     monkeypatch.delenv("DIALECTICAL_LINEAGE_INDEPENDENCE", raising=False)
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
     registry = ProviderRegistry(
         agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
         providers={"anthropic": FakeProvider()},
@@ -5044,7 +5044,7 @@ def test_lineage_guard_off_by_default_scores_even_with_same_lineage(db, monkeypa
 
 def test_lineage_guard_blocks_same_lineage_judge_when_enabled(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
     registry = ProviderRegistry(
         agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
         providers={"anthropic": FakeProvider()},
@@ -5065,7 +5065,7 @@ def test_lineage_guard_blocks_same_lineage_judge_when_enabled(db, monkeypatch) -
 
 def test_lineage_guard_allows_independent_lineage_judge_when_enabled(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
     registry = ProviderRegistry(
         agents={"judge": AgentConfig(provider="codex", model="gpt-5.2-codex", temperature=0.0)},
         providers={"codex": FakeProvider()},
@@ -5100,7 +5100,7 @@ def test_lineage_guard_blocks_score_nodes_with_provider_bypass_when_enabled(db, 
     NodeScoringResult, and must surface a per-node no_independent_judge error
     -- exactly like the completion hook does."""
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
 
     class ExplodingProvider:
         provider = "anthropic"
@@ -5130,7 +5130,7 @@ def test_lineage_guard_blocks_force_refresh_registry_bypass_when_enabled(db, mon
     judge/arguer, force_refresh must not bypass the guard: no provider call,
     no NodeScoringResult write, honest no_independent_judge error."""
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
     registry = ProviderRegistry(
         agents={"judge": AgentConfig(provider="anthropic", model="claude-opus-4", temperature=0.0)},
         providers={"anthropic": FakeProvider()},
@@ -5155,7 +5155,7 @@ def test_lineage_guard_allows_independent_lineage_via_score_nodes_with_provider(
     lineage must still score normally through score_nodes_with_provider (no
     regression on the legitimate path when the guard is enforced)."""
     monkeypatch.setenv("DIALECTICAL_LINEAGE_INDEPENDENCE", "true")
-    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
 
     class IndependentProvider:
         provider = "codex"
@@ -5189,7 +5189,7 @@ def test_lineage_guard_blocks_completion_hook_but_preserves_and_still_serves_cac
       3. Still be served by the separate read path (debate_scoring_payload),
          which reads historical rows independently of the completion hook.
     """
-    debate, node, generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5")
+    debate, node, generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     scoring_item = reduce_assessments(claim, base_assessment(node_id=node.id)).model_dump(mode="json")
     cached_payload = {
@@ -5255,7 +5255,7 @@ def _v2_codex_worker(db) -> Worker:
     worker = Worker(
         name="codex-worker",
         token_hash="test-token",
-        capabilities=["codex-gpt-5.5"],
+        capabilities=["gpt-5.6sol-medium"],
         last_seen=now_utc(),
         status="online",
     )
@@ -5281,7 +5281,7 @@ def _v2_pov_output(worker: Worker, job: Job) -> dict:
             "con": {"title": f"{job.required_role} con limitation", "content": "Limiting detail."},
         },
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job.id}",
             "job_id": job.id,
@@ -5298,7 +5298,7 @@ def _v2_synthesis_output(worker: Worker, job: Job) -> dict:
         "evidence_gaps": ["Local baseline data is still needed."],
         "key_takeaways": ["Treat the question as evidence-sensitive."],
         "provenance": {
-            "model_id": "codex-gpt-5.5",
+            "model_id": "gpt-5.6sol-medium",
             "worker_id": worker.id,
             "prompt_id": f"prompt-{job.id}",
             "job_id": job.id,
@@ -6237,7 +6237,7 @@ def test_scoring_service_marks_active_scoring_job_over_stale_failed_output(db) -
                 "reason": (
                     "Scoring judge call failed: Codex command exited with code 1: "
                     "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\","
-                    "\"message\":\"The 'codex-gpt-5.5' model is not supported when using Codex "
+                    "\"message\":\"The 'gpt-5.6sol-medium' model is not supported when using Codex "
                     "with a ChatGPT account.\"}}"
                 ),
             },
@@ -6249,7 +6249,7 @@ def test_scoring_service_marks_active_scoring_job_over_stale_failed_output(db) -
         debate_id=debate.id,
         job_type="score_debate",
         required_role="judge",
-        required_model="gpt-5.5",
+        required_model="gpt-5.6-sol",
         status="running",
         deadline=now_utc() + timedelta(minutes=5),
     )
@@ -6263,7 +6263,7 @@ def test_scoring_service_marks_active_scoring_job_over_stale_failed_output(db) -
     assert payload["active_scoring_job_id"] == job.id
     assert payload["active_scoring_job_status"] == "running"
     assert payload["reason"] == "Judge outputs are being generated."
-    assert "codex-gpt-5.5" not in str(payload)
+    assert "gpt-5.6sol-medium" not in str(payload)
 
 
 def test_scoring_service_returns_stored_real_scoring_outputs(db) -> None:
@@ -6936,7 +6936,7 @@ def test_scoring_api_approve_adaptive_depth_expand_leaves_v2_subtree_untouched(d
         debate_id=debate.id,
         job_type="v2_pov",
         required_role="Mechanism POV",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         node_id=pov.id,
         status="complete",
         deadline=now_utc(),
@@ -8232,7 +8232,7 @@ def test_scoring_job_start_queues_and_completes_score_debate_job(db) -> None:
     assert job.debate_id == debate.id
     assert job.job_type == "score_debate"
     assert job.required_role == "judge"
-    assert job.required_model == "gpt-5.5"
+    assert job.required_model == "gpt-5.6-sol"
     assert job.node_id is None
     assert job.status == "complete"
     assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()
@@ -8264,7 +8264,7 @@ def test_scoring_job_status_api_maps_real_job_state_without_progress(db, stored_
     debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
     db.add(debate)
     db.flush()
-    job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
     job.status = stored_status
     db.commit()
 
@@ -8287,7 +8287,7 @@ def test_scoring_job_status_api_exposes_only_stored_failure_reason(db) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete", config={})
     db.add(debate)
     db.flush()
-    job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
     job.status = "failed"
     job.error = "Model timed out before returning a scoring result."
     db.commit()
@@ -8309,16 +8309,16 @@ def test_scoring_job_status_api_hides_non_scoring_jobs_and_wrong_debates(db) -> 
     archived = Debate(topic="Archived", status="archived", config={})
     db.add_all([debate, other_debate, archived])
     db.flush()
-    scoring_job = queue_scoring_job(db, debate, model_id="codex-gpt-5.5")
-    other_job = queue_scoring_job(db, other_debate, model_id="codex-gpt-5.5")
+    scoring_job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
+    other_job = queue_scoring_job(db, other_debate, model_id="gpt-5.6sol-medium")
     non_scoring_job = Job(
         debate_id=debate.id,
         job_type="decompose",
         required_role="decomposer",
-        required_model="codex-gpt-5.5",
+        required_model="gpt-5.6sol-medium",
         status="pending",
     )
-    archived_job = queue_scoring_job(db, archived, model_id="codex-gpt-5.5")
+    archived_job = queue_scoring_job(db, archived, model_id="gpt-5.6sol-medium")
     db.add(non_scoring_job)
     db.commit()
 

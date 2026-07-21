@@ -38,7 +38,7 @@ def test_missing_agents_file_repairs_by_creating_minimal_judge_entry(module, tmp
 
     assert agents_path.exists()
     data = yaml.safe_load(agents_path.read_text(encoding="utf-8"))
-    assert data["agents"]["judge"] == {"provider": "codex", "model": "codex-gpt-5.5"}
+    assert data["agents"]["judge"] == {"provider": "codex", "model": "gpt-5.6sol-medium"}
     assert report["agents_config"]["repaired"] is True
     assert report["provider_detection"]["available"] is True
 
@@ -78,7 +78,7 @@ def test_repair_merges_judge_into_existing_yaml_preserving_other_roles(module, t
     assert data["agents"]["opponent"] == {}
     assert data["agents"]["specialist"] == {}
     assert data["defaults"] == {"provider": "codex", "model": "${OPENAI_MODEL}", "temperature": 0.2}
-    assert data["agents"]["judge"] == {"provider": "codex", "model": "codex-gpt-5.5"}
+    assert data["agents"]["judge"] == {"provider": "codex", "model": "gpt-5.6sol-medium"}
     assert report["agents_config"]["repaired"] is True
 
 
@@ -107,7 +107,7 @@ def test_existing_non_empty_judge_entry_is_never_overwritten(module, tmp_path) -
         agents_path,
         {
             "defaults": {"provider": "codex", "model": "${OPENAI_MODEL}", "temperature": 0.2},
-            "agents": {"judge": {"model": "gpt-5.5", "temperature": 0.0}},
+            "agents": {"judge": {"model": "gpt-5.6-sol", "temperature": 0.0}},
         },
     )
     before = agents_path.read_text(encoding="utf-8")
@@ -119,7 +119,7 @@ def test_existing_non_empty_judge_entry_is_never_overwritten(module, tmp_path) -
     assert report["agents_config"]["repaired"] is False
     assert report["agents_config"]["state"] == "ready"
     assert report["provider_detection"]["available"] is True
-    assert report["provider_detection"]["model"] == "gpt-5.5"
+    assert report["provider_detection"]["model"] == "gpt-5.6-sol"
 
 
 # --- empty model on an existing judge entry: repaired ----------------------
@@ -138,7 +138,7 @@ def test_empty_model_on_existing_judge_entry_is_repaired(module, tmp_path) -> No
     report = module.run_guardian(agents_path=agents_path, codex_command="codex", repair=True)
 
     data = yaml.safe_load(agents_path.read_text(encoding="utf-8"))
-    assert data["agents"]["judge"]["model"] == "codex-gpt-5.5"
+    assert data["agents"]["judge"]["model"] == "gpt-5.6sol-medium"
     assert data["agents"]["judge"]["provider"] == "codex"
     assert data["agents"]["judge"]["temperature"] == 0.0
     assert report["agents_config"]["repaired"] is True
@@ -193,7 +193,7 @@ def test_executable_missing_reports_honest_blocked_reason(module, tmp_path, monk
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
     monkeypatch.setattr(module.shutil, "which", lambda _cmd: None)
 
@@ -235,7 +235,7 @@ def test_summary_line_and_human_output_never_crash(module, tmp_path, capsys) -> 
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
 
     exit_code = module.main(["--agents-path", str(agents_path), "--codex-command", "totally-missing-codex-binary"])
@@ -254,7 +254,7 @@ def test_json_mode_dumps_full_report(module, tmp_path, capsys) -> None:
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
 
     module.main(["--agents-path", str(agents_path), "--json"])
@@ -306,7 +306,7 @@ def test_import_failure_summary_and_human_output_never_crash(module, tmp_path, m
     agents_path = tmp_path / "agents.yaml"
     write_yaml(
         agents_path,
-        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.5"}}},
+        {"defaults": {"provider": "codex", "model": "${OPENAI_MODEL}"}, "agents": {"judge": {"model": "gpt-5.6-sol"}}},
     )
 
     monkeypatch.setattr(module, "IMPORT_ERROR", "ImportError: broken dependency")
