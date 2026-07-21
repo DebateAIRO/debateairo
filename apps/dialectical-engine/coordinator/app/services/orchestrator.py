@@ -823,15 +823,35 @@ def readopt_job_claim(db: Session, job: Job, worker: Worker) -> bool:
     not be overwritten by this stale re-adoption -- re-adoption is refused
     (the caller's 403 stands) rather than silently stealing the worker's
     slot away from the job it is actually holding now.
+
+    The `status`/`last_worker_id` pre-checks above are plain reads of the
+    in-memory Job -- they only protect the caller's own state (this worker's
+    slot) and are safe to read stale. The actual takeover is a guarded
+    compare-and-swap UPDATE instead, mirroring try_claim_pending_job's own
+    atomic claim: a genuinely concurrent claim by another worker landing
+    between this function's pre-checks and its write must never be silently
+    clobbered by a late-arriving re-adoption. If the CAS matches zero rows,
+    someone else won the row first and re-adoption is refused.
     """
     if job.status != "pending" or job.last_worker_id != worker.id:
         return False
     if worker.current_job_id is not None and worker.current_job_id != job.id:
         return False
-    job.worker_id = worker.id
-    job.claimed_at = now_utc()
-    job.status = "running"
-    job.deadline = make_deadline()
+    now = now_utc()
+    deadline = make_deadline()
+    result = db.execute(
+        update(Job)
+        .where(Job.id == job.id, Job.status == "pending", Job.last_worker_id == worker.id)
+        .values(
+            status="running",
+            worker_id=worker.id,
+            claimed_at=now,
+            deadline=deadline,
+        )
+    )
+    if result.rowcount != 1:
+        db.expire(job)
+        return False
     worker.current_job_id = job.id
     record_job_transition(
         db,
@@ -842,6 +862,7 @@ def readopt_job_claim(db: Session, job: Job, worker: Worker) -> bool:
         reason=f"late completion re-adopted by worker {worker.id}",
     )
     commit_write(db)
+    db.refresh(job)
     return True
 
 

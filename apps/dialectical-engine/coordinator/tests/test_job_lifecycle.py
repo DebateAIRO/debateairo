@@ -248,3 +248,66 @@ def test_readoption_never_clobbers_a_newer_claim(db):
     db.refresh(w)
     assert job_a.status == "pending"
     assert w.current_job_id == job_b.id
+
+
+def test_readoption_cas_refuses_a_row_a_concurrent_worker_already_claimed(db):
+    """readopt_job_claim's own pre-checks (status/last_worker_id reads on the
+    in-memory Job) are NOT enough to close the concurrency window: another
+    worker can win the row via try_claim_pending_job's atomic UPDATE between
+    those reads and this function's write. The actual takeover must be a
+    guarded compare-and-swap, or a late re-adoption can silently clobber a
+    live concurrent claim.
+
+    This test simulates exactly that interleaving within a single session: a
+    raw UPDATE (bypassing the ORM) flips the row to "claimed by an intruder"
+    WITHOUT going through db.commit()/db.refresh(), so the in-memory `job`
+    object's cached .status attribute stays "pending" -- genuinely stale,
+    the same way it would look to readopt_job_claim's caller-visible object
+    if another worker's claim landed in the gap. If readopt_job_claim only
+    trusted that stale read it would proceed; the CAS's WHERE clause must
+    still see the real (updated) row and refuse."""
+    from sqlalchemy import update as sa_update
+
+    from app.services.orchestrator import (
+        claim_pending_job,
+        readopt_job_claim,
+        requeue_or_terminalize_timed_out_job,
+    )
+
+    w = worker(db, "grok-loop", ["grok-4.5-high-loop"])
+    intruder = worker(db, "intruder", ["grok-4.5-high-loop"])
+    _, job = make_debate_with_job(db, "grok-4.5-high-loop")
+    claim_pending_job(db, w)
+    requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired")
+    db.commit()
+    db.refresh(job)
+    assert job.status == "pending"
+    assert job.last_worker_id == w.id
+
+    # Simulate a concurrent claim landing in the gap between readopt's
+    # pre-checks and its CAS: a raw UPDATE against the row, deliberately not
+    # committed/refreshed so `job`'s cached Python attributes remain "pending"
+    # (read-your-own-writes keeps this visible to a NEW query in the same
+    # transaction -- e.g. readopt_job_claim's own CAS -- without touching the
+    # already-loaded ORM instance's attributes). synchronize_session=False is
+    # required here: SQLAlchemy's default "auto" sync strategy would otherwise
+    # eagerly patch this same-session `job` object's .status in Python the
+    # moment the UPDATE executes, which a REAL concurrent writer (a separate
+    # process/session with no shared identity map) could never do -- that
+    # eager sync would mask exactly the staleness this test needs to prove
+    # the CAS (not the pre-checks) is what closes the race.
+    db.execute(
+        sa_update(Job)
+        .where(Job.id == job.id)
+        .values(status="running", worker_id=intruder.id)
+        .execution_options(synchronize_session=False)
+    )
+    assert job.status == "pending"  # confirmed stale: caller-visible object unchanged
+
+    assert readopt_job_claim(db, job, w) is False
+
+    db.refresh(job)
+    db.refresh(w)
+    assert job.status == "running"
+    assert job.worker_id == intruder.id  # intruder's claim survives untouched
+    assert w.current_job_id is None  # w never got a slot it doesn't hold
