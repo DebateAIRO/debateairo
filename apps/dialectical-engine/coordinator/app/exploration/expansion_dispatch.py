@@ -81,16 +81,44 @@ def adaptive_expansion_enabled() -> bool:
     return bool_env(ADAPTIVE_EXPANSION_FLAG, False)
 
 
-def expansion_max_rounds() -> int:
-    return int_env(EXPANSION_MAX_ROUNDS_ENV, DEFAULT_EXPANSION_MAX_ROUNDS, 0, 20)
+# W7 per-debate budgets: debate.config["adaptive_expansion"] may carry any of
+# the three knobs; a valid value overrides the env default for THAT debate
+# only, clamped to the same bounds as the env knob. merged_debate_config
+# sanitizes the client-supplied dict at creation time (only these keys, only
+# bounded ints), so runtime bookkeeping keys can never be injected.
+BUDGET_BOUNDS: dict[str, tuple[int, int]] = {
+    "max_rounds": (0, 20),
+    "max_per_node": (0, 20),
+    "max_per_debate": (0, 100),
+}
 
 
-def expansion_max_per_node() -> int:
-    return int_env(EXPANSION_MAX_PER_NODE_ENV, DEFAULT_EXPANSION_MAX_PER_NODE, 0, 20)
+def _config_budget(debate: Debate | None, key: str, env_value: int) -> int:
+    if debate is None:
+        return env_value
+    minimum, maximum = BUDGET_BOUNDS[key]
+    raw = adaptive_expansion_state(debate).get(key)
+    if isinstance(raw, int) and not isinstance(raw, bool) and minimum <= raw <= maximum:
+        return raw
+    return env_value
 
 
-def expansion_max_per_debate() -> int:
-    return int_env(EXPANSION_MAX_PER_DEBATE_ENV, DEFAULT_EXPANSION_MAX_PER_DEBATE, 0, 100)
+def expansion_max_rounds(debate: Debate | None = None) -> int:
+    return _config_budget(
+        debate, "max_rounds", int_env(EXPANSION_MAX_ROUNDS_ENV, DEFAULT_EXPANSION_MAX_ROUNDS, 0, 20)
+    )
+
+
+def expansion_max_per_node(debate: Debate | None = None) -> int:
+    return _config_budget(
+        debate, "max_per_node", int_env(EXPANSION_MAX_PER_NODE_ENV, DEFAULT_EXPANSION_MAX_PER_NODE, 0, 20)
+    )
+
+
+def expansion_max_per_debate(debate: Debate | None = None) -> int:
+    return _config_budget(
+        debate, "max_per_debate", int_env(EXPANSION_MAX_PER_DEBATE_ENV, DEFAULT_EXPANSION_MAX_PER_DEBATE, 0, 100)
+    )
 
 
 def adaptive_expansion_state(debate: Debate) -> dict[str, Any]:
@@ -164,10 +192,21 @@ def _node_expandable(debate: Debate, node: Node | None) -> bool:
 
 
 def _expansion_model_for(db: Session, node: Node) -> str:
-    from app.services.dialectical_v2 import V2_CODEX_MODEL_ID
+    """Challenger-preferred expansion model: the next pool model after the
+    node's author (wrapping), so a DIFFERENT provider stress-tests the
+    argument whenever the deployment has one. Falls back to the author (or
+    the anchor) when the pool offers no alternative."""
+    from app.services.dialectical_v2 import V2_CODEX_MODEL_ID, v2_generation_model_pool
 
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
-    return str(getattr(generation, "model_id", "") or "") or V2_CODEX_MODEL_ID
+    author = str(getattr(generation, "model_id", "") or "") or V2_CODEX_MODEL_ID
+    pool = v2_generation_model_pool(db)
+    start = (pool.index(author) + 1) % len(pool) if author in pool else 0
+    for offset in range(len(pool)):
+        candidate = pool[(start + offset) % len(pool)]
+        if candidate != author:
+            return candidate
+    return author
 
 
 def admit_and_spawn(
@@ -194,14 +233,16 @@ def admit_and_spawn(
     if not _node_expandable(debate, node):
         return None, OUTCOME_TARGET_NOT_EXPANDABLE
     assert node is not None
-    if len(jobs) >= expansion_max_per_debate():
+    if len(jobs) >= expansion_max_per_debate(debate):
         return None, OUTCOME_BUDGET_EXHAUSTED
-    if _expand_job_count_for_node(jobs, node.id) >= expansion_max_per_node():
+    if _expand_job_count_for_node(jobs, node.id) >= expansion_max_per_node(debate):
         return None, OUTCOME_BUDGET_EXHAUSTED
     # Capacity admission: spawn only when a capable online worker exists for
     # the expansion's model; otherwise defer honestly (no spawn, eligible
-    # again on a later pass).
-    if not capable_online_workers(db, _expansion_model_for(db, node)):
+    # again on a later pass). The model is chosen once here (challenger-
+    # preferred) and passed through so admission and queueing agree.
+    expansion_model = _expansion_model_for(db, node)
+    if not capable_online_workers(db, expansion_model):
         return None, OUTCOME_DEFERRED_NO_CAPACITY
     try:
         job = queue_v2_expand_job(
@@ -210,6 +251,7 @@ def admit_and_spawn(
             node,
             polarity,
             reason,
+            expansion_model,
             decision_record_id=decision_record_id,
         )
     except ValueError as exc:
@@ -272,7 +314,7 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     spawned = 0
     replayed = 0
     outcomes: list[str] = []
-    rounds_exhausted = rounds_completed(debate) >= expansion_max_rounds()
+    rounds_exhausted = rounds_completed(debate) >= expansion_max_rounds(debate)
     try:
         for record in dispatchable:
             jobs = debate_expand_jobs(db, debate_id)

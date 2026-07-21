@@ -78,6 +78,23 @@ def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
     merged["max_depth"] = bounded_config_int(merged, "max_depth", 2, 1, 5)
     merged["branching"] = bounded_config_int(merged, "branching", 2, 2, 6)
     merged["max_tokens"] = bounded_config_int(merged, "max_tokens", 800, 128, 4000)
+    # W7 per-debate expansion budgets: keep only the known integer knobs
+    # within bounds. Runtime bookkeeping keys (rounds_completed /
+    # stopped_because) and anything else a client sends are dropped so the
+    # adaptive loop's state can never be pre-seeded at creation time.
+    raw_adaptive = merged.pop("adaptive_expansion", None)
+    if isinstance(raw_adaptive, dict):
+        from app.exploration.expansion_dispatch import BUDGET_BOUNDS
+
+        sanitized_budgets = {
+            key: value
+            for key, (minimum, maximum) in BUDGET_BOUNDS.items()
+            if isinstance(value := raw_adaptive.get(key), int)
+            and not isinstance(value, bool)
+            and minimum <= value <= maximum
+        }
+        if sanitized_budgets:
+            merged["adaptive_expansion"] = sanitized_budgets
     if raw_role_overrides is not None:
         from app.api.settings import validate_routing
 
@@ -1263,6 +1280,7 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
     """
     if job.job_type in ("v2_pov", "v2_expand"):
         from app.services.dialectical_v2 import (
+            V2_CODEX_MODEL_ID,
             has_completed_branch_container,
             pending_generation_nodes,
             queue_v2_job,
@@ -1303,7 +1321,9 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
             .limit(1)
         )
         if existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", job.required_model, None)
+            # Synthesis integrates the whole tree: pin it to the anchor model
+            # rather than inheriting whichever model's job failed last.
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
         return
     # v1 argue: never route a v1 synthesis into a v2 tree, and only
     # synthesize when at least one argument survived.

@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -525,6 +526,44 @@ def require_v2_codex_model(db: Session) -> str:
     if v2_generation_readiness(db).ready:
         return V2_CODEX_MODEL_ID
     raise RuntimeError(NO_REAL_CODEX_WORKER_ERROR)
+
+
+def _looks_mock_model(model_id: str) -> bool:
+    lowered = model_id.lower()
+    return any(marker in lowered for marker in ("mock", "fake", "deterministic"))
+
+
+def v2_generation_model_pool(db: Session) -> list[str]:
+    """Ordered model pool for v2 generation jobs (anchor first).
+
+    The codex anchor model always leads -- creation stays readiness-gated on
+    it (require_v2_codex_model). With DIALECTICAL_MULTI_MODEL_GENERATION
+    (default ON), every other routing-allowed model advertised by an online
+    real worker joins in sorted order, so all working models collaborate on
+    a debate instead of one provider debating itself. Mock/deterministic
+    workers and mock-looking model ids never enter the pool, and a
+    single-worker deployment degrades to a pool of one (byte-identical to
+    the flag-off behavior).
+    """
+    if not bool_env("DIALECTICAL_MULTI_MODEL_GENERATION", True):
+        return [V2_CODEX_MODEL_ID]
+    settings = load_settings()
+    cutoff = now_utc() - timedelta(seconds=settings.worker_offline_seconds)
+    workers = db.scalars(
+        select(Worker).where(Worker.last_seen >= cutoff, Worker.status == "online")
+    ).all()
+    allowed = routing_allowed_models(db)
+    extras: set[str] = set()
+    for worker in workers:
+        if _is_mock_or_deterministic_worker(worker):
+            continue
+        for capability in worker_capability_set(worker):
+            if capability == V2_CODEX_MODEL_ID or _looks_mock_model(capability):
+                continue
+            if allowed is not None and capability not in allowed:
+                continue
+            extras.add(capability)
+    return [V2_CODEX_MODEL_ID, *sorted(extras)]
 
 
 def prompt_text(name: str) -> str:
@@ -1791,7 +1830,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if not pending_branches and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
         commit_write(db)
         return
 
@@ -1822,7 +1861,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if not pending_nodes and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
         commit_write(db)
         # W4 adaptive loop: a completed expansion wakes a debate-scoped
         # re-score (judge scores -> protocol re-run -> lifecycle
@@ -1867,7 +1906,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if incomplete is None and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
         commit_write(db)
         return
 
@@ -1944,7 +1983,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         flush_write(db)
         record_provenance(db, debate.id, branch.id, "agent_output", agent_output.id, payload["provenance"])
         publish_event(debate.id, "agent_output_completed", {"debate_id": debate.id, "agent_output_id": agent_output.id, "job_id": job.id})
-        queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+        queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
         commit_write(db)
         return
 
@@ -2025,6 +2064,10 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     else:
         perspectives = list(POV_BRANCHES)
 
+    # Multi-model collaboration: POV branches round-robin across every online
+    # real worker model (anchor first), so the perspectives are argued by
+    # different providers whenever the deployment has them.
+    model_pool = v2_generation_model_pool(db)
     for position, (node_type, label) in enumerate(perspectives):
         pov_node = Node(
             debate_id=debate.id,
@@ -2038,7 +2081,7 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
         )
         db.add(pov_node)
         flush_write(db)
-        queue_v2_job(db, debate, "v2_pov", label, model_id, pov_node.id)
+        queue_v2_job(db, debate, "v2_pov", label, model_pool[position % len(model_pool)], pov_node.id)
 
     try:
         state = protocol_state_of(debate.config)
