@@ -184,7 +184,7 @@ def test_debate_detail_includes_active_synthesis_stream_snapshot(db) -> None:
         "worker_id": worker.id,
         "worker_name": "mac-mini",
         "created_at": iso(job.claimed_at),
-        "raw": '{"strongest_pro":"Focus improves',
+        "raw": "Drafting…",  # Task 6: partial JSON envelope with no extractable title/content
         "is_streaming": True,
     }
     assert visible["models"] == ["mock-local"]
