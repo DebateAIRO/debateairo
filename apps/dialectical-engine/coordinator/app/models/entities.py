@@ -147,6 +147,11 @@ class Job(Base):
     required_model: Mapped[str] = mapped_column(String(120), index=True)
     status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
     worker_id: Mapped[Optional[str]] = mapped_column(ForeignKey("workers.id"), nullable=True, index=True)
+    # Remembers the most recent claimant across a release (requeue/timeout) so
+    # a worker that finishes late can re-adopt its own claim instead of having
+    # the completed work discarded (late-completion rescue -- see
+    # app.services.orchestrator.readopt_job_claim). Never cleared once set.
+    last_worker_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     idempotency_key: Mapped[str] = mapped_column(String(36), default=uuid_str, unique=True)

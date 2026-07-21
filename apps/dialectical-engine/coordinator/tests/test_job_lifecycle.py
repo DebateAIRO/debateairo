@@ -171,3 +171,80 @@ def test_job_past_both_thresholds_is_charged_once(db, monkeypatch):
     db.refresh(job)
     assert job.status == "pending"
     assert (job.timeout_attempts or 0) == 1  # exactly one charge
+
+
+def test_last_claimant_readopts_a_requeued_job(db):
+    """The doom-loop's cruelest step: grok finished its answer, but the
+    claim had been requeued, so posting got 403/400 and the finished work
+    was discarded. The last claimant must be able to re-adopt a pending
+    job and complete it without burning attempt budget."""
+    from app.api.jobs import require_job_for_worker
+    from app.services.orchestrator import claim_pending_job, requeue_or_terminalize_timed_out_job
+
+    w = worker(db, "grok-loop", ["grok-4.5-high-loop"])
+    _, job = make_debate_with_job(db, "grok-4.5-high-loop")
+    claim_pending_job(db, w)
+    attempts_before = job.attempts
+    requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired")
+    db.commit()
+    db.refresh(job)
+    assert job.status == "pending" and job.worker_id is None
+    resolved = require_job_for_worker(job.id, w, db)
+    assert resolved.id == job.id
+    db.refresh(job)
+    assert job.status == "running"
+    assert job.worker_id == w.id
+    assert job.attempts == attempts_before  # readoption is free
+
+
+def test_other_workers_cannot_adopt_a_released_job(db):
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.jobs import require_job_for_worker
+    from app.services.orchestrator import claim_pending_job, requeue_or_terminalize_timed_out_job
+
+    w = worker(db, "grok-loop", ["grok-4.5-high-loop"])
+    intruder = worker(db, "other", ["grok-4.5-high-loop"])
+    _, job = make_debate_with_job(db, "grok-4.5-high-loop")
+    claim_pending_job(db, w)
+    requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired")
+    db.commit()
+    with pytest.raises(HTTPException):
+        require_job_for_worker(job.id, intruder, db)
+
+
+def test_readoption_never_clobbers_a_newer_claim(db):
+    """Single-slot workers: if the last claimant of job A has since claimed a
+    different job B, a late completion for job A must not be able to
+    silently steal the worker's current_job_id tracking away from B. The
+    403 must stand and job A must stay pending."""
+    from app.api.jobs import require_job_for_worker
+    from app.services.orchestrator import claim_pending_job, requeue_or_terminalize_timed_out_job, try_claim_pending_job
+
+    w = worker(db, "grok-loop", ["grok-4.5-high-loop"])
+    _, job_a = make_debate_with_job(db, "grok-4.5-high-loop")
+    claim_pending_job(db, w)
+    requeue_or_terminalize_timed_out_job(db, job_a, "Job deadline expired")
+    db.commit()
+    db.refresh(job_a)
+    assert job_a.status == "pending" and job_a.worker_id is None
+
+    # Claim job B directly (rather than via claim_pending_job's oldest-first
+    # queue scan) so the test deterministically models "the worker has since
+    # claimed a different job" without depending on scheduler ordering
+    # between two now-pending jobs (job_a is pending again too).
+    _, job_b = make_debate_with_job(db, "grok-4.5-high-loop")
+    assert try_claim_pending_job(db, job_b, w, now_utc())
+    db.refresh(w)
+    assert w.current_job_id == job_b.id
+
+    import pytest
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException):
+        require_job_for_worker(job_a.id, w, db)
+    db.refresh(job_a)
+    db.refresh(w)
+    assert job_a.status == "pending"
+    assert w.current_job_id == job_b.id

@@ -807,8 +807,42 @@ def release_job_claim(db: Session, job: Job) -> None:
         worker = db.get(Worker, job.worker_id)
         if worker and worker.current_job_id == job.id:
             worker.current_job_id = None
+        job.last_worker_id = job.worker_id
     job.worker_id = None
     job.claimed_at = None
+
+
+def readopt_job_claim(db: Session, job: Job, worker: Worker) -> bool:
+    """Hand a released job back to the worker that last held it, free of
+    attempt budget: a late completion is the cheapest possible recovery --
+    the answer is already paid for. Only the most recent claimant may
+    re-adopt, and only while the job is still pending.
+
+    Single-slot workers: never clobber a newer claim. If `worker` has
+    meanwhile claimed a different job, its `current_job_id` tracking must
+    not be overwritten by this stale re-adoption -- re-adoption is refused
+    (the caller's 403 stands) rather than silently stealing the worker's
+    slot away from the job it is actually holding now.
+    """
+    if job.status != "pending" or job.last_worker_id != worker.id:
+        return False
+    if worker.current_job_id is not None and worker.current_job_id != job.id:
+        return False
+    job.worker_id = worker.id
+    job.claimed_at = now_utc()
+    job.status = "running"
+    job.deadline = make_deadline()
+    worker.current_job_id = job.id
+    record_job_transition(
+        db,
+        job,
+        from_status="pending",
+        to_status="running",
+        channel="readopt",
+        reason=f"late completion re-adopted by worker {worker.id}",
+    )
+    commit_write(db)
+    return True
 
 
 def refresh_worker_job_leases(db: Session, worker: Worker) -> None:

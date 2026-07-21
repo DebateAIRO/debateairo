@@ -17,6 +17,7 @@ from app.services.orchestrator import (
     append_stream_delta,
     complete_job,
     fail_job,
+    readopt_job_claim,
 )
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -45,7 +46,8 @@ def require_job_for_worker(job_id: str, worker: Worker, db: Session) -> Job:
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job.worker_id != worker.id:
-        raise HTTPException(status_code=403, detail="Job is not claimed by this worker")
+        if not readopt_job_claim(db, job, worker):
+            raise HTTPException(status_code=403, detail="Job is not claimed by this worker")
     if job.status not in MUTABLE_JOB_STATUSES:
         raise HTTPException(status_code=409, detail=f"Job is {job.status} and cannot be mutated")
     return job
