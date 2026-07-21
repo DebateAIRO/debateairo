@@ -130,3 +130,44 @@ def test_expired_held_job_is_still_requeued_on_poll(db):
     db.refresh(job)
     assert job.status == "pending"
     assert (job.timeout_attempts or 0) == 1
+
+
+def test_stuck_job_is_requeued_even_with_a_fresh_lease(db, monkeypatch):
+    """A wedged worker that keeps heartbeating must not hold a node hostage:
+    after DIALECTICAL_JOB_STUCK_SECONDS with no completion the assignment is
+    taken back regardless of lease freshness."""
+    from app.services.orchestrator import claim_pending_job
+
+    monkeypatch.setenv("DIALECTICAL_JOB_STUCK_SECONDS", "60")
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    job.claimed_at = now_utc() - timedelta(seconds=120)
+    job.deadline = now_utc() + timedelta(seconds=60)  # lease is fresh
+    db.commit()
+    other = worker(db, "sweeper", ["gpt-5.6sol-medium"])
+    claim_pending_job(db, other)
+    db.refresh(job)
+    assert job.status == "pending"
+    assert job.error == "No answer within the stuck window"
+
+
+def test_job_past_both_thresholds_is_charged_once(db, monkeypatch):
+    """A job whose lease expired AND whose claimed_at is past the stuck
+    cutoff must be requeued exactly once per sweep pass, not once per
+    matching query (autoflush=False keeps the first sweep's mutations
+    invisible to the second query)."""
+    from app.services.orchestrator import claim_pending_job
+
+    monkeypatch.setenv("DIALECTICAL_JOB_STUCK_SECONDS", "60")
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    job.claimed_at = now_utc() - timedelta(seconds=120)
+    job.deadline = now_utc() - timedelta(seconds=5)  # BOTH thresholds crossed
+    db.commit()
+    other = worker(db, "sweeper", ["gpt-5.6sol-medium"])
+    claim_pending_job(db, other)
+    db.refresh(job)
+    assert job.status == "pending"
+    assert (job.timeout_attempts or 0) == 1  # exactly one charge

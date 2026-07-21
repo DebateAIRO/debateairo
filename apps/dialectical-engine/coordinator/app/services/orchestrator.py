@@ -209,6 +209,13 @@ def max_job_attempts() -> int:
     return int_env("DIALECTICAL_MAX_JOB_ATTEMPTS", DEFAULT_MAX_JOB_ATTEMPTS, 1, 100)
 
 
+def job_stuck_seconds() -> int:
+    """Hard per-assignment cap: a claim that has produced no completion
+    within this window is taken back even if the worker is still
+    heartbeating -- alive but wedged is still stuck."""
+    return int_env("DIALECTICAL_JOB_STUCK_SECONDS", 600, 60, 3600)
+
+
 def job_attempts_exhausted(job: Job) -> bool:
     """True when this job has consumed its retry budget.
 
@@ -1029,6 +1036,23 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
     ).all()
     for job in expired:
         terminal_events.extend(requeue_or_terminalize_timed_out_job(db, job, "Job deadline expired"))
+    already_swept = {job.id for job in expired}
+    stuck_cutoff = now - timedelta(seconds=job_stuck_seconds())
+    # score_debate is excluded: same rationale as deadline sweep above.
+    stuck = db.scalars(
+        select(Job).where(
+            Job.status.in_(["claimed", "running"]),
+            Job.claimed_at.isnot(None),
+            Job.claimed_at < stuck_cutoff,
+            Job.job_type != "score_debate",
+        )
+    ).all()
+    for job in stuck:
+        if job.id in already_swept:
+            continue
+        terminal_events.extend(
+            requeue_or_terminalize_timed_out_job(db, job, "No answer within the stuck window")
+        )
     if terminal_events:
         commit_write(db)
         _publish_events_sync(terminal_events)
