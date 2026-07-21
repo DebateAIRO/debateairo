@@ -219,7 +219,12 @@ def active_synthesis_summary(
         "worker_id": job.worker_id or "",
         "worker_name": _worker_name(worker_names_by_id, job.worker_id),
         "created_at": iso(job.claimed_at or job.created_at),
-        "raw": presentable_stream_text(job.stream_buffer or ""),
+        # Literal buffer, NOT envelope-prose (unlike streaming_generation_
+        # summary's "argument"): the web client parses this as JSON
+        # (partialJsonField in DebatePageClient.tsx) and appends raw
+        # synthesis_token deltas onto it to drive the live synthesis
+        # preview. presentable_stream_text() here would break that parser.
+        "raw": job.stream_buffer or "",
         "is_streaming": True,
     }
 
@@ -588,6 +593,19 @@ _COMPLETION_REASON_OVERRIDES: dict[str, str] = {
 }
 
 
+def _completion_reason_override(state: str, reason_code: str | None) -> str | None:
+    """The debate-completion copy overrides only read honestly when synthesis
+    actually completed over the survivors. A FAILED debate can carry the
+    exact same node-level reason code (e.g. generation_exhausted, from the
+    one node that got a stopping_reason recorded) as a complete-with-failed-
+    branches debate -- the completed-style "the debate completed with the
+    rest" copy must never leak onto a failed one just because the codes
+    match. Gate on `state`, not just `reason_code`."""
+    if state != "complete-with-failed-branches":
+        return None
+    return _COMPLETION_REASON_OVERRIDES.get(reason_code or "")
+
+
 def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) -> dict[str, Any]:
     """Additive `completion` block: why the debate stopped, in plain language.
 
@@ -598,13 +616,14 @@ def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) 
     generic debate-failure bucket, or the adaptive dispatcher's
     stopped_because (W4) -- never raw private worker text.
     humanReason: reasonCode translated via the debate-completion overrides
-    (_COMPLETION_REASON_OVERRIDES) first, falling back to the shared
-    reason-code map for everything else. Failed debates always carry a
-    non-empty humanReason (reasonCode is never None when state == "failed").
+    (_completion_reason_override, state-gated to complete-with-failed-
+    branches) first, falling back to the shared reason-code map for
+    everything else. Failed debates always carry a non-empty humanReason
+    (reasonCode is never None when state == "failed").
     """
     state = _completion_state(effective_status, nodes)
     reason_code = _completion_reason_code(state, nodes, debate)
-    human_reason = _COMPLETION_REASON_OVERRIDES.get(reason_code or "") or _humanize_reason(reason_code)
+    human_reason = _completion_reason_override(state, reason_code) or _humanize_reason(reason_code)
     return {
         "state": state,
         "reasonCode": reason_code,

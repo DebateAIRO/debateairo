@@ -314,6 +314,60 @@ def test_readoption_cas_refuses_a_row_a_concurrent_worker_already_claimed(db):
     assert w.current_job_id is None  # w never got a slot it doesn't hold
 
 
+def test_stuck_job_with_zero_polling_workers_is_requeued_by_the_reaper(db, monkeypatch):
+    """Fix 1a: the claim-path stuck sweep only runs when SOME worker polls.
+    A worker whose CLI died while holding a server-side claim keeps polling
+    'busy' (claim_pending_job's busy early-return never reaches the stuck
+    sweep) -- so with zero OTHER pollers nothing ever reclaims the job
+    unless the background reaper enforces the stuck cap too."""
+    from app.services.orchestrator import claim_pending_job, job_stuck_seconds
+    from app.services.reaper import sweep_expired_claims
+
+    monkeypatch.setenv("DIALECTICAL_JOB_STUCK_SECONDS", "60")
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    job.claimed_at = now_utc() - timedelta(seconds=job_stuck_seconds() + 5)
+    job.deadline = now_utc() + timedelta(seconds=60)  # lease fresh: deadline sweep would miss it
+    db.commit()
+
+    sweep_expired_claims(db)
+
+    db.refresh(job)
+    assert job.status == "pending"
+    assert job.error == "No answer within the stuck window"
+
+
+def test_busy_worker_contact_cannot_slide_lease_past_stuck_horizon(db, monkeypatch):
+    """Fix 1b: a worker's own poll/heartbeat slides its held job's lease
+    (Task 1) -- but that slide must never push the deadline past
+    claimed_at + the stuck cap, or a wedged-but-still-polling worker could
+    keep sliding the lease forever and outrun the stuck sweep."""
+    from app.services.orchestrator import claim_pending_job, job_stuck_seconds, refresh_worker_job_leases
+
+    monkeypatch.setenv("DIALECTICAL_JOB_STUCK_SECONDS", "60")
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    job.claimed_at = now_utc() - timedelta(seconds=50)
+    db.commit()
+
+    refresh_worker_job_leases(db, w)
+    db.commit()
+    db.expire_all()
+
+    refreshed = db.get(Job, job.id)
+    claimed_at = (
+        refreshed.claimed_at
+        if refreshed.claimed_at.tzinfo
+        else refreshed.claimed_at.replace(tzinfo=timezone.utc)
+    )
+    deadline = (
+        refreshed.deadline if refreshed.deadline.tzinfo else refreshed.deadline.replace(tzinfo=timezone.utc)
+    )
+    assert deadline <= claimed_at + timedelta(seconds=job_stuck_seconds())
+
+
 def test_retryable_v2_failure_publishes_node_retrying_not_debate_failed(db, monkeypatch):
     from app.services import orchestrator as orch
     from app.services.orchestrator import claim_pending_job

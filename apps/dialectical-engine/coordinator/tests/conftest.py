@@ -20,6 +20,8 @@ os.environ.setdefault("DIALECTICAL_LLM_PERSPECTIVES", "false")
 
 import pytest
 
+import app.main  # noqa: F401 — warms the orchestrator<->scoring<->serialization import cycle so collection order can't break imports
+
 from app.core.auth import ensure_user_token
 from app.core.db import Base, SessionLocal, engine, init_db
 

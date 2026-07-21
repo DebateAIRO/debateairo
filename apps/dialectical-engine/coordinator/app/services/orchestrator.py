@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -876,12 +876,25 @@ def refresh_worker_job_leases(db: Session, worker: Worker) -> None:
     """Any authenticated contact from a worker (poll, heartbeat, stream)
     proves liveness for every job it holds: slide those leases so the
     deadline sweep only fires for workers that have actually gone silent.
-    The hard stuck cap still bounds total time per assignment."""
+    The hard stuck cap still bounds total time per assignment: the slide
+    never pushes the deadline past ``claimed_at + job_stuck_seconds()``, so a
+    worker that keeps contacting the coordinator (busy polls, heartbeats)
+    while genuinely wedged cannot outrun the stuck sweep forever."""
     held = db.scalars(
         select(Job).where(Job.worker_id == worker.id, Job.status.in_(["claimed", "running"]))
     ).all()
     for job in held:
-        job.deadline = make_deadline()
+        fresh_deadline = make_deadline()  # always tz-aware (now_utc()-based)
+        if job.claimed_at is not None:
+            # SQLite hands back naive datetimes on reload; normalize to UTC
+            # before doing arithmetic against the aware fresh_deadline.
+            claimed_at = job.claimed_at
+            if claimed_at.tzinfo is None:
+                claimed_at = claimed_at.replace(tzinfo=timezone.utc)
+            stuck_horizon = claimed_at + timedelta(seconds=job_stuck_seconds())
+            job.deadline = min(fresh_deadline, stuck_horizon)
+        else:
+            job.deadline = fresh_deadline
 
 
 def release_held_job_for_restart(db: Session, worker: Worker) -> list[tuple[str, str, dict[str, Any]]]:

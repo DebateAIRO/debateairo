@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import select, update
@@ -32,7 +33,7 @@ from app.core.db import SessionLocal
 from app.core.write_lock import commit_write
 from app.models.entities import Job, now_utc
 from app.services.events import event_bus
-from app.services.orchestrator import requeue_or_terminalize_timed_out_job
+from app.services.orchestrator import job_stuck_seconds, requeue_or_terminalize_timed_out_job
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ DEFAULT_REAPER_INTERVAL_S = 60.0
 MIN_REAPER_INTERVAL_S = 0.05
 MAX_REAPER_INTERVAL_S = 3600.0
 REAPER_TIMEOUT_REASON = "Job deadline expired"
+REAPER_STUCK_REASON = "No answer within the stuck window"
 
 
 def reaper_interval_s() -> float:
@@ -76,6 +78,16 @@ def _stake_expired_job(db: Session, job: Job, now: Any) -> bool:
 def sweep_expired_claims(db: Session) -> list[tuple[str, str, dict[str, Any]]]:
     """One reaper pass. Returns terminal events to publish (already committed).
 
+    Two independent sweeps, mirroring ``claim_pending_job``'s claim-path
+    reaper (orchestrator.py): a deadline sweep (lease expired) and a stuck
+    sweep (``claimed_at`` older than the hard stuck cap, regardless of lease
+    freshness). The stuck sweep exists so a worker that keeps polling/
+    heartbeating -- and thereby keeps sliding its own lease -- while its CLI
+    is actually dead cannot hold a claim forever with zero other pollers to
+    ever notice; ``refresh_worker_job_leases`` caps the slide at the same
+    horizon, but this sweep is what actually reclaims it when nothing else
+    is polling.
+
     ``score_debate`` is excluded exactly like the claim-path reaper (W1):
     scoring expiry stays owned by ``_expire_stale_scoring_jobs`` -- reaping it
     here would resurrect background scoring jobs and flip complete debates
@@ -97,6 +109,25 @@ def sweep_expired_claims(db: Session) -> list[tuple[str, str, dict[str, Any]]]:
         staked_any = True
         terminal_events.extend(
             requeue_or_terminalize_timed_out_job(db, job, REAPER_TIMEOUT_REASON)
+        )
+    already_swept = {job.id for job in expired}
+    stuck_cutoff = now - timedelta(seconds=job_stuck_seconds())
+    stuck = db.scalars(
+        select(Job).where(
+            Job.status.in_(["claimed", "running"]),
+            Job.claimed_at.isnot(None),
+            Job.claimed_at < stuck_cutoff,
+            Job.job_type != "score_debate",
+        )
+    ).all()
+    for job in stuck:
+        if job.id in already_swept:
+            continue
+        if not _stake_expired_job(db, job, now):
+            continue
+        staked_any = True
+        terminal_events.extend(
+            requeue_or_terminalize_timed_out_job(db, job, REAPER_STUCK_REASON)
         )
     if staked_any:
         # Commit BEFORE the caller publishes (W1 terminal-event contract).

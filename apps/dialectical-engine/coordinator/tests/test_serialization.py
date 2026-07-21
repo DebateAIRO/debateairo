@@ -184,7 +184,14 @@ def test_debate_detail_includes_active_synthesis_stream_snapshot(db) -> None:
         "worker_id": worker.id,
         "worker_name": "mac-mini",
         "created_at": iso(job.claimed_at),
-        "raw": "Drafting…",  # Task 6: partial JSON envelope with no extractable title/content
+        # Fix 4: "raw" stays the literal buffer (never envelope-prose). The
+        # web client parses this as JSON (partialJsonField in
+        # DebatePageClient.tsx) and appends raw synthesis_token deltas to it
+        # to drive the live synthesis preview -- prose here breaks that
+        # parser. streaming_generation_summary's "argument" is the one field
+        # that presents envelope prose; active_synthesis's "raw" is parser
+        # input for the client, not display copy.
+        "raw": job.stream_buffer,
         "is_streaming": True,
     }
     assert visible["models"] == ["mock-local"]
@@ -1024,8 +1031,11 @@ def test_completion_block_complete_with_failed_branch_maps_generation_exhausted(
     assert payload["status"] == "complete"
     assert payload["completion"]["state"] == "complete-with-failed-branches"
     assert payload["completion"]["reasonCode"] == "generation_exhausted"
-    assert payload["completion"]["humanReason"]
-    assert payload["completion"]["humanReason"] != "generation_exhausted"
+    # Fix 3: the completed-style override copy is only honest here, where
+    # synthesis actually completed over the survivors.
+    assert payload["completion"]["humanReason"] == (
+        "Some branches were set aside after repeated failures; the debate completed with the rest."
+    )
 
 
 def test_completion_block_reason_pick_is_deterministic_across_multiple_failed_nodes(db) -> None:
@@ -1134,6 +1144,16 @@ def test_completion_block_failed_debate_carries_the_node_reason(db) -> None:
     assert payload["completion"]["state"] == "failed"
     assert payload["completion"]["reasonCode"] == "generation_exhausted"
     assert payload["completion"]["humanReason"]
+    # Fix 3: a FAILED debate must never get the complete-with-failed-branches
+    # override copy just because it shares the same node-level reason code
+    # (generation_exhausted) -- that copy claims synthesis completed over the
+    # survivors, which is false here (payload["status"] == "failed").
+    assert payload["completion"]["humanReason"] != (
+        "Some branches were set aside after repeated failures; the debate completed with the rest."
+    )
+    assert payload["completion"]["humanReason"] == (
+        "Generation failed after repeated attempts, so this path was set aside."
+    )
 
 
 def test_completion_block_failed_debate_without_node_reason_uses_the_honest_generic_code(db) -> None:

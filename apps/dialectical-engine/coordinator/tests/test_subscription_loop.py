@@ -218,6 +218,87 @@ def test_run_cli_with_liveness_heartbeats_during_the_run(monkeypatch):
     assert len(beats) >= 2, "CLI ran ~1s with 0.2s cadence; expected multiple heartbeats"
 
 
+def test_claude_once_reports_retryable_failure_when_the_cli_times_out(tmp_path, monkeypatch):
+    """Fix 2: a CLI that hangs past --timeout-seconds must not crash the loop
+    iteration with a raw subprocess.TimeoutExpired -- it must be caught and
+    reported through the same fail path a nonzero exit code takes, so the
+    loop harness can move on to the next job."""
+    import argparse
+    import asyncio
+
+    loop_module = load_module()
+
+    fail_calls: list[tuple[str, str, bool]] = []
+
+    class FakeClient:
+        def __init__(self, config):
+            pass
+
+        async def register(self, models, save_path=None):
+            pass
+
+        async def heartbeat(self, capabilities, status="online"):
+            pass
+
+        async def poll(self):
+            return {
+                "id": "job-timeout-1",
+                "job_type": "propose",
+                "required_role": "proposer",
+                "required_model": loop_module.CLAUDE_LOOP_MODEL,
+                "prompt": {"system": "System instruction", "user": "User claim", "max_tokens": 800},
+            }
+
+        async def fail(self, job_id, reason, retryable=True):
+            fail_calls.append((job_id, reason, retryable))
+
+        async def aclose(self):
+            pass
+
+    class FakeWorkerConfig:
+        """Plain attribute bag standing in for worker.app.config.WorkerConfig
+        -- loop_config() only ever assigns attributes onto it. Faked (rather
+        than importing the real worker package) because the worker's `app.*`
+        and the coordinator's `app.*` collide under the shared 'app' name
+        once pytest has already imported the coordinator's app package."""
+
+        def __init__(self):
+            self.coordinator_url = ""
+            self.name = None
+            self.enable_mock = True
+            self.enable_real_adapters = True
+            self.allowed_models = None
+            self.user_token = None
+
+    monkeypatch.setattr(
+        loop_module,
+        "worker_runtime",
+        lambda: (FakeClient, FakeWorkerConfig, lambda path: FakeWorkerConfig(), lambda config, path=None: None),
+    )
+    # The CLI command itself is irrelevant to the fix -- swap in a command
+    # that reliably outlives a 1s timeout instead of shelling out to `claude`.
+    monkeypatch.setattr(loop_module, "build_claude_command", lambda model, prompt: ["sleep", "5"])
+
+    args = argparse.Namespace(
+        config=str(tmp_path / "config.toml"),
+        worker_name="test-claude-loop",
+        coordinator_url="http://example.test",
+        advertised_model=loop_module.CLAUDE_LOOP_MODEL,
+        claude_model=loop_module.CLAUDE_LOOP_MODEL,
+        state_dir=str(tmp_path),
+        timeout_seconds=1,
+    )
+
+    result = asyncio.run(loop_module.claude_once(args))
+
+    assert result == 0
+    assert len(fail_calls) == 1
+    job_id, reason, retryable = fail_calls[0]
+    assert job_id == "job-timeout-1"
+    assert retryable is True
+    assert "1s" in reason
+
+
 def test_job_files_are_keyed_by_job_id(tmp_path):
     loop_module = load_module()
     job = {"id": "job-abc123", "job_type": "v2_pov", "prompt": {"system": "s", "user": "u", "max_tokens": 100}}

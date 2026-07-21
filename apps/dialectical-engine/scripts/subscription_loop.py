@@ -533,12 +533,17 @@ async def claude_once(args: argparse.Namespace) -> int:
         state_dir=Path(args.state_dir),
     )
     command = build_claude_command(args.claude_model, render_model_prompt(job))
-    process = await run_cli_with_liveness(
-        config,
-        command,
-        capabilities=[args.advertised_model],
-        timeout_seconds=args.timeout_seconds,
-    )
+    try:
+        process = await run_cli_with_liveness(
+            config,
+            command,
+            capabilities=[args.advertised_model],
+            timeout_seconds=args.timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        reason = f"claude CLI exceeded {args.timeout_seconds}s"
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"claude exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
@@ -569,13 +574,18 @@ async def gemini_once(args: argparse.Namespace) -> int:
         state_dir=Path(args.state_dir),
     )
     command, extra_env = build_gemini_command(args.gemini_model, render_model_prompt(job))
-    process = await run_cli_with_liveness(
-        config,
-        command,
-        capabilities=[args.advertised_model],
-        timeout_seconds=args.timeout_seconds,
-        env=extra_env,
-    )
+    try:
+        process = await run_cli_with_liveness(
+            config,
+            command,
+            capabilities=[args.advertised_model],
+            timeout_seconds=args.timeout_seconds,
+            env=extra_env,
+        )
+    except subprocess.TimeoutExpired:
+        reason = f"gemini CLI exceeded {args.timeout_seconds}s"
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"gemini exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
@@ -605,12 +615,17 @@ async def grok_once(args: argparse.Namespace) -> int:
         job=job,
         state_dir=Path(args.state_dir),
     )
-    process = await run_cli_with_liveness(
-        config,
-        build_grok_command(args.grok_model, render_model_prompt(job)),
-        capabilities=[args.advertised_model],
-        timeout_seconds=args.timeout_seconds,
-    )
+    try:
+        process = await run_cli_with_liveness(
+            config,
+            build_grok_command(args.grok_model, render_model_prompt(job)),
+            capabilities=[args.advertised_model],
+            timeout_seconds=args.timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        reason = f"grok CLI exceeded {args.timeout_seconds}s"
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"grok exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
