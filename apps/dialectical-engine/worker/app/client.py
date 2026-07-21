@@ -53,7 +53,11 @@ class CoordinatorClient:
             return
         if not self.config.user_token:
             raise RuntimeError("Set user_token in worker config or DIALECTICAL_USER_TOKEN to register")
-        payload: dict[str, object] = {"name": self.config.name, "capabilities": capabilities}
+        payload: dict[str, object] = {
+            "name": self.config.name,
+            "capabilities": capabilities,
+            "fresh_start": True,
+        }
         if rotate_token:
             payload["rotate_token"] = True
         response = await self.client.post(
@@ -83,11 +87,14 @@ class CoordinatorClient:
         if persist:
             save_config(self.config, save_path)
 
-    async def heartbeat(self, capabilities: list[str], status: str = "online") -> None:
+    async def heartbeat(self, capabilities: list[str], status: str = "online", *, fresh_start: bool = False) -> None:
+        payload: dict[str, object] = {"capabilities": capabilities, "status": status}
+        if fresh_start:
+            payload["fresh_start"] = True
         response = await self.client.post(
             f"/api/workers/{self.config.worker_id}/heartbeat",
             headers=self.worker_headers,
-            json={"capabilities": capabilities, "status": status},
+            json=payload,
         )
         response.raise_for_status()
 

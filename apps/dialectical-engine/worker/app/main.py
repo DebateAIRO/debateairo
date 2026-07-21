@@ -410,6 +410,18 @@ async def worker_loop(run_once: bool = False) -> None:
             # Funnel startup desync into the capped recovery path; the poll
             # loop below re-attempts and re-enters recovery if still broken.
             recovery_attempts = await handle_identity_desync(client, capabilities, stop, recovery_attempts)
+        try:
+            # A restarted process cannot still be running whatever job it
+            # held before. register() short-circuits without a network call
+            # once worker_id/worker_token are persisted (the common case for
+            # this worker), so it can't be trusted to carry the restart
+            # signal. The heartbeat channel always authenticates and always
+            # fires, so announce the restart there instead: the coordinator
+            # then releases any held job immediately rather than waiting for
+            # the stuck cap.
+            await client.heartbeat(capabilities, fresh_start=True)
+        except Exception as exc:  # noqa: BLE001 - best-effort; the stuck cap remains the backstop.
+            print(f"Fresh-start heartbeat failed: {exc}. Continuing; the stuck cap remains the backstop.", flush=True)
         last_heartbeat = time.monotonic()
         backoff_seconds = 1
         while not stop.is_set():

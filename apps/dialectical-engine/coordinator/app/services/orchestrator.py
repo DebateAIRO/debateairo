@@ -816,6 +816,18 @@ def refresh_worker_job_leases(db: Session, worker: Worker) -> None:
         job.deadline = make_deadline()
 
 
+def release_held_job_for_restart(db: Session, worker: Worker) -> list[tuple[str, str, dict[str, Any]]]:
+    """A worker that declares a fresh start cannot still be running its old
+    job: requeue it immediately instead of waiting for the stuck cap."""
+    if not worker.current_job_id:
+        return []
+    held = db.get(Job, worker.current_job_id)
+    if held is not None and held.worker_id == worker.id and held.status in {"claimed", "running"}:
+        return requeue_or_terminalize_timed_out_job(db, held, "Worker restarted while job was active")
+    worker.current_job_id = None
+    return []
+
+
 def reset_job_target_for_retry(db: Session, job: Job) -> None:
     debate = db.get(Debate, job.debate_id)
     if debate and debate.status not in {"archived", "failed"}:
@@ -974,17 +986,22 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
     # phantom terminal-failure event.
     terminal_events: list[tuple[str, str, dict[str, Any]]] = []
     if worker.current_job_id:
-        orphaned = db.get(Job, worker.current_job_id)
+        held = db.get(Job, worker.current_job_id)
         if (
-            orphaned is not None
-            and orphaned.worker_id == worker.id
-            and orphaned.status in {"claimed", "running"}
+            held is not None
+            and held.worker_id == worker.id
+            and held.status in {"claimed", "running"}
         ):
-            terminal_events.extend(
-                requeue_or_terminalize_timed_out_job(db, orphaned, "Worker restarted while job was active")
-            )
-        else:
-            worker.current_job_id = None
+            # The worker is polling while its job is in flight (loop
+            # harnesses poll on a timer). Its lease was just refreshed by
+            # refresh_worker_job_leases above, so nothing is wrong: report
+            # busy instead of yanking the job. Genuine restarts announce
+            # themselves via fresh_start registration; genuinely dead
+            # workers stop contacting and the deadline sweep reclaims.
+            mark_worker_seen(worker, now_utc())
+            commit_write(db)
+            return None
+        worker.current_job_id = None
 
     if worker.status != "online":
         worker.last_seen = now_utc()

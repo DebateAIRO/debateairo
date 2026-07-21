@@ -95,3 +95,38 @@ def test_refresh_ignores_jobs_held_by_other_workers(db):
     stale_naive = stale.replace(tzinfo=None)
     refreshed_naive = refreshed.deadline
     assert refreshed_naive == stale_naive
+
+
+def test_poll_while_busy_returns_none_and_keeps_the_job(db):
+    """A loop harness polls on a timer while its CLI is still thinking.
+    That poll must NOT tear the in-flight job away (the old behavior
+    requeued it as 'Worker restarted while job was active')."""
+    from app.services.orchestrator import claim_pending_job
+
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    first = claim_pending_job(db, w)
+    assert first is not None
+    second = claim_pending_job(db, w)  # worker polls again mid-run
+    assert second is None
+    db.refresh(job)
+    assert job.status == "running"
+    assert job.worker_id == w.id
+    assert (job.timeout_attempts or 0) == 0
+
+
+def test_expired_held_job_is_still_requeued_on_poll(db):
+    from app.services.orchestrator import claim_pending_job
+
+    w = worker(db, "loop-1", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    job.deadline = now_utc() - timedelta(seconds=5)
+    db.commit()
+    # Bypass the Task 1 refresh (which would resurrect the lease) by
+    # expiring the job and having a DIFFERENT worker trigger the sweep.
+    other = worker(db, "sweeper", ["gpt-5.6sol-medium"])
+    claim_pending_job(db, other)
+    db.refresh(job)
+    assert job.status == "pending"
+    assert (job.timeout_attempts or 0) == 1

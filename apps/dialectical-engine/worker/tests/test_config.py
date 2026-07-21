@@ -252,7 +252,11 @@ async def test_register_can_defer_config_persistence_to_custom_path(tmp_path: Pa
         {
             "path": "/api/workers/register",
             "headers": {"Authorization": "Bearer user_secret"},
-            "json": {"name": " adesso-mbp ", "capabilities": ["gpt-5.6sol-medium"]},
+            "json": {
+                "name": " adesso-mbp ",
+                "capabilities": ["gpt-5.6sol-medium"],
+                "fresh_start": True,
+            },
         }
     ]
     assert not default_path.exists()

@@ -68,13 +68,14 @@ async def test_worker_loop_survives_auth_blocked_identity_recovery(monkeypatch, 
         raise _http_401(f"http://localhost:8000/api/workers/{self.config.worker_id}/poll")
 
     heartbeat_calls = {"count": 0}
-    # Startup does two successful heartbeats before the poll loop is reached:
-    # one inside register_with_backoff's "starting" call, one for "online"
-    # right after. Let both pass so the test exercises the 401 raised by
-    # client.poll() inside the loop (the identity-desync recovery path).
-    STARTUP_HEARTBEATS = 2
+    # Startup does three successful heartbeats before the poll loop is
+    # reached: one inside register_with_backoff's "starting" call, one for
+    # "online" right after, and one fresh_start=True announcement. Let all
+    # three pass so the test exercises the 401 raised by client.poll() inside
+    # the loop (the identity-desync recovery path).
+    STARTUP_HEARTBEATS = 3
 
-    async def fake_heartbeat(self, capabilities, status="online"):
+    async def fake_heartbeat(self, capabilities, status="online", fresh_start=False):
         heartbeat_calls["count"] += 1
         if heartbeat_calls["count"] <= STARTUP_HEARTBEATS:
             return
@@ -151,7 +152,7 @@ async def test_worker_loop_exits_blocked_auth_after_recovery_cap(monkeypatch) ->
     async def fake_poll(self):
         raise _http_status_error(401, "http://localhost:8000/api/workers/w-1/poll")
 
-    async def fake_heartbeat(self, capabilities, status="online"):
+    async def fake_heartbeat(self, capabilities, status="online", fresh_start=False):
         heartbeat_statuses.append(status)
         if status == "blocked_auth":
             return None

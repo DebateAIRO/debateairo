@@ -675,14 +675,20 @@ def test_requeue_active_jobs_for_worker_commits_before_publishing_terminal_event
     assert debate.status != "failed", "one poisoned branch must degrade, not kill, the debate"
 
 
-def test_orphan_release_commits_before_publishing_terminal_event(db, monkeypatch: pytest.MonkeyPatch) -> None:
-    """claim_pending_job's orphan-release branch (a worker reconnecting while
-    its previous claim is still marked claimed/running -- e.g. the worker
-    process restarted) drives a poisoned argue job to the doubled
-    timeout-class budget. The terminal node_failed event must publish
-    exactly once, only after claim_pending_job's commit_write call persists
-    the terminal node/job state -- never before."""
-    import app.services.orchestrator as orchestrator_module
+def test_fresh_start_registration_commits_before_publishing_terminal_event(
+    db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The orphan-release trigger moved from a bare poll to fresh_start=True
+    registration (job-lifecycle plan Task 2: a worker reconnecting while its
+    previous claim is still marked claimed/running -- e.g. the worker
+    process restarted -- now must say so explicitly). Repeated fresh_start
+    registrations drive a poisoned argue job to the doubled timeout-class
+    budget. The terminal node_failed event must publish exactly once, only
+    after register_worker's commit_write call persists the terminal
+    node/job state -- never before."""
+    import app.api.workers as workers_module
+    from app.api.workers import RegisterRequest, register_worker
+    from app.core.auth import AuthContext
     from app.services.orchestrator import create_debate
 
     worker = _worker(db)
@@ -690,7 +696,7 @@ def test_orphan_release_commits_before_publishing_terminal_event(db, monkeypatch
     _complete_decompose(db, worker)
 
     # Isolate a single branch: resolve the sibling so the poison job is the
-    # only claimable job across every orphan cycle below.
+    # only claimable job across every fresh_start cycle below.
     sibling = claim_pending_job(db, worker)
     assert sibling is not None and sibling.job_type == "argue"
     asyncio.run(complete_job(db, sibling, {"argument": "A concise argument."}, {"latency_ms": 5}))
@@ -700,19 +706,33 @@ def test_orphan_release_commits_before_publishing_terminal_event(db, monkeypatch
     assert job is not None and job.job_type == "argue"
     poison_id = job.id
 
-    # Each subsequent claim_pending_job call, while worker.current_job_id
-    # still points at this claimed job, re-enters via the orphan-release
-    # branch (one timeout-class requeue) and immediately re-claims the
-    # now-pending job within the SAME call (one full attempt). 7 such cycles
-    # bring attempts/timeout_attempts to 8/7; the 8th cycle's orphan check
-    # alone (weighted 8 - 4 = 4) exhausts the doubled budget.
-    for cycle in range(1, 8):
-        reclaimed = claim_pending_job(db, worker)
-        assert reclaimed is not None and reclaimed.id == poison_id, f"cycle {cycle} must requeue+reclaim"
+    def fresh_start_register() -> None:
+        register_worker(
+            RegisterRequest(name=worker.name, capabilities=worker.capabilities, fresh_start=True),
+            db,
+            AuthContext(token="user_test_token"),
+        )
 
+    # Each fresh_start registration is one timeout-class requeue (half
+    # budget weight); reclaim in between so attempts keeps pace with
+    # timeout_attempts -- a pure timeout loop terminates at DOUBLE the
+    # configured budget (8 cycles at the default of 4), mirroring the
+    # reaper's own doubled-budget test and the token-rotation channel's test
+    # above.
+    for cycle in range(1, 8):
+        fresh_start_register()
+        refreshed = db.get(Job, poison_id)
+        db.refresh(refreshed)
+        assert refreshed.status == "pending", f"cycle {cycle} must requeue, not terminalize"
+        reclaimed = claim_pending_job(db, worker)
+        assert reclaimed is not None and reclaimed.id == poison_id
+
+    # Final (8th) fresh_start registration exhausts the budget. Record call
+    # order for JUST this call to prove commit_write precedes
+    # _publish_events_sync.
     call_order: list[str] = []
-    real_commit_write = orchestrator_module.commit_write
-    real_publish = orchestrator_module._publish_events_sync
+    real_commit_write = workers_module.commit_write
+    real_publish = workers_module._publish_events_sync
 
     def recording_commit(session):
         call_order.append("commit")
@@ -722,16 +742,11 @@ def test_orphan_release_commits_before_publishing_terminal_event(db, monkeypatch
         call_order.append("publish")
         return real_publish(events)
 
-    monkeypatch.setattr(orchestrator_module, "commit_write", recording_commit)
-    monkeypatch.setattr(orchestrator_module, "_publish_events_sync", recording_publish)
+    monkeypatch.setattr(workers_module, "commit_write", recording_commit)
+    monkeypatch.setattr(workers_module, "_publish_events_sync", recording_publish)
 
-    final = claim_pending_job(db, worker)
+    fresh_start_register()
 
-    # The terminal branch failure unblocks synthesis over the surviving
-    # sibling (_queue_synthesis_after_branch_failure), so this same call may
-    # go on to claim that freshly queued synthesize job -- it must not
-    # reclaim the poison job itself.
-    assert final is None or final.id != poison_id, "the terminalized job itself must not be reclaimed"
     assert call_order.count("publish") == 1, "terminal event must publish exactly once"
     assert call_order.index("commit") < call_order.index(
         "publish"

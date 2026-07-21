@@ -22,6 +22,7 @@ from app.services.orchestrator import (
     mark_worker_seen,
     publish_job_started,
     refresh_worker_job_leases,
+    release_held_job_for_restart,
     render_job_payload,
     requeue_active_jobs_for_worker,
 )
@@ -33,6 +34,7 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     capabilities: list[str] = Field(default_factory=list)
     rotate_token: bool = False
+    fresh_start: bool = False
 
 
 class HeartbeatRequest(BaseModel):
@@ -40,6 +42,7 @@ class HeartbeatRequest(BaseModel):
     status: Literal[
         "online", "offline", "degraded", "starting", "recovering_identity", "blocked_auth"
     ] = "online"
+    fresh_start: bool = False
 
 
 def clean_worker_name(value: str) -> str:
@@ -116,6 +119,11 @@ def register_worker(
     # tree.
     if terminal_events:
         _publish_events_sync(terminal_events)
+    if payload.fresh_start:
+        terminal_events = release_held_job_for_restart(db, worker)
+        commit_write(db)
+        if terminal_events:
+            _publish_events_sync(terminal_events)
     return {"worker_id": worker.id, "worker_token": token, "name": worker.name, "capabilities": worker.capabilities}
 
 
@@ -132,8 +140,16 @@ def heartbeat(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
     worker.last_seen = now_utc()
     worker.status = payload.status
+    terminal_events: list[tuple[str, str, dict[str, Any]]] = []
+    if payload.fresh_start:
+        # Release BEFORE refreshing leases -- a released job is no longer
+        # held by this worker, so it must not have its deadline slid back
+        # out by the refresh below.
+        terminal_events = release_held_job_for_restart(db, worker)
     refresh_worker_job_leases(db, worker)
     commit_write(db)
+    if terminal_events:
+        _publish_events_sync(terminal_events)
     return {"status": worker.status}
 
 
