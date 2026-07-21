@@ -21,6 +21,7 @@ from app.services.orchestrator import (
     claim_pending_job,
     mark_worker_seen,
     publish_job_started,
+    refresh_worker_job_leases,
     render_job_payload,
     requeue_active_jobs_for_worker,
 )
@@ -131,6 +132,7 @@ def heartbeat(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
     worker.last_seen = now_utc()
     worker.status = payload.status
+    refresh_worker_job_leases(db, worker)
     commit_write(db)
     return {"status": worker.status}
 

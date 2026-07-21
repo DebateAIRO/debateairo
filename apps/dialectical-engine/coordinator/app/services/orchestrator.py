@@ -804,6 +804,18 @@ def release_job_claim(db: Session, job: Job) -> None:
     job.claimed_at = None
 
 
+def refresh_worker_job_leases(db: Session, worker: Worker) -> None:
+    """Any authenticated contact from a worker (poll, heartbeat, stream)
+    proves liveness for every job it holds: slide those leases so the
+    deadline sweep only fires for workers that have actually gone silent.
+    The hard stuck cap still bounds total time per assignment."""
+    held = db.scalars(
+        select(Job).where(Job.worker_id == worker.id, Job.status.in_(["claimed", "running"]))
+    ).all()
+    for job in held:
+        job.deadline = make_deadline()
+
+
 def reset_job_target_for_retry(db: Session, job: Job) -> None:
     debate = db.get(Debate, job.debate_id)
     if debate and debate.status not in {"archived", "failed"}:
@@ -953,6 +965,7 @@ def ensure_mutable_claim(db: Session, job: Job) -> None:
 
 
 def claim_pending_job(db: Session, worker: Worker) -> Job | None:
+    refresh_worker_job_leases(db, worker)
     # Collected up front (not published) so every terminal event -- orphan
     # release included -- goes out only after the commit that persists it,
     # per terminalize_job_failure's "commit, then publish" contract. A
