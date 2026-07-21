@@ -216,3 +216,132 @@ def test_run_cli_with_liveness_heartbeats_during_the_run(monkeypatch):
     )
     assert process.returncode == 0
     assert len(beats) >= 2, "CLI ran ~1s with 0.2s cadence; expected multiple heartbeats"
+
+
+def test_job_files_are_keyed_by_job_id(tmp_path):
+    loop_module = load_module()
+    job = {"id": "job-abc123", "job_type": "v2_pov", "prompt": {"system": "s", "user": "u", "max_tokens": 100}}
+    job_file, response_file = loop_module.write_job_file(
+        provider="claude",
+        config_path=tmp_path / "config.json",
+        job=job,
+        state_dir=tmp_path,
+    )
+    assert "job-abc123" in job_file.name
+    assert "job-abc123" in response_file.name
+
+
+def test_slot_names_are_unique_and_slot_one_keeps_the_base_name():
+    loop_module = load_module()
+    assert loop_module.slot_worker_name("claude-sonnet-loop", 1) == "claude-sonnet-loop"
+    assert loop_module.slot_worker_name("claude-sonnet-loop", 3) == "claude-sonnet-loop-s3"
+
+
+def test_start_claude_loop_default_slot_matches_legacy_single_slot_behavior(monkeypatch):
+    module = load_module()
+    calls = []
+    monkeypatch.setattr(module, "start_tmux_session", lambda session, command: calls.append((session, command)))
+    parser = module.build_parser()
+    args = parser.parse_args(["start-claude"])
+
+    result = module.start_claude_loop(args)
+
+    assert result == 0
+    assert len(calls) == 1
+    session, command = calls[0]
+    assert session == "dialectical-claude-loop" == args.claude_session
+    assert f"--worker-name {args.claude_worker_name} " in command
+    assert f"--config {args.claude_config} " in command
+
+
+def test_start_claude_loop_with_slots_creates_one_session_per_slot_with_unique_identities(monkeypatch):
+    module = load_module()
+    calls = []
+    monkeypatch.setattr(module, "start_tmux_session", lambda session, command: calls.append((session, command)))
+    parser = module.build_parser()
+    args = parser.parse_args(["start-claude", "--slots", "3"])
+
+    result = module.start_claude_loop(args)
+
+    assert result == 0
+    sessions = [session for session, _ in calls]
+    assert sessions == [
+        "dialectical-claude-loop",
+        "dialectical-claude-loop-s2",
+        "dialectical-claude-loop-s3",
+    ]
+    # slot 1 keeps the legacy worker name and config path so existing deployments are unchanged
+    assert f"--worker-name {args.claude_worker_name} " in calls[0][1]
+    assert f"--config {args.claude_config} " in calls[0][1]
+    # slots 2 and 3 each register a distinct worker identity against a distinct config path
+    assert f"--worker-name {args.claude_worker_name}-s2 " in calls[1][1]
+    assert f"--config {args.claude_config}.s2 " in calls[1][1]
+    assert f"--worker-name {args.claude_worker_name}-s3 " in calls[2][1]
+    assert f"--config {args.claude_config}.s3 " in calls[2][1]
+
+
+def test_start_grok_loop_with_slots_creates_one_session_per_slot_with_unique_identities(monkeypatch):
+    module = load_module()
+    calls = []
+    monkeypatch.setattr(module, "start_tmux_session", lambda session, command: calls.append((session, command)))
+    parser = module.build_parser()
+    args = parser.parse_args(["start-grok", "--slots", "2"])
+
+    result = module.start_grok_loop(args)
+
+    assert result == 0
+    sessions = [session for session, _ in calls]
+    assert sessions == ["dialectical-grok-loop", "dialectical-grok-loop-s2"]
+    assert f"--worker-name {args.grok_worker_name} " in calls[0][1]
+    assert f"--config {args.grok_config} " in calls[0][1]
+    assert f"--worker-name {args.grok_worker_name}-s2 " in calls[1][1]
+    assert f"--config {args.grok_config}.s2 " in calls[1][1]
+
+
+def test_start_gemini_loop_with_slots_creates_one_session_per_slot_with_unique_identities(monkeypatch):
+    module = load_module()
+    calls = []
+    monkeypatch.setattr(module, "start_tmux_session", lambda session, command: calls.append((session, command)))
+    parser = module.build_parser()
+    args = parser.parse_args(["start-gemini", "--slots", "2"])
+
+    result = module.start_gemini_loop(args)
+
+    assert result == 0
+    sessions = [session for session, _ in calls]
+    assert sessions == ["dialectical-gemini-loop", "dialectical-gemini-loop-s2"]
+    assert f"--worker-name {args.gemini_worker_name} " in calls[0][1]
+    assert f"--config {args.gemini_config} " in calls[0][1]
+    assert f"--worker-name {args.gemini_worker_name}-s2 " in calls[1][1]
+    assert f"--config {args.gemini_config}.s2 " in calls[1][1]
+
+
+def test_start_loop_subcommands_default_slots_to_one():
+    module = load_module()
+    parser = module.build_parser()
+
+    assert parser.parse_args(["start-claude"]).slots == 1
+    assert parser.parse_args(["start-grok"]).slots == 1
+    assert parser.parse_args(["start-gemini"]).slots == 1
+
+
+def test_start_claude_loop_falls_back_to_a_single_slot_when_namespace_has_no_slots_attribute(monkeypatch):
+    """Pins the getattr(args, "slots", 1) fallback that keeps the combined `start`
+    subcommand byte-identical to legacy behavior: its argparse namespace never carries
+    `.slots` (only start-claude/start-grok/start-gemini get that flag), so
+    start_claude_loop must still produce exactly one session with the legacy names."""
+    module = load_module()
+    calls = []
+    monkeypatch.setattr(module, "start_tmux_session", lambda session, command: calls.append((session, command)))
+    parser = module.build_parser()
+    args = parser.parse_args(["start"])
+    assert not hasattr(args, "slots")
+
+    result = module.start_claude_loop(args)
+
+    assert result == 0
+    assert len(calls) == 1
+    session, command = calls[0]
+    assert session == "dialectical-claude-loop" == args.claude_session
+    assert f"--worker-name {args.claude_worker_name} " in command
+    assert f"--config {args.claude_config} " in command

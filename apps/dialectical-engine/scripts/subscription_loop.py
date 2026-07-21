@@ -680,51 +680,72 @@ def start_tmux_session(session: str, command: str) -> None:
     subprocess.run(["tmux", "new-session", "-d", "-s", session, "-c", str(ROOT), command], check=True)
 
 
+def slot_worker_name(base: str, slot: int) -> str:
+    """Slot 1 keeps the base name so existing single-slot deployments keep
+    their worker identity (and their coordinator-side history)."""
+    return base if slot <= 1 else f"{base}-s{slot}"
+
+
 def start_claude_loop(args: argparse.Namespace) -> int:
-    command = (
-        "while true; do "
-        f"./scripts/dezbatere_loop_helper.sh claude-once --coordinator-url {shlex.quote(args.coordinator_url)} "
-        f"--worker-name {shlex.quote(args.claude_worker_name)} "
-        f"--config {shlex.quote(args.claude_config)} "
-        f"--advertised-model {shlex.quote(args.claude_loop_model)} "
-        f"--claude-model {shlex.quote(args.claude_model)}; "
-        f"sleep {int(args.interval_seconds)}; "
-        "done"
-    )
-    start_tmux_session(args.claude_session, command)
-    print(f"started {args.claude_session}")
+    slots = max(1, int(getattr(args, "slots", 1)))
+    for slot in range(1, slots + 1):
+        session = f"{args.claude_session}-s{slot}" if slot > 1 else args.claude_session
+        worker_name = slot_worker_name(args.claude_worker_name, slot)
+        config = f"{args.claude_config}.s{slot}" if slot > 1 else args.claude_config
+        command = (
+            "while true; do "
+            f"./scripts/dezbatere_loop_helper.sh claude-once --coordinator-url {shlex.quote(args.coordinator_url)} "
+            f"--worker-name {shlex.quote(worker_name)} "
+            f"--config {shlex.quote(config)} "
+            f"--advertised-model {shlex.quote(args.claude_loop_model)} "
+            f"--claude-model {shlex.quote(args.claude_model)}; "
+            f"sleep {int(args.interval_seconds)}; "
+            "done"
+        )
+        start_tmux_session(session, command)
+        print(f"started {session}")
     return 0
 
 
 def start_grok_loop(args: argparse.Namespace) -> int:
-    command = (
-        "while true; do "
-        f"./scripts/dezbatere_loop_helper.sh grok-once --coordinator-url {shlex.quote(args.coordinator_url)} "
-        f"--worker-name {shlex.quote(args.grok_worker_name)} "
-        f"--config {shlex.quote(args.grok_config)} "
-        f"--advertised-model {shlex.quote(args.grok_loop_model)} "
-        f"--grok-model {shlex.quote(args.grok_model)}; "
-        f"sleep {int(args.interval_seconds)}; "
-        "done"
-    )
-    start_tmux_session(args.grok_session, command)
-    print(f"started {args.grok_session}")
+    slots = max(1, int(getattr(args, "slots", 1)))
+    for slot in range(1, slots + 1):
+        session = f"{args.grok_session}-s{slot}" if slot > 1 else args.grok_session
+        worker_name = slot_worker_name(args.grok_worker_name, slot)
+        config = f"{args.grok_config}.s{slot}" if slot > 1 else args.grok_config
+        command = (
+            "while true; do "
+            f"./scripts/dezbatere_loop_helper.sh grok-once --coordinator-url {shlex.quote(args.coordinator_url)} "
+            f"--worker-name {shlex.quote(worker_name)} "
+            f"--config {shlex.quote(config)} "
+            f"--advertised-model {shlex.quote(args.grok_loop_model)} "
+            f"--grok-model {shlex.quote(args.grok_model)}; "
+            f"sleep {int(args.interval_seconds)}; "
+            "done"
+        )
+        start_tmux_session(session, command)
+        print(f"started {session}")
     return 0
 
 
 def start_gemini_loop(args: argparse.Namespace) -> int:
-    command = (
-        "while true; do "
-        f"./scripts/dezbatere_loop_helper.sh gemini-once --coordinator-url {shlex.quote(args.coordinator_url)} "
-        f"--worker-name {shlex.quote(args.gemini_worker_name)} "
-        f"--config {shlex.quote(args.gemini_config)} "
-        f"--advertised-model {shlex.quote(args.gemini_loop_model)} "
-        f"--gemini-model {shlex.quote(args.gemini_model)}; "
-        f"sleep {int(args.interval_seconds)}; "
-        "done"
-    )
-    start_tmux_session(args.gemini_session, command)
-    print(f"started {args.gemini_session}")
+    slots = max(1, int(getattr(args, "slots", 1)))
+    for slot in range(1, slots + 1):
+        session = f"{args.gemini_session}-s{slot}" if slot > 1 else args.gemini_session
+        worker_name = slot_worker_name(args.gemini_worker_name, slot)
+        config = f"{args.gemini_config}.s{slot}" if slot > 1 else args.gemini_config
+        command = (
+            "while true; do "
+            f"./scripts/dezbatere_loop_helper.sh gemini-once --coordinator-url {shlex.quote(args.coordinator_url)} "
+            f"--worker-name {shlex.quote(worker_name)} "
+            f"--config {shlex.quote(config)} "
+            f"--advertised-model {shlex.quote(args.gemini_loop_model)} "
+            f"--gemini-model {shlex.quote(args.gemini_model)}; "
+            f"sleep {int(args.interval_seconds)}; "
+            "done"
+        )
+        start_tmux_session(session, command)
+        print(f"started {session}")
     return 0
 
 
@@ -866,6 +887,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_claude_parser.add_argument("--claude-config", default=str(provider_config_path("claude")))
     start_claude_parser.add_argument("--claude-model", default=CLAUDE_RAW_MODEL)
     start_claude_parser.add_argument("--claude-loop-model", default=CLAUDE_LOOP_MODEL)
+    start_claude_parser.add_argument("--slots", type=int, default=1)
     start_claude_parser.set_defaults(func=start_claude_loop)
 
     start_grok_parser = subcommands.add_parser("start-grok")
@@ -876,6 +898,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_grok_parser.add_argument("--grok-config", default=str(provider_config_path("grok")))
     start_grok_parser.add_argument("--grok-model", default=GROK_RAW_MODEL)
     start_grok_parser.add_argument("--grok-loop-model", default=GROK_LOOP_MODEL)
+    start_grok_parser.add_argument("--slots", type=int, default=1)
     start_grok_parser.set_defaults(func=start_grok_loop)
 
     start_gemini_parser = subcommands.add_parser("start-gemini")
@@ -886,6 +909,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_gemini_parser.add_argument("--gemini-config", default=str(provider_config_path("gemini")))
     start_gemini_parser.add_argument("--gemini-model", default=GEMINI_CLI_MODEL)
     start_gemini_parser.add_argument("--gemini-loop-model", default=GEMINI_LOOP_MODEL)
+    start_gemini_parser.add_argument("--slots", type=int, default=1)
     start_gemini_parser.set_defaults(func=start_gemini_loop)
 
     stop_parser = subcommands.add_parser("stop")
