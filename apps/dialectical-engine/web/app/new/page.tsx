@@ -3,6 +3,11 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createDebate } from "@/lib/api";
+import {
+  SCRUTINY_DEPTH_OPTIONS,
+  ScrutinyDepth,
+  adaptiveExpansionBudgetsFor
+} from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
@@ -28,6 +33,7 @@ function NewDebateForm({ token }: { token: string }) {
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
+  const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
   const [depth, setDepth] = useState(3);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
@@ -50,6 +56,10 @@ function NewDebateForm({ token }: { token: string }) {
         concurrency,
         max_tokens: maxTokens
       };
+      const scrutinyBudgets = adaptiveExpansionBudgetsFor(scrutiny);
+      if (scrutinyBudgets) {
+        config.adaptive_expansion = scrutinyBudgets;
+      }
       const cleaned = roleOverrides.trim();
       if (cleaned) {
         const parsed = JSON.parse(cleaned) as unknown;
@@ -111,6 +121,30 @@ function NewDebateForm({ token }: { token: string }) {
                     aria-label="Depth mode"
                   >
                     {depthModeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="optionRow">
+                <div>
+                  <label className="optionLabel" htmlFor="scrutinyDepth">
+                    Depth of scrutiny
+                  </label>
+                  <div className="optionHint">
+                    {SCRUTINY_DEPTH_OPTIONS.find((option) => option.value === scrutiny)?.hint}
+                  </div>
+                </div>
+                <div className="optionControl">
+                  <select
+                    id="scrutinyDepth"
+                    value={scrutiny}
+                    onChange={(event) => setScrutiny(event.target.value as ScrutinyDepth)}
+                    aria-label="Depth of scrutiny"
+                  >
+                    {SCRUTINY_DEPTH_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
