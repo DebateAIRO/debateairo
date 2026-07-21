@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -44,6 +46,33 @@ LOGGER = logging.getLogger(__name__)
 
 STREAMING_JOB_STATUSES = {"claimed", "running"}
 ACTIVE_DEBATE_JOB_STATUSES = {"pending", "claimed", "running"}
+
+
+# Stream envelope extraction: workers stream v2 JSON; readers should see prose.
+_STREAM_TITLE_RE = re.compile(r'"title"\s*:\s*"((?:[^"\\]|\\.)*)')
+_STREAM_CONTENT_RE = re.compile(r'"content"\s*:\s*"((?:[^"\\]|\\.)*)')
+
+
+def _unescape_json_fragment(fragment: str) -> str:
+    try:
+        return json.loads(f'"{fragment}"')
+    except ValueError:
+        return fragment.replace('\\"', '"').replace("\\n", "\n")
+
+
+def presentable_stream_text(raw: str) -> str:
+    """Workers stream the v2 JSON envelope; readers should see prose.
+    Extract the fields that have arrived so far instead of showing raw
+    JSON. Plain-text streams pass through untouched."""
+    text = (raw or "").strip()
+    if not text.startswith("{"):
+        return raw or ""
+    parts = []
+    for pattern in (_STREAM_TITLE_RE, _STREAM_CONTENT_RE):
+        match = pattern.search(text)
+        if match and match.group(1):
+            parts.append(_unescape_json_fragment(match.group(1)))
+    return "\n\n".join(parts) or "Drafting…"
 
 
 def iso(dt: datetime | None) -> str | None:
@@ -167,7 +196,7 @@ def streaming_generation_summary(
         "job_id": job.id,
         "model_id": job.required_model,
         "role": job.required_role,
-        "argument": job.stream_buffer or "",
+        "argument": presentable_stream_text(job.stream_buffer or ""),
         "worker_id": job.worker_id or "",
         "worker_name": _worker_name(worker_names_by_id, job.worker_id),
         "created_at": iso(job.claimed_at or job.created_at),
@@ -190,7 +219,7 @@ def active_synthesis_summary(
         "worker_id": job.worker_id or "",
         "worker_name": _worker_name(worker_names_by_id, job.worker_id),
         "created_at": iso(job.claimed_at or job.created_at),
-        "raw": job.stream_buffer or "",
+        "raw": presentable_stream_text(job.stream_buffer or ""),
         "is_streaming": True,
     }
 
