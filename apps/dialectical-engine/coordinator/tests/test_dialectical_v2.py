@@ -1320,3 +1320,85 @@ def test_new_page_starts_orchestration_mode_not_single_shot() -> None:
     # which the single-shot path never does.
     assert "max_depth" in text
     assert "branching" in text
+
+
+def test_completion_tail_survives_scoring_bootstrap_failure(db, monkeypatch) -> None:
+    """Completion resilience: a scoring-bootstrap failure during synthesis
+    persistence must not swallow the synthesis_completed/debate_complete
+    events or the internal scoring trigger.
+
+    Regression: with the judge model absent from the enabled_models routing
+    allowlist, ensure_default_scoring_for_completed_v2_node raised out of
+    persist_v2_synthesis AFTER run_protocol_analysis had already committed --
+    the debate landed complete in the database, but no completion events were
+    published (open SSE tabs stayed on "generating" forever) and the
+    submitting worker got a 400 for a job that had actually succeeded.
+    """
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    for _ in range(4):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, worker_pov_output(worker, job.id, job.required_role), {"latency_ms": 12}))
+    synthesis_job = claim_for_worker(db, worker)
+    assert synthesis_job.job_type == "v2_synthesize"
+
+    def _boom(db, debate, node):
+        raise RuntimeError("scoring bootstrap exploded")
+
+    monkeypatch.setattr(service, "ensure_default_scoring_for_completed_v2_node", _boom)
+    events: list[str] = []
+    monkeypatch.setattr(service, "publish_event", lambda debate_id, event, data: events.append(event))
+    triggered: list[str] = []
+    monkeypatch.setattr(
+        service, "trigger_internal_scoring_after_completion", lambda debate_id: triggered.append(debate_id)
+    )
+
+    asyncio.run(
+        complete_job(
+            db,
+            synthesis_job,
+            worker_non_adjudicating_synthesis(worker, synthesis_job.id),
+            {"latency_ms": 12},
+        )
+    )
+
+    db.expire_all()
+    assert db.get(Debate, debate.id).status == "complete"
+    assert "synthesis_completed" in events
+    assert "debate_complete" in events
+    assert triggered == [debate.id]
+
+
+def test_scoring_job_queueing_ignores_worker_routing_allowlist(db) -> None:
+    """score_debate jobs are internal bookkeeping for in-process judge runs --
+    workers never claim them (claim/reaper/serialization all exclude them), so
+    the enabled_models worker-routing allowlist must not apply. Generation job
+    types keep enforcing the allowlist unchanged.
+
+    Regression: the judge model missing from enabled_models made create_job
+    raise "Model ... is not currently allowed", so judge scoring could never
+    be queued on deployments with a routing allowlist configured.
+    """
+    from app.core.config import RUNTIME_SETTINGS_KEY
+    from app.scoring.service import queue_scoring_job
+    from app.services.orchestrator import create_job
+
+    service = v2_service()
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    # Allowlist deliberately excludes the judge model (mirrors the production
+    # incident where the judge's model id was not an enabled worker model).
+    db.add(entities.Setting(key=RUNTIME_SETTINGS_KEY, value={"enabled_models": ["claude-sonnet-5-high-loop"]}))
+    db.commit()
+
+    job = queue_scoring_job(db, debate, model_id="gpt-5.6sol-medium")
+    assert job.job_type == "score_debate"
+    assert job.required_model == "gpt-5.6sol-medium"
+    assert job.status == "pending"
+
+    # Worker-routed job types still enforce the allowlist.
+    with pytest.raises(ValueError, match="not currently allowed"):
+        create_job(db, debate.id, "v2_pov", "v2_generator", None, required_model="gpt-5.6sol-medium")

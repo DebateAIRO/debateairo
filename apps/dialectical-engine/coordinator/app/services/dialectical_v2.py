@@ -1275,7 +1275,16 @@ def persist_v2_synthesis(
     record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
     scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
     if scoring_node is not None:
-        ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
+        try:
+            ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
+        except Exception as exc:
+            # Best-effort: scoring bootstrap must never fail synthesis
+            # persistence. run_protocol_analysis above has already committed,
+            # so raising here would strand the debate complete-in-database
+            # while skipping the completion events and scoring trigger below
+            # (and hand the submitting worker a 400 for a job that actually
+            # succeeded).
+            print(f"[dialectical_v2] completion scoring bootstrap failed (non-fatal): {exc!r}")
     if adaptive_expansion_enabled():
         try:
             # W4: every completed adaptive debate carries a non-empty

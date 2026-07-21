@@ -221,7 +221,16 @@ def create_job(
     debate = db.get(Debate, debate_id)
     role_configs = routing_roles_for_debate(debate)
     if required_model is not None:
-        if allowed_models is not None and required_model not in allowed_models:
+        # The enabled_models allowlist governs worker routing, and score_debate
+        # jobs are never worker-routed: they are internal bookkeeping for the
+        # in-process judge provider (claim, reaper, and serialization all
+        # exclude them), so the judge model does not need to be an enabled
+        # worker model.
+        if (
+            job_type != "score_debate"
+            and allowed_models is not None
+            and required_model not in allowed_models
+        ):
             raise ValueError(f"Model {required_model} is not currently allowed")
         model = required_model
     else:
