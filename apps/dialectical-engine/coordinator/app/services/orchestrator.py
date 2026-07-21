@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.core.config import RUNTIME_SETTINGS_KEY, int_env, load_settings
+from app.core.config import RUNTIME_SETTINGS_KEY, bool_env, int_env, load_settings
 from app.core.write_lock import commit_write, flush_write
 
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
@@ -50,6 +50,12 @@ V2_POV_ROLES = {
 NODE_DEGRADABLE_JOB_TYPES = {"argue", "v2_pov", "v2_expand"}
 GENERATION_EXHAUSTED_STOPPING_REASON = "generation_exhausted"
 DEFAULT_MAX_JOB_ATTEMPTS = 4
+# Cross-model failover ladder (Task 5): job families whose generation work is
+# tied to a specific model rather than to worker identity, so re-queuing them
+# under a different pool model is meaningful. Bookkeeping job types
+# (decompose, score_debate, ...) are excluded -- swapping their model does
+# not make sense.
+FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesize"}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -900,6 +906,72 @@ def reset_job_target_for_retry(db: Session, job: Job) -> None:
             node.status = "pending"
 
 
+def model_failover_enabled() -> bool:
+    return bool_env("DIALECTICAL_MODEL_FAILOVER", True)
+
+
+def next_failover_model(db: Session, job: Job) -> str | None:
+    from app.services.dialectical_v2 import v2_generation_model_pool
+
+    tried = set((job.payload or {}).get("tried_models") or []) | {job.required_model}
+    online = online_capabilities(db)
+    for model in v2_generation_model_pool(db):
+        if model not in tried and model in online:
+            return model
+    return None
+
+
+def try_failover_job(db: Session, job: Job, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """Re-queue the SAME job under the next untried online pool model with a
+    fresh budget. Terminal failure is reserved for 'every capable model
+    tried' -- one flaky provider must not kill a branch."""
+    if job.job_type not in FAILOVER_JOB_TYPES or not model_failover_enabled():
+        return []
+    candidate = next_failover_model(db, job)
+    if candidate is None:
+        return []
+    payload = dict(job.payload or {})
+    tried = [*(payload.get("tried_models") or [])]
+    if job.required_model not in tried:
+        tried.append(job.required_model)
+    payload["tried_models"] = tried
+    job.payload = payload
+    record_job_transition(
+        db,
+        job,
+        from_status=job.status,
+        to_status="pending",
+        channel="failover",
+        reason=f"{reason}; reassigned from {job.required_model} to {candidate}",
+    )
+    job.required_model = candidate
+    job.status = "pending"
+    job.attempts = 0
+    job.timeout_attempts = 0
+    job.error = reason
+    job.stream_buffer = ""
+    release_job_claim(db, job)
+    # Failover is a decision: the abandoned model's late post must not
+    # re-adopt this job (readopt gates on last_worker_id, not capability).
+    job.last_worker_id = None
+    reset_job_target_for_retry(db, job)
+    job.deadline = make_deadline()
+    return [
+        (
+            job.debate_id,
+            "node_retrying",
+            {
+                "node_id": job.node_id,
+                "job_id": job.id,
+                "job_type": job.job_type,
+                "model_id": candidate,
+                "tried_models": tried,
+                "retry_in_s": 5,
+            },
+        )
+    ]
+
+
 def requeue_active_jobs_for_worker(db: Session, worker: Worker, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
     """Requeue-or-terminalize every job actively held by `worker`.
 
@@ -1538,6 +1610,9 @@ def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> 
     previous_job_status = job.status
     job.timeout_attempts = (job.timeout_attempts or 0) + 1
     if job_attempts_exhausted(job):
+        failover_events = try_failover_job(db, job, f"{reason} (model budget exhausted)")
+        if failover_events:
+            return failover_events
         return terminalize_job_failure(db, job, f"{reason} (retry budget exhausted)")
     record_job_transition(
         db,
@@ -1604,6 +1679,12 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
                     "retry_in_s": 5,
                 },
             )
+        return
+    failover_events = try_failover_job(db, job, job.error or "Job failed")
+    if failover_events:
+        commit_write(db)
+        for debate_id, event, payload in failover_events:
+            await event_bus.publish(debate_id, event, payload)
         return
     events = terminalize_job_failure(db, job, job.error or "Job failed")
     commit_write(db)
