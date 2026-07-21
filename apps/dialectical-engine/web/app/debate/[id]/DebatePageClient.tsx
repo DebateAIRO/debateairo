@@ -629,11 +629,16 @@ export default function DebatePageClient({
       });
       events.addEventListener("debate_complete", () => {
         setSynthesisDraft(null);
+        setError(null);
         refresh();
       });
       events.addEventListener("debate_failed", (event) => {
-        const payload = parseEventData(event);
-        if (payload) setError("Debate generation failed");
+        const payload = parseEventData(event) as { terminal?: boolean } | null;
+        if (payload?.terminal) setError("Debate generation failed");
+      });
+      events.addEventListener("node_retrying", () => {
+        setError(null);
+        refresh();
       });
       events.onerror = () => {
         events?.close();

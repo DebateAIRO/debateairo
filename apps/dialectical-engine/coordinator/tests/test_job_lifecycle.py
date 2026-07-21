@@ -4,6 +4,7 @@ job it holds. The deadline sweep then only fires for genuinely silent
 workers; the hard stuck cap (Task 3) bounds total time per assignment."""
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta, timezone
 
 from app.models.entities import Debate, Job, Node, Worker, now_utc
@@ -311,3 +312,22 @@ def test_readoption_cas_refuses_a_row_a_concurrent_worker_already_claimed(db):
     assert job.status == "running"
     assert job.worker_id == intruder.id  # intruder's claim survives untouched
     assert w.current_job_id is None  # w never got a slot it doesn't hold
+
+
+def test_retryable_v2_failure_publishes_node_retrying_not_debate_failed(db, monkeypatch):
+    from app.services import orchestrator as orch
+    from app.services.orchestrator import claim_pending_job
+
+    published: list[tuple[str, str, dict]] = []
+
+    async def capture(debate_id, event, payload):
+        published.append((debate_id, event, payload))
+
+    monkeypatch.setattr(orch.event_bus, "publish", capture)
+    w = worker(db, "claude-loop", ["claude-sonnet-5-high-loop"])
+    _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    claim_pending_job(db, w)
+    asyncio.run(orch.fail_job(db, job, "CLI crashed once", retryable=True))
+    names = [name for _, name, _ in published]
+    assert "node_retrying" in names
+    assert "debate_failed" not in names

@@ -37,10 +37,14 @@ test("SSE failure handlers render stable public copy without worker payload text
     "Terminal node failures must refresh the degraded tree"
   );
   assert.match(genericFailureHandler, /setError\("Debate generation failed"\)/);
+  // Task 7: a retryable v2 hiccup requeues and republishes debate_failed with
+  // no terminal flag, so the banner must gate on payload.terminal -- never on
+  // payload presence alone -- or a retry-then-succeed run would show a
+  // permanent false failure banner.
   assert.match(
     genericFailureHandler,
-    /events\.addEventListener\("debate_failed", \(event\) => \{\s*const payload = parseEventData\(event\);\s*if \(payload\) setError\("Debate generation failed"\);\s*\}\);/,
-    "Only server-sent error payloads should display generation-failure copy"
+    /events\.addEventListener\("debate_failed", \(event\) => \{\s*const payload = parseEventData\(event\)[^;]*;\s*if \(payload\?\.terminal\) setError\("Debate generation failed"\);\s*\}\);/,
+    "Only a TERMINAL server-sent failure payload should display generation-failure copy"
   );
   assert.doesNotMatch(
     debatePageSource,

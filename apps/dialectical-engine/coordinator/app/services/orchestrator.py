@@ -1594,6 +1594,7 @@ def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[st
                 "code": PUBLIC_DEBATE_FAILURE_CODE,
                 "message": PUBLIC_DEBATE_FAILURE_MESSAGE,
                 "retry_in_s": 5,
+                "terminal": True,
             },
         )
     )
@@ -1671,11 +1672,12 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
         else:
             await event_bus.publish(
                 job.debate_id,
-                "debate_failed",
+                "node_retrying",
                 {
-                    "scope": job.job_type,
-                    "code": PUBLIC_DEBATE_FAILURE_CODE,
-                    "message": PUBLIC_DEBATE_FAILURE_MESSAGE,
+                    "node_id": job.node_id,
+                    "job_id": job.id,
+                    "job_type": job.job_type,
+                    "model_id": job.required_model,
                     "retry_in_s": 5,
                 },
             )

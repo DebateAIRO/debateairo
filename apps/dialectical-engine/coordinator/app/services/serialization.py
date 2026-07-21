@@ -574,6 +574,20 @@ def _completion_reason_code(state: str, nodes: list[Node], debate: Debate) -> st
     return stopped_because_of(debate)
 
 
+# Debate-level completion copy overrides (Task 7): a handful of reason codes
+# read differently at the debate-completion scope than at the per-node scope
+# reached via `stopping_reason_human` (see node_to_dict). "generation_exhausted"
+# at the node level says a single branch was set aside; at the debate level --
+# where synthesis still completed over the survivors -- the honest framing is
+# that the debate as a whole succeeded despite the pruning, so a retryable
+# hiccup on one branch never reads as a dead debate.
+_COMPLETION_REASON_OVERRIDES: dict[str, str] = {
+    "generation_exhausted": (
+        "Some branches were set aside after repeated failures; the debate completed with the rest."
+    ),
+}
+
+
 def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) -> dict[str, Any]:
     """Additive `completion` block: why the debate stopped, in plain language.
 
@@ -583,16 +597,18 @@ def _completion_block(debate: Debate, effective_status: str, nodes: list[Node]) 
     reasonCode: the terminal branch's real stopping reason, the honest
     generic debate-failure bucket, or the adaptive dispatcher's
     stopped_because (W4) -- never raw private worker text.
-    humanReason: reasonCode translated via the shared reason-code map.
-    Failed debates always carry a non-empty humanReason (reasonCode is never
-    None when state == "failed").
+    humanReason: reasonCode translated via the debate-completion overrides
+    (_COMPLETION_REASON_OVERRIDES) first, falling back to the shared
+    reason-code map for everything else. Failed debates always carry a
+    non-empty humanReason (reasonCode is never None when state == "failed").
     """
     state = _completion_state(effective_status, nodes)
     reason_code = _completion_reason_code(state, nodes, debate)
+    human_reason = _COMPLETION_REASON_OVERRIDES.get(reason_code or "") or _humanize_reason(reason_code)
     return {
         "state": state,
         "reasonCode": reason_code,
-        "humanReason": _humanize_reason(reason_code),
+        "humanReason": human_reason,
     }
 
 

@@ -3093,6 +3093,10 @@ def test_generic_failure_event_omits_private_worker_reason(db) -> None:
         "code": "debate_generation_failed",
         "message": "Debate generation failed",
         "retry_in_s": 5,
+        # Task 7: every debate_failed event is now terminal (a retryable v2
+        # hiccup publishes node_retrying instead), so the frontend banner can
+        # trust payload.terminal without risking a permanent false failure.
+        "terminal": True,
     }
     assert private_reason not in event
     assert job.error == private_reason
