@@ -8,6 +8,9 @@ agents:
   judge:
     model: gpt-5.6sol-medium
     temperature: 0.0
+  perspective_planner:
+    model: gpt-5.6sol-medium
+    temperature: 0.0
   specialist: {}
   methodologist: {}
   skeptic: {}

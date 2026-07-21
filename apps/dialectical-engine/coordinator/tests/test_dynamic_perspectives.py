@@ -102,8 +102,9 @@ def test_production_default_enables_dynamic_perspectives(db, monkeypatch) -> Non
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
     roles = [job.required_role for job in pov_jobs(db, debate)]
 
-    # A normative topic yields the normative lens set, NOT the legacy quartet.
-    assert roles == ["Ethical POV", "Stakeholder POV", "Rights POV", "Consequence POV"]
+    # A normative topic yields the normative lens set composed with the missing
+    # generalist anchor (Practical POV), NOT the legacy quartet.
+    assert roles == ["Ethical POV", "Stakeholder POV", "Rights POV", "Consequence POV", "Practical POV"]
 
 
 # ---------------------------------------------------------------------------
@@ -111,24 +112,24 @@ def test_production_default_enables_dynamic_perspectives(db, monkeypatch) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_dynamic_causal_topic_yields_three_perspectives(db, monkeypatch) -> None:
+def test_dynamic_causal_topic_yields_specialized_plus_anchor_perspectives(db, monkeypatch) -> None:
     monkeypatch.setenv(FLAG, "true")
     codex_worker(db)
 
     debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
     roles = [job.required_role for job in pov_jobs(db, debate)]
 
-    assert roles == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+    assert roles == ["Mechanism POV", "Confounding POV", "Evidence POV", "Ethical POV", "Practical POV"]
 
 
-def test_dynamic_comparative_topic_yields_two_perspectives(db, monkeypatch) -> None:
+def test_dynamic_comparative_topic_yields_family_plus_anchor_perspectives(db, monkeypatch) -> None:
     monkeypatch.setenv(FLAG, "true")
     codex_worker(db)
 
     debate = service.create_dialectical_debate(db, "Is nuclear power safer than coal?", {})
     roles = [job.required_role for job in pov_jobs(db, debate)]
 
-    assert roles == ["Baseline POV", "Measurement POV"]
+    assert roles == ["Baseline POV", "Measurement POV", "Ethical POV", "Practical POV"]
     assert len(roles) >= 2  # honesty floor: at least two perspectives
 
 
@@ -176,7 +177,13 @@ def test_dynamic_perspectives_helper_is_deterministic() -> None:
     a = dynamic_perspectives("Does social media use cause depression?")
     b = dynamic_perspectives("Does social media use cause depression?")
     assert a == b
-    assert [nt for nt, _label, _lens in a] == ["SCIENTIFIC_POV", "STATISTICAL_POV", "ETHICAL_POV"]
+    assert [nt for nt, _label, _lens in a] == [
+        "SCIENTIFIC_POV",
+        "STATISTICAL_POV",
+        "ETHICAL_POV",
+        "PRACTICAL_POV",
+        "SCIENTIFIC_POV",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +202,13 @@ def test_dynamic_creation_persists_the_perspective_derivation(db, monkeypatch) -
     stored = debate.config.get("perspective_derivation")
     assert stored is not None
     assert stored["claim_type"] == "causal"
-    assert stored["lens_set"] == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+    assert stored["lens_set"] == [
+        "Mechanism POV",
+        "Confounding POV",
+        "Evidence POV",
+        "Ethical POV",
+        "Practical POV",
+    ]
     assert stored["markers"]  # a causal topic must match at least one marker
 
 
@@ -210,7 +223,13 @@ def test_derivation_serializes_and_matches_rendered_branches(db, monkeypatch) ->
     assert derivation["claimType"] == "causal"
     assert isinstance(derivation["markers"], list) and derivation["markers"]
     branch_labels = [child["claim"] for child in payload["tree"]["children"]]
-    assert derivation["lensSet"] == branch_labels == ["Mechanism POV", "Confounding POV", "Evidence POV"]
+    assert derivation["lensSet"] == branch_labels == [
+        "Mechanism POV",
+        "Confounding POV",
+        "Evidence POV",
+        "Ethical POV",
+        "Practical POV",
+    ]
 
 
 def test_flag_off_creation_serves_no_derivation_key(db, monkeypatch) -> None:
@@ -326,12 +345,12 @@ def test_synthesis_gate_counts_all_n_perspectives(db, n: int) -> None:
     assert pending_branch_containers(db, debate.id, debate.root_node_id) == []
 
 
-def test_dynamic_three_perspective_debate_queues_synthesis_only_after_all_complete(db, monkeypatch) -> None:
+def test_dynamic_five_perspective_debate_queues_synthesis_only_after_all_complete(db, monkeypatch) -> None:
     monkeypatch.setenv(FLAG, "true")
     worker = codex_worker(db)
 
     debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
-    assert len(pov_jobs(db, debate)) == 3
+    assert len(pov_jobs(db, debate)) == 5
 
     def synthesis_queued() -> bool:
         return db.scalar(
@@ -348,8 +367,8 @@ def test_dynamic_three_perspective_debate_queues_synthesis_only_after_all_comple
         asyncio.run(complete_job(db, job, generic_pov_output(worker, job.id, job.required_role), {"latency_ms": 5}))
         completed += 1
 
-    assert completed == 3
-    assert synthesis_queued()  # queued exactly once all 3 perspectives finished
+    assert completed == 5
+    assert synthesis_queued()  # queued exactly once all 5 perspectives finished
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +393,8 @@ def test_node_payload_emits_dynamic_label_for_cycled_node_types(db, monkeypatch)
         "Mechanism POV",
         "Confounding POV",
         "Evidence POV",
+        "Ethical POV",
+        "Practical POV",
     ]
     # The wrong-name scenario from the web lane: cycled node_type must NOT win.
     first = children[0]
@@ -411,10 +432,14 @@ def test_node_payload_label_null_when_claim_matches_legacy_pairing(db, monkeypat
         "Scientific POV",
         "Statistical POV",
         "Data-quality POV",
+        "Ethical POV",
+        "Practical POV",
     ]
     assert children[0]["label"] is None  # SCIENTIFIC_POV + "Scientific POV" = legacy pairing
     assert children[1]["label"] is None  # STATISTICAL_POV + "Statistical POV" = legacy pairing
     assert children[2]["label"] == "Data-quality POV"  # ETHICAL_POV + dynamic name
+    assert children[3]["label"] == "Ethical POV"  # PRACTICAL_POV + cycled anchor name
+    assert children[4]["label"] == "Practical POV"  # SCIENTIFIC_POV + cycled anchor name
 
 
 def test_node_payload_label_null_for_legacy_quartet_and_non_pov_nodes(db, monkeypatch) -> None:
@@ -462,7 +487,7 @@ def test_regenerated_dynamic_pov_keeps_lens_identity_through_materialization(db,
     worker = codex_worker(db)
 
     debate = service.create_dialectical_debate(db, "Does social media use cause depression?", {})
-    assert _complete_all_pending_pov_jobs(db, worker, debate) == 3
+    assert _complete_all_pending_pov_jobs(db, worker, debate) == 5
     mechanism = db.scalar(
         select(Node).where(
             Node.debate_id == debate.id, Node.parent_id == debate.root_node_id, Node.position == 0

@@ -802,4 +802,8 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
             "markers": list(perspective_derivation.get("markers") or []),
             "lensSet": list(perspective_derivation.get("lens_set") or []),
         }
+        # Additive: how the lens set was chosen ("llm" | "markers" |
+        # "fallback"). Absent for debates created before the LLM planner.
+        if perspective_derivation.get("source"):
+            payload["derivation"]["source"] = perspective_derivation["source"]
     return payload

@@ -13,6 +13,10 @@ os.environ["DIALECTICAL_USER_TOKEN"] = "user_test_token"
 # call). setdefault (not a hard set) so a test can still opt into the dynamic
 # path via monkeypatch.setenv, and delenv to exercise the production default.
 os.environ.setdefault("DIALECTICAL_DYNAMIC_PERSPECTIVES", "false")
+# Same discipline for the LLM perspective planner (production default TRUE):
+# tests stay deterministic and provider-free; LLM-path tests opt in with a
+# fake planner registry (see tests/test_llm_perspectives.py).
+os.environ.setdefault("DIALECTICAL_LLM_PERSPECTIVES", "false")
 
 import pytest
 

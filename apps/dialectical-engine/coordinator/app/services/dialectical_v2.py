@@ -29,7 +29,7 @@ from app.models.entities import (
     next_analyzer_run_seq,
     now_utc,
 )
-from app.core.config import bool_env
+from app.core.config import bool_env, int_env, load_settings
 from app.evidence.extraction import persist_evidence_nodes
 from app.exploration.expansion_dispatch import (
     STOPPED_QUIESCENT_NO_DECISIONS,
@@ -46,6 +46,7 @@ from app.services.orchestrator import (
     create_generation,
     create_job,
     debate_uses_v2_pipeline,
+    extract_jsonish,
     merged_debate_config,
     routing_allowed_models,
     sanitize_text,
@@ -168,24 +169,62 @@ DYNAMIC_LENS_DESCRIPTIONS: dict[str, str] = {
     for label, lens in perspectives
 }
 
+# Generalist anchors composed into every classified lens set: a type-specific
+# family EXTENDS the generalist coverage instead of replacing it, so a causal
+# debate still gets ethical/practical scrutiny alongside mechanism-level
+# skepticism. The "unknown" fallback quartet already carries both anchors.
+_ANCHOR_PERSPECTIVES: tuple[tuple[str, str], ...] = (
+    ("Ethical POV", POV_LENS_DESCRIPTIONS["Ethical POV"]),
+    ("Practical POV", POV_LENS_DESCRIPTIONS["Practical POV"]),
+)
+
+
+def max_perspectives() -> int:
+    """Perspective budget for one debate (DIALECTICAL_MAX_PERSPECTIVES).
+
+    A soft cap, not a target: the rule-based composition and the LLM planner
+    may both select fewer lenses; neither may exceed it. Floor of 2 keeps the
+    honesty invariant that a debate always has at least two perspectives.
+    """
+    return int_env("DIALECTICAL_MAX_PERSPECTIVES", 7, 2, 16)
+
+
+def _attach_pov_node_types(labelled: list[tuple[str, str]]) -> list[tuple[str, str, str]]:
+    """Assign legacy POV node_types to (label, lens) pairs by cycling
+    POV_BRANCHES -- see the dynamic-perspectives design note above for why
+    node_types must stay in the legacy vocabulary."""
+    pov_types = [node_type for node_type, _label in POV_BRANCHES]
+    return [
+        (pov_types[index % len(pov_types)], label, lens)
+        for index, (label, lens) in enumerate(labelled)
+    ]
+
 
 def _classify_and_select_perspectives(topic: str) -> tuple[str, list[str], list[tuple[str, str, str]]]:
-    """Single source of truth for the dynamic-perspective derivation.
+    """Single source of truth for the rule-based perspective derivation.
 
     Returns (claim_type, matched_markers, [(node_type, label, lens), ...]).
     Computing the classification exactly once here -- instead of separately
     inside `dynamic_perspectives` -- lets `create_dialectical_debate` (W5a)
     persist the SAME derivation that produced the debate's lens set, rather
     than discarding it and risking drift from a second classification call.
+
+    A classified family is COMPOSED with the missing generalist anchors
+    (specialized lenses first, anchors appended), capped by max_perspectives().
     """
     claim_type, markers = classify_claim_type(topic)
-    labelled = _CLAIM_TYPE_PERSPECTIVES.get(claim_type, _FALLBACK_PERSPECTIVES)
-    pov_types = [node_type for node_type, _label in POV_BRANCHES]
-    perspectives = [
-        (pov_types[index % len(pov_types)], label, lens)
-        for index, (label, lens) in enumerate(labelled)
-    ]
-    return claim_type, markers, perspectives
+    labelled = _CLAIM_TYPE_PERSPECTIVES.get(claim_type)
+    if labelled is None:
+        composed = list(_FALLBACK_PERSPECTIVES)
+    else:
+        composed = list(labelled)
+        present = {label.casefold() for label, _lens in composed}
+        composed.extend(
+            (label, lens)
+            for label, lens in _ANCHOR_PERSPECTIVES
+            if label.casefold() not in present
+        )
+    return claim_type, markers, _attach_pov_node_types(composed[: max_perspectives()])
 
 
 def dynamic_perspectives(topic: str) -> list[tuple[str, str, str]]:
@@ -199,6 +238,109 @@ def dynamic_perspectives(topic: str) -> list[tuple[str, str, str]]:
     """
     _claim_type, _markers, perspectives = _classify_and_select_perspectives(topic)
     return perspectives
+
+
+# ---------------------------------------------------------------------------
+# LLM perspective planning (DIALECTICAL_LLM_PERSPECTIVES, default ON)
+# ---------------------------------------------------------------------------
+# The rule-based classifier only sees surface markers, so question-phrased
+# topics ("how can we ...") routinely land on the generalist fallback. The
+# planner asks the configured perspective_planner agent to pick the most
+# incisive lens set for THIS topic, seeded with the rule-based candidates.
+# Strictly best-effort: any failure (role unconfigured, provider error,
+# timeout, invalid JSON, too few valid lenses) returns None and creation
+# proceeds on the rule-based composition -- debate creation must never fail
+# or wedge because of the planner.
+
+PERSPECTIVE_PLANNER_ROLE = "perspective_planner"
+
+
+def _planner_registry() -> ProviderRegistry:
+    from app.providers.codex_cli import CodexCliProvider
+
+    settings = load_settings()
+    # Creation is a synchronous API call; bound the planner well below the
+    # provider's 120s default so a slow CLI degrades to the rule-based set
+    # instead of hanging the request.
+    timeout = int_env("DIALECTICAL_PERSPECTIVE_PLANNER_TIMEOUT_S", 45, 5, 120)
+    return ProviderRegistry(
+        providers={"codex": CodexCliProvider(executable=settings.codex_command, timeout_seconds=timeout)}
+    )
+
+
+def plan_perspectives_with_llm(
+    topic: str, candidates: list[tuple[str, str]]
+) -> tuple[str | None, list[tuple[str, str]]] | None:
+    """Ask the perspective_planner agent for the lens set best suited to `topic`.
+
+    Returns (claim_type_or_None, [(label, lens), ...]) on success, None on any
+    failure. Labels are sanitized to fit Job.required_role String(32); the
+    result is deduplicated and capped by max_perspectives(); fewer than two
+    valid lenses counts as failure so the honesty floor stays with the
+    rule-based path.
+    """
+    try:
+        registry = _planner_registry()
+        if PERSPECTIVE_PLANNER_ROLE not in registry.agents:
+            return None
+        cap = max_perspectives()
+        candidate_lines = "\n".join(f'- "{label}": {lens}' for label, lens in candidates)
+        prompt = (
+            "You select the debate perspectives (lenses) for a dialectical engine that "
+            "argues a question from several independent points of view.\n\n"
+            f"Question: {topic}\n\n"
+            "Rule-based candidate lenses (safe fallback, replace freely):\n"
+            f"{candidate_lines}\n\n"
+            f"Choose between 3 and {cap} perspectives giving the most incisive "
+            "multi-angle examination of THIS question -- quality over quantity; "
+            "only include a lens when it attacks a genuine weak point of the "
+            "question (causal mechanism, base rates, verification, incentives, "
+            "rights, feasibility, second-order effects, ...).\n"
+            "Requirements:\n"
+            "- Always keep ethical and practical coverage: either the generic "
+            '"Ethical POV"/"Practical POV" or sharper topic-specific equivalents.\n'
+            '- Each label: at most 26 characters, ending in " POV", unique.\n'
+            '- Each lens: one imperative sentence starting with "Evaluate".\n'
+            "- Order lenses from most to least incisive.\n\n"
+            "Return exactly one strict JSON object of the shape "
+            '{"claim_type": "causal|prediction|comparative|normative|definitional|empirical|mixed|unknown", '
+            '"perspectives": [{"label": "...", "lens": "...", "why": "..."}]} '
+            "with no commentary."
+        )
+        response = registry.generate_for_role(
+            PERSPECTIVE_PLANNER_ROLE,
+            [{"role": "user", "content": prompt}],
+            response_format="json",
+        )
+        payload = extract_jsonish(response.text)
+        raw_perspectives = payload.get("perspectives")
+        if not isinstance(raw_perspectives, list):
+            return None
+        seen: set[str] = set()
+        lenses: list[tuple[str, str]] = []
+        for entry in raw_perspectives:
+            if not isinstance(entry, dict):
+                continue
+            label = sanitize_text(str(entry.get("label") or ""), 32)
+            lens = sanitize_text(str(entry.get("lens") or ""), 600)
+            if not label or not lens or label.casefold() in seen:
+                continue
+            seen.add(label.casefold())
+            lenses.append((label, lens))
+            if len(lenses) >= cap:
+                break
+        if len(lenses) < 2:
+            return None
+        raw_claim_type = payload.get("claim_type")
+        claim_type = (
+            raw_claim_type.strip() if isinstance(raw_claim_type, str) and raw_claim_type.strip() else None
+        )
+        return claim_type, lenses
+    except Exception as exc:
+        LOGGER.warning(
+            "perspective planner unavailable, falling back to rule-based lenses: %r", exc
+        )
+        return None
 
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -1372,9 +1514,18 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             raise ValueError("POV job must target a POV node")
         pov_node = db.get(Node, job.node_id)
         pov_label = pov_node.claim if pov_node else job.required_role
-        # Legacy POV labels resolve from POV_LENS_DESCRIPTIONS (byte-identical
-        # render); dynamic-perspective labels fall back to the dynamic lens map.
-        lens_description = POV_LENS_DESCRIPTIONS.get(pov_label) or DYNAMIC_LENS_DESCRIPTIONS.get(pov_label, "")
+        # The debate-persisted lens map wins (it is the only source that knows
+        # LLM-authored lenses, and for rule-derived labels it is byte-identical
+        # to the static maps); legacy POV labels then resolve from
+        # POV_LENS_DESCRIPTIONS, dynamic labels from the dynamic lens map.
+        derivation = debate.config.get("perspective_derivation") if isinstance(debate.config, dict) else None
+        persisted_lenses = derivation.get("lenses") if isinstance(derivation, dict) else None
+        persisted_lens = persisted_lenses.get(pov_label) if isinstance(persisted_lenses, dict) else None
+        lens_description = (
+            persisted_lens
+            or POV_LENS_DESCRIPTIONS.get(pov_label)
+            or DYNAMIC_LENS_DESCRIPTIONS.get(pov_label, "")
+        )
         pov_context = {
             **base_context,
             "pov": pov_label,
@@ -1839,6 +1990,17 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     # Node + v2_pov job mechanics are shared.
     if bool_env("DIALECTICAL_DYNAMIC_PERSPECTIVES", True):
         claim_type, markers, selected = _classify_and_select_perspectives(topic)
+        source = "markers" if claim_type != "unknown" else "fallback"
+        if bool_env("DIALECTICAL_LLM_PERSPECTIVES", True):
+            planned = plan_perspectives_with_llm(
+                topic, candidates=[(label, lens) for _node_type, label, lens in selected]
+            )
+            if planned is not None:
+                planned_claim_type, labelled = planned
+                selected = _attach_pov_node_types(labelled)
+                source = "llm"
+                if planned_claim_type:
+                    claim_type = planned_claim_type
         perspectives = [(node_type, label) for node_type, label, _lens in selected]
         # W5a: persist the derivation that produced this debate's lens set
         # (additive; NEW debates only -- see serialization.debate_to_dict's
@@ -1847,12 +2009,17 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
         # in-place update would not be tracked as dirty by the ORM (matches
         # the existing debate.config write pattern used elsewhere, e.g.
         # app.exploration.expansion_dispatch._write_adaptive_expansion_state).
+        # `lenses` is load-bearing for LLM-planned debates: render_v2_job_prompt
+        # resolves an LLM-authored label's lens text from here, since no static
+        # map can know it.
         debate.config = {
             **debate.config,
             "perspective_derivation": {
                 "claim_type": claim_type,
                 "markers": list(markers),
                 "lens_set": [label for _node_type, label, _lens in selected],
+                "source": source,
+                "lenses": {label: lens for _node_type, label, lens in selected},
             },
         }
     else:
