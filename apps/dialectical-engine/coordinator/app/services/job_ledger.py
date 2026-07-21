@@ -21,6 +21,8 @@ Channel vocabulary (also the log event suffix):
     worker_fail      fail_job's retryable requeue (-> pending)
     timeout_requeue  requeue_or_terminalize_timed_out_job's requeue branch
                      (deadline reaper / worker re-register / orphan release)
+    readopt          readopt_job_claim's late-completion rescue (pending ->
+                     running, free of attempt budget, most recent claimant only)
     terminalize      terminalize_job_failure (terminal failed, any channel)
     cancel           cancel_active_jobs_for_nodes / cancel_active_synthesis_jobs
     archive          archive_debate's job cancellation
