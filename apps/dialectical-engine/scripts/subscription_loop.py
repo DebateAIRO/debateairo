@@ -56,9 +56,49 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def parse_model_response(job: dict[str, Any], text: str) -> Any:
-    if job["job_type"] in {"decompose", "synthesize"}:
+    if job["job_type"] in {
+        "decompose",
+        "synthesize",
+        "v2_skill_create",
+        "v2_agent_create",
+        "v2_agent_argument",
+        "v2_plan",
+        "v2_pov",
+        "v2_expand",
+        "v2_agent_run",
+        "v2_synthesize",
+    }:
         return extract_json_object(text)
     return {"argument": text.strip()}
+
+
+def enrich_v2_result(job: dict[str, Any], result: Any, worker_id: str | None) -> Any:
+    if not isinstance(result, dict):
+        return result
+    job_type = str(job.get("job_type") or "")
+    if not job_type.startswith("v2_"):
+        return result
+    enriched = dict(result)
+    job_id = str(job.get("id") or "")
+    model_id = str(job.get("required_model") or "")
+    worker = str(worker_id or "")
+    if job_type in {"v2_skill_create", "v2_agent_create"}:
+        enriched["provenance"] = {
+            **(enriched.get("provenance") if isinstance(enriched.get("provenance"), dict) else {}),
+            "created_by_model": model_id,
+            "created_by_worker_id": worker,
+            "creation_prompt_id": f"prompt-{job_id}",
+            "job_id": job_id,
+        }
+    else:
+        enriched["provenance"] = {
+            **(enriched.get("provenance") if isinstance(enriched.get("provenance"), dict) else {}),
+            "model_id": model_id,
+            "worker_id": worker,
+            "prompt_id": f"prompt-{job_id}",
+            "job_id": job_id,
+        }
+    return enriched
 
 
 def estimate_tokens(*parts: str) -> int:
@@ -365,6 +405,7 @@ async def complete_from_job_file(args: argparse.Namespace) -> int:
     try:
         await client.stream_chunks(job["id"], text_chunks(response_text))
         result = parse_model_response(job, response_text)
+        result = enrich_v2_result(job, result, getattr(config, "worker_id", None))
         summary = await client.complete(
             job["id"],
             result,
