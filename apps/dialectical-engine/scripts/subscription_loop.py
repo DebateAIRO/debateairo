@@ -367,6 +367,47 @@ def write_job_file(
     return job_file, response_file
 
 
+async def run_cli_with_liveness(
+    config: Any,
+    command: list[str],
+    *,
+    capabilities: list[str],
+    timeout_seconds: int,
+    env: dict[str, str] | None = None,
+    heartbeat_seconds: float = 30.0,
+) -> subprocess.CompletedProcess:
+    """Run the model CLI while proving liveness to the coordinator. The CLI
+    thinks silently for minutes; without heartbeats the job lease expires
+    mid-run and the claim is torn away (the doom-loop that killed 4 of 7
+    branches in debate 90bad9c5)."""
+    CoordinatorClient, _, _, _ = worker_runtime()
+    client = CoordinatorClient(config)
+    stop = asyncio.Event()
+
+    async def beat() -> None:
+        while not stop.is_set():
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=heartbeat_seconds)
+            except asyncio.TimeoutError:
+                try:
+                    await client.heartbeat(capabilities)
+                except Exception as exc:  # noqa: BLE001 - CLI run must survive
+                    print(f"[loop] heartbeat failed (non-fatal): {exc!r}", flush=True)
+
+    heartbeat_task = asyncio.create_task(beat())
+    run_kwargs: dict[str, Any] = dict(
+        cwd=ROOT, text=True, capture_output=True, timeout=timeout_seconds, check=False
+    )
+    if env:
+        run_kwargs["env"] = {**os.environ, **env}
+    try:
+        return await asyncio.to_thread(subprocess.run, command, **run_kwargs)
+    finally:
+        stop.set()
+        await heartbeat_task
+        await client.aclose()
+
+
 async def next_for_claude(args: argparse.Namespace) -> int:
     config_path = Path(args.config).expanduser()
     config = await ensure_loop_worker(
@@ -492,13 +533,11 @@ async def claude_once(args: argparse.Namespace) -> int:
         state_dir=Path(args.state_dir),
     )
     command = build_claude_command(args.claude_model, render_model_prompt(job))
-    process = subprocess.run(
+    process = await run_cli_with_liveness(
+        config,
         command,
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        timeout=args.timeout_seconds,
-        check=False,
+        capabilities=[args.advertised_model],
+        timeout_seconds=args.timeout_seconds,
     )
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"claude exited {process.returncode}").strip()
@@ -530,14 +569,12 @@ async def gemini_once(args: argparse.Namespace) -> int:
         state_dir=Path(args.state_dir),
     )
     command, extra_env = build_gemini_command(args.gemini_model, render_model_prompt(job))
-    process = subprocess.run(
+    process = await run_cli_with_liveness(
+        config,
         command,
-        cwd=ROOT,
-        env={**os.environ, **extra_env},
-        text=True,
-        capture_output=True,
-        timeout=args.timeout_seconds,
-        check=False,
+        capabilities=[args.advertised_model],
+        timeout_seconds=args.timeout_seconds,
+        env=extra_env,
     )
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"gemini exited {process.returncode}").strip()
@@ -568,13 +605,11 @@ async def grok_once(args: argparse.Namespace) -> int:
         job=job,
         state_dir=Path(args.state_dir),
     )
-    process = subprocess.run(
+    process = await run_cli_with_liveness(
+        config,
         build_grok_command(args.grok_model, render_model_prompt(job)),
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        timeout=args.timeout_seconds,
-        check=False,
+        capabilities=[args.advertised_model],
+        timeout_seconds=args.timeout_seconds,
     )
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"grok exited {process.returncode}").strip()

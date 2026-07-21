@@ -181,3 +181,38 @@ def test_claude_skill_invokes_dezbatere_loop_helper() -> None:
     assert "scripts/dezbatere_loop_helper.sh next --provider claude" in skill
     assert "scripts/dezbatere_loop_helper.sh complete --job-file" in skill
     assert "do not run any command except" in skill.lower()
+
+
+def test_run_cli_with_liveness_heartbeats_during_the_run(monkeypatch):
+    import asyncio
+
+    loop_module = load_module()  # reuse this file's existing loader helper
+
+    beats: list[list[str]] = []
+
+    class FakeClient:
+        def __init__(self, config):
+            pass
+
+        async def heartbeat(self, capabilities, status="online"):
+            beats.append(list(capabilities))
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(
+        loop_module,
+        "worker_runtime",
+        lambda: (FakeClient, None, lambda path: object(), None),
+    )
+    process = asyncio.run(
+        loop_module.run_cli_with_liveness(
+            config=object(),
+            command=["sleep", "1"],
+            capabilities=["claude-sonnet-5-high-loop"],
+            timeout_seconds=10,
+            heartbeat_seconds=0.2,
+        )
+    )
+    assert process.returncode == 0
+    assert len(beats) >= 2, "CLI ran ~1s with 0.2s cadence; expected multiple heartbeats"
