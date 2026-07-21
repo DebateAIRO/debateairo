@@ -35,8 +35,8 @@ REQUIRED_CLOUDFLARED_CREDENTIAL_KEYS = ("AccountTag", "TunnelID", "TunnelSecret"
 GROK_PROMPT_FLAG_PATTERN = re.compile(r"(?<!\S)(?:-p|--prompt)(?:[=\s,]|$)")
 ADAPTER_API_ENV_VARS = ("GEMINI_API_KEY", "XAI_API_KEY")
 API_KEY_MODEL_REQUIREMENTS = {
-    "gemini-2.5-flash": "GEMINI_API_KEY",
-    "grok-4.5": "XAI_API_KEY",
+    "gemini-3.5-flash-loop": "GEMINI_API_KEY",
+    "grok-4.5-high-loop": "XAI_API_KEY",
 }
 INSTALLED_AGENT_SPECS = {
     "coordinator": {

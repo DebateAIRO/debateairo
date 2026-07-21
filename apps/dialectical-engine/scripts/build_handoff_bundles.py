@@ -173,8 +173,8 @@ def worker_register_script(public_url: str, worker_name: str) -> str:
                         ;;
                 esac
                 case "$capability" in
-                    gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
+                    gemini-3.5-flash-loop) NEEDS_GEMINI_API_KEY=1 ;;
+                    grok-4.5-high-loop) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_ALLOWED_MODELS="${{SEEN_ALLOWED_MODELS}}$capability,"
                 ;;
@@ -201,11 +201,11 @@ def worker_register_script(public_url: str, worker_name: str) -> str:
             ;;
     esac
     if [ "$NEEDS_GEMINI_API_KEY" = "1" ] && [ -z "$GEMINI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" >&2
+        echo "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop" >&2
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
+        echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop" >&2
         exit 2
     fi
 
@@ -304,8 +304,8 @@ def worker_real_models_script(public_url: str, worker_name: str) -> str:
                         ;;
                 esac
                 case "$capability" in
-                    gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
+                    gemini-3.5-flash-loop) NEEDS_GEMINI_API_KEY=1 ;;
+                    grok-4.5-high-loop) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_REQUIRED_CAPABILITIES="${{SEEN_REQUIRED_CAPABILITIES}}$capability,"
                 REQUIRED_CAPABILITY_COUNT=$((REQUIRED_CAPABILITY_COUNT + 1))
@@ -335,11 +335,11 @@ def worker_real_models_script(public_url: str, worker_name: str) -> str:
             ;;
     esac
     if [ "$NEEDS_GEMINI_API_KEY" = "1" ] && [ -z "$GEMINI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" >&2
+        echo "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop" >&2
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
+        echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop" >&2
         exit 2
     fi
 
@@ -1648,8 +1648,8 @@ def worker_readme(public_url: str, worker_name: str) -> str:
       configured. Pass `ALLOWED_MODELS=` to clear the pin and advertise all
       detected healthy adapters.
     - `GEMINI_API_KEY`: optional Google AI Studio API key. When set,
-      `gemini-2.5-flash` is available through the Gemini API path, which takes
-      precedence over Gemini CLI detection for the same model.
+      `gemini-3.5-flash-loop` is available through the Gemini API path, which
+      takes precedence over Gemini CLI detection for the same model.
     - `XAI_API_KEY`: optional xAI API key for the Grok API fallback.
 
     The bundle includes the token-free endpoint verifier used by these helper
@@ -2273,8 +2273,8 @@ def worker_a_real_models_script(public_url: str) -> str:
                         ;;
                 esac
                 case "$capability" in
-                    gemini-2.5-flash) NEEDS_GEMINI_API_KEY=1 ;;
-                    grok-4.5) NEEDS_XAI_API_KEY=1 ;;
+                    gemini-3.5-flash-loop) NEEDS_GEMINI_API_KEY=1 ;;
+                    grok-4.5-high-loop) NEEDS_XAI_API_KEY=1 ;;
                 esac
                 SEEN_REQUIRED_CAPABILITIES="${{SEEN_REQUIRED_CAPABILITIES}}$capability,"
                 REQUIRED_CAPABILITY_COUNT=$((REQUIRED_CAPABILITY_COUNT + 1))
@@ -2304,11 +2304,11 @@ def worker_a_real_models_script(public_url: str) -> str:
             ;;
     esac
     if [ "$NEEDS_GEMINI_API_KEY" = "1" ] && [ -z "$GEMINI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash" >&2
+        echo "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop" >&2
         exit 2
     fi
     if [ "$NEEDS_XAI_API_KEY" = "1" ] && [ -z "$XAI_API_KEY_FOR_INSTALL" ]; then
-        echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5" >&2
+        echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop" >&2
         exit 2
     fi
 

@@ -175,7 +175,7 @@ def test_classic_argue_completion_queues_default_scoring_state(db) -> None:
     assert len(scoring_jobs) == 1
     assert scoring_jobs[0].status == "pending"
     assert scoring_jobs[0].required_role == "judge"
-    assert scoring_jobs[0].required_model == "gpt-5.6-sol"
+    assert scoring_jobs[0].required_model == "gpt-5.6sol-medium"
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 

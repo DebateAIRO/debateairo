@@ -8232,7 +8232,7 @@ def test_scoring_job_start_queues_and_completes_score_debate_job(db) -> None:
     assert job.debate_id == debate.id
     assert job.job_type == "score_debate"
     assert job.required_role == "judge"
-    assert job.required_model == "gpt-5.6-sol"
+    assert job.required_model == "gpt-5.6sol-medium"
     assert job.node_id is None
     assert job.status == "complete"
     assert db.scalars(select(AnalyzerRun).where(AnalyzerRun.debate_id == debate.id)).all()

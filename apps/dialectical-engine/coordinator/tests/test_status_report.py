@@ -2041,8 +2041,8 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker B registration requires real model IDs in ALLOWED_MODELS, not placeholders",
                 "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs",
                 "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs",
-                "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
+                "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop",
+                "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop",
                 'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2064,8 +2064,8 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker B real-model setup requires a named Cloudflare hostname, not a trycloudflare.com quick tunnel",
                 "Worker B real-model setup requires non-empty model IDs in ALLOWED_MODELS",
                 "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
-                "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
+                "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop",
+                "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop",
                 'PUBLIC_ENDPOINT_PYTHON="${{PUBLIC_ENDPOINT_PYTHON:-python3}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="${{PUBLIC_ENDPOINT_SCRIPT:-$SCRIPT_DIR/verify_public_endpoint.py}}"',
                 'PUBLIC_ENDPOINT_SCRIPT="$ENGINE_DIR/scripts/verify_public_endpoint.py"',
@@ -2393,8 +2393,8 @@ def test_handoff_generator_summary_reports_strict_worker_b_helpers(
                 "Worker A real-model setup requires a named Cloudflare hostname, not a trycloudflare.com quick tunnel",
                 "Worker A real-model setup requires non-empty model IDs in ALLOWED_MODELS",
                 "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs",
-                "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash",
-                "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5",
+                "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop",
+                "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop",
                 "GEMINI_API_KEY_FOR_INSTALL=",
                 "XAI_API_KEY_FOR_INSTALL=",
                 "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A",
@@ -5766,8 +5766,8 @@ echo "Worker A real-model setup requires real model IDs in ALLOWED_MODELS, not p
 echo "Worker A real-model setup requires real model IDs in ALLOWED_MODELS, not mock model IDs"
 echo "Worker A real-model setup requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs"
 echo "Worker A real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs"
-echo "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
+echo "Worker A real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop"
+echo "Worker A real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop"
 GEMINI_API_KEY_FOR_INSTALL=
 XAI_API_KEY_FOR_INSTALL=
 echo "Worker A real-model setup requires named tunnel deploy preflight before changing Worker A"
@@ -7382,8 +7382,8 @@ echo "Worker B registration requires non-empty model IDs in ALLOWED_MODELS"
 echo "Worker B registration requires real model IDs in ALLOWED_MODELS, not placeholders"
 echo "Worker B registration requires real model IDs in ALLOWED_MODELS, not mock model IDs"
 echo "Worker B registration requires distinct model IDs in ALLOWED_MODELS, not duplicate model IDs"
-echo "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
+echo "Worker B registration requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop"
+echo "Worker B registration requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop"
 USER_TOKEN="${USER_TOKEN:-}"
 echo "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
 export DIALECTICAL_ALLOWED_MODELS="$ALLOWED_MODELS"
@@ -7422,8 +7422,8 @@ echo "not placeholders"
 echo "not mock model IDs"
 echo "not duplicate model IDs"
 echo "Worker B real-model setup requires ALLOWED_MODELS to list at least two distinct real model IDs"
-echo "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-2.5-flash"
-echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5"
+echo "Worker B real-model setup requires GEMINI_API_KEY when ALLOWED_MODELS includes gemini-3.5-flash-loop"
+echo "Worker B real-model setup requires XAI_API_KEY when ALLOWED_MODELS includes grok-4.5-high-loop"
 	USER_TOKEN="${USER_TOKEN:-}"
 	echo "No USER_TOKEN set; make install-worker will reuse an existing matching worker registration"
 	GEMINI_API_KEY_FOR_INSTALL=
@@ -14743,7 +14743,7 @@ def test_strict_production_issues_reject_duplicate_final_required_capabilities(
 
 def test_final_worker_launchd_api_key_summary_reports_ready_keys(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-2.5-flash")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-3.5-flash-loop")
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
@@ -14752,12 +14752,12 @@ def test_final_worker_launchd_api_key_summary_reports_ready_keys(tmp_path: Path,
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     assert module.final_worker_launchd_api_key_issues() == []
-    assert module.final_worker_launchd_api_key_summary() == "ready (GEMINI_API_KEY for gemini-2.5-flash)"
+    assert module.final_worker_launchd_api_key_summary() == "ready (GEMINI_API_KEY for gemini-3.5-flash-loop)"
 
 
 def test_final_worker_launchd_api_key_summary_rejects_shell_only_key(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-2.5-flash")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,gemini-3.5-flash-loop")
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
     with plist_path.open("wb") as file:
@@ -14768,11 +14768,11 @@ def test_final_worker_launchd_api_key_summary_rejects_shell_only_key(tmp_path: P
     issues = module.final_worker_launchd_api_key_issues()
 
     assert issues == [
-        "Worker A launchd API key missing for gemini-2.5-flash: "
+        "Worker A launchd API key missing for gemini-3.5-flash-loop: "
         "GEMINI_API_KEY is set in the shell but not in the installed worker launchd environment; "
         "rerun make install-worker with GEMINI_API_KEY present"
     ]
-    assert "blocked (Worker A launchd API key missing for gemini-2.5-flash" in (
+    assert "blocked (Worker A launchd API key missing for gemini-3.5-flash-loop" in (
         module.final_worker_launchd_api_key_summary()
     )
 
@@ -14782,7 +14782,7 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_DATABASE_URL", f"sqlite:///{tmp_path / 'missing.sqlite3'}")
-    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,grok-4.5")
+    monkeypatch.setenv("WORKER_REQUIRED_CAPABILITIES", "gpt-5.6sol-medium,grok-4.5-high-loop")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     module = load_status_report_module()
     plist_path = tmp_path / "com.dialectical.worker.plist"
@@ -14790,9 +14790,9 @@ def test_final_worker_launchd_api_key_summary_honors_final_capability_override(
         plistlib.dump({"EnvironmentVariables": {"XAI_API_KEY": "xai-secret"}}, file)
     monkeypatch.setattr(module, "INSTALLED_WORKER_LAUNCHD_PLIST", plist_path)
 
-    assert module.final_required_capabilities() == ["gpt-5.6sol-medium", "grok-4.5"]
+    assert module.final_required_capabilities() == ["gpt-5.6sol-medium", "grok-4.5-high-loop"]
     assert module.final_worker_launchd_api_key_issues() == []
-    assert module.final_worker_launchd_api_key_summary() == "ready (XAI_API_KEY for grok-4.5)"
+    assert module.final_worker_launchd_api_key_summary() == "ready (XAI_API_KEY for grok-4.5-high-loop)"
 
 
 def test_final_worker_config_topology_summary_reports_ready_config(

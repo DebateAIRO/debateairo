@@ -174,24 +174,24 @@ def test_required_worker_api_key_checks_pass_when_launchd_has_required_key(monke
 
     checks = checks_by_name(
         module.required_worker_api_key_checks(
-            "gpt-5.6sol-medium,gemini-2.5-flash",
+            "gpt-5.6sol-medium,gemini-3.5-flash-loop",
             {"GEMINI_API_KEY": "gemini-secret"},
         )
     )
 
-    assert checks["worker-api-key:gemini-2.5-flash"].status == "PASS"
-    assert checks["worker-api-key:gemini-2.5-flash"].detail == "GEMINI_API_KEY is set in worker launchd environment"
+    assert checks["worker-api-key:gemini-3.5-flash-loop"].status == "PASS"
+    assert checks["worker-api-key:gemini-3.5-flash-loop"].detail == "GEMINI_API_KEY is set in worker launchd environment"
 
 
 def test_required_worker_api_key_checks_fail_when_key_is_only_in_shell(monkeypatch) -> None:
     module = load_deployment_preflight_module()
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-secret")
 
-    checks = checks_by_name(module.required_worker_api_key_checks("gemini-2.5-flash", {}))
+    checks = checks_by_name(module.required_worker_api_key_checks("gemini-3.5-flash-loop", {}))
 
-    assert checks["worker-api-key:gemini-2.5-flash"].status == "FAIL"
+    assert checks["worker-api-key:gemini-3.5-flash-loop"].status == "FAIL"
     assert "set in the shell but not in the installed worker launchd environment" in checks[
-        "worker-api-key:gemini-2.5-flash"
+        "worker-api-key:gemini-3.5-flash-loop"
     ].detail
 
 
@@ -199,15 +199,15 @@ def test_required_worker_api_key_checks_fail_when_required_key_is_missing(monkey
     module = load_deployment_preflight_module()
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    checks = checks_by_name(module.required_worker_api_key_checks("gemini-2.5-flash,grok-4.5", {}))
+    checks = checks_by_name(module.required_worker_api_key_checks("gemini-3.5-flash-loop,grok-4.5-high-loop", {}))
 
-    assert checks["worker-api-key:gemini-2.5-flash"].status == "FAIL"
+    assert checks["worker-api-key:gemini-3.5-flash-loop"].status == "FAIL"
     assert "GEMINI_API_KEY is not set in the installed worker launchd environment" in checks[
-        "worker-api-key:gemini-2.5-flash"
+        "worker-api-key:gemini-3.5-flash-loop"
     ].detail
-    assert checks["worker-api-key:grok-4.5"].status == "FAIL"
+    assert checks["worker-api-key:grok-4.5-high-loop"].status == "FAIL"
     assert "XAI_API_KEY is not set in the installed worker launchd environment" in checks[
-        "worker-api-key:grok-4.5"
+        "worker-api-key:grok-4.5-high-loop"
     ].detail
 
 
