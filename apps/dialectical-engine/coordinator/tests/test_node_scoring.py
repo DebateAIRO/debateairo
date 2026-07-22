@@ -9,13 +9,13 @@ from typing import get_type_hints
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from app.main import app
 from app.core.auth import hash_token
-from app.core.db import SessionLocal
+from app.core.db import SessionLocal, get_engine
 from app.core.write_lock import commit_write
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, JudgeOutputArtifact, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
 from app.api import scoring as scoring_api
@@ -44,6 +44,7 @@ from app.scoring import (
     FallacyAssessment,
     FatalFlag,
     JudgeAssessment,
+    JudgeChildContext,
     JudgeDisagreement,
     JudgeStrategy,
     NormalizedClaim,
@@ -1857,9 +1858,11 @@ def test_scoring_provider_result_cannot_pretend_to_be_node_score() -> None:
         "claim": base_claim(node_id="node-1").model_dump(mode="json"),
         "argument_text": "Detailed generated argument text.",
         "judge_role": "critic",
-        "prompt_version": "scoring-provider-v1",
+        "prompt_version": "scoring-provider-v2",
         "timeout_seconds": 30,
         "metadata": {},
+        "debate_question": None,
+        "children": [],
     }
     assert result.model_dump(mode="json") == {
         "provider": "codex",
@@ -1920,6 +1923,124 @@ def test_single_node_judge_prompt_contract_includes_json_schema_expectations() -
         "fallacy",
     }
     assert "Never invent evidence" in messages[0]["content"]
+
+
+def test_single_node_judge_prompt_defaults_to_the_bumped_prompt_version() -> None:
+    # Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+    # §P2.3): prompt_version bumped v1 -> v2 because the payload/instructions
+    # changed (debate_question + real children below) -- the judge contract
+    # system exists precisely so this invalidates every cached judge output
+    # (see test_judge_registry.py's contract_hash regression test).
+    messages = render_single_node_judge_prompt(
+        ScoringProviderRequest(
+            claim=base_claim(node_id="node-1", evidence_refs=[]),
+            argument_text=None,
+            judge_role="judge",
+        )
+    )
+
+    payload = json.loads(messages[1]["content"])
+
+    assert payload["prompt_version"] == "scoring-provider-v2"
+
+
+def test_single_node_judge_prompt_includes_debate_question_and_real_children_with_stances() -> None:
+    long_argument = "Coordination costs rise sharply once teams stop sharing an office. " * 15
+    assert len(long_argument) > 700
+
+    request = ScoringProviderRequest(
+        claim=base_claim(node_id="node-1", evidence_refs=[]),
+        argument_text="Employees are less likely to leave when commutes are removed.",
+        judge_role="judge",
+        debate_question="Should companies adopt remote work?",
+        children=[
+            JudgeChildContext(
+                node_id="child-support",
+                stance="support",
+                claim="Remote work expands hiring pools.",
+                argument_excerpt="Hiring no longer depends on commute radius.",
+                truncated=False,
+            ),
+            JudgeChildContext(
+                node_id="child-attack",
+                stance="attack",
+                claim="Remote work weakens collaboration.",
+                argument_excerpt=long_argument[:700] + "…",
+                truncated=True,
+            ),
+        ],
+    )
+
+    messages = render_single_node_judge_prompt(request)
+    payload = json.loads(messages[1]["content"])
+
+    assert payload["debate_question"] == "Should companies adopt remote work?"
+    assert "Should companies adopt remote work?" in messages[1]["content"]
+    assert payload["attacks_provided"] is True
+    assert payload["children"] == [
+        {
+            "node_id": "child-support",
+            "stance": "support",
+            "claim": "Remote work expands hiring pools.",
+            "argument_excerpt": "Hiring no longer depends on commute radius.",
+            "truncated": False,
+        },
+        {
+            "node_id": "child-attack",
+            "stance": "attack",
+            "claim": "Remote work weakens collaboration.",
+            "argument_excerpt": long_argument[:700] + "…",
+            "truncated": True,
+        },
+    ]
+    # Instructions text tells the judge HOW to use the new context, not just
+    # that it exists: relevance is scored against the real question, and
+    # counter_resilience against the real attack, not an imagined one.
+    assert "debate_question" in messages[0]["content"]
+    assert "context.relevance" in messages[0]["content"]
+    assert "counterargument_strength" in messages[0]["content"]
+    assert "attacks_provided" in messages[0]["content"]
+
+
+def test_single_node_judge_prompt_signals_no_attacks_when_node_is_childless() -> None:
+    request = ScoringProviderRequest(
+        claim=base_claim(node_id="node-1", evidence_refs=[]),
+        argument_text="Employees are less likely to leave when commutes are removed.",
+        judge_role="judge",
+        debate_question="Should companies adopt remote work?",
+    )
+
+    messages = render_single_node_judge_prompt(request)
+    payload = json.loads(messages[1]["content"])
+
+    assert payload["children"] == []
+    assert payload["attacks_provided"] is False
+
+
+def test_single_node_judge_prompt_signals_no_attacks_when_children_are_support_only() -> None:
+    # The honest signal is a dedicated boolean, not "children is non-empty":
+    # a node can have real children that are all supports, in which case
+    # there is still no real attack to score counter_resilience against.
+    request = ScoringProviderRequest(
+        claim=base_claim(node_id="node-1", evidence_refs=[]),
+        argument_text="Employees are less likely to leave when commutes are removed.",
+        judge_role="judge",
+        debate_question="Should companies adopt remote work?",
+        children=[
+            JudgeChildContext(
+                node_id="child-support",
+                stance="support",
+                claim="Remote work expands hiring pools.",
+                argument_excerpt="Hiring no longer depends on commute radius.",
+            ),
+        ],
+    )
+
+    messages = render_single_node_judge_prompt(request)
+    payload = json.loads(messages[1]["content"])
+
+    assert len(payload["children"]) == 1
+    assert payload["attacks_provided"] is False
 
 
 def test_verifier_prompt_requests_the_lifecycle_authoritative_verdict_schema() -> None:
@@ -3122,6 +3243,202 @@ def test_score_node_with_provider_scores_requested_current_node(db) -> None:
     assert provider.requests[0].claim.raw_text == child.claim
     assert provider.requests[0].argument_text == generation.argument
     assert provider.requests[0].judge_role == "critic"
+
+
+def test_score_node_with_provider_fetches_real_pro_con_children_for_judge_payload(db) -> None:
+    """Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+    §P2.3): the judge payload must carry the debate's real question and the
+    scored node's actual PRO/CON children -- never an EVIDENCE sibling
+    (different subsystem), and never fabricated context. Exactly one extra
+    query for the child Node rows and one bulk query for their Generations,
+    regardless of child count (no N+1: see the query-count assertions)."""
+
+    class CapturingProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def judge_node(self, request):
+            self.requests.append(request)
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    target = Node(
+        id="target-node",
+        debate=debate,
+        parent=root,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    target_generation = Generation(
+        id="target-generation",
+        node=target,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    target.active_generation_id = target_generation.id
+
+    long_argument = "Coordination costs rise sharply once teams stop sharing an office. " * 15
+    assert len(long_argument) > 700
+    pro_child = Node(
+        id="pro-child",
+        debate=debate,
+        parent=target,
+        node_type="PRO",
+        depth=2,
+        position=0,
+        claim="Remote work expands hiring pools.",
+        status="complete",
+        materialized_path="/0/0/0",
+    )
+    con_child = Node(
+        id="con-child",
+        debate=debate,
+        parent=target,
+        node_type="CON",
+        depth=2,
+        position=1,
+        claim="Remote work weakens collaboration.",
+        status="complete",
+        materialized_path="/0/0/1",
+    )
+    evidence_child = Node(
+        id="evidence-child",
+        debate=debate,
+        parent=target,
+        node_type="EVIDENCE",
+        depth=2,
+        position=2,
+        claim="A cited internal survey on retention.",
+        status="complete",
+        materialized_path="/0/0/2",
+    )
+    pro_generation = Generation(
+        id="pro-generation",
+        node=pro_child,
+        model_id="model-a",
+        role="pro",
+        argument="Hiring no longer depends on commute radius.",
+        worker_id=worker.id,
+    )
+    con_generation = Generation(
+        id="con-generation",
+        node=con_child,
+        model_id="model-a",
+        role="con",
+        argument=long_argument,
+        worker_id=worker.id,
+    )
+    evidence_generation = Generation(
+        id="evidence-generation",
+        node=evidence_child,
+        model_id="model-a",
+        role="evidence",
+        argument="Survey text that must never reach the judge payload as a child.",
+        worker_id=worker.id,
+    )
+    pro_child.active_generation_id = pro_generation.id
+    con_child.active_generation_id = con_generation.id
+    evidence_child.active_generation_id = evidence_generation.id
+    db.add_all(
+        [
+            debate,
+            worker,
+            root,
+            target,
+            target_generation,
+            pro_child,
+            con_child,
+            evidence_child,
+            pro_generation,
+            con_generation,
+            evidence_generation,
+        ]
+    )
+    db.commit()
+    provider = CapturingProvider()
+
+    node_selects = 0
+    generation_selects = 0
+
+    def count_statements(conn, cursor, statement, parameters, context, executemany) -> None:
+        nonlocal node_selects, generation_selects
+        # "nodes.parent_id = ?" is the WHERE-clause filter unique to the new
+        # children query -- unlike a bare "parent_id" substring, it does not
+        # also match the pre-existing single-row node fetch (whose SELECT
+        # column list includes "nodes.parent_id AS nodes_parent_id" even
+        # though it filters on nodes.id, not parent_id).
+        if "nodes.parent_id = ?" in statement:
+            node_selects += 1
+        if "FROM generations" in statement:
+            generation_selects += 1
+
+    db_engine = get_engine()
+    event.listen(db_engine, "before_cursor_execute", count_statements)
+    try:
+        payload = score_node_with_provider(db, debate, target.id, provider)
+    finally:
+        event.remove(db_engine, "before_cursor_execute", count_statements)
+
+    assert payload["status"] == "available"
+    # No N+1: one query for the child Node rows (matched on "parent_id"), one
+    # bulk query for their Generations (plus the pre-existing single lookup
+    # of the target node's own generation) -- never one query per child.
+    assert node_selects == 1
+    assert generation_selects == 2
+
+    request = provider.requests[0]
+    assert request.debate_question == "Should companies adopt remote work?"
+    assert [child.node_id for child in request.children] == [pro_child.id, con_child.id]
+    assert [child.stance for child in request.children] == ["support", "attack"]
+    assert request.children[0].claim == "Remote work expands hiring pools."
+    assert request.children[0].argument_excerpt == "Hiring no longer depends on commute radius."
+    assert request.children[0].truncated is False
+    assert request.children[1].claim == "Remote work weakens collaboration."
+    assert request.children[1].truncated is True
+    excerpt = request.children[1].argument_excerpt
+    assert excerpt is not None
+    assert len(excerpt) <= 701  # <=700 chars of real text + a truncation marker
+    assert excerpt.endswith("…")
+    assert long_argument.startswith(excerpt[:-1])  # a genuine prefix, cut on a word boundary
+    assert not excerpt[:-1].endswith(" ")
+
+    rendered = render_single_node_judge_prompt(request)
+    rendered_content = rendered[1]["content"]
+    assert "Should companies adopt remote work?" in rendered_content
+    assert "Remote work expands hiring pools." in rendered_content
+    assert "Remote work weakens collaboration." in rendered_content
+    assert '"stance": "support"' in rendered_content
+    assert '"stance": "attack"' in rendered_content
+    # EVIDENCE children are a different subsystem and must never leak into the
+    # judge's tree-aware payload as a child.
+    assert "A cited internal survey on retention." not in rendered_content
+    assert "Survey text that must never reach the judge payload" not in rendered_content
 
 
 def test_score_node_with_provider_rejects_non_current_node(db) -> None:

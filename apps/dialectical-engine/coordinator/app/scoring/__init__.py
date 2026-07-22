@@ -13,7 +13,13 @@ from app.scoring.cache import (
     store_scoring_cache,
 )
 from app.scoring.disagreement import detect_disagreements
-from app.scoring.judges import JudgeStrategy, ScoringProvider, ScoringProviderRequest, ScoringProviderResult
+from app.scoring.judges import (
+    JudgeChildContext,
+    JudgeStrategy,
+    ScoringProvider,
+    ScoringProviderRequest,
+    ScoringProviderResult,
+)
 from app.scoring.models import (
     AdaptiveDepthDryRunItem,
     AdaptiveDepthDryRunPlan,
@@ -78,6 +84,7 @@ __all__ = [
     "FallacyAssessment",
     "FatalFlag",
     "JudgeAssessment",
+    "JudgeChildContext",
     "JudgeDisagreement",
     "JudgeParseResult",
     "JudgeStrategy",

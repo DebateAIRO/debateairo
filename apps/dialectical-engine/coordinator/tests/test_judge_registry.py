@@ -51,6 +51,25 @@ def test_active_contract_returns_primary_judge_for_judge_role() -> None:
     assert contract.rubric_version == "debateai-rubric-v1"
 
 
+def test_active_primary_judge_contract_hash_differs_from_pre_bump_v1_hash() -> None:
+    # Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+    # §P2.3): the judge prompt changed (debate_question + real children now
+    # sent to the judge), so prompt_version was bumped v1 -> v2 in BOTH
+    # app.scoring.judges.ScoringProviderRequest and
+    # app.scoring.judge_registry.SCORING_PROMPT_VERSION. _contract()'s
+    # defaults above (rubric/schema/reducer versions + judge identity) are
+    # exactly the pre-bump v1 identity, so this regression-proofs the judge
+    # contract system's whole reason for existing: a prompt change MUST
+    # change contract_hash so every cached NodeScoringResult/
+    # JudgeOutputArtifact invalidates by design. If SCORING_PROMPT_VERSION
+    # were ever reverted to v1 by accident, the two hashes would collide and
+    # this test would catch it.
+    pre_bump_v1_contract = _contract()
+    assert PRIMARY_NODE_SCORING_JUDGE.prompt_version == "scoring-provider-v2"
+    assert PRIMARY_NODE_SCORING_JUDGE.prompt_version != pre_bump_v1_contract.prompt_version
+    assert PRIMARY_NODE_SCORING_JUDGE.contract_hash != pre_bump_v1_contract.contract_hash
+
+
 def test_active_contract_rejects_unknown_role() -> None:
     import pytest
 

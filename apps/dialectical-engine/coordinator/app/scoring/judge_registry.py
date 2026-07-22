@@ -17,7 +17,15 @@ from app.scoring.models import ClaimAssessment
 from app.scoring.reducer import REDUCER_VERSION, RUBRIC_VERSION
 
 CLAIM_ASSESSMENT_SCHEMA_VERSION = "claim-assessment-v1"
-SCORING_PROMPT_VERSION = "scoring-provider-v1"
+# Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+# §P2.3): bumped v1 -> v2 because render_single_node_judge_prompt's payload
+# and instructions changed (debate_question + real PRO/CON children now sent
+# to the judge; context.relevance and critic.counterargument_strength are
+# now scored against them instead of nothing/imagined counters). Keep this in
+# sync with app.scoring.judges.ScoringProviderRequest.prompt_version's
+# default -- both are bumped together by design so contract_hash changes and
+# every cached NodeScoringResult/JudgeOutputArtifact invalidates.
+SCORING_PROMPT_VERSION = "scoring-provider-v2"
 
 
 class JudgeContract(BaseModel):

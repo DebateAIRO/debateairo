@@ -40,7 +40,12 @@ from app.scoring.lineage import (
     judge_lineage_metadata,
     lineage_family,
 )
-from app.scoring.judges import ScoringProvider, ScoringProviderRequest, ScoringProviderResult
+from app.scoring.judges import (
+    JudgeChildContext,
+    ScoringProvider,
+    ScoringProviderRequest,
+    ScoringProviderResult,
+)
 from app.scoring.models import (
     AdaptiveDepthDryRunItem,
     AdaptiveDepthPolicy,
@@ -67,6 +72,21 @@ SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES: int | None = None
 SCORING_PROVIDER_MAX_ATTEMPTS = 2
+# Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+# §P2.3): bound applied to each PRO/CON child's argument excerpt included in
+# the judge payload -- long enough to give the judge real signal on the
+# child's substance, short enough to keep the payload's size predictable
+# regardless of how verbose a child's generated argument gets.
+JUDGE_CHILD_ARGUMENT_EXCERPT_MAX_CHARS = 700
+# Node.node_type -> JudgeChildContext.stance for the judge's tree-aware
+# payload. Mirrors app.protocol.cross_exam's _OPPOSING_NODE_TYPES convention
+# (CON is the exact opposing/attack type; PRO is the exact supporting type).
+# Deliberately excludes EVIDENCE (a different subsystem -- the "verifier"
+# judge role, not this node-scoring judge) and any other node_type (e.g. the
+# POV-branch label nodes dynamic perspectives create as direct ROOT_CLAIM
+# children): those are structural lens nodes, not PRO/CON arguments the
+# judge should weigh as a real counter or support.
+_JUDGE_CHILD_STANCE_BY_NODE_TYPE: dict[str, str] = {"PRO": "support", "CON": "attack"}
 ACTIVE_SCORING_JOB_STATUSES = {"pending", "claimed", "running"}
 STALE_SCORING_JOB_ERROR = "Stale scoring job expired before judge outputs were produced."
 UNAVAILABLE_SCORING_JOB_ERROR = "No scoring provider is configured."
@@ -407,6 +427,64 @@ def _hydrate_historical_public_result(
     return item, metadata
 
 
+def _judge_child_argument_excerpt(argument: str | None) -> tuple[str | None, bool]:
+    """Bound a child's active generation text to
+    JUDGE_CHILD_ARGUMENT_EXCERPT_MAX_CHARS, cutting on a word boundary and
+    flagging the cut so the judge (and callers) can tell a bounded excerpt
+    from the child's whole argument. `argument` is never reflowed/normalized
+    here -- only sliced -- so a non-truncated excerpt is byte-identical to
+    the source text.
+    """
+    if argument is None:
+        return None, False
+    if len(argument) <= JUDGE_CHILD_ARGUMENT_EXCERPT_MAX_CHARS:
+        return argument, False
+    window = argument[:JUDGE_CHILD_ARGUMENT_EXCERPT_MAX_CHARS]
+    last_space = window.rfind(" ")
+    excerpt = window[:last_space] if last_space > 0 else window
+    return f"{excerpt}…", True
+
+
+def _node_children_for_judge(db: Session, node_id: str) -> list[JudgeChildContext]:
+    """Real PRO/CON children of `node_id`, for the judge's tree-aware payload
+    (Task 3, docs/improvement-plan-2026-07-22.md §P2.3). Stable ordering
+    (position, then creation order, then id) keeps the payload deterministic.
+    Exactly two queries total regardless of child count -- one for the child
+    Node rows, one bulk Generation lookup -- never one query per child.
+    """
+    child_nodes = db.scalars(
+        select(Node)
+        .where(
+            Node.parent_id == node_id,
+            Node.node_type.in_(tuple(_JUDGE_CHILD_STANCE_BY_NODE_TYPE)),
+        )
+        .order_by(Node.position.asc(), Node.created_at.asc(), Node.id.asc())
+    ).all()
+    if not child_nodes:
+        return []
+    generation_ids = [child.active_generation_id for child in child_nodes if child.active_generation_id]
+    generations_by_id: dict[str, Generation] = {}
+    if generation_ids:
+        generations_by_id = {
+            generation.id: generation
+            for generation in db.scalars(select(Generation).where(Generation.id.in_(generation_ids))).all()
+        }
+    children: list[JudgeChildContext] = []
+    for child in child_nodes:
+        generation = generations_by_id.get(child.active_generation_id) if child.active_generation_id else None
+        excerpt, truncated = _judge_child_argument_excerpt(generation.argument if generation else None)
+        children.append(
+            JudgeChildContext(
+                node_id=child.id,
+                stance=_JUDGE_CHILD_STANCE_BY_NODE_TYPE[child.node_type],
+                claim=child.claim,
+                argument_excerpt=excerpt,
+                truncated=truncated,
+            )
+        )
+    return children
+
+
 def score_one_node_with_provider(
     db: Session,
     debate: Debate,
@@ -529,6 +607,19 @@ def score_node_with_provider(
         argument_text=argument_text,
         judge_role=judge_role,
         timeout_seconds=timeout_seconds,
+        # Task 3 (tree-aware judge payload,
+        # docs/improvement-plan-2026-07-22.md §P2.3): `debate` is always the
+        # real debate this node belongs to (a caller-supplied parameter, not
+        # inferred), so debate_question is always the node's actual debate
+        # question -- never a placeholder. children is the node's real
+        # PRO/CON tree, fetched fresh every call (never cached across calls)
+        # so it always reflects the current tree even though the scoring
+        # cache keys on claim+argument_text only (see node_scoring_input_hash
+        # -- a tree change alone does not invalidate a cache hit today; that
+        # is a pre-existing cache-key scope limitation, not new to this
+        # change, and out of this task's scope).
+        debate_question=debate.topic,
+        children=_node_children_for_judge(db, node.id),
     )
     try:
         result = None
