@@ -1810,15 +1810,25 @@ def record_approved_adaptive_expansion(
 
 def _debate_node_ids(db: Session, debate_id: str) -> list[str]:
     # T2 (P0.5): exclude dead placeholders in addition to stale ones -- a
-    # node whose generation exhausted every pool model (status="failed") or
-    # whose path was set aside (path_status="abandoned", e.g. via an
-    # exploration-policy "abandon" decision) must never be judged: it wastes
-    # a judge call and produces a misleading strength chip on a claim that
-    # is nothing but its bare placeholder label. This is a live per-call
-    # query (no cached/snapshotted node-id list), so a node whose
-    # path_status later flips back to "active" (an exploration-policy
-    # "reopen" decision) flows back into this set on the very next call,
-    # with no code change here.
+    # node whose generation exhausted every pool model (status="failed") is
+    # a permanent terminal state (no code path ever resets status away from
+    # "failed") and must never be judged: it wastes a judge call and
+    # produces a misleading strength chip on a claim that is nothing but
+    # its bare placeholder label.
+    #
+    # Deliberately NOT excluded on path_status=="abandoned" (controller
+    # decision after Task 2 self-review, see task-2-report.md's "Concerns"
+    # section): an abandoned-but-status=="complete" node (a real, generated
+    # PRO/CON/ROOT_CLAIM argument the exploration-policy lifecycle set
+    # aside) must keep flowing through scoring, because
+    # reevaluate_lifecycle_after_scoring_completion's "reopen" decision
+    # (exploration/policy.py) only ever reconsiders a node that was just
+    # freshly scored in the completed run -- excluding abandoned-but-live
+    # nodes here would make that lifecycle's reopen path permanently
+    # unreachable (P3 of the plan depends on it staying reachable). Re-
+    # selecting them is cheap: NodeScoringResult's contract-hash cache
+    # serves an unchanged claim/argument straight from cache rather than
+    # re-invoking the judge.
     return list(
         db.scalars(
             select(Node.id)
@@ -1826,7 +1836,6 @@ def _debate_node_ids(db: Session, debate_id: str) -> list[str]:
                 Node.debate_id == debate_id,
                 Node.status != "stale",
                 Node.status != "failed",
-                Node.path_status != "abandoned",
             )
             .order_by(Node.materialized_path.asc(), Node.depth.asc(), Node.position.asc(), Node.id.asc())
         ).all()

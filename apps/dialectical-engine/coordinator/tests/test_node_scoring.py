@@ -8354,14 +8354,19 @@ def test_scoring_api_docs_gate_cache_work_on_real_producer_contract() -> None:
     assert "must not create or\ncache fake runtime scores" in docs
 
 
-def test_debate_scoring_node_selection_excludes_failed_or_abandoned_but_keeps_live_and_stale_exclusion(db) -> None:
-    """T2 (P0.5): _debate_node_ids must exclude a node when EITHER
-    status == "failed" OR path_status == "abandoned" holds, independently of
-    one another (terminalize_job_failure's node-degradable branch sets both
-    together, but a non-degradable failure only sets status, and an
-    exploration-policy "abandon" decision only sets path_status), while the
-    pre-existing stale exclusion and ordinary live-node selection keep
-    working exactly as before.
+def test_debate_scoring_node_selection_excludes_only_failed_status_keeps_abandoned_complete_live_and_stale_exclusion(
+    db,
+) -> None:
+    """T2 (P0.5), narrowed per controller decision after Task 2 self-review
+    (see task-2-report.md): _debate_node_ids excludes a node ONLY on
+    status == "failed" (a permanent terminal state -- no code path ever
+    resets status away from "failed"). path_status == "abandoned" is
+    deliberately NOT an exclusion criterion: an abandoned-but-complete node
+    is a real, already-generated argument the exploration-policy lifecycle
+    set aside, and it must keep flowing through scoring so
+    reevaluate_lifecycle_after_scoring_completion's "reopen" decision stays
+    reachable. The pre-existing stale exclusion and ordinary live-node
+    selection keep working exactly as before.
     """
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     root = Node(
@@ -8404,7 +8409,7 @@ def test_debate_scoring_node_selection_excludes_failed_or_abandoned_but_keeps_li
         path_status="active",
         materialized_path="/0/2",
     )
-    abandoned_path_only = Node(
+    abandoned_but_complete = Node(
         debate=debate,
         parent=root,
         node_type="PRACTICAL_POV",
@@ -8415,7 +8420,7 @@ def test_debate_scoring_node_selection_excludes_failed_or_abandoned_but_keeps_li
         path_status="abandoned",
         materialized_path="/0/3",
     )
-    db.add_all([debate, root, live, stale, failed_status_only, abandoned_path_only])
+    db.add_all([debate, root, live, stale, failed_status_only, abandoned_but_complete])
     db.flush()
     debate.root_node_id = root.id
     db.commit()
@@ -8423,16 +8428,18 @@ def test_debate_scoring_node_selection_excludes_failed_or_abandoned_but_keeps_li
     payload = get_debate_scoring(db, debate.id)
 
     assert payload is not None
-    assert payload["node_ids"] == [root.id, live.id]
+    assert payload["node_ids"] == [root.id, live.id, abandoned_but_complete.id]
 
 
-def test_abandoned_path_node_flows_back_into_scoring_once_reopened(db) -> None:
-    """T2 (P0.5) reopen safety: exploration/policy.py can decide "reopen" for
-    an abandoned path, which flips path_status back to "active"
-    (app.exploration.scoring_completion_lifecycle). Selection is a live
-    per-scoring-run query with no cached/snapshotted node-id list, so a
-    node excluded while abandoned must flow back into scoring once its
-    path_status returns to active, with no code change.
+def test_abandoned_but_complete_node_stays_selected_for_scoring(db) -> None:
+    """T2 (P0.5) reopen safety, narrowed per controller decision: an
+    abandoned-but-status=="complete" node (exploration/policy.py can later
+    decide "reopen" for it) must never be excluded from scoring in the
+    first place -- only status == "failed" excludes. This keeps
+    reevaluate_lifecycle_after_scoring_completion's node_ids provenance
+    (app.scoring.jobs.run_scoring_job_background) populated for it on every
+    subsequent score_debate run, which is what makes the "reopen" decision
+    reachable at all.
     """
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     root = Node(
@@ -8444,7 +8451,7 @@ def test_abandoned_path_node_flows_back_into_scoring_once_reopened(db) -> None:
         status="complete",
         materialized_path="/0",
     )
-    reopenable = Node(
+    abandoned_but_complete = Node(
         debate=debate,
         parent=root,
         node_type="PRO",
@@ -8455,21 +8462,15 @@ def test_abandoned_path_node_flows_back_into_scoring_once_reopened(db) -> None:
         path_status="abandoned",
         materialized_path="/0/0",
     )
-    db.add_all([debate, root, reopenable])
+    db.add_all([debate, root, abandoned_but_complete])
     db.flush()
     debate.root_node_id = root.id
     db.commit()
 
-    excluded_payload = get_debate_scoring(db, debate.id)
-    assert excluded_payload is not None
-    assert excluded_payload["node_ids"] == [root.id]
+    payload = get_debate_scoring(db, debate.id)
 
-    reopenable.path_status = "active"
-    db.commit()
-
-    reopened_payload = get_debate_scoring(db, debate.id)
-    assert reopened_payload is not None
-    assert reopened_payload["node_ids"] == [root.id, reopenable.id]
+    assert payload is not None
+    assert payload["node_ids"] == [root.id, abandoned_but_complete.id]
 
 
 def test_score_nodes_with_provider_skips_failed_pov_container_no_judge_call(db) -> None:
@@ -8478,7 +8479,11 @@ def test_score_nodes_with_provider_skips_failed_pov_container_no_judge_call(db) 
     path_status=abandoned, with its claim still the bare perspective label
     ("Scientific POV"). That placeholder must never reach the judge: no
     scoring item, and -- verified via the fake provider's own call log --
-    no judge_node call for it at all.
+    no judge_node call for it at all. (status=="failed" alone is what
+    excludes it here -- path_status=="abandoned" is realistic fixture data
+    matching terminalize_job_failure's actual node-degradable branch, not
+    a second exclusion criterion; see test_abandoned_but_complete_node_
+    stays_selected_for_scoring for the abandoned-without-failed case.)
     """
     class CapturingProvider:
         provider = "test-provider"

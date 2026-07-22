@@ -21,18 +21,20 @@ SEMANTICS_VERSION = DEFAULT_SEMANTICS
 
 def _debate_node_rows(db: Session, debate_id: str) -> list[dict]:
     # Mirrors _debate_node_ids' filter/order (app/scoring/service.py:1811),
-    # including its T2 (P0.5) failed/abandoned exclusion, but selects the
-    # extra columns (parent_id, node_type) the adapter needs. No existing
-    # "full node rows" helper was found in service.py -- every call site
-    # there only needs bare node ids -- so this is a minimal, local query
-    # rather than a shared helper.
+    # including its T2 (P0.5) failed-only exclusion (deliberately NOT
+    # path_status=="abandoned" -- see that function's comment: an abandoned-
+    # but-complete node must stay scoreable so the exploration-policy
+    # reopen lifecycle stays reachable), but selects the extra columns
+    # (parent_id, node_type) the adapter needs. No existing "full node
+    # rows" helper was found in service.py -- every call site there only
+    # needs bare node ids -- so this is a minimal, local query rather than
+    # a shared helper.
     rows = db.scalars(
         select(Node)
         .where(
             Node.debate_id == debate_id,
             Node.status != "stale",
             Node.status != "failed",
-            Node.path_status != "abandoned",
         )
         .order_by(Node.materialized_path.asc(), Node.depth.asc(), Node.position.asc(), Node.id.asc())
     ).all()

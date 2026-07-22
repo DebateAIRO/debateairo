@@ -637,23 +637,23 @@ def test_evidence_nodes_do_not_dilute_tau_coverage(db) -> None:
     assert run.output["tauSources"][evidence.id] == "default"
 
 
-def test_dead_pov_containers_never_hold_tau_coverage_below_one(db) -> None:
-    # T2 (P0.5): a failed/abandoned POV placeholder never receives a judge
-    # score (app.scoring.service._debate_node_ids excludes it from
-    # scoring), so it can never contribute a "judge_strength" tau. Before
-    # the fix its id still counted in the tauCoverage denominator forever
-    # (argument_node_ids had no dead-node exclusion), so a debate whose
-    # live nodes were ALL judged still reported tauCoverage < 1.0 through no
-    # scoring fault. Required invariant: once every live (non-failed,
-    # non-abandoned, non-stale, non-EVIDENCE) node is judged, tauCoverage
-    # reaches 1.0 even though dead placeholders remain in the tree.
+def test_tau_coverage_excludes_only_failed_placeholders_and_counts_abandoned_complete_nodes(db) -> None:
+    # T2 (P0.5), narrowed per controller decision after Task 2 self-review
+    # (see task-2-report.md "Concerns"): only status=="failed" placeholder
+    # nodes are excluded from the tauCoverage denominator. An abandoned-but-
+    # status=="complete" node (exploration/policy.py set its path aside,
+    # but it is a real, already-generated argument -- app.scoring.service.
+    # _debate_node_ids keeps scoring it precisely so its own reopen
+    # decision stays reachable) must stay IN the denominator: it needs to
+    # be judged and counted like any other live node, not silently treated
+    # as dead.
     real_codex_worker(db)
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
     povs = db.scalars(
         select(Node).where(Node.debate_id == debate.id, Node.node_type != "ROOT_CLAIM")
     ).all()
     assert len(povs) == 4  # fixed quartet -- conftest disables dynamic perspectives
-    live_pov, *dead_povs = povs
+    abandoned_but_complete, *dead_povs = povs
     assert len(dead_povs) == 3
     for pov in dead_povs:
         # Mirrors terminalize_job_failure's node-degradable branch exactly
@@ -662,15 +662,48 @@ def test_dead_pov_containers_never_hold_tau_coverage_below_one(db) -> None:
         pov.stopping_status = "stop"
         pov.stopping_reason = "generation_exhausted"
         pov.path_status = "abandoned"
+    # Mirrors the exploration-policy lifecycle's "abandon" decision on an
+    # otherwise-successfully-generated node (scoring_completion_lifecycle.py):
+    # status stays "complete", only path_status moves to "abandoned".
+    abandoned_but_complete.status = "complete"
+    abandoned_but_complete.path_status = "abandoned"
     db.commit()
 
     root_id = debate.root_node_id
     root = db.get(Node, root_id)
+    branch = service.first_branch(db, debate.id)
+
+    # Stage 1: only root is judged so far. If abandoned_but_complete were
+    # (incorrectly) excluded from the denominator like the dead povs,
+    # tauCoverage would misreport 1.0 here; it must instead reflect the one
+    # live-but-still-unjudged node.
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type=SCORING_ANALYZER_TYPE,
+            output={"status": "available", "items": [_scoring_payload_for_node(root_id, root.claim)]},
+            status="complete",
+            provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+        )
+    )
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+    first_run = _latest_protocol_analysis_run(db, debate.id)
+    assert first_run.output["tauCoverage"] == pytest.approx(0.5)  # 1 judged / 2 live nodes
+    assert first_run.output["tauSources"][root_id] == "judge_strength"
+    assert first_run.output["tauSources"][abandoned_but_complete.id] == "default"
+    for pov in dead_povs:
+        assert first_run.output["tauSources"][pov.id] == "default"
+
+    # Stage 2: ordinary rescoring reaches the abandoned-but-complete node
+    # too (exactly the mechanism that keeps its "reopen" decision alive) --
+    # coverage now reaches 1.0.
     items = [
         _scoring_payload_for_node(root_id, root.claim),
-        _scoring_payload_for_node(live_pov.id, live_pov.claim),
+        _scoring_payload_for_node(abandoned_but_complete.id, abandoned_but_complete.claim),
     ]
-    branch = service.first_branch(db, debate.id)
     db.add(
         AnalyzerRun(
             debate_id=debate.id,
@@ -684,15 +717,14 @@ def test_dead_pov_containers_never_hold_tau_coverage_below_one(db) -> None:
     db.commit()
 
     run_protocol_analysis(db, debate)
-
-    run = _latest_protocol_analysis_run(db, debate.id)
-    assert run.output["tauCoverage"] == 1.0
-    assert run.output["tauSources"][root_id] == "judge_strength"
-    assert run.output["tauSources"][live_pov.id] == "judge_strength"
+    second_run = _other_protocol_analysis_run(db, debate.id, excluding_id=first_run.id)
+    assert second_run.output["tauCoverage"] == 1.0
+    assert second_run.output["tauSources"][root_id] == "judge_strength"
+    assert second_run.output["tauSources"][abandoned_but_complete.id] == "judge_strength"
     # Dead nodes still get an honest per-node tau-source entry (default) --
     # they are excluded from the coverage *scope*, not silently disappeared.
     for pov in dead_povs:
-        assert run.output["tauSources"][pov.id] == "default"
+        assert second_run.output["tauSources"][pov.id] == "default"
 
 
 def test_run_protocol_analysis_records_qbaf_unavailable_reason_on_cycle(db) -> None:
