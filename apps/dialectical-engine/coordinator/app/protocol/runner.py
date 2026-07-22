@@ -130,23 +130,46 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     # must still propagate to the outer best-effort wrapper in
     # run_protocol_analysis, unchanged.
     try:
+        # HARD GATE (P7.3 review, RESOLVED Task 11 / P1.2): group persisted
+        # evidence_verification runs by evidenceNodeId and keep ONLY the
+        # latest (max seq) verdict per evidence node -- aggregate-all would
+        # let a stale verdict from a superseded (re-verified) attempt sit
+        # alongside its own replacement forever, and since
+        # rollup_claim_verification_status always lets "contradicted" win, a
+        # single stale "contradicted" could permanently dominate a claim's
+        # rollup even after a fresh verification supersedes it with
+        # "supported". Ordered latest-first by the SAME monotonic tiebreak
+        # the rest of this module uses for "latest AnalyzerRun" (see the
+        # previous_run query below): seq, then created_at, then id. The
+        # FIRST row seen per evidenceNodeId is therefore its latest verdict;
+        # every subsequent row for that same evidence node is a superseded
+        # attempt and is dropped, not aggregated.
         verdict_runs = db.scalars(
-            select(AnalyzerRun).where(
+            select(AnalyzerRun)
+            .where(
                 AnalyzerRun.debate_id == debate.id,
                 AnalyzerRun.analyzer_type == EVIDENCE_VERIFICATION_ANALYZER_TYPE,
             )
+            .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
         ).all()
         verdicts_by_claim_node: dict[str, list[str]] = {}
+        seen_evidence_node_ids: set[str] = set()
         for verdict_run in verdict_runs:
             output = verdict_run.output or {}
+            evidence_node_id = output.get("evidenceNodeId")
             claim_node_id = output.get("claimNodeId")
             status = output.get("status")
-            if claim_node_id and status:
-                verdicts_by_claim_node.setdefault(claim_node_id, []).append(status)
+            if not evidence_node_id or not claim_node_id or not status:
+                # Can't be grouped by evidence node (or has no verdict) --
+                # excluded from the rollup rather than guessed at. Production's
+                # _persist_verification_attempt always writes evidenceNodeId;
+                # this only guards a malformed/legacy row.
+                continue
+            if evidence_node_id in seen_evidence_node_ids:
+                continue  # superseded verdict for an already-resolved evidence node
+            seen_evidence_node_ids.add(evidence_node_id)
+            verdicts_by_claim_node.setdefault(claim_node_id, []).append(status)
 
-        # HARD GATE (P7.3 review): switch to latest-per-evidenceNodeId before
-        # any production caller of evaluate_evidence_verdict lands --
-        # aggregate-all would let stale verdicts dominate re-verifications.
         for node in nodes_with_claims:
             node_id = node["id"]
             # Defense-in-depth: re-check claim_type here even though Task 2's

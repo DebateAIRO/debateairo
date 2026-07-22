@@ -60,6 +60,7 @@ def _build_claim_and_evidence_node(
     evidence_kind: str = "statistical",
     id_suffix: str = "1",
     no_claim_generation: bool = False,
+    evidence_metadata: dict | None = None,
 ) -> tuple[Debate, Node, Node]:
     debate = Debate(topic="Should cities invest in public transit?", status="running")
     worker = Worker(id=f"worker-verify-{id_suffix}", name="Worker Verify", token_hash="hash", capabilities=["debate"])
@@ -113,7 +114,7 @@ def _build_claim_and_evidence_node(
         status="completed",
         path_status="active",
         materialized_path="/0/0",
-        evidence_metadata={"evidenceKind": evidence_kind},
+        evidence_metadata=evidence_metadata if evidence_metadata is not None else {"evidenceKind": evidence_kind},
     )
     db.add(evidence_node)
     db.flush()
@@ -235,6 +236,84 @@ def test_evaluate_evidence_verdict_records_real_verdict_from_independent_judge(d
     assert snapshot.verification_status == "supported"
     assert snapshot.payload["availability"] == "present"
     assert snapshot.payload["value"]["status"] == "grounded"
+
+
+# ---------------------------------------------------------------------------
+# Task 11 (P1.2) end-to-end activation readiness: the verifier payload's
+# evidence_metadata must include Task 10's retrieval provenance
+# (url/publisher/date/resolution_status/method) when the evidence node has
+# it, and regex-extraction ("model-claim") evidence must keep working.
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_evidence_verdict_payload_includes_retrieval_metadata(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    retrieval_metadata = {
+        "method": "retrieval",
+        "url": "https://example.com/study",
+        "quote": "Congestion pricing cut downtown traffic by 15% in the first year.",
+        "publisher": "Example Transit Review",
+        "date": "2023-05-01",
+        "retrieval_query": "congestion pricing downtown traffic study",
+        "stance": "supports",
+        "resolution_status": "resolved_quote_found",
+    }
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db,
+        claim_model_id="claude-sonnet-5-high-loop",
+        evidence_text=retrieval_metadata["quote"],
+        id_suffix="retrieval",
+        evidence_metadata=retrieval_metadata,
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps(_complete_supported_verdict()),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "supported"
+    request = fake_provider.requests[0]
+    # Task 10 retrieval provenance flows straight into the verifier's
+    # judge-visible metadata payload -- the judge can weigh source
+    # credibility (publisher/date/URL) instead of seeing bare text.
+    assert request.metadata["method"] == "retrieval"
+    assert request.metadata["url"] == retrieval_metadata["url"]
+    assert request.metadata["publisher"] == retrieval_metadata["publisher"]
+    assert request.metadata["date"] == retrieval_metadata["date"]
+    assert request.metadata["retrieval_query"] == retrieval_metadata["retrieval_query"]
+    assert request.metadata["stance"] == retrieval_metadata["stance"]
+    assert request.metadata["resolution_status"] == retrieval_metadata["resolution_status"]
+    # No evidenceKind on a retrieval node -- honestly absent, never fabricated.
+    assert request.metadata["evidence_kind"] is None
+    assert request.metadata["evidence_text"] == evidence_node.claim
+
+
+def test_evaluate_evidence_verdict_payload_still_includes_model_claim_kind(db, monkeypatch) -> None:
+    # Regex-extraction evidence (method "model-claim") keeps working: its
+    # evidenceKind still surfaces as evidence_kind exactly as before this
+    # change, and its "method" key passes through the same as retrieval's.
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db,
+        claim_model_id="claude-sonnet-5-high-loop",
+        id_suffix="model-claim",
+        evidence_metadata={"evidenceKind": "statistical", "method": "model-claim"},
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps(_complete_supported_verdict()),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "supported"
+    request = fake_provider.requests[0]
+    assert request.metadata["evidence_kind"] == "statistical"
+    assert request.metadata["method"] == "model-claim"
+    assert "url" not in request.metadata  # honestly absent, never fabricated
 
 
 def test_evaluate_evidence_verdict_honest_unverifiable_on_provider_failure(db, monkeypatch) -> None:

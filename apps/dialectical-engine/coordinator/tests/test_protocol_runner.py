@@ -257,31 +257,34 @@ def _seed_claim_node_with_scoring(db, debate, *, raw_text: str, position: int) -
     return node
 
 
-def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, evidence_node_id: str, status: str) -> None:
+def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, evidence_node_id: str, status: str) -> AnalyzerRun:
     """Persist a REAL AnalyzerRun(analyzer_type="evidence_verification") row
     shaped exactly like app.evidence.verification_evaluator.evaluate_evidence_verdict
     writes it (evidenceNodeId/claimNodeId/status/reason/evaluatorVersion),
     so the runner's real-verdict lookup reads authentic data, not a fake
-    stand-in shape.
+    stand-in shape. Assigns a real monotonic `seq` via next_analyzer_run_seq
+    (exactly like the production writer does) so tests can prove "latest
+    verdict wins" by calling this helper more than once, in order, for the
+    same evidence_node_id -- the later call always gets the higher seq.
     """
     branch = service.first_branch(db, debate.id)
-    db.add(
-        AnalyzerRun(
-            debate_id=debate.id,
-            branch_id=branch.id,
-            analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
-            output={
-                "evidenceNodeId": evidence_node_id,
-                "claimNodeId": claim_node_id,
-                "status": status,
-                "reason": None,
-                "evaluatorVersion": "evidence-verification-v1",
-            },
-            status="complete",
-            provenance={"judge_role": "verifier"},
-        )
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={
+            "evidenceNodeId": evidence_node_id,
+            "claimNodeId": claim_node_id,
+            "status": status,
+            "reason": None,
+            "evaluatorVersion": "evidence-verification-v1",
+        },
+        status="complete",
+        provenance={"judge_role": "verifier"},
     )
+    next_analyzer_run_seq(db, run)
     db.commit()
+    return run
 
 
 def _persist_protocol_analysis_fixture(db, debate, *, output: dict) -> AnalyzerRun:
@@ -349,6 +352,105 @@ def test_verification_statuses_never_overrides_normative_claims(db) -> None:
     # Defense-in-depth: source stays "kind_classifier" even though a stray
     # real verdict exists -- the conflict is honestly never surfaced as a
     # real_verdict source, since it was never actually applied.
+    assert latest.output["verificationSource"][claim_node.id] == "kind_classifier"
+
+
+# ---------------------------------------------------------------------------
+# Task 11 (P1.2) HARD GATE: latest-per-evidence-node rollup. Pre-fix, the
+# overlay aggregated EVERY persisted evidence_verification verdict for a
+# claim's evidence, so a stale verdict from a superseded (re-verified)
+# attempt sat alongside its own replacement forever. These tests use an
+# "old contradicted -> new supported" pairing specifically because
+# rollup_claim_verification_status always lets "contradicted" win -- that is
+# the ONLY ordering that can distinguish "aggregate every row ever written"
+# from "use only the latest row per evidence node" (a "supported"-then-
+# "contradicted" pairing would report "contradicted" under either policy).
+# ---------------------------------------------------------------------------
+
+
+def test_verification_rollup_uses_latest_verdict_per_evidence_node(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=40
+    )
+    evidence_node_id = "evidence-node-fixture-reverified"
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id=evidence_node_id, status="contradicted"
+    )
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id=evidence_node_id, status="supported"
+    )
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    # Naive aggregate-all would see ["contradicted", "supported"] for this
+    # evidence node and report "contradicted" (it always wins the pure
+    # rollup). Latest-only correctly reports the evidence node's CURRENT
+    # (superseding) verdict.
+    assert latest.output["verificationStatuses"][claim_node.id] == "supported"
+    assert latest.output["verificationSource"][claim_node.id] == "real_verdict"
+
+
+def test_verification_rollup_each_evidence_node_contributes_only_its_own_latest(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=41
+    )
+    # Evidence node 1: re-verified -- stale "contradicted" superseded by
+    # "supported". Evidence node 2: verified once -- "unverifiable" is its
+    # only (hence latest) verdict.
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id="evidence-node-fixture-e1", status="contradicted"
+    )
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id="evidence-node-fixture-e1", status="supported"
+    )
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id="evidence-node-fixture-e2", status="unverifiable"
+    )
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    # E1's stale "contradicted" must not leak into the rollup: latest verdicts
+    # are E1 -> "supported", E2 -> "unverifiable" ->
+    # rollup_claim_verification_status(["supported", "unverifiable"]) ==
+    # "supported". A leaked stale "contradicted" would incorrectly win.
+    assert latest.output["verificationStatuses"][claim_node.id] == "supported"
+    assert latest.output["verificationSource"][claim_node.id] == "real_verdict"
+
+
+def test_verification_rollup_ignores_rows_missing_evidence_node_id(db) -> None:
+    # A row that cannot be grouped by evidence node (no evidenceNodeId) must
+    # be excluded from the rollup rather than crash the loop or be silently
+    # treated as a claim-level verdict -- production's _persist_verification_attempt
+    # always writes evidenceNodeId, but the overlay must stay defensive against
+    # any row that doesn't (mirrors the existing corrupted-output defense
+    # below, one level more specific).
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=42
+    )
+    branch = service.first_branch(db, debate.id)
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={"claimNodeId": claim_node.id, "status": "contradicted", "reason": None},
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    assert latest.output["verificationStatuses"][claim_node.id] == "pending_verification"
     assert latest.output["verificationSource"][claim_node.id] == "kind_classifier"
 
 

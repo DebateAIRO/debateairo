@@ -1020,6 +1020,22 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
             AnalyzerRun.analyzer_type == "node_scoring",
         )
     ).one()
+    # Task 11 (P1.2) end-to-end proof: the real verdict evaluate_evidence_verdict
+    # persists above must flow through the 5.5 overlay's latest-per-evidence-node
+    # rollup (protocol/runner.py, re-run in run_scoring_job_background's finally
+    # block) into verificationStatuses/verificationSource -- the whole activation
+    # path wired jobs.py -> lifecycle -> evaluator -> protocol overlay, not just
+    # proven per hop by narrower unit tests.
+    from app.protocol.runner import PROTOCOL_ANALYSIS_TYPE
+
+    protocol_run = db.scalars(
+        select(AnalyzerRun)
+        .where(AnalyzerRun.debate_id == debate.id, AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE)
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+    ).first()
+    assert protocol_run is not None
+    assert protocol_run.output["verificationStatuses"][claim.id] == "supported"
+    assert protocol_run.output["verificationSource"][claim.id] == "real_verdict"
     snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
     score_row = db.scalars(
         select(NodeScoringResult).where(NodeScoringResult.node_id == claim.id)
@@ -1065,3 +1081,183 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
     assert len(db.scalars(select(EvidenceLifecycleSnapshot)).all()) == 1
     assert len(db.scalars(select(LifecycleDecisionRecord)).all()) == 1
     assert len(published) == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 11 (P1.2) ordering/eligibility guard: verification must skip evidence
+# nodes whose resolution_status is "unreachable" -- the coordinator could not
+# even fetch the cited page, so there is nothing for the judge to compare the
+# claim against. "resolved_quote_missing" (fetched, quote absent) and
+# "pending"/absent (not yet resolved, or a model-claim node with no
+# resolution_status key at all) remain verifier-eligible.
+# ---------------------------------------------------------------------------
+
+
+def test_verification_eligible_evidence_excludes_unreachable() -> None:
+    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata={"resolution_status": "unreachable"})
+    assert scoring_completion_lifecycle._verification_eligible_evidence(node) is False
+
+
+@pytest.mark.parametrize(
+    "evidence_metadata",
+    [
+        {"resolution_status": "resolved_quote_missing"},
+        {"resolution_status": "resolved_quote_found"},
+        {"resolution_status": "pending"},
+        {"evidenceKind": "statistical", "method": "model-claim"},  # no resolution_status key at all
+        None,
+    ],
+)
+def test_verification_eligible_evidence_includes_non_unreachable(evidence_metadata) -> None:
+    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata=evidence_metadata)
+    assert scoring_completion_lifecycle._verification_eligible_evidence(node) is True
+
+
+def test_scoring_completion_skips_unreachable_evidence_from_verification(db, monkeypatch) -> None:
+    import json
+
+    from app.models.entities import Generation, Worker
+    from app.scoring.judges import ScoringProviderResult
+
+    debate = Debate(topic="Evidence eligibility guard", status="complete")
+    worker = Worker(id="eligibility-worker", name="Eligibility Worker", token_hash="hash", capabilities=["debate"])
+    claim = Node(
+        id="eligibility-claim",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="A study found congestion pricing reduces downtown traffic.",
+        status="complete",
+        path_status="active",
+        materialized_path="/",
+    )
+    reachable_evidence = Node(
+        id="eligibility-evidence-reachable",
+        debate=debate,
+        parent_id=claim.id,
+        node_type="EVIDENCE",
+        depth=1,
+        position=2000,
+        claim="Congestion pricing cut traffic by 15%.",
+        status="complete",
+        path_status="active",
+        materialized_path="/2000",
+        # "resolved_quote_missing" is deliberately still eligible -- the judge
+        # itself may mark it contradicted/unverifiable; the coordinator only
+        # pre-filters fetchability, never the verdict.
+        evidence_metadata={"method": "retrieval", "resolution_status": "resolved_quote_missing"},
+    )
+    unreachable_evidence = Node(
+        id="eligibility-evidence-unreachable",
+        debate=debate,
+        parent_id=claim.id,
+        node_type="EVIDENCE",
+        depth=1,
+        position=2001,
+        claim="A source that could not be fetched.",
+        status="complete",
+        path_status="active",
+        materialized_path="/2001",
+        evidence_metadata={"method": "retrieval", "resolution_status": "unreachable"},
+    )
+    db.add_all([debate, worker, claim, reachable_evidence, unreachable_evidence])
+    db.flush()
+    debate.root_node_id = claim.id
+    branch = DebateBranch(debate_id=debate.id, root_node_id=claim.id, status="active")
+    db.add(branch)
+    db.flush()
+
+    claim_generation = Generation(
+        id="eligibility-claim-generation",
+        node_id=claim.id,
+        model_id="claude-sonnet-5-high-loop",
+        role="pro",
+        argument=claim.claim,
+        worker_id=worker.id,
+    )
+    reachable_generation = Generation(
+        id="eligibility-reachable-generation",
+        node_id=reachable_evidence.id,
+        model_id="claude-sonnet-5-high-loop",
+        role="evidence_retriever",
+        argument=reachable_evidence.claim,
+        worker_id=worker.id,
+    )
+    unreachable_generation = Generation(
+        id="eligibility-unreachable-generation",
+        node_id=unreachable_evidence.id,
+        model_id="claude-sonnet-5-high-loop",
+        role="evidence_retriever",
+        argument=unreachable_evidence.claim,
+        worker_id=worker.id,
+    )
+    db.add_all([claim_generation, reachable_generation, unreachable_generation])
+    db.flush()
+    claim.active_generation_id = claim_generation.id
+    reachable_evidence.active_generation_id = reachable_generation.id
+    unreachable_evidence.active_generation_id = unreachable_generation.id
+
+    job = queue_scoring_job(db, debate, model_id="fixture-model")
+    job.status = "complete"
+    db.flush()
+    _add_artifact(db, debate_id=debate.id, node_id=claim.id, job_id=job.id)
+    db.flush()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="node_scoring",
+        status="complete",
+        output={"debate_id": debate.id, "items": []},
+        provenance={"scoring_source": "judge_outputs", "job_id": job.id, "node_ids": [claim.id]},
+        seq=1,
+    )
+    db.add(run)
+    db.commit()
+
+    class RecordingVerifierProvider:
+        # Same provider/model pairing app.evidence tests use as a proven-
+        # independent lineage against "claude-sonnet-5-high-loop", so the
+        # provider actually gets called instead of failing closed on lineage.
+        provider = "codex"
+        model = "gpt-5.2-codex"
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def judge_node(self, request):
+            self.requests.append(request)
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps({"verdict": "unverifiable"}),
+                checked_at=now_utc().isoformat(),
+            )
+
+    provider = RecordingVerifierProvider()
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    monkeypatch.setattr(
+        scoring_completion_lifecycle,
+        "decide_lifecycle_for_node",
+        lambda *_args, **_kwargs: SimpleNamespace(authentic_policy_decision=False),
+    )
+
+    scoring_completion_lifecycle.reevaluate_lifecycle_after_scoring_completion(
+        db,
+        debate_id=debate.id,
+        job_id=job.id,
+        analyzer_run_id=run.id,
+        verification_provider=provider,
+    )
+
+    verified_evidence_texts = {request.metadata["evidence_text"] for request in provider.requests}
+    assert reachable_evidence.claim in verified_evidence_texts
+    assert unreachable_evidence.claim not in verified_evidence_texts
+    assert len(provider.requests) == 1
+
+    verification_runs = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).all()
+    assert {verification_run.output["evidenceNodeId"] for verification_run in verification_runs} == {
+        reachable_evidence.id
+    }

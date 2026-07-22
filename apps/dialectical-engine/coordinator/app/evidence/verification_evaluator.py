@@ -288,16 +288,31 @@ def evaluate_evidence_verdict(
         )
         return {"status": "unverifiable", "reason": reason}
 
-    evidence_kind = None
-    if isinstance(evidence_node.evidence_metadata, dict):
-        evidence_kind = evidence_node.evidence_metadata.get("evidenceKind")
+    raw_evidence_metadata = (
+        evidence_node.evidence_metadata if isinstance(evidence_node.evidence_metadata, dict) else {}
+    )
+    evidence_kind = raw_evidence_metadata.get("evidenceKind")
 
+    # Task 11 (P1.2): Task 10's retrieval provenance -- method/url/quote/
+    # publisher/date/retrieval_query/stance/resolution_status -- flows
+    # straight through into the judge-visible evidence_metadata payload
+    # (render_single_node_judge_prompt echoes this whole metadata dict back
+    # as the prompt's "evidence_metadata" field) whenever the evidence node
+    # carries it. Regex-extraction ("model-claim") nodes carry only
+    # {evidenceKind, method}; their evidence_kind alias below still resolves
+    # from evidenceKind exactly as before this change. A field a node
+    # doesn't have (e.g. url on a model-claim node) is honestly absent from
+    # the payload, never fabricated as None.
     request = ScoringProviderRequest(
         claim=normalize_claim(node_id=claim_node.id, raw_text=claim_node.claim),
         argument_text=claim_generation.argument if claim_generation else None,
         judge_role=judge_role,
         prompt_version=EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
-        metadata={"evidence_text": evidence_node.claim, "evidence_kind": evidence_kind},
+        metadata={
+            **raw_evidence_metadata,
+            "evidence_text": evidence_node.claim,
+            "evidence_kind": evidence_kind,
+        },
     )
 
     try:

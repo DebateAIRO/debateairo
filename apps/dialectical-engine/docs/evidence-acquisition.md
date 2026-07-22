@@ -130,13 +130,119 @@ untouched** — a claim simply ends up with no retrieval evidence. When no searc
 model is online, jobs stay `pending` (their role is unrouted, so the reroute
 sweep never moves them onto a non-search model) until one comes online.
 
+## Verification (P1.2)
+
+The verifier judge role compares each `EVIDENCE` node's text against its
+parent claim and returns one of three verdicts: `supported`, `contradicted`,
+`unverifiable`. It reuses the SAME judge-provider transport as claim scoring
+(`ScoringProvider.judge_node`) with a role-specific prompt
+(`app/scoring/prompts.py`, `judge_role="verifier"`) and a strict output
+schema whose `evidence.entailment` field draws on the entailment vocabulary
+in `app/evidence/entailment.py` (`SUPPORTS`/`REFUTES`/`NOINFO`, though today
+only `SUPPORTS` is accepted alongside a `supported` verdict). No new
+`JudgeContract`/agent role is registered for `"verifier"` — the SAME agent
+config that answers `"judge"` scoring requests also answers verifier
+requests; only the prompt content branches on `request.judge_role`.
+
+### Feature flag
+
+| Env var | Default | Meaning |
+| --- | --- | --- |
+| `DIALECTICAL_EVIDENCE_VERIFICATION` | **off** | Master gate (`app/evidence/verification_evaluator.py`). Off ⇒ `evaluate_evidence_verdict` is an immediate no-op: no provider call, no `AnalyzerRun`, no lifecycle snapshot — byte-identical to the module not being wired in. |
+
+### Flow
+
+```
+scoring/jobs.py::run_scoring_job_background (a scoring job completes)
+  └─ (flag on) verification_provider = RegistryScoringProvider(registry)
+       └─ reevaluate_lifecycle_after_scoring_completion
+            ├─ eligible = argument nodes (ROOT_CLAIM/PRO/CON) freshly
+            │    re-scored by THIS run
+            └─ for each eligible node's live EVIDENCE children
+                 (skipping resolution_status == "unreachable" -- see
+                 Eligibility guard below)
+                    └─ evaluate_evidence_verdict(claim_node, evidence_node, provider)
+                         ├─ independence guard (judge_lineage_metadata) --
+                         │    fails closed to "unverifiable" WITHOUT a
+                         │    provider call when arguer/judge lineage isn't
+                         │    affirmatively independent
+                         ├─ provider.judge_node(verifier prompt + evidence_metadata)
+                         └─ persist AnalyzerRun(analyzer_type="evidence_verification")
+                              + EvidenceLifecycleSnapshot
+
+protocol/runner.py::run_protocol_analysis (5.5 overlay, always-on read;
+re-run in run_scoring_job_background's finally block)
+  └─ group evidence_verification AnalyzerRuns by evidenceNodeId, keep only
+       the latest (max seq) verdict per evidence node -- see Rollup semantics
+  └─ rollup_claim_verification_status(latest verdicts) per claim node
+  └─ overlay onto verificationStatuses / verificationSource
+       (verificationSource distinguishes "real_verdict" from the P5b
+       kind-classifier fallback; a real verdict never overrides a
+       normative/definitional claim's "unverifiable_by_kind")
+```
+
+### Verifier payload
+
+The judge-visible `evidence_metadata` field (`app/scoring/prompts.py`) is the
+evidence node's full `Node.evidence_metadata` plus `evidence_text`/
+`evidence_kind` aliases:
+
+- Retrieval evidence (method `"retrieval"`, see above): `url`, `quote`,
+  `publisher`, `date`, `retrieval_query`, `stance`, `resolution_status`, plus
+  `evidence_text` (the node's `claim`, i.e. the quote) and `evidence_kind`
+  (always `null` — retrieval nodes carry no `evidenceKind`).
+- Regex-extracted evidence (method `"model-claim"`): `evidenceKind`, `method`,
+  plus the same `evidence_text`/`evidence_kind` aliases (`evidence_kind`
+  mirrors `evidenceKind`).
+
+A field a node doesn't have (e.g. `url` on a `model-claim` node) is honestly
+absent from the payload, never fabricated as `null`.
+
+Verification only runs on evidence children of nodes `reevaluate_lifecycle_after_scoring_completion`
+finds "eligible" for THIS scoring run (i.e. freshly re-scored, per its own
+`node_ids`/`JudgeOutputArtifact` correlation) — it is not triggered directly
+by `v2_evidence`/citation-resolution completion. Evidence that materializes
+after a claim's most recent scoring pass is picked up on the claim's NEXT
+scoring pass (e.g. the next POV completion's score-before-synthesis trigger,
+or a later `score_debate` job, both of which `force_refresh` the whole
+debate), not necessarily immediately.
+
+### Eligibility guard
+
+Evidence nodes whose `resolution_status` is `"unreachable"` (the coordinator
+could not even fetch the cited page — see [Citation resolution
+statuses](#citation-resolution-statuses) above) are skipped:
+`evaluate_evidence_verdict` is never called for them, so they never
+contribute a verdict to the rollup. `"resolved_quote_missing"` (page fetched,
+quote absent) and `"pending"`/absent (not yet resolved, or a `model-claim`
+node with no `resolution_status` key at all) remain verifier-eligible — the
+judge itself may mark those `contradicted` or `unverifiable`; the coordinator
+only pre-filters fetchability, never the verdict.
+
+### Rollup semantics (5.5 overlay HARD GATE)
+
+`protocol/runner.py`'s Phase 5.5 overlay used to aggregate EVERY persisted
+`evidence_verification` verdict for a claim's evidence nodes, so a stale
+verdict from a superseded verification attempt (e.g. a re-verification after
+new evidence text) could sit alongside its own replacement forever — and
+since `rollup_claim_verification_status` always lets `contradicted` win, one
+stale `contradicted` could permanently dominate a claim's rollup even after a
+fresh verification superseded it with `supported`. It now groups by
+`evidenceNodeId` and keeps only the row with the highest `AnalyzerRun.seq`
+per evidence node (the same monotonic tiebreak the rest of the module uses
+for "latest") before rolling those latest-only verdicts up per claim.
+
 ## ⚠️ Flip-order warning
 
 **`DIALECTICAL_VERDICT_EVIDENCE_GATE` must stay OFF** until acquisition **and**
-verification demonstrably populate evidence (plan §1.2/§3.6). Acquisition
-(this task) only *retrieves and resolves* sources; it does not *verify*
-entailment or feed DF-QuAD. Turning on the verdict evidence gate before the
-verifier (Task 11) and DF-QuAD wiring (Task 12) land would gate verdicts on an
-`evidence_quality` signal that is still structurally near-zero. Enable in order:
-acquisition → verification → DF-QuAD → then flip the gate using the
-flip-readiness shadow telemetry.
+verification demonstrably populate evidence in production (plan §1.2/§3.6).
+Acquisition (Task 10) retrieves and resolves sources; verification (Task 11,
+above) can now score them, but ships with `DIALECTICAL_EVIDENCE_VERIFICATION`
+default OFF, so today NEITHER signal is live in production. DF-QuAD wiring
+(Task 12) has also not landed, so a verified verdict cannot yet raise or
+attack a parent's tau either. Turning on the verdict evidence gate before
+acquisition + verification are enabled in production AND DF-QuAD feeds
+verified evidence into the graph would gate verdicts on an `evidence_quality`
+signal that is still structurally near-zero. Enable in order: acquisition →
+verification → DF-QuAD → then flip the gate using the flip-readiness shadow
+telemetry.
