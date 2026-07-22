@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Node
+from app.models.entities import AnalyzerRun, Debate, DebateBranch, Node, next_analyzer_run_seq
 from app.scoring.qbaf_debug import qbaf_debug_block
 from app.scoring.reducer import reduce_assessments
 from app.scoring.service import debate_scoring_payload
@@ -94,6 +94,73 @@ def test_qbaf_debug_block_excludes_failed_but_keeps_abandoned_complete_nodes(db)
     assert block is not None
     assert "unavailable_reason" not in block
     assert set(block["strengths"]) == {root.id, abandoned_but_complete.id}
+
+
+def test_qbaf_debug_block_reflects_verified_evidence_edges(db):
+    # Task 12 (P1.3), brief point 5: qbaf_debug.py's output must reflect the
+    # new evidence edges, exactly like the real protocol_analysis path.
+    debate = _make_debate(db)
+    root = _make_node(db, debate, node_type="ROOT_CLAIM", parent=None)
+    pro = _make_node(db, debate, node_type="PRO", parent=root, position=0)
+    evidence = _make_node(db, debate, node_type="EVIDENCE", parent=pro, position=0)
+    branch = DebateBranch(debate_id=debate.id, status="active")
+    db.add(branch)
+    db.flush()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type="evidence_verification",
+        output={
+            "evidenceNodeId": evidence.id,
+            "claimNodeId": pro.id,
+            "status": "supported",
+            "reason": None,
+            "evaluatorVersion": "evidence-verification-v1",
+            "baseScore": 0.88,
+        },
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+
+    block = qbaf_debug_block(db, debate, {"items": []})
+
+    assert block is not None
+    assert "unavailable_reason" not in block
+    assert (evidence.id, pro.id) in block["supports"]
+    assert block["tau_sources"][evidence.id] == "verifier_evidence"
+    assert block["strengths"][evidence.id] == 0.88
+
+
+def test_qbaf_debug_block_ignores_evidence_verification_lookup_failure(db, monkeypatch):
+    # The evidence-verification enrichment is best-effort: a failure fetching
+    # it must degrade to "no evidence edges", never take down the whole
+    # debug block (unlike a genuine qbaf computation failure, which DOES
+    # report unavailable_reason -- see the cycle test below).
+    debate = _make_debate(db)
+    root = _make_node(db, debate, node_type="ROOT_CLAIM", parent=None)
+    pro = _make_node(db, debate, node_type="PRO", parent=root, position=0)
+    _make_node(db, debate, node_type="EVIDENCE", parent=pro, position=0)
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("simulated verdict lookup failure")
+
+    # qbaf_debug.py imports this LOCALLY (function-scoped, to avoid a
+    # circular import -- see its docstring), so patch it at its source
+    # module rather than as a qbaf_debug module-level attribute.
+    monkeypatch.setattr(
+        "app.evidence.verification_evaluator.latest_evidence_verdicts_for_debate", _boom
+    )
+
+    block = qbaf_debug_block(db, debate, {"items": []})
+
+    assert block is not None
+    assert "unavailable_reason" not in block
+    # PRO still supports root (ordinary, non-evidence edge, unaffected by
+    # the simulated lookup failure); the EVIDENCE node gets none -- the
+    # failure degraded cleanly to "no evidence edges" rather than crashing.
+    assert block["supports"] == [(pro.id, root.id)]
 
 
 def test_qbaf_debug_block_returns_unavailable_reason_on_cycle(db, monkeypatch):

@@ -31,18 +31,46 @@ DEFAULT_TAU = 0.5
 # lenses SCIENTIFIC_POV/STATISTICAL_POV/ETHICAL_POV/PRACTICAL_POV (defined as
 # POV_BRANCHES in dialectical_v2.py and V2_POV_ROLES in orchestrator.py).
 #
-# Phase 7 Task 1 adds EVIDENCE (app/evidence/extraction.py's
+# Phase 7 Task 1 added EVIDENCE (app/evidence/extraction.py's
 # persist_evidence_nodes) to _NO_EDGE_TYPES: evidence children are extracted
 # substrings of their parent claim's own prose, not independently-argued
-# QBAF support/attack edges -- conservative filtering choice pending P9
-# product sign-off on whether/how evidence should ever compose into the
-# argument graph.
+# QBAF support/attack edges -- conservative filtering choice pending
+# verification. Task 12 (P1.3) narrows that: an EVIDENCE node with an
+# ELIGIBLE verifier verdict (see `evidence_verifications` on
+# `debate_argument_graph`) now gets a real edge; ROOT_CLAIM remains
+# unconditionally no-edge. See `_evidence_verdict_tau` below.
 _SUPPORT_TYPES = {"PRO", "SCIENTIFIC_POV", "STATISTICAL_POV", "ETHICAL_POV", "PRACTICAL_POV"}
 _ATTACK_TYPES = {"CON"}
-_NO_EDGE_TYPES = {"ROOT_CLAIM", "EVIDENCE"}
+_NO_EDGE_TYPES = {"ROOT_CLAIM"}
 _DEFAULT_CONTAINER_TYPES = frozenset(
     {"SCIENTIFIC_POV", "STATISTICAL_POV", "ETHICAL_POV", "PRACTICAL_POV"}
 )
+
+# Task 12 (P1.3, brief-binding rule 2): the verifier output schema
+# (app.scoring.prompts._VERIFIER_OUTPUT_SCHEMA) only ever carries a numeric
+# grounded score (evidence.base_score) on the "supported" branch -- the
+# schema's own allOf clause REQUIRES the "evidence" object to be ABSENT
+# whenever verdict != "supported", so a "contradicted" verdict never carries
+# a confidence/score value the verifier itself vouches for. Rather than
+# fabricate one, "contradicted" evidence gets this single documented
+# constant as its tau: strong enough to register as a real attack, but
+# deliberately below 1.0 -- the verifier confirmed contradiction, but gave
+# no magnitude for how strongly, so this must never read as maximal
+# certainty either.
+CONTRADICTED_EVIDENCE_TAU = 0.7
+
+# Tau-source label for an EVIDENCE leaf whose tau came from a real verifier
+# verdict (a supported base_score, or CONTRADICTED_EVIDENCE_TAU) rather than
+# a judge strength or the bare default -- lets every consumer (tauCoverage,
+# convergence, debug views) distinguish "this is a verified evidence signal"
+# without re-deriving it from the edge lists.
+EVIDENCE_VERIFIER_TAU_SOURCE = "verifier_evidence"
+
+# Brief-binding rule 1: "supported" -> SUPPORT edge, "contradicted" -> ATTACK
+# edge; any other status (including "unverifiable"/"pending") maps to no
+# entry here, which callers use to mean "no edge -- exactly today's
+# behavior".
+_EVIDENCE_VERDICT_POLARITY = {"supported": "support", "contradicted": "attack"}
 
 
 @dataclass(frozen=True)
@@ -64,11 +92,56 @@ def _tau_for(node_id: str, scores: Mapping[str, Any]) -> tuple[float, str]:
     return DEFAULT_TAU, "default"
 
 
+def _evidence_verdict_tau(
+    node_id: str, evidence_verifications: Mapping[str, Any] | None
+) -> tuple[str | None, float | None]:
+    """Return (polarity, tau) for an EVIDENCE node's latest verifier verdict.
+
+    (None, None) covers every case that must fall back to the pre-Task-12
+    behavior UNCHANGED (brief P1.3 binding rule 1: "unverifiable" or no
+    verdict -> no edge, exactly today's behavior): no evidence_verifications
+    map at all, this node id absent from it, a status other than
+    "supported"/"contradicted", or -- fail closed -- a "supported" entry
+    whose base_score is missing/out-of-range/wrong-typed. The verifier
+    output schema guarantees base_score when supported, but a corrupted or
+    legacy upstream row must never fabricate a tau rather than degrading to
+    "no edge"; this mirrors the untrustworthy-data posture
+    app.evidence.verification_evaluator.evidence_node_verification_eligible
+    already takes on corrupted evidence metadata.
+    """
+    if not evidence_verifications:
+        return None, None
+    verdict = evidence_verifications.get(node_id)
+    if not isinstance(verdict, Mapping):
+        return None, None
+    polarity = _EVIDENCE_VERDICT_POLARITY.get(verdict.get("status"))
+    if polarity is None:
+        return None, None
+    if polarity == "attack":
+        return polarity, CONTRADICTED_EVIDENCE_TAU
+    base_score = verdict.get("base_score")
+    if isinstance(base_score, bool) or not isinstance(base_score, (int, float)):
+        return None, None
+    base_score = float(base_score)
+    if not 0.0 <= base_score <= 1.0:
+        return None, None
+    return polarity, base_score
+
+
 def _edge_for(
-    node_id: str, parent_id: str | None, node_type: str
+    node_id: str,
+    parent_id: str | None,
+    node_type: str,
+    evidence_polarity: str | None = None,
 ) -> tuple[tuple[str, str] | None, str | None]:
     """Returns ((source, target), polarity) or (None, 'unmapped_edge' | None)."""
-    if parent_id is None or node_type in _NO_EDGE_TYPES:
+    if parent_id is None:
+        return None, None
+    if node_type == "EVIDENCE":
+        if evidence_polarity is None:
+            return None, None
+        return (node_id, parent_id), evidence_polarity
+    if node_type in _NO_EDGE_TYPES:
         return None, None
     if node_type in _ATTACK_TYPES:
         return (node_id, parent_id), "attack"
@@ -132,7 +205,21 @@ def _v2_edge_for(
     node_type: str,
     nodes_by_id: Mapping[str, Mapping[str, Any]],
     container_types: AbstractSet[str],
+    evidence_polarity: str | None = None,
 ) -> tuple[tuple[str, str] | None, str | None]:
+    # Task 12 (P1.3): a verified EVIDENCE node's edge target lifts past a
+    # container parent exactly like PRO/CON's own _v2_effective_parent walk
+    # -- an EVIDENCE node's immediate parent CAN be a POV container, and a
+    # verified edge must land on the nearest real argumentative ancestor,
+    # never on a "no edge" pass-through container. `_v2_node_class` still
+    # classifies EVIDENCE as "no_edge" below (used when evidence_polarity is
+    # None -- no verdict, exactly today's behavior).
+    if node_type == "EVIDENCE" and evidence_polarity is not None:
+        effective_parent = _v2_effective_parent(node_id, parent_id, nodes_by_id, container_types)
+        if effective_parent is None:
+            return None, "orphaned_parent"
+        return (node_id, effective_parent), evidence_polarity
+
     node_class = _v2_node_class(node_type, container_types)
     if node_class == "container":
         return None, "lens_no_edge"
@@ -158,12 +245,22 @@ def debate_argument_graph(
     *,
     semantics: str = DEFAULT_SEMANTICS,
     container_types: AbstractSet[str] | None = None,
+    evidence_verifications: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> AdaptedDebateGraph:
     """Build an ArgumentGraph + provenance from plain node/score dicts.
 
     nodes: sequence of {"id", "parent_id", "node_type"} plain dicts (no ORM).
     scores: mapping of node_id -> scoring-item-dict (as validated/public
         scoring items), or {} when no scores are available yet.
+    evidence_verifications: Task 12 (P1.3) -- mapping of EVIDENCE node id ->
+        {"status": "supported"|"contradicted"|..., "base_score": float|None},
+        the latest-per-evidence-node verifier verdict (Task 11 semantics).
+        Only "supported"/"contradicted" ever produce an edge (support/attack
+        respectively into the node's own parent_id, or the nearest real
+        argumentative ancestor under v2 lens-lift semantics); any other
+        status, a node id absent from this mapping, or None/{} (the default)
+        all mean "no edge" -- byte-identical to pre-Task-12 behavior. See
+        `_evidence_verdict_tau`.
     """
     resolved_semantics = resolve_semantics(semantics)
     if resolved_semantics not in {DEFAULT_SEMANTICS, SEMANTICS_V2_LENS_LIFT}:
@@ -193,7 +290,20 @@ def debate_argument_graph(
         parent_id = node.get("parent_id")
         node_type = str(node["node_type"])
 
-        tau, tau_source = _tau_for(node_id, scores)
+        # Task 12 (P1.3): only ever consult evidence_verifications for
+        # EVIDENCE-typed nodes -- a non-EVIDENCE node_id must never have its
+        # tau/edge overridden even if it happens to collide with a key in a
+        # malformed caller-supplied map.
+        evidence_polarity, evidence_tau = (
+            _evidence_verdict_tau(node_id, evidence_verifications)
+            if node_type == "EVIDENCE"
+            else (None, None)
+        )
+
+        if evidence_polarity is not None:
+            tau, tau_source = evidence_tau, EVIDENCE_VERIFIER_TAU_SOURCE
+        else:
+            tau, tau_source = _tau_for(node_id, scores)
         base_scores[node_id] = tau
         tau_sources[node_id] = tau_source
 
@@ -204,9 +314,10 @@ def debate_argument_graph(
                 node_type,
                 nodes_by_id,
                 resolved_container_types,
+                evidence_polarity,
             )
         else:
-            edge, polarity = _edge_for(node_id, parent_id, node_type)
+            edge, polarity = _edge_for(node_id, parent_id, node_type, evidence_polarity)
 
         if polarity in {"unmapped_edge", "lens_no_edge", "orphaned_parent"}:
             tau_sources[f"{node_id}__edge"] = polarity

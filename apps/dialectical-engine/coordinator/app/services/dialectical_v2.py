@@ -2527,6 +2527,29 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
                 trigger_citation_resolution(debate.id, node_ids)
             except Exception as exc:
                 print(f"[dialectical_v2] citation resolution trigger failed (non-fatal): {exc!r}")
+        # Controller addition (Task 12 / P1.3): close the pipeline-ordering
+        # gap Task 11 disclosed -- v2_evidence completion did not itself
+        # trigger any scoring/analysis pass, so newly-materialized evidence
+        # could sit unverified and un-graphed until something UNRELATED
+        # re-scored the debate. Firing the SAME Task 8 incremental-scoring
+        # driver used at the v2_pov/v2_expand completion sites means the
+        # NEXT scoring pass picks these nodes up, which (via
+        # reevaluate_lifecycle_after_scoring_completion) opportunistically
+        # verifies their evidence children, whose verdicts then flow into
+        # the NEXT protocol re-analysis as DF-QuAD evidence edges (Task 12) --
+        # acquisition -> scoring -> verification -> protocol re-analysis ->
+        # evidence edges, without manual intervention. Best-effort/
+        # fire-and-forget, matching every other trigger site in this
+        # function; gated on evidence_acquisition_enabled() alone (the same
+        # flag that gates v2_evidence jobs existing at all) rather than
+        # DIALECTICAL_SCORE_BEFORE_SYNTHESIS -- this is evidence-acquisition's
+        # own completion-driven trigger, independent of the v2_pov branch-
+        # completion trigger's own flag.
+        if evidence_acquisition_enabled():
+            try:
+                trigger_internal_scoring_after_completion(debate.id)
+            except Exception as exc:
+                print(f"[dialectical_v2] evidence-completion scoring trigger failed (non-fatal): {exc!r}")
         return
 
     if job.job_type == "v2_pov":

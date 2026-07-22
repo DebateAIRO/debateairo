@@ -466,6 +466,62 @@ def test_completion_materializes_evidence_nodes_with_retrieval_metadata(db, monk
     assert set(triggered[0][1]) == {child.id for child in evidence_children}
 
 
+# ---------------------------------------------------------------------------
+# Controller addition (binding, Task 12): v2_evidence completion must fire
+# the existing incremental scoring trigger (Task 8's
+# trigger_internal_scoring_after_completion) so late-arriving evidence gets
+# picked up by the NEXT scoring pass -> verification -> protocol re-analysis
+# -> DF-QuAD evidence edges, without waiting on some other unrelated event
+# to re-score the debate. Gated on the evidence-acquisition flag alone (the
+# same flag that gates v2_evidence jobs existing at all), best-effort/
+# fire-and-forget like the other trigger sites (v2_pov, v2_expand).
+# ---------------------------------------------------------------------------
+
+
+def test_evidence_completion_fires_internal_scoring_trigger_when_flag_on(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_ACQUISITION", "true")
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_SEARCH_MODELS", "search-a")
+    service = _service()
+    monkeypatch.setattr(service, "trigger_citation_resolution", lambda debate_id, node_ids: None)
+    calls: list[str] = []
+    monkeypatch.setattr(service, "trigger_internal_scoring_after_completion", lambda debate_id: calls.append(debate_id))
+
+    worker = _online_worker(db, "search-worker", ["search-a"])
+    debate, root, _ = _debate_with_branch(db)
+    node = _claim_node(db, debate, root, argument=EMPIRICAL_ARGUMENT)
+    job = service.maybe_queue_evidence_job(db, debate, node)
+    db.commit()
+    claimed = claim_pending_job(db, worker)
+
+    asyncio.run(complete_job(db, claimed, _evidence_payload(worker, claimed.id, count=1), {"latency_ms": 5}))
+
+    assert calls == [debate.id]
+
+
+def test_evidence_completion_does_not_fire_internal_scoring_trigger_when_flag_off(db, monkeypatch) -> None:
+    # The v2_evidence job itself can only exist because the flag was on at
+    # queue time; flip it off before COMPLETION to prove the completion-site
+    # gate is real (not merely inherited from "the job wouldn't exist").
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_ACQUISITION", "true")
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_SEARCH_MODELS", "search-a")
+    service = _service()
+    monkeypatch.setattr(service, "trigger_citation_resolution", lambda debate_id, node_ids: None)
+    calls: list[str] = []
+    monkeypatch.setattr(service, "trigger_internal_scoring_after_completion", lambda debate_id: calls.append(debate_id))
+
+    worker = _online_worker(db, "search-worker", ["search-a"])
+    debate, root, _ = _debate_with_branch(db)
+    node = _claim_node(db, debate, root, argument=EMPIRICAL_ARGUMENT)
+    job = service.maybe_queue_evidence_job(db, debate, node)
+    db.commit()
+    claimed = claim_pending_job(db, worker)
+
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_ACQUISITION", "false")
+    asyncio.run(complete_job(db, claimed, _evidence_payload(worker, claimed.id, count=1), {"latency_ms": 5}))
+
+    assert calls == []
+
+
 def test_completion_caps_materialized_nodes_at_three(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_ACQUISITION", "true")
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_SEARCH_MODELS", "search-a")

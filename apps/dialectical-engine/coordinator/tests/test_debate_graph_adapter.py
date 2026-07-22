@@ -6,7 +6,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.qbaf.debate_adapter import AdaptedDebateGraph, debate_argument_graph
+from app.qbaf.debate_adapter import (
+    CONTRADICTED_EVIDENCE_TAU,
+    EVIDENCE_VERIFIER_TAU_SOURCE,
+    AdaptedDebateGraph,
+    debate_argument_graph,
+)
 from app.qbaf.dfquad import CyclicGraphError
 from app.qbaf.semantics_versions import DEFAULT_SEMANTICS, SEMANTICS_V2_LENS_LIFT
 from app.scoring.qbaf_debug import qbaf_debug_block
@@ -101,6 +106,189 @@ def test_evidence_node_type_has_no_edge_and_default_tau():
     # EVIDENCE is in _NO_EDGE_TYPES, so no "unmapped_edge" marker either --
     # distinguishing "deliberately no edge" from "unrecognized node_type".
     assert f"evidence1__edge" not in adapted.tau_sources
+
+
+# ---------------------------------------------------------------------------
+# Task 12 (P1.3): verified evidence feeds DF-QuAD. An EVIDENCE node with an
+# eligible verifier verdict (supplied via the `evidence_verifications` param,
+# keyed by evidence node id) gets a real support/attack edge into its parent
+# instead of staying no-edge; "unverifiable"/no verdict/corrupted data all
+# fall back to EXACTLY the pre-Task-12 no-edge/default-tau behavior asserted
+# above.
+# ---------------------------------------------------------------------------
+
+
+def _evidence_tree(evidence_type="EVIDENCE"):
+    return [
+        _node("root", None, "ROOT_CLAIM"),
+        _node("pro1", "root", "PRO"),
+        _node("evidence1", "pro1", evidence_type),
+    ]
+
+
+def test_evidence_supported_verdict_gets_support_edge_and_base_score_tau():
+    nodes = _evidence_tree()
+    adapted = debate_argument_graph(
+        nodes, {}, evidence_verifications={"evidence1": {"status": "supported", "base_score": 0.83}}
+    )
+    assert ("evidence1", "pro1") in adapted.graph.supports
+    assert ("evidence1", "pro1") not in adapted.graph.attacks
+    assert adapted.graph.base_scores["evidence1"] == 0.83
+    assert adapted.tau_sources["evidence1"] == EVIDENCE_VERIFIER_TAU_SOURCE
+    assert "evidence1__edge" not in adapted.tau_sources
+
+
+def test_evidence_contradicted_verdict_gets_attack_edge_and_constant_tau():
+    nodes = _evidence_tree()
+    adapted = debate_argument_graph(
+        nodes, {}, evidence_verifications={"evidence1": {"status": "contradicted", "base_score": None}}
+    )
+    assert ("evidence1", "pro1") in adapted.graph.attacks
+    assert ("evidence1", "pro1") not in adapted.graph.supports
+    assert adapted.graph.base_scores["evidence1"] == CONTRADICTED_EVIDENCE_TAU
+    assert CONTRADICTED_EVIDENCE_TAU == 0.7  # brief-documented constant
+    assert adapted.tau_sources["evidence1"] == EVIDENCE_VERIFIER_TAU_SOURCE
+
+
+@pytest.mark.parametrize("status", ["unverifiable", "pending", "something-unmapped"])
+def test_evidence_non_actionable_status_has_no_edge(status):
+    nodes = _evidence_tree()
+    adapted = debate_argument_graph(
+        nodes, {}, evidence_verifications={"evidence1": {"status": status, "base_score": 0.9}}
+    )
+    assert ("evidence1", "pro1") not in adapted.graph.supports
+    assert ("evidence1", "pro1") not in adapted.graph.attacks
+    assert adapted.graph.base_scores["evidence1"] == 0.5
+    assert adapted.tau_sources["evidence1"] == "default"
+
+
+def test_evidence_absent_from_verifications_map_has_no_edge():
+    nodes = _evidence_tree()
+    # Map is non-empty (some OTHER evidence node has a verdict) but this
+    # node isn't in it -- must behave exactly like "no verdict at all".
+    adapted = debate_argument_graph(
+        nodes, {}, evidence_verifications={"some-other-node": {"status": "supported", "base_score": 0.9}}
+    )
+    assert ("evidence1", "pro1") not in adapted.graph.supports
+    assert adapted.graph.base_scores["evidence1"] == 0.5
+    assert adapted.tau_sources["evidence1"] == "default"
+
+
+@pytest.mark.parametrize(
+    "base_score",
+    [None, "0.8", True, -0.01, 1.01, float("nan")],
+)
+def test_evidence_supported_verdict_with_unusable_base_score_falls_back_to_no_edge(base_score):
+    # Brief binding rule 2 says the verifier schema "guarantees" base_score
+    # when supported, but a corrupted/legacy upstream row must never
+    # fabricate a tau -- fails closed to the pre-Task-12 no-edge behavior,
+    # the same untrustworthy-data posture the rest of this codebase takes.
+    nodes = _evidence_tree()
+    adapted = debate_argument_graph(
+        nodes, {}, evidence_verifications={"evidence1": {"status": "supported", "base_score": base_score}}
+    )
+    assert ("evidence1", "pro1") not in adapted.graph.supports
+    assert ("evidence1", "pro1") not in adapted.graph.attacks
+    assert adapted.graph.base_scores["evidence1"] == 0.5
+    assert adapted.tau_sources["evidence1"] == "default"
+
+
+def test_evidence_verifications_none_and_empty_dict_and_omitted_are_identical():
+    nodes = _evidence_tree()
+    omitted = debate_argument_graph(nodes, {})
+    none_passed = debate_argument_graph(nodes, {}, evidence_verifications=None)
+    empty_passed = debate_argument_graph(nodes, {}, evidence_verifications={})
+    assert omitted.fingerprint == none_passed.fingerprint == empty_passed.fingerprint
+    assert omitted.tau_sources == none_passed.tau_sources == empty_passed.tau_sources
+
+
+def test_supported_evidence_raises_parent_strength_vs_no_verdict_baseline():
+    nodes = _evidence_tree()
+    baseline = debate_argument_graph(nodes, {"pro1": {"scores": {"strength": 0.7}}})
+    supported = debate_argument_graph(
+        nodes,
+        {"pro1": {"scores": {"strength": 0.7}}},
+        evidence_verifications={"evidence1": {"status": "supported", "base_score": 0.95}},
+    )
+    baseline_pro = baseline.graph.compute_strengths()["pro1"]
+    supported_pro = supported.graph.compute_strengths()["pro1"]
+    assert supported_pro > baseline_pro
+
+
+def test_contradicted_evidence_lowers_parent_strength_vs_no_verdict_baseline():
+    nodes = _evidence_tree()
+    baseline = debate_argument_graph(nodes, {"pro1": {"scores": {"strength": 0.7}}})
+    contradicted = debate_argument_graph(
+        nodes,
+        {"pro1": {"scores": {"strength": 0.7}}},
+        evidence_verifications={"evidence1": {"status": "contradicted", "base_score": None}},
+    )
+    baseline_pro = baseline.graph.compute_strengths()["pro1"]
+    contradicted_pro = contradicted.graph.compute_strengths()["pro1"]
+    assert contradicted_pro < baseline_pro
+
+
+def test_evidence_fingerprint_changes_when_verdict_edge_appears():
+    nodes = _evidence_tree()
+    fp_no_verdict = debate_argument_graph(nodes, {}).fingerprint
+    fp_supported = debate_argument_graph(
+        nodes, {}, evidence_verifications={"evidence1": {"status": "supported", "base_score": 0.6}}
+    ).fingerprint
+    assert fp_no_verdict != fp_supported
+
+
+def test_evidence_verdict_edge_deterministic_regardless_of_node_order():
+    # Fingerprint hashing sorts its rows internally (see
+    # test_fingerprint_stable_for_same_input_order_independent above), so it
+    # is order-independent; the raw supports/attacks tuples deliberately
+    # preserve input iteration order (pre-existing property, unrelated to
+    # Task 12) -- compare edge membership as a set, not tuple equality.
+    nodes = _evidence_tree()
+    reversed_nodes = list(reversed(nodes))
+    verifications = {"evidence1": {"status": "supported", "base_score": 0.6}}
+    forward = debate_argument_graph(nodes, {}, evidence_verifications=verifications)
+    backward = debate_argument_graph(reversed_nodes, {}, evidence_verifications=verifications)
+    assert forward.fingerprint == backward.fingerprint
+    assert set(forward.graph.supports) == set(backward.graph.supports)
+
+
+def test_evidence_verdict_edge_lifted_past_container_under_v2_lens_lift():
+    # An EVIDENCE node's immediate parent can itself be a POV container (a
+    # v2-lens-lift "no edge" pass-through node) -- a verified evidence edge
+    # must lift to the nearest real argumentative ancestor exactly like
+    # PRO/CON already do (_v2_effective_parent), not target the container.
+    nodes = [
+        _node("root", None, "ROOT_CLAIM"),
+        _node("pov", "root", "SCIENTIFIC_POV"),
+        _node("evidence1", "pov", "EVIDENCE"),
+    ]
+    adapted = debate_argument_graph(
+        nodes,
+        {},
+        semantics=SEMANTICS_V2_LENS_LIFT,
+        evidence_verifications={"evidence1": {"status": "supported", "base_score": 0.7}},
+    )
+    assert ("evidence1", "root") in adapted.graph.supports
+    edge_endpoints = {endpoint for edge in adapted.graph.supports for endpoint in edge}
+    assert "pov" not in edge_endpoints
+
+
+def test_evidence_verdict_edge_orphaned_parent_fails_closed_under_v2_lens_lift():
+    nodes = [
+        _node("evidence1", "missing-parent", "EVIDENCE"),
+    ]
+    adapted = debate_argument_graph(
+        nodes,
+        {},
+        semantics=SEMANTICS_V2_LENS_LIFT,
+        evidence_verifications={"evidence1": {"status": "supported", "base_score": 0.7}},
+    )
+    assert adapted.graph.supports == ()
+    assert adapted.graph.attacks == ()
+    assert adapted.tau_sources["evidence1__edge"] == "orphaned_parent"
+    # The tau override still applies -- only the EDGE fails closed.
+    assert adapted.graph.base_scores["evidence1"] == 0.7
+    assert adapted.tau_sources["evidence1"] == EVIDENCE_VERIFIER_TAU_SOURCE
 
 
 def test_unknown_node_type_has_no_edge_and_is_recorded():

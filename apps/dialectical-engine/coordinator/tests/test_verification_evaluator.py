@@ -6,8 +6,10 @@ import pytest
 from sqlalchemy import select
 
 from app.evidence.verification_evaluator import (
+    EVIDENCE_VERIFICATION_ANALYZER_TYPE,
     evaluate_evidence_verdict,
     evidence_node_verification_eligible,
+    latest_evidence_verdicts_for_debate,
     rollup_claim_verification_status,
 )
 from app.models.entities import (
@@ -18,6 +20,7 @@ from app.models.entities import (
     Generation,
     Node,
     Worker,
+    next_analyzer_run_seq,
 )
 from app.providers import ProviderError
 from app.scoring.judges import ScoringProviderResult
@@ -430,6 +433,267 @@ def test_evaluate_evidence_verdict_records_contradicted_verdict(db, monkeypatch)
         select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
     ).one()
     assert run.output["status"] == "contradicted"
+
+
+# ---------------------------------------------------------------------------
+# Task 12 (P1.3): the persisted AnalyzerRun.output must carry the verifier's
+# grounded evidence.base_score when supported -- this is the SAME row
+# app.protocol.runner's 5.5 overlay (and app.evidence.verification_evaluator.
+# latest_evidence_verdicts_for_debate below) already loads, so the DF-QuAD
+# graph adapter's evidence tau reads it from there rather than a second query.
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_evidence_verdict_persists_base_score_when_supported(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="base-score-supported"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps(_complete_supported_verdict()),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "supported"
+    run = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).one()
+    assert run.output["baseScore"] == 0.8  # _complete_supported_verdict()'s evidence.base_score
+
+
+def test_evaluate_evidence_verdict_base_score_honestly_none_when_contradicted(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="base-score-contradicted"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps({"verdict": "contradicted"}),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "contradicted"
+    run = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).one()
+    assert run.output["baseScore"] is None
+
+
+def test_evaluate_evidence_verdict_base_score_none_when_supported_but_evidence_object_invalid(
+    db, monkeypatch
+) -> None:
+    # verdict says "supported" but the evidence sub-object fails
+    # _authoritative_evidence_payload's semantic validation (wrong
+    # entailment) -- authoritative_evidence is None, so baseScore must be
+    # honestly None too, never fabricated from the unvalidated raw number.
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="base-score-invalid-evidence"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps(
+            {
+                "verdict": "supported",
+                "evidence": {
+                    "status": "grounded",
+                    "base_score": 0.8,
+                    "uncertainty": 0.1,
+                    "entailment": "REFUTES",  # invalid: must be SUPPORTS
+                    "caveats": [],
+                },
+            }
+        ),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "supported"
+    run = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).one()
+    assert run.output["baseScore"] is None
+
+
+# ---------------------------------------------------------------------------
+# Task 12 (P1.3): latest_evidence_verdicts_for_debate -- the SAME
+# latest-per-evidence-node query + unreachable re-check
+# app.protocol.runner's 5.5 overlay performs (Task 11), factored out so the
+# claim-level rollup, the DF-QuAD graph adapter's evidence edges, and the
+# debug-only QBAF view all read one query's output.
+# ---------------------------------------------------------------------------
+
+
+def _evidence_node(db, debate, claim_node, *, node_id: str, evidence_metadata: dict | None = None) -> Node:
+    node = db.get(Node, node_id)
+    if node is not None:
+        return node
+    node = Node(
+        id=node_id,
+        debate_id=debate.id,
+        parent_id=claim_node.id,
+        node_type="EVIDENCE",
+        depth=claim_node.depth + 1,
+        position=0,
+        claim="Evidence fixture text.",
+        status="complete",
+        path_status="active",
+        materialized_path=f"/evidence-fixture/{node_id}",
+        evidence_metadata=evidence_metadata,
+    )
+    db.add(node)
+    db.flush()
+    return node
+
+
+def _persist_verdict_row(
+    db, debate, *, evidence_node_id: str, claim_node_id: str, status: str, base_score: float | None = None
+) -> AnalyzerRun:
+    branch = db.scalars(select(DebateBranch).where(DebateBranch.debate_id == debate.id)).first()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={
+            "evidenceNodeId": evidence_node_id,
+            "claimNodeId": claim_node_id,
+            "status": status,
+            "reason": None,
+            "evaluatorVersion": "evidence-verification-v1",
+            "baseScore": base_score,
+        },
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+    return run
+
+
+def test_latest_evidence_verdicts_for_debate_returns_empty_when_no_rows(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-empty"
+    )
+    assert latest_evidence_verdicts_for_debate(db, debate.id) == {}
+
+
+def test_latest_evidence_verdicts_for_debate_returns_status_and_base_score(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-basic"
+    )
+    evidence_node = _evidence_node(db, debate, claim_node, node_id="evidence-latest-basic")
+    _persist_verdict_row(
+        db, debate, evidence_node_id=evidence_node.id, claim_node_id=claim_node.id, status="supported", base_score=0.77
+    )
+
+    result = latest_evidence_verdicts_for_debate(db, debate.id)
+
+    assert result == {
+        evidence_node.id: {"claim_node_id": claim_node.id, "status": "supported", "base_score": 0.77}
+    }
+
+
+def test_latest_evidence_verdicts_for_debate_keeps_only_latest_per_evidence_node(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-reverified"
+    )
+    evidence_node = _evidence_node(db, debate, claim_node, node_id="evidence-latest-reverified")
+    _persist_verdict_row(
+        db, debate, evidence_node_id=evidence_node.id, claim_node_id=claim_node.id, status="contradicted"
+    )
+    _persist_verdict_row(
+        db, debate, evidence_node_id=evidence_node.id, claim_node_id=claim_node.id, status="supported", base_score=0.9
+    )
+
+    result = latest_evidence_verdicts_for_debate(db, debate.id)
+
+    assert result[evidence_node.id]["status"] == "supported"
+    assert result[evidence_node.id]["base_score"] == 0.9
+
+
+def test_latest_evidence_verdicts_for_debate_excludes_unreachable_node(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-unreachable"
+    )
+    evidence_node = _evidence_node(
+        db,
+        debate,
+        claim_node,
+        node_id="evidence-latest-unreachable",
+        evidence_metadata={"resolution_status": "unreachable"},
+    )
+    _persist_verdict_row(
+        db, debate, evidence_node_id=evidence_node.id, claim_node_id=claim_node.id, status="supported", base_score=0.9
+    )
+
+    assert latest_evidence_verdicts_for_debate(db, debate.id) == {}
+
+
+def test_latest_evidence_verdicts_for_debate_excludes_row_with_missing_node(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-missing-node"
+    )
+    _persist_verdict_row(
+        db,
+        debate,
+        evidence_node_id="evidence-node-never-persisted",
+        claim_node_id=claim_node.id,
+        status="supported",
+        base_score=0.9,
+    )
+
+    assert latest_evidence_verdicts_for_debate(db, debate.id) == {}
+
+
+def test_latest_evidence_verdicts_for_debate_ignores_rows_missing_required_fields(db) -> None:
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-missing-fields"
+    )
+    branch = db.scalars(select(DebateBranch).where(DebateBranch.debate_id == debate.id)).first()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={"claimNodeId": claim_node.id, "status": "contradicted"},
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+
+    assert latest_evidence_verdicts_for_debate(db, debate.id) == {}
+
+
+def test_latest_evidence_verdicts_for_debate_raises_on_corrupted_output_row(db) -> None:
+    # A corrupted row (output is a list, not a dict) must RAISE rather than
+    # be silently swallowed here -- app.protocol.runner's caller relies on
+    # this to trigger its OWN graceful-degradation try/except (mirrors the
+    # pre-Task-12 inline behavior asserted by
+    # test_corrupted_evidence_verification_row_falls_back_and_still_persists
+    # in test_protocol_runner.py).
+    debate, claim_node, _evidence = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="latest-corrupted"
+    )
+    branch = db.scalars(select(DebateBranch).where(DebateBranch.debate_id == debate.id)).first()
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output=["not", "a", "dict"],
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+
+    with pytest.raises(AttributeError):
+        latest_evidence_verdicts_for_debate(db, debate.id)
 
 
 # ---------------------------------------------------------------------------

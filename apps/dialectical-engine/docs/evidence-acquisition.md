@@ -265,10 +265,26 @@ verification demonstrably populate evidence in production (plan §1.2/§3.6).
 Acquisition (Task 10) retrieves and resolves sources; verification (Task 11,
 above) can now score them, but ships with `DIALECTICAL_EVIDENCE_VERIFICATION`
 default OFF, so today NEITHER signal is live in production. DF-QuAD wiring
-(Task 12) has also not landed, so a verified verdict cannot yet raise or
-attack a parent's tau either. Turning on the verdict evidence gate before
-acquisition + verification are enabled in production AND DF-QuAD feeds
-verified evidence into the graph would gate verdicts on an `evidence_quality`
-signal that is still structurally near-zero. Enable in order: acquisition →
-verification → DF-QuAD → then flip the gate using the flip-readiness shadow
+(Task 12) has now landed structurally: a "supported" verdict draws a SUPPORT
+edge into its parent claim (tau = the verifier's grounded
+`evidence.base_score`) and a "contradicted" verdict draws an ATTACK edge
+(tau = a documented constant, 0.7 -- the verifier schema carries no
+confidence value on that branch); "unverifiable"/no verdict stays no-edge
+exactly as before. Because `DIALECTICAL_EVIDENCE_VERIFICATION` stays OFF,
+no `evidence_verification` rows exist in production yet, so this wiring is
+presently a no-op in practice -- it activates automatically, with no further
+code change, once acquisition + verification are both enabled. Turning on
+the verdict evidence gate before acquisition + verification are enabled in
+production would gate verdicts on an `evidence_quality` signal that is still
+structurally near-zero. Enable in order: acquisition → verification (DF-QuAD
+wiring requires no separate flip -- it activates once verification produces
+real verdicts) → then flip the gate using the flip-readiness shadow
 telemetry.
+
+Task 12 also closes a pipeline-ordering gap: `v2_evidence` job completion
+now fires the existing incremental scoring trigger
+(`trigger_internal_scoring_after_completion`, gated on
+`DIALECTICAL_EVIDENCE_ACQUISITION`), so newly-acquired evidence is picked up
+by the next scoring pass instead of waiting on an unrelated event to
+re-score the debate: acquisition → (next scoring pass) verification →
+protocol re-analysis → evidence edges, with no manual intervention.

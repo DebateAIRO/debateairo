@@ -58,6 +58,7 @@ from collections.abc import Mapping
 from datetime import datetime
 import json
 from json import JSONDecodeError
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -155,6 +156,91 @@ def evidence_node_verification_eligible(evidence_node: Node) -> bool:
     return metadata.get("resolution_status") != "unreachable"
 
 
+def latest_evidence_verdicts_for_debate(db: Session, debate_id: str) -> dict[str, dict[str, Any]]:
+    """Task 12 (P1.3): the SAME latest-per-evidence-node query + unreachable
+    re-check app.protocol.runner's 5.5 overlay performs (Task 11 HARD GATE +
+    review fix), factored out here so every consumer of "what does the
+    latest, currently-eligible evidence_verification verdict say for this
+    debate's evidence nodes right now" -- the 5.5 claim-level rollup, the
+    DF-QuAD graph adapter's evidence edges (both in app.protocol.runner),
+    and the debug-only QBAF view (app.scoring.qbaf_debug) -- reads the
+    identical rows the identical way, rather than each re-deriving its own
+    query (brief P1.3 point 4: "reuse that loading... do not re-query
+    differently").
+
+    Returns {evidence_node_id: {"claim_node_id", "status", "base_score"}}
+    for every evidence node whose LATEST persisted evidence_verification
+    verdict is still eligible right now (evidence_node_verification_eligible
+    on the evidence node's CURRENT row -- an evidence node verified while
+    "pending" citation resolution and later downgraded to "unreachable" is
+    excluded here even though its verdict row still exists). "Eligible"
+    only means "trustworthy to read", not "supported"/"contradicted"
+    specifically -- callers that only care about a graph edge filter status
+    themselves (see app.qbaf.debate_adapter._evidence_verdict_tau).
+
+    base_score is whatever the row's "baseScore" field holds (only ever
+    written non-None by _persist_verification_attempt when status is
+    "supported" AND the verifier's evidence sub-object validated) --
+    returned verbatim, NOT re-validated here: the graph adapter is the
+    single place that decides whether a base_score is usable as a tau
+    (brief P1.3 point 4), so this function does not duplicate that check.
+
+    Raises if a persisted row's `output` is corrupted (not dict-shaped) --
+    deliberately NOT swallowed here so callers' OWN best-effort/graceful-
+    degradation wrapping (e.g. app.protocol.runner's evidence-verification
+    overlay try/except) decides how to degrade, exactly as the pre-Task-12
+    inline version of this logic behaved.
+    """
+    verdict_runs = db.scalars(
+        select(AnalyzerRun)
+        .where(
+            AnalyzerRun.debate_id == debate_id,
+            AnalyzerRun.analyzer_type == EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        )
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+    ).all()
+    latest_by_evidence_node: dict[str, dict[str, Any]] = {}
+    seen_evidence_node_ids: set[str] = set()
+    for verdict_run in verdict_runs:
+        output = verdict_run.output or {}
+        evidence_node_id = output.get("evidenceNodeId")
+        claim_node_id = output.get("claimNodeId")
+        status = output.get("status")
+        if not evidence_node_id or not claim_node_id or not status:
+            # Can't be grouped by evidence node (or has no verdict) --
+            # excluded rather than guessed at. Production's
+            # _persist_verification_attempt always writes evidenceNodeId;
+            # this only guards a malformed/legacy row.
+            continue
+        if evidence_node_id in seen_evidence_node_ids:
+            continue  # superseded verdict for an already-resolved evidence node
+        seen_evidence_node_ids.add(evidence_node_id)
+        latest_by_evidence_node[evidence_node_id] = {
+            "claim_node_id": claim_node_id,
+            "status": status,
+            "base_score": output.get("baseScore"),
+        }
+
+    if not latest_by_evidence_node:
+        return {}
+
+    current_evidence_nodes = {
+        node.id: node
+        for node in db.scalars(
+            select(Node).where(
+                Node.debate_id == debate_id,
+                Node.id.in_(latest_by_evidence_node.keys()),
+            )
+        ).all()
+    }
+    return {
+        evidence_node_id: verdict
+        for evidence_node_id, verdict in latest_by_evidence_node.items()
+        if (node := current_evidence_nodes.get(evidence_node_id)) is not None
+        and evidence_node_verification_eligible(node)
+    }
+
+
 def _active_generation(db: Session, node: Node) -> Generation | None:
     if not node.active_generation_id:
         return None
@@ -233,6 +319,17 @@ def _persist_verification_attempt(
 ) -> None:
     """Persist one verifier attempt and its honest lifecycle projection."""
 
+    # Task 12 (P1.3): the verifier's grounded evidence.base_score, when
+    # present -- ONLY ever non-None here when status=="supported" AND
+    # _authoritative_evidence_payload validated the whole evidence
+    # sub-object (range/type/entailment all checked there already, so this
+    # is a trustworthy passthrough, not a second validation pass). A
+    # "supported" verdict whose evidence sub-object failed that validation
+    # (authoritative_evidence is None despite the textual verdict saying
+    # "supported") honestly persists baseScore: None rather than fabricate
+    # a number -- app.qbaf.debate_adapter fails closed (no edge) on that.
+    base_score = authoritative_evidence.get("base_score") if authoritative_evidence is not None else None
+
     branch = _first_branch(db, debate.id)
     run = AnalyzerRun(
         debate_id=debate.id,
@@ -244,6 +341,7 @@ def _persist_verification_attempt(
             "status": status,
             "reason": reason,
             "evaluatorVersion": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
+            "baseScore": base_score,
             **lineage_metadata,
         },
         status="complete",

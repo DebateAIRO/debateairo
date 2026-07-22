@@ -19,8 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.core.write_lock import commit_write
 from app.evidence.verification_evaluator import (
-    EVIDENCE_VERIFICATION_ANALYZER_TYPE,
-    evidence_node_verification_eligible,
+    latest_evidence_verdicts_for_debate,
     rollup_claim_verification_status,
 )
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Node, next_analyzer_run_seq
@@ -28,7 +27,7 @@ from app.protocol.cross_exam import cross_examine
 from app.protocol.state import advance_phase, protocol_state_of
 from app.protocol.verification import classify_verification, verification_statuses
 from app.qbaf.dfquad import CyclicGraphError
-from app.qbaf.debate_adapter import debate_argument_graph
+from app.qbaf.debate_adapter import EVIDENCE_VERIFIER_TAU_SOURCE, debate_argument_graph
 from app.qbaf.semantics_versions import DEFAULT_SEMANTICS, resolve_semantics
 from app.scoring.normalizer import classify_claim_type
 from app.scoring.service import debate_scoring_payload
@@ -112,6 +111,16 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     # verification_source at the pure P5b fallback, never partially applied.
     verification_source: dict[str, str] = {node["id"]: "kind_classifier" for node in nodes_with_claims}
 
+    # Task 12 (P1.3): per-evidence-node verified verdicts, keyed by EVIDENCE
+    # node id, feeding the DF-QuAD graph adapter's evidence edges below
+    # ({"status", "base_score"} per node -- see debate_argument_graph's
+    # evidence_verifications param). Initialized empty (matching the
+    # pre-Task-12 "always no-edge" behavior) BEFORE the try block so any
+    # failure inside it (same graceful-degradation posture as
+    # verification_map/verification_source above) leaves evidence edges off
+    # rather than partially applied.
+    evidence_verifications: dict[str, dict[str, Any]] = {}
+
     # Phase 7 Task 3: overlay real persisted evidence-verification verdicts
     # on top of the P5b kind-classifier fallback computed above. Always-on
     # (no DIALECTICAL_EVIDENCE_VERIFICATION gate here) -- this just reads
@@ -131,81 +140,24 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     # must still propagate to the outer best-effort wrapper in
     # run_protocol_analysis, unchanged.
     try:
-        # HARD GATE (P7.3 review, RESOLVED Task 11 / P1.2): group persisted
-        # evidence_verification runs by evidenceNodeId and keep ONLY the
-        # latest (max seq) verdict per evidence node -- aggregate-all would
-        # let a stale verdict from a superseded (re-verified) attempt sit
-        # alongside its own replacement forever, and since
-        # rollup_claim_verification_status always lets "contradicted" win, a
-        # single stale "contradicted" could permanently dominate a claim's
-        # rollup even after a fresh verification supersedes it with
-        # "supported". Ordered latest-first by the SAME monotonic tiebreak
-        # the rest of this module uses for "latest AnalyzerRun" (see the
-        # previous_run query below): seq, then created_at, then id. The
-        # FIRST row seen per evidenceNodeId is therefore its latest verdict;
-        # every subsequent row for that same evidence node is a superseded
-        # attempt and is dropped, not aggregated.
-        verdict_runs = db.scalars(
-            select(AnalyzerRun)
-            .where(
-                AnalyzerRun.debate_id == debate.id,
-                AnalyzerRun.analyzer_type == EVIDENCE_VERIFICATION_ANALYZER_TYPE,
-            )
-            .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
-        ).all()
-        latest_verdict_by_evidence_node: dict[str, tuple[str, str]] = {}
-        seen_evidence_node_ids: set[str] = set()
-        for verdict_run in verdict_runs:
-            output = verdict_run.output or {}
-            evidence_node_id = output.get("evidenceNodeId")
-            claim_node_id = output.get("claimNodeId")
-            status = output.get("status")
-            if not evidence_node_id or not claim_node_id or not status:
-                # Can't be grouped by evidence node (or has no verdict) --
-                # excluded from the rollup rather than guessed at. Production's
-                # _persist_verification_attempt always writes evidenceNodeId;
-                # this only guards a malformed/legacy row.
-                continue
-            if evidence_node_id in seen_evidence_node_ids:
-                continue  # superseded verdict for an already-resolved evidence node
-            seen_evidence_node_ids.add(evidence_node_id)
-            latest_verdict_by_evidence_node[evidence_node_id] = (claim_node_id, status)
+        # HARD GATE (Task 11 / P1.2) + unreachable re-check (Task 11 review)
+        # + Task 12 (P1.3) per-evidence-node verified verdicts all come from
+        # ONE shared, latest-per-evidence-node query
+        # (app.evidence.verification_evaluator.latest_evidence_verdicts_for_debate)
+        # so the claim-level rollup below and the DF-QuAD evidence edges can
+        # never read two different views of "what counts as verified right
+        # now" (brief P1.3 point 4: "reuse that loading... do not re-query
+        # differently"). Raises on a corrupted row (e.g. non-dict output) --
+        # caught by this SAME try/except, same as before the refactor.
+        verified_evidence = latest_evidence_verdicts_for_debate(db, debate.id)
 
-        # CRITICAL fix (Task 11 / P1.2 review): a verdict can be persisted
-        # while its evidence node was still "pending" citation resolution;
-        # citation resolution can LATER downgrade that SAME node to
-        # "unreachable" (the fetch ultimately failed) after the verdict was
-        # already recorded. Once a node is "unreachable", the query-time
-        # eligibility guard (scoring_completion_lifecycle.py) permanently
-        # refuses to ever (re-)verify it -- so that one stale verdict would
-        # be this evidence node's only AnalyzerRun and would haunt the
-        # rollup forever without this re-check. Look up each SURVIVING
-        # (latest) verdict's evidence node CURRENT state and drop the
-        # verdict if the node is unreachable now, or missing entirely
-        # (fail closed -- an evidence node is never hard-deleted by any
-        # writer in this codebase today, but an unconfirmable node must
-        # never be trusted by default). Mirrors the unverifiable_by_kind
-        # defense-in-depth re-check below, just for evidence nodes instead
-        # of claim nodes -- the SAME evidence_node_verification_eligible
-        # predicate the query-time guard uses, so both sites can never
-        # silently disagree about what "eligible" means.
-        current_evidence_nodes: dict[str, Node] = {}
-        if latest_verdict_by_evidence_node:
-            current_evidence_nodes = {
-                node.id: node
-                for node in db.scalars(
-                    select(Node).where(
-                        Node.debate_id == debate.id,
-                        Node.id.in_(latest_verdict_by_evidence_node.keys()),
-                    )
-                ).all()
-            }
         verdicts_by_claim_node: dict[str, list[str]] = {}
-        for evidence_node_id, (claim_node_id, status) in latest_verdict_by_evidence_node.items():
-            evidence_node = current_evidence_nodes.get(evidence_node_id)
-            if evidence_node is None or not evidence_node_verification_eligible(evidence_node):
-                continue
-            verdicts_by_claim_node.setdefault(claim_node_id, []).append(status)
+        for evidence_node_id, verdict in verified_evidence.items():
+            verdicts_by_claim_node.setdefault(verdict["claim_node_id"], []).append(verdict["status"])
+            evidence_verifications[evidence_node_id] = {
+                "status": verdict["status"],
+                "base_score": verdict["base_score"],
+            }
 
         for node in nodes_with_claims:
             node_id = node["id"]
@@ -221,10 +173,14 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     except Exception as exc:
         # Honest degradation: leave verification_map/verification_source
         # exactly at the P5b kind-classifier fallback computed above and
-        # keep going -- the protocol run must still persist.
+        # keep going -- the protocol run must still persist. evidence_
+        # verifications also resets to {} (no evidence edges) for the same
+        # reason: a corrupted verdict read must never partially wire the
+        # DF-QuAD graph.
         print(f"[protocol.runner] evidence-verification overlay failed (non-fatal, falling back to kind_classifier): {exc!r}")
         verification_map = verification_statuses(nodes_with_claims)
         verification_source = {node["id"]: "kind_classifier" for node in nodes_with_claims}
+        evidence_verifications = {}
 
     scores_by_node_id = {
         item["node_id"]: item for item in scoring_items if item.get("node_id")
@@ -232,12 +188,21 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
     semantics_version = DEFAULT_SEMANTICS
     qbaf_output: dict[str, Any] = {}
     try:
-        adapted = debate_argument_graph(node_dicts, scores_by_node_id)
+        adapted = debate_argument_graph(
+            node_dicts, scores_by_node_id, evidence_verifications=evidence_verifications
+        )
         strengths = adapted.graph.compute_strengths()
         # W2: aggregate judge-score coverage over ARGUMENT nodes -- every
         # non-EVIDENCE node (ROOT_CLAIM, PRO, CON, POV containers all carry a
-        # tau that composes into the root strength; EVIDENCE nodes are
-        # no-edge extracted substrings whose taus never reach the verdict).
+        # tau that composes into the root strength). EVIDENCE nodes stay
+        # excluded from this denominator even once Task 12 (P1.3) gives some
+        # of them a real verifier-driven edge -- tauCoverage measures JUDGE
+        # coverage over argument nodes specifically; evidence verification is
+        # a different signal class with its own (0/1, not fractional)
+        # semantics, so mixing the two denominators would make tauCoverage
+        # mean something different depending on how much evidence happens to
+        # exist. `argument_node_ids` below already filters by node_type !=
+        # "EVIDENCE" regardless of tau_source, so this holds unconditionally.
         # 0..1 fraction whose tau came from a persisted judge strength rather
         # than DEFAULT_TAU; consumed by verdict_summary's coverage gate.
         #
@@ -344,7 +309,37 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
                 intersection = prev_keys & curr_keys
                 added = curr_keys - prev_keys
                 removed = prev_keys - curr_keys
-                if not intersection:
+
+                # Task 12 (P1.3) honesty fix: node-id-set overlap alone is
+                # blind to a topology change that adds/removes an EDGE
+                # without adding/removing a NODE -- exactly what happens the
+                # first time an EXISTING (already-scored-as-default) EVIDENCE
+                # node gains a verifier-driven support/attack edge (its id
+                # was already present in BOTH runs' dialecticalStrengths).
+                # Comparing which node ids carry the EVIDENCE_VERIFIER_TAU_
+                # SOURCE tau source between the two runs' persisted
+                # tauSources catches exactly that case: it is the ONLY tau
+                # source Task 12 introduces, and an EVIDENCE node's tau
+                # source flips to/from it exactly when its edge appears/
+                # disappears (app.qbaf.debate_adapter._evidence_verdict_tau).
+                # A debate that never touches evidence verification always
+                # computes two empty sets here (equal), so this can never
+                # change behavior for any pre-Task-12 scenario -- reporting a
+                # raw maxDelta for what is actually a structural graph change
+                # would misrepresent it as ordinary strength drift.
+                prev_evidence_edge_nodes = {
+                    node_id
+                    for node_id, source in (previous_output.get("tauSources") or {}).items()
+                    if source == EVIDENCE_VERIFIER_TAU_SOURCE
+                }
+                curr_evidence_edge_nodes = {
+                    node_id
+                    for node_id, source in (qbaf_output.get("tauSources") or {}).items()
+                    if source == EVIDENCE_VERIFIER_TAU_SOURCE
+                }
+                evidence_topology_changed = prev_evidence_edge_nodes != curr_evidence_edge_nodes
+
+                if not intersection or evidence_topology_changed:
                     convergence = {
                         "converged": None,
                         "reason": "topology_changed",

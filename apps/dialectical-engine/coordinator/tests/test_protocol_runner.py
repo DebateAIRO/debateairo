@@ -257,12 +257,16 @@ def _seed_claim_node_with_scoring(db, debate, *, raw_text: str, position: int) -
     return node
 
 
-def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, evidence_node_id: str, status: str) -> AnalyzerRun:
+def _persist_evidence_verification_run(
+    db, debate, *, claim_node_id: str, evidence_node_id: str, status: str, base_score: float | None = None
+) -> AnalyzerRun:
     """Persist a REAL AnalyzerRun(analyzer_type="evidence_verification") row
     shaped exactly like app.evidence.verification_evaluator.evaluate_evidence_verdict
-    writes it (evidenceNodeId/claimNodeId/status/reason/evaluatorVersion),
-    so the runner's real-verdict lookup reads authentic data, not a fake
-    stand-in shape. Assigns a real monotonic `seq` via next_analyzer_run_seq
+    writes it (evidenceNodeId/claimNodeId/status/reason/evaluatorVersion/
+    baseScore -- Task 12/P1.3), so the runner's real-verdict lookup reads
+    authentic data, not a fake stand-in shape. `base_score` defaults to None
+    (matching a "contradicted" verdict, which never carries one). Assigns a
+    real monotonic `seq` via next_analyzer_run_seq
     (exactly like the production writer does) so tests can prove "latest
     verdict wins" by calling this helper more than once, in order, for the
     same evidence_node_id -- the later call always gets the higher seq.
@@ -307,6 +311,7 @@ def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, eviden
             "status": status,
             "reason": None,
             "evaluatorVersion": "evidence-verification-v1",
+            "baseScore": base_score,
         },
         status="complete",
         provenance={"judge_role": "verifier"},
@@ -997,6 +1002,98 @@ def test_evidence_nodes_do_not_dilute_tau_coverage(db) -> None:
     assert run.output["tauSources"][evidence.id] == "default"
 
 
+# ---------------------------------------------------------------------------
+# Task 12 (P1.3): verified evidence feeds DF-QuAD. A verified support/attack
+# edge from an EVIDENCE node changes its parent's PROPAGATED strength (never
+# its own tau, which stays argument-nodes-only per tauCoverage) -- these
+# tests build a baseline (evidence present but never verified, exactly
+# today's pre-Task-12 no-edge behavior) then verify the SAME evidence node
+# and re-run, comparing against the baseline.
+# ---------------------------------------------------------------------------
+
+
+def _seed_pro_with_unverified_evidence(db, debate) -> tuple[Node, Node]:
+    strengths = _seed_scored_pro_con_nodes(db, debate)
+    pro = db.scalars(select(Node).where(Node.debate_id == debate.id, Node.node_type == "PRO")).one()
+    evidence = Node(
+        debate_id=debate.id,
+        parent_id=pro.id,
+        node_type="EVIDENCE",
+        depth=2,
+        position=0,
+        claim="a transport study reported fewer collisions",
+        status="complete",
+        materialized_path="/0/10/0",
+    )
+    db.add(evidence)
+    db.commit()
+    return pro, evidence
+
+
+def test_supported_evidence_raises_parent_strength_vs_no_verdict_baseline(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    pro, evidence = _seed_pro_with_unverified_evidence(db, debate)
+
+    run_protocol_analysis(db, debate)
+    baseline = _latest_protocol_analysis_run(db, debate.id)
+    baseline_pro_strength = baseline.output["dialecticalStrengths"][pro.id]
+    baseline_coverage = baseline.output["tauCoverage"]
+    assert baseline.output["tauSources"][evidence.id] == "default"
+
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=pro.id, evidence_node_id=evidence.id, status="supported", base_score=0.95
+    )
+    run_protocol_analysis(db, debate)
+    verified = _other_protocol_analysis_run(db, debate.id, excluding_id=baseline.id)
+
+    assert verified.output["dialecticalStrengths"][pro.id] > baseline_pro_strength
+    assert verified.output["tauSources"][evidence.id] == "verifier_evidence"
+    assert verified.output["tauCoverage"] == baseline_coverage  # denominator stays argument-nodes-only
+
+
+def test_contradicted_evidence_lowers_parent_strength_vs_no_verdict_baseline(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    pro, evidence = _seed_pro_with_unverified_evidence(db, debate)
+
+    run_protocol_analysis(db, debate)
+    baseline = _latest_protocol_analysis_run(db, debate.id)
+    baseline_pro_strength = baseline.output["dialecticalStrengths"][pro.id]
+    baseline_coverage = baseline.output["tauCoverage"]
+
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=pro.id, evidence_node_id=evidence.id, status="contradicted"
+    )
+    run_protocol_analysis(db, debate)
+    verified = _other_protocol_analysis_run(db, debate.id, excluding_id=baseline.id)
+
+    assert verified.output["dialecticalStrengths"][pro.id] < baseline_pro_strength
+    assert verified.output["tauSources"][evidence.id] == "verifier_evidence"
+    assert verified.output["tauCoverage"] == baseline_coverage
+
+
+def test_unverifiable_evidence_verdict_leaves_strengths_and_coverage_unchanged(db) -> None:
+    # Regression guard: an "unverifiable" verdict must behave EXACTLY like no
+    # verdict at all -- no edge, tau stays default, parent strength unchanged.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    pro, evidence = _seed_pro_with_unverified_evidence(db, debate)
+
+    run_protocol_analysis(db, debate)
+    baseline = _latest_protocol_analysis_run(db, debate.id)
+
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=pro.id, evidence_node_id=evidence.id, status="unverifiable"
+    )
+    run_protocol_analysis(db, debate)
+    after = _other_protocol_analysis_run(db, debate.id, excluding_id=baseline.id)
+
+    assert after.output["dialecticalStrengths"][pro.id] == baseline.output["dialecticalStrengths"][pro.id]
+    assert after.output["tauSources"][evidence.id] == "default"
+    assert after.output["graphFingerprint"] == baseline.output["graphFingerprint"]
+
+
 def test_tau_coverage_excludes_only_failed_placeholders_and_counts_abandoned_complete_nodes(db) -> None:
     # T2 (P0.5), narrowed per controller decision after Task 2 self-review
     # (see task-2-report.md "Concerns"): only status=="failed" placeholder
@@ -1264,6 +1361,48 @@ def test_topology_drift_reports_added_and_removed_node_counts(db) -> None:
     run_protocol_analysis(db, debate)
     run = _other_protocol_analysis_run(db, debate.id, excluding_id=first_run.id)
     assert run.output["convergence"]["nodesAdded"] >= 1
+
+
+def test_evidence_edge_first_appearance_reports_topology_changed_not_spurious_delta(db) -> None:
+    # Task 12 (P1.3) honesty fix: the evidence node's id is UNCHANGED between
+    # the two runs (it already existed, tau=default, no edge) -- only its
+    # edge/tau changes. Plain node-id-set overlap alone would miss this and
+    # report a raw maxDelta instead, which would misrepresent a genuine
+    # topology change as ordinary strength drift.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    pro, evidence = _seed_pro_with_unverified_evidence(db, debate)
+
+    run_protocol_analysis(db, debate)
+    baseline = _latest_protocol_analysis_run(db, debate.id)
+    assert baseline.output["convergence"]["reason"] == "first_evaluation"
+
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=pro.id, evidence_node_id=evidence.id, status="supported", base_score=0.9
+    )
+    run_protocol_analysis(db, debate)
+    verified = _other_protocol_analysis_run(db, debate.id, excluding_id=baseline.id)
+
+    assert verified.output["convergence"]["converged"] is None
+    assert verified.output["convergence"]["reason"] == "topology_changed"
+    assert "maxDelta" not in verified.output["convergence"]
+
+    # Control: re-running with NOTHING new must NOT report topology_changed
+    # (the evidence-edge node set is identical across these two runs). Three
+    # protocol_analysis runs now exist, so query directly rather than reuse
+    # _other_protocol_analysis_run (which only disambiguates exactly 2 rows).
+    run_protocol_analysis(db, debate)
+    stable = db.scalars(
+        select(AnalyzerRun).where(
+            AnalyzerRun.debate_id == debate.id,
+            AnalyzerRun.analyzer_type == "protocol_analysis",
+            AnalyzerRun.id.not_in([baseline.id, verified.id]),
+        )
+    ).one()
+    # The maxDelta branch carries no "reason" key at all (only the
+    # topology_changed/semantics_changed/first_evaluation branches do).
+    assert stable.output["convergence"].get("reason") != "topology_changed"
+    assert stable.output["convergence"]["converged"] is True
 
 
 def test_convergence_phase_advances_to_complete_regardless_of_converged_value(db) -> None:
