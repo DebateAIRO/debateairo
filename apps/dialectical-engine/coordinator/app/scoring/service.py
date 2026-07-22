@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
 from app.core.config import bool_env, float_env
+from app.core.oplog import log_event
 from app.core.write_lock import commit_write, flush_write
 from app.models.entities import (
     AnalyzerRun,
@@ -34,11 +36,13 @@ from app.scoring.cache import (
 from app.scoring.calibration import correlated_discount, judge_weight
 from app.scoring.disagreement import detect_persisted_judge_disagreements, dispersion_uncertainty
 from app.scoring.judge_registry import active_contract
+from app.scoring.judge_panel import build_judge_panel_members
 from app.scoring.lineage import (
     SECRET_METADATA_MARKERS,
     _public_metadata_text,
     judge_lineage_metadata,
     lineage_family,
+    panel_vendor_family,
 )
 from app.scoring.judges import (
     JudgeChildContext,
@@ -65,6 +69,8 @@ from app.scoring.qbaf_debug import qbaf_debug_block
 from app.scoring.reducer import adaptive_depth_dry_run, reduce_assessments
 from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import create_job
+
+LOGGER = logging.getLogger(__name__)
 
 
 SCORING_ANALYZER_TYPE = "node_scoring"
@@ -379,6 +385,7 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         node_id=node.id,
         input_hash=input_hash,
         claim=claim,
+        arguer_model_id=generation.model_id if generation else None,
     )
     metadata = ScoringModelMetadata(
         provider=_public_metadata_text(artifact.provider),
@@ -705,6 +712,21 @@ def score_node_with_provider(
             )
             db.flush()
         return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
+    # Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+    # §P2.2): only runs after the primary judge above has produced a real,
+    # available assessment -- there is no `item` yet to attach a panel to if
+    # the primary itself failed/timed out/parsed unavailable (every branch
+    # above this point already returned). Persists each panel member's own
+    # JudgeOutputArtifact under the SAME input_hash before
+    # _attach_plural_judge_provenance below re-reads persisted evidence for
+    # this node, so a panel judgment is always visible to that read.
+    judge_panel_notes = _run_judge_panel(
+        db,
+        debate=debate,
+        node=node,
+        request=request,
+        input_hash=input_hash,
+    )
     item = reduce_assessments(claim, parsed.assessment).model_dump(mode="json")
     item = _attach_plural_judge_provenance(
         db,
@@ -713,6 +735,8 @@ def score_node_with_provider(
         node_id=node.id,
         input_hash=input_hash,
         claim=claim,
+        arguer_model_id=generation.model_id if generation else None,
+        judge_panel_notes=judge_panel_notes,
     )
     payload = {
         "debate_id": debate.id,
@@ -980,6 +1004,110 @@ def _persist_judge_output_artifact(
     return artifact
 
 
+def _run_judge_panel(
+    db: Session,
+    *,
+    debate: Debate,
+    node: Node,
+    request: ScoringProviderRequest,
+    input_hash: str,
+) -> list[dict]:
+    """Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+    §P2.2): when DIALECTICAL_JUDGE_PANEL_MODELS is set, call each configured
+    secondary-family judge (in addition to the primary judge the caller
+    already called above) and persist its own JudgeOutputArtifact under the
+    SAME input_hash -- so _persisted_judge_evidence_for_node /
+    detect_persisted_judge_disagreements / dispersion_uncertainty (all
+    already generic over any number of distinct persisted (judge_role,
+    provider, model) judgments sharing an input_hash) pick them up
+    automatically, with zero changes to that machinery. Sequential, using
+    the SAME request the primary judge scored (claim/argument_text/
+    debate_question/children all identical -- only judge_role differs per
+    member), just like the primary (point 6: "Panel execution sequential is
+    fine").
+
+    Returns one honest note per panel member that did NOT end up
+    contributing a usable ("available") persisted judgment -- config-time
+    skips (build_judge_panel_members' own unconfigured/unavailable
+    entries), runtime failures caught here, and parse failures -- folded
+    into score_provenance.judge_panel_notes by the caller
+    (_attach_plural_judge_provenance). A panel member's own failure/
+    timeout/exception is caught here and never propagated: it degrades to
+    the remaining judges (point 2), leaving an honest gap rather than a
+    fabricated judgment or a failed scoring run.
+    """
+    members, notes = build_judge_panel_members()
+    notes = list(notes)
+    for member in members:
+        try:
+            result = member.provider.judge_node(request)
+        except TimeoutError:
+            LOGGER.warning("judge panel member timed out: %s", member.model_id)
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "timeout",
+                    "reason": "Panel judge call timed out.",
+                }
+            )
+            continue
+        except ProviderError as exc:
+            LOGGER.warning("judge panel member provider error for %s: %s", member.model_id, exc)
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "provider_error",
+                    "reason": _provider_error_reason(exc, "Panel judge call failed."),
+                }
+            )
+            continue
+        except Exception:  # noqa: BLE001 -- a panel member's own bug/crash must never fail the primary scoring run (point 2)
+            LOGGER.exception("judge panel member raised unexpectedly: %s", member.model_id)
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "exception",
+                    "reason": "Panel judge call raised an unexpected error.",
+                }
+            )
+            continue
+        parsed = parse_judge_json(result.raw_output)
+        parse_available = parsed.status == "available" and parsed.assessment is not None
+        _persist_judge_output_artifact(
+            db,
+            debate_id=debate.id,
+            node_id=node.id,
+            input_hash=input_hash,
+            judge_role=member.judge_role,
+            request=request,
+            result=result,
+            parse_status="available" if parse_available else "unavailable",
+            parse_error=None if parse_available else parsed.reason,
+            assessment=parsed.assessment.model_dump(mode="json") if parsed.assessment is not None else None,
+        )
+        if not parse_available:
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "parse_unavailable",
+                    "reason": parsed.reason or "Panel judge output was unavailable.",
+                }
+            )
+    log_event(
+        LOGGER,
+        "judge_panel.run",
+        debate_id=debate.id,
+        node_id=node.id,
+        member_count=len(members),
+        note_count=len(notes),
+    )
+    return notes
+
+
 def _attach_plural_judge_provenance(
     db: Session,
     item: dict,
@@ -988,6 +1116,8 @@ def _attach_plural_judge_provenance(
     node_id: str,
     input_hash: str,
     claim: NormalizedClaim,
+    arguer_model_id: str | None = None,
+    judge_panel_notes: list[dict] | None = None,
 ) -> dict:
     judge_evidence = _persisted_judge_evidence_for_node(
         db,
@@ -1075,6 +1205,31 @@ def _attach_plural_judge_provenance(
     provenance["calibrationWeights"] = calibration_weights
     provenance["calibrationApplied"] = calibration_applied
     provenance["discountFactor"] = discount_factor
+
+    # Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+    # §P2.2 point 4): always recorded, mirroring the calibrationWeights
+    # precedent immediately above -- "only one real judge ran" is itself an
+    # honest, always-present fact (judgment_mode: "single_judgment"), not
+    # something only surfaced once a panel happens to exist. judge_families
+    # / sole_judge_family_matches_author use panel_vendor_family's vendor-
+    # brand vocabulary (the brief's exact mapping) -- deliberately NOT
+    # lineage_family's buckets used everywhere else in this function; see
+    # panel_vendor_family's docstring for why these are two different
+    # "family" concepts. arguer_model_id is used raw (unscrubbed), matching
+    # the existing lineage_family(generation.model_id) call sites elsewhere
+    # in this file (the DIALECTICAL_LINEAGE_INDEPENDENCE guards) -- only
+    # judge-side model text is scrubbed via _public_metadata_text, per that
+    # same precedent.
+    judge_families = sorted(
+        {panel_vendor_family(_public_metadata_text(evidence["model"])) for evidence in judge_evidence}
+    )
+    provenance["judgment_mode"] = "judge_panel" if len(judge_evidence) >= 2 else "single_judgment"
+    provenance["judge_families"] = judge_families
+    provenance["sole_judge_family_matches_author"] = (
+        len(judge_evidence) == 1 and judge_families == [panel_vendor_family(arguer_model_id)]
+    )
+    if judge_panel_notes:
+        provenance["judge_panel_notes"] = list(judge_panel_notes)
     next_item["score_provenance"] = provenance
 
     if len(judge_evidence) < 2:

@@ -6,14 +6,17 @@ import pytest
 
 from app.providers import (
     AgentConfig,
+    ClaudeCliProvider,
     CodexCliProvider,
     FakeProvider,
+    GeminiCliProvider,
     LLMResponse,
     ProviderError,
     ProviderRegistry,
     detect_codex_scoring_config,
     detect_scoring_provider_config,
     load_agent_configs,
+    panel_cli_provider_for_family,
 )
 
 
@@ -262,6 +265,226 @@ def test_codex_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
         provider.generate([{"role": "user", "content": "score"}], model="gpt-5.6sol-medium")
 
 
+# Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+# §P2.2 point 2): coordinator-side, in-process CLI providers for the claude
+# and gemini CLIs, siblings of CodexCliProvider above. Command construction
+# mirrors worker/app/adapters/claude_cli.py / gemini_cli.py's --model/
+# --effort flags and scripts/subscription_loop.py's build_claude_command /
+# build_gemini_command's single-shot (non-streaming) invocation -- NOT the
+# worker's --output-format stream-json delta feed, since the coordinator
+# wants one plain-text response it can feed straight to
+# app.scoring.parser.parse_judge_json, the same way CodexCliProvider does.
+def test_claude_provider_builds_cli_command_without_live_call() -> None:
+    provider = ClaudeCliProvider(executable="claude")
+
+    command = provider.command(
+        [{"role": "system", "content": "sys"}, {"role": "user", "content": "user"}],
+        model="claude-sonnet-5-high-loop",
+        response_format="json",
+    )
+
+    assert command[0] == "claude"
+    assert "-p" in command
+    assert command[command.index("--model") + 1] == "claude-sonnet-5"
+    assert command[command.index("--effort") + 1] == "high"
+    assert command[command.index("--output-format") + 1] == "text"
+    assert "Return only valid JSON." in command[command.index("-p") + 1]
+
+
+def test_claude_provider_passes_through_an_unrecognized_model_id_unchanged() -> None:
+    provider = ClaudeCliProvider(executable="claude")
+
+    command = provider.command(
+        [{"role": "user", "content": "hi"}],
+        model="claude-future-model",
+    )
+
+    assert command[command.index("--model") + 1] == "claude-future-model"
+
+
+def test_claude_provider_reports_missing_cli_without_generation(monkeypatch) -> None:
+    provider = ClaudeCliProvider(executable="missing-claude")
+    run_called = False
+
+    def fake_run(*args, **kwargs):
+        nonlocal run_called
+        run_called = True
+        raise AssertionError("availability check must not invoke generation")
+
+    monkeypatch.setattr("app.providers.claude_cli.shutil.which", lambda executable: None)
+    monkeypatch.setattr("app.providers.claude_cli.subprocess.run", fake_run)
+
+    status = provider.availability()
+
+    assert status.available is False
+    assert status.provider == "claude"
+    assert status.reason == "Claude executable not found: missing-claude"
+    assert run_called is False
+
+
+def test_claude_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monkeypatch) -> None:
+    provider = ClaudeCliProvider(executable="claude")
+    captured: dict[str, object] = {}
+
+    class Completed:
+        returncode = 0
+        stdout = '{"status":"unavailable"}\n'
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        captured["command"] = command
+        return Completed()
+
+    monkeypatch.setattr("app.providers.claude_cli.shutil.which", lambda executable: "/usr/local/bin/claude")
+    monkeypatch.setattr("app.providers.claude_cli.subprocess.run", fake_run)
+
+    response = provider.generate([{"role": "user", "content": "score"}], model="claude-sonnet-5-high-loop")
+
+    assert captured["command"][0] == "/usr/local/bin/claude"
+    assert response.text == '{"status":"unavailable"}'
+
+
+def test_claude_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
+    provider = ClaudeCliProvider(executable="claude")
+
+    class Completed:
+        returncode = 1
+        stdout = ""
+        stderr = "fatal: authentication required\n"
+
+    monkeypatch.setattr("app.providers.claude_cli.shutil.which", lambda executable: executable)
+    monkeypatch.setattr("app.providers.claude_cli.subprocess.run", lambda *args, **kwargs: Completed())
+
+    with pytest.raises(ProviderError, match="Claude command exited with code 1: fatal: authentication required"):
+        provider.generate([{"role": "user", "content": "score"}], model="claude-sonnet-5-high-loop")
+
+
+def test_claude_provider_times_out(monkeypatch) -> None:
+    import subprocess
+
+    provider = ClaudeCliProvider(executable="claude", timeout_seconds=5)
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="claude", timeout=5)
+
+    monkeypatch.setattr("app.providers.claude_cli.shutil.which", lambda executable: "claude")
+    monkeypatch.setattr("app.providers.claude_cli.subprocess.run", fake_run)
+
+    with pytest.raises(TimeoutError):
+        provider.generate([{"role": "user", "content": "score"}], model="claude-sonnet-5-high-loop")
+
+
+def test_gemini_provider_builds_cli_command_without_live_call() -> None:
+    provider = GeminiCliProvider(executable="agy")
+
+    command = provider.command(
+        [{"role": "user", "content": "score this"}],
+        model="gemini-3.5-flash-loop",
+        response_format="json",
+    )
+
+    assert command[0] == "agy"
+    assert command[1] == "--print"
+    assert command[command.index("--model") + 1] == "gemini-3.5-flash-high"
+    assert command[command.index("--effort") + 1] == "high"
+    assert "--output-format" not in command
+    assert "Return only valid JSON." in command[2]
+
+
+def test_gemini_provider_passes_through_an_unrecognized_model_id_unchanged() -> None:
+    provider = GeminiCliProvider(executable="agy")
+
+    command = provider.command([{"role": "user", "content": "hi"}], model="gemini-future-model")
+
+    assert command[command.index("--model") + 1] == "gemini-future-model"
+
+
+def test_gemini_provider_reports_missing_cli_without_generation(monkeypatch) -> None:
+    provider = GeminiCliProvider(executable="missing-agy")
+    run_called = False
+
+    def fake_run(*args, **kwargs):
+        nonlocal run_called
+        run_called = True
+        raise AssertionError("availability check must not invoke generation")
+
+    monkeypatch.setattr("app.providers.gemini_cli.shutil.which", lambda executable: None)
+    monkeypatch.setattr("app.providers.gemini_cli.subprocess.run", fake_run)
+
+    status = provider.availability()
+
+    assert status.available is False
+    assert status.provider == "gemini"
+    assert status.reason == "Gemini executable not found: missing-agy"
+    assert run_called is False
+
+
+def test_gemini_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monkeypatch) -> None:
+    provider = GeminiCliProvider(executable="agy")
+    captured: dict[str, object] = {}
+
+    class Completed:
+        returncode = 0
+        stdout = '{"status":"unavailable"}\n'
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        captured["command"] = command
+        return Completed()
+
+    monkeypatch.setattr("app.providers.gemini_cli.shutil.which", lambda executable: "/usr/local/bin/agy")
+    monkeypatch.setattr("app.providers.gemini_cli.subprocess.run", fake_run)
+
+    response = provider.generate([{"role": "user", "content": "score"}], model="gemini-3.5-flash-loop")
+
+    assert captured["command"][0] == "/usr/local/bin/agy"
+    assert response.text == '{"status":"unavailable"}'
+
+
+def test_gemini_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
+    provider = GeminiCliProvider(executable="agy")
+
+    class Completed:
+        returncode = 1
+        stdout = ""
+        stderr = "fatal: not authenticated\n"
+
+    monkeypatch.setattr("app.providers.gemini_cli.shutil.which", lambda executable: executable)
+    monkeypatch.setattr("app.providers.gemini_cli.subprocess.run", lambda *args, **kwargs: Completed())
+
+    with pytest.raises(ProviderError, match="Gemini command exited with code 1: fatal: not authenticated"):
+        provider.generate([{"role": "user", "content": "score"}], model="gemini-3.5-flash-loop")
+
+
+def test_gemini_provider_times_out(monkeypatch) -> None:
+    import subprocess
+
+    provider = GeminiCliProvider(executable="agy", timeout_seconds=5)
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="agy", timeout=5)
+
+    monkeypatch.setattr("app.providers.gemini_cli.shutil.which", lambda executable: "agy")
+    monkeypatch.setattr("app.providers.gemini_cli.subprocess.run", fake_run)
+
+    with pytest.raises(TimeoutError):
+        provider.generate([{"role": "user", "content": "score"}], model="gemini-3.5-flash-loop")
+
+
+def test_panel_cli_provider_for_family_resolves_claude_and_gemini() -> None:
+    claude = panel_cli_provider_for_family("claude")
+    gemini = panel_cli_provider_for_family("gemini")
+
+    assert isinstance(claude, ClaudeCliProvider)
+    assert isinstance(gemini, GeminiCliProvider)
+
+
+def test_panel_cli_provider_for_family_returns_none_for_unconfigured_family() -> None:
+    assert panel_cli_provider_for_family("grok") is None
+    assert panel_cli_provider_for_family("unknown") is None
+    assert panel_cli_provider_for_family("") is None
+
+
 def test_proposal_engine_modules_outside_providers_do_not_reference_vendors() -> None:
     checked_roots = [
         ENGINE_ROOT / "coordinator" / "app" / "debate",
@@ -280,9 +503,15 @@ def test_proposal_engine_modules_outside_providers_do_not_reference_vendors() ->
     # integration, so app/providers is not the right home for it; the exact
     # vendor-family tokens its classification table needs are allowlisted
     # here rather than banned, while any other vendor leak in the file (e.g.
-    # "openai") still fails the test.
+    # "ollama") still fails the test.
+    # Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+    # §P2.2): lineage.py's panel_vendor_family adds a second classification
+    # table (gpt*/codex -> "openai", claude* -> "anthropic") for the
+    # sole_judge_family_matches_author comparison -- "openai"/"anthropic"
+    # join the allowlist for the same reason "codex"/"claude"/"gemini"/
+    # "grok" are already there.
     allowed_vendor_tokens = {
-        "coordinator/app/scoring/lineage.py": {"codex", "claude", "gemini", "grok"},
+        "coordinator/app/scoring/lineage.py": {"codex", "claude", "gemini", "grok", "openai", "anthropic"},
     }
     offenders: list[str] = []
     for root in checked_roots:

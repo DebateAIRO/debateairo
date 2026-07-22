@@ -46,6 +46,54 @@ def lineage_family(model_id: str | None) -> str | None:
     return lowered
 
 
+# Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+# §P2.2 point 4): the brief's exact vendor-brand mapping for
+# sole_judge_family_matches_author. Deliberately ordered codex/gpt adjacent
+# (both -> openai) -- order otherwise doesn't matter since no model id
+# string plausibly matches two of these substrings.
+_PANEL_VENDOR_FAMILY_SUBSTRINGS: tuple[tuple[str, str], ...] = (
+    ("codex", "openai"),
+    ("gpt", "openai"),
+    ("claude", "anthropic"),
+    ("gemini", "google"),
+    ("grok", "xai"),
+    ("lmstudio", "local"),
+)
+PANEL_VENDOR_FAMILY_UNKNOWN = "unknown"
+
+
+def panel_vendor_family(model_id: str | None) -> str:
+    """Vendor-brand family bucket for the Task 6 cross-family judge panel's
+    sole_judge_family_matches_author comparison (docs/improvement-plan-
+    2026-07-22.md §P2.2 point 4) -- gpt*/codex -> "openai", claude* ->
+    "anthropic", gemini* -> "google", grok* -> "xai", lmstudio* -> "local";
+    anything else (including None/empty) -> the literal string "unknown".
+
+    Deliberately separate from lineage_family above: lineage_family's
+    "claude"/"gpt"/"gemini"/... buckets are the established internal
+    identity/grouping vocabulary this file already uses everywhere else
+    (judge/arguer independence, calibration correlated-error discounting,
+    panel judge_id/judge_role naming in judge_registry.py) -- changing what
+    it returns would ripple into all of those, which is explicitly out of
+    scope (the Task 6 brief's "Do NOT change... the single-judge default
+    path"). This function exists only to answer one question honestly --
+    "is the author a vendor the reader would recognize as the SAME org as
+    the judge?" -- with the coarser, product-facing vendor-brand vocabulary
+    the brief specifies. Returns "unknown" (never None) for unrecognized or
+    empty input because sole_judge_family_matches_author needs a concrete
+    value on both sides of its comparison, not an absence to special-case.
+    """
+    if not model_id:
+        return PANEL_VENDOR_FAMILY_UNKNOWN
+    lowered = model_id.strip().lower()
+    if not lowered:
+        return PANEL_VENDOR_FAMILY_UNKNOWN
+    for substring, family in _PANEL_VENDOR_FAMILY_SUBSTRINGS:
+        if substring in lowered:
+            return family
+    return PANEL_VENDOR_FAMILY_UNKNOWN
+
+
 def judge_lineage_metadata(
     *,
     arguer_model_id: str | None,

@@ -2,6 +2,8 @@ from app.scoring.judge_registry import (
     PRIMARY_NODE_SCORING_JUDGE,
     JudgeContract,
     active_contract,
+    judge_panel_role,
+    panel_contract,
 )
 
 
@@ -127,3 +129,67 @@ def test_active_contract_rejects_unknown_role() -> None:
 
     with pytest.raises(KeyError):
         active_contract("nonexistent_role")
+
+
+# Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+# §P2.2 point 3): "one JudgeContract per panel family (judge_id
+# node_scoring.panel.<family>, same prompt/schema/reducer versions as
+# primary -> distinct contract_hash per judge)".
+def test_judge_panel_role_is_distinct_per_family() -> None:
+    assert judge_panel_role("claude") == "judge_panel_claude"
+    assert judge_panel_role("gemini") == "judge_panel_gemini"
+    assert judge_panel_role("claude") != judge_panel_role("gemini")
+
+
+def test_panel_contract_uses_the_documented_judge_id_shape() -> None:
+    contract = panel_contract("claude")
+    assert contract.judge_id == "node_scoring.panel.claude"
+    assert contract.role == "judge"
+
+
+def test_panel_contract_shares_primary_prompt_schema_and_reducer_versions() -> None:
+    # Task 6 does not change prompt content or reducer math (brief's "Do
+    # NOT change" list) -- a panel judge's contract must pin the exact same
+    # rubric/prompt/schema/reducer versions as the primary, so it is scored
+    # (and its cache invalidated) under identical rules.
+    contract = panel_contract("gemini")
+    assert contract.rubric_version == PRIMARY_NODE_SCORING_JUDGE.rubric_version
+    assert contract.prompt_version == PRIMARY_NODE_SCORING_JUDGE.prompt_version
+    assert contract.schema_version == PRIMARY_NODE_SCORING_JUDGE.schema_version
+    assert contract.reducer_version == PRIMARY_NODE_SCORING_JUDGE.reducer_version
+
+
+def test_panel_contract_hash_differs_from_primary_and_between_families() -> None:
+    claude_contract = panel_contract("claude")
+    gemini_contract = panel_contract("gemini")
+    assert claude_contract.contract_hash != PRIMARY_NODE_SCORING_JUDGE.contract_hash
+    assert gemini_contract.contract_hash != PRIMARY_NODE_SCORING_JUDGE.contract_hash
+    assert claude_contract.contract_hash != gemini_contract.contract_hash
+
+
+def test_panel_contract_is_deterministic_for_the_same_family() -> None:
+    # Two independently-built contracts for the same family must be
+    # value-equal (same contract_hash) even though they are not the same
+    # object -- active_contract derives a panel contract on demand from the
+    # role string rather than reading a pre-built singleton (see
+    # test_active_contract_derives_panel_contract_from_role_prefix below).
+    assert panel_contract("claude").contract_hash == panel_contract("claude").contract_hash
+
+
+def test_active_contract_derives_panel_contract_from_role_prefix() -> None:
+    contract = active_contract(judge_panel_role("claude"))
+    assert contract.contract_hash == panel_contract("claude").contract_hash
+    assert contract.judge_id == "node_scoring.panel.claude"
+
+
+def test_active_contract_still_returns_primary_for_plain_judge_role() -> None:
+    # Regression: the panel-role-prefix handling in active_contract must not
+    # disturb the existing "judge" -> PRIMARY_NODE_SCORING_JUDGE lookup.
+    assert active_contract("judge") is PRIMARY_NODE_SCORING_JUDGE
+
+
+def test_active_contract_rejects_a_bare_panel_prefix_with_no_family() -> None:
+    import pytest
+
+    with pytest.raises(KeyError):
+        active_contract("judge_panel_")

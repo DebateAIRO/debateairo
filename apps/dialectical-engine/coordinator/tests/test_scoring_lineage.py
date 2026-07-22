@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.scoring.lineage import lineage_family, judge_lineage_metadata
+from app.scoring.lineage import lineage_family, judge_lineage_metadata, panel_vendor_family
 
 
 def test_lineage_family_recognizes_claude() -> None:
@@ -59,3 +59,52 @@ def test_judge_lineage_metadata_honest_null_when_arguer_lineage_unknown() -> Non
     assert meta["arguerLineage"] is None
     assert meta["independent"] is None
     assert meta["independenceReason"] == "arguer_lineage_unknown"
+
+
+# Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+# §P2.2): panel_vendor_family is a DIFFERENT "family" concept from
+# lineage_family above -- see its docstring. It exists only for the
+# sole_judge_family_matches_author comparison in
+# app.scoring.service._attach_plural_judge_provenance, so its vocabulary is
+# the brief's exact vendor-brand mapping (gpt*/codex -> openai, claude* ->
+# anthropic, gemini* -> google, grok* -> xai, lmstudio* -> local), never
+# lineage_family's claude/gpt/gemini buckets.
+def test_panel_vendor_family_recognizes_gpt_and_codex_as_openai() -> None:
+    assert panel_vendor_family("gpt-5.6sol-medium") == "openai"
+    assert panel_vendor_family("gpt-4o") == "openai"
+    assert panel_vendor_family("codex-test-model") == "openai"
+
+
+def test_panel_vendor_family_recognizes_claude_as_anthropic() -> None:
+    assert panel_vendor_family("claude-sonnet-5-high-loop") == "anthropic"
+
+
+def test_panel_vendor_family_recognizes_gemini_as_google() -> None:
+    assert panel_vendor_family("gemini-3.5-flash-loop") == "google"
+
+
+def test_panel_vendor_family_recognizes_grok_as_xai() -> None:
+    assert panel_vendor_family("grok-4.5-high-loop") == "xai"
+
+
+def test_panel_vendor_family_recognizes_lmstudio_as_local() -> None:
+    assert panel_vendor_family("lmstudio:google_gemma-4-e4b-it") == "local"
+
+
+def test_panel_vendor_family_unrecognized_model_is_literal_unknown_string() -> None:
+    # Unlike lineage_family (which returns the raw lowercased string for an
+    # unrecognized-but-concrete model id), panel_vendor_family always
+    # collapses to the literal string "unknown" -- the brief's mapping ends
+    # "unknown -> 'unknown'", and sole_judge_family_matches_author needs a
+    # concrete value on both sides of its comparison, not an unbounded set
+    # of one-off bucket names.
+    assert panel_vendor_family("some-future-model-x9") == "unknown"
+
+
+def test_panel_vendor_family_of_none_or_empty_is_literal_unknown_string() -> None:
+    # Also unlike lineage_family (None for None/empty input): this helper
+    # never returns None, because sole_judge_family_matches_author always
+    # needs a concrete value to compare against.
+    assert panel_vendor_family(None) == "unknown"
+    assert panel_vendor_family("") == "unknown"
+    assert panel_vendor_family("   ") == "unknown"

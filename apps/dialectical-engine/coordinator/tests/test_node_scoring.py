@@ -81,7 +81,9 @@ from app.scoring import (
     select_depth_pressure,
     scoring_result_payload,
 )
-from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE
+from app.scoring.judge_panel import JudgePanelMember
+from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE, judge_panel_role
+from app.scoring.lineage import panel_vendor_family
 from app.scoring.service import NO_INDEPENDENT_JUDGE_REASON, ensure_node_scoring_on_completion
 from app.services.orchestrator import claim_pending_job, complete_job
 
@@ -3699,6 +3701,618 @@ def test_score_node_with_provider_keeps_heuristic_uncertainty_source_for_a_singl
     item = payload["items"][0]
     assert item["uncertainty_source"] == "heuristic"
     assert item["scores"]["uncertainty"] == pytest.approx(expected_uncertainty)
+
+
+# Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
+# §P2.2): DIALECTICAL_JUDGE_PANEL_MODELS opt-in. Real CLI construction
+# (app.scoring.judge_panel.build_judge_panel_members with the real
+# app.providers.judge_panel_providers.panel_cli_provider_for_family) is
+# covered by tests/test_judge_panel.py and tests/test_providers.py -- these
+# tests exercise score_node_with_provider's consumption of an already-built
+# panel by monkeypatching app.scoring.service.build_judge_panel_members
+# directly (the same "patch where it's looked up" pattern already used for
+# e.g. scoring_api.score_debate_with_provider_registry elsewhere in this
+# file), so no live CLI is ever invoked.
+def test_score_node_with_provider_panel_disabled_persists_single_artifact_and_reports_single_judgment_mode(
+    db, monkeypatch
+) -> None:
+    monkeypatch.delenv("DIALECTICAL_JUDGE_PANEL_MODELS", raising=False)
+
+    class SoloJudgeProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=9,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, SoloJudgeProvider(), judge_role="judge", force_refresh=True
+    )
+
+    # Explicit regression (brief's Tests section): panel disabled -> exactly
+    # one JudgeOutputArtifact, unchanged from today's single-judge behavior.
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=node.id)
+    assert artifact.judge_role == "judge"
+
+    item = payload["items"][0]
+    provenance = item["score_provenance"]
+    assert provenance["judgment_mode"] == "single_judgment"
+    assert provenance["judge_families"] == ["openai"]
+    assert "judge_participation" not in provenance
+    assert "judge_panel_notes" not in provenance
+
+
+def test_score_node_with_provider_panel_enabled_persists_artifacts_for_every_panel_member(db, monkeypatch) -> None:
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "panel-model-x,panel-model-y")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                # _private_test_marker keeps this provider's raw_output
+                # byte-distinct from the panel members below --
+                # _persisted_judge_evidence_for_node dedupes by
+                # raw_output_sha256 as well as by (judge_role, provider,
+                # model) identity, so three judges returning byte-identical
+                # JSON would collapse to one distinct evidence item (see the
+                # identical technique in
+                # test_score_node_with_provider_exposes_plural_provenance_
+                # from_distinct_persisted_judges above).
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": "T6-PRIMARY-RAW",
+                    }
+                ),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class PanelMemberProvider:
+        def __init__(self, provider: str, model: str, marker: str) -> None:
+            self.provider = provider
+            self.model = model
+            self.marker = marker
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": self.marker,
+                    }
+                ),
+                latency_ms=12,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    claude_member = JudgePanelMember(
+        family="claude",
+        model_id="panel-model-x",
+        judge_role=judge_panel_role("claude"),
+        provider=PanelMemberProvider("claude", "panel-model-x", "T6-CLAUDE-RAW"),
+    )
+    gemini_member = JudgePanelMember(
+        family="gemini",
+        model_id="panel-model-y",
+        judge_role=judge_panel_role("gemini"),
+        provider=PanelMemberProvider("gemini", "panel-model-y", "T6-GEMINI-RAW"),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([claude_member, gemini_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    db.expire_all()
+    artifact_model = _judge_output_artifact_model()
+    artifacts = db.scalars(
+        select(artifact_model).where(artifact_model.debate_id == debate.id, artifact_model.node_id == node.id)
+    ).all()
+    assert len(artifacts) == 3
+    assert {artifact.judge_role for artifact in artifacts} == {
+        "judge",
+        "judge_panel_claude",
+        "judge_panel_gemini",
+    }
+    # Each panel family gets its own contract (brief point 3: distinct
+    # contract_hash per judge).
+    assert len({artifact.contract_hash for artifact in artifacts}) == 3
+
+    item = payload["items"][0]
+    provenance = item["score_provenance"]
+    assert provenance["judgment_mode"] == "judge_panel"
+    assert provenance["judge_families"] == sorted(
+        {panel_vendor_family("gpt-5.6sol-medium"), panel_vendor_family("panel-model-x"), panel_vendor_family("panel-model-y")}
+    )
+    assert provenance["judge_participation"]["judge_count"] == 3
+    assert provenance["judge_participation"]["judge_roles"] == sorted(
+        ["judge", "judge_panel_claude", "judge_panel_gemini"]
+    )
+    assert provenance["sole_judge_family_matches_author"] is False
+
+
+def test_score_node_with_provider_panel_scores_reflect_calibration_weighted_merge_of_all_members(
+    db, monkeypatch
+) -> None:
+    # Task 6 point 4 ("Merge: ... feed it all panel assessments for the
+    # node"): the existing DIALECTICAL_CALIBRATION_WEIGHTS reducer-merge
+    # path (_weighted_aggregate_scores, already exercised without a panel by
+    # tests/test_calibration_integration.py) must compose with panel
+    # judgments with ZERO new merge code -- it already reads
+    # _persisted_judge_evidence_for_node, which is panel-agnostic. Primary
+    # logical_validity=0.75 (base_assessment default), panel member
+    # logical_validity=0.25, both at full weight (distinct lineage_family
+    # buckets "gpt" vs "claude" -- correlated_discount never discounts
+    # different families against each other), so the honest weighted mean
+    # is exactly 0.5 -- provably neither input alone, so this fails if the
+    # panel's own persisted judgment were silently excluded from the merge.
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "claude-panel-model")
+    monkeypatch.setenv("DIALECTICAL_CALIBRATION_WEIGHTS", "true")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class ClaudePanelProvider:
+        provider = "claude-panel-provider"
+        model = "claude-panel-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        critic=CriticAssessment(
+                            logical_validity=0.25,
+                            assumption_risk=0.4,
+                            counterargument_strength=0.3,
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=12,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    claude_member = JudgePanelMember(
+        family="claude",
+        model_id="claude-panel-model",
+        judge_role=judge_panel_role("claude"),
+        provider=ClaudePanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([claude_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["calibrationApplied"] is True
+    assert item["scores"]["logical_validity"] == pytest.approx(0.5)
+
+
+def test_score_node_with_provider_panel_split_produces_persisted_disagreement_and_dispersion_driver(
+    db, monkeypatch
+) -> None:
+    # Same strong-evidence-primary / weak-evidence-skeptic fixture shape as
+    # test_score_node_with_provider_exposes_plural_provenance_from_distinct_
+    # persisted_judges above (0.35+ _claim_strength_signal gap), but driven
+    # through the panel mechanism (one score_node_with_provider call, with a
+    # panel member injected) rather than two separate calls under different
+    # judge_role values.
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "skeptic-panel-model")
+
+    class PrimaryJudgeProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        evidence=EvidenceAssessment(
+                            evidence_quality=0.8,
+                            evidence_relevance=0.8,
+                            evidence_sufficiency=0.8,
+                            source_reliability=0.8,
+                            freshness=0.8,
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=11,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class SkepticPanelProvider:
+        provider = "skeptic-panel-provider"
+        model = "skeptic-panel-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        critic=CriticAssessment(
+                            logical_validity=0.25,
+                            assumption_risk=0.9,
+                            counterargument_strength=0.85,
+                        ),
+                        evidence=EvidenceAssessment(
+                            evidence_quality=0.15,
+                            evidence_relevance=0.25,
+                            evidence_sufficiency=0.15,
+                            source_reliability=0.2,
+                            freshness=0.2,
+                            missing_evidence=["No independent source supports this claim."],
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=13,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    skeptic_member = JudgePanelMember(
+        family="skeptic-family",
+        model_id="skeptic-panel-model",
+        judge_role=judge_panel_role("skeptic-family"),
+        provider=SkepticPanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([skeptic_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryJudgeProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["disagreement_status"] == {
+        "status": "present",
+        "derived_from": "persisted_judge_artifacts",
+    }
+    assert item["judge_disagreements"] == [
+        {
+            "judges": sorted(["judge", judge_panel_role("skeptic-family")]),
+            "type": "persisted_judge_strength_gap",
+            "severity": "high",
+            "description": "Persisted judge assessments materially disagree on claim strength.",
+        }
+    ]
+    assert "judge_dispersion" in [driver["code"] for driver in item["uncertainty_drivers"]]
+    assert item["uncertainty_source"] == "dispersion"
+
+
+def test_score_node_with_provider_panel_member_exception_degrades_to_remaining_judges_with_provenance_note(
+    db, monkeypatch
+) -> None:
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "broken-panel-model")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class BrokenPanelProvider:
+        def judge_node(self, request):
+            raise RuntimeError("simulated panel crash")
+
+    broken_member = JudgePanelMember(
+        family="broken-family",
+        model_id="broken-panel-model",
+        judge_role=judge_panel_role("broken-family"),
+        provider=BrokenPanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([broken_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    # The run completes -- a broken panel member never fails the primary
+    # scoring run (brief point 2).
+    assert payload["status"] == "available"
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=node.id)
+    assert artifact.judge_role == "judge"
+
+    item = payload["items"][0]
+    provenance = item["score_provenance"]
+    assert provenance["judgment_mode"] == "single_judgment"
+    notes = provenance["judge_panel_notes"]
+    assert len(notes) == 1
+    assert notes[0]["model_id"] == "broken-panel-model"
+    assert notes[0]["family"] == "broken-family"
+    assert notes[0]["status"] == "exception"
+    assert notes[0]["reason"]
+
+
+def test_score_node_with_provider_panel_member_timeout_degrades_to_remaining_judges_with_provenance_note(
+    db, monkeypatch
+) -> None:
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "slow-panel-model")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class SlowPanelProvider:
+        def judge_node(self, request):
+            raise TimeoutError("simulated panel timeout")
+
+    slow_member = JudgePanelMember(
+        family="slow-family",
+        model_id="slow-panel-model",
+        judge_role=judge_panel_role("slow-family"),
+        provider=SlowPanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([slow_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    assert payload["status"] == "available"
+    item = payload["items"][0]
+    notes = item["score_provenance"]["judge_panel_notes"]
+    assert len(notes) == 1
+    assert notes[0]["model_id"] == "slow-panel-model"
+    assert notes[0]["status"] == "timeout"
+
+
+def test_score_node_with_provider_panel_member_unconfigured_family_is_noted_without_running(
+    db, monkeypatch
+) -> None:
+    # build_judge_panel_members' own config-time skip (unrecognized family /
+    # no CLI provider) must ALSO surface as a judge_panel_notes entry, same
+    # as a runtime failure -- both are honest reasons a requested panel
+    # member never produced a judgment.
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "unrouted-panel-model")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    monkeypatch.setattr(
+        scoring_service,
+        "build_judge_panel_members",
+        lambda: (
+            [],
+            [
+                {
+                    "model_id": "unrouted-panel-model",
+                    "family": None,
+                    "status": "unconfigured",
+                    "reason": "No in-process CLI provider is configured for this model's family.",
+                }
+            ],
+        ),
+    )
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    notes = item["score_provenance"]["judge_panel_notes"]
+    assert notes == [
+        {
+            "model_id": "unrouted-panel-model",
+            "family": None,
+            "status": "unconfigured",
+            "reason": "No in-process CLI provider is configured for this model's family.",
+        }
+    ]
+
+
+def test_sole_judge_family_matches_author_true_when_the_lone_judge_shares_the_authors_vendor_family(
+    db, monkeypatch
+) -> None:
+    monkeypatch.delenv("DIALECTICAL_JUDGE_PANEL_MODELS", raising=False)
+
+    class JudgeProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"  # panel_vendor_family -> "openai"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=9,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    # Author model id also maps to "openai" via panel_vendor_family's gpt*/
+    # codex substring rule -- the exact self-grading scenario the plan's
+    # audit evidence flagged (codex/gpt-5.6sol-medium judging codex-authored
+    # content), now honestly surfaced rather than hidden.
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="codex-authored-generation")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, JudgeProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["judgment_mode"] == "single_judgment"
+    assert item["score_provenance"]["sole_judge_family_matches_author"] is True
+
+
+def test_sole_judge_family_matches_author_false_when_the_lone_judge_differs_from_the_authors_vendor_family(
+    db, monkeypatch
+) -> None:
+    monkeypatch.delenv("DIALECTICAL_JUDGE_PANEL_MODELS", raising=False)
+
+    class JudgeProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"  # panel_vendor_family -> "openai"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=9,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="claude-sonnet-5-high-loop")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, JudgeProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["sole_judge_family_matches_author"] is False
+
+
+def test_sole_judge_family_matches_author_false_when_panel_has_multiple_judges_even_if_families_match(
+    db, monkeypatch
+) -> None:
+    # "Sole" means exactly one judge ran -- even if every participant's
+    # vendor family happens to match the author's, two-or-more judges means
+    # the flag must be False, never True (the panel is exactly what makes
+    # this claim honestly false).
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "second-codex-panel-model")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                # Distinct raw_output from the panel member below -- see the
+                # comment on the identical technique in
+                # test_score_node_with_provider_panel_enabled_persists_
+                # artifacts_for_every_panel_member above.
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": "T6-SOLE-MULTI-PRIMARY-RAW",
+                    }
+                ),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class SecondCodexPanelProvider:
+        provider = "second-codex-panel-provider"
+        model = "gpt-second-panel-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    {
+                        **base_assessment(node_id=request.claim.node_id).model_dump(mode="json"),
+                        "_private_test_marker": "T6-SOLE-MULTI-SECOND-RAW",
+                    }
+                ),
+                latency_ms=12,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    second_member = JudgePanelMember(
+        family="gpt-secondary",
+        model_id="second-codex-panel-model",
+        judge_role=judge_panel_role("gpt-secondary"),
+        provider=SecondCodexPanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([second_member], []))
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="codex-authored-generation")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    item = payload["items"][0]
+    assert item["score_provenance"]["judgment_mode"] == "judge_panel"
+    assert item["score_provenance"]["judge_families"] == ["openai"]
+    assert item["score_provenance"]["sole_judge_family_matches_author"] is False
 
 
 def test_score_node_with_provider_persists_malformed_judge_output_privately_without_public_secret_leak(db) -> None:
