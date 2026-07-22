@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -39,6 +40,7 @@ from app.exploration.expansion_dispatch import (
     record_adaptive_stop,
     stopped_because_of,
 )
+from app.scoring.lineage import lineage_family
 from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
 from app.services.orchestrator import (
@@ -53,11 +55,12 @@ from app.services.orchestrator import (
     sanitize_text,
     worker_capability_set,
 )
-from app.protocol.runner import run_protocol_analysis
+from app.protocol.cross_exam import _OPPOSING_NODE_TYPES
+from app.protocol.runner import PROTOCOL_ANALYSIS_TYPE, run_protocol_analysis
 from app.protocol.state import advance_phase, initialize_protocol_state, protocol_state_of
 from app.providers import ProviderRegistry
 from app.scoring.jobs import trigger_internal_scoring_after_completion
-from app.scoring.service import ensure_node_scoring_on_completion
+from app.scoring.service import debate_scoring_payload, ensure_node_scoring_on_completion
 
 
 DEFAULT_ANALYZERS = ("Statistical Analyzer", "Scientific Analyzer", "Psychological Analyzer")
@@ -856,6 +859,401 @@ def queue_v2_job(db: Session, debate: Debate, job_type: str, role: str, model_id
     return job
 
 
+# --------------------------------------------------------------------------
+# Task 8 (P3.4 + P4.2): score-before-synthesis, score-informed synthesis,
+# synthesizer rotation (docs/improvement-plan-2026-07-22.md).
+# --------------------------------------------------------------------------
+# "Argument node" scope reused from the protocol runner's tauCoverage
+# definition (app/protocol/runner.py): every NON-EVIDENCE node carries a tau
+# that composes into the root strength (ROOT_CLAIM, PRO, CON, and the POV/lens
+# containers). EVIDENCE nodes are no-edge extracted substrings and are
+# excluded. "Live" additionally drops dead placeholders (status stale/failed),
+# the same exclusion app.scoring.service._debate_node_ids applies before
+# judging -- a dead node can never earn a scoring result, so keeping it in the
+# "must be scored" set would defer synthesis forever.
+_ARGUMENT_DEAD_STATUSES = ("stale", "failed")
+
+
+def score_before_synthesis_enabled() -> bool:
+    """P3.4 sequencing fix: score the tree before synthesis so the synthesis
+    prompt reflects measured standing. Default ON; env kill-switch."""
+    return bool_env("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", True)
+
+
+def synthesizer_rotation_enabled() -> bool:
+    """P4.2: rotate the synthesizer off the hardcoded anchor family so the
+    reader is not the family that wrote most of the content. Default ON."""
+    return bool_env("DIALECTICAL_SYNTHESIZER_ROTATION", True)
+
+
+def synthesis_score_wait_seconds() -> int:
+    """Bounded deferral budget: how long a pending v2_synthesize job waits for
+    scoring before it becomes claimable with whatever scores exist. Clamped to
+    [0, 3600]; 0 disables the wait (synthesis claimable immediately)."""
+    return int_env("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", 240, 0, 3600)
+
+
+def live_argument_nodes(db: Session, debate_id: str) -> list[Node]:
+    """The debate's live argument nodes (non-EVIDENCE, not stale/failed), in
+    stable tree order. See the module comment above for the argument-node
+    scope this reuses from the protocol runner."""
+    return list(
+        db.scalars(
+            select(Node)
+            .where(
+                Node.debate_id == debate_id,
+                Node.node_type != "EVIDENCE",
+                Node.status.notin_(_ARGUMENT_DEAD_STATUSES),
+            )
+            .order_by(Node.materialized_path.asc(), Node.depth.asc(), Node.position.asc(), Node.id.asc())
+        ).all()
+    )
+
+
+def all_live_argument_nodes_scored(db: Session, debate: Debate) -> bool:
+    """True when every live argument node appears in the latest persisted
+    public scoring payload's scored items. Empty tree -> True (nothing to
+    score)."""
+    live_ids = {node.id for node in live_argument_nodes(db, debate.id)}
+    if not live_ids:
+        return True
+    payload = debate_scoring_payload(db, debate)
+    scored_ids = {
+        item["node_id"]
+        for item in (payload.get("items") or [])
+        if isinstance(item, dict) and item.get("node_id")
+    }
+    return live_ids <= scored_ids
+
+
+def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
+    """Claim-eligibility deferral: True when this pending v2_synthesize job
+    must NOT yet be claimed because scoring of the debate's live argument
+    nodes has not finished and the score-wait budget has not elapsed.
+
+    Returns False (claimable) for any non-synthesize job, when the
+    score-before-synthesis flag is off, once every live argument node is
+    scored, or once the job has been pending past the wait budget -- so the
+    deferral is always bounded and can never wedge a debate. Skipping a job
+    here burns no attempt (see orchestrator.worker_can_claim_job)."""
+    if job.job_type != "v2_synthesize":
+        return False
+    if not score_before_synthesis_enabled():
+        return False
+    debate = db.get(Debate, job.debate_id)
+    if debate is None:
+        return False
+    if all_live_argument_nodes_scored(db, debate):
+        return False
+    comparable_now = now.replace(tzinfo=None) if job.created_at.tzinfo is None else now
+    waited = comparable_now - job.created_at
+    return waited < timedelta(seconds=synthesis_score_wait_seconds())
+
+
+def _majority_author_family(db: Session, debate: Debate) -> str | None:
+    """Most common lineage family among the models that authored the debate's
+    COMPLETED branch containers (depth-1 non-EVIDENCE nodes under the root --
+    materialize_pov_branch stamps the branch's author model on the container).
+    None when no completed branch has a resolvable author family. Uses
+    app.scoring.lineage.lineage_family (the established internal grouping the
+    judge/arguer-independence path already uses) -- NOT a second family
+    mapper."""
+    if not debate.root_node_id:
+        return None
+    containers = db.scalars(
+        select(Node)
+        .where(
+            Node.debate_id == debate.id,
+            Node.parent_id == debate.root_node_id,
+            Node.node_type != "EVIDENCE",
+            Node.status == "complete",
+        )
+        # Stable order so Counter's tie-break (insertion order) is deterministic
+        # across backends when two families are exactly even.
+        .order_by(Node.position.asc(), Node.id.asc())
+    ).all()
+    families: list[str] = []
+    for container in containers:
+        generation = (
+            db.get(Generation, container.active_generation_id) if container.active_generation_id else None
+        )
+        family = lineage_family(generation.model_id if generation else None)
+        if family:
+            families.append(family)
+    if not families:
+        return None
+    return Counter(families).most_common(1)[0][0]
+
+
+def choose_synthesizer_model(db: Session, debate: Debate) -> tuple[str, dict[str, Any]]:
+    """Pick the v2_synthesize model + rotation provenance (P4.2).
+
+    Rotation (default on) prefers a healthy online pool model whose lineage
+    family differs from the majority author family of completed branches, so
+    the reader is not the same family that wrote most of the content. Falls
+    back to the anchor (V2_CODEX_MODEL_ID) when rotation is disabled, when no
+    completed branch has a resolvable author family, or when no different-
+    family online pool model is available. The v2_synthesize failover ladder
+    is unchanged -- rotation only changes the FIRST pinned model.
+
+    Returns (model_id, {chosen_model, family, rotation_reason,
+    author_family_majority}); rotation_reason is one of
+    "rotated_off_author_family" | "anchor_fallback" | "rotation_disabled"."""
+    anchor_family = lineage_family(V2_CODEX_MODEL_ID)
+    if not synthesizer_rotation_enabled():
+        return V2_CODEX_MODEL_ID, {
+            "chosen_model": V2_CODEX_MODEL_ID,
+            "family": anchor_family,
+            "rotation_reason": "rotation_disabled",
+            "author_family_majority": None,
+        }
+    author_family = _majority_author_family(db, debate)
+    if author_family is not None:
+        for model in v2_generation_model_pool(db):
+            if model == V2_CODEX_MODEL_ID:
+                continue
+            family = lineage_family(model)
+            if family is not None and family != author_family:
+                return model, {
+                    "chosen_model": model,
+                    "family": family,
+                    "rotation_reason": "rotated_off_author_family",
+                    "author_family_majority": author_family,
+                }
+    return V2_CODEX_MODEL_ID, {
+        "chosen_model": V2_CODEX_MODEL_ID,
+        "family": anchor_family,
+        "rotation_reason": "anchor_fallback",
+        "author_family_majority": author_family,
+    }
+
+
+def queue_v2_synthesize_job(db: Session, debate: Debate) -> Job:
+    """Single queue site for the debate's v2_synthesize job. Every synthesis-
+    queue path routes through here so synthesizer selection + rotation
+    provenance live in exactly ONE place (never copied across the four
+    completion tails). Records the rotation decision in job.payload; it is
+    mirrored into synthesis.provenance at persist time."""
+    model_id, rotation = choose_synthesizer_model(db, debate)
+    job = queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
+    payload = dict(job.payload or {})
+    payload["synthesizer_rotation"] = rotation
+    job.payload = payload
+    flush_write(db)
+    return job
+
+
+def _synthesis_node_scores(db: Session, debate: Debate) -> dict[str, Any]:
+    """Score-informed synthesis payload (P3.4/P4.2): per live argument node,
+    the measured strength/uncertainty projected from the latest persisted
+    PUBLIC scoring items (reused shape -- no parallel scoring computation).
+    Present-but-honest: an unscored live node is listed with scored=false + a
+    reason, so the block is a complete census of the tree whether or not
+    scoring finished."""
+    live = live_argument_nodes(db, debate.id)
+    payload = debate_scoring_payload(db, debate)
+    items_by_node = {
+        item["node_id"]: item
+        for item in (payload.get("items") or [])
+        if isinstance(item, dict) and item.get("node_id")
+    }
+    nodes: list[dict[str, Any]] = []
+    scored_count = 0
+    for node in live:
+        item = items_by_node.get(node.id)
+        if not isinstance(item, dict):
+            nodes.append(
+                {
+                    "node_id": node.id,
+                    "node_type": node.node_type,
+                    "scored": False,
+                    "reason": "No current scoring result for this node yet.",
+                }
+            )
+            continue
+        scored_count += 1
+        scores = item.get("scores") if isinstance(item.get("scores"), dict) else {}
+        drivers = item.get("uncertainty_drivers") if isinstance(item.get("uncertainty_drivers"), list) else []
+        nodes.append(
+            {
+                "node_id": node.id,
+                "node_type": node.node_type,
+                "scored": True,
+                "strength": scores.get("strength"),
+                "strength_kind": item.get("strength_kind"),
+                "uncertainty": scores.get("uncertainty"),
+                "uncertainty_source": item.get("uncertainty_source"),
+                "uncertainty_drivers": [
+                    driver.get("label")
+                    for driver in drivers[:3]
+                    if isinstance(driver, dict) and driver.get("label")
+                ],
+            }
+        )
+    complete = scored_count == len(live)
+    return {
+        "status": payload.get("status", "unavailable"),
+        "live_argument_node_count": len(live),
+        "scored_node_count": scored_count,
+        "reason": None
+        if complete
+        else "Scoring is incomplete for some live argument nodes; treat their standing as not-yet-measured, not as weak.",
+        "nodes": nodes,
+    }
+
+
+def _synthesis_verification_statuses(db: Session, debate: Debate) -> dict[str, Any]:
+    """Score-informed synthesis payload (P3.4): per-node verification standing
+    read from the latest persisted protocol verification rollup
+    (app/protocol/runner.py writes verificationStatuses + verificationSource on
+    each protocol_analysis run -- reused, never recomputed here). Present-but-
+    honest: when no protocol analysis has run yet, available=false + a
+    reason."""
+    run = db.scalars(
+        select(AnalyzerRun)
+        .where(
+            AnalyzerRun.debate_id == debate.id,
+            AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE,
+        )
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+    ).first()
+    output = run.output if run is not None and isinstance(run.output, dict) else None
+    status_map = output.get("verificationStatuses") if isinstance(output, dict) else None
+    if not isinstance(status_map, dict) or not status_map:
+        return {
+            "available": False,
+            "reason": "No verification analysis has run for this debate yet.",
+            "statuses": [],
+        }
+    source_map = output.get("verificationSource") if isinstance(output.get("verificationSource"), dict) else {}
+    statuses = [
+        {"node_id": node_id, "status": status, "source": source_map.get(node_id)}
+        for node_id, status in status_map.items()
+    ]
+    return {
+        "available": True,
+        "version": output.get("verificationVersion"),
+        "statuses": statuses,
+    }
+
+
+def _synthesis_unresolved_attacks(db: Session, debate: Debate) -> dict[str, Any]:
+    """Score-informed synthesis payload (P4.2): per node, the attack children
+    the debate did NOT resolve in the parent's favor. Cheap deterministic
+    proxy (NOT a QBAF re-derivation): an attack child (a CON child -- reusing
+    app.protocol.cross_exam._OPPOSING_NODE_TYPES) is 'unresolved' when its
+    measured strength is >= its parent's, or when either the parent or the
+    attacker is unscored (so an unmeasured attack is surfaced, never silently
+    treated as resolved). The definition ships in the payload."""
+    live = live_argument_nodes(db, debate.id)
+    payload = debate_scoring_payload(db, debate)
+    strength_by_node: dict[str, float | None] = {}
+    for item in payload.get("items") or []:
+        if isinstance(item, dict) and item.get("node_id"):
+            scores = item.get("scores") if isinstance(item.get("scores"), dict) else {}
+            value = scores.get("strength")
+            strength_by_node[item["node_id"]] = float(value) if isinstance(value, (int, float)) else None
+    children_by_parent: dict[str, list[Node]] = {}
+    for node in live:
+        if node.parent_id:
+            children_by_parent.setdefault(node.parent_id, []).append(node)
+    per_node: list[dict[str, Any]] = []
+    for node in live:
+        attack_children = [
+            child
+            for child in children_by_parent.get(node.id, [])
+            if child.node_type in _OPPOSING_NODE_TYPES
+        ]
+        if not attack_children:
+            continue
+        parent_strength = strength_by_node.get(node.id)
+        unresolved_ids = [
+            child.id
+            for child in attack_children
+            if parent_strength is None
+            or strength_by_node.get(child.id) is None
+            or strength_by_node[child.id] >= parent_strength
+        ]
+        if unresolved_ids:
+            per_node.append(
+                {
+                    "node_id": node.id,
+                    "parent_strength": parent_strength,
+                    "attack_child_count": len(attack_children),
+                    "unresolved_attack_count": len(unresolved_ids),
+                    "unresolved_attack_ids": unresolved_ids,
+                }
+            )
+    return {
+        "definition": (
+            "An attack child is a CON child node. An attack is 'unresolved' when its "
+            "measured strength is >= its parent's, or when either the parent or the "
+            "attacker is unscored. Cheap deterministic proxy over persisted scores, "
+            "not a QBAF re-derivation."
+        ),
+        "nodes": per_node,
+    }
+
+
+def _synthesis_failure_manifest(db: Session, debate: Debate) -> dict[str, Any]:
+    """Score-informed synthesis payload (P4.2): which perspectives died and
+    why. Each failed branch container (depth-1 non-EVIDENCE node under the root
+    with status=='failed') with its label, the models the failover ladder
+    exhausted (job.payload['tried_models'] + the last required_model), and the
+    recorded stopping_reason -- so the synthesis accounts for the perspectives
+    that never made it, not just the survivors."""
+    if not debate.root_node_id:
+        return {"died_count": 0, "perspectives": []}
+    failed = db.scalars(
+        select(Node)
+        .where(
+            Node.debate_id == debate.id,
+            Node.parent_id == debate.root_node_id,
+            Node.node_type != "EVIDENCE",
+            Node.status == "failed",
+        )
+        .order_by(Node.position.asc(), Node.id.asc())
+    ).all()
+    perspectives: list[dict[str, Any]] = []
+    for node in failed:
+        job = db.scalars(
+            select(Job)
+            .where(
+                Job.debate_id == debate.id,
+                Job.node_id == node.id,
+                Job.job_type == "v2_pov",
+            )
+            .order_by(Job.created_at.desc(), Job.id.desc())
+        ).first()
+        tried_models: list[str] = []
+        if job is not None:
+            job_payload = job.payload if isinstance(job.payload, dict) else {}
+            tried_models = [model for model in (job_payload.get("tried_models") or []) if isinstance(model, str)]
+            if job.required_model and job.required_model not in tried_models:
+                tried_models.append(job.required_model)
+        perspectives.append(
+            {
+                "node_id": node.id,
+                "label": (node.claim or "").strip() or node.node_type,
+                "tried_models": tried_models,
+                "stopping_reason": node.stopping_reason,
+            }
+        )
+    return {"died_count": len(perspectives), "perspectives": perspectives}
+
+
+def _synthesis_measured_standing(db: Session, debate: Debate) -> dict[str, Any]:
+    """Assemble the four score-informed synthesis payload blocks (P3.4/P4.2).
+    Every block is present-but-honest even when scoring/verification has not
+    run, so the synthesis prompt contract is stable regardless of timing."""
+    return {
+        "node_scores": _synthesis_node_scores(db, debate),
+        "verification_statuses": _synthesis_verification_statuses(db, debate),
+        "unresolved_attacks": _synthesis_unresolved_attacks(db, debate),
+        "failure_manifest": _synthesis_failure_manifest(db, debate),
+    }
+
+
 def queue_next_capability_job(
     db: Session,
     debate: Debate,
@@ -1427,6 +1825,10 @@ def persist_v2_synthesis(
             "evidence_gaps": payload.get("evidence_gaps") or [],
             "key_takeaways": payload.get("key_takeaways") or [],
             "contribution_summary": payload.get("contribution_summary") or [],
+            # Task 8 (P4.2): mirror the synthesizer-rotation decision (chosen
+            # model, family, rotation_reason) recorded on the job payload at
+            # queue time into the durable synthesis provenance.
+            "synthesizer_rotation": (job.payload or {}).get("synthesizer_rotation"),
         },
         model_id=str(payload["provenance"].get("model_id") or job.required_model),
         worker_id=str(payload["provenance"].get("worker_id") or (worker.id if worker else job.worker_id)),
@@ -1745,15 +2147,25 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
                     f"stopped (reason: {stopped_because}). "
                     "Treat the argument tree as final under that stopping condition.\n"
                 )
+        # Task 8 (P3.4/P4.2): score-informed synthesis context. Always present-
+        # but-honest (empty + reason when scoring/verification has not run yet),
+        # so this prompt contract is stable whether or not scoring finished.
+        measured_standing = _synthesis_measured_standing(db, debate)
         user = (
             "Return a non-adjudicating synthesis JSON with exactly this shape: "
             '{"title":"Synthesis","content":"...","tensions":["..."],"agreements":["..."],'
             '"evidence_gaps":["..."],"key_takeaways":["..."],'
             '"provenance":{"model_id":"...","worker_id":"...","prompt_id":"...","job_id":"..."}}. '
             "Summarize tensions, agreements, evidence gaps, and key takeaways. "
+            "Ground the synthesis in the measured_standing block (per-node node_scores, "
+            "verification_statuses, unresolved_attacks, and the failure_manifest), not the "
+            "argument prose alone. Where a branch's prose confidence disagrees with its "
+            "measured strength or verification standing, say so explicitly, and account for "
+            "the perspectives in the failure_manifest instead of treating the surviving "
+            "branches as the whole debate. "
             "Do not declare a winner and do not say Pro wins or Con wins. Do not return status wrappers.\n"
             f"{adaptive_context}"
-            f"Context JSON:\n{json.dumps({**base_context, 'agent_runs': completed_runs, 'tree_nodes': tree_nodes}, default=str)}"
+            f"Context JSON:\n{json.dumps({**base_context, 'agent_runs': completed_runs, 'tree_nodes': tree_nodes, 'measured_standing': measured_standing}, default=str)}"
         )
     else:
         raise ValueError(f"Unsupported V2 job type {job.job_type}")
@@ -1830,8 +2242,22 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if not pending_branches and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
+            queue_v2_synthesize_job(db, debate)
         commit_write(db)
+        # Task 8 (P3.4): incremental scoring at branch completion. Fire the
+        # internal scoring driver so judging overlaps remaining generation and
+        # the tree is (incrementally) scored before synthesis becomes
+        # claimable (see v2_synthesis_claim_blocked). Fire-and-forget after the
+        # commit above; the scoring path is idempotent/input-hash-cached, so
+        # repeated triggers only judge new/changed nodes. Best-effort: it must
+        # never fail or delay POV completion (matches persist_v2_synthesis's
+        # trigger_internal_scoring_after_completion guard). Flag off -> today's
+        # post-synthesis-only scoring flow, untouched.
+        if score_before_synthesis_enabled():
+            try:
+                trigger_internal_scoring_after_completion(debate.id)
+            except Exception as exc:
+                print(f"[dialectical_v2] pre-synthesis scoring trigger failed (non-fatal): {exc!r}")
         return
 
     if job.job_type == "v2_expand":
@@ -1861,7 +2287,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if not pending_nodes and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
+            queue_v2_synthesize_job(db, debate)
         commit_write(db)
         # W4 adaptive loop: a completed expansion wakes a debate-scoped
         # re-score (judge scores -> protocol re-run -> lifecycle
@@ -1906,7 +2332,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             )
         )
         if incomplete is None and existing_synthesis is None:
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
+            queue_v2_synthesize_job(db, debate)
         commit_write(db)
         return
 
@@ -1983,7 +2409,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         flush_write(db)
         record_provenance(db, debate.id, branch.id, "agent_output", agent_output.id, payload["provenance"])
         publish_event(debate.id, "agent_output_completed", {"debate_id": debate.id, "agent_output_id": agent_output.id, "job_id": job.id})
-        queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
+        queue_v2_synthesize_job(db, debate)
         commit_write(db)
         return
 

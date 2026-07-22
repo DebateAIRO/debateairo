@@ -17,6 +17,18 @@ os.environ.setdefault("DIALECTICAL_DYNAMIC_PERSPECTIVES", "false")
 # tests stay deterministic and provider-free; LLM-path tests opt in with a
 # fake planner registry (see tests/test_llm_perspectives.py).
 os.environ.setdefault("DIALECTICAL_LLM_PERSPECTIVES", "false")
+# Task 8 (P3.4/P4.2): both default TRUE in production, but the test baseline
+# pins them OFF so the many pipeline tests that claim/complete a v2_synthesize
+# right after generation keep their pre-Task-8 behavior byte-for-byte:
+#  - SCORE_BEFORE_SYNTHESIS on would defer synthesis until the tree is scored,
+#    but the autouse _no_internal_scoring_thread stub means scoring never runs
+#    in tests, so synthesis would never become claimable within the budget.
+#  - SYNTHESIZER_ROTATION on would rotate the synthesize model off the anchor
+#    whenever a second family is online, breaking anchor-pinned assertions.
+# Task 8's own tests opt back in per-case via monkeypatch.setenv, and delenv
+# exercises the production default. setdefault (not a hard set) preserves that.
+os.environ.setdefault("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "false")
+os.environ.setdefault("DIALECTICAL_SYNTHESIZER_ROTATION", "false")
 
 import pytest
 

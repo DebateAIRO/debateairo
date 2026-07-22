@@ -803,6 +803,17 @@ def worker_debate_loads(db: Session, debate_id: str, workers: list[Worker]) -> d
 
 
 def worker_can_claim_job(db: Session, worker: Worker, job: Job, now: Any) -> bool:
+    # Task 8 (P3.4): a pending v2_synthesize job defers to scoring so synthesis
+    # sees measured standing. Bounded wait (see
+    # dialectical_v2.v2_synthesis_claim_blocked). Checked before the single-
+    # worker fast path below so a solo deployment still defers, and returning
+    # False here skips the job without burning an attempt (the claim loop just
+    # moves on). Function-level import to avoid the module-load cycle
+    # (dialectical_v2 imports this module) -- the render path does the same.
+    from app.services.dialectical_v2 import v2_synthesis_claim_blocked
+
+    if v2_synthesis_claim_blocked(db, job, now):
+        return False
     capable_workers = capable_online_workers(db, job.required_model)
     if len(capable_workers) <= 1:
         return True

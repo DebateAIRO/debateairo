@@ -1,0 +1,599 @@
+"""Task 8 (P3.4 + P4.2): score-before-synthesis deferral, score-informed
+synthesis prompt payload, and synthesizer rotation.
+
+The v2_synthesize flags default OFF in the test baseline (see conftest.py);
+each test here opts the relevant one back in via monkeypatch.setenv so it
+exercises the production-default behavior in isolation.
+"""
+from __future__ import annotations
+
+import asyncio
+import inspect
+
+import pytest
+from sqlalchemy import func, select
+
+from app.models.entities import (
+    AnalyzerRun,
+    Debate,
+    DebateBranch,
+    Generation,
+    Job,
+    Node,
+    Worker,
+    now_utc,
+)
+from app.protocol.runner import run_protocol_analysis
+from app.scoring.lineage import lineage_family
+from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
+from app.services import dialectical_v2 as service
+from app.services.dialectical_v2 import V2_CODEX_MODEL_ID
+from app.services.orchestrator import claim_pending_job, complete_job
+
+from test_dialectical_v2 import real_codex_worker, worker_non_adjudicating_synthesis
+from test_protocol_runner import (
+    _latest_protocol_analysis_run,
+    _other_protocol_analysis_run,
+    _scoring_payload_for_node,
+)
+
+CLAUDE = "claude-sonnet-5-high-loop"
+GEMINI = "gemini-3.5-flash-loop"
+GROK = "grok-4.5-high-loop"
+TOPIC = "Should cities ban cars downtown?"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _online_worker(db, name: str, capabilities: list[str]) -> Worker:
+    worker = Worker(
+        name=name,
+        token_hash="test-token",
+        capabilities=capabilities,
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    db.commit()
+    return worker
+
+
+def _pov_output(worker: Worker, job: Job) -> dict:
+    pov = job.required_role
+    return {
+        "title": f"{pov} assessment",
+        "content": f"A concise {pov} assessment based on the strongest available reasoning.",
+        "strongest_pro": {
+            "title": f"{pov} strongest pro",
+            "content": f"The strongest {pov} pro relies on the clearest relevant evidence.",
+            "pro": {"title": f"{pov} pro support", "content": f"Detail strengthening the {pov} pro."},
+            "con": {"title": f"{pov} pro limitation", "content": f"Detail limiting the {pov} pro."},
+        },
+        "strongest_con": {
+            "title": f"{pov} strongest con",
+            "content": f"The strongest {pov} con identifies the most important risk.",
+            "pro": {"title": f"{pov} con support", "content": f"Detail strengthening the {pov} con."},
+            "con": {"title": f"{pov} con limitation", "content": f"Detail limiting the {pov} con."},
+        },
+        "provenance": {
+            "model_id": job.required_model,
+            "worker_id": worker.id,
+            "prompt_id": f"prompt-{job.id}",
+            "job_id": job.id,
+        },
+    }
+
+
+def _complete_all_povs(db, debate: Debate, worker: Worker) -> None:
+    """Claim + complete exactly the debate's pending v2_pov jobs, stopping
+    before the queued v2_synthesize job is claimed."""
+    n = int(
+        db.scalar(
+            select(func.count()).select_from(Job).where(
+                Job.debate_id == debate.id, Job.job_type == "v2_pov"
+            )
+        )
+        or 0
+    )
+    assert n > 0
+    for _ in range(n):
+        job = claim_pending_job(db, worker)
+        assert job is not None and job.job_type == "v2_pov", job
+        asyncio.run(complete_job(db, job, _pov_output(worker, job), {"latency_ms": 5}))
+
+
+def _seed_tree_scoring(db, debate: Debate, *, node_ids: list[str] | None = None) -> None:
+    """Persist a node_scoring AnalyzerRun (real reducer payloads) covering the
+    given node ids (default: every live argument node)."""
+    if node_ids is None:
+        nodes = service.live_argument_nodes(db, debate.id)
+    else:
+        nodes = [db.get(Node, node_id) for node_id in node_ids]
+    items = [_scoring_payload_for_node(node.id, node.claim or node.node_type) for node in nodes]
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type=SCORING_ANALYZER_TYPE,
+            output={"status": "available", "items": items},
+            status="complete",
+            provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+        )
+    )
+    db.commit()
+
+
+def _pending_synthesize_job(db, debate: Debate) -> Job | None:
+    return db.scalar(
+        select(Job).where(
+            Job.debate_id == debate.id,
+            Job.job_type == "v2_synthesize",
+            Job.status == "pending",
+        )
+    )
+
+
+def _bare_debate(db, topic: str = TOPIC) -> tuple[Debate, Node]:
+    """A v2 debate skeleton (root + branch) with NO POV scaffolding, for
+    precise per-node payload/rotation fixtures."""
+    debate = Debate(topic=topic, status="generating", config={})
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    db.add(DebateBranch(debate_id=debate.id, root_node_id=root.id, status="active"))
+    db.flush()
+    return debate, root
+
+
+def _add_node(
+    db,
+    debate: Debate,
+    parent: Node,
+    *,
+    node_type: str,
+    position: int,
+    claim: str,
+    status: str = "complete",
+    model_id: str | None = None,
+    worker_id: str | None = None,
+    argument: str = "",
+    stopping_reason: str | None = None,
+) -> Node:
+    node = Node(
+        debate_id=debate.id,
+        parent_id=parent.id,
+        node_type=node_type,
+        depth=parent.depth + 1,
+        position=position,
+        claim=claim,
+        status=status,
+        materialized_path=f"{parent.materialized_path}/{position}",
+        stopping_reason=stopping_reason,
+    )
+    db.add(node)
+    db.flush()
+    if model_id is not None and worker_id is not None:
+        generation = Generation(
+            node_id=node.id,
+            model_id=model_id,
+            role=node_type,
+            argument=argument,
+            is_active=True,
+            worker_id=worker_id,
+        )
+        db.add(generation)
+        db.flush()
+        node.active_generation_id = generation.id
+        db.flush()
+    return node
+
+
+# ---------------------------------------------------------------------------
+# Bounded synthesis deferral (claim eligibility)
+# ---------------------------------------------------------------------------
+
+
+def test_synthesis_not_claimable_while_live_nodes_unscored_within_budget(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    # Synthesis is queued, but scoring never ran (autouse stub) so no live node
+    # has a scoring result -> the pending synthesize job is not claimable yet.
+    assert _pending_synthesize_job(db, debate) is not None
+    assert claim_pending_job(db, worker) is None
+
+    still_pending = _pending_synthesize_job(db, debate)
+    assert still_pending is not None
+    assert still_pending.attempts == 0  # skipped, not a burned attempt
+
+
+def test_synthesis_claimable_once_all_live_nodes_scored(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    _seed_tree_scoring(db, debate)  # every live argument node now scored
+
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_synthesis_claimable_after_budget_expiry_with_partial_scores(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "0")  # no wait budget
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    # No scoring at all (fully partial), but the wait budget is exhausted, so
+    # synthesis proceeds rather than wedging.
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_synthesis_immediately_claimable_when_flag_off(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "false")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+# ---------------------------------------------------------------------------
+# Incremental scoring trigger at branch completion
+# ---------------------------------------------------------------------------
+
+
+def test_branch_completion_triggers_scoring_when_enabled(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "app.services.dialectical_v2.trigger_internal_scoring_after_completion",
+        lambda debate_id: calls.append(debate_id),
+    )
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+
+    job = claim_pending_job(db, worker)
+    assert job is not None and job.job_type == "v2_pov"
+    asyncio.run(complete_job(db, job, _pov_output(worker, job), {"latency_ms": 5}))
+
+    assert calls == [debate.id]  # fired on this branch completion
+
+
+def test_branch_completion_does_not_trigger_scoring_when_flag_off(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "false")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "app.services.dialectical_v2.trigger_internal_scoring_after_completion",
+        lambda debate_id: calls.append(debate_id),
+    )
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+
+    job = claim_pending_job(db, worker)
+    assert job is not None and job.job_type == "v2_pov"
+    asyncio.run(complete_job(db, job, _pov_output(worker, job), {"latency_ms": 5}))
+
+    assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Score-informed synthesis prompt payload
+# ---------------------------------------------------------------------------
+
+
+def test_failure_manifest_surfaces_dead_perspective_with_tried_models(db) -> None:
+    debate, root = _bare_debate(db)
+    dead = _add_node(
+        db,
+        debate,
+        root,
+        node_type="STATISTICAL_POV",
+        position=1,
+        claim="Statistical POV",
+        status="failed",
+        stopping_reason="generation_exhausted",
+    )
+    db.add(
+        Job(
+            debate_id=debate.id,
+            node_id=dead.id,
+            job_type="v2_pov",
+            required_role="Statistical POV",
+            required_model=GROK,
+            status="failed",
+            payload={"tried_models": [V2_CODEX_MODEL_ID, CLAUDE]},
+        )
+    )
+    db.commit()
+
+    manifest = service._synthesis_failure_manifest(db, debate)
+    assert manifest["died_count"] == 1
+    perspective = manifest["perspectives"][0]
+    assert perspective["node_id"] == dead.id
+    assert perspective["label"] == "Statistical POV"
+    # tried_models = job.payload["tried_models"] + the last required_model.
+    assert perspective["tried_models"] == [V2_CODEX_MODEL_ID, CLAUDE, GROK]
+    assert perspective["stopping_reason"] == "generation_exhausted"
+
+
+def test_node_scores_honest_partial_signal_for_scored_and_unscored(db) -> None:
+    debate, root = _bare_debate(db)
+    scored = _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="Scientific POV")
+    unscored = _add_node(db, debate, root, node_type="ETHICAL_POV", position=2, claim="Ethical POV")
+    db.commit()
+
+    _seed_tree_scoring(db, debate, node_ids=[scored.id])  # only one node judged
+
+    node_scores = service._synthesis_node_scores(db, debate)
+    by_id = {entry["node_id"]: entry for entry in node_scores["nodes"]}
+
+    assert by_id[scored.id]["scored"] is True
+    assert isinstance(by_id[scored.id]["strength"], (int, float))
+    assert by_id[scored.id]["strength_kind"] in {"argument_only", "evidence_weighted"}
+    assert by_id[scored.id]["uncertainty_source"] in {"dispersion", "heuristic"}
+    assert isinstance(by_id[scored.id]["uncertainty_drivers"], list)
+    assert len(by_id[scored.id]["uncertainty_drivers"]) <= 3
+
+    assert by_id[unscored.id]["scored"] is False
+    assert by_id[unscored.id]["reason"]
+
+    # root + scored + unscored are all live argument nodes; one is scored.
+    assert node_scores["live_argument_node_count"] == 3
+    assert node_scores["scored_node_count"] == 1
+    assert node_scores["reason"]  # honest partial signal
+
+
+def test_verification_statuses_honest_when_no_protocol_run(db) -> None:
+    debate, root = _bare_debate(db)
+    _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="Scientific POV")
+    db.commit()
+
+    verification = service._synthesis_verification_statuses(db, debate)
+    assert verification["available"] is False
+    assert verification["reason"]
+    assert verification["statuses"] == []
+
+
+def test_verification_statuses_read_from_protocol_rollup(db) -> None:
+    debate, root = _bare_debate(db)
+    pro = _add_node(db, debate, root, node_type="PRO", position=0, claim="Downtown bans cut congestion.")
+    con = _add_node(db, debate, root, node_type="CON", position=1, claim="Bans burden delivery access.")
+    db.commit()
+    _seed_tree_scoring(db, debate)
+    run_protocol_analysis(db, debate)
+
+    verification = service._synthesis_verification_statuses(db, debate)
+    assert verification["available"] is True
+    node_ids = {entry["node_id"] for entry in verification["statuses"]}
+    assert pro.id in node_ids and con.id in node_ids
+    assert all("status" in entry and "source" in entry for entry in verification["statuses"])
+
+
+def test_unresolved_attacks_flags_con_child_at_least_as_strong(db) -> None:
+    debate, root = _bare_debate(db)
+    parent = _add_node(db, debate, root, node_type="PRO", position=0, claim="Bans help downtown.")
+    attacker = _add_node(db, debate, parent, node_type="CON", position=1, claim="But access suffers.")
+    supporter = _add_node(db, debate, parent, node_type="PRO", position=0, claim="And air quality improves.")
+    items = [
+        _scoring_payload_for_node(parent.id, parent.claim, strength_override=0.4),
+        _scoring_payload_for_node(attacker.id, attacker.claim, strength_override=0.7),
+        _scoring_payload_for_node(supporter.id, supporter.claim, strength_override=0.9),
+    ]
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type=SCORING_ANALYZER_TYPE,
+            output={"status": "available", "items": items},
+            status="complete",
+            provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+        )
+    )
+    db.commit()
+
+    unresolved = service._synthesis_unresolved_attacks(db, debate)
+    assert "definition" in unresolved
+    by_id = {entry["node_id"]: entry for entry in unresolved["nodes"]}
+    assert parent.id in by_id
+    entry = by_id[parent.id]
+    # The PRO supporter is not an attack; only the CON attacker counts, and it
+    # is at least as strong as the parent (0.7 >= 0.4) -> unresolved.
+    assert entry["attack_child_count"] == 1
+    assert entry["unresolved_attack_ids"] == [attacker.id]
+    assert entry["unresolved_attack_count"] == 1
+
+
+def test_unresolved_attacks_counts_all_when_parent_unscored(db) -> None:
+    debate, root = _bare_debate(db)
+    parent = _add_node(db, debate, root, node_type="PRO", position=0, claim="Bans help downtown.")
+    attacker = _add_node(db, debate, parent, node_type="CON", position=1, claim="But access suffers.")
+    db.commit()
+    _seed_tree_scoring(db, debate, node_ids=[attacker.id])  # parent left unscored
+
+    unresolved = service._synthesis_unresolved_attacks(db, debate)
+    by_id = {entry["node_id"]: entry for entry in unresolved["nodes"]}
+    assert by_id[parent.id]["unresolved_attack_ids"] == [attacker.id]
+
+
+def test_synthesize_prompt_includes_measured_standing_and_keeps_no_winner(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    _seed_tree_scoring(db, debate)
+    run_protocol_analysis(db, debate)
+
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    _system, user = service.render_v2_job_prompt(db, synth)
+
+    assert "Do not declare a winner" in user  # dissent contract preserved
+    assert "Ground the synthesis in the measured_standing" in user
+    for key in ("measured_standing", "node_scores", "verification_statuses", "unresolved_attacks", "failure_manifest"):
+        assert key in user
+
+
+# ---------------------------------------------------------------------------
+# Synthesizer rotation
+# ---------------------------------------------------------------------------
+
+
+def test_majority_author_family_from_completed_branches(db) -> None:
+    author = _online_worker(db, "codex-worker", [V2_CODEX_MODEL_ID])
+    debate, root = _bare_debate(db)
+    _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="A", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    _add_node(db, debate, root, node_type="STATISTICAL_POV", position=1, claim="B", model_id=CLAUDE, worker_id=author.id)
+    _add_node(db, debate, root, node_type="ETHICAL_POV", position=2, claim="C", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    # An INCOMPLETE branch authored by a third family must not count.
+    _add_node(db, debate, root, node_type="PRACTICAL_POV", position=3, claim="D", status="pending", model_id=GEMINI, worker_id=author.id)
+    db.commit()
+
+    assert service._majority_author_family(db, debate) == "gpt"
+
+
+def test_rotation_disabled_pins_anchor_with_reason(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIZER_ROTATION", "false")
+    author = _online_worker(db, "codex-worker", [V2_CODEX_MODEL_ID])
+    _online_worker(db, "claude-loop", [CLAUDE])
+    debate, root = _bare_debate(db)
+    _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="A", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    db.commit()
+
+    model, provenance = service.choose_synthesizer_model(db, debate)
+    assert model == V2_CODEX_MODEL_ID
+    assert provenance["rotation_reason"] == "rotation_disabled"
+    assert provenance["chosen_model"] == V2_CODEX_MODEL_ID
+    assert provenance["family"] == "gpt"
+
+
+def test_rotation_prefers_different_family_when_online(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIZER_ROTATION", "true")
+    author = _online_worker(db, "codex-worker", [V2_CODEX_MODEL_ID])
+    _online_worker(db, "claude-loop", [CLAUDE])
+    debate, root = _bare_debate(db)
+    # Majority author family = gpt (2 of 3 completed branches).
+    _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="A", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    _add_node(db, debate, root, node_type="STATISTICAL_POV", position=1, claim="B", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    _add_node(db, debate, root, node_type="ETHICAL_POV", position=2, claim="C", model_id=CLAUDE, worker_id=author.id)
+    db.commit()
+
+    model, provenance = service.choose_synthesizer_model(db, debate)
+    assert provenance["author_family_majority"] == "gpt"
+    assert provenance["rotation_reason"] == "rotated_off_author_family"
+    assert model == CLAUDE  # only non-anchor family online
+    assert model != V2_CODEX_MODEL_ID
+    assert lineage_family(model) != provenance["author_family_majority"]
+
+
+def test_rotation_anchor_fallback_when_pool_single_family(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIZER_ROTATION", "true")
+    author = _online_worker(db, "codex-worker", [V2_CODEX_MODEL_ID])  # only gpt online
+    debate, root = _bare_debate(db)
+    _add_node(db, debate, root, node_type="SCIENTIFIC_POV", position=0, claim="A", model_id=V2_CODEX_MODEL_ID, worker_id=author.id)
+    db.commit()
+
+    model, provenance = service.choose_synthesizer_model(db, debate)
+    assert model == V2_CODEX_MODEL_ID
+    assert provenance["rotation_reason"] == "anchor_fallback"
+    assert provenance["author_family_majority"] == "gpt"
+
+
+def test_synthesis_job_rotates_off_author_family_end_to_end(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIZER_ROTATION", "true")
+    monkeypatch.setenv("DIALECTICAL_DYNAMIC_PERSPECTIVES", "true")  # 5 lenses -> gpt clear majority
+    # One real worker advertising two families -> pool is [anchor, claude].
+    worker = _online_worker(db, "codex-worker", [V2_CODEX_MODEL_ID, CLAUDE])
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    rotation = synth.payload["synthesizer_rotation"]
+    assert rotation["author_family_majority"] == "gpt"
+    assert rotation["rotation_reason"] == "rotated_off_author_family"
+    assert synth.required_model == CLAUDE
+    assert synth.required_model == rotation["chosen_model"]
+    assert synth.required_model != V2_CODEX_MODEL_ID
+
+
+def test_synthesis_provenance_records_rotation_end_to_end(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIZER_ROTATION", "false")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    synth = claim_pending_job(db, worker)
+    assert synth is not None and synth.job_type == "v2_synthesize"
+    asyncio.run(complete_job(db, synth, worker_non_adjudicating_synthesis(worker, synth.id), {"latency_ms": 5}))
+
+    db.refresh(debate)
+    from app.models.entities import Synthesis
+
+    synthesis = db.scalar(select(Synthesis).where(Synthesis.debate_id == debate.id))
+    assert synthesis is not None
+    rotation = synthesis.provenance["synthesizer_rotation"]
+    assert rotation["rotation_reason"] == "rotation_disabled"
+    assert rotation["chosen_model"] == V2_CODEX_MODEL_ID
+
+
+def test_synthesize_is_queued_only_through_the_shared_helper() -> None:
+    source = inspect.getsource(service)
+    # The anchor/model queue_v2_job call for synthesis exists exactly once --
+    # inside queue_v2_synthesize_job -- so all four completion tails route
+    # through the single selection+rotation helper (never copied).
+    assert source.count('queue_v2_job(db, debate, "v2_synthesize"') == 1
+    assert source.count('"v2_synthesize", "v2_synthesizer"') == 1
+    helper_source = inspect.getsource(service.queue_v2_synthesize_job)
+    assert 'queue_v2_job(db, debate, "v2_synthesize"' in helper_source
+
+
+# ---------------------------------------------------------------------------
+# Convergence compares like with like (resolution 6)
+# ---------------------------------------------------------------------------
+
+
+def test_convergence_compares_like_with_like_when_scoring_precedes_synthesis(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+
+    # New flow: scoring precedes synthesis. Seed judge scores, then run the
+    # pre-synthesis protocol analysis (the post-scoring predecessor).
+    _seed_tree_scoring(db, debate)
+    run_protocol_analysis(db, debate)
+    predecessor = _latest_protocol_analysis_run(db, debate.id)
+    assert predecessor.output["tauCoverage"] > 0.0  # judge-sourced, not default tau
+
+    # Complete synthesis -> persist_v2_synthesis runs protocol analysis again,
+    # which (because scoring already ran) is ALSO judge-sourced.
+    synth = claim_pending_job(db, worker)
+    assert synth is not None and synth.job_type == "v2_synthesize"
+    asyncio.run(complete_job(db, synth, worker_non_adjudicating_synthesis(worker, synth.id), {"latency_ms": 5}))
+
+    synth_run = _other_protocol_analysis_run(db, debate.id, excluding_id=predecessor.id)
+    assert synth_run.output["tauCoverage"] > 0.0  # like-with-like: both judge-sourced
+    convergence = synth_run.output["convergence"]
+    assert convergence["comparedAnalyzerRunId"] == predecessor.id
+    assert convergence["converged"] is not None  # a real numeric comparison ran
