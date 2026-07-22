@@ -358,6 +358,37 @@ class UncertaintyDriver(BaseModel):
     label: str
 
 
+def _default_score_provenance() -> "ScoreProvenance":
+    """default_factory for NodeScoringPayload.score_provenance.
+
+    Final-branch-review fix: this used to hardcode reducer_version=
+    "node-scoring-reducer-v1" / rubric_version="debateai-rubric-v1" as
+    string literals here, so a bare NodeScoringPayload construction (no
+    explicit score_provenance=...) could silently mint provenance claiming
+    stale reducer math even after app.scoring.reducer.REDUCER_VERSION moved
+    on (v1 -> v2 -> v3). Reads the live constants instead, so the default
+    can never drift from what reduce_assessments() itself stamps.
+
+    Deferred (function-local, not module-level) import: app.scoring.reducer
+    imports FROM this module (ClaimAssessment, NodeScoringPayload, etc.), so
+    a top-level `from app.scoring.reducer import ...` here would be a
+    circular import. This factory only runs at NodeScoringPayload
+    construction time (a runtime event, never at either module's import
+    time), by which point both modules are always fully loaded -- see
+    tests/conftest.py's own `import app.main` comment about this same
+    orchestrator<->scoring<->serialization import-cycle discipline.
+    """
+    from app.scoring.reducer import REDUCER_VERSION, RUBRIC_VERSION
+
+    return ScoreProvenance(
+        raw_judge_output_kind="claim_assessment",
+        raw_judge_output_included=False,
+        final_score_source="deterministic_reducer",
+        reducer_version=REDUCER_VERSION,
+        rubric_version=RUBRIC_VERSION,
+    )
+
+
 class NodeScoringPayload(BaseModel):
     node_id: str
     claim: NormalizedClaim
@@ -369,15 +400,7 @@ class NodeScoringPayload(BaseModel):
     judge_disagreements: list[JudgeDisagreement]
     recommended_investigations: list[RecommendedInvestigation]
     rationale: ScoreRationale
-    score_provenance: ScoreProvenance = Field(
-        default_factory=lambda: ScoreProvenance(
-            raw_judge_output_kind="claim_assessment",
-            raw_judge_output_included=False,
-            final_score_source="deterministic_reducer",
-            reducer_version="node-scoring-reducer-v1",
-            rubric_version="debateai-rubric-v1",
-        )
-    )
+    score_provenance: ScoreProvenance = Field(default_factory=_default_score_provenance)
     debug: ScoringDebug | None = None
     # Task 4: labeled drivers are the primary, human-legible explanation for
     # `scores.uncertainty` (empty when the reducer found no driver
