@@ -406,6 +406,115 @@ def _persist_grounded_evidence(
     return row.id
 
 
+def _persist_adverse_evidence(
+    db,
+    *,
+    debate: Debate,
+    node: Node,
+    worker: Worker,
+    observed_at: datetime,
+    status: str,
+    entailment: str,
+    base_score: float,
+    uncertainty: float,
+) -> str:
+    """Task 16 (P3.2): a REAL, judge-produced adverse verdict -- mirrors
+    _persist_grounded_evidence's shape exactly, but with a status/entailment
+    pair OTHER than grounded/SUPPORTS (contradicted+REFUTES, no_info+NOINFO),
+    exactly what app.evidence.verification_evaluator now persists for a real
+    "contradicted"/"unverifiable" verifier verdict."""
+    evidence_node = Node(
+        id=f"evidence-node-adverse-{status}",
+        debate_id=debate.id,
+        parent_id=node.id,
+        node_type="EVIDENCE",
+        depth=node.depth + 1,
+        position=10_000,
+        claim="A persisted evidence source.",
+        status="completed",
+        materialized_path=f"{node.materialized_path}/10000",
+        evidence_metadata={"evidenceKind": "citation"},
+    )
+    db.add(evidence_node)
+    db.flush()
+    generation = Generation(
+        id=f"evidence-generation-adverse-{status}",
+        node_id=evidence_node.id,
+        model_id="fixture-arguer",
+        role="proposer",
+        argument=evidence_node.claim,
+        prompt_version="v1",
+        worker_id=worker.id,
+        is_active=True,
+    )
+    db.add(generation)
+    db.flush()
+    evidence_node.active_generation_id = generation.id
+    content_hash = hashlib.sha256(evidence_node.claim.encode("utf-8")).hexdigest()
+    source = {
+        "evidence_node_id": evidence_node.id,
+        "claim_node_id": node.id,
+        "generation_id": generation.id,
+        "reference": f"evidence-node:{evidence_node.id}",
+        "content_sha256": content_hash,
+        "evidence_kind": "citation",
+    }
+    observed_text = observed_at.isoformat().replace("+00:00", "Z")
+    row = persist_evidence_lifecycle_snapshot(
+        db,
+        snapshot={
+            "schema_version": "lifecycle-input-persistence/v1",
+            "debate_id": debate.id,
+            "node_id": node.id,
+            "source_identity": source,
+            "availability": "present",
+            "observed_at": observed_text,
+            "provenance": {
+                "source_kind": "evidence_verification_run",
+                "source_record_id": f"evidence-run-adverse-{status}",
+                "run": {"run_id": f"evidence-run-adverse-{status}", "sequence": 2},
+                "producer": "fixture-evidence-evaluator",
+                "recorded_at": observed_text,
+                "checked_at": observed_text,
+            },
+            "value": {
+                "source": source,
+                "status": status,
+                "base_score": base_score,
+                "uncertainty": uncertainty,
+                "entailment": entailment,
+                "caveats": [],
+                "evaluator_id": "fixture-evaluator",
+                "evaluator_version": "v1",
+            },
+            "unavailability_reason": None,
+        },
+        verification_status=status,
+    )
+    return row.id
+
+
+def _set_claim_type(db, score_row: NodeScoringResult, claim_type: str) -> None:
+    """Overrides the persisted score item's reported claim_type -- read
+    directly by app.exploration.lifecycle_inputs._parse_score_value, never
+    cross-derived from node.claim -- so this cannot desync the score's
+    input_hash (computed independently from node.claim at both persist- and
+    decide-time). Must update BOTH NodeScoringResult.result and the backing
+    AnalyzerRun.output identically: _run_authenticates_row (scoring_input_
+    resolver.py) requires the two items to compare equal, or the row fails
+    authentication entirely (score_run_unverifiable)."""
+
+    def _retyped(payload: dict) -> dict:
+        items = list(payload["items"])
+        items[0] = {**items[0], "claim": {**items[0]["claim"], "claim_type": claim_type}}
+        return {**payload, "items": items}
+
+    score_row.result = _retyped(score_row.result)
+    run = db.get(AnalyzerRun, "score-run-current")
+    run.output = _retyped(run.output)
+    db.commit()
+
+
 def _persist_grounded_lifecycle_inputs(db) -> tuple[Debate, Node]:
     debate, node, generation, worker, branch = _subject(db)
     observed_at = DECISION_TIME - timedelta(minutes=5)
@@ -463,6 +572,97 @@ def test_grounded_correlated_persisted_inputs_authenticate_abandonment(db) -> No
     assert outcome.evidence_snapshot_id == evidence_snapshot_id
     assert outcome.decision_timestamp == DECISION_TIME
     assert outcome.scoring_contract_hash == active_contract("judge").contract_hash
+
+
+# ---------------------------------------------------------------------------
+# Task 16 (P3.2, adaptive-expansion activation readiness): a REAL adverse
+# evidence verdict (contradicted / no_info -- see
+# app.evidence.verification_evaluator._lifecycle_evidence_for_verdict) is
+# just as authoritative as a grounded/SUPPORTS one -- it must reach the real
+# ExplorationPolicy and authenticate a challenge/seek_evidence decision,
+# never fall back to _fail_safe's unauthenticated "continue".
+# ---------------------------------------------------------------------------
+
+
+def test_real_contradicted_evidence_authenticates_challenge_decision(db) -> None:
+    debate, node, generation, worker, branch = _subject(db)
+    score_row = _persist_score(
+        db,
+        debate=debate,
+        node=node,
+        generation=generation,
+        branch=branch,
+        observed_at=DECISION_TIME - timedelta(minutes=5),
+    )
+    evidence_snapshot_id = _persist_adverse_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=4),
+        status="contradicted",
+        entailment="REFUTES",
+        base_score=0.05,
+        uncertainty=0.90,
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db,
+        debate=debate,
+        node=node,
+        decision_timestamp=DECISION_TIME,
+    )
+
+    assert outcome.action == "challenge"
+    assert outcome.keeps_path_active is True
+    assert outcome.authentic_policy_decision is True
+    assert outcome.input_state == "grounded"
+    assert outcome.signal_class == "categorical"
+    assert outcome.stopping_reason == "evidence refutes or contradicts the claim"
+    assert outcome.score_record_id == score_row.id
+    assert outcome.evidence_snapshot_id == evidence_snapshot_id
+
+
+def test_real_no_info_evidence_authenticates_seek_evidence_decision_for_empirical_claim(db) -> None:
+    debate, node, generation, worker, branch = _subject(db)
+    score_row = _persist_score(
+        db,
+        debate=debate,
+        node=node,
+        generation=generation,
+        branch=branch,
+        observed_at=DECISION_TIME - timedelta(minutes=5),
+    )
+    # requires_evidence in app.exploration.policy is gated on claim_type in
+    # {"empirical", "causal"} -- override just the persisted score item's
+    # reported claim_type (see _set_claim_type's docstring for why this is
+    # input-hash-safe).
+    _set_claim_type(db, score_row, "empirical")
+    evidence_snapshot_id = _persist_adverse_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=4),
+        status="no_info",
+        entailment="NOINFO",
+        base_score=0.05,
+        uncertainty=1.0,
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db,
+        debate=debate,
+        node=node,
+        decision_timestamp=DECISION_TIME,
+    )
+
+    assert outcome.action == "seek_evidence"
+    assert outcome.keeps_path_active is True
+    assert outcome.authentic_policy_decision is True
+    assert outcome.input_state == "grounded"
+    assert outcome.signal_class == "categorical"
+    assert outcome.evidence_snapshot_id == evidence_snapshot_id
 
 
 @pytest.mark.parametrize("artifact_job_id", [None, "other-score-job"], ids=["null", "mismatched"])

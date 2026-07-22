@@ -436,6 +436,125 @@ def test_evaluate_evidence_verdict_records_contradicted_verdict(db, monkeypatch)
 
 
 # ---------------------------------------------------------------------------
+# Task 16 (P3.2, adaptive-expansion activation readiness): a REAL,
+# judge-parsed "contradicted"/"unverifiable" verdict is a genuine categorical
+# signal -- app.exploration.policy's challenge branch is grounded in
+# EvidenceStatus.REFUTED/CONTRADICTED + EntailmentLabel.REFUTES, and its
+# seek_evidence branch in EvidenceStatus.{MISSING,UNAVAILABLE,NO_INFO}. Before
+# this wave, ONLY a "supported" verdict ever produced a lifecycle-authoritative
+# value (see build_verification_lifecycle_snapshot); "contradicted" and
+# "unverifiable" were both silently withheld (terminal_unverifiable, value
+# None) -- indistinguishable, at the lifecycle-input layer, from an infra
+# failure (timeout/provider error) that produced no real verdict at all. That
+# made the two categorical branches structurally unreachable through the real
+# verifier pipeline even with DIALECTICAL_EVIDENCE_VERIFICATION on. This
+# section proves the fix: a real verdict now maps onto a real
+# EvidenceStatus/EntailmentLabel pair (CONTRADICTED/REFUTES,
+# NO_INFO/NOINFO), fixed-sentinel base_score/uncertainty ONLY (mirroring
+# app.qbaf.debate_adapter.CONTRADICTED_EVIDENCE_TAU's established posture for
+# "real verdict, no elicited magnitude"), while AnalyzerRun.output["baseScore"]
+# (the DF-QuAD/Task-12 contract) and every infra/parse-failure path stay
+# byte-identical.
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_evidence_verdict_contradicted_verdict_authenticates_lifecycle_evidence(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="lifecycle-contradicted"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps({"verdict": "contradicted"}),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "contradicted"
+    run = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).one()
+    # Untouched Task 12 contract: AnalyzerRun.output["baseScore"] is honestly
+    # None whenever the verifier's schema never elicited a number -- this fix
+    # only affects the LIFECYCLE snapshot's value, never this field.
+    assert run.output["baseScore"] is None
+
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.verification_status == "contradicted"
+    assert snapshot.payload["availability"] == "present"
+    assert snapshot.payload["unavailability_reason"] is None
+    value = snapshot.payload["value"]
+    assert value["status"] == "contradicted"
+    assert value["entailment"] == "REFUTES"
+    assert isinstance(value["base_score"], float) and 0.0 <= value["base_score"] <= 1.0
+    assert isinstance(value["uncertainty"], float) and 0.0 <= value["uncertainty"] <= 1.0
+    assert value["caveats"] == []
+    assert value["source"]["evidence_node_id"] == evidence_node.id
+
+
+def test_evaluate_evidence_verdict_real_unverifiable_verdict_authenticates_no_info_lifecycle_evidence(
+    db, monkeypatch
+) -> None:
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="lifecycle-no-info"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps({"verdict": "unverifiable"}),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "unverifiable"
+    # A REAL parsed verdict -- never an honest failure reason string like an
+    # infra/parse failure would carry (see the contrast test below).
+    assert result["reason"] is None
+
+    run = db.scalars(
+        select(AnalyzerRun).where(AnalyzerRun.analyzer_type == "evidence_verification")
+    ).one()
+    assert run.output["baseScore"] is None
+
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.verification_status == "unverifiable"
+    assert snapshot.payload["availability"] == "present"
+    value = snapshot.payload["value"]
+    assert value["status"] == "no_info"
+    assert value["entailment"] == "NOINFO"
+    assert isinstance(value["base_score"], float) and 0.0 <= value["base_score"] <= 1.0
+    assert isinstance(value["uncertainty"], float) and 0.0 <= value["uncertainty"] <= 1.0
+
+
+def test_evaluate_evidence_verdict_unparseable_verdict_still_withholds_lifecycle_value(db, monkeypatch) -> None:
+    # Contrast case at the SAME call site as the two tests above: an
+    # unparseable verdict string means `_parse_verifier_verdict` returns
+    # verdict=None (not a genuine enum member), so the new enrichment must
+    # NOT fire -- proves the discrimination is on the raw parsed verdict,
+    # never just the reported "unverifiable" status bucket.
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    debate, claim_node, evidence_node = _build_claim_and_evidence_node(
+        db, claim_model_id="claude-sonnet-5-high-loop", id_suffix="lifecycle-unparseable"
+    )
+    fake_provider = _FakeProvider(
+        provider="codex",
+        model="gpt-5.2-codex",
+        raw_output=json.dumps({"verdict": "definitely-true-trust-me"}),
+    )
+
+    result = evaluate_evidence_verdict(db, debate, claim_node, evidence_node, fake_provider)
+
+    assert result["status"] == "unverifiable"
+    assert result["reason"] == "unparseable_verdict"
+    snapshot = db.scalars(select(EvidenceLifecycleSnapshot)).one()
+    assert snapshot.payload["availability"] == "terminal_unverifiable"
+    assert snapshot.payload["value"] is None
+    assert snapshot.payload["unavailability_reason"] == "unparseable_verdict"
+
+
+# ---------------------------------------------------------------------------
 # Task 12 (P1.3): the persisted AnalyzerRun.output must carry the verifier's
 # grounded evidence.base_score when supported -- this is the SAME row
 # app.protocol.runner's 5.5 overlay (and app.evidence.verification_evaluator.

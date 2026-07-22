@@ -338,9 +338,21 @@ def build_verification_lifecycle_snapshot(
     verification_reason: str | None,
     recorded_at: datetime,
     checked_at: datetime | str | None,
-    authoritative_evidence: Mapping[str, Any] | None = None,
+    lifecycle_evidence: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any]:
-    """Project only complete facts established by the verifier response."""
+    """Project only complete facts established by the verifier response.
+
+    `lifecycle_evidence` (Task 16, P3.2) is non-None exactly when
+    `verification_status` came from a REAL, judge-parsed verdict --
+    "supported" (wrapping the verifier's grounded evidence.base_score,
+    unchanged from before this parameter existed), "contradicted", or a
+    genuine "unverifiable" verdict (see
+    app.evidence.verification_evaluator._lifecycle_evidence_for_verdict,
+    the sole caller that builds it). Every OTHER "unverifiable" status --
+    an infra failure (timeout/provider error), a lineage-independence
+    refusal, or an unparseable response -- passes None here exactly as
+    before, so this stays honestly withheld (terminal_unverifiable).
+    """
 
     recorded_text = _rfc3339_utc(recorded_at)
     if recorded_text is None:
@@ -359,8 +371,8 @@ def build_verification_lifecycle_snapshot(
     value = None
     availability = "terminal_unverifiable"
     reason = verification_reason
-    if verification_status == "supported" and authoritative_evidence is not None:
-        value = {"source": source_identity, **_plain_json(authoritative_evidence)}
+    if lifecycle_evidence is not None:
+        value = {"source": source_identity, **_plain_json(lifecycle_evidence)}
         availability = "present"
         reason = None
     elif reason is None:

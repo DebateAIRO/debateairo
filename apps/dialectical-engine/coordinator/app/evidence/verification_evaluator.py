@@ -81,6 +81,28 @@ EVIDENCE_VERIFICATION_ANALYZER_TYPE = "evidence_verification"
 EVIDENCE_VERIFICATION_EVALUATOR_VERSION = "evidence-verification-v1"
 _VALID_VERDICTS = {"supported", "contradicted", "unverifiable"}
 
+# Task 16 (P3.2, adaptive-expansion activation readiness): "contradicted" and
+# "unverifiable" are REAL, judge-produced verdicts -- the verifier's schema
+# (app.scoring.prompts._VERIFIER_OUTPUT_SCHEMA) never elicits a numeric
+# magnitude for either branch (only "supported" carries the "evidence"
+# sub-object), so these are FIXED, documented sentinels feeding ONLY the
+# lifecycle-facing snapshot value -- never AnalyzerRun.output["baseScore"],
+# which stays computed from `authoritative_evidence` alone (see
+# _persist_verification_attempt), honestly None for both, exactly as before
+# this change (Task 12's DF-QuAD contract is untouched). This mirrors the
+# posture app.qbaf.debate_adapter.CONTRADICTED_EVIDENCE_TAU already
+# established for the graph-edge case: a real verdict, no elicited
+# confidence, so a conservative constant stands in rather than a fabricated
+# number. The exact values are inert for every policy branch that actually
+# fires off them: app.exploration.policy's challenge/seek_evidence branches
+# read only status/entailment for these two decisions (never base_score/
+# uncertainty), and every scalar-sensitive branch (abandon/reopen) requires
+# EvidenceStatus.GROUNDED, which neither of these ever is.
+LIFECYCLE_CONTRADICTED_BASE_SCORE = 0.05
+LIFECYCLE_CONTRADICTED_UNCERTAINTY = 0.90
+LIFECYCLE_NO_INFO_BASE_SCORE = 0.05
+LIFECYCLE_NO_INFO_UNCERTAINTY = 1.0
+
 
 def _first_branch(db: Session, debate_id: str) -> DebateBranch:
     # Local, minimal lookup mirroring app.protocol.runner._first_branch --
@@ -303,6 +325,50 @@ def _parse_verifier_verdict(
     return verdict, None, authoritative_evidence
 
 
+def _lifecycle_evidence_for_verdict(
+    verdict: str | None,
+    authoritative_evidence: Mapping[str, object] | None,
+) -> dict | None:
+    """Evidence value for the LIFECYCLE snapshot only -- never
+    AnalyzerRun.output["baseScore"] (see _persist_verification_attempt,
+    which computes that field from `authoritative_evidence` alone,
+    unaffected by this function).
+
+    `verdict` must be the RAW value `_parse_verifier_verdict` returned --
+    None for every path that is not a genuinely-parsed enum member
+    (unparseable response, and the three failure call sites in
+    evaluate_evidence_verdict -- timeout, provider error, lineage
+    independence refusal -- which never even reach _parse_verifier_verdict
+    and so never pass a verdict here at all). Those all correctly fall
+    through to `return None` below, preserving the pre-existing withheld
+    (terminal_unverifiable, value=None) posture -- this function only ever
+    enriches a REAL, judge-produced verdict.
+    """
+    if verdict == "supported":
+        return dict(authoritative_evidence) if authoritative_evidence is not None else None
+    if verdict == "contradicted":
+        return {
+            "status": "contradicted",
+            "base_score": LIFECYCLE_CONTRADICTED_BASE_SCORE,
+            "uncertainty": LIFECYCLE_CONTRADICTED_UNCERTAINTY,
+            "entailment": "REFUTES",
+            "caveats": [],
+            "evaluator_id": EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+            "evaluator_version": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
+        }
+    if verdict == "unverifiable":
+        return {
+            "status": "no_info",
+            "base_score": LIFECYCLE_NO_INFO_BASE_SCORE,
+            "uncertainty": LIFECYCLE_NO_INFO_UNCERTAINTY,
+            "entailment": "NOINFO",
+            "caveats": [],
+            "evaluator_id": EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+            "evaluator_version": EVIDENCE_VERIFICATION_EVALUATOR_VERSION,
+        }
+    return None
+
+
 def _persist_verification_attempt(
     db: Session,
     *,
@@ -315,6 +381,7 @@ def _persist_verification_attempt(
     lineage_metadata: dict,
     checked_at: datetime | str | None = None,
     authoritative_evidence: Mapping[str, object] | None = None,
+    lifecycle_evidence: Mapping[str, object] | None = None,
     commit: bool = True,
 ) -> None:
     """Persist one verifier attempt and its honest lifecycle projection."""
@@ -328,6 +395,10 @@ def _persist_verification_attempt(
     # (authoritative_evidence is None despite the textual verdict saying
     # "supported") honestly persists baseScore: None rather than fabricate
     # a number -- app.qbaf.debate_adapter fails closed (no edge) on that.
+    # `lifecycle_evidence` (Task 16) is a DELIBERATELY SEPARATE value: it
+    # also covers "contradicted"/"unverifiable" real verdicts (fixed
+    # sentinels, see _lifecycle_evidence_for_verdict), but must never affect
+    # this AnalyzerRun.output["baseScore"] computation.
     base_score = authoritative_evidence.get("base_score") if authoritative_evidence is not None else None
 
     branch = _first_branch(db, debate.id)
@@ -369,7 +440,7 @@ def _persist_verification_attempt(
         verification_reason=reason,
         recorded_at=run.created_at,
         checked_at=checked_at,
-        authoritative_evidence=authoritative_evidence,
+        lifecycle_evidence=lifecycle_evidence,
     )
     persist_evidence_lifecycle_snapshot(
         db,
@@ -490,6 +561,11 @@ def evaluate_evidence_verdict(
         return {"status": "unverifiable", "reason": "verification_judge_call_failed"}
 
     verdict, error_reason, authoritative_evidence = _parse_verifier_verdict(result.raw_output)
+    # Task 16 (P3.2): `verdict` here is None for every path that isn't a
+    # genuinely-parsed enum member (e.g. an unparseable response), so this
+    # naturally returns None for those too -- see
+    # _lifecycle_evidence_for_verdict's own docstring.
+    lifecycle_evidence = _lifecycle_evidence_for_verdict(verdict, authoritative_evidence)
 
     # Same scrub applied at the guard above -- reuse it here rather than the
     # raw provider attributes, so no secret-like provider/model string is ever
@@ -508,6 +584,7 @@ def evaluate_evidence_verdict(
         lineage_metadata=lineage_metadata,
         checked_at=result.checked_at,
         authoritative_evidence=authoritative_evidence,
+        lifecycle_evidence=lifecycle_evidence,
         commit=commit,
     )
 

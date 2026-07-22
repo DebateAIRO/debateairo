@@ -76,6 +76,21 @@ _STATE_PRECEDENCE = {
     "mismatched": 4,
     "malformed": 5,
 }
+# Task 16 (P3.2, adaptive-expansion activation readiness): a REAL, judge-
+# produced adverse verdict is just as authoritative as a "grounded"(=
+# supports) one for POLICY purposes -- app.exploration.policy's categorical
+# challenge branch is grounded in EvidenceStatus.CONTRADICTED/REFUTED +
+# EntailmentLabel.REFUTES, and its seek_evidence branch in
+# EvidenceStatus.{MISSING,UNAVAILABLE,NO_INFO}. resolve_evidence_lifecycle_
+# input's OWN "state" name deliberately stays "contradicted"/"no_info" (never
+# rewritten to "grounded") because it must still refuse to authorize an
+# ABANDON decision -- see its "grounded_for_abandonment" field and
+# test_resolver_withholds_authoritative_but_contradicted_evidence. This set
+# names exactly which evidence-resolution states may proceed to the real
+# policy signal below; every other non-grounded state (missing/pending/
+# unverifiable-from-an-infra-failure/stale/mismatched/malformed) still fails
+# safe exactly as before.
+_EVIDENCE_AUTHENTICATING_STATES = {"grounded", "contradicted", "no_info"}
 
 
 @dataclass(frozen=True)
@@ -470,7 +485,7 @@ def decide_lifecycle_for_node(
         reason
         for reason, grounded in (
             (score.resolution.reason_code, score.resolution.state == "grounded"),
-            (evidence.reason_code, evidence.state == "grounded"),
+            (evidence.reason_code, evidence.state in _EVIDENCE_AUTHENTICATING_STATES),
         )
         if not grounded
     )

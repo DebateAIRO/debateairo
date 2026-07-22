@@ -18,6 +18,7 @@ Design under test:
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -33,7 +34,7 @@ from app.exploration.expansion_dispatch import (
     expansion_dispatch,
     maybe_queue_rescore_after_expansion,
 )
-from app.models.entities import AnalyzerRun, Debate, Job, LifecycleDecisionRecord, Node, now_utc
+from app.models.entities import AnalyzerRun, Debate, Generation, Job, LifecycleDecisionRecord, Node, now_utc
 from app.scoring import queue_scoring_job
 from app.scoring.jobs import drive_internal_scoring_for_debate, run_scoring_job_background
 from app.services import dialectical_v2 as service
@@ -700,3 +701,187 @@ def test_user_approved_expansion_refuses_budget_honestly_flag_on(db, monkeypatch
     assert body["audit_record_id"] is not None
     db.expire_all()
     assert expand_jobs(db, debate.id) == []
+
+
+# ---------------------------------------------------------------------------
+# Task 16 (P3.2): adaptive-expansion activation readiness -- end-to-end proof
+# with BOTH DIALECTICAL_ADAPTIVE_EXPANSION and DIALECTICAL_EVIDENCE_
+# VERIFICATION on, driving the REAL chain (no scripted decide_lifecycle_for_
+# node anywhere): scoring completion -> evidence verification (a fake
+# judge-provider response, exactly like the real worker transport) ->
+# lifecycle reevaluation -> a real, categorically-grounded challenge/
+# seek_evidence decision -> expansion_dispatch -> a real v2_expand job
+# queued -> LifecycleDecisionRecord persisted with dispatch_outcome, and the
+# decision exposed on the serialized debate payload (lifecycleDecisions).
+# ---------------------------------------------------------------------------
+
+
+def _neutral_claim_assessment():
+    from app.scoring import ClaimAssessment, ContextAssessment, CriticAssessment, EvidenceAssessment, FallacyAssessment, SteelmanAssessment
+
+    return ClaimAssessment(
+        steelman=SteelmanAssessment(charitable_strength=0.5, confidence=0.7),
+        critic=CriticAssessment(logical_validity=0.6, assumption_risk=0.2, counterargument_strength=0.3),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.5,
+            evidence_relevance=0.5,
+            evidence_sufficiency=0.5,
+            source_reliability=0.5,
+            freshness=0.5,
+            missing_evidence=[],
+            fatal_flags=[],
+        ),
+        context=ContextAssessment(relevance=0.5, impact=0.2, dependency_weight=0.2),
+        fallacy=FallacyAssessment(logical_consistency=0.8),
+    )
+
+
+def _add_evidence_child(db, worker, target: Node, *, id_suffix: str) -> Node:
+    evidence = Node(
+        id=f"e2e-evidence-{id_suffix}",
+        debate_id=target.debate_id,
+        parent_id=target.id,
+        node_type="EVIDENCE",
+        depth=target.depth + 1,
+        position=5000,
+        claim="A cited source appears to address the claim.",
+        status="completed",
+        path_status="active",
+        materialized_path=f"{target.materialized_path}/5000",
+        evidence_metadata={"evidenceKind": "citation"},
+    )
+    db.add(evidence)
+    db.flush()
+    evidence_generation = Generation(
+        id=f"e2e-evidence-generation-{id_suffix}",
+        node_id=evidence.id,
+        model_id="gpt-5.6sol-medium",
+        role="pro",
+        argument=evidence.claim,
+        worker_id=worker.id,
+    )
+    db.add(evidence_generation)
+    db.flush()
+    evidence.active_generation_id = evidence_generation.id
+    db.commit()
+    return evidence
+
+
+def _verifier_fake_registry(verdict: str):
+    from app.providers import AgentConfig, ProviderRegistry
+    from app.scoring.judges import ScoringProviderResult
+
+    class FakeProvider:
+        provider = "fixture-judge"
+        # A DIFFERENT model family than codex_worker's "gpt-5.6sol-medium"
+        # (the argument's author, per generic_pov_output's provenance) --
+        # judge_lineage_metadata refuses to call the provider at all for a
+        # same-family judge (see app.scoring.lineage), so the verifier must
+        # be cross-family for evaluate_evidence_verdict to ever reach it.
+        model = "claude-sonnet-5-high-loop"
+
+        def judge_node(self, request):
+            if request.judge_role == "verifier":
+                raw_output = json.dumps({"verdict": verdict})
+            else:
+                raw_output = _neutral_claim_assessment().model_dump_json()
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=raw_output,
+                latency_ms=5,
+                checked_at=now_utc().isoformat(),
+            )
+
+    provider = FakeProvider()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider=provider.provider, model=provider.model, temperature=0.0)},
+        providers={provider.provider: provider},
+    )
+    return provider, registry
+
+
+def test_real_contradicted_verifier_verdict_authenticates_challenge_and_dispatches_expand_job(
+    db, monkeypatch
+) -> None:
+    from app.services.serialization import debate_to_dict
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    _add_evidence_child(db, worker, target, id_suffix="challenge")
+    provider, registry = _verifier_fake_registry("contradicted")
+
+    job = queue_scoring_job(db, debate, model_id=provider.model)
+    db.commit()
+    run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    record = db.scalars(
+        select(LifecycleDecisionRecord).where(LifecycleDecisionRecord.node_id == target.id)
+    ).one()
+    assert record.decision == "challenge"
+    assert record.signal_class == "categorical"
+    assert record.input_state == "grounded"
+    assert record.dispatch_outcome == "spawned"
+    assert record.child_spawn_count == 1
+
+    jobs = expand_jobs(db, debate.id)
+    assert len(jobs) == 1
+    assert jobs[0].job_type == "v2_expand"
+    assert jobs[0].payload["decision_record_id"] == record.id
+    child = db.get(Node, jobs[0].node_id)
+    assert child.parent_id == target.id and child.node_type == "CON"
+    assert adaptive_config(db, debate.id)["rounds_completed"] == 1
+
+    # lifecycleDecisions on the wire (brief point 2): the debate payload
+    # exposes exactly this persisted decision for the target node.
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    wire_decisions = {entry["nodeId"]: entry for entry in payload["lifecycleDecisions"]}
+    assert wire_decisions[target.id]["decision"] == "challenge"
+    assert wire_decisions[target.id]["signalClass"] == "categorical"
+    assert wire_decisions[target.id]["outcome"] == "spawned"
+    assert wire_decisions[target.id]["childSpawnCount"] == 1
+
+
+def test_real_unverifiable_verifier_verdict_authenticates_seek_evidence_and_dispatches_expand_job(
+    db, monkeypatch
+) -> None:
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    # requires_evidence in app.exploration.policy is gated on the REAL
+    # deterministic claim-type classifier (app.scoring.normalizer), which
+    # runs against node.claim during the real scoring pass -- so, unlike the
+    # unit-level test_lifecycle_decision_service.py test, the claim text
+    # itself (not a score-item field) must classify empirical.
+    target.claim = "A study reports a measured 12 percent adoption rate among surveyed users."
+    db.commit()
+    _add_evidence_child(db, worker, target, id_suffix="seek-evidence")
+    provider, registry = _verifier_fake_registry("unverifiable")
+
+    job = queue_scoring_job(db, debate, model_id=provider.model)
+    db.commit()
+    run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    record = db.scalars(
+        select(LifecycleDecisionRecord).where(LifecycleDecisionRecord.node_id == target.id)
+    ).one()
+    assert record.decision == "seek_evidence"
+    assert record.signal_class == "categorical"
+    assert record.input_state == "grounded"
+    assert record.dispatch_outcome == "spawned"
+    assert record.child_spawn_count == 1
+
+    jobs = expand_jobs(db, debate.id)
+    assert len(jobs) == 1
+    assert jobs[0].job_type == "v2_expand"
+    assert jobs[0].payload["decision_record_id"] == record.id
+    child = db.get(Node, jobs[0].node_id)
+    assert child.parent_id == target.id and child.node_type == "PRO"
+    assert adaptive_config(db, debate.id)["rounds_completed"] == 1
