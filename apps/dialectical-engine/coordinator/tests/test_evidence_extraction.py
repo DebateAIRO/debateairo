@@ -110,7 +110,11 @@ def test_persist_evidence_nodes_creates_evidence_children_with_copied_attributio
     assert evidence_nodes[0].node_type == "EVIDENCE"
     assert evidence_nodes[0].parent_id == claim_node.id
     assert evidence_nodes[0].depth == claim_node.depth + 1
-    assert evidence_nodes[0].status == "completed" or evidence_nodes[0].status == "complete"
+    # Task 9 (scoring/status hygiene, docs/improvement-plan-2026-07-22.md
+    # Sec P2.5): "complete" (no "-ed") is the app-wide node-status vocabulary
+    # -- every other Node.status reader/writer uses it; extractor-created
+    # EVIDENCE nodes must match, not carry the one-off "completed" spelling.
+    assert evidence_nodes[0].status == "complete"
 
     evidence_generation = db.get(Generation, evidence_nodes[0].active_generation_id)
     assert evidence_generation is not None

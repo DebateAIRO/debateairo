@@ -340,8 +340,14 @@ def _max_severity(severities) -> Severity:
 
 def _rationale(claim: NormalizedClaim, scores: NodeScores, holes: list[ScoringHole]) -> ScoreRationale:
     weakest_link = holes[0].description if holes else "No dominant weakness was detected by the scoring reducer."
+    # Task 9 (scoring/status hygiene, docs/improvement-plan-2026-07-22.md
+    # Sec P2.5): claim_type=="unknown" must not render the literal type word
+    # -- "Unknown claim scored ..." reads like an error state, not an
+    # honestly-unclassified claim. Every other type keeps its title-cased
+    # leading word (unchanged wording/behavior).
+    claim_label = "Claim" if claim.claim_type == "unknown" else f"{claim.claim_type.title()} claim"
     return ScoreRationale(
-        short=f"{claim.claim_type.title()} claim scored {scores.strength:.2f} with {scores.uncertainty:.2f} uncertainty.",
+        short=f"{claim_label} scored {scores.strength:.2f} with {scores.uncertainty:.2f} uncertainty.",
         why_not_higher=weakest_link,
         why_not_lower="The claim remains judgeable and has a coherent charitable reading.",
         weakest_link=weakest_link,

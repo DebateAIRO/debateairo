@@ -1756,6 +1756,34 @@ def test_reducer_public_rationale_does_not_expose_mock_language() -> None:
     assert "mock" not in payload.rationale.why_not_higher.lower()
 
 
+def test_reducer_rationale_omits_leading_type_word_for_unknown_claim_type() -> None:
+    # Task 9 (scoring/status hygiene, docs/improvement-plan-2026-07-22.md
+    # Sec P2.5): claim_type="unknown" must not render the literal word
+    # "Unknown" in the rationale -- "Unknown claim scored 0.42 ..." reads
+    # like an error state, not an honestly-unclassified claim.
+    payload = reduce_assessments(
+        base_claim(claim_type="unknown", ambiguity_flags=[], evidence_refs=["stored-judge-output"]),
+        base_assessment(),
+    )
+    short = payload.rationale.short
+    assert short.startswith("Claim scored ")
+    assert short.endswith(" uncertainty.")
+    assert "Unknown" not in short
+    assert "unknown" not in short.lower()
+
+
+def test_reducer_rationale_keeps_leading_type_word_for_known_claim_type() -> None:
+    # Companion case: every OTHER claim_type keeps the pre-existing
+    # "<Type> claim scored ..." wording -- only "unknown" is special-cased.
+    payload = reduce_assessments(
+        base_claim(claim_type="empirical", ambiguity_flags=[], evidence_refs=["stored-judge-output"]),
+        base_assessment(),
+    )
+    short = payload.rationale.short
+    assert short.startswith("Empirical claim scored ")
+    assert short.endswith(" uncertainty.")
+
+
 def test_disagreement_detection_surfaces_high_steelman_weak_evidence_tension() -> None:
     disagreements = detect_disagreements(
         base_assessment(

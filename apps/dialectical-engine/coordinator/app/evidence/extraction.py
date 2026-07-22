@@ -173,7 +173,11 @@ def persist_evidence_nodes(
             depth=claim_node.depth + 1,
             position=position,
             claim=span["text"],
-            status="completed",
+            # Task 9 (scoring/status hygiene, docs/improvement-plan-2026-07-22.md
+            # Sec P2.5): "complete" (no "-ed") is the app-wide Node.status
+            # vocabulary -- every reader compares "complete"; this was the
+            # only "-ed" writer in the app.
+            status="complete",
             path_status="active",
             materialized_path=f"{claim_node.materialized_path}/{position}",
             evidence_metadata={"evidenceKind": span["evidenceKind"]},
