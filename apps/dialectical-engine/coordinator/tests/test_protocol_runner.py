@@ -637,6 +637,64 @@ def test_evidence_nodes_do_not_dilute_tau_coverage(db) -> None:
     assert run.output["tauSources"][evidence.id] == "default"
 
 
+def test_dead_pov_containers_never_hold_tau_coverage_below_one(db) -> None:
+    # T2 (P0.5): a failed/abandoned POV placeholder never receives a judge
+    # score (app.scoring.service._debate_node_ids excludes it from
+    # scoring), so it can never contribute a "judge_strength" tau. Before
+    # the fix its id still counted in the tauCoverage denominator forever
+    # (argument_node_ids had no dead-node exclusion), so a debate whose
+    # live nodes were ALL judged still reported tauCoverage < 1.0 through no
+    # scoring fault. Required invariant: once every live (non-failed,
+    # non-abandoned, non-stale, non-EVIDENCE) node is judged, tauCoverage
+    # reaches 1.0 even though dead placeholders remain in the tree.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    povs = db.scalars(
+        select(Node).where(Node.debate_id == debate.id, Node.node_type != "ROOT_CLAIM")
+    ).all()
+    assert len(povs) == 4  # fixed quartet -- conftest disables dynamic perspectives
+    live_pov, *dead_povs = povs
+    assert len(dead_povs) == 3
+    for pov in dead_povs:
+        # Mirrors terminalize_job_failure's node-degradable branch exactly
+        # (orchestrator.py ~1592-1596).
+        pov.status = "failed"
+        pov.stopping_status = "stop"
+        pov.stopping_reason = "generation_exhausted"
+        pov.path_status = "abandoned"
+    db.commit()
+
+    root_id = debate.root_node_id
+    root = db.get(Node, root_id)
+    items = [
+        _scoring_payload_for_node(root_id, root.claim),
+        _scoring_payload_for_node(live_pov.id, live_pov.claim),
+    ]
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type=SCORING_ANALYZER_TYPE,
+            output={"status": "available", "items": items},
+            status="complete",
+            provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+        )
+    )
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    assert run.output["tauCoverage"] == 1.0
+    assert run.output["tauSources"][root_id] == "judge_strength"
+    assert run.output["tauSources"][live_pov.id] == "judge_strength"
+    # Dead nodes still get an honest per-node tau-source entry (default) --
+    # they are excluded from the coverage *scope*, not silently disappeared.
+    for pov in dead_povs:
+        assert run.output["tauSources"][pov.id] == "default"
+
+
 def test_run_protocol_analysis_records_qbaf_unavailable_reason_on_cycle(db) -> None:
     real_codex_worker(db)
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})

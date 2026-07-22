@@ -1809,10 +1809,25 @@ def record_approved_adaptive_expansion(
 
 
 def _debate_node_ids(db: Session, debate_id: str) -> list[str]:
+    # T2 (P0.5): exclude dead placeholders in addition to stale ones -- a
+    # node whose generation exhausted every pool model (status="failed") or
+    # whose path was set aside (path_status="abandoned", e.g. via an
+    # exploration-policy "abandon" decision) must never be judged: it wastes
+    # a judge call and produces a misleading strength chip on a claim that
+    # is nothing but its bare placeholder label. This is a live per-call
+    # query (no cached/snapshotted node-id list), so a node whose
+    # path_status later flips back to "active" (an exploration-policy
+    # "reopen" decision) flows back into this set on the very next call,
+    # with no code change here.
     return list(
         db.scalars(
             select(Node.id)
-            .where(Node.debate_id == debate_id, Node.status != "stale")
+            .where(
+                Node.debate_id == debate_id,
+                Node.status != "stale",
+                Node.status != "failed",
+                Node.path_status != "abandoned",
+            )
             .order_by(Node.materialized_path.asc(), Node.depth.asc(), Node.position.asc(), Node.id.asc())
         ).all()
     )

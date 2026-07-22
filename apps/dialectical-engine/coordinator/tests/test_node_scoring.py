@@ -8352,3 +8352,196 @@ def test_scoring_api_docs_gate_cache_work_on_real_producer_contract() -> None:
     assert "Real async worker scoring is explicitly deferred to a later milestone" in docs
     assert "scoring_source: \"judge_outputs\"" in docs
     assert "must not create or\ncache fake runtime scores" in docs
+
+
+def test_debate_scoring_node_selection_excludes_failed_or_abandoned_but_keeps_live_and_stale_exclusion(db) -> None:
+    """T2 (P0.5): _debate_node_ids must exclude a node when EITHER
+    status == "failed" OR path_status == "abandoned" holds, independently of
+    one another (terminalize_job_failure's node-degradable branch sets both
+    together, but a non-degradable failure only sets status, and an
+    exploration-policy "abandon" decision only sets path_status), while the
+    pre-existing stale exclusion and ordinary live-node selection keep
+    working exactly as before.
+    """
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/0",
+    )
+    live = Node(
+        debate=debate,
+        parent=root,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Remote work gives people more focus time.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    stale = Node(
+        debate=debate,
+        parent=root,
+        node_type="CON",
+        depth=1,
+        position=1,
+        claim="This stale node should not be exposed for scoring.",
+        status="stale",
+        materialized_path="/0/1",
+    )
+    failed_status_only = Node(
+        debate=debate,
+        parent=root,
+        node_type="ETHICAL_POV",
+        depth=1,
+        position=2,
+        claim="Ethical POV",
+        status="failed",
+        path_status="active",
+        materialized_path="/0/2",
+    )
+    abandoned_path_only = Node(
+        debate=debate,
+        parent=root,
+        node_type="PRACTICAL_POV",
+        depth=1,
+        position=3,
+        claim="Practical POV",
+        status="complete",
+        path_status="abandoned",
+        materialized_path="/0/3",
+    )
+    db.add_all([debate, root, live, stale, failed_status_only, abandoned_path_only])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    payload = get_debate_scoring(db, debate.id)
+
+    assert payload is not None
+    assert payload["node_ids"] == [root.id, live.id]
+
+
+def test_abandoned_path_node_flows_back_into_scoring_once_reopened(db) -> None:
+    """T2 (P0.5) reopen safety: exploration/policy.py can decide "reopen" for
+    an abandoned path, which flips path_status back to "active"
+    (app.exploration.scoring_completion_lifecycle). Selection is a live
+    per-scoring-run query with no cached/snapshotted node-id list, so a
+    node excluded while abandoned must flow back into scoring once its
+    path_status returns to active, with no code change.
+    """
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    root = Node(
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Remote work improves productivity.",
+        status="complete",
+        materialized_path="/0",
+    )
+    reopenable = Node(
+        debate=debate,
+        parent=root,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Remote work gives people more focus time.",
+        status="complete",
+        path_status="abandoned",
+        materialized_path="/0/0",
+    )
+    db.add_all([debate, root, reopenable])
+    db.flush()
+    debate.root_node_id = root.id
+    db.commit()
+
+    excluded_payload = get_debate_scoring(db, debate.id)
+    assert excluded_payload is not None
+    assert excluded_payload["node_ids"] == [root.id]
+
+    reopenable.path_status = "active"
+    db.commit()
+
+    reopened_payload = get_debate_scoring(db, debate.id)
+    assert reopened_payload is not None
+    assert reopened_payload["node_ids"] == [root.id, reopenable.id]
+
+
+def test_score_nodes_with_provider_skips_failed_pov_container_no_judge_call(db) -> None:
+    """T2 (P0.5): a POV branch whose generation exhausts every pool model is
+    terminalized by terminalize_job_failure to status=failed,
+    path_status=abandoned, with its claim still the bare perspective label
+    ("Scientific POV"). That placeholder must never reach the judge: no
+    scoring item, and -- verified via the fake provider's own call log --
+    no judge_node call for it at all.
+    """
+    class CapturingProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.requested_node_ids = []
+
+        def judge_node(self, request):
+            self.requested_node_ids.append(request.claim.node_id)
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should cities ban cars downtown?", status="generating")
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Should cities ban cars downtown?",
+        status="complete",
+        materialized_path="/0",
+    )
+    live_pov = Node(
+        id="live-pov-node",
+        debate=debate,
+        parent=root,
+        node_type="STATISTICAL_POV",
+        depth=1,
+        position=0,
+        claim="Statistical POV",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    dead_pov = Node(
+        id="dead-pov-node",
+        debate=debate,
+        parent=root,
+        node_type="SCIENTIFIC_POV",
+        depth=1,
+        position=1,
+        claim="Scientific POV",
+        status="failed",
+        path_status="abandoned",
+        stopping_status="stop",
+        stopping_reason="generation_exhausted",
+        materialized_path="/0/1",
+    )
+    db.add_all([debate, root, live_pov, dead_pov])
+    db.commit()
+    provider = CapturingProvider()
+
+    payload = score_nodes_with_provider(db, debate, provider)
+
+    assert payload["status"] == "available"
+    assert payload["node_ids"] == [root.id, live_pov.id]
+    assert dead_pov.id not in payload["node_ids"]
+    assert [item["node_id"] for item in payload["items"]] == [root.id, live_pov.id]
+    assert provider.requested_node_ids == [root.id, live_pov.id]
+    assert dead_pov.id not in provider.requested_node_ids

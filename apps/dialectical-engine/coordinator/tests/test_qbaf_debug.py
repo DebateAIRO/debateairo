@@ -74,6 +74,25 @@ def test_qbaf_debug_block_excludes_stale_nodes(db):
     assert set(block["strengths"]) == {root.id}
 
 
+def test_qbaf_debug_block_excludes_failed_and_abandoned_nodes(db):
+    # T2 (P0.5): the qbaf_debug.py:23 mirror of _debate_node_ids must apply
+    # the same failed/abandoned exclusion, not just the stale one.
+    debate = _make_debate(db)
+    root = _make_node(db, debate, node_type="ROOT_CLAIM", parent=None)
+    failed = _make_node(db, debate, node_type="PRO", parent=root, position=0)
+    failed.status = "failed"
+    abandoned = _make_node(db, debate, node_type="CON", parent=root, position=1)
+    abandoned.path_status = "abandoned"
+    db.add_all([failed, abandoned])
+    db.commit()
+
+    block = qbaf_debug_block(db, debate, {"items": []})
+
+    assert block is not None
+    assert "unavailable_reason" not in block
+    assert set(block["strengths"]) == {root.id}
+
+
 def test_qbaf_debug_block_returns_unavailable_reason_on_cycle(db, monkeypatch):
     debate = _make_debate(db)
     _make_node(db, debate, node_type="ROOT_CLAIM", parent=None)

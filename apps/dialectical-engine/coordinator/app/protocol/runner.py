@@ -180,8 +180,32 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
         # no-edge extracted substrings whose taus never reach the verdict).
         # 0..1 fraction whose tau came from a persisted judge strength rather
         # than DEFAULT_TAU; consumed by verdict_summary's coverage gate.
+        #
+        # T2 (P0.5) dead-node exclusion: a failed/abandoned placeholder node
+        # (app.scoring.service._debate_node_ids already excludes it from
+        # judging) can never earn a "judge_strength" tau, so leaving its id
+        # in this denominator would hold tauCoverage below 1.0 forever, even
+        # once every live node is judged -- through no scoring fault. `nodes`
+        # above is intentionally NOT filtered by status/path_status (unlike
+        # the scoring node-id query): a dead node can still be a live
+        # sibling's attack/support edge *target* by construction (parent_id),
+        # and debate_adapter._edge_for never verifies an edge endpoint
+        # actually exists in the graph -- dropping dead nodes from
+        # `node_dicts`/the graph itself risks an orphaned edge that raises
+        # ValueError in debate_argument_graph (caught below as
+        # qbafUnavailableReason, losing tauCoverage entirely, which is worse
+        # than the bug this fixes). Excluding dead ids from just the
+        # coverage scope is the smallest change that establishes the
+        # invariant without that risk; dead nodes still get an honest
+        # "default" tauSources entry above, they are just never counted
+        # toward -- or against -- coverage.
+        dead_node_ids = {
+            str(node.id) for node in nodes if node.status == "failed" or node.path_status == "abandoned"
+        }
         argument_node_ids = [
-            str(node["id"]) for node in node_dicts if str(node["node_type"]) != "EVIDENCE"
+            str(node["id"])
+            for node in node_dicts
+            if str(node["node_type"]) != "EVIDENCE" and str(node["id"]) not in dead_node_ids
         ]
         judged_count = sum(
             1
