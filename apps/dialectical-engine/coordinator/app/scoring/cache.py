@@ -9,19 +9,67 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import AnalyzerRun, NodeScoringResult, now_utc
 from app.scoring.judge_registry import JudgeContract
+from app.scoring.judges import JudgeChildContext
 from app.scoring.models import NormalizedClaim
 
 
 SCORING_CACHE_ANALYZER_TYPE = "node_scoring_cache"
 SCORING_CACHE_SOURCE = "scoring_cache"
-SCORING_INPUT_HASH_VERSION = "node-scoring-input-v2"
+# Task 3 amendment (controller follow-up, docs/improvement-plan-2026-07-22.md
+# §P2.3): bumped v2 -> v3 because the hash payload below now includes
+# debate_question and a children digest (previously claim + argument_text
+# only). Motivating case: a later cross-examination task adds attack
+# children to a node and rescores it -- without this, that rescore would
+# cache-hit on the OLD (children-blind) hash and never see the new
+# counters, silently defeating Task 3's tree-aware judge payload. Every
+# pre-existing persisted input_hash is intentionally invalidated by this
+# bump (a hash computed under the old payload shape can never collide with
+# one computed under the new shape, regardless of content).
+SCORING_INPUT_HASH_VERSION = "node-scoring-input-v3"
 
 
-def node_scoring_input_hash(*, claim: NormalizedClaim, argument_text: str | None) -> str:
+def _children_digest_payload(children: list[JudgeChildContext]) -> list[dict[str, str | None]]:
+    # Hash EXACTLY what the judge prompt renders for each child (node_id,
+    # stance, claim, argument_excerpt as rendered -- i.e. already truncated),
+    # in the same stable order the caller supplies (never re-sorted here):
+    # identical rendered payloads must hash identically, and a real content
+    # change (a new attack child, a regenerated excerpt, a reordering) must
+    # change the hash. `truncated` is deliberately omitted -- it is fully
+    # determined by argument_excerpt (whether it carries the truncation
+    # marker), so including it would be redundant, not additional signal.
+    return [
+        {
+            "node_id": child.node_id,
+            "stance": child.stance,
+            "claim": child.claim,
+            "argument_excerpt": child.argument_excerpt,
+        }
+        for child in children
+    ]
+
+
+def node_scoring_input_hash(
+    *,
+    claim: NormalizedClaim,
+    argument_text: str | None,
+    debate_question: str | None = None,
+    children: list[JudgeChildContext] | None = None,
+) -> str:
     payload = {
         "version": SCORING_INPUT_HASH_VERSION,
         "claim": claim.model_dump(mode="json"),
         "argument_text": argument_text or "",
+        # Task 3 amendment: debate_question and children are exactly the two
+        # new prompt inputs render_single_node_judge_prompt's default branch
+        # consumes (docs/improvement-plan-2026-07-22.md §P2.3) -- the cache
+        # key now covers everything the prompt renders, not just claim and
+        # argument_text. Both default to "absent" (None / no children) so a
+        # caller that genuinely has neither (there are none in production,
+        # but the parameters stay optional for symmetry with
+        # ScoringProviderRequest's own optional fields) still gets a
+        # well-defined, deterministic hash.
+        "debate_question": debate_question or "",
+        "children": _children_digest_payload(children or []),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

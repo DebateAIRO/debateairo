@@ -336,7 +336,12 @@ def _hydrate_node_scoring_item_from_judge_artifact(
         return None, None, None
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
-    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    input_hash = node_scoring_input_hash(
+        claim=claim,
+        argument_text=generation.argument if generation else None,
+        debate_question=debate.topic,
+        children=_node_children_for_judge(db, node.id),
+    )
     try:
         contract = active_contract("judge")
     except KeyError:
@@ -540,7 +545,20 @@ def score_node_with_provider(
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
     argument_text = generation.argument if generation else None
-    input_hash = node_scoring_input_hash(claim=claim, argument_text=argument_text)
+    # Task 3 amendment (controller follow-up): fetched here, BEFORE the cache
+    # lookup below, rather than deferred to the ScoringProviderRequest
+    # construction further down -- the cache key now covers children (see
+    # node_scoring_input_hash), so children must be known before the cache
+    # can even be checked. Reused as-is for the request below: exactly one
+    # fetch per call, on a cache hit or a miss alike (unavoidable now that
+    # the cache key depends on it), never a second query.
+    children = _node_children_for_judge(db, node.id)
+    input_hash = node_scoring_input_hash(
+        claim=claim,
+        argument_text=argument_text,
+        debate_question=debate.topic,
+        children=children,
+    )
     provider_name = getattr(provider, "provider", None)
     model_name = getattr(provider, "model", None)
     stale_cache_metadata = None
@@ -607,19 +625,16 @@ def score_node_with_provider(
         argument_text=argument_text,
         judge_role=judge_role,
         timeout_seconds=timeout_seconds,
-        # Task 3 (tree-aware judge payload,
-        # docs/improvement-plan-2026-07-22.md §P2.3): `debate` is always the
-        # real debate this node belongs to (a caller-supplied parameter, not
-        # inferred), so debate_question is always the node's actual debate
-        # question -- never a placeholder. children is the node's real
-        # PRO/CON tree, fetched fresh every call (never cached across calls)
-        # so it always reflects the current tree even though the scoring
-        # cache keys on claim+argument_text only (see node_scoring_input_hash
-        # -- a tree change alone does not invalidate a cache hit today; that
-        # is a pre-existing cache-key scope limitation, not new to this
-        # change, and out of this task's scope).
+        # Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
+        # §P2.3): `debate` is always the real debate this node belongs to (a
+        # caller-supplied parameter, not inferred), so debate_question is
+        # always the node's actual debate question -- never a placeholder.
+        # `children` is the SAME list already fetched above for the cache-key
+        # computation (Task 3 amendment) -- reused, not re-fetched, so this
+        # request is always built from exactly the children the cache lookup
+        # already checked freshness against.
         debate_question=debate.topic,
-        children=_node_children_for_judge(db, node.id),
+        children=children,
     )
     try:
         result = None
@@ -1368,7 +1383,12 @@ def ensure_node_scoring_on_completion(
         )
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
-    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument if generation else None)
+    input_hash = node_scoring_input_hash(
+        claim=claim,
+        argument_text=generation.argument if generation else None,
+        debate_question=debate.topic,
+        children=_node_children_for_judge(db, node.id),
+    )
     _expire_stale_scoring_jobs(db, debate.id)
     config = detect_scoring_provider_config(
         registry.agents,
@@ -1995,7 +2015,12 @@ def _score_node_will_call_provider(
         db,
         debate_id=debate.id,
         node_id=node.id,
-        input_hash=node_scoring_input_hash(claim=claim, argument_text=argument_text),
+        input_hash=node_scoring_input_hash(
+            claim=claim,
+            argument_text=argument_text,
+            debate_question=debate.topic,
+            children=_node_children_for_judge(db, node.id),
+        ),
         judge_role=judge_role,
         contract_hash=will_call_contract.contract_hash if will_call_contract is not None else None,
         provider=provider_name,

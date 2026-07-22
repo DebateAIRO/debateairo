@@ -2479,7 +2479,12 @@ def test_score_node_with_provider_returns_matching_cache_without_model_call(db) 
         NodeScoringResult(
             debate_id=debate.id,
             node_id=node.id,
-            input_hash=node_scoring_input_hash(claim=claim, argument_text=generation.argument),
+            input_hash=node_scoring_input_hash(
+                claim=claim,
+                argument_text=generation.argument,
+                debate_question=debate.topic,
+                children=[],
+            ),
             judge_role="judge",
             provider="test-provider",
             model="test-model",
@@ -2703,7 +2708,12 @@ def test_score_node_with_provider_writes_successful_result_to_cache(db) -> None:
     cached = db.query(NodeScoringResult).filter_by(
         debate_id=debate.id,
         node_id=node.id,
-        input_hash=node_scoring_input_hash(claim=claim, argument_text=generation.argument),
+        input_hash=node_scoring_input_hash(
+            claim=claim,
+            argument_text=generation.argument,
+            debate_question=debate.topic,
+            children=[],
+        ),
         judge_role="judge",
         provider="test-provider",
         model="test-model",
@@ -2925,6 +2935,8 @@ def test_score_node_with_provider_persists_private_raw_judge_output_without_publ
     assert artifact.input_hash == node_scoring_input_hash(
         claim=normalize_claim(node_id=node.id, raw_text=node.claim),
         argument_text=generation.argument,
+        debate_question=debate.topic,
+        children=[],
     )
     cached = db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).one()
     _assert_public_payload_has_no_private_judge_output(cached.result, raw_marker)
@@ -3439,6 +3451,121 @@ def test_score_node_with_provider_fetches_real_pro_con_children_for_judge_payloa
     # judge's tree-aware payload as a child.
     assert "A cited internal survey on retention." not in rendered_content
     assert "Survey text that must never reach the judge payload" not in rendered_content
+
+
+def test_score_node_with_provider_rescoring_after_a_new_attack_child_causes_a_fresh_judge_call(db) -> None:
+    """Task 3 amendment (controller follow-up,
+    docs/improvement-plan-2026-07-22.md §P2.3), TDD bullet (a): a later
+    cross-examination task adds attack children and rescores affected nodes.
+    node_scoring_input_hash must key on children (not just claim +
+    argument_text) so that rescore is a genuine cache MISS -- proved
+    end-to-end here via a fake provider's call log, not just at the pure
+    node_scoring_input_hash level (covered separately by
+    test_node_scoring_input_hash_changes_when_a_child_is_added)."""
+
+    class CapturingProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def judge_node(self, request):
+            self.requests.append(request)
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    root = Node(
+        id="root-node",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="complete",
+        materialized_path="/0",
+    )
+    target = Node(
+        id="target-node",
+        debate=debate,
+        parent=root,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/0/0",
+    )
+    target_generation = Generation(
+        id="target-generation",
+        node=target,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    target.active_generation_id = target_generation.id
+    db.add_all([debate, worker, root, target, target_generation])
+    db.commit()
+    provider = CapturingProvider()
+
+    # 1) First score: childless node -- one real judge call, cached.
+    first_payload = score_node_with_provider(db, debate, target.id, provider)
+    assert first_payload["status"] == "available"
+    assert first_payload["cache"]["hit"] is False
+    assert len(provider.requests) == 1
+    assert provider.requests[0].children == []
+
+    # 2) Rescoring with NOTHING changed must still be a cache hit -- no new
+    # provider call. (Guards against the amendment accidentally making the
+    # hash unstable/non-deterministic for identical state.)
+    unchanged_payload = score_node_with_provider(db, debate, target.id, provider)
+    assert unchanged_payload["cache"]["hit"] is True
+    assert len(provider.requests) == 1
+
+    # 3) A pre-synthesis-cross-examination-style event: a new CON (attack)
+    # child appears on the tree, with its own generation.
+    con_child = Node(
+        id="con-child",
+        debate=debate,
+        parent=target,
+        node_type="CON",
+        depth=2,
+        position=0,
+        claim="Remote work weakens collaboration.",
+        status="complete",
+        materialized_path="/0/0/0",
+    )
+    con_generation = Generation(
+        id="con-generation",
+        node=con_child,
+        model_id="model-a",
+        role="con",
+        argument="Coordination suffers once teams stop sharing an office.",
+        worker_id=worker.id,
+    )
+    con_child.active_generation_id = con_generation.id
+    db.add_all([con_child, con_generation])
+    db.commit()
+
+    # 4) Rescoring the SAME node (same claim, same argument_text) after the
+    # tree changed must be a cache MISS -- a fresh judge call that actually
+    # sees the new counter, not a stale hit on the old (children-blind) hash.
+    rescored_payload = score_node_with_provider(db, debate, target.id, provider)
+
+    assert rescored_payload["cache"]["hit"] is False
+    assert len(provider.requests) == 2
+    second_request = provider.requests[1]
+    assert [child.node_id for child in second_request.children] == [con_child.id]
+    assert second_request.children[0].stance == "attack"
+    assert second_request.children[0].claim == "Remote work weakens collaboration."
 
 
 def test_score_node_with_provider_rejects_non_current_node(db) -> None:
@@ -4748,7 +4875,16 @@ def test_score_nodes_with_provider_audit_counts_only_model_calls_made(db) -> Non
         NodeScoringResult(
             debate_id=debate.id,
             node_id=cached_node.id,
-            input_hash=node_scoring_input_hash(claim=cached_claim, argument_text=None),
+            input_hash=node_scoring_input_hash(
+                claim=cached_claim,
+                argument_text=None,
+                debate_question=debate.topic,
+                # cached_node's only child (fresh_node) is node_type="support",
+                # not "PRO"/"CON", so it is not a real counter/support child
+                # and node_children_for_judge would never fetch it -- children
+                # stays [] here regardless.
+                children=[],
+            ),
             judge_role="judge",
             provider="test-provider",
             model="test-model",
@@ -5250,7 +5386,12 @@ def test_ensure_node_scoring_on_completion_reuses_cache_or_queues_once(db) -> No
         NodeScoringResult(
             debate_id=debate.id,
             node_id=node.id,
-            input_hash=node_scoring_input_hash(claim=claim, argument_text=generation.argument),
+            input_hash=node_scoring_input_hash(
+                claim=claim,
+                argument_text=generation.argument,
+                debate_question=debate.topic,
+                children=[],
+            ),
             judge_role="judge",
             provider="codex",
             model="codex-test-model",
@@ -5515,7 +5656,12 @@ def test_lineage_guard_blocks_completion_hook_but_preserves_and_still_serves_cac
         "node_ids": [node.id],
         "items": [scoring_item],
     }
-    input_hash = node_scoring_input_hash(claim=claim, argument_text=generation.argument)
+    input_hash = node_scoring_input_hash(
+        claim=claim,
+        argument_text=generation.argument,
+        debate_question=debate.topic,
+        children=[],
+    )
     db.add(
         NodeScoringResult(
             debate_id=debate.id,
@@ -6027,6 +6173,92 @@ def test_node_scoring_input_hash_changes_when_claim_or_argument_changes() -> Non
     assert node_scoring_input_hash(claim=claim, argument_text=None) != original
 
 
+def _con_child_context(**overrides) -> JudgeChildContext:
+    data = {
+        "node_id": "child-con",
+        "stance": "attack",
+        "claim": "Remote work weakens collaboration.",
+        "argument_excerpt": "Coordination suffers once teams stop sharing an office.",
+        "truncated": False,
+    }
+    data.update(overrides)
+    return JudgeChildContext(**data)
+
+
+def test_node_scoring_input_hash_is_unchanged_for_content_identical_children() -> None:
+    # Task 3 amendment (controller follow-up, docs/improvement-plan-2026-07-22.md
+    # §P2.3), TDD bullet (b): the hash is a pure function of CONTENT, not
+    # object identity -- two freshly-fetched children lists with identical
+    # node_id/stance/claim/argument_excerpt must hash identically.
+    claim = normalize_claim(node_id="node-1", raw_text="Remote work improves retention.")
+
+    first = node_scoring_input_hash(
+        claim=claim,
+        argument_text="Retention improved by 12%.",
+        debate_question="Should companies adopt remote work?",
+        children=[_con_child_context()],
+    )
+    second = node_scoring_input_hash(
+        claim=claim,
+        argument_text="Retention improved by 12%.",
+        debate_question="Should companies adopt remote work?",
+        children=[_con_child_context()],
+    )
+
+    assert first == second
+
+
+def test_node_scoring_input_hash_changes_when_a_child_is_added() -> None:
+    # TDD bullet (a) at the pure-function level (see
+    # test_score_node_with_provider_rescoring_a_new_attack_child_causes_a_
+    # fresh_judge_call below for the end-to-end cache-miss proof).
+    claim = normalize_claim(node_id="node-1", raw_text="Remote work improves retention.")
+    common = dict(
+        claim=claim,
+        argument_text="Retention improved by 12%.",
+        debate_question="Should companies adopt remote work?",
+    )
+
+    childless = node_scoring_input_hash(children=[], **common)
+    with_attack_child = node_scoring_input_hash(children=[_con_child_context()], **common)
+
+    assert childless != with_attack_child
+
+
+def test_node_scoring_input_hash_changes_when_debate_question_changes() -> None:
+    # TDD bullet (c).
+    claim = normalize_claim(node_id="node-1", raw_text="Remote work improves retention.")
+    common = dict(claim=claim, argument_text="Retention improved by 12%.", children=[])
+
+    original = node_scoring_input_hash(debate_question="Should companies adopt remote work?", **common)
+
+    assert node_scoring_input_hash(debate_question="Should companies mandate remote work?", **common) != original
+    assert node_scoring_input_hash(debate_question=None, **common) != original
+
+
+def test_node_scoring_input_hash_changes_when_a_childs_stance_or_excerpt_changes() -> None:
+    # Confirms the digest is content-sensitive per field, not just
+    # sensitive to the number of children.
+    claim = normalize_claim(node_id="node-1", raw_text="Remote work improves retention.")
+    common = dict(
+        claim=claim,
+        argument_text="Retention improved by 12%.",
+        debate_question="Should companies adopt remote work?",
+    )
+    baseline = node_scoring_input_hash(children=[_con_child_context()], **common)
+
+    assert node_scoring_input_hash(children=[_con_child_context(stance="support")], **common) != baseline
+    assert node_scoring_input_hash(children=[_con_child_context(claim="A different claim.")], **common) != baseline
+    assert (
+        node_scoring_input_hash(children=[_con_child_context(argument_excerpt="A different excerpt.")], **common)
+        != baseline
+    )
+    # `truncated` alone is deliberately NOT part of the digest (see
+    # app.scoring.cache._children_digest_payload) -- it is fully determined
+    # by argument_excerpt, so it carries no independent signal.
+    assert node_scoring_input_hash(children=[_con_child_context(truncated=True)], **common) == baseline
+
+
 def test_lookup_scoring_cache_requires_full_cache_identity(db) -> None:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
     db.add(debate)
@@ -6265,7 +6497,12 @@ def test_score_one_node_with_provider_rejects_malformed_model_output(db) -> None
     cached = db.query(NodeScoringResult).filter_by(
         debate_id=debate.id,
         node_id=node.id,
-        input_hash=node_scoring_input_hash(claim=claim, argument_text=None),
+        input_hash=node_scoring_input_hash(
+            claim=claim,
+            argument_text=None,
+            debate_question=debate.topic,
+            children=[],
+        ),
         judge_role="judge",
         provider="test-provider",
         model="test-model",
@@ -8444,6 +8681,8 @@ def test_scoring_api_hydrates_from_persisted_judge_artifacts_after_session_reloa
     input_hash = node_scoring_input_hash(
         claim=normalize_claim(node_id=node.id, raw_text=node.claim),
         argument_text=generation.argument,
+        debate_question=debate.topic,
+        children=[],
     )
     stale_job = Job(
         debate_id=debate.id,

@@ -50,6 +50,17 @@ from app.scoring.cache import node_scoring_input_hash
 from app.scoring.judge_registry import active_contract
 from app.scoring.models import ClaimAssessment
 from app.scoring.normalizer import normalize_claim
+# Task 3 amendment (controller follow-up, docs/improvement-plan-2026-07-22.md
+# §P2.3): reuses the SAME live children-fetch app.scoring.service's
+# score_node_with_provider uses to build both the judge payload and the
+# cache key, rather than a second, potentially-diverging implementation --
+# a lifecycle decision's "current" input hash must be computed exactly the
+# way a fresh score would be, or it can never correctly authenticate a
+# persisted score against the node's live state. Cross-module import of a
+# private helper mirrors the existing
+# app.evidence.verification_evaluator -> app.scoring.service._public_metadata_text
+# precedent.
+from app.scoring.service import _node_children_for_judge
 
 
 DEFAULT_SCORE_MAX_AGE_SECONDS = 60 * 60
@@ -130,11 +141,17 @@ def _active_contract_identity() -> ScoringContractIdentity:
     )
 
 
-def _current_score_input_hash(db: Session, node: Node) -> str:
+def _current_score_input_hash(db: Session, debate: Debate, node: Node) -> str:
     generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
     return node_scoring_input_hash(
         claim=normalize_claim(node_id=node.id, raw_text=node.claim),
         argument_text=generation.argument if generation is not None else None,
+        # Task 3 amendment: must match exactly how app.scoring.service
+        # computes the SAME node's input_hash when it actually scores it, or
+        # a fresh score's input_hash could never authenticate against this
+        # "current" hash -- see the module-level import comment above.
+        debate_question=debate.topic,
+        children=_node_children_for_judge(db, node.id),
     )
 
 
@@ -436,7 +453,7 @@ def decide_lifecycle_for_node(
         schema_version=SCHEMA_VERSION,
         debate_id=debate.id,
         node_id=node.id,
-        current_score_input_hash=_current_score_input_hash(db, node),
+        current_score_input_hash=_current_score_input_hash(db, debate, node),
         active_scoring_contract=_active_contract_identity(),
         expected_evidence_source=evidence_source,
         decision_timestamp=decision_timestamp,

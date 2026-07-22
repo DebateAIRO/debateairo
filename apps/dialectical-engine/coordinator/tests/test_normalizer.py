@@ -335,8 +335,12 @@ def test_normalize_claim_key_terms_remains_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_input_hash_version_is_bumped_to_v2() -> None:
-    assert SCORING_INPUT_HASH_VERSION == "node-scoring-input-v2"
+def test_input_hash_version_is_bumped_to_v3() -> None:
+    # Task 3 amendment (controller follow-up, docs/improvement-plan-2026-07-22.md
+    # §P2.3): bumped v2 -> v3 because node_scoring_input_hash's payload now
+    # also covers debate_question and a children digest -- see
+    # app.scoring.cache's SCORING_INPUT_HASH_VERSION comment.
+    assert SCORING_INPUT_HASH_VERSION == "node-scoring-input-v3"
 
 
 def test_node_scoring_input_hash_changes_from_v1_baseline_for_same_claim() -> None:
@@ -352,5 +356,5 @@ def test_node_scoring_input_hash_changes_from_v1_baseline_for_same_claim() -> No
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    v2_hash = node_scoring_input_hash(claim=claim, argument_text="Retention improved by 12%.")
-    assert v2_hash != v1_payload_hash
+    current_hash = node_scoring_input_hash(claim=claim, argument_text="Retention improved by 12%.")
+    assert current_hash != v1_payload_hash

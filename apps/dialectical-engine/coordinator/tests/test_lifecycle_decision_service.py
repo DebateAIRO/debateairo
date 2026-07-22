@@ -166,6 +166,11 @@ def _persist_score(
     input_hash = node_scoring_input_hash(
         claim=normalize_claim(node_id=node.id, raw_text=node.claim),
         argument_text=generation.argument,
+        # _subject() never gives `node` any PRO/CON children, so this must
+        # match app.scoring.service._node_children_for_judge's real result
+        # for it: debate.topic and no children.
+        debate_question=debate.topic,
+        children=[],
     )
     item = _score_item(node.id)
     checked_at = observed_at.isoformat().replace("+00:00", "Z")
@@ -713,9 +718,11 @@ def test_stale_inputs_persist_fail_safe_continuation_and_retry_is_idempotent(db,
 
     monkeypatch.setattr("app.services.orchestrator.now_utc", lambda: DECISION_TIME)
     spawn_child_argument_jobs(db, debate, node, candidates)
-    spawn_child_argument_jobs(db, debate, node, candidates)
     db.flush()
 
+    # First spawn: `node` was still childless when the lifecycle decision
+    # ran, so the persisted (stale) score's input_hash still matches --
+    # staleness alone (not a tree change) drives the fail-safe "continue".
     children = db.scalars(
         select(Node).where(Node.parent_id == node.id, Node.node_type != "EVIDENCE")
     ).all()
@@ -728,6 +735,26 @@ def test_stale_inputs_persist_fail_safe_continuation_and_retry_is_idempotent(db,
     assert "evidence_stale" in node.stopping_reason
     assert len(children) == 2
     assert len(jobs) == 2
+
+    # Retry is idempotent: no duplicate children are spawned. Task 3
+    # amendment (controller follow-up, docs/improvement-plan-2026-07-22.md
+    # §P2.3): by now `node` HAS the two real children just spawned above, so
+    # the live input_hash (which now keys on children, not just claim +
+    # argument_text) genuinely no longer matches the persisted score --
+    # "score_input_hash_mismatch" is the honest reason this time, not
+    # "score_stale": the TREE changed, not just the clock. This is exactly
+    # the invalidation the amendment exists to guarantee.
+    spawn_child_argument_jobs(db, debate, node, candidates)
+    db.flush()
+
+    assert node.stopping_reason
+    assert "score_input_hash_mismatch" in node.stopping_reason
+    assert "evidence_stale" in node.stopping_reason
+    children_after_retry = db.scalars(
+        select(Node).where(Node.parent_id == node.id, Node.node_type != "EVIDENCE")
+    ).all()
+    assert len(children_after_retry) == 2
+    assert [child.id for child in children_after_retry] == child_ids
 
 
 def test_duplicate_authenticated_artifact_linkage_fails_closed(db) -> None:

@@ -68,6 +68,10 @@ def _seed_debate_with_node(db, *, node_id: str = "node-hydration-guard"):
     input_hash = node_scoring_input_hash(
         claim=normalize_claim(node_id=node.id, raw_text=node.claim),
         argument_text=generation.argument,
+        # `node` is given no PRO/CON children here, so this must match
+        # app.scoring.service._node_children_for_judge's real result for it.
+        debate_question=debate.topic,
+        children=[],
     )
     return debate, node, input_hash
 
