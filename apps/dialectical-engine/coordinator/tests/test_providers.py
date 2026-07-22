@@ -323,6 +323,8 @@ def test_claude_provider_reports_missing_cli_without_generation(monkeypatch) -> 
 
 
 def test_claude_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monkeypatch) -> None:
+    import subprocess
+
     provider = ClaudeCliProvider(executable="claude")
     captured: dict[str, object] = {}
 
@@ -333,6 +335,7 @@ def test_claude_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monk
 
     def fake_run(command, *args, **kwargs):
         captured["command"] = command
+        captured["kwargs"] = kwargs
         return Completed()
 
     monkeypatch.setattr("app.providers.claude_cli.shutil.which", lambda executable: "/usr/local/bin/claude")
@@ -342,6 +345,10 @@ def test_claude_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monk
 
     assert captured["command"][0] == "/usr/local/bin/claude"
     assert response.text == '{"status":"unavailable"}'
+    # Reviewer follow-up: no prompt is piped via stdin (it's a -p argument)
+    # -- stdin must be explicitly closed so an unexpected interactive
+    # prompt fails fast instead of stalling the full timeout.
+    assert captured["kwargs"]["stdin"] is subprocess.DEVNULL
 
 
 def test_claude_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:
@@ -420,6 +427,8 @@ def test_gemini_provider_reports_missing_cli_without_generation(monkeypatch) -> 
 
 
 def test_gemini_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monkeypatch) -> None:
+    import subprocess
+
     provider = GeminiCliProvider(executable="agy")
     captured: dict[str, object] = {}
 
@@ -430,6 +439,7 @@ def test_gemini_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monk
 
     def fake_run(command, *args, **kwargs):
         captured["command"] = command
+        captured["kwargs"] = kwargs
         return Completed()
 
     monkeypatch.setattr("app.providers.gemini_cli.shutil.which", lambda executable: "/usr/local/bin/agy")
@@ -439,6 +449,10 @@ def test_gemini_provider_uses_resolved_cli_path_and_returns_stripped_stdout(monk
 
     assert captured["command"][0] == "/usr/local/bin/agy"
     assert response.text == '{"status":"unavailable"}'
+    # Reviewer follow-up: no prompt is piped via stdin (it's a --print
+    # argument) -- stdin must be explicitly closed so an unexpected
+    # interactive prompt fails fast instead of stalling the full timeout.
+    assert captured["kwargs"]["stdin"] is subprocess.DEVNULL
 
 
 def test_gemini_provider_reports_compact_nonzero_cli_error(monkeypatch) -> None:

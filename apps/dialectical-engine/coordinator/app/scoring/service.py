@@ -1027,20 +1027,62 @@ def _run_judge_panel(
     fine").
 
     Returns one honest note per panel member that did NOT end up
-    contributing a usable ("available") persisted judgment -- config-time
-    skips (build_judge_panel_members' own unconfigured/unavailable
-    entries), runtime failures caught here, and parse failures -- folded
-    into score_provenance.judge_panel_notes by the caller
-    (_attach_plural_judge_provenance). A panel member's own failure/
-    timeout/exception is caught here and never propagated: it degrades to
-    the remaining judges (point 2), leaving an honest gap rather than a
-    fabricated judgment or a failed scoring run.
+    contributing a usable ("available") persisted judgment -- panel
+    construction failures, config-time skips (build_judge_panel_members'
+    own unconfigured/unavailable entries), runtime failures (call, parse,
+    OR persist -- see the per-member try/except below), and parse
+    failures -- folded into score_provenance.judge_panel_notes by the
+    caller (_attach_plural_judge_provenance). A panel member's own
+    failure/timeout/exception -- including a persistence failure, e.g. a
+    transient DB error -- is caught here and never propagated: it degrades
+    to the remaining judges (point 2), leaving an honest gap rather than a
+    fabricated judgment or a failed scoring run, and never discards the
+    primary judge's own already-persisted result.
     """
-    members, notes = build_judge_panel_members()
+    try:
+        members, notes = build_judge_panel_members()
+    except Exception:  # noqa: BLE001 -- panel construction must never fail the primary scoring run (point 2)
+        LOGGER.exception("judge panel construction raised unexpectedly")
+        return [
+            {
+                "model_id": None,
+                "family": None,
+                "status": "exception",
+                "reason": "Judge panel construction raised an unexpected error.",
+            }
+        ]
     notes = list(notes)
     for member in members:
+        # Reviewer follow-up: the ENTIRE unit of work for one panel member
+        # -- the call, the parse, and the persist -- runs inside one
+        # try/except AND one SAVEPOINT (db.begin_nested()), not just the
+        # call. Persist failures (e.g. a transient DB error) are just as
+        # real a "panel member failure" as a timeout or a bad response and
+        # must degrade the same way. A savepoint (not a bare db.rollback())
+        # is required here: db.rollback() would roll back the WHOLE shared
+        # session -- including the primary judge's own JudgeOutputArtifact,
+        # already flushed (but not yet committed) by the caller above --
+        # wiping out a result that had already succeeded. begin_nested()
+        # scopes any rollback to exactly this member's own uncommitted work
+        # (verified empirically: a failing nested block leaves prior
+        # flushes on the same session, and the session itself, intact).
         try:
-            result = member.provider.judge_node(request)
+            with db.begin_nested():
+                result = member.provider.judge_node(request)
+                parsed = parse_judge_json(result.raw_output)
+                parse_available = parsed.status == "available" and parsed.assessment is not None
+                _persist_judge_output_artifact(
+                    db,
+                    debate_id=debate.id,
+                    node_id=node.id,
+                    input_hash=input_hash,
+                    judge_role=member.judge_role,
+                    request=request,
+                    result=result,
+                    parse_status="available" if parse_available else "unavailable",
+                    parse_error=None if parse_available else parsed.reason,
+                    assessment=parsed.assessment.model_dump(mode="json") if parsed.assessment is not None else None,
+                )
         except TimeoutError:
             LOGGER.warning("judge panel member timed out: %s", member.model_id)
             notes.append(
@@ -1063,7 +1105,7 @@ def _run_judge_panel(
                 }
             )
             continue
-        except Exception:  # noqa: BLE001 -- a panel member's own bug/crash must never fail the primary scoring run (point 2)
+        except Exception:  # noqa: BLE001 -- any panel member failure (call, parse, or persist) must never fail the primary scoring run (point 2)
             LOGGER.exception("judge panel member raised unexpectedly: %s", member.model_id)
             notes.append(
                 {
@@ -1074,20 +1116,6 @@ def _run_judge_panel(
                 }
             )
             continue
-        parsed = parse_judge_json(result.raw_output)
-        parse_available = parsed.status == "available" and parsed.assessment is not None
-        _persist_judge_output_artifact(
-            db,
-            debate_id=debate.id,
-            node_id=node.id,
-            input_hash=input_hash,
-            judge_role=member.judge_role,
-            request=request,
-            result=result,
-            parse_status="available" if parse_available else "unavailable",
-            parse_error=None if parse_available else parsed.reason,
-            assessment=parsed.assessment.model_dump(mode="json") if parsed.assessment is not None else None,
-        )
         if not parse_available:
             notes.append(
                 {
@@ -1097,14 +1125,15 @@ def _run_judge_panel(
                     "reason": parsed.reason or "Panel judge output was unavailable.",
                 }
             )
-    log_event(
-        LOGGER,
-        "judge_panel.run",
-        debate_id=debate.id,
-        node_id=node.id,
-        member_count=len(members),
-        note_count=len(notes),
-    )
+    if members or notes:
+        log_event(
+            LOGGER,
+            "judge_panel.run",
+            debate_id=debate.id,
+            node_id=node.id,
+            member_count=len(members),
+            note_count=len(notes),
+        )
     return notes
 
 

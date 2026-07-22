@@ -4125,6 +4125,95 @@ def test_score_node_with_provider_panel_member_timeout_degrades_to_remaining_jud
     assert notes[0]["status"] == "timeout"
 
 
+def test_score_node_with_provider_panel_member_persist_exception_leaves_primary_artifact_intact(
+    db, monkeypatch
+) -> None:
+    # Reviewer follow-up: parse_judge_json and _persist_judge_output_artifact
+    # were previously OUTSIDE the per-member try/except -- a persist-time
+    # exception (e.g. a transient DB error) would propagate out of
+    # score_node_with_provider entirely, discarding the primary judge's
+    # already-persisted result. _persist_judge_output_artifact is
+    # monkeypatched here to raise ONLY for the panel member's own
+    # judge_role -- the primary's own call (judge_role="judge", which
+    # happens earlier in score_node_with_provider, before _run_judge_panel
+    # is ever reached) is delegated through to the real implementation
+    # unchanged, so this proves the primary's write survives a panel
+    # member's persist failure, not merely that the fake never touches it.
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "persist-failure-panel-model")
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=10,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class PersistFailurePanelProvider:
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider="persist-failure-panel-provider",
+                model="persist-failure-panel-model",
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=12,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    failing_member = JudgePanelMember(
+        family="persist-failure-family",
+        model_id="persist-failure-panel-model",
+        judge_role=judge_panel_role("persist-failure-family"),
+        provider=PersistFailurePanelProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([failing_member], []))
+
+    real_persist = scoring_service._persist_judge_output_artifact
+
+    def persist_that_fails_for_the_panel_contract_only(db_arg, *, judge_role, **kwargs):
+        if judge_role == "judge":
+            return real_persist(db_arg, judge_role=judge_role, **kwargs)
+        raise RuntimeError("simulated transient DB failure persisting a panel judgment")
+
+    monkeypatch.setattr(
+        scoring_service, "_persist_judge_output_artifact", persist_that_fails_for_the_panel_contract_only
+    )
+
+    debate, node, _generation = _lineage_guard_debate_and_node(db, arguer_model_id="model-a")
+
+    payload = score_node_with_provider(
+        db, debate, node.id, PrimaryProvider(), judge_role="judge", force_refresh=True
+    )
+
+    # The run completes -- a panel member's persist-time exception never
+    # fails the primary scoring run.
+    assert payload["status"] == "available"
+
+    # The primary judge's artifact is intact -- exactly one persisted row,
+    # for "judge", proving the panel member's failed persist attempt did
+    # not roll back or otherwise discard the primary's own write.
+    db.expire_all()
+    artifact = _single_judge_output_artifact(db, debate_id=debate.id, node_id=node.id)
+    assert artifact.judge_role == "judge"
+    assert artifact.parse_status == "available"
+
+    item = payload["items"][0]
+    provenance = item["score_provenance"]
+    assert provenance["judgment_mode"] == "single_judgment"
+    notes = provenance["judge_panel_notes"]
+    assert len(notes) == 1
+    assert notes[0]["model_id"] == "persist-failure-panel-model"
+    assert notes[0]["family"] == "persist-failure-family"
+    assert notes[0]["status"] == "exception"
+    assert notes[0]["reason"]
+
+
 def test_score_node_with_provider_panel_member_unconfigured_family_is_noted_without_running(
     db, monkeypatch
 ) -> None:

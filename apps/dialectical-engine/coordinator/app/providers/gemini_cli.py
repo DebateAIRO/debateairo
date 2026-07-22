@@ -84,6 +84,12 @@ class GeminiCliProvider:
                 errors="replace",
                 timeout=self.timeout_seconds,
                 check=False,
+                # Reviewer follow-up: no prompt is piped via stdin (it's a
+                # --print command-line argument) -- close stdin explicitly
+                # so an unexpected interactive prompt (e.g. an auth flow)
+                # fails fast with EOF instead of hanging for the full
+                # timeout_seconds.
+                stdin=subprocess.DEVNULL,
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(f"Gemini command timed out after {self.timeout_seconds} seconds.") from exc
