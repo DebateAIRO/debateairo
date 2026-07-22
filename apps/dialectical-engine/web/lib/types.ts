@@ -78,6 +78,23 @@ export type DebateNode = {
   active_generation: Generation | null;
   children: DebateNode[];
   score?: NodeScore | null;
+  /**
+   * Task 13 (P1.5, evidence independence bookkeeping): additive, per-claim
+   * aggregation over this node's own EVIDENCE children -- counts distinct
+   * (source_domain, method) pairs (coordinator/app/evidence/independence.py).
+   * Measures sourcing BREADTH (how many distinct places/ways this claim's
+   * evidence claims to come from), never verified accuracy and never
+   * training-corpus independence. Absent (not a fabricated zero-object) for
+   * a node with no EVIDENCE children -- callers must not assume presence.
+   */
+  evidence_independence?: EvidenceIndependence | null;
+};
+
+export type EvidenceIndependencePair = [string | null, string | null];
+
+export type EvidenceIndependence = {
+  distinct_source_count: number;
+  pairs: EvidenceIndependencePair[];
 };
 
 export type ScoringStatus = "available" | "partial" | "unavailable";

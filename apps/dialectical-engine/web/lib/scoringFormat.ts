@@ -1,4 +1,4 @@
-import type { StrengthKind, UncertaintyDriver, UncertaintySource } from "./types";
+import type { EvidenceIndependence, EvidenceIndependencePair, StrengthKind, UncertaintyDriver, UncertaintySource } from "./types";
 
 export type FormattedScorePercent = {
   value: number;
@@ -86,5 +86,51 @@ export function formatStrengthPill(
   return {
     pillText: `STR ${strengthPercent.value} · argument-only`,
     title: `Argument-only strength — evidence not weighted for this claim type (${strengthPercent.label})`,
+  };
+}
+
+export type IndependencePillContent = {
+  /** Short pill text: how many distinct (domain, method) sources this claim's evidence cites. */
+  pillText: string;
+  /** Full explanation for the title attribute: every pair, plus what the number does and does not mean. */
+  title: string;
+};
+
+// Task 13 (docs/improvement-plan-2026-07-22.md Sec P1.5): "cheap first
+// version" sourcing-breadth bookkeeping over a claim's EVIDENCE children --
+// counts distinct (source_domain, method) pairs
+// (coordinator/app/evidence/independence.py). This is deliberately NOT
+// named/worded as "independent sources" anywhere visible: the brief is
+// explicit that the label must say what it measures (distinct
+// source-domain/method pairs) and must never read as a claim about
+// verified accuracy or training-corpus independence, so both the pill text
+// and the title spell that out rather than using the ambiguous word
+// "independent".
+const INDEPENDENCE_METHOD_LABELS: Record<string, string> = {
+  retrieval: "retrieved",
+  "model-claim": "model claim",
+};
+
+function formatIndependencePair([domain, method]: EvidenceIndependencePair): string {
+  const domainText = domain ?? "no domain";
+  const methodText = (method && INDEPENDENCE_METHOD_LABELS[method]) || method || "unknown method";
+  return `${domainText} (${methodText})`;
+}
+
+export function formatIndependencePill(
+  independence: EvidenceIndependence | null | undefined
+): IndependencePillContent | null {
+  if (!independence || independence.distinct_source_count <= 0) {
+    return null;
+  }
+  const count = independence.distinct_source_count;
+  const pairText = independence.pairs.map(formatIndependencePair).join("; ");
+  const title =
+    `${count} distinct source-domain/method pair${count === 1 ? "" : "s"}` +
+    (pairText ? ` (${pairText})` : "") +
+    " — measures sourcing breadth (where evidence claims to come from), not verified accuracy or training-corpus independence.";
+  return {
+    pillText: `sources: ${count} distinct`,
+    title,
   };
 }

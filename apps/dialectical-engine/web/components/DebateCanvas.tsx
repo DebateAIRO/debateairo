@@ -15,7 +15,13 @@ import {
 } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
-import { formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill } from "@/lib/scoringFormat";
+import {
+  formatIndependencePill,
+  formatScoreBadgeLabel,
+  formatScorePercent,
+  formatStrengthPill,
+  formatUncertaintyPill
+} from "@/lib/scoringFormat";
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
@@ -219,6 +225,10 @@ function CanvasCard({
   const model = generation ? modelMeta(generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const setAside = isSetAsidePath(node);
+  // Task 13 (P1.5): sourcing-breadth chip, derived straight from the node's
+  // own EVIDENCE children -- independent of whether scoring has run, so it
+  // renders alongside (not inside) the scoring badges below.
+  const independencePill = formatIndependencePill(node.evidence_independence);
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -372,6 +382,15 @@ function CanvasCard({
                   </span>
                 ) : null}
               </ScoringErrorBoundary>
+              {independencePill ? (
+                <span
+                  className="scoreBadge independence"
+                  aria-label={`Evidence sourcing for ${node.claim}: ${independencePill.title}`}
+                  title={independencePill.title}
+                >
+                  {independencePill.pillText}
+                </span>
+              ) : null}
             </div>
 
             {state === "pending" ? (

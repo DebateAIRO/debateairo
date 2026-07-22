@@ -694,6 +694,251 @@ def test_debate_to_dict_includes_evidence_presence_and_state(db) -> None:
     assert no_evidence_visible["tree"]["id"] == no_evidence_root.id
 
 
+# ---------------------------------------------------------------------------
+# Task 13 (P1.5): evidence independence bookkeeping wiring. Pure-function
+# coverage (domain heuristic, per-leaf record, aggregation) lives in
+# test_evidence_independence.py -- these tests prove debate_to_dict attaches
+# the per-claim aggregate to (and only to) claim nodes with real EVIDENCE
+# children, reading each one's real evidence_metadata + generating model.
+# ---------------------------------------------------------------------------
+
+
+def _evidence_node(
+    db,
+    debate: Debate,
+    parent: Node,
+    *,
+    position: int,
+    claim: str,
+    evidence_metadata: dict | None,
+    model_id: str | None = None,
+    worker_id: str | None = None,
+) -> Node:
+    """An EVIDENCE child node with optional metadata and an optional
+    attributed generation, mirroring app.evidence.extraction's real node
+    shapes closely enough for evidence_leaf_record's inputs to be real."""
+    node = Node(
+        debate_id=debate.id,
+        parent_id=parent.id,
+        node_type="EVIDENCE",
+        depth=parent.depth + 1,
+        position=position,
+        claim=claim,
+        status="complete",
+        materialized_path=f"{parent.materialized_path}/{position}",
+        evidence_metadata=evidence_metadata,
+    )
+    db.add(node)
+    db.flush()
+    if model_id:
+        generation = Generation(
+            node_id=node.id,
+            model_id=model_id,
+            role="evidence_retriever",
+            argument=claim,
+            worker_id=worker_id,
+        )
+        db.add(generation)
+        db.flush()
+        node.active_generation_id = generation.id
+    return node
+
+
+def _pro_child(db, debate: Debate, root: Node) -> Node:
+    pro = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="Fewer cars would reduce street danger.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(pro)
+    db.flush()
+    return pro
+
+
+def test_debate_to_dict_evidence_independence_absent_without_evidence_children(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    _pro_child(db, debate, root)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert "evidence_independence" not in visible["tree"]
+    assert "evidence_independence" not in visible["tree"]["children"][0]
+
+
+def test_debate_to_dict_evidence_independence_counts_distinct_retrieval_domains(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    pro = _pro_child(db, debate, root)
+    _evidence_node(
+        db,
+        debate,
+        pro,
+        position=2000,
+        claim="A study reported fewer collisions.",
+        evidence_metadata={
+            "method": "retrieval",
+            "url": "https://www.reuters.com/world/article",
+            "quote": "collisions fell",
+            "retrieval_query": "car ban collisions",
+            "publisher": "Reuters",
+            "date": None,
+            "stance": "supports",
+            "resolution_status": "pending",
+        },
+        model_id="claude-sonnet-5-high-loop",
+        worker_id=worker.id,
+    )
+    _evidence_node(
+        db,
+        debate,
+        pro,
+        position=2001,
+        claim="Another outlet reported the same trend.",
+        evidence_metadata={
+            "method": "retrieval",
+            "url": "https://apnews.com/article/car-ban",
+            "quote": "trend confirmed",
+            "retrieval_query": "car ban collisions",
+            "publisher": "AP",
+            "date": None,
+            "stance": "supports",
+            "resolution_status": "pending",
+        },
+        model_id="gemini-2.5-pro",
+        worker_id=worker.id,
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    pro_dict = visible["tree"]["children"][0]
+
+    assert pro_dict["evidence_independence"] == {
+        "distinct_source_count": 2,
+        "pairs": [["apnews.com", "retrieval"], ["reuters.com", "retrieval"]],
+    }
+    # Scoped to THIS node's own direct EVIDENCE children -- the root has no
+    # direct evidence children of its own (they belong to the PRO node).
+    assert "evidence_independence" not in visible["tree"]
+
+
+def test_debate_to_dict_evidence_independence_counts_model_claim_spans_as_one_pair(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    pro = _pro_child(db, debate, root)
+    for index in range(3):
+        _evidence_node(
+            db,
+            debate,
+            pro,
+            position=1000 + index,
+            claim=f"Extracted span {index}.",
+            evidence_metadata={"evidenceKind": "statistical", "method": "model-claim"},
+            model_id="claude-sonnet-5-high-loop",
+            worker_id=worker.id,
+        )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    pro_dict = visible["tree"]["children"][0]
+
+    assert pro_dict["evidence_independence"] == {
+        "distinct_source_count": 1,
+        "pairs": [[None, "model-claim"]],
+    }
+
+
+def test_debate_to_dict_evidence_independence_mixes_retrieval_and_model_claim(db) -> None:
+    worker = add_worker(db)
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    pro = _pro_child(db, debate, root)
+    _evidence_node(
+        db,
+        debate,
+        pro,
+        position=1000,
+        claim="Extracted span.",
+        evidence_metadata={"evidenceKind": "statistical", "method": "model-claim"},
+        model_id="claude-sonnet-5-high-loop",
+        worker_id=worker.id,
+    )
+    _evidence_node(
+        db,
+        debate,
+        pro,
+        position=2000,
+        claim="Retrieved source.",
+        evidence_metadata={
+            "method": "retrieval",
+            "url": "https://x.com/a",
+            "quote": "q",
+            "retrieval_query": "r",
+            "publisher": "X",
+            "date": None,
+            "stance": "supports",
+            "resolution_status": "pending",
+        },
+        model_id="gemini-2.5-pro",
+        worker_id=worker.id,
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+    pro_dict = visible["tree"]["children"][0]
+
+    assert pro_dict["evidence_independence"] == {
+        "distinct_source_count": 2,
+        "pairs": [[None, "model-claim"], ["x.com", "retrieval"]],
+    }
+
+
+def test_debate_to_dict_evidence_independence_survives_evidence_with_no_generation_or_metadata(db) -> None:
+    # Defensive: an EVIDENCE node with no attached generation and no
+    # evidence_metadata (e.g. a legacy/pre-Task-10 row) must not crash
+    # serialization -- it degrades to an honest (None, None) pair rather
+    # than a fabricated guess or a stack trace.
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    evidence = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="EVIDENCE",
+        depth=1,
+        position=0,
+        claim="A transport study reported fewer collisions after a car ban.",
+        status="complete",
+        materialized_path="0/0",
+    )
+    db.add(evidence)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["tree"]["evidence_independence"] == {
+        "distinct_source_count": 1,
+        "pairs": [[None, None]],
+    }
+
+
 def test_synthesis_verdict_gate_mirrors_top_level_verdict_state(db, monkeypatch, caplog) -> None:
     monkeypatch.setenv("DIALECTICAL_VERDICT_EVIDENCE_GATE", "1")
     caplog.set_level("INFO", logger="app.services.serialization")

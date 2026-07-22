@@ -172,3 +172,87 @@ test("formatStrengthPill treats missing strength_kind the same as evidence_weigh
   assert.equal(resultUndefined.pillText, "STR 62");
   assert.equal(resultUndefined.title, undefined);
 });
+
+// Task 13 (P1.5, evidence independence bookkeeping): formatIndependencePill
+// renders the per-claim {distinct_source_count, pairs} aggregate
+// (coordinator/app/evidence/independence.py via
+// DebateNode.evidence_independence) as a compact pill + explanatory title,
+// following the same pillText/title convention as formatUncertaintyPill/
+// formatStrengthPill above. The label must say what it measures (distinct
+// source-domain/method pairs) and must never read as a training-corpus-
+// independence claim.
+
+test("formatIndependencePill returns null when there is no independence data to show", async () => {
+  const { formatIndependencePill } = await loadHelper();
+
+  assert.equal(formatIndependencePill(null), null);
+  assert.equal(formatIndependencePill(undefined), null);
+  assert.equal(formatIndependencePill({ distinct_source_count: 0, pairs: [] }), null);
+});
+
+test("formatIndependencePill renders a single distinct source", async () => {
+  const { formatIndependencePill } = await loadHelper();
+
+  const result = formatIndependencePill({
+    distinct_source_count: 1,
+    pairs: [["reuters.com", "retrieval"]],
+  });
+
+  assert.equal(result.pillText, "sources: 1 distinct");
+  assert.equal(
+    result.title,
+    "1 distinct source-domain/method pair (reuters.com (retrieved)) — measures sourcing breadth " +
+      "(where evidence claims to come from), not verified accuracy or training-corpus independence.",
+  );
+});
+
+test("formatIndependencePill pluralizes and lists every pair, including the null-domain model-claim bucket", async () => {
+  const { formatIndependencePill } = await loadHelper();
+
+  const result = formatIndependencePill({
+    distinct_source_count: 2,
+    pairs: [
+      [null, "model-claim"],
+      ["reuters.com", "retrieval"],
+    ],
+  });
+
+  assert.equal(result.pillText, "sources: 2 distinct");
+  assert.equal(
+    result.title,
+    "2 distinct source-domain/method pairs (no domain (model claim); reuters.com (retrieved)) — " +
+      "measures sourcing breadth (where evidence claims to come from), not verified accuracy or " +
+      "training-corpus independence.",
+  );
+});
+
+test("formatIndependencePill degrades honestly for an unrecognized method and a null method", async () => {
+  const { formatIndependencePill } = await loadHelper();
+
+  const result = formatIndependencePill({
+    distinct_source_count: 2,
+    pairs: [
+      ["x.com", "archived"],
+      [null, null],
+    ],
+  });
+
+  assert.match(result.title, /x\.com \(archived\)/);
+  assert.match(result.title, /no domain \(unknown method\)/);
+});
+
+test("formatIndependencePill never claims to measure training-corpus independence", async () => {
+  const { formatIndependencePill } = await loadHelper();
+
+  const result = formatIndependencePill({
+    distinct_source_count: 3,
+    pairs: [
+      [null, "model-claim"],
+      ["apnews.com", "retrieval"],
+      ["reuters.com", "retrieval"],
+    ],
+  });
+
+  assert.doesNotMatch(result.pillText, /independent/i);
+  assert.match(result.title, /not verified accuracy or training-corpus independence/);
+});

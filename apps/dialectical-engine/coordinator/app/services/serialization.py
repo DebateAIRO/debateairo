@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.argument_claim.node_adapter import argument_claim_from_node
 from app.core.config import bool_env
+from app.evidence.independence import aggregate_evidence_independence, evidence_leaf_record
 from app.evidence.presence import EVIDENCE_STATE_EXTRACTED, evidence_presence
 from app.models.entities import (
     AgentCapability,
@@ -280,6 +281,32 @@ def _node_label(node: Node) -> str | None:
     return label
 
 
+def _claim_evidence_independence(
+    child_nodes: list[Node], child_payloads: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Task 13 (P1.5): the per-claim independence aggregate over THIS node's
+    own direct EVIDENCE children (never grandchildren -- EVIDENCE nodes are
+    always leaves; extraction/retrieval only ever attach them to the claim
+    node whose own generation/job just completed, see
+    app.evidence.extraction). Reads each EVIDENCE child's real,
+    already-loaded evidence_metadata plus its generating model id (already
+    resolved onto child_payloads by the recursive node_to_dict call below --
+    no extra query). Returns None (never a fabricated zero-object) when the
+    node has no EVIDENCE children, so the key is honestly absent rather than
+    present-but-empty."""
+    leaf_records = [
+        evidence_leaf_record(
+            child_node.evidence_metadata,
+            model_id=(child_payload.get("active_generation") or {}).get("model_id"),
+        )
+        for child_node, child_payload in zip(child_nodes, child_payloads, strict=True)
+        if child_node.node_type == "EVIDENCE"
+    ]
+    if not leaf_records:
+        return None
+    return aggregate_evidence_independence(leaf_records)
+
+
 def node_to_dict(
     db: Session,
     node: Node,
@@ -295,6 +322,11 @@ def node_to_dict(
         if streaming_job
         else generation_summary(db, node.active_generation_id, worker_names_by_id)
     )
+    child_nodes = sorted(children_by_parent.get(node.id, []), key=lambda item: item.position)
+    child_payloads = [
+        node_to_dict(db, child, children_by_parent, streaming_jobs_by_node, worker_names_by_id)
+        for child in child_nodes
+    ]
     payload = {
         **argument_claim.to_node_payload(status=status),
         "label": _node_label(node),
@@ -310,13 +342,17 @@ def node_to_dict(
         # fabrication.
         "stopping_reason_human": _humanize_reason(node.stopping_reason),
         "active_generation": active_generation,
-        "children": [
-            node_to_dict(db, child, children_by_parent, streaming_jobs_by_node, worker_names_by_id)
-            for child in sorted(children_by_parent.get(node.id, []), key=lambda item: item.position)
-        ],
+        "children": child_payloads,
     }
     if node.node_type == "EVIDENCE":
         payload["evidence_state"] = EVIDENCE_STATE_EXTRACTED
+    # Task 13 (P1.5): additive, absent for claims without evidence children --
+    # see _claim_evidence_independence and app.evidence.independence's
+    # honesty laws (sourcing breadth, never truth, never a training-corpus-
+    # independence claim).
+    evidence_independence = _claim_evidence_independence(child_nodes, child_payloads)
+    if evidence_independence is not None:
+        payload["evidence_independence"] = evidence_independence
     return payload
 
 
