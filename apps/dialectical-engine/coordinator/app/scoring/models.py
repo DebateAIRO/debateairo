@@ -33,6 +33,22 @@ EvidenceSupportStatus = Literal[
 ScoringCacheStaleReason = Literal["input_hash_mismatch"]
 AdaptiveDepthMode = Literal["fixed", "manual", "recommended", "adaptive"]
 ManualInvestigationStatus = Literal["queued", "unavailable"]
+# Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
+# docs/improvement-plan-2026-07-22.md Sec P2.1). UncertaintyDriverCode is the
+# closed set of reasons the reducer can cite for a claim's uncertainty
+# (replacing the opaque "UNC 48" numeric-only display). UncertaintySource
+# records whether the numeric `scores.uncertainty` this task pairs with them
+# was measured from real judge-panel dispersion ("dispersion") or is the
+# pre-existing hand-coded checklist kept as a fallback ("heuristic").
+UncertaintyDriverCode = Literal[
+    "no_evidence_refs",
+    "low_evidence_quality",
+    "ambiguity",
+    "judge_disagreement",
+    "score_caps",
+    "strong_counter",
+]
+UncertaintySource = Literal["dispersion", "heuristic"]
 
 
 def _unit_interval(value: float) -> float:
@@ -315,6 +331,11 @@ class ScoreProvenance(BaseModel):
     rubric_version: str
 
 
+class UncertaintyDriver(BaseModel):
+    code: UncertaintyDriverCode
+    label: str
+
+
 class NodeScoringPayload(BaseModel):
     node_id: str
     claim: NormalizedClaim
@@ -336,6 +357,14 @@ class NodeScoringPayload(BaseModel):
         )
     )
     debug: ScoringDebug | None = None
+    # Task 4: labeled drivers are the primary, human-legible explanation for
+    # `scores.uncertainty` (empty when the reducer found no driver
+    # conditions true). uncertainty_source records whether that numeric
+    # value was measured (dispersion) or is the heuristic checklist
+    # fallback -- see app.scoring.reducer._uncertainty_drivers and
+    # app.scoring.disagreement.dispersion_uncertainty.
+    uncertainty_drivers: list[UncertaintyDriver] = Field(default_factory=list)
+    uncertainty_source: UncertaintySource = "heuristic"
 
 
 class NodeScoringError(BaseModel):

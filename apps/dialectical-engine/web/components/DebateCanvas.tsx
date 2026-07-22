@@ -15,7 +15,7 @@ import {
 } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
-import { formatScoreBadgeLabel, formatScorePercent } from "@/lib/scoringFormat";
+import { formatScoreBadgeLabel, formatScorePercent, formatUncertaintyPill } from "@/lib/scoringFormat";
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
@@ -452,6 +452,7 @@ function ScoreBadges({
   const uncertainty = formatScorePercent(scoring.scores.uncertainty);
   const impact = formatScorePercent(scoring.scores.impact);
   const issueSummary = summarizeCardScoringIssues(scoring);
+  const uncertaintyPill = formatUncertaintyPill(scoring.uncertainty_drivers, scoring.uncertainty_source, uncertainty);
 
   return (
     <button
@@ -466,8 +467,12 @@ function ScoreBadges({
       <span className="scoreBadge strength" aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}>
         STR {strength.value}
       </span>
-      <span className="scoreBadge uncertainty" aria-label={formatScoreBadgeLabel("Uncertainty", scoring.labels.uncertainty_label, uncertainty)}>
-        UNC {uncertainty.value}
+      <span
+        className="scoreBadge uncertainty"
+        aria-label={formatScoreBadgeLabel("Uncertainty", scoring.labels.uncertainty_label, uncertainty)}
+        title={uncertaintyPill.title}
+      >
+        {uncertaintyPill.pillText}
       </span>
       <span className="scoreBadge impact" aria-label={formatScoreBadgeLabel("Impact", scoring.labels.impact_label, impact)}>
         IMP {impact.value}

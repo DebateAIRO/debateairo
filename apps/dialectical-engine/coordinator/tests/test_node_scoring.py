@@ -21,6 +21,7 @@ from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, J
 from app.api import scoring as scoring_api
 from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegistry
 from app.scoring.caps import apply_score_caps
+from app.scoring.disagreement import dispersion_uncertainty
 from app.scoring.normalizer import normalize_claim
 from app.scoring.models import (
     EvidenceSupportStatus,
@@ -1356,7 +1357,7 @@ def test_reducer_composes_minimal_scores_deterministically() -> None:
         "raw_judge_output_kind": "claim_assessment",
         "raw_judge_output_included": False,
         "final_score_source": "deterministic_reducer",
-        "reducer_version": "node-scoring-reducer-v1",
+        "reducer_version": "node-scoring-reducer-v2",
         "rubric_version": "debateai-rubric-v1",
     }
 
@@ -1442,6 +1443,139 @@ def test_reducer_increases_uncertainty_for_vague_scope_flags() -> None:
     assert [hole.type for hole in vague.holes] == ["ambiguity", "ambiguity"]
     assert vague.score_caps == []
     assert vague.judge_disagreements == []
+
+
+def test_reducer_uncertainty_drivers_are_empty_and_source_is_heuristic_when_no_conditions_are_true() -> None:
+    claim = base_claim(
+        claim_type="normative",
+        ambiguity_flags=[],
+        evidence_refs=["stored-judge-output"],
+    )
+    assessment = base_assessment(
+        critic=CriticAssessment(
+            logical_validity=0.8,
+            assumption_risk=0.1,
+            counterargument_strength=0.2,
+        ),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.6,
+            evidence_relevance=0.6,
+            evidence_sufficiency=0.6,
+            source_reliability=0.6,
+            freshness=0.6,
+        ),
+        context=ContextAssessment(relevance=0.7, impact=0.65, dependency_weight=0.5),
+    )
+
+    payload = reduce_assessments(claim, assessment)
+
+    assert payload.uncertainty_drivers == []
+    assert payload.uncertainty_source == "heuristic"
+
+
+def test_reducer_heuristic_uncertainty_and_drivers_are_a_stable_regression_for_the_documented_048_case() -> None:
+    # Audit finding (docs/improvement-plan-2026-07-22.md Sec 1.3): the old
+    # checklist quantized to only 5 distinct values across 29 real nodes, 16
+    # of them exactly 0.48. This locks the heuristic math itself (unchanged
+    # by this task) to that exact historical value for a fixture that
+    # reproduces the same three checklist inputs (1 ambiguity flag, no
+    # evidence_refs, evidence_quality < 0.30) with 0 disagreements/caps, and
+    # asserts the labeled drivers that now explain it.
+    claim = base_claim(
+        claim_type="normative",
+        ambiguity_flags=["scope is vague"],
+        evidence_refs=[],
+    )
+    assessment = base_assessment(
+        steelman=SteelmanAssessment(charitable_strength=0.5, confidence=0.6),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.2,
+            evidence_relevance=0.2,
+            evidence_sufficiency=0.2,
+            source_reliability=0.2,
+            freshness=0.2,
+        ),
+        context=ContextAssessment(relevance=0.8, impact=0.7, dependency_weight=0.5),
+    )
+
+    payload = reduce_assessments(claim, assessment)
+
+    assert payload.scores.uncertainty == pytest.approx(0.48)
+    assert payload.uncertainty_source == "heuristic"
+    assert payload.model_dump(mode="json")["uncertainty_drivers"] == [
+        {"code": "no_evidence_refs", "label": "no external evidence"},
+        {"code": "low_evidence_quality", "label": "evidence quality low"},
+        {"code": "ambiguity", "label": "1 ambiguity flag(s)"},
+    ]
+
+
+def test_reducer_uncertainty_drivers_fire_every_code_in_deterministic_order() -> None:
+    # Same fixture as test_reducer_payload_surfaces_disagreements_not_averaged_away
+    # plus base_claim/base_assessment's own defaults (missing ambiguity
+    # flag, no evidence_refs, weak evidence, a weak-evidence strength cap,
+    # and a >0.6 counterargument strength) so every one of the six driver
+    # codes fires from a single reduce_assessments() call, in one
+    # deterministic pass: no_evidence_refs, low_evidence_quality, ambiguity,
+    # judge_disagreement (one per disagreement), score_caps (one per
+    # applied cap), strong_counter.
+    claim = base_claim()
+    assessment = base_assessment(
+        steelman=SteelmanAssessment(charitable_strength=0.9, confidence=0.8),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.2,
+            evidence_relevance=0.25,
+            evidence_sufficiency=0.2,
+            source_reliability=0.2,
+            freshness=0.2,
+        ),
+        critic=CriticAssessment(
+            logical_validity=0.7,
+            assumption_risk=0.8,
+            counterargument_strength=0.7,
+        ),
+        context=ContextAssessment(relevance=0.85, impact=0.85, dependency_weight=0.6),
+    )
+
+    payload = reduce_assessments(claim, assessment)
+
+    assert payload.model_dump(mode="json")["uncertainty_drivers"] == [
+        {"code": "no_evidence_refs", "label": "no external evidence"},
+        {"code": "low_evidence_quality", "label": "evidence quality low"},
+        {"code": "ambiguity", "label": "1 ambiguity flag(s)"},
+        {"code": "judge_disagreement", "label": "judge disagreement: steelman_evidence_tension"},
+        {"code": "judge_disagreement", "label": "judge disagreement: impact_assumption_tension"},
+        {"code": "score_caps", "label": "score capped: strength"},
+        {"code": "strong_counter", "label": "strong counterargument present"},
+    ]
+
+
+def test_reducer_uncertainty_drivers_include_one_entry_per_applied_score_cap() -> None:
+    # Same fixture as test_reducer_payload_exposes_applied_cap_reasons
+    # (three applied score caps: strength/weak_evidence,
+    # strength/fatal_contradiction, impact/low_relevance).
+    claim = base_claim(claim_type="causal")
+    assessment = base_assessment(
+        context=ContextAssessment(relevance=0.2, impact=0.9, dependency_weight=0.5),
+        fallacy=FallacyAssessment(
+            logical_consistency=0.2,
+            fatal_flags=[
+                {
+                    "type": "contradiction",
+                    "severity": "high",
+                    "description": "Internal contradiction.",
+                }
+            ],
+        ),
+    )
+
+    payload = reduce_assessments(claim, assessment)
+
+    cap_drivers = [driver for driver in payload.uncertainty_drivers if driver.code == "score_caps"]
+    assert [driver.label for driver in cap_drivers] == [
+        "score capped: strength",
+        "score capped: strength",
+        "score capped: impact",
+    ]
 
 
 def test_reducer_public_rationale_does_not_expose_mock_language() -> None:
@@ -1571,6 +1705,140 @@ def test_disagreement_detection_surfaces_strong_evidence_low_relevance_tension()
             "description": "Evidence appears strong but relevance to the debate is low.",
         }
     ]
+
+
+def _dispersion_judge_evidence_entry(
+    *, judge_role: str, provider: str, model: str, raw_output_sha256: str, assessment: ClaimAssessment
+) -> dict:
+    return {
+        "judge_role": judge_role,
+        "provider": provider,
+        "model": model,
+        "raw_output_sha256": raw_output_sha256,
+        "assessment": assessment.model_dump(mode="json"),
+    }
+
+
+def test_dispersion_uncertainty_maps_a_035_strength_gap_to_05_uncertainty() -> None:
+    # Documented map (docs/improvement-plan-2026-07-22.md Sec P2.1): spread
+    # normalized so a 0.35 strength gap maps to 0.5 uncertainty --
+    # uncertainty = clamp(spread * (0.5 / 0.35)).
+    def signal_assessment(*, logical_validity: float, assumption_risk: float) -> ClaimAssessment:
+        return base_assessment(
+            steelman=SteelmanAssessment(charitable_strength=0.5, confidence=0.5),
+            critic=CriticAssessment(
+                logical_validity=logical_validity,
+                assumption_risk=assumption_risk,
+                counterargument_strength=0.0,
+            ),
+            evidence=EvidenceAssessment(
+                evidence_quality=0.5,
+                evidence_relevance=0.5,
+                evidence_sufficiency=0.5,
+                source_reliability=0.5,
+                freshness=0.5,
+            ),
+            context=ContextAssessment(relevance=0.5, impact=0.5, dependency_weight=0.5),
+        )
+
+    judge_evidence = [
+        _dispersion_judge_evidence_entry(
+            judge_role="primary_judge",
+            provider="provider-a",
+            model="model-a",
+            raw_output_sha256="a" * 64,
+            assessment=signal_assessment(logical_validity=1.0, assumption_risk=0.0),
+        ),
+        _dispersion_judge_evidence_entry(
+            judge_role="skeptic_judge",
+            provider="provider-b",
+            model="model-b",
+            raw_output_sha256="b" * 64,
+            assessment=signal_assessment(logical_validity=0.5, assumption_risk=1.0),
+        ),
+    ]
+
+    assert dispersion_uncertainty(judge_evidence) == pytest.approx(0.5, abs=1e-4)
+
+
+def test_dispersion_uncertainty_clamps_a_large_strength_gap_to_10() -> None:
+    high = base_assessment(
+        critic=CriticAssessment(logical_validity=1.0, assumption_risk=0.0, counterargument_strength=0.0),
+        evidence=EvidenceAssessment(
+            evidence_quality=1.0,
+            evidence_relevance=1.0,
+            evidence_sufficiency=1.0,
+            source_reliability=1.0,
+            freshness=1.0,
+        ),
+        context=ContextAssessment(relevance=1.0, impact=0.5, dependency_weight=0.5),
+    )
+    low = base_assessment(
+        critic=CriticAssessment(logical_validity=0.0, assumption_risk=1.0, counterargument_strength=1.0),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.0,
+            evidence_relevance=0.0,
+            evidence_sufficiency=0.0,
+            source_reliability=0.0,
+            freshness=0.0,
+        ),
+        context=ContextAssessment(relevance=0.0, impact=0.5, dependency_weight=0.5),
+    )
+    judge_evidence = [
+        _dispersion_judge_evidence_entry(
+            judge_role="primary_judge", provider="provider-a", model="model-a", raw_output_sha256="c" * 64, assessment=high
+        ),
+        _dispersion_judge_evidence_entry(
+            judge_role="skeptic_judge", provider="provider-b", model="model-b", raw_output_sha256="d" * 64, assessment=low
+        ),
+    ]
+
+    assert dispersion_uncertainty(judge_evidence) == 1.0
+
+
+def test_dispersion_uncertainty_returns_none_for_fewer_than_two_distinct_judgments() -> None:
+    solo = base_assessment()
+
+    assert dispersion_uncertainty([]) is None
+    assert (
+        dispersion_uncertainty(
+            [
+                _dispersion_judge_evidence_entry(
+                    judge_role="primary_judge",
+                    provider="provider-a",
+                    model="model-a",
+                    raw_output_sha256="e" * 64,
+                    assessment=solo,
+                )
+            ]
+        )
+        is None
+    )
+    # Same (judge_role, provider, model) identity twice is not two
+    # independent judgments -- mirrors
+    # detect_persisted_judge_disagreements' own distinctness rule (both
+    # read the same _distinct_persisted_judge_evidence helper).
+    assert (
+        dispersion_uncertainty(
+            [
+                _dispersion_judge_evidence_entry(
+                    judge_role="primary_judge",
+                    provider="provider-a",
+                    model="model-a",
+                    raw_output_sha256="e" * 64,
+                    assessment=solo,
+                ),
+                _dispersion_judge_evidence_entry(
+                    judge_role="primary_judge",
+                    provider="provider-a",
+                    model="model-a",
+                    raw_output_sha256="f" * 64,
+                    assessment=solo,
+                ),
+            ]
+        )
+        is None
+    )
 
 
 def test_scoring_status_model_accepts_only_public_status_values() -> None:
@@ -3080,6 +3348,172 @@ def test_score_node_with_provider_exposes_plural_provenance_from_distinct_persis
     _assert_public_payload_has_no_private_judge_output(payload, "RJ04-PRIMARY-RAW", "RJ04-SKEPTIC-RAW")
     assert "primary-provider" not in json.dumps(item)
     assert "skeptic-provider" not in json.dumps(item)
+
+
+def test_score_node_with_provider_derives_uncertainty_from_persisted_judge_dispersion(db) -> None:
+    # Same two judge fixtures as
+    # test_score_node_with_provider_exposes_plural_provenance_from_distinct_persisted_judges
+    # (a strong-evidence primary judgment and a weak-evidence/high-risk
+    # skeptic judgment). Their _claim_strength_signal spread is 0.5825,
+    # which the documented map (0.35 gap ~= 0.5 uncertainty) puts at
+    # 0.8321 uncertainty.
+    class PrimaryJudgeProvider:
+        provider = "primary-provider"
+        model = "primary-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        evidence=EvidenceAssessment(
+                            evidence_quality=0.8,
+                            evidence_relevance=0.8,
+                            evidence_sufficiency=0.8,
+                            source_reliability=0.8,
+                            freshness=0.8,
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=11,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    class SkepticJudgeProvider:
+        provider = "skeptic-provider"
+        model = "skeptic-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(
+                        node_id=request.claim.node_id,
+                        critic=CriticAssessment(
+                            logical_validity=0.25,
+                            assumption_risk=0.9,
+                            counterargument_strength=0.85,
+                        ),
+                        evidence=EvidenceAssessment(
+                            evidence_quality=0.15,
+                            evidence_relevance=0.25,
+                            evidence_sufficiency=0.15,
+                            source_reliability=0.2,
+                            freshness=0.2,
+                            missing_evidence=["No independent source supports this claim."],
+                        ),
+                    ).model_dump(mode="json")
+                ),
+                latency_ms=13,
+                checked_at="2026-06-18T10:16:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    score_node_with_provider(
+        db,
+        debate,
+        node.id,
+        PrimaryJudgeProvider(),
+        judge_role="primary_judge",
+        force_refresh=True,
+    )
+    payload = score_node_with_provider(
+        db,
+        debate,
+        node.id,
+        SkepticJudgeProvider(),
+        judge_role="skeptic_judge",
+        force_refresh=True,
+    )
+
+    item = payload["items"][0]
+    assert item["uncertainty_source"] == "dispersion"
+    assert item["scores"]["uncertainty"] == pytest.approx(0.8321, abs=1e-4)
+
+
+def test_score_node_with_provider_keeps_heuristic_uncertainty_source_for_a_single_persisted_judgment(db) -> None:
+    class SoloJudgeProvider:
+        provider = "solo-provider"
+        model = "solo-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=9,
+                checked_at="2026-06-18T10:15:30+00:00",
+            )
+
+    debate = Debate(topic="Should companies adopt remote work?", status="complete")
+    worker = Worker(id="worker-a", name="Worker A", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Remote work improves retention.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="Employees are less likely to leave when commutes are removed.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    payload = score_node_with_provider(
+        db,
+        debate,
+        node.id,
+        SoloJudgeProvider(),
+        judge_role="judge",
+        force_refresh=True,
+    )
+
+    expected_claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    expected_uncertainty = reduce_assessments(expected_claim, base_assessment(node_id=node.id)).scores.uncertainty
+
+    item = payload["items"][0]
+    assert item["uncertainty_source"] == "heuristic"
+    assert item["scores"]["uncertainty"] == pytest.approx(expected_uncertainty)
 
 
 def test_score_node_with_provider_persists_malformed_judge_output_privately_without_public_secret_leak(db) -> None:
@@ -7118,9 +7552,18 @@ def test_scoring_api_returns_stored_judge_outputs(db) -> None:
         "raw_judge_output_kind": "claim_assessment",
         "raw_judge_output_included": False,
         "final_score_source": "deterministic_reducer",
-        "reducer_version": "node-scoring-reducer-v1",
+        "reducer_version": "node-scoring-reducer-v2",
         "rubric_version": "debateai-rubric-v1",
     }
+    # Task 4 (docs/improvement-plan-2026-07-22.md Sec P2.1): uncertainty_drivers
+    # and uncertainty_source must survive the stored-AnalyzerRun ->
+    # DebateScoringResponse round trip (this GET goes through
+    # _public_scoring_item's NodeScoringPayload.model_validate() and
+    # FastAPI's response_model=DebateScoringWithFeedbackResponse -- both
+    # would silently drop undeclared fields).
+    assert response.json()["items"][0]["uncertainty_drivers"] == scoring_item["uncertainty_drivers"]
+    assert len(response.json()["items"][0]["uncertainty_drivers"]) > 0
+    assert response.json()["items"][0]["uncertainty_source"] == scoring_item["uncertainty_source"] == "heuristic"
     assert "raw_output" not in str(response.json()["items"][0])
     assert "judge_outputs" not in str(response.json()["items"][0]["score_provenance"])
 

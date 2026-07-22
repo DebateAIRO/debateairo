@@ -24,6 +24,7 @@ from app.scoring import (
     reduce_assessments,
     score_node_with_provider,
 )
+from app.scoring.disagreement import dispersion_uncertainty
 from app.scoring.judges import ScoringProviderResult
 from app.scoring.normalizer import normalize_claim
 
@@ -150,7 +151,19 @@ def test_calibration_metadata_always_recorded_flag_off(db, monkeypatch) -> None:
     assert len(item["score_provenance"]["calibrationWeights"]["weights"]) == 2
 
 
-def test_calibration_flag_off_leaves_scores_byte_identical(db, monkeypatch) -> None:
+def test_calibration_flag_off_leaves_non_uncertainty_scores_byte_identical(db, monkeypatch) -> None:
+    # Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
+    # docs/improvement-plan-2026-07-22.md Sec P2.1) amendment: this test
+    # used to assert the WHOLE scores dict was byte identical to a direct
+    # single-assessment reduce_assessments() call when the calibration flag
+    # is off. dispersion_uncertainty now overrides scores.uncertainty
+    # whenever >=2 independent persisted judge assessments exist --
+    # unconditionally on DIALECTICAL_CALIBRATION_WEIGHTS (the brief's
+    # dispersion condition never mentions that flag; it is a separate
+    # feature from the flag-gated weighted aggregate below). This still
+    # proves _weighted_aggregate_scores does not touch any field when the
+    # flag is off (every OTHER field remains byte identical), and
+    # separately proves uncertainty is now the measured dispersion value.
     monkeypatch.delenv("DIALECTICAL_CALIBRATION_WEIGHTS", raising=False)
     debate, node = _build_debate_and_node(db)
 
@@ -174,6 +187,16 @@ def test_calibration_flag_off_leaves_scores_byte_identical(db, monkeypatch) -> N
     item = payload["items"][0]
 
     claim = normalize_claim(node_id=node.id, raw_text=node.claim)
+    primary_assessment = base_assessment(
+        node_id=node.id,
+        evidence=EvidenceAssessment(
+            evidence_quality=0.8,
+            evidence_relevance=0.8,
+            evidence_sufficiency=0.8,
+            source_reliability=0.8,
+            freshness=0.8,
+        ),
+    )
     verifier_assessment = base_assessment(
         node_id=node.id,
         evidence=EvidenceAssessment(
@@ -185,7 +208,39 @@ def test_calibration_flag_off_leaves_scores_byte_identical(db, monkeypatch) -> N
         ),
     )
     direct = reduce_assessments(claim, verifier_assessment).model_dump(mode="json")
-    assert item["scores"] == direct["scores"]
+    non_uncertainty_fields = {
+        "strength",
+        "impact",
+        "evidence_quality",
+        "relevance",
+        "logical_validity",
+        "assumption_risk",
+        "counter_resilience",
+    }
+    for field in non_uncertainty_fields:
+        assert item["scores"][field] == direct["scores"][field]
+
+    expected_uncertainty = dispersion_uncertainty(
+        [
+            {
+                "judge_role": "primary_judge",
+                "provider": "anthropic",
+                "model": "claude-3-sonnet",
+                "raw_output_sha256": "irrelevant-a",
+                "assessment": primary_assessment.model_dump(mode="json"),
+            },
+            {
+                "judge_role": "verifier_judge",
+                "provider": "anthropic",
+                "model": "claude-3-opus",
+                "raw_output_sha256": "irrelevant-b",
+                "assessment": verifier_assessment.model_dump(mode="json"),
+            },
+        ]
+    )
+    assert item["uncertainty_source"] == "dispersion"
+    assert item["scores"]["uncertainty"] == expected_uncertainty
+    assert item["scores"]["uncertainty"] != direct["scores"]["uncertainty"]
 
 
 def test_calibration_single_judgment_never_applies_discount(db, monkeypatch) -> None:

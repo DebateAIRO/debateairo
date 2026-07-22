@@ -15,15 +15,25 @@ from app.scoring.models import (
     NodeScoringPayload,
     NormalizedClaim,
     RecommendedInvestigation,
+    ScoreCap,
     Severity,
     ScoreLabels,
     ScoreProvenance,
     ScoreRationale,
     ScoringDebug,
     ScoringHole,
+    UncertaintyDriver,
 )
 
-REDUCER_VERSION = "node-scoring-reducer-v1"
+# Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
+# docs/improvement-plan-2026-07-22.md Sec P2.1): bumped v1 -> v2 because
+# reduce_assessments now emits uncertainty_drivers/uncertainty_source on
+# every NodeScoringPayload (see _uncertainty_drivers below) -- a real,
+# semantic change to what the reducer produces from the same inputs, so the
+# judge contract_hash (app.scoring.judge_registry pins REDUCER_VERSION into
+# it) must change and invalidate every cached NodeScoringResult/
+# JudgeOutputArtifact, same as Task 3's prompt_version bump.
+REDUCER_VERSION = "node-scoring-reducer-v2"
 RUBRIC_VERSION = "debateai-rubric-v1"
 
 
@@ -110,6 +120,7 @@ def reduce_assessments(claim: NormalizedClaim, assessment: ClaimAssessment) -> N
         *assessment.fallacy.fatal_flags,
     ]
     uncertainty = _uncertainty(claim, assessment, len(disagreements), len(score_caps))
+    uncertainty_drivers = _uncertainty_drivers(claim, assessment, disagreements, score_caps)
     scores = NodeScores(
         strength=_round(strength),
         uncertainty=_round(uncertainty),
@@ -153,6 +164,14 @@ def reduce_assessments(claim: NormalizedClaim, assessment: ClaimAssessment) -> N
             reducer_version=REDUCER_VERSION,
             rubric_version=RUBRIC_VERSION,
         ),
+        uncertainty_drivers=uncertainty_drivers,
+        # The reducer only ever sees a single ClaimAssessment, so it always
+        # stamps the heuristic fallback source here. service.py's
+        # _attach_plural_judge_provenance overrides this to "dispersion"
+        # (and recomputes scores.uncertainty) when >=2 independent
+        # persisted judge assessments exist for the node -- see
+        # app.scoring.disagreement.dispersion_uncertainty.
+        uncertainty_source="heuristic",
     )
 
 
@@ -313,6 +332,46 @@ def _uncertainty(
     uncertainty += 0.08 * disagreement_count
     uncertainty += 0.04 * cap_count
     return _clamp(uncertainty)
+
+
+def _uncertainty_drivers(
+    claim: NormalizedClaim,
+    assessment: ClaimAssessment,
+    disagreements: list[JudgeDisagreement],
+    score_caps: list[ScoreCap],
+) -> list[UncertaintyDriver]:
+    """Labeled, human-legible reasons behind scores.uncertainty.
+
+    Emits one driver per true condition, in the fixed order below (never
+    reordered -- callers may rely on this for a stable "primary driver"
+    pill). judge_disagreement and score_caps emit one entry per item in
+    disagreements/score_caps respectively, so a claim can carry several
+    drivers of the same code.
+    """
+    drivers: list[UncertaintyDriver] = []
+    if not claim.evidence_refs:
+        drivers.append(UncertaintyDriver(code="no_evidence_refs", label="no external evidence"))
+    if assessment.evidence.evidence_quality < 0.30:
+        drivers.append(UncertaintyDriver(code="low_evidence_quality", label="evidence quality low"))
+    if claim.ambiguity_flags:
+        drivers.append(
+            UncertaintyDriver(
+                code="ambiguity",
+                label=f"{len(claim.ambiguity_flags)} ambiguity flag(s)",
+            )
+        )
+    for disagreement in disagreements:
+        drivers.append(
+            UncertaintyDriver(
+                code="judge_disagreement",
+                label=f"judge disagreement: {disagreement.type}",
+            )
+        )
+    for cap in score_caps:
+        drivers.append(UncertaintyDriver(code="score_caps", label=f"score capped: {cap.score}"))
+    if assessment.critic.counterargument_strength > 0.6:
+        drivers.append(UncertaintyDriver(code="strong_counter", label="strong counterargument present"))
+    return drivers
 
 
 def _label(value: float, *, low: str, mid: str, high: str):

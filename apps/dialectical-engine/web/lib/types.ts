@@ -142,6 +142,26 @@ export type ScoreLabels = {
   impact_label: "low" | "medium" | "high";
 };
 
+// Task 4 (docs/improvement-plan-2026-07-22.md Sec P2.1): labeled drivers
+// replace the opaque "UNC 48" numeric-only display. Mirrors
+// coordinator/app/scoring/models.py's UncertaintyDriverCode/UncertaintyDriver/
+// UncertaintySource -- see app/scoring/reducer.py::_uncertainty_drivers and
+// app/scoring/disagreement.py::dispersion_uncertainty for how they're derived.
+export type UncertaintyDriverCode =
+  | "no_evidence_refs"
+  | "low_evidence_quality"
+  | "ambiguity"
+  | "judge_disagreement"
+  | "score_caps"
+  | "strong_counter";
+
+export type UncertaintyDriver = {
+  code: UncertaintyDriverCode;
+  label: string;
+};
+
+export type UncertaintySource = "dispersion" | "heuristic";
+
 export type ScoringHole = {
   type: string;
   severity: Severity;
@@ -220,6 +240,11 @@ export type NodeScoringPayload = {
   recommended_investigations: RecommendedInvestigation[];
   rationale: ScoreRationale;
   debug?: ScoringDebug | null;
+  // Optional: additive fields (Task 4). Older persisted/cached debates
+  // predate these and omit them entirely -- callers must not assume
+  // presence.
+  uncertainty_drivers?: UncertaintyDriver[] | null;
+  uncertainty_source?: UncertaintySource | null;
 };
 
 export type NodeScoringError = {

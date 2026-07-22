@@ -32,7 +32,7 @@ from app.scoring.cache import (
     store_scoring_cache,
 )
 from app.scoring.calibration import correlated_discount, judge_weight
-from app.scoring.disagreement import detect_persisted_judge_disagreements
+from app.scoring.disagreement import detect_persisted_judge_disagreements, dispersion_uncertainty
 from app.scoring.judge_registry import active_contract
 from app.scoring.lineage import (
     SECRET_METADATA_MARKERS,
@@ -1109,6 +1109,23 @@ def _attach_plural_judge_provenance(
 
     if calibration_applied:
         next_item["scores"] = _weighted_aggregate_scores(claim, judge_evidence, discount["weights"])
+
+    # Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
+    # docs/improvement-plan-2026-07-22.md Sec P2.1): dispersion_uncertainty
+    # reads the same judge_evidence base (and the same distinctness rule)
+    # as detect_persisted_judge_disagreements above, so this always wins
+    # over the reducer's per-assessment heuristic uncertainty -- including
+    # overriding the (flag-gated, off by default) calibration-weighted
+    # average set just above -- whenever >=2 independent persisted judge
+    # assessments exist. Left untouched (None) when they don't, leaving the
+    # reducer's "heuristic" stamp and checklist value as the honest
+    # fallback.
+    dispersion = dispersion_uncertainty(judge_evidence)
+    if dispersion is not None:
+        scores = dict(next_item.get("scores") or {})
+        scores["uncertainty"] = dispersion
+        next_item["scores"] = scores
+        next_item["uncertainty_source"] = "dispersion"
 
     return next_item
 

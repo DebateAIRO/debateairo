@@ -30,6 +30,15 @@ DECISION_TIME = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
 
 
 def _score_item(node_id: str) -> dict[str, object]:
+    # reducer_version/rubric_version must match the LIVE active contract
+    # (app.exploration.lifecycle_inputs._parse_score_value compares them
+    # against active_scoring_contract, which decide_lifecycle_for_node
+    # builds from the real active_contract("judge") -- same contract
+    # _persist_score below already uses for contract_hash/judge_id/
+    # judge_version/prompt_version). Deriving them here, rather than
+    # hardcoding a version string, keeps this fixture correct across future
+    # reducer/rubric version bumps instead of silently going stale.
+    contract = active_contract("judge")
     return {
         "node_id": node_id,
         "claim": {
@@ -68,8 +77,8 @@ def _score_item(node_id: str) -> dict[str, object]:
             "raw_judge_output_kind": "claim_assessment",
             "raw_judge_output_included": False,
             "final_score_source": "deterministic_reducer",
-            "reducer_version": "node-scoring-reducer-v1",
-            "rubric_version": "debateai-rubric-v1",
+            "reducer_version": contract.reducer_version,
+            "rubric_version": contract.rubric_version,
         },
     }
 

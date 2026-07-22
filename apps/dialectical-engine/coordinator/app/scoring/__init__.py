@@ -51,6 +51,7 @@ from app.scoring.models import (
     ScoringModelMetadata,
     ScoringStatusModel,
     SteelmanAssessment,
+    UncertaintyDriver,
 )
 from app.scoring.parser import JudgeParseResult, parse_judge_json
 from app.scoring.prompts import render_single_node_judge_prompt
@@ -112,6 +113,7 @@ __all__ = [
     "SelfConsistencyResult",
     "SelfConsistencyScorer",
     "SteelmanAssessment",
+    "UncertaintyDriver",
     "adaptive_depth_dry_run",
     "debate_scoring_payload",
     "detect_disagreements",

@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from app.scoring.models import ClaimAssessment, JudgeDisagreement
 
+# Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
+# docs/improvement-plan-2026-07-22.md Sec P2.1): documented map from a
+# judge-panel strength spread to a [0, 1] uncertainty value. Calibrated so
+# the same 0.35 strength gap that already flags a persisted_judge_strength_
+# gap disagreement (see detect_persisted_judge_disagreements below) lands
+# at 0.5 uncertainty: uncertainty = clamp(spread * DISPERSION_UNCERTAINTY_SLOPE).
+DISPERSION_UNCERTAINTY_SLOPE = 0.5 / 0.35
+
 
 def detect_disagreements(assessment: ClaimAssessment) -> list[JudgeDisagreement]:
     disagreements: list[JudgeDisagreement] = []
@@ -92,6 +100,32 @@ def _distinct_persisted_judge_evidence(judge_evidence: list[dict]) -> list[dict]
         seen_identities.add(identity)
         seen_outputs.add(raw_output_sha256)
     return distinct
+
+
+def dispersion_uncertainty(judge_evidence: list[dict]) -> float | None:
+    """Derive a measured uncertainty value from real judge-panel dispersion.
+
+    Reads exactly the same evidence base and distinctness/parseability
+    rules as detect_persisted_judge_disagreements above (both call
+    _distinct_persisted_judge_evidence on the same judge_evidence list), so
+    "dispersion is available" and "cross-judge disagreement was checked"
+    always agree on what counts as two independent judgments. Returns None
+    (never a fabricated number) when fewer than two distinct, parseable
+    persisted judgments exist -- callers must keep the existing heuristic
+    uncertainty in that case rather than treat None as zero uncertainty.
+    """
+    distinct_evidence = _distinct_persisted_judge_evidence(judge_evidence)
+    if len(distinct_evidence) < 2:
+        return None
+    strengths = [
+        _claim_strength_signal(item["assessment"])
+        for item in distinct_evidence
+        if isinstance(item.get("assessment"), ClaimAssessment)
+    ]
+    if len(strengths) < 2:
+        return None
+    spread = max(strengths) - min(strengths)
+    return round(max(0.0, min(1.0, spread * DISPERSION_UNCERTAINTY_SLOPE)), 4)
 
 
 def _claim_strength_signal(assessment: ClaimAssessment) -> float:
