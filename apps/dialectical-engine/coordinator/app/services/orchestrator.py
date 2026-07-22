@@ -1527,10 +1527,9 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
     """
     if job.job_type in ("v2_pov", "v2_expand"):
         from app.services.dialectical_v2 import (
-            V2_CODEX_MODEL_ID,
             has_completed_branch_container,
             pending_generation_nodes,
-            queue_v2_job,
+            queue_v2_synthesize_job,
         )
 
         if not debate.root_node_id:
@@ -1568,9 +1567,20 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
             .limit(1)
         )
         if existing_synthesis is None:
-            # Synthesis integrates the whole tree: pin it to the anchor model
-            # rather than inheriting whichever model's job failed last.
-            queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", V2_CODEX_MODEL_ID, None)
+            # Task 15 fix: route through the single rotation-aware seam
+            # (queue_v2_synthesize_job) instead of queuing v2_synthesize
+            # directly. A direct call here used to bypass BOTH synthesizer
+            # rotation (queue_v2_job pinned unconditionally to the anchor,
+            # never consulting choose_synthesizer_model) AND the P3.3
+            # cross-exam wave (queue_v2_synthesize_job is the wave's only
+            # trigger point) whenever synthesis became reachable via a
+            # branch's terminal FAILURE rather than a completion tail's
+            # success -- a realistic case: the last outstanding v2_pov
+            # exhausts its model ladder while the other branches already
+            # succeeded. queue_v2_synthesize_job is count/model-agnostic
+            # (it re-derives the synthesizer choice itself), so no anchor
+            # pin is needed here anymore.
+            queue_v2_synthesize_job(db, debate)
         return
     # v1 argue: never route a v1 synthesis into a v2 tree, and only
     # synthesize when at least one argument survived.
@@ -1610,11 +1620,19 @@ def _maybe_queue_synthesis_after_cross_exam_terminal(db: Session, debate: Debate
     queue_v2_synthesize_job -- this covers the path that tail never reaches),
     re-check whole-tree quiescence and, once every wave job (and everything
     else) is terminal, queue the debate's real synthesis THROUGH
-    queue_v2_synthesize_job -- the single rotation-aware seam -- so a
-    cross-exam failure never bypasses rotation the way the legacy node-
-    degradable branch-failure path (_queue_synthesis_after_branch_failure)
-    does, and never re-queues a second wave (queue_v2_synthesize_job's own
-    idempotency check, see maybe_queue_cross_exam_wave)."""
+    queue_v2_synthesize_job -- the single rotation-aware seam (so this never
+    re-queues a second wave either, via that seam's own idempotency check --
+    see maybe_queue_cross_exam_wave).
+
+    Deliberately NOT the same call as the legacy node-degradable branch-
+    failure path (_queue_synthesis_after_branch_failure, which ALSO now
+    routes through queue_v2_synthesize_job): that path's v2_expand branch
+    also records an adaptive-expansion "generation exhausted" stop reason
+    when DIALECTICAL_ADAPTIVE_EXPANSION is on, which would misattribute a
+    skeptic-wave failure as adaptive-expansion growth stopping if that
+    unrelated flag happened to be on at the same time. This helper stays
+    scoped to exactly the wave's own re-check, with no adaptive-expansion
+    side effect."""
     from app.services.dialectical_v2 import pending_generation_nodes, queue_v2_synthesize_job
 
     if not debate.root_node_id:

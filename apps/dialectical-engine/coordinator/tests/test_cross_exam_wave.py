@@ -331,6 +331,60 @@ def test_wave_queues_one_challenge_per_branch_and_holds_synthesis(db, monkeypatc
     assert len(queued) == 1 and queued[0].status == "pending"
 
 
+def test_wave_fires_when_synthesis_is_triggered_by_a_branch_terminal_failure(db, monkeypatch) -> None:
+    """Regression for the reviewer-flagged critical gap: synthesis can also
+    become reachable via a branch's terminal FAILURE (the last outstanding
+    v2_pov exhausts its model ladder while the other branches already
+    succeeded), not just via a completion tail's success --
+    orchestrator._queue_synthesis_after_branch_failure. Before the fix that
+    path queued v2_synthesize directly, bypassing the wave entirely (and
+    Task 8's rotation). Prove: the wave fires there too, synthesis is held
+    until it resolves, and the eventual real v2_synthesize job carries
+    synthesizer_rotation payload -- proof it went through
+    queue_v2_synthesize_job (a direct queue_v2_job call, as the old path
+    made, never sets that key)."""
+    monkeypatch.setenv(FLAG, "true")
+    monkeypatch.setenv("DIALECTICAL_MAX_JOB_ATTEMPTS", "1")
+    g = gpt_worker(db)
+    debate = make_debate(db)
+    povs = list(db.scalars(select(Job).where(Job.debate_id == debate.id, Job.job_type == "v2_pov")).all())
+    assert len(povs) == 4
+
+    # Three branches complete successfully.
+    for _ in range(3):
+        job = claim_pending_job(db, g)
+        assert job is not None and job.job_type == "v2_pov"
+        asyncio.run(complete_job(db, job, legacy_pov_output(job, g), {"latency_ms": 5}))
+    assert wave_jobs(db, debate) == []
+    assert synth_jobs(db, debate) == []
+
+    # The LAST branch reaches terminal failure instead of success (single-
+    # attempt budget, single-family pool -> immediate ladder exhaustion).
+    last = claim_pending_job(db, g)
+    assert last is not None and last.job_type == "v2_pov"
+    asyncio.run(fail_job(db, last, "last branch model exhausted", True))
+    db.refresh(last)
+    assert last.status == "failed"
+
+    # The wave fires on THIS path too -- one job per SURVIVING branch --
+    # instead of being bypassed straight to synthesis.
+    jobs = wave_jobs(db, debate)
+    assert len(jobs) == 3
+    assert synth_jobs(db, debate) == []
+
+    # fail_job(..., retryable=True) marks the worker "degraded" on the way
+    # through; reconnect it before claiming the wave jobs.
+    g.status = "online"
+    db.commit()
+    complete_all_wave_jobs(db, debate, [g])
+
+    queued = synth_jobs(db, debate)
+    assert len(queued) == 1
+    rotation = queued[0].payload.get("synthesizer_rotation")
+    assert rotation is not None
+    assert rotation.get("rotation_reason") is not None
+
+
 # ---------------------------------------------------------------------------
 # Flag ON -- attacker model selection (family helper reuse).
 # ---------------------------------------------------------------------------

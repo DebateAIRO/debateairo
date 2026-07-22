@@ -31,6 +31,7 @@ from app.scoring.jobs import run_scoring_job_background
 from app.scoring.lineage import lineage_family
 from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
 from app.services import dialectical_v2 as service
+from app.services import orchestrator
 from app.services.dialectical_v2 import V2_CODEX_MODEL_ID
 from app.services.orchestrator import claim_pending_job, complete_job, worker_can_claim_job
 
@@ -630,6 +631,17 @@ def test_synthesize_is_queued_only_through_the_shared_helper() -> None:
     assert source.count('"v2_synthesize", "v2_synthesizer"') == 1
     helper_source = inspect.getsource(service.queue_v2_synthesize_job)
     assert 'queue_v2_job(db, debate, "v2_synthesize"' in helper_source
+
+    # Task 15 fix: orchestrator._queue_synthesis_after_branch_failure used to
+    # queue v2_synthesize directly (bypassing rotation AND, once it existed,
+    # the P3.3 cross-exam wave) whenever synthesis became reachable via a
+    # branch's terminal failure rather than a completion tail's success --
+    # the dialectical_v2-only source scan above could never catch that.
+    # Guard it directly so any FUTURE direct v2_synthesize queueing anywhere
+    # in orchestrator.py fails this test too.
+    orchestrator_source = inspect.getsource(orchestrator)
+    assert 'queue_v2_job(db, debate, "v2_synthesize"' not in orchestrator_source
+    assert '"v2_synthesize", "v2_synthesizer"' not in orchestrator_source
 
 
 # ---------------------------------------------------------------------------

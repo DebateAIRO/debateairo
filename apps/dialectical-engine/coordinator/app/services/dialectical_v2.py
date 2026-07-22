@@ -46,6 +46,7 @@ from app.scoring.lineage import lineage_family
 from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
 from app.services.orchestrator import (
+    _is_cross_exam_expand_job,
     cancel_active_synthesis_jobs,
     capable_online_workers,
     create_generation,
@@ -1338,12 +1339,16 @@ def cross_exam_max_jobs() -> int:
     return int_env("DIALECTICAL_CROSS_EXAM_MAX_JOBS", 8, 0, 20)
 
 
-def _is_cross_exam_job(job: Job) -> bool:
-    """True for a v2_expand job the coordinator marked as part of the P3.3
-    wave (job.payload set at queue time by maybe_queue_cross_exam_wave --
-    coordinator-authoritative, never worker-supplied)."""
-    payload = job.payload if isinstance(job.payload, dict) else {}
-    return bool(payload.get("cross_exam"))
+# "Is this v2_expand job part of the P3.3 wave" has exactly ONE definition:
+# orchestrator._is_cross_exam_expand_job (used directly below, never
+# aliased). terminalize_job_failure needs the SAME job.payload marker check
+# to route these jobs through the AUXILIARY terminal path, so the predicate
+# lives there and is reused here rather than duplicated. dialectical_v2
+# already imports FROM orchestrator at module level, so this needs no
+# deferred import (the reverse direction would; orchestrator cannot import
+# dialectical_v2 at module level -- see the deferred imports elsewhere in
+# this file). Cross-module reuse of an underscore-prefixed name matches this
+# file's existing app.protocol.cross_exam._OPPOSING_NODE_TYPES import.
 
 
 def _cross_exam_wave_already_queued(db: Session, debate_id: str) -> bool:
@@ -1355,7 +1360,7 @@ def _cross_exam_wave_already_queued(db: Session, debate_id: str) -> bool:
     jobs = db.scalars(
         select(Job).where(Job.debate_id == debate_id, Job.job_type == "v2_expand")
     ).all()
-    return any(_is_cross_exam_job(job) for job in jobs)
+    return any(_is_cross_exam_expand_job(job) for job in jobs)
 
 
 def _cross_exam_branch_claim(
@@ -1489,17 +1494,24 @@ def maybe_queue_cross_exam_wave(db: Session, debate: Debate) -> list[Job]:
 def queue_v2_synthesize_job(db: Session, debate: Debate) -> Job:
     """Single queue site for the debate's v2_synthesize job. Every synthesis-
     queue path routes through here so synthesizer selection + rotation
-    provenance live in exactly ONE place (never copied across the four
-    completion tails). Records the rotation decision in job.payload; it is
-    mirrored into synthesis.provenance at persist time.
+    provenance live in exactly ONE place (never copied). That now includes
+    NOT ONLY the four completion tails but also the branch-terminal-FAILURE
+    path (orchestrator._queue_synthesis_after_branch_failure) -- a Task 15
+    fix: that path used to queue v2_synthesize directly, bypassing both
+    rotation and (see below) the cross-exam wave whenever a debate reached
+    "ready to synthesize" via a branch's terminal failure rather than a
+    completion tail's success. Records the rotation decision in job.payload;
+    it is mirrored into synthesis.provenance at persist time.
 
     Task 15 (P3.3): reached here means the tree is otherwise quiescent --
-    exactly the moment the brief's pre-synthesis wave must run. On its first
-    hit for a debate, maybe_queue_cross_exam_wave queues the wave INSTEAD of
-    synthesis (its v2_expand jobs then hold quiescence, so every caller's own
-    pre-check keeps this seam from firing again until the wave resolves);
-    once the wave has already run (or is disabled), it returns [] and this
-    falls through to real synthesis exactly as before."""
+    exactly the moment the brief's pre-synthesis wave must run, regardless of
+    whether that quiescence was reached by success or by a branch's terminal
+    failure (see above). On its first hit for a debate, maybe_queue_cross_exam_
+    wave queues the wave INSTEAD of synthesis (its v2_expand jobs then hold
+    quiescence, so every caller's own pre-check keeps this seam from firing
+    again until the wave resolves); once the wave has already run (or is
+    disabled), it returns [] and this falls through to real synthesis exactly
+    as before."""
     wave_jobs = maybe_queue_cross_exam_wave(db, debate)
     if wave_jobs:
         return wave_jobs[-1]
@@ -3075,7 +3087,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             if isinstance(result, dict) and isinstance(result.get("provenance"), dict)
             else {}
         )
-        if _is_cross_exam_job(job):
+        if _is_cross_exam_expand_job(job):
             # Task 15 (P3.3): coordinator-authoritative mark (job.payload was
             # set by the coordinator at queue time, never by the worker) so
             # the child's provenance record honestly discloses its cross-
@@ -3115,7 +3127,7 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         # (below) stays byte-identical; gated on the same
         # DIALECTICAL_SCORE_BEFORE_SYNTHESIS flag. Best-effort/fire-and-forget,
         # matching every other trigger site in this function.
-        if (_is_adversarial_attacker_job(job) or _is_cross_exam_job(job)) and score_before_synthesis_enabled():
+        if (_is_adversarial_attacker_job(job) or _is_cross_exam_expand_job(job)) and score_before_synthesis_enabled():
             try:
                 trigger_internal_scoring_after_completion(debate.id)
             except Exception as exc:
