@@ -29,6 +29,12 @@ os.environ.setdefault("DIALECTICAL_LLM_PERSPECTIVES", "false")
 # exercises the production default. setdefault (not a hard set) preserves that.
 os.environ.setdefault("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "false")
 os.environ.setdefault("DIALECTICAL_SYNTHESIZER_ROTATION", "false")
+# Task 14 (P3.1): the adversarial POV pipeline defaults OFF in production too,
+# but pin it explicitly in the test baseline so a stray shell env can never
+# flip the many pipeline tests that complete v2_pov jobs with the legacy 7-card
+# contract onto the 3-card proposer contract. Task 14's own tests opt in per
+# case via monkeypatch.setenv; delenv exercises the production default.
+os.environ.setdefault("DIALECTICAL_ADVERSARIAL_POV", "false")
 
 import pytest
 

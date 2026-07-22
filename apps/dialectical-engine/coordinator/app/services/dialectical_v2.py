@@ -1109,6 +1109,62 @@ def synthesizer_rotation_enabled() -> bool:
     return bool_env("DIALECTICAL_SYNTHESIZER_ROTATION", True)
 
 
+# --------------------------------------------------------------------------
+# Task 14 (P3.1): the adversarial POV pipeline (cross-model attacker).
+# --------------------------------------------------------------------------
+# Today a POV branch is one model in one completion -- the PRO and CON of a
+# branch share one author and one forward pass (self-play, not adversarial
+# testing). With DIALECTICAL_ADVERSARIAL_POV ON, the v2_pov job's contract
+# shrinks to the PRO side only (lens card + strongest_pro + strongest_pro.pro),
+# and on proposer materialization the completion tail queues TWO v2_expand
+# CHALLENGE jobs authored by a DIFFERENT model family than the proposer:
+#  (a) the strongest attack against the lens claim -> the branch's top-level CON
+#      (the position where strongest_con lives on the legacy path),
+#  (b) the strongest attack against strongest_pro -> its CON child.
+# Flag OFF: the 7-card contract/prompt/materialization are byte-identical to the
+# legacy self-play path and no attacker job is ever queued.
+ADVERSARIAL_ATTACK_REASON = (
+    "adversarial_pov: find the decision-changing objection against this claim"
+)
+
+
+def adversarial_pov_enabled() -> bool:
+    """P3.1 feature gate. Default OFF: flag-off behavior is byte-identical to
+    the legacy one-shot POV subtree (proposer authors the whole 7-card branch,
+    no attacker jobs)."""
+    return bool_env("DIALECTICAL_ADVERSARIAL_POV", False)
+
+
+def choose_adversarial_attacker_model(db: Session, proposer_model_id: str) -> tuple[str, str]:
+    """Pick the attacker model + the reason it was chosen (P3.1).
+
+    Prefer a healthy online pool model whose lineage family DIFFERS from the
+    proposer's, so the attack is genuinely adversarial (a different family
+    challenges the claim) rather than the proposer critiquing itself. Reuses
+    the SAME pool + lineage_family machinery choose_synthesizer_model uses --
+    NOT a second mapper. Same-family fallback (the proposer's own model) is
+    allowed ONLY when the pool has a single family; the choice is recorded so
+    the branch discloses honestly which case applied.
+
+    Returns (model_id, reason) where reason is one of
+    "cross_family" | "same_family_fallback_single_family_pool"."""
+    proposer_family = lineage_family(proposer_model_id)
+    for model in v2_generation_model_pool(db):
+        family = lineage_family(model)
+        if family is not None and family != proposer_family:
+            return model, "cross_family"
+    return proposer_model_id, "same_family_fallback_single_family_pool"
+
+
+def _is_adversarial_attacker_job(job: Job) -> bool:
+    """True when a v2_expand job is one of Task 14's adversarial challenge jobs
+    (marked in its payload at queue time). Used to scope the post-attack
+    scoring trigger + the failure manifest to adversarial attacks, leaving the
+    adaptive-expansion path byte-identical."""
+    payload = job.payload if isinstance(job.payload, dict) else {}
+    return bool(payload.get("adversarial_pov"))
+
+
 def synthesis_score_wait_seconds() -> int:
     """Bounded deferral budget: how long a pending v2_synthesize job waits for
     scoring before it becomes claimable with whatever scores exist. Clamped to
@@ -1462,7 +1518,59 @@ def _synthesis_failure_manifest(db: Session, debate: Debate) -> dict[str, Any]:
                 "stopping_reason": node.stopping_reason,
             }
         )
-    return {"died_count": len(perspectives), "perspectives": perspectives}
+    attacker_failures = _synthesis_attacker_failures(db, debate)
+    return {
+        "died_count": len(perspectives),
+        "perspectives": perspectives,
+        # Task 14 (P3.1): adversarial attacker (CON) jobs that died terminally,
+        # so the synthesis accounts for the missing challenges (the CON node is
+        # failed/absent, not silently resolved).
+        "attacker_failure_count": len(attacker_failures),
+        "attacker_failures": attacker_failures,
+    }
+
+
+def _synthesis_attacker_failures(db: Session, debate: Debate) -> list[dict[str, Any]]:
+    """Task 14 (P3.1): the adversarial attacker (v2_expand CON) jobs that
+    failed terminally. Each entry names the failed CON node, the attack target
+    (lens_claim | strongest_pro), its parent, the models the failover ladder
+    exhausted, the attacker-selection reason, and the node's stopping reason --
+    so the synthesis knows which challenges never made it (a missing CON is a
+    gap in the adversarial test, not a claim that survived unchallenged)."""
+    failed_jobs = db.scalars(
+        select(Job)
+        .where(
+            Job.debate_id == debate.id,
+            Job.job_type == "v2_expand",
+            Job.status == "failed",
+        )
+        .order_by(Job.created_at.asc(), Job.id.asc())
+    ).all()
+    failures: list[dict[str, Any]] = []
+    seen_nodes: set[str] = set()
+    for job in failed_jobs:
+        if not _is_adversarial_attacker_job(job):
+            continue
+        if job.node_id and job.node_id in seen_nodes:
+            continue
+        payload = job.payload if isinstance(job.payload, dict) else {}
+        node = db.get(Node, job.node_id) if job.node_id else None
+        tried_models = [model for model in (payload.get("tried_models") or []) if isinstance(model, str)]
+        if job.required_model and job.required_model not in tried_models:
+            tried_models.append(job.required_model)
+        if job.node_id:
+            seen_nodes.add(job.node_id)
+        failures.append(
+            {
+                "node_id": job.node_id,
+                "parent_node_id": payload.get("parent_node_id"),
+                "target": payload.get("adversarial_target"),
+                "attacker_reason": payload.get("adversarial_attacker_reason"),
+                "tried_models": tried_models,
+                "stopping_reason": node.stopping_reason if node is not None else None,
+            }
+        )
+    return failures
 
 
 def _synthesis_measured_standing(db: Session, debate: Debate) -> dict[str, Any]:
@@ -1515,6 +1623,7 @@ def queue_v2_expand_job(
     model_id: str | None = None,
     *,
     decision_record_id: str | None = None,
+    payload_extra: dict[str, Any] | None = None,
 ) -> Job:
     """Queue ONE single-node expansion under `node` (the W3 primitive).
 
@@ -1601,9 +1710,80 @@ def queue_v2_expand_job(
         # this job travels in the payload, committed atomically with the job,
         # so a dispatch replay can never double-spawn for the same decision.
         payload["decision_record_id"] = decision_record_id
+    if payload_extra:
+        # Additive markers/provenance for the caller (e.g. Task 14's adversarial
+        # attacker markers), committed atomically with the job. Never overrides
+        # the structural keys above.
+        for key, value in payload_extra.items():
+            payload.setdefault(key, value)
     job.payload = payload
     commit_write(db)
     return job
+
+
+def queue_adversarial_attacker_jobs(db: Session, debate: Debate, pov_job: Job, pov_node: Node) -> list[Job]:
+    """P3.1 attacker phase: queue the TWO cross-model challenge jobs for a
+    freshly-materialized adversarial POV branch.
+
+    (a) the strongest attack against the lens claim -> the branch's top-level
+        CON (position 1 under the container, where strongest_con lives on the
+        legacy path); (b) the strongest attack against strongest_pro -> its CON
+        child (position 1 under strongest_pro). Both are v2_expand CHALLENGE
+        jobs (reusing queue_v2_expand_job + expansion_reason) authored by a
+        model from a DIFFERENT family than the proposer's -- the position
+        contract is honored for free by queue_v2_expand_job's next-free-slot
+        allocation. Same-family fallback is recorded honestly in the payload.
+
+    Best-effort: a queueing failure must never damage the already-complete
+    proposer branch (the CON is simply absent, which is visible/honest and
+    surfaced in the synthesis failure manifest)."""
+    strongest_pro = db.scalar(
+        select(Node)
+        .where(Node.parent_id == pov_node.id, Node.node_type == "PRO", Node.position == 0)
+        .order_by(Node.id.asc())
+    )
+    proposer_generation = (
+        db.get(Generation, pov_node.active_generation_id) if pov_node.active_generation_id else None
+    )
+    proposer_model = str(
+        (proposer_generation.model_id if proposer_generation else None) or pov_job.required_model or ""
+    )
+    attacker_model, attacker_reason = choose_adversarial_attacker_model(db, proposer_model)
+    marker = {
+        "adversarial_pov": True,
+        "adversarial_attacker_reason": attacker_reason,
+        "adversarial_proposer_model": proposer_model,
+        "adversarial_proposer_family": lineage_family(proposer_model),
+        "adversarial_attacker_model": attacker_model,
+        "adversarial_attacker_family": lineage_family(attacker_model),
+    }
+    queued: list[Job] = []
+    # (a) attack the lens claim -> top-level CON under the container.
+    queued.append(
+        queue_v2_expand_job(
+            db,
+            debate,
+            pov_node,
+            "CON",
+            ADVERSARIAL_ATTACK_REASON,
+            attacker_model,
+            payload_extra={**marker, "adversarial_target": "lens_claim"},
+        )
+    )
+    # (b) attack strongest_pro -> its CON child.
+    if strongest_pro is not None:
+        queued.append(
+            queue_v2_expand_job(
+                db,
+                debate,
+                strongest_pro,
+                "CON",
+                ADVERSARIAL_ATTACK_REASON,
+                attacker_model,
+                payload_extra={**marker, "adversarial_target": "strongest_pro"},
+            )
+        )
+    return queued
 
 
 def analyzer_output(question: str, analyzer_type: str, classification: dict[str, Any]) -> dict[str, Any]:
@@ -1668,7 +1848,54 @@ def require_title_content(payload: dict[str, Any], label: str) -> dict[str, str]
     return {"title": title, "content": content}
 
 
+def _con_content_present(container: Any, key: str) -> bool:
+    """True when `container[key]` carries real Con content (title/content) --
+    used to reject con-bearing proposer payloads under the adversarial flag.
+    An absent key or an empty/null value is not con-bearing (a compliant
+    proposer simply omits it)."""
+    if not isinstance(container, dict):
+        return False
+    value = container.get(key)
+    if not isinstance(value, dict):
+        return False
+    return bool(str(value.get("title") or "").strip() or str(value.get("content") or "").strip())
+
+
+def validate_pov_proposer_contract(payload: dict[str, Any]) -> dict[str, Any]:
+    """Adversarial-flag proposer contract (P3.1): the PRO side ONLY --
+    lens card + strongest_pro + strongest_pro.pro (3 cards) + provenance. A
+    different model authors the CON attacks, so a con-bearing payload (any
+    strongest_con, or a strongest_pro.con) is REJECTED: the proposer must not
+    write challenge cards. The returned shape carries no strongest_con and its
+    strongest_pro carries no con -- materialize_pov_branch grows only the PRO
+    side and the attacker jobs supply the CONs."""
+    root = require_title_content(payload, "POV output")
+    strongest_pro_in = payload.get("strongest_pro")
+    if not isinstance(strongest_pro_in, dict):
+        raise ValueError("strongest_pro must be a JSON object")
+    strongest_pro = require_title_content(strongest_pro_in, "strongest_pro")
+    nested_pro = require_title_content(
+        strongest_pro_in.get("pro") if isinstance(strongest_pro_in.get("pro"), dict) else {},
+        "strongest_pro.pro",
+    )
+    if _con_content_present(payload, "strongest_con") or _con_content_present(strongest_pro_in, "con"):
+        raise ValueError(
+            "Adversarial POV proposer output must not include Con cards "
+            "(strongest_con or strongest_pro.con); a different model writes the attack"
+        )
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict) or not all(provenance.get(key) for key in ("model_id", "worker_id", "prompt_id", "job_id")):
+        raise ValueError("POV output must include model, worker, prompt, and job provenance")
+    return {
+        **root,
+        "strongest_pro": {**strongest_pro, "pro": nested_pro},
+        "provenance": provenance,
+    }
+
+
 def validate_pov_contract(payload: dict[str, Any]) -> dict[str, Any]:
+    if adversarial_pov_enabled():
+        return validate_pov_proposer_contract(payload)
     root = require_title_content(payload, "POV output")
     strongest_pro = require_title_content(payload.get("strongest_pro") if isinstance(payload.get("strongest_pro"), dict) else {}, "strongest_pro")
     strongest_con = require_title_content(payload.get("strongest_con") if isinstance(payload.get("strongest_con"), dict) else {}, "strongest_con")
@@ -1873,6 +2100,27 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_pro"]),
     )
     _extract_and_maybe_acquire_evidence(db, debate, pro_node)
+    if adversarial_pov_enabled():
+        # P3.1 proposer phase: grow the PRO side ONLY -- strongest_pro (above)
+        # plus its single nested Pro. The two CON attacks are authored by a
+        # different-family model via the v2_expand challenge jobs the completion
+        # tail queues; they materialize at the legacy strongest_con /
+        # strongest_pro.con positions (position 1 under the container and under
+        # strongest_pro respectively -- queue_v2_expand_job's next-free-slot).
+        nested_pro = create_completed_node(
+            db,
+            debate,
+            pro_node,
+            node_type="PRO",
+            position=0,
+            title=payload["strongest_pro"]["pro"]["title"],
+            content=payload["strongest_pro"]["pro"]["content"],
+            job=job,
+            provenance=provenance,
+            prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_pro"]["pro"]),
+        )
+        _extract_and_maybe_acquire_evidence(db, debate, nested_pro)
+        return pov_node
     con_node = create_completed_node(
         db,
         debate,
@@ -2190,39 +2438,68 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             or POV_LENS_DESCRIPTIONS.get(pov_label)
             or DYNAMIC_LENS_DESCRIPTIONS.get(pov_label, "")
         )
-        pov_context = {
-            **base_context,
-            "pov": pov_label,
-            "lens_description": lens_description,
-            "output_contract": {
-                "title": "short title for the POV assessment",
-                "content": "concise content with only the most relevant data/reasoning",
-                "strongest_pro": {
-                    "title": "short title",
-                    "content": "concise content",
-                    "pro": {"title": "short title", "content": "concise support for the strongest Pro"},
-                    "con": {"title": "short title", "content": "concise challenge to the strongest Pro"},
-                },
-                "strongest_con": {
-                    "title": "short title",
-                    "content": "concise content",
-                    "pro": {"title": "short title", "content": "concise support for the strongest Con"},
-                    "con": {"title": "short title", "content": "concise challenge to the strongest Con"},
-                },
-            },
-        }
         system = (
             "You are a Codex-backed Dialectical Engine V2 POV worker. "
             "Return exactly one strict JSON object. Do not include markdown or status wrappers."
         )
-        user = (
-            f"Generate the {pov_label} branch for the debate question. "
-            f"Lens instructions: {lens_description} "
-            "Use real reasoning from this model call only; do not use placeholders or canned examples. "
-            "Create one strongest Pro and one strongest Con, and for each create one nested Pro and one nested Con. "
-            "Every generated card must have a short title and concise content.\n\n"
-            f"Context JSON:\n{json.dumps(pov_context, default=str)}"
-        )
+        if adversarial_pov_enabled():
+            # P3.1 proposer phase: PRO side ONLY. A different, opposing model
+            # attacks these claims via v2_expand challenge jobs, so the
+            # proposer must NOT write any Con/challenge cards.
+            pov_context = {
+                **base_context,
+                "pov": pov_label,
+                "lens_description": lens_description,
+                "output_contract": {
+                    "title": "short title for the POV assessment",
+                    "content": "concise content with only the most relevant data/reasoning",
+                    "strongest_pro": {
+                        "title": "short title",
+                        "content": "concise content",
+                        "pro": {"title": "short title", "content": "concise support for the strongest Pro"},
+                    },
+                },
+            }
+            user = (
+                f"Generate the PRO side of the {pov_label} branch for the debate question. "
+                f"Lens instructions: {lens_description} "
+                "Use real reasoning from this model call only; do not use placeholders or canned examples. "
+                "State the perspective's assessment, its single strongest Pro, and one nested Pro that "
+                "supports that Pro. Do NOT write any Con, challenge, objection, or limitation cards -- a "
+                "different, opposing model will attack your claims. Every generated card must have a short "
+                "title and concise content.\n\n"
+                f"Context JSON:\n{json.dumps(pov_context, default=str)}"
+            )
+        else:
+            pov_context = {
+                **base_context,
+                "pov": pov_label,
+                "lens_description": lens_description,
+                "output_contract": {
+                    "title": "short title for the POV assessment",
+                    "content": "concise content with only the most relevant data/reasoning",
+                    "strongest_pro": {
+                        "title": "short title",
+                        "content": "concise content",
+                        "pro": {"title": "short title", "content": "concise support for the strongest Pro"},
+                        "con": {"title": "short title", "content": "concise challenge to the strongest Pro"},
+                    },
+                    "strongest_con": {
+                        "title": "short title",
+                        "content": "concise content",
+                        "pro": {"title": "short title", "content": "concise support for the strongest Con"},
+                        "con": {"title": "short title", "content": "concise challenge to the strongest Con"},
+                    },
+                },
+            }
+            user = (
+                f"Generate the {pov_label} branch for the debate question. "
+                f"Lens instructions: {lens_description} "
+                "Use real reasoning from this model call only; do not use placeholders or canned examples. "
+                "Create one strongest Pro and one strongest Con, and for each create one nested Pro and one nested Con. "
+                "Every generated card must have a short title and concise content.\n\n"
+                f"Context JSON:\n{json.dumps(pov_context, default=str)}"
+            )
     elif job.job_type == "v2_expand":
         if not job.node_id:
             raise ValueError("Expand job must target its pending child node")
@@ -2561,6 +2838,18 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             "pov_completed",
             {"debate_id": debate.id, "node_id": pov_node.id, "job_id": job.id, "role": job.required_role},
         )
+        if adversarial_pov_enabled():
+            # P3.1 attacker phase: queue the two cross-model challenge jobs on
+            # proposer materialization. Queued BEFORE the quiescence check so
+            # their pending v2_expand jobs (in V2_GENERATION_JOB_TYPES) hold
+            # synthesis until proposer + both attackers are terminal. Best-
+            # effort: a queueing failure must never damage the already-complete
+            # proposer branch (the CON is simply absent -- honest, and surfaced
+            # in the synthesis failure manifest).
+            try:
+                queue_adversarial_attacker_jobs(db, debate, job, pov_node)
+            except Exception as exc:
+                print(f"[dialectical_v2] adversarial attacker queueing failed (non-fatal): {exc!r}")
         pending_branches = pending_generation_nodes(db, debate.id, debate.root_node_id)
         existing_synthesis = db.scalar(
             select(Job).where(
@@ -2617,6 +2906,20 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         if not pending_nodes and existing_synthesis is None:
             queue_v2_synthesize_job(db, debate)
         commit_write(db)
+        # Task 14 (P3.1): a materialized adversarial attack (a CON child) is a
+        # new argument node whose parent's scoring input-hash (Task 3) is now
+        # stale. Fire the SAME Task 8 incremental-scoring trigger the proposer
+        # branch uses so the attack node -- and its cache-invalidated parent --
+        # get (re)scored before synthesis becomes claimable. Scoped to
+        # adversarial attacker jobs so the adaptive-expansion path's own scoring
+        # behavior (below) stays byte-identical; gated on the same
+        # DIALECTICAL_SCORE_BEFORE_SYNTHESIS flag. Best-effort/fire-and-forget,
+        # matching every other trigger site in this function.
+        if _is_adversarial_attacker_job(job) and score_before_synthesis_enabled():
+            try:
+                trigger_internal_scoring_after_completion(debate.id)
+            except Exception as exc:
+                print(f"[dialectical_v2] adversarial post-attack scoring trigger failed (non-fatal): {exc!r}")
         # W4 adaptive loop: a completed expansion wakes a debate-scoped
         # re-score (judge scores -> protocol re-run -> lifecycle
         # reevaluation -> possibly another dispatch round), only once the
