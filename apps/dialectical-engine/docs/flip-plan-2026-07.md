@@ -43,6 +43,32 @@ blind.
 
 ---
 
+## How to set a coordinator flag so it survives (READ FIRST)
+
+**Editing the live `~/Library/LaunchAgents/com.dialectical.coordinator.plist`
+directly does NOT persist.** The `com.dialectical.watchdog` service, on seeing
+the coordinator briefly down (e.g. during your restart), calls
+`install_core_services()` → `make install-services`, which **regenerates the
+live plist from the git-tracked template
+`deploy/launchd/coordinator.plist`** (verified 2026-07-23: a `PlistBuddy` edit
+adding the evidence flags was reverted within seconds, and the watchdog
+respawned the coordinator from the clean template with the flags absent).
+
+To flip a coordinator env flag durably:
+1. Add the `<key>`/`<string>` pair to the `EnvironmentVariables` dict in
+   `deploy/launchd/coordinator.plist` (the template — NOT the installed copy).
+2. `cd apps/dialectical-engine && make install-services` (regenerates the live
+   plist from the template and reloads the service).
+3. Verify the **running** daemon actually has it (SIP hides daemon env from
+   `ps eww`, so confirm behaviorally — start a debate and observe the flag's
+   effect, e.g. `v2_evidence` jobs appearing — not by inspecting the plist).
+Rollback is the reverse: remove the pair from the template, `make
+install-services`. The subscription-loop workers are tmux/shell, not launchd —
+their env is set where the loop is launched, not here.
+
+> The individual steps below say "flip … and restart the coordinator" — do that
+> via this template path, never by editing the installed plist in place.
+
 ## Staged flip order
 
 Preconditions are cumulative: each step assumes every earlier step is
