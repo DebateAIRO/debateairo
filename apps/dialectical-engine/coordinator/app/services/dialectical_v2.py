@@ -1307,12 +1307,202 @@ def choose_synthesizer_model(db: Session, debate: Debate) -> tuple[str, dict[str
     }
 
 
+# --------------------------------------------------------------------------
+# Task 15 (P3.3): the pre-synthesis cross-examination round.
+# --------------------------------------------------------------------------
+# Today's protocol phase 5.4 "cross-exam" (app.protocol.cross_exam) is a
+# passive read-only analysis over ALREADY-EXISTING scores/nodes -- no new LLM
+# calls, no new nodes. With DIALECTICAL_CROSS_EXAM ON, a REAL skeptic wave
+# runs immediately before synthesis: for each completed POV branch, that
+# branch's strongest claim gets ONE v2_expand CHALLENGE job from a healthy
+# online model in a DIFFERENT family than the claim's own author, carrying
+# the skeptic contract below. This reuses the v2_expand machinery end to end
+# (queueing, materialization, the Task 3 children-digest cache-busting that
+# was built anticipating exactly this) -- nothing new is invented, only a new
+# caller of it. Flag OFF: the wave never queues and queue_v2_synthesize_job
+# is byte-identical to pre-Task-15.
+CROSS_EXAM_REASON = (
+    "cross-examination: find the decision-changing objection — the "
+    "single strongest reason this claim's conclusion should change"
+)
+
+
+def cross_exam_enabled() -> bool:
+    """P3.3 feature gate. Default OFF."""
+    return bool_env("DIALECTICAL_CROSS_EXAM", False)
+
+
+def cross_exam_max_jobs() -> int:
+    """Wave size cap (env, clamped [0, 20]). 0 disables the wave even with
+    the flag on. Counts against nothing else -- its own budget only."""
+    return int_env("DIALECTICAL_CROSS_EXAM_MAX_JOBS", 8, 0, 20)
+
+
+def _is_cross_exam_job(job: Job) -> bool:
+    """True for a v2_expand job the coordinator marked as part of the P3.3
+    wave (job.payload set at queue time by maybe_queue_cross_exam_wave --
+    coordinator-authoritative, never worker-supplied)."""
+    payload = job.payload if isinstance(job.payload, dict) else {}
+    return bool(payload.get("cross_exam"))
+
+
+def _cross_exam_wave_already_queued(db: Session, debate_id: str) -> bool:
+    """True once at least one cross-exam-marked v2_expand job has ever been
+    queued for this debate. Job rows are never deleted (the same durable-
+    marker precedent debate_uses_v2_pipeline relies on), so this is a stable
+    per-debate idempotency check regardless of how many of those jobs are
+    still outstanding vs. terminal."""
+    jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate_id, Job.job_type == "v2_expand")
+    ).all()
+    return any(_is_cross_exam_job(job) for job in jobs)
+
+
+def _cross_exam_branch_claim(
+    container: Node,
+    live_nodes_by_id: dict[str, Node],
+    children_by_parent: dict[str, list[Node]],
+    strength_by_node: dict[str, float],
+) -> Node | None:
+    """The branch's strongest claim (brief P3.3 point 2): the branch's own
+    live argument node (the container included) with the highest current
+    persisted strength. Fallback when nothing in the branch is scored: the
+    branch's strongest_pro node (position 0 PRO child of the container) --
+    the SAME "strongest claim" position Task 14's adversarial attacker
+    targets, and the only node BOTH the legacy and adversarial-POV proposer
+    contracts guarantee exists on every completed branch."""
+    subtree_ids: set[str] = set()
+    frontier = [container.id]
+    while frontier:
+        current = frontier.pop()
+        if current in subtree_ids:
+            continue
+        subtree_ids.add(current)
+        frontier.extend(child.id for child in children_by_parent.get(current, []))
+    scored_candidates = [live_nodes_by_id[node_id] for node_id in subtree_ids if node_id in strength_by_node]
+    if scored_candidates:
+        # Highest strength wins; ties broken by node id for determinism
+        # (mirrors app.protocol.cross_exam.cross_examine's own tie-break).
+        scored_candidates.sort(key=lambda node: (-strength_by_node[node.id], node.id))
+        return scored_candidates[0]
+    # position is a next-free-slot allocation shared across a container's
+    # PRO/CON children (see queue_v2_expand_job), so at most one child can
+    # ever match "PRO at position 0" -- no ordering needed to pick among
+    # candidates that structurally cannot exceed one.
+    return next(
+        (child for child in children_by_parent.get(container.id, []) if child.node_type == "PRO" and child.position == 0),
+        None,
+    )
+
+
+def maybe_queue_cross_exam_wave(db: Session, debate: Debate) -> list[Job]:
+    """P3.3: queue the pre-synthesis skeptic wave -- one v2_expand CHALLENGE
+    job per completed POV branch, against that branch's strongest claim,
+    authored by a healthy online model from a DIFFERENT family than the
+    claim's own author (choose_adversarial_attacker_model reuse -- family
+    helper reuse, same-family fallback recorded honestly in the payload).
+
+    Returns the newly-queued wave jobs; empty when the flag is off, the cap
+    is 0, no branch has completed yet, or the wave already ran for this
+    debate (idempotent -- see _cross_exam_wave_already_queued). Called from
+    queue_v2_synthesize_job, itself only reached once the tree is otherwise
+    quiescent, so a second wave can never be queued for the same debate: the
+    first wave's own v2_expand jobs hold whole-tree quiescence (see
+    pending_generation_nodes) until it resolves.
+    """
+    if not cross_exam_enabled():
+        return []
+    cap = cross_exam_max_jobs()
+    if cap <= 0 or not debate.root_node_id:
+        return []
+    if _cross_exam_wave_already_queued(db, debate.id):
+        return []
+    containers = db.scalars(
+        select(Node)
+        .where(
+            Node.debate_id == debate.id,
+            Node.parent_id == debate.root_node_id,
+            Node.node_type != "EVIDENCE",
+            Node.status == "complete",
+        )
+        .order_by(Node.position.asc(), Node.id.asc())
+    ).all()
+    if not containers:
+        return []
+    live_nodes = live_argument_nodes(db, debate.id)
+    live_nodes_by_id = {node.id: node for node in live_nodes}
+    children_by_parent: dict[str, list[Node]] = {}
+    for node in live_nodes:
+        if node.parent_id:
+            children_by_parent.setdefault(node.parent_id, []).append(node)
+    scoring_payload = debate_scoring_payload(db, debate)
+    strength_by_node: dict[str, float] = {}
+    for item in scoring_payload.get("items") or []:
+        if isinstance(item, dict) and item.get("node_id"):
+            scores = item.get("scores") if isinstance(item.get("scores"), dict) else {}
+            value = scores.get("strength")
+            if isinstance(value, (int, float)):
+                strength_by_node[item["node_id"]] = float(value)
+    # Cap ranking (brief: "branches > cap -> strongest branches first by root
+    # strength"): the branch's OWN container strength, unscored -> 0.0, ties
+    # broken by node id for determinism (same convention as the claim pick
+    # above and app.protocol.cross_exam.cross_examine).
+    ranked_containers = sorted(
+        containers, key=lambda node: (-(strength_by_node.get(node.id) or 0.0), node.id)
+    )[:cap]
+    queued: list[Job] = []
+    for container in ranked_containers:
+        claim = _cross_exam_branch_claim(container, live_nodes_by_id, children_by_parent, strength_by_node)
+        if claim is None:
+            continue
+        author_generation = (
+            db.get(Generation, claim.active_generation_id) if claim.active_generation_id else None
+        )
+        author_model = str((author_generation.model_id if author_generation else None) or "")
+        attacker_model, attacker_reason = choose_adversarial_attacker_model(db, author_model)
+        marker = {
+            "cross_exam": True,
+            "cross_exam_attacker_reason": attacker_reason,
+            "cross_exam_author_model": author_model,
+            "cross_exam_author_family": lineage_family(author_model),
+            "cross_exam_attacker_model": attacker_model,
+            "cross_exam_attacker_family": lineage_family(attacker_model),
+            "cross_exam_branch_container_id": container.id,
+        }
+        try:
+            queued.append(
+                queue_v2_expand_job(
+                    db,
+                    debate,
+                    claim,
+                    "CON",
+                    CROSS_EXAM_REASON,
+                    attacker_model,
+                    payload_extra=marker,
+                )
+            )
+        except Exception as exc:  # pragma: no cover - defensive best-effort guard
+            print(f"[dialectical_v2] cross-exam job queueing failed for claim {claim.id} (non-fatal): {exc!r}")
+    return queued
+
+
 def queue_v2_synthesize_job(db: Session, debate: Debate) -> Job:
     """Single queue site for the debate's v2_synthesize job. Every synthesis-
     queue path routes through here so synthesizer selection + rotation
     provenance live in exactly ONE place (never copied across the four
     completion tails). Records the rotation decision in job.payload; it is
-    mirrored into synthesis.provenance at persist time."""
+    mirrored into synthesis.provenance at persist time.
+
+    Task 15 (P3.3): reached here means the tree is otherwise quiescent --
+    exactly the moment the brief's pre-synthesis wave must run. On its first
+    hit for a debate, maybe_queue_cross_exam_wave queues the wave INSTEAD of
+    synthesis (its v2_expand jobs then hold quiescence, so every caller's own
+    pre-check keeps this seam from firing again until the wave resolves);
+    once the wave has already run (or is disabled), it returns [] and this
+    falls through to real synthesis exactly as before."""
+    wave_jobs = maybe_queue_cross_exam_wave(db, debate)
+    if wave_jobs:
+        return wave_jobs[-1]
     model_id, rotation = choose_synthesizer_model(db, debate)
     job = queue_v2_job(db, debate, "v2_synthesize", "v2_synthesizer", model_id, None)
     payload = dict(job.payload or {})
@@ -2885,6 +3075,15 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             if isinstance(result, dict) and isinstance(result.get("provenance"), dict)
             else {}
         )
+        if _is_cross_exam_job(job):
+            # Task 15 (P3.3): coordinator-authoritative mark (job.payload was
+            # set by the coordinator at queue time, never by the worker) so
+            # the child's provenance record honestly discloses its cross-
+            # examination origin -- additive only, no existing provenance key
+            # touched; exposed for free via the existing provenance_records
+            # serialization channel (debate_to_dict) so the UI could badge it
+            # later (no UI work in this task).
+            provenance = {**provenance, "cross_exam": True}
         child = materialize_expand_child(db, debate, job, payload, provenance)
         record_provenance(db, debate.id, branch.id, "expand_node", child.id, provenance)
         publish_event(
@@ -2906,20 +3105,21 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         if not pending_nodes and existing_synthesis is None:
             queue_v2_synthesize_job(db, debate)
         commit_write(db)
-        # Task 14 (P3.1): a materialized adversarial attack (a CON child) is a
-        # new argument node whose parent's scoring input-hash (Task 3) is now
-        # stale. Fire the SAME Task 8 incremental-scoring trigger the proposer
-        # branch uses so the attack node -- and its cache-invalidated parent --
-        # get (re)scored before synthesis becomes claimable. Scoped to
-        # adversarial attacker jobs so the adaptive-expansion path's own scoring
-        # behavior (below) stays byte-identical; gated on the same
+        # Task 14 (P3.1) / Task 15 (P3.3): a materialized adversarial attack or
+        # cross-exam attack (a CON child) is a new argument node whose parent's
+        # scoring input-hash (Task 3) is now stale. Fire the SAME Task 8
+        # incremental-scoring trigger the proposer branch uses so the attack
+        # node -- and its cache-invalidated parent -- get (re)scored before
+        # synthesis becomes claimable. Scoped to adversarial attacker / cross-
+        # exam jobs so the adaptive-expansion path's own scoring behavior
+        # (below) stays byte-identical; gated on the same
         # DIALECTICAL_SCORE_BEFORE_SYNTHESIS flag. Best-effort/fire-and-forget,
         # matching every other trigger site in this function.
-        if _is_adversarial_attacker_job(job) and score_before_synthesis_enabled():
+        if (_is_adversarial_attacker_job(job) or _is_cross_exam_job(job)) and score_before_synthesis_enabled():
             try:
                 trigger_internal_scoring_after_completion(debate.id)
             except Exception as exc:
-                print(f"[dialectical_v2] adversarial post-attack scoring trigger failed (non-fatal): {exc!r}")
+                print(f"[dialectical_v2] post-attack scoring trigger failed (non-fatal): {exc!r}")
         # W4 adaptive loop: a completed expansion wakes a debate-scoped
         # re-score (judge scores -> protocol re-run -> lifecycle
         # reevaluation -> possibly another dispatch round), only once the

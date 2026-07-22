@@ -1587,6 +1587,54 @@ def _queue_synthesis_after_branch_failure(db: Session, debate: Debate, job: Job)
     maybe_queue_synthesis(db, debate)
 
 
+def _is_cross_exam_expand_job(job: Job) -> bool:
+    """Task 15 (P3.3): true for a v2_expand job the coordinator marked as
+    part of the pre-synthesis cross-examination wave (job.payload set at
+    queue time by dialectical_v2.maybe_queue_cross_exam_wave --
+    coordinator-authoritative, never worker-supplied). Lets
+    terminalize_job_failure route these v2_expand jobs through the AUXILIARY
+    terminal path instead of NODE_DEGRADABLE (v2_expand's default): the
+    wave's target is an already-complete, healthy claim elsewhere in the
+    tree, not a branch of its own -- a ladder-exhausted skeptic probe must
+    never read as that claim (or its branch) having failed."""
+    if job.job_type != "v2_expand":
+        return False
+    payload = job.payload if isinstance(job.payload, dict) else {}
+    return bool(payload.get("cross_exam"))
+
+
+def _maybe_queue_synthesis_after_cross_exam_terminal(db: Session, debate: Debate) -> None:
+    """P3.3: after a cross-exam-marked v2_expand job terminalizes with a
+    FAILURE (a materialized completion routes through dialectical_v2's own
+    v2_expand completion tail, which already re-checks quiescence and calls
+    queue_v2_synthesize_job -- this covers the path that tail never reaches),
+    re-check whole-tree quiescence and, once every wave job (and everything
+    else) is terminal, queue the debate's real synthesis THROUGH
+    queue_v2_synthesize_job -- the single rotation-aware seam -- so a
+    cross-exam failure never bypasses rotation the way the legacy node-
+    degradable branch-failure path (_queue_synthesis_after_branch_failure)
+    does, and never re-queues a second wave (queue_v2_synthesize_job's own
+    idempotency check, see maybe_queue_cross_exam_wave)."""
+    from app.services.dialectical_v2 import pending_generation_nodes, queue_v2_synthesize_job
+
+    if not debate.root_node_id:
+        return
+    flush_write(db)
+    if pending_generation_nodes(db, debate.id, debate.root_node_id):
+        return
+    existing_synthesis = db.scalar(
+        select(Job)
+        .where(
+            Job.debate_id == debate.id,
+            Job.job_type == "v2_synthesize",
+            Job.status.in_(["pending", "claimed", "running"]),
+        )
+        .limit(1)
+    )
+    if existing_synthesis is None:
+        queue_v2_synthesize_job(db, debate)
+
+
 def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
     """Shared terminal-failure handling for every requeue channel.
 
@@ -1632,6 +1680,38 @@ def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[st
                     "job_id": job.id,
                     "job_type": job.job_type,
                     "reason": "Evidence retrieval exhausted all search-capable models",
+                    "terminal": True,
+                },
+            )
+        )
+        return events
+    if _is_cross_exam_expand_job(job):
+        # Task 15 (P3.3): AUXILIARY-style terminal failure (Task 10's
+        # category) for the cross-exam wave -- job-scoped ledger entry only.
+        # Unlike v2_evidence (whose node_id is an already-complete node),
+        # a cross-exam job's node_id IS a freshly created placeholder
+        # (queue_v2_expand_job's own child, never generated) that held
+        # whole-tree quiescence while pending. Mark it "stale" -- the
+        # established idiom for "this generation attempt is abandoned,
+        # invisible" (see stale_descendants) -- so it neither lingers as a
+        # permanently-pending ghost node in the tree nor taxes Task 8's
+        # score-before-synthesis wait on a node that can never be scored.
+        # The attacked claim (the placeholder's parent) is never touched, so
+        # it stays complete regardless. Then re-check quiescence so a wave
+        # failure can never wedge synthesis forever.
+        if node is not None:
+            node.status = "stale"
+        if debate is not None:
+            _maybe_queue_synthesis_after_cross_exam_terminal(db, debate)
+        events.append(
+            (
+                job.debate_id,
+                "cross_exam_unavailable",
+                {
+                    "node_id": job.node_id,
+                    "job_id": job.id,
+                    "job_type": job.job_type,
+                    "reason": "Cross-examination exhausted all eligible models",
                     "terminal": True,
                 },
             )

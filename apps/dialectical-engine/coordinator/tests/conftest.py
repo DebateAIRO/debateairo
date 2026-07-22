@@ -35,6 +35,14 @@ os.environ.setdefault("DIALECTICAL_SYNTHESIZER_ROTATION", "false")
 # contract onto the 3-card proposer contract. Task 14's own tests opt in per
 # case via monkeypatch.setenv; delenv exercises the production default.
 os.environ.setdefault("DIALECTICAL_ADVERSARIAL_POV", "false")
+# Task 15 (P3.3): the pre-synthesis cross-examination wave defaults OFF in
+# production too, but pin it explicitly in the test baseline (same defensive
+# discipline as ADVERSARIAL_POV above) so a stray shell env can never flip the
+# many pipeline tests that complete the last v2_pov job expecting a
+# v2_synthesize job to be queued directly onto queuing the wave instead.
+# Task 15's own tests opt in per case via monkeypatch.setenv; delenv exercises
+# the production default.
+os.environ.setdefault("DIALECTICAL_CROSS_EXAM", "false")
 
 import pytest
 
