@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 
 import pytest
 from sqlalchemy import func, select
@@ -24,13 +25,17 @@ from app.models.entities import (
     now_utc,
 )
 from app.protocol.runner import run_protocol_analysis
+from app.providers import AgentConfig, ProviderRegistry
+from app.scoring import ScoringProviderResult, queue_scoring_job
+from app.scoring.jobs import run_scoring_job_background
 from app.scoring.lineage import lineage_family
 from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
 from app.services import dialectical_v2 as service
 from app.services.dialectical_v2 import V2_CODEX_MODEL_ID
-from app.services.orchestrator import claim_pending_job, complete_job
+from app.services.orchestrator import claim_pending_job, complete_job, worker_can_claim_job
 
 from test_dialectical_v2 import real_codex_worker, worker_non_adjudicating_synthesis
+from test_node_scoring import base_assessment
 from test_protocol_runner import (
     _latest_protocol_analysis_run,
     _other_protocol_analysis_run,
@@ -41,6 +46,31 @@ CLAUDE = "claude-sonnet-5-high-loop"
 GEMINI = "gemini-3.5-flash-loop"
 GROK = "grok-4.5-high-loop"
 TOPIC = "Should cities ban cars downtown?"
+
+
+class _FakeJudgeProvider:
+    """In-process judge that returns a valid ClaimAssessment for ANY node --
+    including ROOT_CLAIM and POV containers -- so the real scoring pipeline
+    yields items (never errors) for every live argument node."""
+
+    provider = "codex"
+    model = "codex-test-model"
+
+    def judge_node(self, request):
+        return ScoringProviderResult(
+            provider=self.provider,
+            model=self.model,
+            raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+            latency_ms=7,
+            checked_at="2026-07-19T10:15:30+00:00",
+        )
+
+
+def _fake_judge_registry() -> ProviderRegistry:
+    return ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": _FakeJudgeProvider()},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +287,39 @@ def test_synthesis_immediately_claimable_when_flag_off(db, monkeypatch) -> None:
 
     claimed = claim_pending_job(db, worker)
     assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_real_scoring_pipeline_opens_deferral_gate_before_budget(db, monkeypatch) -> None:
+    """End-to-end: the REAL scoring path (fake judge, whole debate) must yield
+    items -- not errors -- for ROOT_CLAIM and POV-container nodes, so
+    condition (a) (all live argument nodes scored) opens the deferral gate
+    WITHOUT waiting out the budget. Uses run_scoring_job_background (the actual
+    pipeline the deferral checks against), not hand-seeded scoring items."""
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "3600")  # far from expiry
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)  # root + POV containers + PRO/CON tree
+
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    # Gate CLOSED before scoring: nothing scored, budget nowhere near expiry.
+    assert service.all_live_argument_nodes_scored(db, debate) is False
+    assert worker_can_claim_job(db, worker, synth, now_utc()) is False
+
+    # Run the REAL scoring pipeline over the whole debate with the fake judge.
+    scoring_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(scoring_job.id, debate.id, registry_factory=_fake_judge_registry)
+    db.expire_all()
+
+    # The real path produced a scoring item for every live argument node --
+    # ROOT_CLAIM and the POV containers included -> condition (a) opens the gate
+    # long before the 3600s budget could have expired.
+    assert service.all_live_argument_nodes_scored(db, debate) is True
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    assert worker_can_claim_job(db, worker, synth, now_utc()) is True
 
 
 # ---------------------------------------------------------------------------
