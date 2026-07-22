@@ -66,8 +66,13 @@ test("cached real scoring responses display metadata and claim badges through th
   );
   assert.match(
     canvasSource,
-    /className="scoreBadgeButton"[\s\S]*aria-label=\{`Open scoring explanation for \$\{node\.claim\}`\}[\s\S]*STR \{strength\.value\}[\s\S]*UNC \{uncertainty\.value\}[\s\S]*IMP \{impact\.value\}/,
-    "Cached real scores should be exposed as the visible node badge triplet"
+    /const uncertaintyPill = formatUncertaintyPill\(scoring\.uncertainty_drivers, scoring\.uncertainty_source, uncertainty\);[\s\S]*const strengthPill = formatStrengthPill\(scoring\.strength_kind, strength\);/,
+    "Strength and uncertainty badge content should be derived from the real driver-first scoring fields (uncertainty_drivers/uncertainty_source/strength_kind), not just the raw percentages"
+  );
+  assert.match(
+    canvasSource,
+    /className="scoreBadgeButton"[\s\S]*aria-label=\{`Open scoring explanation for \$\{node\.claim\}`\}[\s\S]*className="scoreBadge strength"[\s\S]*title=\{strengthPill\.title\}[\s\S]*\{strengthPill\.pillText\}[\s\S]*className="scoreBadge uncertainty"[\s\S]*title=\{uncertaintyPill\.title\}[\s\S]*\{uncertaintyPill\.pillText\}[\s\S]*IMP \{impact\.value\}/,
+    "Cached real scores should be exposed as the visible node badge triplet: driver-first strength/uncertainty pill text and title from the shared formatters, plus the unchanged plain impact badge"
   );
   assert.match(
     debatePageSource,

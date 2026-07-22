@@ -15,8 +15,8 @@ test("DebateOutline accepts optional scoring metadata without requiring page wir
   );
   assert.match(
     source,
-    /import \{ formatScoreBadgeLabel, formatScorePercent \} from "@\/lib\/scoringFormat";/,
-    "Outline scoring chips should use the shared score formatting helpers"
+    /import \{ formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill \} from "@\/lib\/scoringFormat";/,
+    "Outline scoring chips should use the shared score formatting helpers, including the driver-first strength/uncertainty pill formatters (Task 4/5)"
   );
   assert.match(
     source,
@@ -60,8 +60,13 @@ test("DebateOutline accepts optional scoring metadata without requiring page wir
   );
   assert.match(
     source,
-    /STR \{strength\.value\}[\s\S]*UNC \{uncertainty\.value\}[\s\S]*HOLES \{issueCount\}/,
-    "Compact metadata should show score and hole counts"
+    /const uncertaintyPill = formatUncertaintyPill\(scoring\.uncertainty_drivers, scoring\.uncertainty_source, uncertainty\);[\s\S]*const strengthPill = formatStrengthPill\(scoring\.strength_kind, strength\);/,
+    "Compact metadata's strength/uncertainty chips should be computed via the driver-first pill formatters, not the raw percentages alone"
+  );
+  assert.match(
+    source,
+    /className="scoreBadge strength"[\s\S]*title=\{strengthPill\.title\}[\s\S]*\{strengthPill\.pillText\}[\s\S]*className="scoreBadge uncertainty"[\s\S]*title=\{uncertaintyPill\.title\}[\s\S]*\{uncertaintyPill\.pillText\}[\s\S]*HOLES \{issueCount\}/,
+    "Compact metadata should show the driver-first strength/uncertainty pill text and title, plus the hole count"
   );
   assert.match(
     source,

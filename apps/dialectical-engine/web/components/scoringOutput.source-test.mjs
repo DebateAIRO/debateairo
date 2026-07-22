@@ -21,13 +21,18 @@ test("score chips render STR/UNC/IMP from the real node scoring payload", () => 
   );
   assert.match(
     canvasSource,
-    /formatScoreBadgeLabel\("Strength", scoring\.labels\.strength_label, strength\)[\s\S]*STR \{strength\.value\}/,
-    "Strength chip should pair the returned strength label with the returned score"
+    /const uncertaintyPill = formatUncertaintyPill\(scoring\.uncertainty_drivers, scoring\.uncertainty_source, uncertainty\);[\s\S]*const strengthPill = formatStrengthPill\(scoring\.strength_kind, strength\);/,
+    "STR/UNC chip content should be derived from the driver-first formatters using the real uncertainty_drivers/uncertainty_source/strength_kind fields (Task 4/5)"
   );
   assert.match(
     canvasSource,
-    /formatScoreBadgeLabel\("Uncertainty", scoring\.labels\.uncertainty_label, uncertainty\)[\s\S]*UNC \{uncertainty\.value\}/,
-    "Uncertainty chip should pair the returned uncertainty label with the returned score"
+    /formatScoreBadgeLabel\("Strength", scoring\.labels\.strength_label, strength\)[\s\S]*title=\{strengthPill\.title\}[\s\S]*\{strengthPill\.pillText\}/,
+    "Strength chip should pair the returned strength label with the driver-first strength pill (formatStrengthPill)"
+  );
+  assert.match(
+    canvasSource,
+    /formatScoreBadgeLabel\("Uncertainty", scoring\.labels\.uncertainty_label, uncertainty\)[\s\S]*title=\{uncertaintyPill\.title\}[\s\S]*\{uncertaintyPill\.pillText\}/,
+    "Uncertainty chip should pair the returned uncertainty label with the driver-first uncertainty pill (formatUncertaintyPill)"
   );
   assert.match(
     canvasSource,
