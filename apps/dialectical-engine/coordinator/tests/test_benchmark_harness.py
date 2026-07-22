@@ -480,6 +480,141 @@ def test_verdict_band_and_lean_reuse_the_real_pure_scoring_functions(fixture_con
     assert result["lean"]["source"] == "dialectical"
 
 
+def _build_gate_sensitive_debate(db) -> Debate:
+    """Empirical root claim, real strength above the "supported" threshold,
+    tauCoverage above the scoring-sufficiency threshold, and NO evidence
+    anywhere -- exactly the shape where DIALECTICAL_VERDICT_EVIDENCE_GATE
+    changes the served band (app.scoring.verdict._apply_evidence_gate:
+    claim_type in GATE_ELIGIBLE_CLAIM_TYPES={"empirical"} and
+    evidence_presence=="none" -> would_suppress; gate_enabled=True turns
+    that into verdictBand "suppressed" instead of the raw "supported" band)."""
+    debate = Debate(topic="Does X cause Y?", status="complete")
+    db.add(debate)
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        parent_id=None,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Does X cause Y?",
+        status="complete",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=_first_branch_id(db, debate.id),
+            analyzer_type="protocol_analysis",
+            status="complete",
+            output={
+                "dialecticalStrengths": {root.id: 0.8},
+                "verificationStatuses": {},
+                "tauCoverage": 0.9,
+                "semanticsVersion": "v1",
+                "convergence": {"converged": True},
+                "claimTypes": {root.id: "empirical"},
+                "claimTypeSource": {root.id: "classifier"},
+            },
+        )
+    )
+    debate.completed_at = now_utc()
+    db.commit()
+    db.refresh(debate)
+    return debate
+
+
+def test_verdict_band_and_lean_respects_gate_enabled_parameter(runner, db):
+    debate = _build_gate_sensitive_debate(db)
+    conn = runner.open_readonly_db(_debate_db_path())
+    try:
+        gate_off = runner.verdict_band_and_lean(conn, debate.id, gate_enabled=False)
+        gate_on = runner.verdict_band_and_lean(conn, debate.id, gate_enabled=True)
+    finally:
+        conn.close()
+    assert gate_off["verdict_band"] == "supported"
+    assert gate_on["verdict_band"] == "suppressed"
+
+
+def test_verdict_band_and_lean_defaults_gate_enabled_to_false(runner, db):
+    debate = _build_gate_sensitive_debate(db)
+    conn = runner.open_readonly_db(_debate_db_path())
+    try:
+        result = runner.verdict_band_and_lean(conn, debate.id)
+    finally:
+        conn.close()
+    assert result["verdict_band"] == "supported"
+
+
+def test_gate_enabled_from_config_reads_the_verdict_gate_flag_from_captured_flags(runner):
+    config_true = {"flags": {"source": "env_file", "values": {"DIALECTICAL_VERDICT_EVIDENCE_GATE": "1"}}}
+    config_false_value = {"flags": {"source": "env_file", "values": {"DIALECTICAL_VERDICT_EVIDENCE_GATE": "false"}}}
+    config_absent_flag = {"flags": {"source": "env_file", "values": {}}}
+    config_unknown_source = {"flags": {"source": "unknown"}}
+    assert runner.gate_enabled_from_config(config_true) is True
+    assert runner.gate_enabled_from_config(config_false_value) is False
+    assert runner.gate_enabled_from_config(config_absent_flag) is False
+    assert runner.gate_enabled_from_config(config_unknown_source) is False
+    assert runner.gate_enabled_from_config(None) is False
+    assert runner.gate_enabled_from_config({}) is False
+
+
+def test_run_case_threads_gate_enabled_into_collected_metrics(runner, db):
+    debate = _build_gate_sensitive_debate(db)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(200, json={"id": debate.id, "status": "generating"})
+        return httpx.Response(200, json={"id": debate.id, "status": "complete"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    common_kwargs = dict(
+        timeout_seconds=5, poll_interval_seconds=0, panel=False, sleep_fn=lambda _seconds: None
+    )
+    result_gate_on = runner.run_case(
+        client, "http://127.0.0.1:8000", "tok", _debate_db_path(), _sample_case(), gate_enabled=True, **common_kwargs
+    )
+    result_gate_off = runner.run_case(
+        client, "http://127.0.0.1:8000", "tok", _debate_db_path(), _sample_case(), gate_enabled=False, **common_kwargs
+    )
+
+    assert result_gate_on["metrics"]["verdict_band"] == "suppressed"
+    assert result_gate_off["metrics"]["verdict_band"] == "supported"
+
+
+def test_execute_run_derives_gate_enabled_from_the_env_file_and_passes_it_to_run_case(runner, tmp_path):
+    env_file = tmp_path / "coordinator.env"
+    env_file.write_text("DIALECTICAL_VERDICT_EVIDENCE_GATE=true\n", encoding="utf-8")
+    captured_gate_enabled = []
+
+    def fake_run_case(client, base_url, token, db_path, case, *, gate_enabled, **kwargs):
+        captured_gate_enabled.append(gate_enabled)
+        return _result_from_fake_run_case(case)
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"routing": {}, "enabled_models": []})))
+    args = _make_args(limit=1, env_file=env_file)
+    runner.execute_run(args, client, run_case_fn=fake_run_case)
+
+    assert captured_gate_enabled == [True]
+
+
+def test_execute_run_defaults_gate_enabled_false_without_an_env_file(runner):
+    captured_gate_enabled = []
+
+    def fake_run_case(client, base_url, token, db_path, case, *, gate_enabled, **kwargs):
+        captured_gate_enabled.append(gate_enabled)
+        return _result_from_fake_run_case(case)
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"routing": {}, "enabled_models": []})))
+    args = _make_args(limit=1)  # env_file defaults to None
+    runner.execute_run(args, client, run_case_fn=fake_run_case)
+
+    assert captured_gate_enabled == [False]
+
+
 def test_failover_event_count_reads_job_transitions_channel(fixture_conn, runner):
     conn, debate_id, _pro_nodes = fixture_conn
     assert runner.failover_event_count(conn, debate_id) == 1
@@ -795,6 +930,25 @@ def _sample_case(**overrides):
     }
     case.update(overrides)
     return case
+
+
+def _result_from_fake_run_case(case: dict) -> dict:
+    """A minimally valid run_case-shaped result, for fake_run_case stand-ins
+    that only care about capturing the arguments they were called with."""
+    return {
+        "case_id": case["id"],
+        "category": case["category"],
+        "claim_type": case["claim_type"],
+        "topic": case["topic"],
+        "expected_verdict_direction": case["expected_verdict_direction"],
+        "is_trap": case["is_trap"],
+        "status": "completed",
+        "debate_id": "d",
+        "error": None,
+        "wall_time_seconds": 1.0,
+        "metrics": {"spend_usd": {"known_total": 0.0, "by_model": {}, "unpriced_model_ids": []}},
+        "panel": None,
+    }
 
 
 def test_run_case_creates_polls_and_collects_metrics_end_to_end_with_fake_transport(runner, db):
@@ -1234,7 +1388,11 @@ def _golden_manifest(label: str, *, git_sha: str, spend: float) -> dict:
             "trap_expected_direction_match": {"matched": 0, "evaluated": 0, "rate": None},
             "evidence_resolution_rate": 0.5,
             "judge_calls_total": 8,
-            "failover_events_total": label == "candidate" and 0 or 2,
+            # NOTE: not `label == "candidate" and 0 or 2` -- that classic
+            # Python and/or idiom is broken here because 0 is falsy, so it
+            # would silently evaluate to 2 for BOTH labels. Caught by the
+            # byte-for-byte golden test below expecting a real 2 -> 0 delta.
+            "failover_events_total": 0 if label == "candidate" else 2,
             "tokens_in_total": 200,
             "tokens_out_total": 100,
             "spend_usd_known_total": spend,
@@ -1266,6 +1424,84 @@ def test_report_golden_markdown_diff_is_deterministic_and_stable(report, tmp_pat
     assert "b" * 40 in first
     assert "spend_usd_known_total" in first or "Spend" in first
     assert first.count("\n\n\n") == 0  # tidy markdown, no triple-blank-line artifacts
+
+
+# Checked-in expected output for the SAME baseline/candidate fixture pair
+# _golden_manifest("baseline", git_sha="a"*40, spend=1.5) /
+# _golden_manifest("candidate", git_sha="b"*40, spend=3.0) produces above --
+# reviewer follow-up: the determinism test alone only proves render_report
+# is a pure function of its input, not that its actual heading/table/column
+# shape is what we intend. This is a genuine byte-for-byte comparison
+# against a fixed, checked-in string (inline triple-quoted constant --
+# there is no tests/fixtures/ directory convention elsewhere in this
+# coordinator test suite), so any future heading rename, column reorder, or
+# whitespace drift in report.py fails this test loudly.
+EXPECTED_GOLDEN_REPORT = """# Benchmark Report: Baseline vs Candidate
+
+## Config
+
+|  | Baseline | Candidate |
+| --- | --- | --- |
+| Git SHA | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
+| Flags source | env_file | env_file |
+| Enabled models | gpt-5.6sol-medium | gpt-5.6sol-medium |
+| Run captured at | 2026-07-22T00:00:00+00:00 | 2026-07-22T00:00:00+00:00 |
+
+**Flags:**
+
+| Flag | Baseline | Candidate |
+| --- | --- | --- |
+| DIALECTICAL_EVIDENCE_ACQUISITION | 1 | 1 |
+
+## Per-Dimension Scores (LLM panel, blueprint dims 1-10)
+
+Panel scoring (--panel) did not run for either config; dimension-level quality is unavailable. See Per-Metric Deltas below for a proxy signal (expected-direction match rate, evidence resolution rate).
+
+## Per-Metric Deltas
+
+| Metric | Baseline | Candidate | Δ |
+| --- | --- | --- | --- |
+| Cases run | 2 | 2 | +0 |
+| Branch completion (mean fraction) | 0.7500 | 0.7500 | +0.0000 |
+| Evidence resolution rate | 0.5000 | 0.5000 | +0.0000 |
+| Model family diversity (mean) | 2.0000 | 2.0000 | +0.0000 |
+| Expected-direction match rate | 1.0000 | 1.0000 | +0.0000 |
+| Trap (false-premise) match rate | — | — | — |
+
+**Status counts:**
+
+| Status | Baseline | Candidate | Δ |
+| --- | --- | --- | --- |
+| completed | 2 | 2 | +0 |
+
+**Verdict band distribution:**
+
+| Band | Baseline | Candidate | Δ |
+| --- | --- | --- | --- |
+| supported | 2 | 2 | +0 |
+
+## Cost & Wall Time
+
+| Metric | Baseline | Candidate | Δ |
+| --- | --- | --- | --- |
+| Judge calls (total) | 8 | 8 | +0 |
+| Failover events (total) | 2 | 0 | -2 |
+| Tokens in (total) | 200 | 200 | +0 |
+| Tokens out (total) | 100 | 100 | +0 |
+| Known spend (USD) | 1.5000 | 3.0000 | +1.5000 |
+| Wall time (mean seconds) | 10.0000 | 10.0000 | +0.0000 |
+
+Spend is tracked only for models with known pricing (`app/services/spend.py`). Unpriced models this run -- baseline: ['claude-sonnet-5-high-loop']; candidate: ['claude-sonnet-5-high-loop'].
+"""
+
+
+def test_report_golden_markdown_diff_matches_checked_in_expected_output_byte_for_byte(report):
+    baseline = _golden_manifest("baseline", git_sha="a" * 40, spend=1.5)
+    candidate = _golden_manifest("candidate", git_sha="b" * 40, spend=3.0)
+
+    actual = report.render_report(baseline, candidate)
+
+    assert actual == EXPECTED_GOLDEN_REPORT
 
 
 def test_report_main_writes_output_file(report, tmp_path):

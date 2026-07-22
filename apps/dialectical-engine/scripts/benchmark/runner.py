@@ -382,7 +382,14 @@ def latest_protocol_output(conn: sqlite3.Connection, debate_id: str) -> dict | N
     return output if isinstance(output, dict) else None
 
 
-def verdict_band_and_lean(conn: sqlite3.Connection, debate_id: str) -> dict:
+def verdict_band_and_lean(conn: sqlite3.Connection, debate_id: str, *, gate_enabled: bool = False) -> dict:
+    """`gate_enabled` mirrors app.services.serialization.derive_debate_
+    verdict's live `bool_env("DIALECTICAL_VERDICT_EVIDENCE_GATE", False)`
+    read -- the exact value production computes verdictBand with for
+    GET /api/debates/{id}. Callers must pass the run's real value (see
+    gate_enabled_from_config); the False default here is only the same
+    fail-safe default bool_env itself uses, not an assumption that the gate
+    is off."""
     debate = conn.execute("SELECT root_node_id FROM debates WHERE id = ?", (debate_id,)).fetchone()
     root_node_id = debate["root_node_id"] if debate else None
     protocol_output = latest_protocol_output(conn, debate_id)
@@ -392,7 +399,9 @@ def verdict_band_and_lean(conn: sqlite3.Connection, debate_id: str) -> dict:
     presence = evidence_presence(
         [SimpleNamespace(node_type=row["node_type"], claim=row["claim"] or "") for row in node_rows]
     )
-    verdict = verdict_summary(protocol_output, root_node_id=root_node_id, evidence_presence=presence, gate_enabled=False)
+    verdict = verdict_summary(
+        protocol_output, root_node_id=root_node_id, evidence_presence=presence, gate_enabled=gate_enabled
+    )
     pro_ids, con_ids = live_pro_con_node_ids(
         [{"id": row["id"], "node_type": row["node_type"], "status": row["status"]} for row in node_rows]
     )
@@ -460,11 +469,15 @@ def token_and_spend_totals(conn: sqlite3.Connection, debate_id: str, pricing: di
     }
 
 
-def collect_case_metrics(conn: sqlite3.Connection, debate_id: str, pricing: dict | None = None) -> dict:
+def collect_case_metrics(
+    conn: sqlite3.Connection, debate_id: str, pricing: dict | None = None, *, gate_enabled: bool = False
+) -> dict:
     """Composes every §1-style metric the brief lists, in one call, from
-    already-open read-only DB rows -- the single entry point run_case uses."""
+    already-open read-only DB rows -- the single entry point run_case uses.
+    `gate_enabled` -- see verdict_band_and_lean's docstring -- must be the
+    run's real DIALECTICAL_VERDICT_EVIDENCE_GATE value, not assumed off."""
     pricing = MODEL_PRICING_USD_PER_MILLION_TOKENS if pricing is None else pricing
-    verdict_lean = verdict_band_and_lean(conn, debate_id)
+    verdict_lean = verdict_band_and_lean(conn, debate_id, gate_enabled=gate_enabled)
     tokens_spend = token_and_spend_totals(conn, debate_id, pricing)
     return {
         "branch_completion": branch_completion(conn, debate_id),
@@ -557,6 +570,34 @@ def resolve_config_tag(
         "flags": flags_from_env_file(env_file),
         "model_pool": fetch_settings(client, base_url, token),
     }
+
+
+# Mirrors app.core.config.bool_env's truthy vocabulary exactly -- this is not
+# a live env lookup (bool_env reads os.environ by name), it parses an
+# already-captured flag *value* string from the run's own config tag.
+_TRUTHY_FLAG_VALUES = {"1", "true", "yes", "on"}
+
+
+def gate_enabled_from_config(config: dict | None) -> bool:
+    """DIALECTICAL_VERDICT_EVIDENCE_GATE, read from the run's own captured
+    config-tag flags (see flags_from_env_file), not hardcoded. Mirrors
+    app.services.serialization.derive_debate_verdict's live
+    `bool_env("DIALECTICAL_VERDICT_EVIDENCE_GATE", False)` read -- the exact
+    value production computes verdictBand with for GET /api/debates/{id} --
+    so this harness's verdict_band metric can never silently diverge from
+    what a real client sees once flip-plan stage 6 flips that flag on.
+    Absent --env-file (flags source "unknown") or the flag simply not being
+    present in the captured file, this honestly defaults to False -- the
+    same default bool_env itself uses, never a guess."""
+    if not isinstance(config, dict):
+        return False
+    values = (config.get("flags") or {}).get("values")
+    if not isinstance(values, dict):
+        return False
+    raw = values.get("DIALECTICAL_VERDICT_EVIDENCE_GATE")
+    if not isinstance(raw, str):
+        return False
+    return raw.strip().lower() in _TRUTHY_FLAG_VALUES
 
 
 # ---------------------------------------------------------------------------
@@ -749,6 +790,7 @@ def run_case(
     timeout_seconds: float,
     poll_interval_seconds: float,
     panel: bool,
+    gate_enabled: bool = False,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict:
     result = _case_result_shell(case)
@@ -790,7 +832,7 @@ def run_case(
     try:
         conn = open_readonly_db(db_path)
         try:
-            result["metrics"] = collect_case_metrics(conn, debate_id)
+            result["metrics"] = collect_case_metrics(conn, debate_id, gate_enabled=gate_enabled)
         finally:
             conn.close()
     except Exception as exc:  # noqa: BLE001 - metrics failure must not lose the run's HTTP result
@@ -975,6 +1017,11 @@ def execute_run(
     cases = cases_from_suite(suite, limit=args.limit)
     token = args.user_token or dev_user_token()
     config = resolve_config_tag_fn(repo_root=ROOT, env_file=args.env_file, client=client, base_url=args.base_url, token=token)
+    # See gate_enabled_from_config's docstring: this is what production's
+    # own live bool_env read would resolve to for this run, so verdict_band
+    # never silently diverges from what GET /api/debates/{id} actually
+    # serves once DIALECTICAL_VERDICT_EVIDENCE_GATE is flipped on.
+    gate_enabled = gate_enabled_from_config(config)
 
     if args.dry_run:
         results = [_skipped_result(case, "skipped_dry_run") for case in cases]
@@ -1007,6 +1054,7 @@ def execute_run(
             timeout_seconds=args.timeout_seconds,
             poll_interval_seconds=args.poll_interval_seconds,
             panel=args.panel,
+            gate_enabled=gate_enabled,
             sleep_fn=sleep_fn,
         )
         results.append(result)
