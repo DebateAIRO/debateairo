@@ -627,6 +627,24 @@ export type DebateCompletion = {
   humanReason: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// P4.1: the synthesis "Leans" meter, backend-derived (coordinator/app/
+// scoring/lean.py's compute_lean) from the debate's live PRO/CON nodes.
+// Matches debate_to_dict's "lean" key exactly. Older cached debate-detail
+// payloads may lack this key entirely -- optional field, honest absence,
+// never a fabricated value; lib/debatePresentation.ts's computeLean is the
+// client-side fallback for exactly that case.
+// ---------------------------------------------------------------------------
+
+export type DebateLean = {
+  /** "dialectical": propagated DF-QuAD strength split of live PRO vs CON
+   * nodes. "structural": raw live-node-count split, used whenever no usable
+   * judge-informed strength exists yet -- see compute_lean's docstring. */
+  source: "dialectical" | "structural";
+  pct: number;
+  label: string;
+};
+
 export type DebateDetail = {
   id: string;
   topic: string;
@@ -644,6 +662,7 @@ export type DebateDetail = {
   branch_lineage: DebateBranch[];
   analyzer_runs: AnalyzerRun[];
   verdict?: VerdictSummary;
+  lean?: DebateLean | null;
   selected_skills: SelectedCapability[];
   selected_agents: SelectedCapability[];
   agent_outputs: AgentOutput[];

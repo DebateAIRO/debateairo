@@ -670,12 +670,27 @@ export default function DebatePageClient({
     { title: "Evidence Gaps", items: stringList(synthesisProvenance.evidence_gaps) },
     { title: "Key Takeaways", items: stringList(synthesisProvenance.key_takeaways) }
   ].filter((section) => section.items.length > 0);
-  const leanRaw = synthesisProvenance.lean as { pct?: unknown; label?: unknown } | undefined;
+  // P4.1: prefer the backend-computed lean (coordinator/app/scoring/lean.py --
+  // propagated DF-QuAD strength split when usable, else a labeled structural
+  // count fallback). `synthesis.provenance.lean` was investigated and
+  // confirmed vestigial (no backend path ever wrote it), so it is no longer
+  // read; computeLean(debate.tree) is now only a client-side fallback for
+  // payloads cached before the top-level `lean` field existed -- i.e. the
+  // key is genuinely absent (`undefined`), NOT merely null. A present-but-
+  // null backend `lean` is itself an honest answer (no live PRO/CON node
+  // yet) and must not be overridden by a looser client-side recomputation.
+  const backendLean = debate?.lean;
   const lean =
-    leanRaw && typeof leanRaw.pct === "number" && typeof leanRaw.label === "string"
-      ? { pct: leanRaw.pct, label: leanRaw.label }
-      : debate?.synthesis
+    backendLean === undefined
+      ? debate?.synthesis
         ? computeLean(debate.tree)
+        : null
+      : backendLean && typeof backendLean.pct === "number" && typeof backendLean.label === "string"
+        ? {
+            pct: backendLean.pct,
+            label: backendLean.label,
+            source: backendLean.source === "dialectical" ? ("dialectical" as const) : ("structural" as const)
+          }
         : null;
   const synthesisMeta = synthesisDraft?.model_id
     ? `${synthesisDraft.model_id}${synthesisDraft.worker_id ? ` · ${synthesisDraft.worker_id}` : ""}`

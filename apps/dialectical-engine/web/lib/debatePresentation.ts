@@ -301,12 +301,25 @@ export function treeDepth(root: DebateNode | null): number {
 }
 
 /**
- * A structural lean for the synthesis verdict bar: the balance of surviving
- * pro vs con arguments in the tree. This is a transparent proxy (argument
- * count), not an LLM judgement — used only when the backend doesn't supply
- * an explicit lean in synthesis provenance.
+ * P4.1 client-side STRUCTURAL FALLBACK for the synthesis "Leans" meter: the
+ * balance of surviving pro vs con arguments in the tree. This is a
+ * transparent proxy (argument count), never a dialectical-strength reading —
+ * used only when the backend's top-level `lean` field (coordinator/app/
+ * scoring/lean.py's compute_lean, which prefers the propagated DF-QuAD
+ * strength split) is absent, e.g. a debate payload cached before that field
+ * existed. (Investigated and confirmed vestigial: `synthesis.provenance.lean`
+ * was never populated by any backend path, so it is no longer read anywhere.)
+ *
+ * The v2 debate-generation contract guarantees a symmetric PRO/CON node count
+ * on every completed branch (audit-verified 2026-07-22: all debates in the DB
+ * had exactly equal PRO/CON counts) — a bare "Even" there would silently
+ * misrepresent that permanent topology artifact as a genuine 50/50 reading,
+ * so an exactly-symmetric split is always labeled "Even (structural)". A
+ * genuinely asymmetric split (only reachable once adaptive expansion grows
+ * one side more than the other) gets a plain Pro/Con/Even label instead, but
+ * `source` still honestly reads "structural" either way.
  */
-export function computeLean(root: DebateNode | null): { pct: number; label: string } | null {
+export function computeLean(root: DebateNode | null): { pct: number; label: string; source: "structural" } | null {
   if (!root) return null;
   let pro = 0;
   let con = 0;
@@ -323,8 +336,8 @@ export function computeLean(root: DebateNode | null): { pct: number; label: stri
   const total = pro + con;
   if (total === 0) return null;
   const pct = Math.round((pro / total) * 100);
-  const label = pct >= 55 ? "Pro" : pct <= 45 ? "Con" : "Even";
-  return { pct, label };
+  const label = pro === con ? "Even (structural)" : pct >= 55 ? "Pro" : pct <= 45 ? "Con" : "Even";
+  return { pct, label, source: "structural" };
 }
 
 export function flattenOutline(root: DebateNode | null): { node: DebateNode; depth: number }[] {

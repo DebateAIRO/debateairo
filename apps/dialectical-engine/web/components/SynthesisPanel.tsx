@@ -13,8 +13,13 @@ export type SynthesisView = {
   verdict: string;
   verdictGate?: Synthesis["verdict_gate"];
   meta: string;
-  lean?: { pct: number; label: string } | null;
+  lean?: { pct: number; label: string; source: "dialectical" | "structural" } | null;
   sections?: { title: string; items: string[] }[];
+};
+
+const LEAN_SOURCE_TITLE: Record<"dialectical" | "structural", string> = {
+  dialectical: "Derived from propagated dialectical (DF-QuAD) strength of the surviving pro vs con arguments.",
+  structural: "Structural: based on surviving argument counts, not dialectical strength."
 };
 
 export function SynthesisPanel(view: SynthesisView) {
@@ -66,7 +71,7 @@ export function SynthesisPanel(view: SynthesisView) {
               </div>
               <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
               {view.lean ? (
-                <div className="synthLean">
+                <div className="synthLean" title={LEAN_SOURCE_TITLE[view.lean.source]}>
                   <span className="synthLeanLabel">Leans</span>
                   <div
                     className="synthLeanBar"

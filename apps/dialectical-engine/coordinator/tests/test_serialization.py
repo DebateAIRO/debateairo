@@ -528,6 +528,112 @@ def test_debate_detail_verdict_unavailable_when_no_protocol_analysis_run(db) -> 
     assert visible["analyzer_runs"] == []
 
 
+# ---------------------------------------------------------------------------
+# P4.1: debate_to_dict["lean"] -- see app.scoring.lean.compute_lean.
+# ---------------------------------------------------------------------------
+
+
+def _pro_con_child(db, debate: Debate, root: Node, node_type: str, position: int, status: str = "complete") -> Node:
+    child = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type=node_type,
+        depth=1,
+        position=position,
+        claim=f"{node_type} claim {position}",
+        status=status,
+        materialized_path=f"0/{position}",
+    )
+    db.add(child)
+    db.flush()
+    return child
+
+
+def test_debate_detail_lean_dialectical_when_protocol_analysis_has_usable_strengths(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    pro = _pro_con_child(db, debate, root, "PRO", 0)
+    con = _pro_con_child(db, debate, root, "CON", 1)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                "dialecticalStrengths": {root.id: 0.7, pro.id: 0.9, con.id: 0.3},
+                "tauCoverage": 1.0,
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["lean"] == {"source": "dialectical", "pct": 75, "label": "Pro"}
+
+
+def test_debate_detail_lean_structural_when_no_protocol_analysis_run(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, _branch = _root_with_branch(db, debate)
+    _pro_con_child(db, debate, root, "PRO", 0)
+    _pro_con_child(db, debate, root, "CON", 1)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["analyzer_runs"] == []
+    assert visible["lean"] == {"source": "structural", "pct": 50, "label": "Even (structural)"}
+
+
+def test_debate_detail_lean_excludes_failed_node_from_dialectical_mass(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    root, branch = _root_with_branch(db, debate)
+    live_pro = _pro_con_child(db, debate, root, "PRO", 0, status="complete")
+    dead_pro = _pro_con_child(db, debate, root, "PRO", 1, status="failed")
+    con = _pro_con_child(db, debate, root, "CON", 2, status="complete")
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="protocol_analysis",
+            output={
+                # The failed node's strength is deliberately huge -- if it
+                # ever leaked into pro_mass the lean would read "Pro", not
+                # the "Even" this test asserts.
+                "dialecticalStrengths": {root.id: 0.5, live_pro.id: 0.5, dead_pro.id: 0.99, con.id: 0.5},
+                "tauCoverage": 1.0,
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+    )
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["lean"] == {"source": "dialectical", "pct": 50, "label": "Even"}
+
+
+def test_debate_detail_lean_none_when_no_pro_con_nodes_yet(db) -> None:
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1})
+    db.add(debate)
+    db.flush()
+    _root_with_branch(db, debate)
+    db.commit()
+
+    visible = debate_to_dict(db, db.get(Debate, debate.id))
+
+    assert visible["lean"] is None
+
+
 def test_debate_to_dict_includes_evidence_presence_and_state(db) -> None:
     debate = Debate(topic="Should cities ban cars?", status="complete", config={"max_depth": 1})
     db.add(debate)
@@ -1260,7 +1366,9 @@ def test_debate_payload_pre_existing_keys_are_byte_identical(db) -> None:
 
     top_level_keys = set(payload.keys())
     assert _PRE_W5A_DEBATE_KEYS <= top_level_keys
-    assert top_level_keys - _PRE_W5A_DEBATE_KEYS == {"lifecycleDecisions", "completion"}
+    # P4.1 additive: "lean" (see app.scoring.lean.compute_lean), alongside
+    # W5a's own two additions.
+    assert top_level_keys - _PRE_W5A_DEBATE_KEYS == {"lifecycleDecisions", "completion", "lean"}
 
     root_keys = set(payload["tree"].keys())
     assert _PRE_W5A_NODE_KEYS <= root_keys

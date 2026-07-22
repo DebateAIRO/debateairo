@@ -30,6 +30,7 @@ from app.models.entities import (
     Synthesis,
     Worker,
 )
+from app.scoring.lean import compute_lean, live_pro_con_node_ids
 from app.scoring.verdict import verdict_summary
 
 # Phase 9 Task 1: analyzer_type value for the protocol_analysis AnalyzerRun.
@@ -776,6 +777,19 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
     verdict = verdict_context["verdict"]
     protocol_output = verdict_context["protocol_output"]
     debate_evidence_presence = verdict_context["evidence_presence"]
+    # P4.1: the synthesis "Leans" meter, derived from the SAME already-loaded
+    # `nodes` + `protocol_output` used for the verdict above -- no new query,
+    # no new protocol_analysis run. See app.scoring.lean.compute_lean for the
+    # dialectical (propagated DF-QuAD strength split)/structural (live node
+    # count split, "Even (structural)" when symmetric) fallback rule.
+    lean_pro_ids, lean_con_ids = live_pro_con_node_ids(
+        [{"id": node.id, "node_type": node.node_type, "status": node.status} for node in nodes]
+    )
+    lean = compute_lean(
+        protocol_output,
+        live_pro_node_ids=lean_pro_ids,
+        live_con_node_ids=lean_con_ids,
+    )
     verdict_gate = {
         "state": verdict["verdictState"],
         "reason": verdict["suppressionReason"],
@@ -839,6 +853,9 @@ def debate_to_dict(db: Session, debate: Debate) -> dict[str, Any]:
         # above (line 349 in the pre-Task-1 file); root.id is the ROOT_CLAIM
         # node id that keys dialecticalStrengths/verificationStatuses.
         "verdict": verdict,
+        # P4.1: additive field, always present (value may be None -- see
+        # compute_lean's docstring for when there is honestly no data yet).
+        "lean": lean,
         "selected_skills": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "skill"],
         "selected_agents": [capability_match_to_dict(db, match) for match in matches if match.capability_kind == "agent"],
         "agent_outputs": [agent_output_to_dict(output) for output in agent_outputs],
