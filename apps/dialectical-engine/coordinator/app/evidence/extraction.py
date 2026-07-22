@@ -22,6 +22,7 @@ Honesty laws (binding, see docs/superpowers/plans/2026-07-07-phase7-evidence-ver
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -60,6 +61,15 @@ from app.scoring.normalizer import _URL_PATTERN
 # enormous, effectively permanent safety margin against ever colliding with
 # real argument-child positions.
 EVIDENCE_POSITION_OFFSET = 1000
+
+# Task 10 (P1.1): retrieval-acquired EVIDENCE nodes (real sources fetched by a
+# search-capable worker, materialized by persist_retrieval_evidence_nodes) live
+# in their OWN reserved namespace at 2000+, so retrieval evidence and the
+# regex-extracted "model-claim" evidence (1000+) can coexist under the same
+# claim node without ever colliding on (position, materialized_path). A single
+# claim's extracted spans never approach 1000, so the 1000/2000 bands never
+# overlap; argument children stay at small indexes (0, 1).
+RETRIEVAL_EVIDENCE_POSITION_OFFSET = 2000
 
 # ---------------------------------------------------------------------------
 # evidence_kind: pure, deterministic, no I/O.
@@ -180,7 +190,12 @@ def persist_evidence_nodes(
             status="complete",
             path_status="active",
             materialized_path=f"{claim_node.materialized_path}/{position}",
-            evidence_metadata={"evidenceKind": span["evidenceKind"]},
+            # Task 10 (P1.1): stamp method "model-claim" at the creation site so
+            # every evidence leaf declares HOW it came to exist. These nodes are
+            # substrings of the generating model's own prose (not retrieved),
+            # which the independence bookkeeping (plan P1.5) must distinguish
+            # from method "retrieval" nodes.
+            evidence_metadata={"evidenceKind": span["evidenceKind"], "method": "model-claim"},
         )
         db.add(evidence_node)
         flush_write(db)
@@ -192,6 +207,75 @@ def persist_evidence_nodes(
             argument=span["text"],
             prompt_version=generation.prompt_version,
             worker_id=generation.worker_id,
+            is_active=True,
+        )
+        db.add(evidence_generation)
+        flush_write(db)
+
+        evidence_node.active_generation_id = evidence_generation.id
+        evidence_nodes.append(evidence_node)
+
+    return evidence_nodes
+
+
+def persist_retrieval_evidence_nodes(
+    db: Session,
+    debate: Debate,
+    claim_node: Node,
+    *,
+    sources: list[dict[str, Any]],
+    model_id: str,
+    worker_id: str,
+    prompt_version: str = "v1",
+) -> list[Node]:
+    """Persist retrieval-acquired sources as EVIDENCE child nodes of a claim
+    node (Task 10 / P1.1). Unlike persist_evidence_nodes (regex spans of the
+    model's own prose), each node here is a real external source returned by a
+    search-capable worker: the node carries the verbatim quote as its claim and
+    the full retrieval provenance in evidence_metadata (method "retrieval",
+    url/quote/publisher/date/retrieval_query/stance, plus a "pending"
+    resolution_status the coordinator's citation check later overwrites).
+
+    Positions use the reserved RETRIEVAL_EVIDENCE_POSITION_OFFSET band so these
+    coexist with extractor evidence and argument children without collision.
+    Attribution is the retrieving model/worker (honest: they produced this
+    artifact by searching, distinct from the claim's own author).
+    """
+    evidence_nodes: list[Node] = []
+    for index, source in enumerate(sources):
+        position = RETRIEVAL_EVIDENCE_POSITION_OFFSET + index
+        quote = str(source.get("quote") or "")
+        evidence_node = Node(
+            debate_id=debate.id,
+            parent_id=claim_node.id,
+            node_type="EVIDENCE",
+            depth=claim_node.depth + 1,
+            position=position,
+            claim=quote or str(source.get("url") or "retrieved source"),
+            status="complete",
+            path_status="active",
+            materialized_path=f"{claim_node.materialized_path}/{position}",
+            evidence_metadata={
+                "method": "retrieval",
+                "url": source.get("url"),
+                "quote": quote,
+                "publisher": source.get("publisher"),
+                "date": source.get("date"),
+                "retrieval_query": source.get("retrieval_query"),
+                "stance": source.get("stance"),
+                "resolution_status": "pending",
+            },
+        )
+        db.add(evidence_node)
+        flush_write(db)
+
+        evidence_generation = Generation(
+            node_id=evidence_node.id,
+            model_id=model_id,
+            role="evidence_retriever",
+            argument=quote,
+            prompt_version=prompt_version,
+            worker_id=worker_id,
             is_active=True,
         )
         db.add(evidence_generation)

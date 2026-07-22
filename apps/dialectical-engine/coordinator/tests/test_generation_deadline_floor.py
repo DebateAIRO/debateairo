@@ -24,10 +24,19 @@ def _as_utc(dt):
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def test_generation_job_types_is_the_five_generation_job_types():
+def test_generation_job_types_is_the_generation_job_types():
     from app.services.orchestrator import GENERATION_JOB_TYPES
 
-    assert GENERATION_JOB_TYPES == {"argue", "synthesize", "v2_pov", "v2_expand", "v2_synthesize"}
+    # Task 10 (P1.1) added v2_evidence: a web-search CLI call has the same
+    # slow-latency profile as generation, so it earns the deadline floor.
+    assert GENERATION_JOB_TYPES == {
+        "argue",
+        "synthesize",
+        "v2_pov",
+        "v2_expand",
+        "v2_synthesize",
+        "v2_evidence",
+    }
 
 
 # --- generation_job_fallback_seconds(): env-tunable, clamped [60, 3600] -----

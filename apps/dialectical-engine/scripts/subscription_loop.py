@@ -67,6 +67,7 @@ def parse_model_response(job: dict[str, Any], text: str) -> Any:
         "v2_expand",
         "v2_agent_run",
         "v2_synthesize",
+        "v2_evidence",
     }:
         return extract_json_object(text)
     return {"argument": text.strip()}
@@ -533,6 +534,12 @@ async def claude_once(args: argparse.Namespace) -> int:
         state_dir=Path(args.state_dir),
     )
     command = build_claude_command(args.claude_model, render_model_prompt(job))
+    # Task 10 (P1.1) evidence-acquisition seam: retrieval rides the Claude CLI's
+    # own web search. Only v2_evidence jobs get the tool -- every other job type
+    # keeps its byte-identical argv (no search, no tool surface). The job dict
+    # written by poll carries job_type, so no coordinator round-trip is needed.
+    if str(job.get("job_type") or "") == "v2_evidence":
+        command = [*command, "--allowedTools", "WebSearch"]
     try:
         process = await run_cli_with_liveness(
             config,

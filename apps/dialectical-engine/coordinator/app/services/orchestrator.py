@@ -48,14 +48,24 @@ V2_POV_ROLES = {
 # debate-level terminal `failed`. v2_expand (W3) targets its pending
 # placeholder child, so terminal failure marks only that child path failed.
 NODE_DEGRADABLE_JOB_TYPES = {"argue", "v2_pov", "v2_expand"}
+# Task 10 (P1.1): AUXILIARY job families never damage the debate on terminal
+# failure. A v2_evidence job augments a claim with retrieved sources; if every
+# search-capable model is exhausted the debate simply has no retrieval evidence
+# for that claim -- the node stays complete, the debate stays generating, no
+# debate_failed is emitted (see terminalize_job_failure). This is the opposite
+# posture from NODE_DEGRADABLE (which fails the branch) and from the default
+# (which fails the debate). Kept disjoint from both.
+AUXILIARY_JOB_TYPES = {"v2_evidence"}
 GENERATION_EXHAUSTED_STOPPING_REASON = "generation_exhausted"
 DEFAULT_MAX_JOB_ATTEMPTS = 4
 # Cross-model failover ladder (Task 5): job families whose generation work is
 # tied to a specific model rather than to worker identity, so re-queuing them
 # under a different pool model is meaningful. Bookkeeping job types
 # (decompose, score_debate, ...) are excluded -- swapping their model does
-# not make sense.
-FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesize"}
+# not make sense. v2_evidence (Task 10) fails over ONLY within the
+# search-capable pool (next_failover_model routes it there, never onto a
+# non-search generation model).
+FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesize", "v2_evidence"}
 # Generation-class jobs (Task 1 / P0.2): LLM CLI calls whose model latency
 # can legitimately run 51-500s+ (verified P99, 2026-07-22 audit) rather than
 # a quick bookkeeping call. These get a longer base silence-tolerance floor
@@ -63,8 +73,9 @@ FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesi
 # FAILOVER_JOB_TYPES today -- both currently mean "real model generation
 # work" -- but the two constants encode different concerns (deadline policy
 # vs. cross-model failover eligibility) and may diverge later, so they are
-# defined separately rather than aliased.
-GENERATION_JOB_TYPES = {"argue", "synthesize", "v2_pov", "v2_expand", "v2_synthesize"}
+# defined separately rather than aliased. v2_evidence (Task 10) joins here too:
+# a web-search CLI call has the same slow-latency profile as generation.
+GENERATION_JOB_TYPES = {"argue", "synthesize", "v2_pov", "v2_expand", "v2_synthesize", "v2_evidence"}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -961,11 +972,16 @@ def model_failover_enabled() -> bool:
 
 
 def next_failover_model(db: Session, job: Job) -> str | None:
-    from app.services.dialectical_v2 import v2_generation_model_pool
+    from app.services.dialectical_v2 import evidence_search_models, v2_generation_model_pool
 
     tried = set((job.payload or {}).get("tried_models") or []) | {job.required_model}
     online = online_capabilities(db)
-    for model in v2_generation_model_pool(db):
+    # Task 10 (P1.1): an evidence job's failover pool is the search-capable list
+    # ONLY -- a retrieval job must never be reassigned to a non-search model
+    # (it could not do the web search the contract demands). Every other
+    # failover family uses the general v2 generation pool.
+    pool = evidence_search_models() if job.job_type in AUXILIARY_JOB_TYPES else v2_generation_model_pool(db)
+    for model in pool:
         if model not in tried and model in online:
             return model
     return None
@@ -1600,6 +1616,27 @@ def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[st
     debate = db.get(Debate, job.debate_id)
     node = db.get(Node, job.node_id) if job.node_id else None
     events: list[tuple[str, str, dict[str, Any]]] = []
+    if job.job_type in AUXILIARY_JOB_TYPES:
+        # Task 10 (P1.1): AUXILIARY terminal failure never damages the debate.
+        # The ledger entry above already records the terminal transition; we add
+        # a non-alarming SSE note and stop. The target node stays complete and
+        # debate.status is untouched -- there is no node_failed and no
+        # debate_failed. A claim simply ends up with no retrieval evidence when
+        # every search-capable model was exhausted.
+        events.append(
+            (
+                job.debate_id,
+                "evidence_unavailable",
+                {
+                    "node_id": job.node_id,
+                    "job_id": job.id,
+                    "job_type": job.job_type,
+                    "reason": "Evidence retrieval exhausted all search-capable models",
+                    "terminal": True,
+                },
+            )
+        )
+        return events
     if job.job_type in NODE_DEGRADABLE_JOB_TYPES and node is not None and debate is not None:
         node.status = "failed"
         node.stopping_status = "stop"

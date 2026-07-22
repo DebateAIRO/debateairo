@@ -132,6 +132,99 @@ def test_build_claude_command_uses_subscription_cli_model() -> None:
     ]
 
 
+def test_parse_model_response_treats_v2_evidence_as_json() -> None:
+    module = load_module()
+
+    parsed = module.parse_model_response(
+        {"job_type": "v2_evidence"},
+        'prefix {"sources": [], "provenance": {"model_id": "m"}} suffix',
+    )
+    assert parsed == {"sources": [], "provenance": {"model_id": "m"}}
+
+
+def _run_claude_once_capture(tmp_path, monkeypatch, job_type: str) -> list[str]:
+    """Drive claude_once for a job of `job_type` and return the CLI argv that
+    was handed to run_cli_with_liveness (no real CLI, no coordinator I/O)."""
+    import argparse
+    import asyncio
+    import subprocess
+
+    loop_module = load_module()
+    captured: dict[str, list[str]] = {}
+
+    class FakeClient:
+        def __init__(self, config):
+            pass
+
+        async def register(self, models, save_path=None):
+            pass
+
+        async def heartbeat(self, capabilities, status="online"):
+            pass
+
+        async def poll(self):
+            return {
+                "id": "job-evidence-1",
+                "job_type": job_type,
+                "required_role": "v2_evidence",
+                "required_model": loop_module.CLAUDE_LOOP_MODEL,
+                "prompt": {"system": "System instruction", "user": "User claim", "max_tokens": 800},
+            }
+
+        async def aclose(self):
+            pass
+
+    class FakeWorkerConfig:
+        def __init__(self):
+            self.coordinator_url = ""
+            self.name = None
+            self.enable_mock = True
+            self.enable_real_adapters = True
+            self.allowed_models = None
+            self.user_token = None
+
+    async def fake_run_cli(config, command, **kwargs):
+        captured["command"] = command
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout='{"sources": []}', stderr="")
+
+    async def fake_complete(args):
+        return 0
+
+    monkeypatch.setattr(
+        loop_module,
+        "worker_runtime",
+        lambda: (FakeClient, FakeWorkerConfig, lambda path: FakeWorkerConfig(), lambda config, path=None: None),
+    )
+    monkeypatch.setattr(loop_module, "run_cli_with_liveness", fake_run_cli)
+    monkeypatch.setattr(loop_module, "complete_from_job_file", fake_complete)
+
+    args = argparse.Namespace(
+        config=str(tmp_path / "config.toml"),
+        worker_name="test-claude-loop",
+        coordinator_url="http://example.test",
+        advertised_model=loop_module.CLAUDE_LOOP_MODEL,
+        claude_model=loop_module.CLAUDE_LOOP_MODEL,
+        state_dir=str(tmp_path),
+        timeout_seconds=30,
+    )
+    result = asyncio.run(loop_module.claude_once(args))
+    assert result == 0
+    return captured["command"]
+
+
+def test_claude_once_appends_websearch_tool_for_evidence_jobs(tmp_path, monkeypatch) -> None:
+    command = _run_claude_once_capture(tmp_path, monkeypatch, "v2_evidence")
+    assert "--allowedTools" in command
+    idx = command.index("--allowedTools")
+    assert command[idx + 1] == "WebSearch"
+
+
+def test_claude_once_omits_websearch_tool_for_non_evidence_jobs(tmp_path, monkeypatch) -> None:
+    command = _run_claude_once_capture(tmp_path, monkeypatch, "v2_pov")
+    assert "--allowedTools" not in command
+    assert "WebSearch" not in command
+
+
 def test_build_grok_command_uses_verified_model_and_high_effort() -> None:
     module = load_module()
 

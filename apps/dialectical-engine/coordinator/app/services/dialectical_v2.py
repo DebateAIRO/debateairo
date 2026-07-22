@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.write_lock import commit_write, flush_write
@@ -32,7 +33,8 @@ from app.models.entities import (
     now_utc,
 )
 from app.core.config import bool_env, int_env, load_settings
-from app.evidence.extraction import persist_evidence_nodes
+from app.evidence.citations import evidence_url_is_safe, trigger_citation_resolution
+from app.evidence.extraction import persist_evidence_nodes, persist_retrieval_evidence_nodes
 from app.exploration.expansion_dispatch import (
     STOPPED_QUIESCENT_NO_DECISIONS,
     adaptive_expansion_enabled,
@@ -51,6 +53,7 @@ from app.services.orchestrator import (
     debate_uses_v2_pipeline,
     extract_jsonish,
     merged_debate_config,
+    online_capabilities,
     routing_allowed_models,
     sanitize_text,
     worker_capability_set,
@@ -860,6 +863,204 @@ def queue_v2_job(db: Session, debate: Debate, job_type: str, role: str, model_id
 
 
 # --------------------------------------------------------------------------
+# Task 10 (P1.1): evidence-acquisition jobs (retrieval via search-capable CLIs).
+# --------------------------------------------------------------------------
+# A v2_evidence job asks a search-capable worker to retrieve independent sources
+# bearing on an evidence-eligible claim (empirical/causal), returning a strict
+# JSON contract that materializes into EVIDENCE nodes with real retrieval
+# provenance -- the first non-regex evidence path in the engine. The feature is
+# flag-gated OFF: with DIALECTICAL_EVIDENCE_ACQUISITION unset, no v2_evidence
+# job is ever queued and every POV/expand completion stays byte-identical to the
+# pre-Task-10 flow. Evidence jobs are AUXILIARY (orchestrator.AUXILIARY_JOB_TYPES):
+# terminal failure never damages the node or debate.
+EVIDENCE_ELIGIBLE_CLAIM_TYPES = frozenset({"empirical", "causal"})
+EVIDENCE_MAX_SOURCES_PER_JOB = 3
+EVIDENCE_STANCES = frozenset({"supports", "refutes", "mixed"})
+DEFAULT_EVIDENCE_SEARCH_MODELS = ("claude-sonnet-5-high-loop",)
+EVIDENCE_JOB_ROLE = "v2_evidence"
+
+
+def evidence_acquisition_enabled() -> bool:
+    """P1.1 feature gate. Default OFF."""
+    return bool_env("DIALECTICAL_EVIDENCE_ACQUISITION", False)
+
+
+def evidence_search_models() -> list[str]:
+    """Ordered, de-duplicated search-capable model list evidence jobs may use
+    (env DIALECTICAL_EVIDENCE_SEARCH_MODELS, comma-separated; default the single
+    Claude loop model whose CLI carries --allowedTools WebSearch). Evidence jobs
+    round-robin over whichever of these are online and fail over ONLY within
+    this set (orchestrator.next_failover_model)."""
+    raw = os.getenv("DIALECTICAL_EVIDENCE_SEARCH_MODELS")
+    if raw is None:
+        return list(DEFAULT_EVIDENCE_SEARCH_MODELS)
+    models: list[str] = []
+    for part in raw.split(","):
+        model = part.strip()
+        if model and model not in models:
+            models.append(model)
+    return models or list(DEFAULT_EVIDENCE_SEARCH_MODELS)
+
+
+def evidence_max_per_node() -> int:
+    """Max v2_evidence jobs queued per argument node (env, clamped)."""
+    return int_env("DIALECTICAL_EVIDENCE_MAX_PER_NODE", 2, 0, 20)
+
+
+def evidence_max_per_debate() -> int:
+    """Max v2_evidence jobs queued per debate (env, clamped)."""
+    return int_env("DIALECTICAL_EVIDENCE_MAX_PER_DEBATE", 6, 0, 200)
+
+
+def _evidence_eligible(text: str) -> bool:
+    """Reuse the SAME deterministic claim-type classifier scoring uses -- a
+    claim is evidence-eligible only when it reads empirical or causal."""
+    claim_type, _markers = classify_claim_type(text or "")
+    return claim_type in EVIDENCE_ELIGIBLE_CLAIM_TYPES
+
+
+def _count_evidence_jobs(db: Session, debate_id: str, node_id: str | None = None) -> int:
+    query = select(func.count()).select_from(Job).where(
+        Job.debate_id == debate_id, Job.job_type == "v2_evidence"
+    )
+    if node_id is not None:
+        query = query.where(Job.node_id == node_id)
+    return int(db.scalar(query) or 0)
+
+
+def choose_evidence_model(db: Session, debate: Debate) -> str | None:
+    """Round-robin the debate's next evidence job across the ONLINE
+    search-capable models; if none is online, pin it to the first configured
+    search model so it waits pending until one comes online (an evidence job's
+    role is unrouted, so reroute_unavailable_pending_jobs can never move it onto
+    a non-search model). Returns None only when no search model is configured."""
+    models = evidence_search_models()
+    if not models:
+        return None
+    online = online_capabilities(db)
+    online_search = [model for model in models if model in online]
+    if online_search:
+        rotation = _count_evidence_jobs(db, debate.id)
+        return online_search[rotation % len(online_search)]
+    return models[0]
+
+
+def maybe_queue_evidence_job(db: Session, debate: Debate, node: Node) -> Job | None:
+    """Best-effort: queue one v2_evidence job for `node` when the flag is on,
+    the node's claim is evidence-eligible (empirical/causal), and both the
+    per-node and per-debate budgets allow it. Never raises -- a queueing failure
+    must never damage the POV/expand completion that called it (mirrors
+    extract_and_persist_evidence_for_completed_node's best-effort guard)."""
+    try:
+        if not evidence_acquisition_enabled():
+            return None
+        if node is None or node.node_type == "EVIDENCE":
+            return None
+        generation = db.get(Generation, node.active_generation_id) if node.active_generation_id else None
+        claim_text = generation.argument if generation else (node.claim or "")
+        if not _evidence_eligible(claim_text):
+            return None
+        if _count_evidence_jobs(db, debate.id, node.id) >= evidence_max_per_node():
+            return None
+        if _count_evidence_jobs(db, debate.id) >= evidence_max_per_debate():
+            return None
+        model_id = choose_evidence_model(db, debate)
+        if model_id is None:
+            return None
+        return queue_v2_job(db, debate, "v2_evidence", EVIDENCE_JOB_ROLE, model_id, node.id)
+    except Exception as exc:  # pragma: no cover - defensive best-effort guard
+        print(
+            f"[dialectical_v2] evidence job queueing failed for node "
+            f"{getattr(node, 'id', '?')} (non-fatal): {exc!r}"
+        )
+        return None
+
+
+def _normalize_evidence_source(raw: Any, index: int) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"Evidence source #{index} must be a JSON object")
+    url = sanitize_text(str(raw.get("url") or ""), 2_000)
+    if not url or not evidence_url_is_safe(url):
+        raise ValueError(f"Evidence source #{index} must include a fetchable http(s) url")
+    quote = sanitize_text(str(raw.get("quote") or ""), 300)
+    if not quote:
+        raise ValueError(f"Evidence source #{index} must include a non-empty quote")
+    publisher = sanitize_text(str(raw.get("publisher") or ""), 300)
+    if not publisher:
+        raise ValueError(f"Evidence source #{index} must include a publisher")
+    stance = str(raw.get("stance") or "").strip().lower()
+    if stance not in EVIDENCE_STANCES:
+        raise ValueError(f"Evidence source #{index} stance must be one of supports|refutes|mixed")
+    date_value = raw.get("date")
+    date = sanitize_text(str(date_value), 40) if date_value not in (None, "") else None
+    retrieval_query = sanitize_text(str(raw.get("retrieval_query") or ""), 500)
+    return {
+        "url": url,
+        "quote": quote,
+        "publisher": publisher,
+        "date": date,
+        "retrieval_query": retrieval_query,
+        "stance": stance,
+    }
+
+
+def validate_evidence_contract(payload: dict[str, Any]) -> dict[str, Any]:
+    """Strict evidence-source contract (mirrors validate_pov_contract's
+    strictness: malformed -> ValueError -> retryable failure -> failover ladder).
+    An empty sources list is a valid, honest "found nothing" completion (0
+    EVIDENCE nodes), NOT a failure. Provenance is always required."""
+    if not isinstance(payload, dict):
+        raise ValueError("Evidence output must be a JSON object")
+    raw_sources = payload.get("sources")
+    if not isinstance(raw_sources, list):
+        raise ValueError("Evidence output must include a sources list")
+    if len(raw_sources) > EVIDENCE_MAX_SOURCES_PER_JOB:
+        raise ValueError(f"Evidence output must include at most {EVIDENCE_MAX_SOURCES_PER_JOB} sources")
+    sources = [_normalize_evidence_source(raw, index) for index, raw in enumerate(raw_sources)]
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict) or not all(
+        provenance.get(key) for key in ("model_id", "worker_id", "prompt_id", "job_id")
+    ):
+        raise ValueError("Evidence output must include model, worker, prompt, and job provenance")
+    return {"sources": sources, "provenance": provenance}
+
+
+def materialize_evidence_nodes(
+    db: Session,
+    debate: Debate,
+    job: Job,
+    claim_node: Node,
+    payload: dict[str, Any],
+    *,
+    worker: Worker | None = None,
+) -> list[Node]:
+    """Create EVIDENCE child nodes (method "retrieval") under `claim_node` from
+    a validated evidence payload (capped at EVIDENCE_MAX_SOURCES_PER_JOB).
+    Attribution is the retrieving model/worker."""
+    provenance = payload.get("provenance") or {}
+    sources = list(payload.get("sources") or [])[:EVIDENCE_MAX_SOURCES_PER_JOB]
+    model_id = str(provenance.get("model_id") or job.required_model)
+    worker_id = str((worker.id if worker else None) or provenance.get("worker_id") or job.worker_id or "")
+    return persist_retrieval_evidence_nodes(
+        db,
+        debate,
+        claim_node,
+        sources=sources,
+        model_id=model_id,
+        worker_id=worker_id,
+    )
+
+
+def _extract_and_maybe_acquire_evidence(db: Session, debate: Debate, node: Node) -> None:
+    """Seam run over each completed argument node: the always-on regex extractor
+    (marks in-prose citations as method "model-claim"), then -- flag-gated --
+    queue a retrieval evidence job for the same node. Both are best-effort and
+    never fail node completion."""
+    extract_and_persist_evidence_for_completed_node(db, debate, node)
+    maybe_queue_evidence_job(db, debate, node)
+
+
+# --------------------------------------------------------------------------
 # Task 8 (P3.4 + P4.2): score-before-synthesis, score-informed synthesis,
 # synthesizer rotation (docs/improvement-plan-2026-07-22.md).
 # --------------------------------------------------------------------------
@@ -1649,7 +1850,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         provenance=provenance,
         prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_pro"]),
     )
-    extract_and_persist_evidence_for_completed_node(db, debate, pro_node)
+    _extract_and_maybe_acquire_evidence(db, debate, pro_node)
     con_node = create_completed_node(
         db,
         debate,
@@ -1662,7 +1863,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
         provenance=provenance,
         prompt_rendered=job.stream_buffer or json.dumps(payload["strongest_con"]),
     )
-    extract_and_persist_evidence_for_completed_node(db, debate, con_node)
+    _extract_and_maybe_acquire_evidence(db, debate, con_node)
     for parent, stance in ((pro_node, payload["strongest_pro"]), (con_node, payload["strongest_con"])):
         nested_pro = create_completed_node(
             db,
@@ -1676,7 +1877,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
             provenance=provenance,
             prompt_rendered=job.stream_buffer or json.dumps(stance["pro"]),
         )
-        extract_and_persist_evidence_for_completed_node(db, debate, nested_pro)
+        _extract_and_maybe_acquire_evidence(db, debate, nested_pro)
         nested_con = create_completed_node(
             db,
             debate,
@@ -1689,7 +1890,7 @@ def materialize_pov_branch(db: Session, debate: Debate, job: Job, payload: dict[
             provenance=provenance,
             prompt_rendered=job.stream_buffer or json.dumps(stance["con"]),
         )
-        extract_and_persist_evidence_for_completed_node(db, debate, nested_con)
+        _extract_and_maybe_acquire_evidence(db, debate, nested_con)
     return pov_node
 
 
@@ -1730,7 +1931,7 @@ def materialize_expand_child(
         prompt_rendered=job.stream_buffer or json.dumps(payload),
         node=child,
     )
-    extract_and_persist_evidence_for_completed_node(db, debate, child)
+    _extract_and_maybe_acquire_evidence(db, debate, child)
     return child
 
 
@@ -2167,6 +2368,53 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             f"{adaptive_context}"
             f"Context JSON:\n{json.dumps({**base_context, 'agent_runs': completed_runs, 'tree_nodes': tree_nodes, 'measured_standing': measured_standing}, default=str)}"
         )
+    elif job.job_type == "v2_evidence":
+        if not job.node_id:
+            raise ValueError("Evidence job must target a claim node")
+        claim_node = db.get(Node, job.node_id)
+        if not claim_node:
+            raise ValueError("Evidence claim node not found")
+        claim_generation = (
+            db.get(Generation, claim_node.active_generation_id) if claim_node.active_generation_id else None
+        )
+        claim_text = claim_generation.argument if claim_generation else claim_node.claim
+        evidence_context = {
+            **base_context,
+            "claim": claim_text,
+            "claim_node_id": claim_node.id,
+            "max_sources": EVIDENCE_MAX_SOURCES_PER_JOB,
+            "output_contract": {
+                "sources": [
+                    {
+                        "url": "canonical source URL (http or https)",
+                        "quote": "verbatim quote copied from the source, at most 300 characters",
+                        "publisher": "site or organization name",
+                        "date": "ISO date (YYYY-MM-DD) or null",
+                        "retrieval_query": "the query you searched",
+                        "stance": "supports | refutes | mixed",
+                    }
+                ],
+                "provenance": {"model_id": "...", "worker_id": "...", "prompt_id": "...", "job_id": "..."},
+            },
+        }
+        system = (
+            "You are a Codex-backed Dialectical Engine V2 evidence-retrieval worker. "
+            "Use web search to find real, independent sources. Return exactly one strict JSON "
+            "object. Do not include markdown or status wrappers."
+        )
+        user = (
+            "Search the web for independent, reputable sources bearing on the claim below -- "
+            "seek sources that SUPPORT it and sources that REFUTE it. Prefer primary and "
+            f"reputable sources. Return AT MOST {EVIDENCE_MAX_SOURCES_PER_JOB} sources. Each "
+            "source must include a canonical http(s) url, a verbatim quote of at most 300 "
+            "characters copied from the source, the publisher (site/organization), an ISO date "
+            "or null, the retrieval_query you used, and a stance of supports, refutes, or mixed. "
+            "Do not fabricate URLs or quotes; if you find nothing relevant, return an empty "
+            'sources list. Return strict JSON: {"sources":[{"url","quote","publisher","date",'
+            '"retrieval_query","stance"}],"provenance":{"model_id","worker_id","prompt_id","job_id"}}.\n\n'
+            f"Claim:\n{claim_text}\n\n"
+            f"Context JSON:\n{json.dumps(evidence_context, default=str)}"
+        )
     else:
         raise ValueError(f"Unsupported V2 job type {job.job_type}")
     return system, user
@@ -2222,6 +2470,41 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
             flush_write(db)
             publish_event(debate.id, "agent_run_created", {"debate_id": debate.id, "agent_run_id": agent_run.id, "job_id": run_job.id})
         commit_write(db)
+        return
+
+    if job.job_type == "v2_evidence":
+        # Strict contract first (malformed -> ValueError -> retryable failure ->
+        # search-only failover ladder -> AUXILIARY terminal, never debate-fatal).
+        payload = validate_evidence_contract(result if isinstance(result, dict) else {})
+        if not job.node_id:
+            raise ValueError("Evidence job must target a claim node")
+        claim_node = db.get(Node, job.node_id)
+        if claim_node is None:
+            raise ValueError("Evidence claim node not found")
+        evidence_nodes = materialize_evidence_nodes(db, debate, job, claim_node, payload, worker=worker)
+        for evidence_node in evidence_nodes:
+            record_provenance(db, debate.id, branch.id, "retrieval_evidence", evidence_node.id, payload["provenance"])
+        publish_event(
+            debate.id,
+            "evidence_acquired",
+            {
+                "debate_id": debate.id,
+                "node_id": claim_node.id,
+                "job_id": job.id,
+                "evidence_node_ids": [n.id for n in evidence_nodes],
+                "source_count": len(evidence_nodes),
+            },
+        )
+        commit_write(db)
+        # Fire-and-forget citation resolution (best-effort, off the worker POST):
+        # fetch each new source URL and stamp resolution_status. Never blocks or
+        # fails completion (matches trigger_internal_scoring_after_completion).
+        node_ids = [n.id for n in evidence_nodes]
+        if node_ids:
+            try:
+                trigger_citation_resolution(debate.id, node_ids)
+            except Exception as exc:
+                print(f"[dialectical_v2] citation resolution trigger failed (non-fatal): {exc!r}")
         return
 
     if job.job_type == "v2_pov":
