@@ -56,6 +56,15 @@ DEFAULT_MAX_JOB_ATTEMPTS = 4
 # (decompose, score_debate, ...) are excluded -- swapping their model does
 # not make sense.
 FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesize"}
+# Generation-class jobs (Task 1 / P0.2): LLM CLI calls whose model latency
+# can legitimately run 51-500s+ (verified P99, 2026-07-22 audit) rather than
+# a quick bookkeeping call. These get a longer base silence-tolerance floor
+# in make_deadline() than every other job type. This set coincides with
+# FAILOVER_JOB_TYPES today -- both currently mean "real model generation
+# work" -- but the two constants encode different concerns (deadline policy
+# vs. cross-model failover eligibility) and may diverge later, so they are
+# defined separately rather than aliased.
+GENERATION_JOB_TYPES = {"argue", "synthesize", "v2_pov", "v2_expand", "v2_synthesize"}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -205,9 +214,26 @@ def claim_author_exclusions(db: Session, role: str, parent: Node | None, debate:
     return set()
 
 
-def make_deadline() -> Any:
+def generation_job_fallback_seconds() -> int:
+    """Base silence tolerance for generation-class jobs (Task 1 / P0.2): LLM
+    CLI calls can legitimately run 51-500s+ (verified P99, 2026-07-22 audit),
+    so the flat 60s job_fallback_seconds default reaps them mid-flight.
+    Same env-tunable clamp idiom as job_stuck_seconds()."""
+    return int_env("DIALECTICAL_GENERATION_JOB_FALLBACK_SECONDS", 300, 60, 3600)
+
+
+def make_deadline(job_type: str) -> Any:
+    """Silence-tolerance deadline for a job's current assignment (not a
+    total budget -- any authenticated worker contact slides it forward via
+    refresh_worker_job_leases, capped at claimed_at + job_stuck_seconds()).
+    Generation-class jobs (GENERATION_JOB_TYPES) get the longer
+    generation_job_fallback_seconds() floor; every other job type keeps the
+    short settings.job_fallback_seconds default."""
     settings = load_settings()
-    return now_utc() + timedelta(seconds=max(settings.worker_poll_seconds * 2, settings.job_fallback_seconds))
+    base_seconds = (
+        generation_job_fallback_seconds() if job_type in GENERATION_JOB_TYPES else settings.job_fallback_seconds
+    )
+    return now_utc() + timedelta(seconds=max(settings.worker_poll_seconds * 2, base_seconds))
 
 
 def max_job_attempts() -> int:
@@ -278,7 +304,7 @@ def create_job(
         required_role=role,
         required_model=model,
         status="pending",
-        deadline=make_deadline(),
+        deadline=make_deadline(job_type),
     )
     db.add(job)
     record_job_transition(db, job, from_status=None, to_status="pending", channel="create")
@@ -844,7 +870,7 @@ def readopt_job_claim(db: Session, job: Job, worker: Worker) -> bool:
     if worker.current_job_id is not None and worker.current_job_id != job.id:
         return False
     now = now_utc()
-    deadline = make_deadline()
+    deadline = make_deadline(job.job_type)
     result = db.execute(
         update(Job)
         .where(Job.id == job.id, Job.status == "pending", Job.last_worker_id == worker.id)
@@ -884,7 +910,7 @@ def refresh_worker_job_leases(db: Session, worker: Worker) -> None:
         select(Job).where(Job.worker_id == worker.id, Job.status.in_(["claimed", "running"]))
     ).all()
     for job in held:
-        fresh_deadline = make_deadline()  # always tz-aware (now_utc()-based)
+        fresh_deadline = make_deadline(job.job_type)  # always tz-aware (now_utc()-based)
         if job.claimed_at is not None:
             # SQLite hands back naive datetimes on reload; normalize to UTC
             # before doing arithmetic against the aware fresh_deadline.
@@ -968,7 +994,7 @@ def try_failover_job(db: Session, job: Job, reason: str) -> list[tuple[str, str,
     # re-adopt this job (readopt gates on last_worker_id, not capability).
     job.last_worker_id = None
     reset_job_target_for_retry(db, job)
-    job.deadline = make_deadline()
+    job.deadline = make_deadline(job.job_type)
     return [
         (
             job.debate_id,
@@ -1050,7 +1076,7 @@ def reroute_unavailable_pending_jobs(db: Session, now: Any) -> None:
             continue
         if replacement != job.required_model:
             job.required_model = replacement
-            job.deadline = make_deadline()
+            job.deadline = make_deadline(job.job_type)
 
 
 def maybe_queue_synthesis(db: Session, debate: Debate) -> Job | None:
@@ -1083,7 +1109,7 @@ def maybe_queue_synthesis(db: Session, debate: Debate) -> Job | None:
 
 
 def try_claim_pending_job(db: Session, job: Job, worker: Worker, now: Any) -> bool:
-    deadline = make_deadline()
+    deadline = make_deadline(job.job_type)
     result = db.execute(
         update(Job)
         .where(Job.id == job.id, Job.status == "pending")
@@ -1309,7 +1335,7 @@ async def append_stream_delta(db: Session, job: Job, delta: str, offset: int | N
         raise ValueError(f"stream buffer exceeds {MAX_STREAM_BUFFER_CHARS} characters")
     job.stream_buffer = current_buffer + delta
     job.status = "running"
-    job.deadline = make_deadline()
+    job.deadline = make_deadline(job.job_type)
     commit_write(db)
     if job.job_type in {"synthesize", "v2_synthesize"}:
         await event_bus.publish(job.debate_id, "synthesis_token", {"debate_id": job.debate_id, "delta": delta})
@@ -1641,7 +1667,7 @@ def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> 
     reset_job_target_for_retry(db, job)
     job.stream_buffer = ""
     job.error = reason
-    job.deadline = make_deadline()
+    job.deadline = make_deadline(job.job_type)
     return []
 
 
@@ -1665,7 +1691,7 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
         job.status = "pending"
         release_job_claim(db, job)
         job.stream_buffer = ""
-        job.deadline = make_deadline()
+        job.deadline = make_deadline(job.job_type)
         if job.node_id and not job.job_type.startswith("v2_"):
             node = db.get(Node, job.node_id)
             if node:
