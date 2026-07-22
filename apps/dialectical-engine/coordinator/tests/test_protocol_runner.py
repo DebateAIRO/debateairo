@@ -266,8 +266,37 @@ def _persist_evidence_verification_run(db, debate, *, claim_node_id: str, eviden
     (exactly like the production writer does) so tests can prove "latest
     verdict wins" by calling this helper more than once, in order, for the
     same evidence_node_id -- the later call always gets the higher seq.
+
+    Also ensures a real EVIDENCE Node with id `evidence_node_id` exists
+    (idempotent -- a test may call this more than once for the SAME
+    evidence_node_id to simulate re-verification): the P1.2 review's
+    CRITICAL fix re-checks each surviving verdict's evidence node CURRENT
+    resolution_status, so a fixture-only AnalyzerRun with no backing Node
+    row would be excluded by that fail-closed re-check regardless of intent.
+    The node's evidence_metadata defaults to None (no resolution_status),
+    which evidence_node_verification_eligible treats as eligible -- exactly
+    matching a freshly-materialized evidence node that hasn't been through
+    citation resolution yet. Tests that need a SPECIFIC resolution_status
+    (e.g. simulating a later downgrade to "unreachable") mutate the node
+    directly after calling this helper.
     """
     branch = service.first_branch(db, debate.id)
+    if db.get(Node, evidence_node_id) is None:
+        db.add(
+            Node(
+                id=evidence_node_id,
+                debate_id=debate.id,
+                parent_id=claim_node_id,
+                node_type="EVIDENCE",
+                depth=1,
+                position=0,
+                claim="Evidence fixture text.",
+                status="complete",
+                path_status="active",
+                materialized_path=f"/evidence-fixture/{evidence_node_id}",
+            )
+        )
+        db.flush()
     run = AnalyzerRun(
         debate_id=debate.id,
         branch_id=branch.id,
@@ -441,6 +470,110 @@ def test_verification_rollup_ignores_rows_missing_evidence_node_id(db) -> None:
         branch_id=branch.id,
         analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
         output={"claimNodeId": claim_node.id, "status": "contradicted", "reason": None},
+        status="complete",
+        provenance={"judge_role": "verifier"},
+    )
+    next_analyzer_run_seq(db, run)
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    assert latest.output["verificationStatuses"][claim_node.id] == "pending_verification"
+    assert latest.output["verificationSource"][claim_node.id] == "kind_classifier"
+
+
+# ---------------------------------------------------------------------------
+# Task 11 (P1.2) review, CRITICAL finding: a verdict persisted while its
+# evidence node was still "pending" citation resolution must NOT haunt the
+# rollup forever once that resolution LATER downgrades the node to
+# "unreachable" -- the query-time eligibility guard in
+# scoring_completion_lifecycle.py only stops FUTURE verification attempts on
+# that node (it never gets re-verified once unreachable), so this read-time
+# re-check is the only thing that can retract the already-persisted verdict.
+# ---------------------------------------------------------------------------
+
+
+def test_verification_rollup_drops_verdict_when_evidence_node_downgrades_to_unreachable_after_verification(db) -> None:
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=43
+    )
+    evidence_node_id = "evidence-node-fixture-pending-then-unreachable"
+    # Verified while the evidence node's citation was still unresolved --
+    # this is the ONLY verdict ever recorded for this evidence node, since
+    # the query-time eligibility guard will never let it be (re-)verified
+    # once it downgrades to "unreachable" below.
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id=evidence_node_id, status="supported"
+    )
+    # Citation resolution completes LATER (the fire-and-forget thread in
+    # app.evidence.citations) and the fetch ultimately failed.
+    evidence_node = db.get(Node, evidence_node_id)
+    evidence_node.evidence_metadata = {"method": "retrieval", "resolution_status": "unreachable"}
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    # The stale "supported" verdict must NOT flow through: its evidence node
+    # is unreachable NOW, so the re-check must exclude the already-persisted
+    # verdict, falling all the way back to the P5b kind-classifier exactly
+    # as if no verdict had ever been recorded.
+    assert latest.output["verificationStatuses"][claim_node.id] == "pending_verification"
+    assert latest.output["verificationSource"][claim_node.id] == "kind_classifier"
+
+
+def test_verification_rollup_still_applies_when_evidence_node_stays_reachable(db) -> None:
+    # Companion/control for the downgrade test above: without a downgrade,
+    # the SAME verdict must still flow through normally -- proves the
+    # re-check does not over-exclude reachable evidence.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=44
+    )
+    evidence_node_id = "evidence-node-fixture-stays-reachable"
+    _persist_evidence_verification_run(
+        db, debate, claim_node_id=claim_node.id, evidence_node_id=evidence_node_id, status="supported"
+    )
+    evidence_node = db.get(Node, evidence_node_id)
+    evidence_node.evidence_metadata = {"method": "retrieval", "resolution_status": "resolved_quote_found"}
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    latest = _latest_protocol_analysis_run(db, debate.id)
+    assert latest.output["verificationStatuses"][claim_node.id] == "supported"
+    assert latest.output["verificationSource"][claim_node.id] == "real_verdict"
+
+
+def test_verification_rollup_drops_verdict_when_evidence_node_row_is_missing(db) -> None:
+    # Defensive: a verdict whose evidenceNodeId has no corresponding Node row
+    # at all (never happens via production writes -- EVIDENCE nodes are never
+    # hard-deleted -- but the overlay must still be safe) is excluded from
+    # the rollup rather than trusted by default, consistent with failing
+    # closed on anything that can't be confirmed eligible. Built directly
+    # (bypassing _persist_evidence_verification_run, which would create a
+    # backing Node) specifically to leave no Node row behind.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    claim_node = _seed_claim_node_with_scoring(
+        db, debate, raw_text="A recent study found that congestion pricing reduces downtown traffic.", position=45
+    )
+    branch = service.first_branch(db, debate.id)
+    run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=branch.id,
+        analyzer_type=EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+        output={
+            "evidenceNodeId": "evidence-node-that-was-never-persisted",
+            "claimNodeId": claim_node.id,
+            "status": "supported",
+            "reason": None,
+            "evaluatorVersion": "evidence-verification-v1",
+        },
         status="complete",
         provenance={"judge_role": "verifier"},
     )

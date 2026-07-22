@@ -7,7 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.write_lock import commit_write
-from app.evidence.verification_evaluator import evaluate_evidence_verdict
+from app.evidence.verification_evaluator import (
+    evaluate_evidence_verdict,
+    evidence_node_verification_eligible,
+)
 from app.exploration.decision_repository import (
     LIFECYCLE_DECISION_SCHEMA_VERSION,
     LifecycleDecisionPersistence,
@@ -127,25 +130,6 @@ def _lifecycle_event_payload(
     }
 
 
-def _verification_eligible_evidence(evidence_node: Node) -> bool:
-    """Task 11 (P1.2) ordering/eligibility guard: an evidence node whose
-    citation could not even be fetched ("unreachable" -- see
-    app.evidence.citations) has nothing for the verifier to compare the
-    claim against, so it is never sent to evaluate_evidence_verdict; its
-    verdict (there isn't one) stays out of the 5.5 rollup entirely, rather
-    than the coordinator persisting a fabricated "unverifiable" run for it
-    every scoring pass. "resolved_quote_missing" (page fetched, quote not
-    found) and "pending"/absent (not yet resolved, or a "model-claim" node
-    with no resolution_status key at all) remain eligible -- the judge
-    itself may mark those contradicted or unverifiable; this guard only
-    pre-filters fetchability, never the verdict.
-    """
-    metadata = evidence_node.evidence_metadata
-    if not isinstance(metadata, dict):
-        return True
-    return metadata.get("resolution_status") != "unreachable"
-
-
 def _completed_operation(
     db: Session,
     *,
@@ -256,7 +240,7 @@ def reevaluate_lifecycle_after_scoring_completion(
             .order_by(Node.parent_id.asc(), Node.position.asc(), Node.id.asc())
         ).all()
         for evidence_node in evidence_nodes:
-            if not _verification_eligible_evidence(evidence_node):
+            if not evidence_node_verification_eligible(evidence_node):
                 continue
             assert evidence_node.parent_id is not None
             evidence_by_parent.setdefault(evidence_node.parent_id, []).append(evidence_node)

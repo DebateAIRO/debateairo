@@ -211,13 +211,37 @@ debate), not necessarily immediately.
 
 Evidence nodes whose `resolution_status` is `"unreachable"` (the coordinator
 could not even fetch the cited page — see [Citation resolution
-statuses](#citation-resolution-statuses) above) are skipped:
-`evaluate_evidence_verdict` is never called for them, so they never
-contribute a verdict to the rollup. `"resolved_quote_missing"` (page fetched,
-quote absent) and `"pending"`/absent (not yet resolved, or a `model-claim`
-node with no `resolution_status` key at all) remain verifier-eligible — the
-judge itself may mark those `contradicted` or `unverifiable`; the coordinator
-only pre-filters fetchability, never the verdict.
+statuses](#citation-resolution-statuses) above) are ineligible for
+verification. `"resolved_quote_missing"` (page fetched, quote absent) and
+`"pending"`/absent (not yet resolved, or a `model-claim` node with no
+`resolution_status` key at all) remain verifier-eligible — the judge itself
+may mark those `contradicted` or `unverifiable`; the coordinator only
+pre-filters fetchability, never the verdict.
+
+The single predicate deciding this
+(`app.evidence.verification_evaluator.evidence_node_verification_eligible`)
+is applied at TWO sites, not one, because citation resolution is
+asynchronous and can race a verification that already ran:
+
+1. **Query-time** (`scoring_completion_lifecycle.py`): `evaluate_evidence_verdict`
+   is never called for an ineligible evidence node, so no NEW verdict is
+   recorded for it.
+2. **Read-time** (`protocol/runner.py`'s 5.5 overlay, defense-in-depth): after
+   latest-per-evidence-node grouping (see Rollup semantics below), each
+   SURVIVING verdict's evidence node is re-checked against its CURRENT
+   state before folding into the rollup.
+
+Site 2 exists because site 1 alone cannot retract a verdict recorded
+*before* the node's citation resolved: an evidence node can be verified
+while its `resolution_status` is still `"pending"`, and citation resolution
+can later stamp that SAME node `"unreachable"` (fetch ultimately failed)
+*after* the verdict was already persisted. Once a node is `"unreachable"`,
+site 1 permanently refuses to ever (re-)verify it, so without site 2's
+re-check that one stale verdict would be the node's only `AnalyzerRun` and
+would haunt the rollup forever. A verdict whose evidence node row cannot be
+found at all is also excluded (fail closed — EVIDENCE nodes are never
+hard-deleted by any writer in this codebase today, but an unconfirmable
+node is never trusted by default).
 
 ### Rollup semantics (5.5 overlay HARD GATE)
 
@@ -230,7 +254,9 @@ stale `contradicted` could permanently dominate a claim's rollup even after a
 fresh verification superseded it with `supported`. It now groups by
 `evidenceNodeId` and keeps only the row with the highest `AnalyzerRun.seq`
 per evidence node (the same monotonic tiebreak the rest of the module uses
-for "latest") before rolling those latest-only verdicts up per claim.
+for "latest"), applies the eligibility re-check described above to that
+surviving verdict, and only THEN rolls the remaining latest-and-eligible
+verdicts up per claim.
 
 ## ⚠️ Flip-order warning
 

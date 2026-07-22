@@ -1090,27 +1090,14 @@ def test_normal_scoring_completion_verifies_evidence_and_persists_one_abandonmen
 # claim against. "resolved_quote_missing" (fetched, quote absent) and
 # "pending"/absent (not yet resolved, or a model-claim node with no
 # resolution_status key at all) remain verifier-eligible.
+#
+# The pure eligibility predicate itself
+# (app.evidence.verification_evaluator.evidence_node_verification_eligible)
+# is tested in test_verification_evaluator.py -- it is shared between this
+# module's query-time guard (below) and protocol/runner.py's read-time
+# re-check (see test_protocol_runner.py), so its unit tests live next to its
+# canonical definition rather than here.
 # ---------------------------------------------------------------------------
-
-
-def test_verification_eligible_evidence_excludes_unreachable() -> None:
-    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata={"resolution_status": "unreachable"})
-    assert scoring_completion_lifecycle._verification_eligible_evidence(node) is False
-
-
-@pytest.mark.parametrize(
-    "evidence_metadata",
-    [
-        {"resolution_status": "resolved_quote_missing"},
-        {"resolution_status": "resolved_quote_found"},
-        {"resolution_status": "pending"},
-        {"evidenceKind": "statistical", "method": "model-claim"},  # no resolution_status key at all
-        None,
-    ],
-)
-def test_verification_eligible_evidence_includes_non_unreachable(evidence_metadata) -> None:
-    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata=evidence_metadata)
-    assert scoring_completion_lifecycle._verification_eligible_evidence(node) is True
 
 
 def test_scoring_completion_skips_unreachable_evidence_from_verification(db, monkeypatch) -> None:

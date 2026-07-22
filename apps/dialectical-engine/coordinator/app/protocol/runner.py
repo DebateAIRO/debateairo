@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.write_lock import commit_write
 from app.evidence.verification_evaluator import (
     EVIDENCE_VERIFICATION_ANALYZER_TYPE,
+    evidence_node_verification_eligible,
     rollup_claim_verification_status,
 )
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Node, next_analyzer_run_seq
@@ -152,7 +153,7 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
             )
             .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
         ).all()
-        verdicts_by_claim_node: dict[str, list[str]] = {}
+        latest_verdict_by_evidence_node: dict[str, tuple[str, str]] = {}
         seen_evidence_node_ids: set[str] = set()
         for verdict_run in verdict_runs:
             output = verdict_run.output or {}
@@ -168,6 +169,42 @@ def _run_protocol_analysis(db: Session, debate: Debate) -> None:
             if evidence_node_id in seen_evidence_node_ids:
                 continue  # superseded verdict for an already-resolved evidence node
             seen_evidence_node_ids.add(evidence_node_id)
+            latest_verdict_by_evidence_node[evidence_node_id] = (claim_node_id, status)
+
+        # CRITICAL fix (Task 11 / P1.2 review): a verdict can be persisted
+        # while its evidence node was still "pending" citation resolution;
+        # citation resolution can LATER downgrade that SAME node to
+        # "unreachable" (the fetch ultimately failed) after the verdict was
+        # already recorded. Once a node is "unreachable", the query-time
+        # eligibility guard (scoring_completion_lifecycle.py) permanently
+        # refuses to ever (re-)verify it -- so that one stale verdict would
+        # be this evidence node's only AnalyzerRun and would haunt the
+        # rollup forever without this re-check. Look up each SURVIVING
+        # (latest) verdict's evidence node CURRENT state and drop the
+        # verdict if the node is unreachable now, or missing entirely
+        # (fail closed -- an evidence node is never hard-deleted by any
+        # writer in this codebase today, but an unconfirmable node must
+        # never be trusted by default). Mirrors the unverifiable_by_kind
+        # defense-in-depth re-check below, just for evidence nodes instead
+        # of claim nodes -- the SAME evidence_node_verification_eligible
+        # predicate the query-time guard uses, so both sites can never
+        # silently disagree about what "eligible" means.
+        current_evidence_nodes: dict[str, Node] = {}
+        if latest_verdict_by_evidence_node:
+            current_evidence_nodes = {
+                node.id: node
+                for node in db.scalars(
+                    select(Node).where(
+                        Node.debate_id == debate.id,
+                        Node.id.in_(latest_verdict_by_evidence_node.keys()),
+                    )
+                ).all()
+            }
+        verdicts_by_claim_node: dict[str, list[str]] = {}
+        for evidence_node_id, (claim_node_id, status) in latest_verdict_by_evidence_node.items():
+            evidence_node = current_evidence_nodes.get(evidence_node_id)
+            if evidence_node is None or not evidence_node_verification_eligible(evidence_node):
+                continue
             verdicts_by_claim_node.setdefault(claim_node_id, []).append(status)
 
         for node in nodes_with_claims:

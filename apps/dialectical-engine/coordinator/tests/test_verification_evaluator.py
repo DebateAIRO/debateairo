@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from sqlalchemy import select
 
 from app.evidence.verification_evaluator import (
     evaluate_evidence_verdict,
+    evidence_node_verification_eligible,
     rollup_claim_verification_status,
 )
 from app.models.entities import (
@@ -40,6 +42,56 @@ def test_rollup_claim_verification_status_pending_when_nothing_resolved() -> Non
 
 def test_rollup_claim_verification_status_pending_when_empty() -> None:
     assert rollup_claim_verification_status([]) == "pending"
+
+
+# ---------------------------------------------------------------------------
+# evidence_node_verification_eligible: pure function, no fixtures needed.
+# Shared between app.exploration.scoring_completion_lifecycle's query-time
+# guard and app.protocol.runner's read-time re-check (Task 11 / P1.2 review,
+# CRITICAL finding) -- both call THIS function, never a local copy, so they
+# can never silently disagree about what "eligible" means.
+# ---------------------------------------------------------------------------
+
+
+def test_evidence_node_verification_eligible_excludes_unreachable() -> None:
+    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata={"resolution_status": "unreachable"})
+    assert evidence_node_verification_eligible(node) is False
+
+
+@pytest.mark.parametrize(
+    "evidence_metadata",
+    [
+        {"resolution_status": "resolved_quote_missing"},
+        {"resolution_status": "resolved_quote_found"},
+        {"resolution_status": "pending"},
+        {"evidenceKind": "statistical", "method": "model-claim"},  # no resolution_status key at all
+        {},  # empty dict -- no resolution_status key either
+        None,  # no metadata recorded at all -- legitimate "absent" state
+    ],
+)
+def test_evidence_node_verification_eligible_includes_non_unreachable(evidence_metadata) -> None:
+    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata=evidence_metadata)
+    assert evidence_node_verification_eligible(node) is True
+
+
+@pytest.mark.parametrize(
+    "evidence_metadata",
+    [
+        "not-a-dict",
+        ["a", "list", "not", "a", "dict"],
+        42,
+        True,
+    ],
+)
+def test_evidence_node_verification_eligible_fails_closed_on_corrupted_metadata(evidence_metadata) -> None:
+    # MINOR finding (Task 11 / P1.2 review): corrupted (present but
+    # uninterpretable) evidence_metadata must fail CLOSED -- treated as
+    # ineligible, the same untrustworthy-data posture the 5.5 rollup already
+    # takes on a corrupted AnalyzerRun.output -- not fail OPEN as "eligible
+    # by default". None (no metadata at all) is the only value that gets the
+    # eligible default; anything else non-dict is corruption, not absence.
+    node = Node(node_type="EVIDENCE", depth=1, position=0, claim="x", evidence_metadata=evidence_metadata)
+    assert evidence_node_verification_eligible(node) is False
 
 
 # ---------------------------------------------------------------------------

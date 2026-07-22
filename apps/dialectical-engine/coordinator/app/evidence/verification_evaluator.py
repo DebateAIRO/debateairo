@@ -108,6 +108,53 @@ def rollup_claim_verification_status(evidence_verdicts: list[str]) -> str:
     return "pending"
 
 
+def evidence_node_verification_eligible(evidence_node: Node) -> bool:
+    """Task 11 (P1.2) eligibility guard -- pure, single source of truth,
+    used at BOTH the two sites that must agree on it:
+      1. app.exploration.scoring_completion_lifecycle (query-time): decides
+         whether to CALL evaluate_evidence_verdict for this evidence node at
+         all.
+      2. app.protocol.runner's 5.5 overlay (read-time, defense-in-depth):
+         after latest-per-evidence-node grouping, decides whether an
+         ALREADY-PERSISTED verdict may still fold into the rollup.
+
+    Site 2 exists because site 1 alone is not enough: a verdict can be
+    persisted while the evidence node was still "pending" citation
+    resolution, and citation resolution can LATER downgrade that SAME node
+    to "unreachable" (the fetch ultimately failed) after the verdict was
+    already recorded. Once a node is "unreachable", site 1 permanently
+    refuses to ever (re-)verify it -- so without site 2's re-check, that one
+    stale verdict would be the evidence node's only AnalyzerRun forever and
+    would haunt the rollup indefinitely. Using the SAME predicate at both
+    sites is what actually delivers "an unreachable evidence node's verdict
+    stays out of the 5.5 rollup entirely", not just "no NEW verdict is
+    recorded for it".
+
+    An evidence node whose citation could not even be fetched
+    ("unreachable" -- see app.evidence.citations) has nothing for the
+    verifier to compare the claim against, so it is ineligible.
+    "resolved_quote_missing" (fetched, quote not found) and "pending"/absent
+    (not yet resolved, or a "model-claim" node with no resolution_status key
+    at all) remain eligible -- the judge itself may mark those contradicted
+    or unverifiable; this guard only pre-filters fetchability, never the
+    verdict.
+
+    Fails CLOSED (ineligible) on uninterpretable metadata: `evidence_metadata`
+    present but not a dict (corrupted -- should never happen via any writer
+    in this codebase, but an untrustworthy value must never be treated as
+    "fine") returns False, the same posture as excluding a corrupted verdict
+    row from the rollup. `None` (no metadata recorded at all -- the
+    Node.evidence_metadata column's own type is Optional[dict]) is a
+    legitimate, expected "absent" state, not corruption, and stays eligible.
+    """
+    metadata = evidence_node.evidence_metadata
+    if metadata is None:
+        return True
+    if not isinstance(metadata, dict):
+        return False
+    return metadata.get("resolution_status") != "unreachable"
+
+
 def _active_generation(db: Session, node: Node) -> Generation | None:
     if not node.active_generation_id:
         return None
