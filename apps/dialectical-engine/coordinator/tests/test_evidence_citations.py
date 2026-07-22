@@ -5,9 +5,12 @@ guard is a pure function unit-tested in isolation."""
 from __future__ import annotations
 
 import asyncio
+import socket
 
 import httpx
+import pytest
 
+import app.evidence.citations as citations
 from app.evidence.citations import (
     RESOLVED_QUOTE_FOUND,
     RESOLVED_QUOTE_MISSING,
@@ -17,6 +20,17 @@ from app.evidence.citations import (
     resolve_and_stamp_citations,
 )
 from app.models.entities import Debate, Generation, Node, Worker
+
+
+@pytest.fixture(autouse=True)
+def _safe_public_dns(monkeypatch):
+    """No live DNS in tests. Hostnames resolve to a public, SSRF-safe address by
+    default; the DNS-rebinding test overrides this to a loopback answer."""
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(citations.socket, "getaddrinfo", fake_getaddrinfo)
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +63,19 @@ def test_url_guard_refuses_private_and_link_local_ips() -> None:
     assert evidence_url_is_safe("http://192.168.1.10/x") is False
     assert evidence_url_is_safe("http://172.16.4.4/x") is False
     assert evidence_url_is_safe("http://169.254.169.254/latest/meta-data") is False
+
+
+def test_url_guard_refuses_numeric_ip_literal_forms_for_loopback() -> None:
+    # curl/browsers accept these encodings of 127.0.0.1 -- the guard must too.
+    assert evidence_url_is_safe("http://2130706433/x") is False  # decimal
+    assert evidence_url_is_safe("http://0x7f000001/x") is False  # hex
+    assert evidence_url_is_safe("http://017700000001/x") is False  # octal
+    # Decimal encoding of the cloud-metadata address 169.254.169.254.
+    assert evidence_url_is_safe("http://2852039166/x") is False
+
+
+def test_url_guard_allows_public_dotted_ip() -> None:
+    assert evidence_url_is_safe("http://93.184.216.34/x") is True
 
 
 def test_url_guard_refuses_nonstandard_ports() -> None:
@@ -143,18 +170,112 @@ def test_check_refuses_private_ip_without_fetching() -> None:
     assert fetched == []  # guard short-circuits before any request
 
 
-def test_check_returns_unreachable_when_body_exceeds_size_cap() -> None:
+def test_check_streams_and_aborts_early_on_oversize_body() -> None:
     quote = "needle in the haystack"
+    yielded = {"chunks": 0}
+    total_chunks = 60  # 60 x 200KB ~= 12MB if fully drained; cap is 1MB
+
+    def body_iter():
+        for _ in range(total_chunks):
+            yielded["chunks"] += 1
+            yield b"z" * 200_000
 
     def handler(request: httpx.Request) -> httpx.Response:
-        oversize = ("x" * 1_000) + " needle in the haystack " + ("y" * 2_000_000)
-        return httpx.Response(200, text=oversize)
+        return httpx.Response(200, content=body_iter())
 
     async def go():
         async with _client(handler) as client:
             return await check_citation_resolution(client, "https://example.org/huge", quote)
 
     assert _run(go()) == UNREACHABLE
+    # Early abort: streaming stopped well before draining the whole body.
+    assert yielded["chunks"] < total_chunks
+
+
+# ---------------------------------------------------------------------------
+# Redirects: the SSRF guard must run on EVERY hop, not just the first URL.
+# ---------------------------------------------------------------------------
+
+
+def test_check_follows_safe_https_redirect_then_matches_quote() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "https://example.org/final"})
+        return httpx.Response(200, text="The report notes a forty two percent improvement overall.")
+
+    async def go():
+        async with _client(handler) as client:
+            return await check_citation_resolution(
+                client, "https://example.org/start", "forty two percent improvement"
+            )
+
+    assert _run(go()) == RESOLVED_QUOTE_FOUND
+
+
+def test_check_blocks_redirect_to_private_ip() -> None:
+    fetched_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        fetched_paths.append(str(request.url))
+        if request.url.host == "example.org":
+            return httpx.Response(302, headers={"location": "http://169.254.169.254/latest/meta-data"})
+        return httpx.Response(200, text="internal metadata should never be read")
+
+    async def go():
+        async with _client(handler) as client:
+            return await check_citation_resolution(client, "https://example.org/start", "anything")
+
+    assert _run(go()) == UNREACHABLE
+    # The metadata endpoint was never fetched -- the guard blocked the hop.
+    assert all("169.254.169.254" not in path for path in fetched_paths)
+
+
+def test_check_blocks_redirect_to_nonstandard_port() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "example.org" and request.url.port in (None, 80, 443):
+            return httpx.Response(302, headers={"location": "http://example.org:6379/"})
+        return httpx.Response(200, text="redis payload should never be read")
+
+    async def go():
+        async with _client(handler) as client:
+            return await check_citation_resolution(client, "https://example.org/start", "anything")
+
+    assert _run(go()) == UNREACHABLE
+
+
+def test_check_unreachable_when_redirect_chain_exceeds_max() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Always redirect to another safe URL -> chain never terminates.
+        nxt = int(request.url.params.get("n", "0")) + 1
+        return httpx.Response(302, headers={"location": f"https://example.org/hop?n={nxt}"})
+
+    async def go():
+        async with _client(handler) as client:
+            return await check_citation_resolution(client, "https://example.org/hop?n=0", "anything")
+
+    assert _run(go()) == UNREACHABLE
+
+
+def test_check_blocks_hostname_that_resolves_to_loopback(monkeypatch) -> None:
+    # DNS-rebinding shape: a syntactically fine public hostname resolves to
+    # loopback. The fetch-time guard resolves DNS and refuses.
+    def rebinding_getaddrinfo(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+
+    monkeypatch.setattr(citations.socket, "getaddrinfo", rebinding_getaddrinfo)
+
+    fetched: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        fetched.append(str(request.url))
+        return httpx.Response(200, text="loopback content should never be read")
+
+    async def go():
+        async with _client(handler) as client:
+            return await check_citation_resolution(client, "https://evil.example/x", "anything")
+
+    assert _run(go()) == UNREACHABLE
+    assert fetched == []  # refused before any request left the guard
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import os
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -962,6 +962,12 @@ def maybe_queue_evidence_job(db: Session, debate: Debate, node: Node) -> Job | N
             return None
         if _count_evidence_jobs(db, debate.id, node.id) >= evidence_max_per_node():
             return None
+        # Read-then-queue budget: within one completion transaction the count is
+        # consistent, but two branch completions committing concurrently on
+        # different workers can each pass this check before the other commits, so
+        # the per-debate total may overshoot by up to one racing completion's
+        # worth of eligible nodes (a branch has <=6). Acceptable -- evidence is
+        # auxiliary and every extra job is itself cost-capped and non-fatal.
         if _count_evidence_jobs(db, debate.id) >= evidence_max_per_debate():
             return None
         model_id = choose_evidence_model(db, debate)
@@ -991,17 +997,33 @@ def _normalize_evidence_source(raw: Any, index: int) -> dict[str, Any]:
     stance = str(raw.get("stance") or "").strip().lower()
     if stance not in EVIDENCE_STANCES:
         raise ValueError(f"Evidence source #{index} stance must be one of supports|refutes|mixed")
-    date_value = raw.get("date")
-    date = sanitize_text(str(date_value), 40) if date_value not in (None, "") else None
     retrieval_query = sanitize_text(str(raw.get("retrieval_query") or ""), 500)
     return {
         "url": url,
         "quote": quote,
         "publisher": publisher,
-        "date": date,
+        "date": _normalize_iso_date(raw.get("date")),
         "retrieval_query": retrieval_query,
         "stance": stance,
     }
+
+
+def _normalize_iso_date(raw: Any) -> str | None:
+    """Keep an ISO-8601 date verbatim (YYYY-MM-DD or a full ISO 8601 timestamp,
+    optionally 'Z'-suffixed); anything else -> None. A model that returns
+    "last Tuesday" or "May 2023" yields a null date rather than junk metadata."""
+    if raw in (None, ""):
+        return None
+    text = sanitize_text(str(raw), 40)
+    if not text:
+        return None
+    for parser in (datetime.fromisoformat, date.fromisoformat):
+        try:
+            parser(text)
+            return text
+        except ValueError:
+            continue
+    return None
 
 
 def validate_evidence_contract(payload: dict[str, Any]) -> dict[str, Any]:

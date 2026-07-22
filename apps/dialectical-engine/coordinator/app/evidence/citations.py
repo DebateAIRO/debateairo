@@ -21,8 +21,9 @@ import asyncio
 import ipaddress
 import logging
 import re
+import socket
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -49,19 +50,73 @@ _WHITESPACE = re.compile(r"\s+")
 
 
 # ---------------------------------------------------------------------------
-# SSRF guard: pure, deterministic, no I/O, unit-tested in isolation.
+# SSRF guard.
+#
+# `evidence_url_is_safe` is a pure, DNS-free SYNTACTIC guard (scheme, port, and
+# host-literal checks including numeric IP encodings) -- safe to call in the
+# hot contract-validation path with no network I/O. The FETCH path additionally
+# resolves hostnames (`_url_is_fetch_safe`) and re-runs the guard on every
+# redirect hop, so a public-looking URL that 30x-redirects to an internal
+# target, or a hostname that resolves to a private address, is refused.
+#
+# Residual limitation (accepted): DNS is resolved BEFORE the connection, so a
+# classic DNS-rebinding attacker who flips the record between our getaddrinfo
+# and httpx's own connection-time resolution could still reach an internal host
+# (TOCTOU). Mitigating that fully needs pinning the vetted IP into the socket
+# connect, which httpx does not expose cleanly. For this single-user deployment
+# with the feature default OFF and evidence URLs coming from the debate's own
+# search worker (not arbitrary attacker input), the pre-connection check is the
+# accepted bound; revisit if evidence acquisition is ever exposed to untrusted
+# URL sources.
 # ---------------------------------------------------------------------------
 
 
-def evidence_url_is_safe(url: str) -> bool:
-    """True only for a fetchable public http/https URL.
+def _ip_is_unsafe(ip: ipaddress._BaseAddress) -> bool:
+    return bool(
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
 
-    Refuses non-http(s) schemes, non-standard ports, empty/absent hosts,
-    `localhost`/`*.localhost`, and any IP literal that is loopback, private,
-    link-local, reserved, multicast, or unspecified. Hostnames are NOT
-    DNS-resolved here (that would need the network); the literal-IP and
-    localhost checks cover the common SSRF footguns without live lookups.
-    """
+
+def _host_as_ip(host: str) -> ipaddress._BaseAddress | None:
+    """Parse an IP literal from a URL host, covering the dotted/IPv6 forms AND
+    the bare-integer/hex/octal encodings resolvers accept (e.g. 2130706433,
+    0x7f000001, 017700000001 all == 127.0.0.1). Returns None for real
+    hostnames."""
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    stripped = host.strip()
+    candidates: list[int] = []
+    if re.fullmatch(r"[0-9]+", stripped):
+        candidates.append(int(stripped, 10))
+        if len(stripped) > 1 and stripped.startswith("0"):
+            try:
+                candidates.append(int(stripped, 8))
+            except ValueError:
+                pass
+    elif re.fullmatch(r"0[xX][0-9a-fA-F]+", stripped):
+        candidates.append(int(stripped, 16))
+    for value in candidates:
+        if 0 <= value <= 0xFFFFFFFF:
+            try:
+                return ipaddress.ip_address(value)
+            except ValueError:
+                continue
+    return None
+
+
+def evidence_url_is_safe(url: str) -> bool:
+    """Syntactic (DNS-free) SSRF guard: True only for a well-formed http/https
+    URL on a standard port whose host is neither `localhost`/`*.localhost` nor
+    an IP literal (in ANY numeric encoding) that is loopback, private,
+    link-local, reserved, multicast, or unspecified. Hostnames are not resolved
+    here -- the fetch path does that (see `_url_is_fetch_safe`)."""
     if not isinstance(url, str) or not url.strip():
         return False
     try:
@@ -82,20 +137,44 @@ def evidence_url_is_safe(url: str) -> bool:
     lowered = host.lower()
     if lowered == "localhost" or lowered.endswith(".localhost"):
         return False
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        ip = None
-    if ip is not None and (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
-    ):
+    ip = _host_as_ip(host)
+    if ip is not None and _ip_is_unsafe(ip):
         return False
     return True
+
+
+def _resolved_addresses_are_safe(host: str) -> bool:
+    """Resolve a hostname and refuse if ANY returned A/AAAA address is unsafe.
+    Fail-closed: an unresolvable host is treated as unsafe."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (OSError, UnicodeError):
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        sockaddr = info[4]
+        if not sockaddr:
+            return False
+        try:
+            ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            return False
+        if _ip_is_unsafe(ip):
+            return False
+    return True
+
+
+def _url_is_fetch_safe(url: str) -> bool:
+    """Fetch-time guard: the syntactic guard PLUS DNS validation for hostnames.
+    Run on the original URL and on every redirect hop before it is fetched."""
+    if not evidence_url_is_safe(url):
+        return False
+    parts = urlsplit(url.strip())
+    host = parts.hostname or ""
+    if _host_as_ip(host) is not None:
+        return True  # IP literal already vetted syntactically
+    return _resolved_addresses_are_safe(host)
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -117,25 +196,47 @@ def _normalized_contains(page_text: str, quote: str) -> bool:
 
 
 async def check_citation_resolution(client: httpx.AsyncClient, url: str, quote: str) -> str:
-    if not evidence_url_is_safe(url):
-        return UNREACHABLE
-    try:
-        response = await client.get(url, follow_redirects=True)
-    except Exception:
-        return UNREACHABLE
-    if response.status_code >= 400:
-        return UNREACHABLE
-    try:
-        content = response.content
-    except Exception:
-        return UNREACHABLE
-    if content is not None and len(content) > CITATION_MAX_BYTES:
-        return UNREACHABLE
-    try:
-        page_text = response.text
-    except Exception:
-        return RESOLVED_QUOTE_MISSING
-    return RESOLVED_QUOTE_FOUND if _normalized_contains(page_text, quote) else RESOLVED_QUOTE_MISSING
+    """Fetch `url` (following up to CITATION_MAX_REDIRECTS redirects MANUALLY,
+    guarding every hop) and classify whether `quote` resolves. Never raises: any
+    guard refusal, transport error, non-2xx, redirect-budget overrun, or
+    oversize body maps to "unreachable". Redirects are followed by hand
+    (`follow_redirects=False` per request) precisely so the SSRF guard runs on
+    each Location target before it is fetched -- httpx's own redirect following
+    would fetch unvalidated hops."""
+    current = url
+    # range(MAX + 1): the original request plus up to MAX redirect hops. A chain
+    # that is still redirecting after that budget -> unreachable.
+    for _ in range(CITATION_MAX_REDIRECTS + 1):
+        if not _url_is_fetch_safe(current):
+            return UNREACHABLE
+        try:
+            async with client.stream("GET", current, follow_redirects=False) as response:
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        return UNREACHABLE
+                    # Resolve relative redirects against the current URL; the
+                    # next loop iteration re-guards the absolute target.
+                    current = urljoin(str(response.url), location)
+                    continue
+                if response.status_code >= 400:
+                    return UNREACHABLE
+                total = 0
+                chunks: list[bytes] = []
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    if total > CITATION_MAX_BYTES:
+                        return UNREACHABLE  # abort early, do not buffer the rest
+                    chunks.append(chunk)
+        except Exception:
+            return UNREACHABLE
+        body = b"".join(chunks)
+        try:
+            page_text = body.decode(response.encoding or "utf-8", errors="replace")
+        except (LookupError, ValueError):
+            page_text = body.decode("utf-8", errors="replace")
+        return RESOLVED_QUOTE_FOUND if _normalized_contains(page_text, quote) else RESOLVED_QUOTE_MISSING
+    return UNREACHABLE
 
 
 # ---------------------------------------------------------------------------
@@ -144,11 +245,12 @@ async def check_citation_resolution(client: httpx.AsyncClient, url: str, quote: 
 
 
 async def _resolve_and_stamp_async(debate_id: str, node_ids: list[str], *, transport=None) -> None:
+    # follow_redirects=False: check_citation_resolution follows redirects itself
+    # so the SSRF guard runs on every hop (httpx's own follower would not).
     async with httpx.AsyncClient(
         transport=transport,
         timeout=CITATION_FETCH_TIMEOUT_SECONDS,
-        follow_redirects=True,
-        max_redirects=CITATION_MAX_REDIRECTS,
+        follow_redirects=False,
     ) as client:
         with SessionLocal() as db:
             for node_id in node_ids:

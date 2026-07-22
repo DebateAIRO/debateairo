@@ -170,6 +170,20 @@ def test_contract_truncates_quote_to_max_length() -> None:
     assert 0 < len(validated["sources"][0]["quote"]) <= 300
 
 
+def test_contract_keeps_iso_dates_and_nulls_non_iso() -> None:
+    svc = _service()
+    assert svc.validate_evidence_contract(_payload([_source(date="2023-05-01")]))["sources"][0]["date"] == "2023-05-01"
+    assert (
+        svc.validate_evidence_contract(_payload([_source(date="2023-05-01T12:30:00Z")]))["sources"][0]["date"]
+        == "2023-05-01T12:30:00Z"
+    )
+    # Non-ISO free text and impossible dates become null, not junk metadata.
+    assert svc.validate_evidence_contract(_payload([_source(date="last Tuesday")]))["sources"][0]["date"] is None
+    assert svc.validate_evidence_contract(_payload([_source(date="05/01/2023")]))["sources"][0]["date"] is None
+    assert svc.validate_evidence_contract(_payload([_source(date="2023-13-45")]))["sources"][0]["date"] is None
+    assert svc.validate_evidence_contract(_payload([_source(date=None)]))["sources"][0]["date"] is None
+
+
 @pytest.mark.parametrize(
     "payload",
     [
