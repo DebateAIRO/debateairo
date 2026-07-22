@@ -265,6 +265,38 @@ spawn counts vs. budget ceilings, depth variance) is now more likely to show
 real signal — the loop's full decision vocabulary is live, not just the
 `abandon` slice of it.
 
+**Known interaction: adaptive dispatch can race a pending synthesis
+(reviewer follow-up, not fixed by this task).** Making `challenge`/
+`seek_evidence` reachable (above) also makes a narrow, already-bounded race
+reachable: a generation-completion tail can see the tree quiescent and queue
+a `v2_synthesize` job (`app/services/dialectical_v2.py::
+queue_v2_synthesize_job`) at the same moment an in-flight scoring pass's
+adaptive dispatch (`app/exploration/expansion_dispatch.py::admit_and_spawn`)
+authenticates a fresh categorical decision and spawns a `v2_expand` job
+through the same W3 primitive every other expansion uses. When that happens,
+the pending synthesis submission fails `persist_v2_synthesis`'s own
+whole-tree quiescence re-check (`ValueError: "Cannot synthesize until all
+branches and expansions are complete"`, surfaced to the worker as HTTP 400)
+and burns one attempt (`Job.attempts` counts claims) before the expansion's
+own completion tail re-queues synthesis once the tree is quiescent again.
+This is bounded on every axis that matters, never open-ended: `DIALECTICAL_
+MAX_JOB_ATTEMPTS`/`max_job_attempts()` caps how many attempts a job can burn
+before terminalizing, the adaptive dispatcher's own round/per-node/
+per-debate budgets (`DIALECTICAL_EXPANSION_MAX_ROUNDS`/`_PER_NODE`/
+`_PER_DEBATE`) cap how often it can fire at all, and every `queue_v2_
+synthesize_job` call site's `existing_synthesis` check means the debate is
+never left with two `v2_synthesize` jobs pending at once (no double-queue).
+The cost is a wasted attempt and a delayed synthesis, never a stuck or
+duplicated debate. Operators soaking this step should expect a nonzero
+"synthesize retries during adaptive rounds" signal and should not treat it
+as a bug by itself — only investigate if it grows unbounded or a debate
+fails to ever synthesize. A future claim-gate mirroring `v2_synthesis_
+claim_blocked`'s existing deferral pattern (defer a pending `v2_synthesize`
+claim while a categorical dispatch decision is imminent, the same way
+score-before-synthesis already defers it on scoring) would remove the
+burned attempt entirely; that gate does not exist today and is out of scope
+for this task.
+
 **`lifecycleDecisions` on the wire.** Also verified/closed by this task: the
 debate payload's `lifecycleDecisions` array (`app/services/serialization.
 py::_lifecycle_decisions_payload`), the web types (`LifecycleDecision` in
