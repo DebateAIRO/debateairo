@@ -9,7 +9,14 @@ from app.models.entities import AnalyzerRun, JudgeOutputArtifact, Node, next_ana
 from app.protocol.runner import run_protocol_analysis
 from app.protocol.state import protocol_state_of
 from app.qbaf.dfquad import CyclicGraphError
-from app.scoring import NodeScoringPayload, reduce_assessments
+from app.scoring import (
+    ClaimAssessment,
+    ContextAssessment,
+    CriticAssessment,
+    EvidenceAssessment,
+    NodeScoringPayload,
+    reduce_assessments,
+)
 from app.scoring.normalizer import normalize_claim
 from app.scoring.service import SCORING_ANALYZER_TYPE, JUDGE_OUTPUT_SOURCE
 from app.services import dialectical_v2 as service
@@ -20,16 +27,27 @@ from test_dialectical_v2 import complete_worker_v2_pipeline, real_codex_worker
 from test_node_scoring import base_assessment
 
 
-def _scoring_payload_for_node(node_id: str, raw_text: str, *, strength_override: float | None = None) -> dict:
+def _scoring_payload_for_node(
+    node_id: str,
+    raw_text: str,
+    *,
+    assessment: ClaimAssessment | None = None,
+    strength_override: float | None = None,
+) -> dict:
     """Build a REAL NodeScoringPayload via the actual normalizer + reducer.
 
     Not hand-rolled fake JSON: this runs the same deterministic code path
     (`normalize_claim` + `reduce_assessments`) that production scoring uses,
     just fed a real ClaimAssessment fixture instead of a live judge call.
+
+    `assessment` defaults to the plain `base_assessment()` fixture; pass a
+    customized one (e.g. Task 5's argument-only-composition fixture) when a
+    test needs the reducer's real composition to land on a specific,
+    hand-verified number, rather than overwriting the result after the fact
+    via `strength_override`.
     """
     claim = normalize_claim(node_id=node_id, raw_text=raw_text)
-    assessment = base_assessment()
-    payload = reduce_assessments(claim, assessment)
+    payload = reduce_assessments(claim, assessment if assessment is not None else base_assessment())
     if strength_override is not None:
         payload = payload.model_copy(
             update={"scores": payload.scores.model_copy(update={"strength": strength_override})}
@@ -595,6 +613,113 @@ def test_protocol_analysis_records_tau_coverage_fraction_of_argument_nodes(db) -
     assert run.output["tauSources"][pro.id] == "judge_strength"
     assert run.output["tauSources"][con.id] == "judge_strength"
     assert run.output["tauSources"][debate.root_node_id] == "default"
+
+
+def test_run_protocol_analysis_carries_argument_only_strength_into_dialectical_strengths_for_a_normative_node(
+    db,
+) -> None:
+    # Task 5 reviewer follow-up (strength composition honest for
+    # evidence-empty claims, docs/improvement-plan-2026-07-22.md Sec P2.4).
+    # Controller adjudication: the cascade from reduce_assessments'
+    # argument-only strength, through debate_adapter._tau_for's base_scores,
+    # into compute_strengths()'s dialecticalStrengths (and onward to
+    # verdict bands, exploration priorities, and the web weak_uncertain
+    # filter) is INTENDED -- the plan's whole complaint (audit Sec 1.3) was
+    # that artificially evidence-crushed normative strengths poisoned that
+    # entire downstream tree. This proves the cascade actually carries the
+    # higher, honest number end to end, not just at the reducer's own
+    # boundary (already covered unit-level by
+    # test_reducer_uses_argument_only_composition_for_claim_types_that_can_
+    # never_have_evidence / test_reducer_composes_minimal_scores_
+    # deterministically in test_node_scoring.py).
+    #
+    # Same critic/evidence/context overrides as that 0.8 unit fixture, but
+    # run through the REAL normalize_claim -> reduce_assessments ->
+    # debate_argument_graph -> compute_strengths() pipeline (via
+    # run_protocol_analysis against a real persisted node_scoring
+    # AnalyzerRun) -- not a hand-set strength_override, so this exercises
+    # the actual argument-only branch, not a stand-in number that merely
+    # happens to equal it.
+    real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    root_id = debate.root_node_id
+    normative_pro = Node(
+        debate_id=debate.id,
+        parent_id=root_id,
+        node_type="PRO",
+        depth=1,
+        position=10,
+        # Matches exactly one normative marker ("should") and no other
+        # claim-type family, and contains no hedge marker -- so
+        # normalize_claim honestly derives claim_type="normative" and
+        # ambiguity_flags=[] here, the same clarity=1.0 assumption the hand
+        # computation below relies on. (evidence_refs is honestly []
+        # too -- unlike the unit fixture's explicit ["stored-judge-output"]
+        # override -- but evidence_refs never feeds base_strength, only the
+        # separate uncertainty checklist, so it doesn't affect this test.)
+        claim="Cities should ban cars downtown to protect pedestrians.",
+        status="complete",
+        materialized_path="/0/10",
+    )
+    db.add(normative_pro)
+    db.flush()
+
+    assessment = base_assessment(
+        critic=CriticAssessment(
+            logical_validity=0.8,
+            assumption_risk=0.1,
+            counterargument_strength=0.2,
+        ),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.6,
+            evidence_relevance=0.6,
+            evidence_sufficiency=0.6,
+            source_reliability=0.6,
+            freshness=0.6,
+        ),
+        context=ContextAssessment(relevance=0.7, impact=0.65, dependency_weight=0.5),
+    )
+    payload = _scoring_payload_for_node(normative_pro.id, normative_pro.claim, assessment=assessment)
+    # Sanity: claim_type is really classifier-derived, not hand-set, and the
+    # reducer really took the argument-only branch for it.
+    assert payload["claim"]["claim_type"] == "normative"
+    assert payload["strength_kind"] == "argument_only"
+    # Exact renormalized value, hand-computed the same way as
+    # test_reducer_composes_minimal_scores_deterministically:
+    # (1/3)*0.8 + (4/15)*0.8 + 0.20*1.0 + 0.20*0.7 - 0.20*0.1 = 0.8
+    assert payload["scores"]["strength"] == 0.8
+
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type=SCORING_ANALYZER_TYPE,
+            output={"status": "available", "items": [payload]},
+            status="complete",
+            provenance={"scoring_source": JUDGE_OUTPUT_SOURCE},
+        )
+    )
+    db.commit()
+
+    run_protocol_analysis(db, debate)
+
+    run = _latest_protocol_analysis_run(db, debate.id)
+    # (a) dialecticalStrengths reflects the argument-only value honestly.
+    # normative_pro has no incoming attack/support edges of its own (nothing
+    # targets it as an attacker/supporter -- it is only ever a SOURCE of a
+    # support edge into root), so DF-QuAD's mediating function degenerates
+    # to sigma(tau, 0, 0) == tau exactly: its own base score passes through
+    # compute_strengths() unchanged. Pre-Task-5, the SAME evidence_quality
+    # (0.6) fed the always-evidence-weighted formula and this claim would
+    # have landed at 0.745, not 0.8 -- and a genuinely evidence-empty
+    # normative claim (evidence_quality near 0, the audit's real-world
+    # case) would have been structurally ceilinged near 0.5 regardless of
+    # argument quality (docs/improvement-plan-2026-07-22.md Sec 1.3).
+    assert run.output["dialecticalStrengths"][normative_pro.id] == pytest.approx(0.8)
+    # (b) tauSources marks it judge-sourced, not the 0.5 DEFAULT_TAU
+    # fallback debate_adapter.DEFAULT_TAU stamps for unscored nodes.
+    assert run.output["tauSources"][normative_pro.id] == "judge_strength"
 
 
 def test_protocol_analysis_tau_coverage_zero_for_unscored_debate(db) -> None:
