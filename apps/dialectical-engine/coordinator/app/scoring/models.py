@@ -57,6 +57,21 @@ UncertaintyDriverCode = Literal[
 ]
 UncertaintySource = Literal["dispersion", "heuristic"]
 
+# Task 5 (strength composition honest for evidence-empty claims,
+# docs/improvement-plan-2026-07-22.md Sec P2.4). StrengthKind records which
+# base_strength composition reduce_assessments used to compute
+# `scores.strength`: "argument_only" for claim types that can never carry
+# external evidence (normative/definitional -- the same set
+# app.protocol.verification classifies as "unverifiable_by_kind"), where the
+# evidence_quality term is dropped entirely and the remaining positive
+# weights (logical_validity, counter_resilience, clarity, relevance) are
+# renormalized to sum to 1 (assumption_risk keeps its -0.20 penalty
+# unchanged). "evidence_weighted" (the default) is the pre-Task-5
+# composition, byte-identical for every other claim type -- for them a
+# missing/weak-evidence term is an honest signal that P1's evidence
+# pipeline is still being built, not a structural flaw to paper over.
+StrengthKind = Literal["argument_only", "evidence_weighted"]
+
 
 def _unit_interval(value: float) -> float:
     if value < 0.0 or value > 1.0:
@@ -372,6 +387,8 @@ class NodeScoringPayload(BaseModel):
     # app.scoring.disagreement.dispersion_uncertainty.
     uncertainty_drivers: list[UncertaintyDriver] = Field(default_factory=list)
     uncertainty_source: UncertaintySource = "heuristic"
+    # Task 5: see StrengthKind above.
+    strength_kind: StrengthKind = "evidence_weighted"
 
 
 class NodeScoringError(BaseModel):

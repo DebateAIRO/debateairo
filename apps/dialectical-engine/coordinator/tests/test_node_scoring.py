@@ -1316,6 +1316,13 @@ def test_reducer_payload_surfaces_disagreements_not_averaged_away() -> None:
 
 
 def test_reducer_composes_minimal_scores_deterministically() -> None:
+    # Task 5 (strength composition honest for evidence-empty claims,
+    # docs/improvement-plan-2026-07-22.md Sec P2.4) amendment: this fixture's
+    # claim_type="normative" now takes the argument-only composition (no
+    # evidence_quality term), so the expected strength changed from the
+    # pre-Task-5 evidence-weighted value (0.745) to 0.8 -- computed by hand:
+    # (1/3)*0.8 + (4/15)*0.8 + 0.20*1.0 + 0.20*0.7 - 0.20*0.1
+    #   = 0.26667 + 0.21333 + 0.2 + 0.14 - 0.02 = 0.8
     claim = base_claim(
         claim_type="normative",
         ambiguity_flags=[],
@@ -1342,7 +1349,7 @@ def test_reducer_composes_minimal_scores_deterministically() -> None:
 
     assert first.model_dump(mode="json") == second.model_dump(mode="json")
     assert first.scores.model_dump() == {
-        "strength": 0.745,
+        "strength": 0.8,
         "uncertainty": 0.2,
         "impact": 0.65,
         "evidence_quality": 0.6,
@@ -1351,15 +1358,163 @@ def test_reducer_composes_minimal_scores_deterministically() -> None:
         "assumption_risk": 0.1,
         "counter_resilience": 0.8,
     }
+    assert first.strength_kind == "argument_only"
     assert first.score_caps == []
     assert first.judge_disagreements == []
     assert first.model_dump(mode="json")["score_provenance"] == {
         "raw_judge_output_kind": "claim_assessment",
         "raw_judge_output_included": False,
         "final_score_source": "deterministic_reducer",
-        "reducer_version": "node-scoring-reducer-v2",
+        "reducer_version": "node-scoring-reducer-v3",
         "rubric_version": "debateai-rubric-v1",
     }
+
+
+def test_reducer_uses_argument_only_composition_for_claim_types_that_can_never_have_evidence() -> None:
+    # Task 5 (strength composition honest for evidence-empty claims,
+    # docs/improvement-plan-2026-07-22.md Sec P2.4). Audit finding (Sec 1.3):
+    # base_strength's fixed 0.25 evidence_quality weight caps every claim
+    # near 0.5 while evidence_quality is structurally ~0 (P1's evidence
+    # pipeline is still being built) -- including normative/definitional
+    # claims that can NEVER carry external evidence, no matter how strong
+    # the argument. Same assessment (evidence_quality=0.0, otherwise a
+    # strong argument), only claim_type differs: normative/definitional get
+    # the argument-only renormalized composition (evidence term dropped
+    # entirely) and score meaningfully higher than empirical, which is
+    # honestly capped by the unchanged weak_evidence score cap.
+    assessment = base_assessment(
+        critic=CriticAssessment(
+            logical_validity=0.9,
+            assumption_risk=0.1,
+            counterargument_strength=0.1,
+        ),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.0,
+            evidence_relevance=0.0,
+            evidence_sufficiency=0.0,
+            source_reliability=0.0,
+            freshness=0.0,
+        ),
+        context=ContextAssessment(relevance=0.9, impact=0.7, dependency_weight=0.5),
+    )
+
+    normative = reduce_assessments(
+        base_claim(claim_type="normative", ambiguity_flags=[], evidence_refs=[]), assessment
+    )
+    definitional = reduce_assessments(
+        base_claim(claim_type="definitional", ambiguity_flags=[], evidence_refs=[]), assessment
+    )
+    empirical = reduce_assessments(
+        base_claim(claim_type="empirical", ambiguity_flags=[], evidence_refs=[]), assessment
+    )
+
+    # Exact renormalized value, computed by hand:
+    # (1/3)*0.9 + (4/15)*0.9 + 0.20*1.0 + 0.20*0.9 - 0.20*0.1
+    #   = 0.3 + 0.24 + 0.2 + 0.18 - 0.02 = 0.90
+    assert normative.scores.strength == 0.9
+    assert normative.strength_kind == "argument_only"
+    assert definitional.scores.strength == 0.9
+    assert definitional.strength_kind == "argument_only"
+
+    # Empirical keeps the pre-Task-5 evidence-weighted composition, honestly
+    # capped by the unchanged weak_evidence score cap (claim_type in
+    # {"empirical", "causal"} and evidence_quality < 0.30).
+    assert empirical.scores.strength == 0.45
+    assert empirical.strength_kind == "evidence_weighted"
+    assert any(cap.triggered_by == "weak_evidence" for cap in empirical.score_caps)
+
+    assert normative.scores.strength > empirical.scores.strength
+    assert definitional.scores.strength > empirical.scores.strength
+
+
+def test_reducer_keeps_evidence_weighted_composition_byte_identical_for_claim_types_outside_the_argument_only_set() -> None:
+    # Regression guard: every claim type OTHER than normative/definitional
+    # must produce the exact pre-Task-5 base_strength value from the same
+    # inputs -- this task must not change scoring for claims where a
+    # missing/weak-evidence term is an honest signal (P1's evidence pipeline
+    # still being built), not a structural flaw.
+    assessment = base_assessment(
+        critic=CriticAssessment(
+            logical_validity=0.8,
+            assumption_risk=0.1,
+            counterargument_strength=0.2,
+        ),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.6,
+            evidence_relevance=0.6,
+            evidence_sufficiency=0.6,
+            source_reliability=0.6,
+            freshness=0.6,
+        ),
+        context=ContextAssessment(relevance=0.7, impact=0.65, dependency_weight=0.5),
+    )
+
+    for claim_type in ("empirical", "causal", "prediction", "comparative", "mixed", "unknown"):
+        payload = reduce_assessments(
+            base_claim(claim_type=claim_type, ambiguity_flags=[], evidence_refs=["stored-judge-output"]),
+            assessment,
+        )
+        # Pinned pre-Task-5 value: 0.25*0.8 + 0.25*0.6 + 0.20*0.8 + 0.15*1.0 +
+        # 0.15*0.7 - 0.20*0.1 = 0.745, byte-identical to what
+        # test_reducer_composes_minimal_scores_deterministically asserted for
+        # this same assessment before Task 5 branched claim_type="normative"
+        # onto the argument-only path.
+        assert payload.scores.strength == 0.745, claim_type
+        assert payload.strength_kind == "evidence_weighted", claim_type
+
+
+def test_reducer_still_applies_score_caps_after_the_argument_only_composition() -> None:
+    # Order preserved: base_strength is computed first (branch-dependent),
+    # THEN apply_score_caps still runs on the result exactly as before. A
+    # fatal contradiction still caps a normative claim's strength to 0.25
+    # even though its uncapped argument-only base_strength (0.90, see
+    # test_reducer_uses_argument_only_composition_for_claim_types_that_can_
+    # never_have_evidence above) is far higher than the cap. The
+    # weak_evidence cap, meanwhile, correctly never fires for normative
+    # claims (apply_score_caps gates it to claim_type in
+    # {"empirical", "causal"}), unchanged by this task.
+    claim = base_claim(claim_type="normative", ambiguity_flags=[], evidence_refs=[])
+    assessment = base_assessment(
+        critic=CriticAssessment(
+            logical_validity=0.9,
+            assumption_risk=0.1,
+            counterargument_strength=0.1,
+        ),
+        evidence=EvidenceAssessment(
+            evidence_quality=0.0,
+            evidence_relevance=0.0,
+            evidence_sufficiency=0.0,
+            source_reliability=0.0,
+            freshness=0.0,
+        ),
+        context=ContextAssessment(relevance=0.9, impact=0.7, dependency_weight=0.5),
+        fallacy=FallacyAssessment(
+            logical_consistency=0.2,
+            fatal_flags=[
+                {
+                    "type": "contradiction",
+                    "severity": "high",
+                    "description": "Internal contradiction.",
+                }
+            ],
+        ),
+    )
+
+    payload = reduce_assessments(claim, assessment)
+
+    assert payload.strength_kind == "argument_only"
+    assert payload.scores.strength == 0.25
+    assert [cap.triggered_by for cap in payload.score_caps] == ["fatal_contradiction"]
+
+
+def test_reducer_stamps_strength_kind_in_payload_and_serialized_json() -> None:
+    normative = reduce_assessments(base_claim(claim_type="normative"), base_assessment())
+    empirical = reduce_assessments(base_claim(claim_type="empirical"), base_assessment())
+
+    assert normative.strength_kind == "argument_only"
+    assert normative.model_dump(mode="json")["strength_kind"] == "argument_only"
+    assert empirical.strength_kind == "evidence_weighted"
+    assert empirical.model_dump(mode="json")["strength_kind"] == "evidence_weighted"
 
 
 def test_reducer_increases_uncertainty_when_evidence_refs_are_missing() -> None:
@@ -7582,7 +7737,7 @@ def test_scoring_api_returns_stored_judge_outputs(db) -> None:
         "raw_judge_output_kind": "claim_assessment",
         "raw_judge_output_included": False,
         "final_score_source": "deterministic_reducer",
-        "reducer_version": "node-scoring-reducer-v2",
+        "reducer_version": "node-scoring-reducer-v3",
         "rubric_version": "debateai-rubric-v1",
     }
     # Task 4 (docs/improvement-plan-2026-07-22.md Sec P2.1): uncertainty_drivers
@@ -7594,6 +7749,9 @@ def test_scoring_api_returns_stored_judge_outputs(db) -> None:
     assert response.json()["items"][0]["uncertainty_drivers"] == scoring_item["uncertainty_drivers"]
     assert len(response.json()["items"][0]["uncertainty_drivers"]) > 0
     assert response.json()["items"][0]["uncertainty_source"] == scoring_item["uncertainty_source"] == "heuristic"
+    # Task 5 (docs/improvement-plan-2026-07-22.md Sec P2.4): strength_kind
+    # must survive the same round trip, for the same reason.
+    assert response.json()["items"][0]["strength_kind"] == scoring_item["strength_kind"] == "evidence_weighted"
     assert "raw_output" not in str(response.json()["items"][0])
     assert "judge_outputs" not in str(response.json()["items"][0]["score_provenance"])
 

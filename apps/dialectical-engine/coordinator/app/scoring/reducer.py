@@ -22,6 +22,7 @@ from app.scoring.models import (
     ScoreRationale,
     ScoringDebug,
     ScoringHole,
+    StrengthKind,
     UncertaintyDriver,
 )
 
@@ -33,8 +34,24 @@ from app.scoring.models import (
 # judge contract_hash (app.scoring.judge_registry pins REDUCER_VERSION into
 # it) must change and invalidate every cached NodeScoringResult/
 # JudgeOutputArtifact, same as Task 3's prompt_version bump.
-REDUCER_VERSION = "node-scoring-reducer-v2"
+# Task 5 (strength composition honest for evidence-empty claims,
+# docs/improvement-plan-2026-07-22.md Sec P2.4): bumped v2 -> v3 for the
+# same reason -- base_strength's composition now branches on
+# claim.claim_type (see _ARGUMENT_ONLY_CLAIM_TYPES below) and
+# NodeScoringPayload.strength_kind is a new emitted field, so cached
+# results computed under the old, always-evidence-weighted composition must
+# not be silently reinterpreted as if they used the new one.
+REDUCER_VERSION = "node-scoring-reducer-v3"
 RUBRIC_VERSION = "debateai-rubric-v1"
+
+# Task 5: claim types that can NEVER carry external evidence -- the same set
+# app.protocol.verification classifies as "unverifiable_by_kind". For these,
+# base_strength drops the evidence_quality term entirely (rather than
+# letting a term that can never move cap every such claim near 0.5 while
+# P1's evidence pipeline is still being built) and renormalizes the
+# remaining four positive weights -- 0.25/0.75, 0.20/0.75, 0.15/0.75,
+# 0.15/0.75 -- to sum back to 1; the assumption_risk penalty is unchanged.
+_ARGUMENT_ONLY_CLAIM_TYPES = {"normative", "definitional"}
 
 
 def select_depth_pressure(payload: NodeScoringPayload) -> DepthPressureSelection:
@@ -96,14 +113,25 @@ def adaptive_depth_dry_run(
 def reduce_assessments(claim: NormalizedClaim, assessment: ClaimAssessment) -> NodeScoringPayload:
     counter_resilience = 1.0 - assessment.critic.counterargument_strength
     clarity = max(0.0, 1.0 - (0.15 * len(claim.ambiguity_flags)))
-    base_strength = (
-        0.25 * assessment.critic.logical_validity
-        + 0.25 * assessment.evidence.evidence_quality
-        + 0.20 * counter_resilience
-        + 0.15 * clarity
-        + 0.15 * assessment.context.relevance
-        - 0.20 * assessment.critic.assumption_risk
-    )
+    if claim.claim_type in _ARGUMENT_ONLY_CLAIM_TYPES:
+        strength_kind: StrengthKind = "argument_only"
+        base_strength = (
+            (1 / 3) * assessment.critic.logical_validity
+            + (4 / 15) * counter_resilience
+            + 0.20 * clarity
+            + 0.20 * assessment.context.relevance
+            - 0.20 * assessment.critic.assumption_risk
+        )
+    else:
+        strength_kind = "evidence_weighted"
+        base_strength = (
+            0.25 * assessment.critic.logical_validity
+            + 0.25 * assessment.evidence.evidence_quality
+            + 0.20 * counter_resilience
+            + 0.15 * clarity
+            + 0.15 * assessment.context.relevance
+            - 0.20 * assessment.critic.assumption_risk
+        )
     strength = _clamp(base_strength)
     impact = assessment.context.impact
     strength, impact, score_caps = apply_score_caps(
@@ -172,6 +200,7 @@ def reduce_assessments(claim: NormalizedClaim, assessment: ClaimAssessment) -> N
         # persisted judge assessments exist for the node -- see
         # app.scoring.disagreement.dispersion_uncertainty.
         uncertainty_source="heuristic",
+        strength_kind=strength_kind,
     )
 
 

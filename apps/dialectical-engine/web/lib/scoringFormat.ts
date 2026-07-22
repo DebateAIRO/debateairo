@@ -1,4 +1,4 @@
-import type { UncertaintyDriver, UncertaintySource } from "./types";
+import type { StrengthKind, UncertaintyDriver, UncertaintySource } from "./types";
 
 export type FormattedScorePercent = {
   value: number;
@@ -57,5 +57,34 @@ export function formatUncertaintyPill(
   return {
     pillText,
     title: `${driverText} (${numericSuffix})`,
+  };
+}
+
+export type StrengthPillContent = {
+  /** Pill text: unchanged "STR {value}" unless strength_kind is argument_only. */
+  pillText: string;
+  /** Full explanation for the title attribute; omitted (no attribute rendered) unless strength_kind is argument_only. */
+  title?: string;
+};
+
+// Task 5 (docs/improvement-plan-2026-07-22.md Sec P2.4): the strength pill
+// stays exactly the pre-Task-5 "STR {value}" (no title attribute) for the
+// default evidence_weighted case -- including older payloads that omit
+// strength_kind entirely -- so nothing changes for the vast majority of
+// claims. Only when strength_kind is "argument_only" (claim types that can
+// never carry external evidence, e.g. normative/definitional) does the
+// pill gain a compact "· argument-only" suffix plus a title explaining why
+// evidence isn't weighted into that number, per the same driver-first/
+// title-carries-detail convention formatUncertaintyPill established above.
+export function formatStrengthPill(
+  strengthKind: StrengthKind | null | undefined,
+  strengthPercent: FormattedScorePercent
+): StrengthPillContent {
+  if (strengthKind !== "argument_only") {
+    return { pillText: `STR ${strengthPercent.value}` };
+  }
+  return {
+    pillText: `STR ${strengthPercent.value} · argument-only`,
+    title: `Argument-only strength — evidence not weighted for this claim type (${strengthPercent.label})`,
   };
 }

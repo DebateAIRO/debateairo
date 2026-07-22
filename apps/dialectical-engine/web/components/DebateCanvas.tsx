@@ -15,7 +15,7 @@ import {
 } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
-import { formatScoreBadgeLabel, formatScorePercent, formatUncertaintyPill } from "@/lib/scoringFormat";
+import { formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill } from "@/lib/scoringFormat";
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
@@ -453,6 +453,7 @@ function ScoreBadges({
   const impact = formatScorePercent(scoring.scores.impact);
   const issueSummary = summarizeCardScoringIssues(scoring);
   const uncertaintyPill = formatUncertaintyPill(scoring.uncertainty_drivers, scoring.uncertainty_source, uncertainty);
+  const strengthPill = formatStrengthPill(scoring.strength_kind, strength);
 
   return (
     <button
@@ -464,8 +465,12 @@ function ScoreBadges({
         openNodeDetails();
       }}
     >
-      <span className="scoreBadge strength" aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}>
-        STR {strength.value}
+      <span
+        className="scoreBadge strength"
+        aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}
+        title={strengthPill.title}
+      >
+        {strengthPill.pillText}
       </span>
       <span
         className="scoreBadge uncertainty"

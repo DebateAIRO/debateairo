@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import type { DebateNode, NodeScoringError, NodeScoringPayload } from "@/lib/types";
 import { ROLE_PALETTES, flattenOutline, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { modelMeta } from "@/lib/models";
-import { formatScoreBadgeLabel, formatScorePercent, formatUncertaintyPill } from "@/lib/scoringFormat";
+import { formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill } from "@/lib/scoringFormat";
 
 type DebateOutlineProps = {
   root: DebateNode;
@@ -92,11 +92,16 @@ function OutlineScoringMetadata({
     const uncertainty = formatScorePercent(scoring.scores.uncertainty);
     const issueCount = scoring.holes.length + scoring.fatal_flags.length;
     const uncertaintyPill = formatUncertaintyPill(scoring.uncertainty_drivers, scoring.uncertainty_source, uncertainty);
+    const strengthPill = formatStrengthPill(scoring.strength_kind, strength);
 
     return (
       <span className="scoreBadgeButton" aria-label={`Scoring summary for ${nodeClaim}`}>
-        <span className="scoreBadge strength" aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}>
-          STR {strength.value}
+        <span
+          className="scoreBadge strength"
+          aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}
+          title={strengthPill.title}
+        >
+          {strengthPill.pillText}
         </span>
         <span
           className="scoreBadge uncertainty"

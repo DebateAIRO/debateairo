@@ -140,3 +140,35 @@ test("formatUncertaintyPill falls back to the numeric+source pill for a dispersi
   assert.equal(result.pillText, "UNC 83 · dispersion");
   assert.equal(result.title, "UNC 83 · dispersion (UNC 83 · dispersion)");
 });
+
+test("formatStrengthPill adds a compact argument-only suffix and an explanatory title when strength_kind is argument_only", async () => {
+  const { formatStrengthPill, formatScorePercent } = await loadHelper();
+
+  const result = formatStrengthPill("argument_only", formatScorePercent(0.62));
+
+  assert.equal(result.pillText, "STR 62 · argument-only");
+  assert.equal(
+    result.title,
+    "Argument-only strength — evidence not weighted for this claim type (62 out of 100)",
+  );
+});
+
+test("formatStrengthPill renders the plain pre-Task-5 pill with no title for strength_kind evidence_weighted", async () => {
+  const { formatStrengthPill, formatScorePercent } = await loadHelper();
+
+  const result = formatStrengthPill("evidence_weighted", formatScorePercent(0.62));
+
+  assert.equal(result.pillText, "STR 62");
+  assert.equal(result.title, undefined);
+});
+
+test("formatStrengthPill treats missing strength_kind the same as evidence_weighted (older, pre-Task-5 debates)", async () => {
+  const { formatStrengthPill, formatScorePercent } = await loadHelper();
+
+  const resultUndefined = formatStrengthPill(undefined, formatScorePercent(0.62));
+  const resultNull = formatStrengthPill(null, formatScorePercent(0.62));
+
+  assert.deepEqual(resultUndefined, resultNull);
+  assert.equal(resultUndefined.pillText, "STR 62");
+  assert.equal(resultUndefined.title, undefined);
+});

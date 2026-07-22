@@ -165,6 +165,16 @@ export type UncertaintyDriver = {
 
 export type UncertaintySource = "dispersion" | "heuristic";
 
+// Task 5 (docs/improvement-plan-2026-07-22.md Sec P2.4): mirrors
+// coordinator/app/scoring/models.py's StrengthKind -- "argument_only" is
+// stamped for claim types that can never carry external evidence
+// (normative/definitional), where scores.strength is computed by dropping
+// the evidence_quality term and renormalizing the remaining criteria,
+// rather than being structurally capped near 0.5 by a term that can never
+// move. "evidence_weighted" (the default) is the pre-Task-5 composition,
+// unchanged for every other claim type.
+export type StrengthKind = "argument_only" | "evidence_weighted";
+
 export type ScoringHole = {
   type: string;
   severity: Severity;
@@ -248,6 +258,9 @@ export type NodeScoringPayload = {
   // presence.
   uncertainty_drivers?: UncertaintyDriver[] | null;
   uncertainty_source?: UncertaintySource | null;
+  // Optional: additive field (Task 5). Older persisted/cached debates
+  // predate this and omit it entirely -- callers must not assume presence.
+  strength_kind?: StrengthKind | null;
 };
 
 export type NodeScoringError = {

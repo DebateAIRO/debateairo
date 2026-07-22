@@ -47,7 +47,9 @@ def test_active_contract_returns_primary_judge_for_judge_role() -> None:
     assert contract is PRIMARY_NODE_SCORING_JUDGE
     assert contract.judge_id == "node_scoring.primary"
     assert contract.judge_version == "v1"
-    assert contract.reducer_version == "node-scoring-reducer-v2"
+    # Task 5 (strength composition honest for evidence-empty claims,
+    # docs/improvement-plan-2026-07-22.md Sec P2.4) bumped this v2 -> v3.
+    assert contract.reducer_version == "node-scoring-reducer-v3"
     assert contract.rubric_version == "debateai-rubric-v1"
 
 
@@ -83,10 +85,41 @@ def test_active_primary_judge_contract_hash_differs_from_pre_task4_reducer_v1_ha
     # task), so this regression-proofs the same invariant as the Task 3
     # prompt_version test above: a reducer change MUST change contract_hash
     # so every cached NodeScoringResult/JudgeOutputArtifact invalidates.
+    #
+    # Task 5 amendment: reducer_version has since moved again (v2 -> v3, see
+    # the test below), so the live-value assertion here was updated to match
+    # -- the property under test (today's hash differs from the pre-Task-3
+    # all-v1 baseline) still holds transitively regardless of how many times
+    # reducer_version has been bumped since.
     pre_bump_v1_contract = _contract()
-    assert PRIMARY_NODE_SCORING_JUDGE.reducer_version == "node-scoring-reducer-v2"
+    assert PRIMARY_NODE_SCORING_JUDGE.reducer_version == "node-scoring-reducer-v3"
     assert PRIMARY_NODE_SCORING_JUDGE.reducer_version != pre_bump_v1_contract.reducer_version
     assert PRIMARY_NODE_SCORING_JUDGE.contract_hash != pre_bump_v1_contract.contract_hash
+
+
+def test_active_primary_judge_contract_hash_differs_from_pre_task5_reducer_v2_hash() -> None:
+    # Task 5 (strength composition honest for evidence-empty claims,
+    # docs/improvement-plan-2026-07-22.md Sec P2.4): reduce_assessments now
+    # branches base_strength's composition on claim.claim_type
+    # (argument-only renormalized weights for normative/definitional claims
+    # that can never carry external evidence; unchanged evidence-weighted
+    # composition for every other claim type) and stamps
+    # NodeScoringPayload.strength_kind -- a real, semantic change to what
+    # the reducer produces from the same inputs, so reducer_version was
+    # bumped v2 -> v3 in app.scoring.reducer.REDUCER_VERSION (and,
+    # transitively via that import,
+    # app.scoring.judge_registry.PRIMARY_NODE_SCORING_JUDGE). Unlike the
+    # Task 4 test above (which compares against the full pre-Task-3 all-v1
+    # baseline), this pins every OTHER field at its current live value
+    # (prompt_version is already Task 3's "scoring-provider-v2") so it
+    # isolates exactly the Task 5 bump.
+    pre_bump_v2_contract = _contract(
+        prompt_version="scoring-provider-v2",
+        reducer_version="node-scoring-reducer-v2",
+    )
+    assert PRIMARY_NODE_SCORING_JUDGE.reducer_version == "node-scoring-reducer-v3"
+    assert PRIMARY_NODE_SCORING_JUDGE.reducer_version != pre_bump_v2_contract.reducer_version
+    assert PRIMARY_NODE_SCORING_JUDGE.contract_hash != pre_bump_v2_contract.contract_hash
 
 
 def test_active_contract_rejects_unknown_role() -> None:
