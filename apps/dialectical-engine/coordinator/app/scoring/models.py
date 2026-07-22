@@ -47,6 +47,13 @@ UncertaintyDriverCode = Literal[
     "judge_disagreement",
     "score_caps",
     "strong_counter",
+    # Controller design decision (reviewer follow-up): stamped only at the
+    # uncertainty_source="dispersion" override site
+    # (app.scoring.service._attach_plural_judge_provenance), never by the
+    # reducer's own _uncertainty_drivers -- it explains the *dispersion*
+    # numeric specifically, so it is always prepended first when that
+    # numeric is in play.
+    "judge_dispersion",
 ]
 UncertaintySource = Literal["dispersion", "heuristic"]
 

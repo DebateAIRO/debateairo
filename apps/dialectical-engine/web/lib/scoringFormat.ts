@@ -28,6 +28,15 @@ export type UncertaintyPillContent = {
 // numeric value and its source (measured judge-panel dispersion vs the
 // heuristic checklist fallback) remain available via the title attribute
 // (and as the pill text itself when there are no labeled drivers to show).
+//
+// Reviewer follow-up (controller design decision): when uncertainty_source
+// is "dispersion", app.scoring.service._attach_plural_judge_provenance
+// always prepends a judge_dispersion driver ("judges disagree (spread
+// N.NN)") explaining that number, so drivers is empty here only for the
+// honest heuristic "nothing fired" case in practice -- the
+// source === "dispersion" branch below is a defensive fallback for that
+// combination, kept consistent with the has-drivers branch's parenthesized
+// title form rather than a special-cased shorter one.
 export function formatUncertaintyPill(
   drivers: UncertaintyDriver[] | null | undefined,
   source: UncertaintySource | null | undefined,
@@ -37,15 +46,16 @@ export function formatUncertaintyPill(
   const safeSource: UncertaintySource = source ?? "heuristic";
   const numericSuffix = `UNC ${uncertaintyPercent.value} · ${safeSource}`;
 
-  if (safeDrivers.length === 0) {
-    return {
-      pillText: safeSource === "heuristic" ? "uncertainty unmeasured" : numericSuffix,
-      title: numericSuffix,
-    };
-  }
+  const pillText =
+    safeDrivers.length > 0
+      ? safeDrivers[0].label
+      : safeSource === "heuristic"
+        ? "uncertainty unmeasured"
+        : numericSuffix;
+  const driverText = safeDrivers.length > 0 ? safeDrivers.map((driver) => driver.label).join("; ") : pillText;
 
   return {
-    pillText: safeDrivers[0].label,
-    title: `${safeDrivers.map((driver) => driver.label).join("; ")} (${numericSuffix})`,
+    pillText,
+    title: `${driverText} (${numericSuffix})`,
   };
 }

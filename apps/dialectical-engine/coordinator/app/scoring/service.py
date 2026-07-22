@@ -1123,9 +1123,23 @@ def _attach_plural_judge_provenance(
     dispersion = dispersion_uncertainty(judge_evidence)
     if dispersion is not None:
         scores = dict(next_item.get("scores") or {})
-        scores["uncertainty"] = dispersion
+        scores["uncertainty"] = dispersion.uncertainty
         next_item["scores"] = scores
         next_item["uncertainty_source"] = "dispersion"
+        # Controller design decision (reviewer follow-up): the drivers list
+        # must explain the number it now sits next to. Prepended (not
+        # appended) -- it is THE source of this specific numeric, so it
+        # leads; the reducer's own heuristic-derived drivers (still
+        # meaningful qualitative context from the most recent single
+        # assessment) follow.
+        existing_drivers = list(next_item.get("uncertainty_drivers") or [])
+        next_item["uncertainty_drivers"] = [
+            {
+                "code": "judge_dispersion",
+                "label": f"judges disagree (spread {dispersion.spread:.2f})",
+            },
+            *existing_drivers,
+        ]
 
     return next_item
 

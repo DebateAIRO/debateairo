@@ -153,7 +153,10 @@ export type UncertaintyDriverCode =
   | "ambiguity"
   | "judge_disagreement"
   | "score_caps"
-  | "strong_counter";
+  | "strong_counter"
+  // Stamped only when uncertainty_source is "dispersion" -- always the
+  // first driver in that case, explaining the measured numeric itself.
+  | "judge_dispersion";
 
 export type UncertaintyDriver = {
   code: UncertaintyDriverCode;

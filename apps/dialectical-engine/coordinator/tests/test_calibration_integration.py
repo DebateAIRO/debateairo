@@ -220,7 +220,7 @@ def test_calibration_flag_off_leaves_non_uncertainty_scores_byte_identical(db, m
     for field in non_uncertainty_fields:
         assert item["scores"][field] == direct["scores"][field]
 
-    expected_uncertainty = dispersion_uncertainty(
+    expected_dispersion = dispersion_uncertainty(
         [
             {
                 "judge_role": "primary_judge",
@@ -238,8 +238,9 @@ def test_calibration_flag_off_leaves_non_uncertainty_scores_byte_identical(db, m
             },
         ]
     )
+    assert expected_dispersion is not None
     assert item["uncertainty_source"] == "dispersion"
-    assert item["scores"]["uncertainty"] == expected_uncertainty
+    assert item["scores"]["uncertainty"] == expected_dispersion.uncertainty
     assert item["scores"]["uncertainty"] != direct["scores"]["uncertainty"]
 
 
@@ -388,3 +389,38 @@ def test_calibration_weighted_aggregate_applied_when_flag_on_and_plural(db, monk
         4,
     )
     assert item["scores"]["strength"] == expected_strength
+
+    # Reviewer follow-up: this is exactly the risk combination -- calibration
+    # weighting ON (flag-gated) AND >=2 persisted judgments (dispersion-eligible)
+    # at once. dispersion_uncertainty is unconditional on the calibration flag
+    # and is applied after _weighted_aggregate_scores in
+    # _attach_plural_judge_provenance, so it must win for uncertainty
+    # specifically even while calibrationApplied is True for strength above.
+    expected_dispersion = dispersion_uncertainty(
+        [
+            {
+                "judge_role": "primary_judge",
+                "provider": "anthropic",
+                "model": "claude-3-sonnet",
+                "raw_output_sha256": "irrelevant-primary",
+                "assessment": primary_assessment.model_dump(mode="json"),
+            },
+            {
+                "judge_role": "verifier_judge",
+                "provider": "anthropic",
+                "model": "claude-3-opus",
+                "raw_output_sha256": "irrelevant-verifier",
+                "assessment": verifier_assessment.model_dump(mode="json"),
+            },
+            {
+                "judge_role": "third_judge",
+                "provider": "codex",
+                "model": "gpt-5.2-codex",
+                "raw_output_sha256": "irrelevant-third",
+                "assessment": third_assessment.model_dump(mode="json"),
+            },
+        ]
+    )
+    assert expected_dispersion is not None
+    assert item["uncertainty_source"] == "dispersion"
+    assert item["scores"]["uncertainty"] == expected_dispersion.uncertainty

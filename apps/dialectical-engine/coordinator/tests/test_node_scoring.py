@@ -1544,7 +1544,7 @@ def test_reducer_uncertainty_drivers_fire_every_code_in_deterministic_order() ->
         {"code": "ambiguity", "label": "1 ambiguity flag(s)"},
         {"code": "judge_disagreement", "label": "judge disagreement: steelman_evidence_tension"},
         {"code": "judge_disagreement", "label": "judge disagreement: impact_assumption_tension"},
-        {"code": "score_caps", "label": "score capped: strength"},
+        {"code": "score_caps", "label": "score capped: weak_evidence"},
         {"code": "strong_counter", "label": "strong counterargument present"},
     ]
 
@@ -1552,7 +1552,10 @@ def test_reducer_uncertainty_drivers_fire_every_code_in_deterministic_order() ->
 def test_reducer_uncertainty_drivers_include_one_entry_per_applied_score_cap() -> None:
     # Same fixture as test_reducer_payload_exposes_applied_cap_reasons
     # (three applied score caps: strength/weak_evidence,
-    # strength/fatal_contradiction, impact/low_relevance).
+    # strength/fatal_contradiction, impact/low_relevance). Labels use
+    # triggered_by (the semantic cause), not score (the capped field) --
+    # the first two caps share score="strength" but must still render as
+    # distinct drivers.
     claim = base_claim(claim_type="causal")
     assessment = base_assessment(
         context=ContextAssessment(relevance=0.2, impact=0.9, dependency_weight=0.5),
@@ -1572,9 +1575,9 @@ def test_reducer_uncertainty_drivers_include_one_entry_per_applied_score_cap() -
 
     cap_drivers = [driver for driver in payload.uncertainty_drivers if driver.code == "score_caps"]
     assert [driver.label for driver in cap_drivers] == [
-        "score capped: strength",
-        "score capped: strength",
-        "score capped: impact",
+        "score capped: weak_evidence",
+        "score capped: fatal_contradiction",
+        "score capped: low_relevance",
     ]
 
 
@@ -1758,7 +1761,11 @@ def test_dispersion_uncertainty_maps_a_035_strength_gap_to_05_uncertainty() -> N
         ),
     ]
 
-    assert dispersion_uncertainty(judge_evidence) == pytest.approx(0.5, abs=1e-4)
+    result = dispersion_uncertainty(judge_evidence)
+
+    assert result is not None
+    assert result.uncertainty == pytest.approx(0.5, abs=1e-4)
+    assert result.spread == pytest.approx(0.35, abs=1e-4)
 
 
 def test_dispersion_uncertainty_clamps_a_large_strength_gap_to_10() -> None:
@@ -1793,7 +1800,11 @@ def test_dispersion_uncertainty_clamps_a_large_strength_gap_to_10() -> None:
         ),
     ]
 
-    assert dispersion_uncertainty(judge_evidence) == 1.0
+    result = dispersion_uncertainty(judge_evidence)
+
+    assert result is not None
+    assert result.uncertainty == 1.0
+    assert result.spread == 1.0
 
 
 def test_dispersion_uncertainty_returns_none_for_fewer_than_two_distinct_judgments() -> None:
@@ -3457,6 +3468,25 @@ def test_score_node_with_provider_derives_uncertainty_from_persisted_judge_dispe
     item = payload["items"][0]
     assert item["uncertainty_source"] == "dispersion"
     assert item["scores"]["uncertainty"] == pytest.approx(0.8321, abs=1e-4)
+    # Reviewer follow-up (controller design decision): the drivers list must
+    # explain the number it sits next to. judge_dispersion is prepended
+    # first -- it is the dispersion numeric's own source -- ahead of the
+    # heuristic drivers the reducer already derived from the most recent
+    # (skeptic) assessment against the real normalized claim ("Remote work
+    # improves retention." normalizes to claim_type "unknown" with no
+    # ambiguity flags or evidence refs -- verified independently before
+    # writing this assertion).
+    assert [driver["code"] for driver in item["uncertainty_drivers"]] == [
+        "judge_dispersion",
+        "no_evidence_refs",
+        "low_evidence_quality",
+        "judge_disagreement",
+        "strong_counter",
+    ]
+    assert item["uncertainty_drivers"][0] == {
+        "code": "judge_dispersion",
+        "label": "judges disagree (spread 0.58)",
+    }
 
 
 def test_score_node_with_provider_keeps_heuristic_uncertainty_source_for_a_single_persisted_judgment(db) -> None:

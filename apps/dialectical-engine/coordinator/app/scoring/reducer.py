@@ -368,7 +368,13 @@ def _uncertainty_drivers(
             )
         )
     for cap in score_caps:
-        drivers.append(UncertaintyDriver(code="score_caps", label=f"score capped: {cap.score}"))
+        # triggered_by (the semantic cause slug, e.g. "weak_evidence") --
+        # not cap.score (the capped field name, e.g. "strength"). Two
+        # different caps commonly cap the SAME score field (see
+        # apply_score_caps: weak_evidence and fatal_contradiction both cap
+        # "strength"), so cap.score alone would render byte-identical
+        # labels for genuinely different causes.
+        drivers.append(UncertaintyDriver(code="score_caps", label=f"score capped: {cap.triggered_by}"))
     if assessment.critic.counterargument_strength > 0.6:
         drivers.append(UncertaintyDriver(code="strong_counter", label="strong counterargument present"))
     return drivers

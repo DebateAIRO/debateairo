@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.scoring.models import ClaimAssessment, JudgeDisagreement
 
 # Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
@@ -9,6 +11,17 @@ from app.scoring.models import ClaimAssessment, JudgeDisagreement
 # gap disagreement (see detect_persisted_judge_disagreements below) lands
 # at 0.5 uncertainty: uncertainty = clamp(spread * DISPERSION_UNCERTAINTY_SLOPE).
 DISPERSION_UNCERTAINTY_SLOPE = 0.5 / 0.35
+
+
+@dataclass(frozen=True)
+class DispersionResult:
+    """uncertainty: the mapped, clamped [0, 1] value. spread: the raw
+    max-min _claim_strength_signal gap it was derived from, kept alongside
+    so callers can label *why* (e.g. "judges disagree (spread 0.58)")
+    without recomputing it."""
+
+    uncertainty: float
+    spread: float
 
 
 def detect_disagreements(assessment: ClaimAssessment) -> list[JudgeDisagreement]:
@@ -102,7 +115,7 @@ def _distinct_persisted_judge_evidence(judge_evidence: list[dict]) -> list[dict]
     return distinct
 
 
-def dispersion_uncertainty(judge_evidence: list[dict]) -> float | None:
+def dispersion_uncertainty(judge_evidence: list[dict]) -> DispersionResult | None:
     """Derive a measured uncertainty value from real judge-panel dispersion.
 
     Reads exactly the same evidence base and distinctness/parseability
@@ -125,7 +138,8 @@ def dispersion_uncertainty(judge_evidence: list[dict]) -> float | None:
     if len(strengths) < 2:
         return None
     spread = max(strengths) - min(strengths)
-    return round(max(0.0, min(1.0, spread * DISPERSION_UNCERTAINTY_SLOPE)), 4)
+    uncertainty = round(max(0.0, min(1.0, spread * DISPERSION_UNCERTAINTY_SLOPE)), 4)
+    return DispersionResult(uncertainty=uncertainty, spread=round(spread, 4))
 
 
 def _claim_strength_signal(assessment: ClaimAssessment) -> float:
