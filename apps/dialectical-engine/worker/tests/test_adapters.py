@@ -24,7 +24,7 @@ from app.adapters.grok_cli import GrokCliAdapter
 from app.adapters.lmstudio import LMStudioAdapter
 from app.adapters.mock import MockAdapter
 from app.adapters.ollama import OllamaAdapter
-from app.adapters.subprocess_base import claude_stream_json_delta
+from app.adapters.subprocess_base import ClaudeStreamJsonParser, claude_stream_json_delta
 from app.adapters.xai_api import XaiApiAdapter
 from app.capabilities import detect_adapters
 from app.client import CoordinatorClient
@@ -42,6 +42,8 @@ from app.main import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+CLAUDE_STREAM_JSON_FIXTURE = FIXTURES / "claude_stream_json_2026-07.jsonl"
 
 
 @pytest.mark.asyncio
@@ -427,11 +429,114 @@ async def test_codex_health_rejects_unspawnable_windowsapps_alias(monkeypatch: p
 
 
 def test_claude_stream_json_parser() -> None:
+    # Legacy shapes (backward compat).
     line = '{"type":"content_block_delta","delta":{"text":"hello"}}'
     assert claude_stream_json_delta(line) == "hello"
     assert claude_stream_json_delta('{"completion":"done"}') == "done"
     assert claude_stream_json_delta('{"type":"other"}') == ""
     assert claude_stream_json_delta("plain") == "plain"
+    # Current CLI schema (single-line, stateless per call).
+    assert (
+        claude_stream_json_delta(
+            '{"type":"assistant","message":{"content":[{"type":"text","text":"OK"}]}}'
+        )
+        == "OK"
+    )
+    assert claude_stream_json_delta('{"type":"result","result":"OK"}') == "OK"
+    assert claude_stream_json_delta('{"type":"system","subtype":"init"}') == ""
+    assert claude_stream_json_delta('{"type":"rate_limit_event","rate_limit_info":{}}') == ""
+
+
+@pytest.mark.asyncio
+async def test_claude_stream_parses_current_schema_fixture_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Reproduces the production soak failure: the CURRENT `claude ... --output-
+    # format stream-json --verbose` stream (captured live, 2026-07) must parse to
+    # exactly the model's answer text -- not "produced no output".
+    fixture_bytes = CLAUDE_STREAM_JSON_FIXTURE.read_bytes()
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del command, stdin, stdout, stderr, env
+        return FakeStreamingProcess(stdout=fixture_bytes, returncode=0)
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    chunks = [chunk async for chunk in ClaudeCliAdapter().stream("sys", "user", 100)]
+
+    assert "".join(chunks) == "OK"  # exact answer text
+    assert chunks == ["OK"]  # single emission: assistant text once, result envelope de-duped
+    assert not any("{" in chunk for chunk in chunks)  # no raw envelope JSON leaked through
+
+
+def test_claude_new_line_parser_parses_current_schema_fixture() -> None:
+    lines = [line for line in CLAUDE_STREAM_JSON_FIXTURE.read_text().splitlines() if line.strip()]
+    parse = ClaudeCliAdapter().new_line_parser()
+
+    outputs = [parse(line) for line in lines]
+
+    assert "".join(outputs) == "OK"
+    assert outputs.count("OK") == 1  # assistant text once; result envelope de-duped to ""
+    assert all(out in {"", "OK"} for out in outputs)  # no raw envelope JSON, no partial leakage
+
+
+def test_claude_stream_json_parser_concatenates_text_blocks_and_dedupes_result() -> None:
+    parse = ClaudeStreamJsonParser()
+    assistant = (
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"text","text":"Hello "},{"type":"thinking","text":"ignored"},{"type":"text","text":"world"}]}}'
+    )
+    assert parse(assistant) == "Hello world"  # only text blocks, concatenated
+    # Precedence: assistant text already emitted -> the duplicate result envelope
+    # contributes nothing.
+    assert parse('{"type":"result","result":"Hello world"}') == ""
+
+
+def test_claude_stream_json_parser_falls_back_to_result_without_assistant_text() -> None:
+    parse = ClaudeStreamJsonParser()
+    assert parse('{"type":"system","subtype":"init","cwd":"/x"}') == ""
+    assert parse('{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}') == ""
+    # No assistant text this stream -> the result envelope is the answer.
+    assert parse('{"type":"result","result":"fallback"}') == "fallback"
+
+
+def test_claude_stream_json_parser_passes_through_non_json_line() -> None:
+    parse = ClaudeStreamJsonParser()
+    assert parse("network unreachable") == "network unreachable"  # genuine non-JSON stderr-on-stdout
+    assert parse('{"type":"system"}') == ""  # but envelope JSON never passes through raw
+
+
+def test_claude_new_line_parser_resets_state_per_stream() -> None:
+    # The adapter is built once and reused across jobs; per-stream de-dup state
+    # must NOT leak between stream() invocations.
+    adapter = ClaudeCliAdapter()
+    first = adapter.new_line_parser()
+    assert first('{"type":"assistant","message":{"content":[{"type":"text","text":"one"}]}}') == "one"
+    assert first('{"type":"result","result":"one"}') == ""  # de-duped within stream 1
+
+    second = adapter.new_line_parser()
+    assert second is not first
+    # A fresh stream carrying ONLY a result envelope must still surface it --
+    # proof the emitted flag reset rather than leaking from stream 1.
+    assert second('{"type":"result","result":"two"}') == "two"
+
+
+@pytest.mark.asyncio
+async def test_claude_stream_raises_when_only_system_envelopes(monkeypatch: pytest.MonkeyPatch) -> None:
+    system_only = (
+        b'{"type":"system","subtype":"init","cwd":"/x"}\n'
+        b'{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}\n'
+        b'{"type":"system","subtype":"post_turn_summary"}\n'
+    )
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del command, stdin, stdout, stderr, env
+        return FakeStreamingProcess(stdout=system_only, returncode=0)
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    with pytest.raises(RuntimeError, match="claude produced no output"):
+        [chunk async for chunk in ClaudeCliAdapter().stream("sys", "user", 100)]
 
 
 @pytest.mark.asyncio
