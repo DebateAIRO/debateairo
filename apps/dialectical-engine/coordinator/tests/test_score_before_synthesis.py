@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import threading
 
 import pytest
 from sqlalchemy import func, select
@@ -27,7 +28,11 @@ from app.models.entities import (
 from app.protocol.runner import run_protocol_analysis
 from app.providers import AgentConfig, ProviderRegistry
 from app.scoring import ScoringProviderResult, queue_scoring_job
-from app.scoring.jobs import run_scoring_job_background
+from app.scoring.jobs import (
+    drive_internal_scoring_for_debate,
+    run_scoring_job_background,
+    wake_pending_internal_scoring_job,
+)
 from app.scoring.lineage import lineage_family
 from app.scoring.service import JUDGE_OUTPUT_SOURCE, SCORING_ANALYZER_TYPE
 from app.services import dialectical_v2 as service
@@ -360,6 +365,157 @@ def test_branch_completion_does_not_trigger_scoring_when_flag_off(db, monkeypatc
     asyncio.run(complete_job(db, job, _pov_output(worker, job), {"latency_ms": 5}))
 
     assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Cold-start incremental scoring (soak fix A / P3.4 regression)
+# ---------------------------------------------------------------------------
+
+
+class _MinimalTasks:
+    """BackgroundTasks stand-in for direct wake calls: records add_task calls."""
+
+    def __init__(self) -> None:
+        self.added: list[tuple] = []
+
+    def add_task(self, func, *args) -> None:
+        self.added.append((func, args))
+
+
+def _score_debate_job_count(db, debate: Debate) -> int:
+    return int(
+        db.scalar(
+            select(func.count()).select_from(Job).where(
+                Job.debate_id == debate.id, Job.job_type == "score_debate"
+            )
+        )
+        or 0
+    )
+
+
+def test_drive_cold_starts_scoring_when_no_job_exists(db) -> None:
+    """A fresh debate mid-generation has NO score_debate job. The internal
+    completion driver must be able to create the FIRST one (cold-start), claim
+    it, and run it -- not silently no-op like the browser-poll waker does."""
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)  # live nodes; autouse stub => no scoring job
+
+    assert _score_debate_job_count(db, debate) == 0
+    assert service.all_live_argument_nodes_scored(db, debate) is False
+
+    job_id = drive_internal_scoring_for_debate(
+        debate.id,
+        registry_factory=_fake_judge_registry,
+        background_runner=lambda job_id, d_id: run_scoring_job_background(
+            job_id, d_id, registry_factory=_fake_judge_registry
+        ),
+    )
+
+    assert job_id is not None
+    db.expire_all()
+    created = db.get(Job, job_id)
+    assert created is not None and created.job_type == "score_debate"
+    assert created.status == "complete"  # created, claimed, AND run
+    scoring_runs = db.scalars(
+        select(AnalyzerRun).where(
+            AnalyzerRun.debate_id == debate.id,
+            AnalyzerRun.analyzer_type == SCORING_ANALYZER_TYPE,
+        )
+    ).all()
+    assert len(scoring_runs) == 1  # scoring items persisted
+    assert service.all_live_argument_nodes_scored(db, debate) is True
+
+
+def test_wake_without_create_if_missing_stays_noop_without_jobs(db) -> None:
+    """Regression guard: the browser-poll waker (default create_if_missing
+    False) must NOT create the first scoring job -- it only ever wakes an
+    existing pending/stale one. Byte-identical to pre-fix behavior."""
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    assert _score_debate_job_count(db, debate) == 0
+
+    tasks = _MinimalTasks()
+    result = wake_pending_internal_scoring_job(
+        db, debate, tasks, registry_factory=_fake_judge_registry
+    )
+
+    assert result is None
+    assert tasks.added == []
+    assert _score_debate_job_count(db, debate) == 0  # nothing created
+
+
+def test_v2_pov_completion_cold_starts_scoring_and_opens_gate(db, monkeypatch) -> None:
+    """End-to-end fast-path: with DIALECTICAL_SCORE_BEFORE_SYNTHESIS on, a REAL
+    v2_pov branch completion drives cold-start scoring (real completion path,
+    fake judge in the trigger thread) so a scoring job exists BEFORE the debate
+    completes, and -- once the passes run -- condition (a) opens the synthesis
+    deferral gate WITHOUT waiting out the wait budget."""
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "3600")  # far from expiry
+    threads: list[threading.Thread] = []
+
+    def _thread_trigger(debate_id: str) -> threading.Thread:
+        # Mirror the real trigger's daemon-thread hop, but drive with the
+        # in-process fake judge (there is no real judge CLI in tests). Returns
+        # the started Thread so the test can join it deterministically.
+        def _run() -> None:
+            drive_internal_scoring_for_debate(
+                debate_id,
+                registry_factory=_fake_judge_registry,
+                background_runner=lambda job_id, d_id: run_scoring_job_background(
+                    job_id, d_id, registry_factory=_fake_judge_registry
+                ),
+            )
+
+        thread = threading.Thread(target=_run, name=f"test-scoring-{debate_id}", daemon=True)
+        thread.start()
+        threads.append(thread)
+        return thread
+
+    monkeypatch.setattr(
+        "app.services.dialectical_v2.trigger_internal_scoring_after_completion",
+        _thread_trigger,
+    )
+
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+
+    # Complete POVs one at a time, joining each completion's trigger thread
+    # before the next: exercises the real Thread hop while keeping the SQLite
+    # writers serialized (deterministic).
+    n = int(
+        db.scalar(
+            select(func.count()).select_from(Job).where(
+                Job.debate_id == debate.id, Job.job_type == "v2_pov"
+            )
+        )
+        or 0
+    )
+    assert n > 0
+    scored_before_completion = False
+    for _ in range(n):
+        job = claim_pending_job(db, worker)
+        assert job is not None and job.job_type == "v2_pov", job
+        asyncio.run(complete_job(db, job, _pov_output(worker, job), {"latency_ms": 5}))
+        for thread in list(threads):
+            thread.join(timeout=15)
+            assert not thread.is_alive()
+        db.expire_all()
+        if _score_debate_job_count(db, debate) > 0:
+            scored_before_completion = True
+
+    assert scored_before_completion  # a scoring job was cold-started mid-generation
+    db.refresh(debate)
+    assert debate.status != "complete"  # synthesis still pending, debate not done
+
+    # The passes scored every live argument node -> condition (a) opens the
+    # deferral gate long before the 3600s budget could have expired.
+    assert service.all_live_argument_nodes_scored(db, debate) is True
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    assert worker_can_claim_job(db, worker, synth, now_utc()) is True
 
 
 # ---------------------------------------------------------------------------

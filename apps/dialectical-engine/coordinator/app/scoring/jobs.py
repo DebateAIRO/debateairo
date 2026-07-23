@@ -278,6 +278,7 @@ def wake_pending_internal_scoring_job(
     *,
     registry_factory: RegistryFactory = ProviderRegistry,
     background_runner: Callable[[str, str], None] = run_scoring_job_background,
+    create_if_missing: bool = False,
 ) -> Job | None:
     # W2 idempotency: the find-and-claim below runs under the process-wide
     # write lock so the browser-poll thread(s) and the internal completion
@@ -319,13 +320,22 @@ def wake_pending_internal_scoring_job(
             .limit(1)
         ).first()
         if job is None:
-            if _latest_retryable_stale_scoring_job(db, debate.id) is None:
+            has_retryable_stale = _latest_retryable_stale_scoring_job(db, debate.id) is not None
+            # Browser-poll semantics (create_if_missing False): only ever WAKE an
+            # existing pending/stale job -- never create the first one. Cold-start
+            # (create_if_missing True, the internal completion/incremental driver)
+            # falls through to queue_scoring_job below so a fresh debate mid-
+            # generation actually gets its first scoring pass.
+            if not has_retryable_stale and not create_if_missing:
                 return None
             # W1 bounded failure lifecycle: stale expiries are timeout-class, so
             # the stale-requeue channel gets the doubled (half-weight) budget --
             # 2x DIALECTICAL_MAX_JOB_ATTEMPTS consecutive stale failures since the
-            # last successful scoring run, then the channel stops requeuing.
-            # Scores are advisory: nothing here ever touches debate.status.
+            # last successful scoring run, then the channel stops requeuing. This
+            # budget still binds cold-start (a cold-start after a run of stale
+            # failures must not bypass the exhausted budget); with no stale jobs
+            # the count is 0, so a genuine cold-start proceeds. Scores are
+            # advisory: nothing here ever touches debate.status.
             if _consecutive_stale_scoring_failures(db, debate.id) >= 2 * max_job_attempts():
                 return None
         registry = registry_factory()
@@ -374,8 +384,13 @@ def drive_internal_scoring_for_debate(
     Reuses wake_pending_internal_scoring_job end-to-end: same pending-job
     claim dedup, same W1 stale-failure budget, same provider-absence bail-out
     (a test env without a scoring provider degrades to a silent no-op).
-    Exactly one wake per call -- retries stay owned by later browser polls.
-    Returns the claimed scoring job's id, or None when nothing was woken.
+    As the internal completion/incremental driver it cold-starts
+    (create_if_missing=True): a fresh debate mid-generation with no scoring job
+    yet gets its FIRST one created + claimed here, rather than silently no-op'ing
+    (the browser-poll waker keeps the create_if_missing=False default and only
+    ever wakes an existing job). Exactly one wake per call -- retries stay owned
+    by later browser polls. Returns the claimed scoring job's id, or None when
+    nothing was woken.
     """
     tasks = _CollectedBackgroundTasks()
     with SessionLocal() as db:
@@ -388,6 +403,7 @@ def drive_internal_scoring_for_debate(
             tasks,
             registry_factory=registry_factory,
             background_runner=background_runner,
+            create_if_missing=True,
         )
         job_id = job.id if job is not None else None
     tasks.run_all()
