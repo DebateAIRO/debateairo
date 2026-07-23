@@ -64,7 +64,15 @@ def run_scoring_job_background(
     *,
     registry_factory: RegistryFactory = ProviderRegistry,
     scoring_runner: ScoringRunner = score_debate_with_provider_registry,
+    force_refresh: bool = True,
 ) -> None:
+    # force_refresh defaults True so every EXPLICIT caller (the user-facing
+    # POST /{debate_id}/scoring/jobs start endpoint and the browser-poll wake,
+    # both via app.api.scoring._run_scoring_job_background) is byte-identical.
+    # The internal completion/incremental drive passes False (see
+    # _run_internal_scoring_job) so an incremental pass only (re)judges
+    # new/changed nodes via the NodeScoringResult input-hash cache instead of
+    # fully re-judging every live node on every branch-completion trigger.
     with SessionLocal() as db:
         job = db.get(Job, job_id)
         debate = db.get(Debate, debate_id)
@@ -80,7 +88,7 @@ def run_scoring_job_background(
         job.error = None
         commit_write(db)
         try:
-            scoring_payload = scoring_runner(db, debate, registry, force_refresh=True)
+            scoring_payload = scoring_runner(db, debate, registry, force_refresh=force_refresh)
             if _scoring_payload_requires_judge_artifacts(scoring_payload):
                 _ensure_job_has_required_judge_artifacts(db, job.id, scoring_payload)
             branch = current_scoring_branch(db, debate)
@@ -286,6 +294,16 @@ def wake_pending_internal_scoring_job(
     # The RLock is reentrant, so the nested commit_write/flush_write calls
     # inside this section are safe no-op re-entries.
     with hold_write_lock():
+        # Establish a fresh read snapshot now that we hold the write lock. A
+        # concurrent create+claim+commit (separate session) -- or a pass claimed
+        # since this session's transaction began -- must be visible to the
+        # find/active-job checks below, otherwise a second create_if_missing
+        # caller (concurrent branch-completion trigger, or a trigger firing
+        # while an earlier pass is still in flight) would miss the already-
+        # claimed job and double-create. Under SQLite WAL a reader keeps its
+        # pre-lock snapshot until its transaction ends, so drop it here. Safe:
+        # callers hold no uncommitted writes at wake entry.
+        db.rollback()
         stale_jobs = db.scalars(
             select(Job).where(
                 Job.debate_id == debate.id,
@@ -338,6 +356,18 @@ def wake_pending_internal_scoring_job(
             # advisory: nothing here ever touches debate.status.
             if _consecutive_stale_scoring_failures(db, debate.id) >= 2 * max_job_attempts():
                 return None
+            # Cold-start idempotency: create only when NO active (pending /
+            # claimed / running) scoring job exists. A pending-only find misses a
+            # pass that is already claimed or running, so without this guard a
+            # concurrent branch-completion trigger -- or any trigger firing while
+            # an earlier pass is still in flight -- would spin up a SECOND full
+            # scoring pass (double judge cost, racing NodeScoringResult cache
+            # writes). Runs under the write lock on a fresh snapshot (see the
+            # db.rollback() above), so the check-then-create is atomic across
+            # concurrent callers. Stale-requeue is unaffected: stale rows are
+            # 'failed', never active.
+            if create_if_missing and _active_scoring_job_exists(db, debate.id):
+                return None
         registry = registry_factory()
         scoring_config = detect_scoring_provider_config(
             registry.agents, role="judge", providers=registry.providers
@@ -373,11 +403,25 @@ class _CollectedBackgroundTasks:
             func(*args)
 
 
+def _run_internal_scoring_job(job_id: str, debate_id: str) -> None:
+    """Default background runner for the internal completion/incremental drive.
+
+    Passes force_refresh=False so each incremental/completion pass only
+    (re)judges new or changed nodes through the NodeScoringResult input-hash
+    cache -- the T8 trigger fires on every branch completion, and re-judging
+    every live node on each of those would multiply judge-provider cost/quota
+    for no benefit (the cache already invalidates honestly on content/children/
+    question changes). Explicit user-facing scoring keeps force_refresh=True
+    (run_scoring_job_background's default; see that function's note).
+    """
+    run_scoring_job_background(job_id, debate_id, force_refresh=False)
+
+
 def drive_internal_scoring_for_debate(
     debate_id: str,
     *,
     registry_factory: RegistryFactory = ProviderRegistry,
-    background_runner: Callable[[str, str], None] = run_scoring_job_background,
+    background_runner: Callable[[str, str], None] = _run_internal_scoring_job,
 ) -> str | None:
     """One bounded wake of the debate's scoring state machine -- no HTTP.
 
@@ -479,3 +523,23 @@ def _latest_retryable_stale_scoring_job(db: Session, debate_id: str) -> Job | No
         .order_by(Job.created_at.desc(), Job.id.desc())
         .limit(1)
     ).first()
+
+
+def _active_scoring_job_exists(db: Session, debate_id: str) -> bool:
+    """True when a score_debate job for this debate is pending, claimed, or
+    running -- i.e. a scoring pass is already queued or in flight. Used to keep
+    cold-start (create_if_missing) from spinning up a duplicate concurrent pass;
+    must be read on a fresh snapshot under the write lock (see
+    wake_pending_internal_scoring_job)."""
+    return (
+        db.scalar(
+            select(Job.id)
+            .where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(("pending", "claimed", "running")),
+            )
+            .limit(1)
+        )
+        is not None
+    )

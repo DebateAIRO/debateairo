@@ -11,6 +11,7 @@ import asyncio
 import inspect
 import json
 import threading
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select
@@ -77,6 +78,32 @@ def _fake_judge_registry() -> ProviderRegistry:
         agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
         providers={"codex": _FakeJudgeProvider()},
     )
+
+
+class _CountingJudgeProvider(_FakeJudgeProvider):
+    """Fake judge that also records the node_id of every judge_node call, so a
+    test can distinguish nodes actually (re)judged from nodes served by the
+    NodeScoringResult input-hash cache."""
+
+    def __init__(self) -> None:
+        self.judged_node_ids: list[str] = []
+
+    def judge_node(self, request):
+        self.judged_node_ids.append(request.claim.node_id)
+        return super().judge_node(request)
+
+
+def _counting_judge_registry(provider: _CountingJudgeProvider):
+    """A registry_factory bound to a SHARED counting provider, so its call log
+    accumulates across the passes a single test drives."""
+
+    def factory() -> ProviderRegistry:
+        return ProviderRegistry(
+            agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+            providers={"codex": provider},
+        )
+
+    return factory
 
 
 # ---------------------------------------------------------------------------
@@ -516,6 +543,184 @@ def test_v2_pov_completion_cold_starts_scoring_and_opens_gate(db, monkeypatch) -
     synth = _pending_synthesize_job(db, debate)
     assert synth is not None
     assert worker_can_claim_job(db, worker, synth, now_utc()) is True
+
+
+# ---------------------------------------------------------------------------
+# Cold-start idempotency: never double-create a concurrent scoring pass
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("in_flight_status", ["claimed", "running"])
+def test_drive_does_not_double_create_while_pass_in_flight(db, in_flight_status: str) -> None:
+    """A trigger firing while a scoring pass is already claimed/running must NOT
+    cold-start a second one -- the pending-only find misses an in-flight job, so
+    the active-job guard must catch it."""
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    in_flight = queue_scoring_job(db, debate, model_id="codex-test-model")
+    in_flight.status = in_flight_status
+    in_flight.deadline = now_utc() + timedelta(seconds=600)
+    db.commit()
+    ran: list[str] = []
+
+    result = drive_internal_scoring_for_debate(
+        debate.id,
+        registry_factory=_fake_judge_registry,
+        background_runner=lambda job_id, d_id: ran.append(job_id),
+    )
+
+    assert result is None  # in-flight pass -> cold-start suppressed
+    assert ran == []
+    db.expire_all()
+    jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")
+    ).all()
+    assert len(jobs) == 1 and jobs[0].id == in_flight.id  # no duplicate row
+
+
+def test_concurrent_cold_start_creates_exactly_one_scoring_job(db) -> None:
+    """Two genuinely concurrent cold-start triggers (barrier-released) must
+    create exactly ONE score_debate row -- the write lock + fresh-snapshot read
+    make the check-then-create atomic, so the loser sees the winner's claimed
+    job and creates nothing."""
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    assert _score_debate_job_count(db, debate) == 0
+
+    barrier = threading.Barrier(2)
+    ran: list[str] = []
+    ran_lock = threading.Lock()
+
+    def _record(job_id: str, _debate_id: str) -> None:
+        with ran_lock:
+            ran.append(job_id)
+
+    def _drive() -> None:
+        barrier.wait()  # release both threads into the wake at once
+        drive_internal_scoring_for_debate(
+            debate.id,
+            registry_factory=_fake_judge_registry,
+            background_runner=_record,
+        )
+
+    threads = [threading.Thread(target=_drive, daemon=True) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+        assert not thread.is_alive()
+
+    db.expire_all()
+    jobs = db.scalars(
+        select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")
+    ).all()
+    assert len(jobs) == 1  # exactly one row despite the concurrent double-trigger
+    assert ran == [jobs[0].id]  # only the winner ran; the loser cold-started nothing
+
+
+# ---------------------------------------------------------------------------
+# Incremental passes use the input-hash cache; explicit refresh forces
+# ---------------------------------------------------------------------------
+
+
+def _incremental_runner_for(factory):
+    def _run(job_id: str, debate_id: str) -> None:
+        run_scoring_job_background(job_id, debate_id, registry_factory=factory, force_refresh=False)
+
+    return _run
+
+
+def test_internal_drive_default_runner_uses_cache_not_force_refresh(db, monkeypatch) -> None:
+    """The internal completion/incremental drive's DEFAULT background runner
+    threads force_refresh=False, so incremental passes ride the cache instead of
+    fully re-judging every node on every branch-completion trigger."""
+    from app.scoring import jobs as scoring_jobs
+
+    default_runner = (
+        inspect.signature(scoring_jobs.drive_internal_scoring_for_debate)
+        .parameters["background_runner"]
+        .default
+    )
+    captured: dict = {}
+    monkeypatch.setattr(
+        scoring_jobs,
+        "run_scoring_job_background",
+        lambda job_id, debate_id, *, force_refresh=True, **kw: captured.update(force_refresh=force_refresh),
+    )
+
+    default_runner("job-x", "debate-y")
+
+    assert captured.get("force_refresh") is False
+
+
+def test_incremental_pass_serves_unchanged_nodes_from_cache(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    provider = _CountingJudgeProvider()
+    factory = _counting_judge_registry(provider)
+    runner = _incremental_runner_for(factory)
+
+    drive_internal_scoring_for_debate(debate.id, registry_factory=factory, background_runner=runner)
+    assert provider.judged_node_ids  # first pass judged the live nodes
+    assert service.all_live_argument_nodes_scored(db, debate) is True
+
+    provider.judged_node_ids.clear()
+    drive_internal_scoring_for_debate(debate.id, registry_factory=factory, background_runner=runner)
+    assert provider.judged_node_ids == []  # nothing changed -> every node served from cache
+
+
+def test_incremental_pass_rejudges_new_node_but_not_unchanged_siblings(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    provider = _CountingJudgeProvider()
+    factory = _counting_judge_registry(provider)
+    runner = _incremental_runner_for(factory)
+
+    drive_internal_scoring_for_debate(debate.id, registry_factory=factory, background_runner=runner)
+    full_pass_count = len(provider.judged_node_ids)
+    assert full_pass_count > 1
+
+    # A new attack child appears under an existing live argument node.
+    parent = service.live_argument_nodes(db, debate.id)[0]
+    new_child = _add_node(db, debate, parent, node_type="CON", position=99, claim="A fresh counter-argument.")
+    db.commit()
+
+    provider.judged_node_ids.clear()
+    drive_internal_scoring_for_debate(debate.id, registry_factory=factory, background_runner=runner)
+
+    assert new_child.id in provider.judged_node_ids  # the new node IS judged
+    # ...but this is an INCREMENTAL pass: unchanged subtrees are cache hits, so
+    # far fewer than a full re-judge.
+    assert len(provider.judged_node_ids) < full_pass_count
+
+
+def test_explicit_scoring_pass_forces_rejudge_despite_warm_cache(db) -> None:
+    """The explicit user-facing path (run_scoring_job_background's default
+    force_refresh=True -- used by the POST start endpoint and the browser-poll
+    wake) re-judges every node even when the cache is warm and nothing changed."""
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    provider = _CountingJudgeProvider()
+    factory = _counting_judge_registry(provider)
+
+    # Warm the cache with an incremental (force_refresh=False) pass.
+    job1 = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(job1.id, debate.id, registry_factory=factory, force_refresh=False)
+    full_count = len(provider.judged_node_ids)
+    assert full_count > 0
+
+    provider.judged_node_ids.clear()
+    job2 = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(job2.id, debate.id, registry_factory=factory)  # default force_refresh=True
+
+    assert len(provider.judged_node_ids) == full_count  # cache bypassed: full re-judge
 
 
 # ---------------------------------------------------------------------------
