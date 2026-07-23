@@ -17,6 +17,16 @@
     <string>1</string>
     <key>DIALECTICAL_EVIDENCE_VERIFICATION</key>
     <string>1</string>
+    <!-- Flip plan stage 3 (judge panel + score blending), operator-requested 2026-07-24. -->
+    <key>DIALECTICAL_JUDGE_PANEL_MODELS</key>
+    <string>claude-sonnet-5-high-loop,gemini-3.5-flash-loop</string>
+    <key>DIALECTICAL_CALIBRATION_WEIGHTS</key>
+    <string>1</string>
+    <!-- Flip plan stage 5 (adversarial POV + cross-exam), operator-requested 2026-07-24. -->
+    <key>DIALECTICAL_ADVERSARIAL_POV</key>
+    <string>1</string>
+    <key>DIALECTICAL_CROSS_EXAM</key>
+    <string>1</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
