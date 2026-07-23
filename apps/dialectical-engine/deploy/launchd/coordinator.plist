@@ -12,6 +12,11 @@
     <string>__PATH__</string>
     <key>DYLD_LIBRARY_PATH</key>
     <string>__PYTHON_DYLD_LIBRARY_PATH__</string>
+    <!-- Flip plan 2026-07 stages 1+2 (docs/flip-plan-2026-07.md). Rollback: delete + make install-services. -->
+    <key>DIALECTICAL_EVIDENCE_ACQUISITION</key>
+    <string>1</string>
+    <key>DIALECTICAL_EVIDENCE_VERIFICATION</key>
+    <string>1</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
