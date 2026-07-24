@@ -17,12 +17,16 @@
     <string>1</string>
     <key>DIALECTICAL_EVIDENCE_VERIFICATION</key>
     <string>1</string>
-    <!-- Flip plan stage 3 (judge panel + score blending) ROLLED BACK 2026-07-24:
-         the panel holds a SQLite write transaction (begin_nested savepoint in
-         _run_judge_panel) across the up-to-120s in-coordinator CLI judge call,
-         starving all other writers -> "database is locked" 500s -> coordinator
-         crash under load. Re-enable only after the savepoint-scope fix (move
-         judge_node() outside begin_nested) lands. See flip-plan-2026-07.md. -->
+    <!-- Flip plan stage 3 (judge panel + score blending). RE-ENABLED 2026-07-24
+         after the F1 writer-release fix (d25f969): panel judge CLI calls now
+         run with the SQLite writer committed/released (commit_write before each
+         member call), so they no longer freeze the coordinator. F2 (43edb49)
+         self-recovers any scoring job orphaned by a restart. See
+         flip-plan-2026-07.md. Rollback: delete these 4 lines + make install-services. -->
+    <key>DIALECTICAL_JUDGE_PANEL_MODELS</key>
+    <string>claude-sonnet-5-high-loop,gemini-3.5-flash-loop</string>
+    <key>DIALECTICAL_CALIBRATION_WEIGHTS</key>
+    <string>1</string>
     <!-- Flip plan stage 5 (adversarial POV + cross-exam), operator-requested 2026-07-24. Proven safe (worker-side, timeouts). -->
     <key>DIALECTICAL_ADVERSARIAL_POV</key>
     <string>1</string>
