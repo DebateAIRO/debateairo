@@ -2871,25 +2871,38 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
                 select(AgentRun).where(AgentRun.debate_id == debate.id, AgentRun.status == "complete").order_by(AgentRun.created_at.asc())
             ).all()
         ]
-        tree_nodes = [
-            {
-                "id": node.id,
-                "parent_id": node.parent_id,
-                "node_type": node.node_type,
-                "claim": node.claim,
-                "depth": node.depth,
-                "position": node.position,
-                "status": node.status,
-                "active_generation": {
-                    "model_id": generation.model_id,
-                    "role": generation.role,
-                    "argument": generation.argument,
+        # P1 Task 3: bounded payload. Flag OFF renders the historical
+        # every-node-with-full-argument list byte-identically; flag ON
+        # renders O(branches + K). See app/synthesis/branch_summary.py.
+        if bool_env("DIALECTICAL_HIERARCHICAL_SYNTHESIS", False):
+            from app.synthesis.branch_summary import (
+                build_synthesis_tree_payload,
+                synthesis_load_bearing_k,
+            )
+
+            tree_nodes = build_synthesis_tree_payload(
+                db, debate, load_bearing_k=synthesis_load_bearing_k()
+            )
+        else:
+            tree_nodes = [
+                {
+                    "id": node.id,
+                    "parent_id": node.parent_id,
+                    "node_type": node.node_type,
+                    "claim": node.claim,
+                    "depth": node.depth,
+                    "position": node.position,
+                    "status": node.status,
+                    "active_generation": {
+                        "model_id": generation.model_id,
+                        "role": generation.role,
+                        "argument": generation.argument,
+                    }
+                    if node.active_generation_id and (generation := db.get(Generation, node.active_generation_id))
+                    else None,
                 }
-                if node.active_generation_id and (generation := db.get(Generation, node.active_generation_id))
-                else None,
-            }
-            for node in db.scalars(select(Node).where(Node.debate_id == debate.id).order_by(Node.materialized_path.asc())).all()
-        ]
+                for node in db.scalars(select(Node).where(Node.debate_id == debate.id).order_by(Node.materialized_path.asc())).all()
+            ]
         # W4 (flag-gated; flag-off renders stay byte-identical even when a
         # stale adaptive_expansion config key exists): a completed adaptive
         # debate's synthesis gets the recorded stopping context.
