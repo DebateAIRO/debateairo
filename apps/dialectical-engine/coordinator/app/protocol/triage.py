@@ -18,6 +18,11 @@ Difficulty = Literal["simple", "contested", "high_stakes"]
 
 _CONTESTED_CLAIM_TYPES = {"normative", "causal", "prediction", "mixed"}
 
+# ADVISORY ONLY -- nothing reads this back as a budget. Enforced depth
+# control lives in app.services.dialectical_v2.expansion_depth_limit(), and
+# the frontier's real bound is the priority floor (P1 Task 6). This value
+# records the triage classifier's difficulty read, nothing more. Do not
+# reintroduce it as a control input without wiring an enforcement site.
 _DEPTH_BUDGET_BY_DIFFICULTY: dict[Difficulty, int] = {
     "simple": 1,
     "contested": 2,

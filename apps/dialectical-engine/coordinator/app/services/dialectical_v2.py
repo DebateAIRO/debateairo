@@ -1374,6 +1374,17 @@ def cross_exam_max_jobs() -> int:
     return int_env("DIALECTICAL_CROSS_EXAM_MAX_JOBS", 8, 0, 20)
 
 
+# P1 Task 1: hard depth guardrail. The v2 pipeline previously had no depth
+# check of any kind; triage's depth_budget is computed and never read. This
+# is a safety rail against unbounded expansion chains, NOT a target -- the
+# frontier's priority floor is what actually stops healthy branches.
+MAX_EXPANSION_DEPTH = 10
+
+
+def expansion_depth_limit() -> int:
+    return int_env("DIALECTICAL_MAX_EXPANSION_DEPTH", MAX_EXPANSION_DEPTH, 1, 32)
+
+
 # "Is this v2_expand job part of the P3.3 wave" has exactly ONE definition:
 # orchestrator._is_cross_exam_expand_job (used directly below, never
 # aliased). terminalize_job_failure needs the SAME job.payload marker check
@@ -1888,6 +1899,10 @@ def queue_v2_expand_job(
         raise ValueError("Expansion target must be an argument node below the root")
     if node.status != "complete" or not node.active_generation_id:
         raise ValueError("Expansion target must be a completed argument node")
+    if node.depth >= expansion_depth_limit():
+        raise ValueError(
+            f"Expansion target is at or beyond the depth limit ({expansion_depth_limit()})"
+        )
     if not debate_uses_v2_pipeline(db, debate.id):
         raise ValueError("Expansion is only supported on v2-pipeline debates")
 

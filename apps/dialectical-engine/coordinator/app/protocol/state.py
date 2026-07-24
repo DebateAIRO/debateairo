@@ -49,6 +49,11 @@ def initialize_protocol_state(topic: str, config: dict[str, Any] | None) -> dict
         "version": PROTOCOL_VERSION,
         "triage": {
             "difficulty": decision.difficulty,
+            # ADVISORY ONLY -- nothing reads this back as a budget. Enforced depth
+            # control lives in app.services.dialectical_v2.expansion_depth_limit(), and
+            # the frontier's real bound is the priority floor (P1 Task 6). This value
+            # records the triage classifier's difficulty read, nothing more. Do not
+            # reintroduce it as a control input without wiring an enforcement site.
             "depth_budget": decision.depth_budget,
             "verification_required": decision.verification_required,
             "rationale": list(decision.rationale),
