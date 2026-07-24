@@ -1053,24 +1053,43 @@ def _run_judge_panel(
         ]
     notes = list(notes)
     for member in members:
-        # Reviewer follow-up: the ENTIRE unit of work for one panel member
-        # -- the call, the parse, and the persist -- runs inside one
-        # try/except AND one SAVEPOINT (db.begin_nested()), not just the
-        # call. Persist failures (e.g. a transient DB error) are just as
-        # real a "panel member failure" as a timeout or a bad response and
-        # must degrade the same way. A savepoint (not a bare db.rollback())
-        # is required here: db.rollback() would roll back the WHOLE shared
-        # session -- including the primary judge's own JudgeOutputArtifact,
-        # already flushed (but not yet committed) by the caller above --
-        # wiping out a result that had already succeeded. begin_nested()
-        # scopes any rollback to exactly this member's own uncommitted work
-        # (verified empirically: a failing nested block leaves prior
-        # flushes on the same session, and the session itself, intact).
+        # F1 (2026-07-24 incident): release SQLite's single writer BEFORE this
+        # member's up-to-120s judge CLI subprocess. By this point the primary
+        # judge's JudgeOutputArtifact is flushed-but-uncommitted (the caller's
+        # _persist_judge_output_artifact -> db.flush()), and so is each prior
+        # panel member's -- that open write transaction holds the one writer
+        # across the CLI call, starving every other writer (worker
+        # heartbeats/leases, generation completion) into
+        # "database is locked" 500s and freezing the coordinator. Moving the
+        # call out of the savepoint alone does NOT fix it (the primary's flush
+        # still holds the writer -- verified); committing here makes the
+        # primary's (and each prior member's) artifact durable and drops the
+        # writer, so the CLI call runs lock-free.
+        #
+        # Committing the primary before the panel is safe and desirable, not a
+        # loss of the old begin_nested-protects-primary guarantee: per-node
+        # judge artifacts are ALREADY committed incrementally (the caller
+        # commit_writes after each node) and are never atomic with the
+        # debate-wide node_scoring AnalyzerRun (written once per run in
+        # scoring/jobs.py, its own commit) -- so a crash mid-panel leaves
+        # durable artifacts + no cache row, i.e. a benign re-judge next pass,
+        # exactly the failure mode the per-node commit already tolerates. The
+        # input-hash cache and F2 restart recovery both compose with the
+        # earlier durability.
+        commit_write(db)
+        # The judge CLI call and the pure parse run OUTSIDE any open write
+        # transaction/savepoint (the writer was just released). Only the
+        # DB-mutating persist runs inside a SAVEPOINT (db.begin_nested()): a
+        # persist failure (e.g. a transient DB error) rolls back exactly this
+        # member's own uncommitted work -- never the primary's or a prior
+        # member's already-committed artifact -- and still degrades to the
+        # remaining judges via the try/except below (a persist failure is as
+        # real a panel-member failure as a timeout or a bad response).
         try:
+            result = member.provider.judge_node(request)
+            parsed = parse_judge_json(result.raw_output)
+            parse_available = parsed.status == "available" and parsed.assessment is not None
             with db.begin_nested():
-                result = member.provider.judge_node(request)
-                parsed = parse_judge_json(result.raw_output)
-                parse_available = parsed.status == "available" and parsed.assessment is not None
                 _persist_judge_output_artifact(
                     db,
                     debate_id=debate.id,
