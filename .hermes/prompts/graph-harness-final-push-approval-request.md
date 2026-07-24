@@ -23,3 +23,10 @@ Commit on `lane/roadmap-p0-p3` (explicit paths only) → isolated `git worktree`
 - Lane commit: <recorded post-push in this file's committed copy's follow-up note and in the final V report>
 - Dev commit + remote SHA verification: <same>
 - Rollback path: `git revert <dev commit>` on dev — single-commit, clean.
+
+## RECEIPT (executed 2026-07-24)
+
+- Lane commit: c854f48b80f20e7bce2612fcf55c31bb639be96a (lane/roadmap-p0-p3)
+- Dev commit: e436c1daa8245869f968855486104810d7f2d957 — pushed fast-forward ac96b49..e436c1d, verified via ls-remote
+- Rollback path: git revert e436c1d on dev (single commit, clean)
+- Push worktree: ../DebateV2-dev-push (transient orchestrator tool; listed in the 6.6 prune packet)
