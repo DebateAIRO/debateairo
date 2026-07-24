@@ -1,7 +1,8 @@
 ---
 name: heartbeat-protocol
 description: Codex adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Codex requests independent peer review; Hermes performs its own review and runs verified same-terminal /compact after every durable coding/review/rework sequence.
-version: 2.2.0
+version: 3.0.0
+spine_version: 3.0.0
 ---
 
 # Codex Heartbeat Protocol
