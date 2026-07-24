@@ -108,10 +108,30 @@ def test_recovery_fails_orphaned_running_job_and_rescores_unscored_debate(db) ->
     job.deadline = now_utc() - timedelta(minutes=5)  # past deadline == orphaned by restart
     db.commit()
 
+    # A single shared fake judge, bound into BOTH the wake-time availability
+    # check AND the background runner. drive_internal_scoring_for_debate's
+    # default runner (_run_internal_scoring_job) routes the actual scoring RUN
+    # through run_scoring_job_background with the DEFAULT ProviderRegistry
+    # (real codex CLI) -- so binding registry_factory only feeds the wake's
+    # availability check, leaving the run non-hermetic. Bind the fake into the
+    # runner too (idiom: test_scoring_verdict_refresh.py) and assert the fake's
+    # call counter proves the fake path -- not the real CLI -- did the scoring.
+    fake_judge = _FakeJudgeProvider()
+
+    def registry_factory() -> ProviderRegistry:
+        return ProviderRegistry(
+            agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+            providers={"codex": fake_judge},
+        )
+
     rescored = recover_orphaned_scoring_jobs(
         db,
         rescore=lambda debate_id: drive_internal_scoring_for_debate(
-            debate_id, registry_factory=_judge_registry
+            debate_id,
+            registry_factory=registry_factory,
+            background_runner=lambda job_id, d_id: run_scoring_job_background(
+                job_id, d_id, registry_factory=registry_factory
+            ),
         ),
     )
 
@@ -119,8 +139,9 @@ def test_recovery_fails_orphaned_running_job_and_rescores_unscored_debate(db) ->
     refreshed = db.get(Job, job.id)
     assert refreshed.status == "failed"
     assert "orphan" in (refreshed.error or "").lower()
-    # A fresh scoring pass ran and actually scored the live node.
+    # A fresh scoring pass ran THROUGH THE FAKE and actually scored the live node.
     assert debate.id in rescored
+    assert fake_judge.calls > 0
     assert all_live_argument_nodes_scored(db, db.get(Debate, debate.id))
 
 
