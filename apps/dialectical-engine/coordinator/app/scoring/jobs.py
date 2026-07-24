@@ -39,6 +39,10 @@ SCORING_JOB_COMPLETION_PERSISTENCE_ERROR = (
 )
 SCORING_JOB_MISSING_ARTIFACTS_ERROR = "No durable judge output artifacts were persisted for this scoring job."
 SCORING_JOB_MISSING_NODE_ARTIFACTS_ERROR = "Missing durable judge output artifacts for scoring job nodes."
+# F2 (2026-07-24 incident): terminal error stamped on a score_debate job that a
+# coordinator restart orphaned in claimed/running -- see
+# recover_orphaned_scoring_jobs.
+SCORING_JOB_ORPHANED_BY_RESTART_ERROR = "orphaned by coordinator restart"
 RegistryFactory = Callable[[], ProviderRegistry]
 ScoringRunner = Callable[..., dict]
 
@@ -452,6 +456,118 @@ def drive_internal_scoring_for_debate(
         job_id = job.id if job is not None else None
     tasks.run_all()
     return job_id
+
+
+def recover_orphaned_scoring_jobs(
+    db: Session,
+    *,
+    rescore: Callable[[str], Any] = drive_internal_scoring_for_debate,
+) -> list[str]:
+    """F2 (2026-07-24 incident): recover score_debate jobs orphaned by a
+    coordinator restart.
+
+    score_debate runs in an in-coordinator daemon thread
+    (trigger_internal_scoring_after_completion -> drive_internal_scoring_for_
+    debate -> run_scoring_job_background). A restart kills the thread and
+    strands the row in claimed/running: the reaper deliberately EXCLUDES
+    score_debate (reaping a *live* one would resurrect scoring and flip a
+    complete debate back to "generating" -- see services/reaper.py), and
+    _expire_stale_scoring_jobs only fails pending rows, so nothing else ever
+    recovers it. In prod one such job sat "running" 9h after a restart with 0
+    nodes scored, and _active_scoring_job_exists then blocked any replacement.
+
+    Startup-only sweep, gated on a PAST deadline: a genuinely live in-process
+    job holds a FUTURE deadline (run start refreshes it to now +
+    SCORING_BACKGROUND_JOB_DEADLINE_SECONDS), so only truly orphaned rows are
+    reset -- a healthy in-flight pass is never killed. Each orphan is failed
+    to a non-active terminal state so _active_scoring_job_exists no longer
+    counts it and a fresh pass can be created; then, for each affected debate
+    that still needs scoring (not archived, not already fully scored --
+    honoring the reaper's do-not-flip-complete-debates warning), scoring is
+    re-driven once.
+
+    Best-effort and bounded: each job and each re-drive is wrapped so one
+    failure never aborts the rest, and this never raises (startup must not be
+    blocked or crashed by recovery). Returns the debate ids re-driven.
+    """
+    now = now_utc()
+    orphaned = db.scalars(
+        select(Job).where(
+            Job.job_type == "score_debate",
+            Job.status.in_(("claimed", "running")),
+            Job.deadline < now,
+        )
+    ).all()
+    affected_debate_ids: list[str] = []
+    for job in orphaned:
+        try:
+            record_job_transition(
+                db,
+                job,
+                from_status=job.status,
+                to_status="failed",
+                channel="scoring_restart_recovery",
+                reason=SCORING_JOB_ORPHANED_BY_RESTART_ERROR,
+            )
+            job.status = "failed"
+            job.error = SCORING_JOB_ORPHANED_BY_RESTART_ERROR
+            job.deadline = now
+            commit_write(db)
+        except Exception:  # noqa: BLE001 -- one job's failure must not abort recovery of the rest
+            LOGGER.exception("failed to reset restart-orphaned scoring job %s", job.id)
+            db.rollback()
+            continue
+        if job.debate_id not in affected_debate_ids:
+            affected_debate_ids.append(job.debate_id)
+    rescored: list[str] = []
+    for debate_id in affected_debate_ids:
+        try:
+            if not _debate_still_needs_scoring(db, debate_id):
+                continue
+            rescore(debate_id)
+            rescored.append(debate_id)
+        except Exception:  # noqa: BLE001 -- one debate's re-drive failure must not abort the rest
+            LOGGER.exception("restart scoring recovery re-drive failed for debate %s", debate_id)
+            continue
+    if orphaned:
+        log_event(
+            LOGGER,
+            "scoring.restart_recovery",
+            orphaned_job_count=len(orphaned),
+            rescored_debate_count=len(rescored),
+        )
+    return rescored
+
+
+def _debate_still_needs_scoring(db: Session, debate_id: str) -> bool:
+    # Lazy import: app.services.dialectical_v2 imports this module at top level
+    # (trigger_internal_scoring_after_completion), so a module-level import
+    # here would be circular. Reuses the exact "all live argument nodes
+    # scored" check the score-before-synthesis gate uses, so recovery never
+    # re-scores a debate whose latest node_scoring run already covers its live
+    # nodes (reaper.py:93 do-not-flip-complete-debates warning).
+    from app.services.dialectical_v2 import all_live_argument_nodes_scored
+
+    debate = db.get(Debate, debate_id)
+    if debate is None or debate.status == "archived":
+        return False
+    return not all_live_argument_nodes_scored(db, debate)
+
+
+def recover_orphaned_scoring_jobs_at_startup() -> list[str]:
+    """Startup entrypoint for F2 recovery: open a session and sweep.
+
+    Wraps recover_orphaned_scoring_jobs in its own session and a top-level
+    guard so a coordinator restart's recovery can NEVER raise into or block
+    lifespan startup -- the coordinator must always come up even if recovery
+    fails. Intended to run off the event loop (it does blocking DB work and
+    may re-drive a full scoring pass)."""
+    try:
+        with SessionLocal() as db:
+            return recover_orphaned_scoring_jobs(db)
+    except Exception:
+        LOGGER.exception("restart scoring recovery sweep failed (non-fatal)")
+        return []
 
 
 def trigger_internal_scoring_after_completion(debate_id: str) -> threading.Thread | None:

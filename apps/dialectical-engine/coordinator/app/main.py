@@ -16,6 +16,7 @@ from app.core.auth import ensure_user_token
 from app.core.config import load_settings
 from app.core.db import SessionLocal, get_engine, init_db
 from app.core.instance_lock import acquire_single_instance_lock, release_single_instance_lock
+from app.scoring.jobs import recover_orphaned_scoring_jobs_at_startup
 from app.services.reaper import reaper_loop
 
 settings_obj = load_settings()
@@ -39,12 +40,22 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     instance_lock_key = acquire_single_instance_lock(str(get_engine().url))
     reaper_stop = asyncio.Event()
     reaper_task: asyncio.Task[None] | None = None
+    recovery_task: asyncio.Task[list[str]] | None = None
     try:
         run_startup_tasks()
         # W5b reaper: with zero polling workers an expired claim would sit
         # forever (the claim-path reaper only runs when a worker polls).
         reaper_task = asyncio.create_task(reaper_loop(reaper_stop), name="dialectical-reaper")
         app_.state.reaper_task = reaper_task
+        # F2: recover score_debate jobs orphaned by a prior coordinator
+        # restart (the reaper deliberately excludes score_debate, so nothing
+        # else does). One-shot, off the event loop so its blocking DB work and
+        # possible re-score never delay serving; best-effort and non-fatal.
+        recovery_task = asyncio.create_task(
+            asyncio.to_thread(recover_orphaned_scoring_jobs_at_startup),
+            name="dialectical-scoring-recovery",
+        )
+        app_.state.scoring_recovery_task = recovery_task
         yield
     finally:
         reaper_stop.set()
@@ -55,6 +66,10 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
                 reaper_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await reaper_task
+        if recovery_task is not None and not recovery_task.done():  # pragma: no cover - fast shutdown
+            recovery_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await recovery_task
         release_single_instance_lock(instance_lock_key)
 
 
