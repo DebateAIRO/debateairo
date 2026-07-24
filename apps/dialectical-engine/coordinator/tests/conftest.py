@@ -50,6 +50,58 @@ import app.main  # noqa: F401 — warms the orchestrator<->scoring<->serializati
 
 from app.core.auth import ensure_user_token
 from app.core.db import Base, SessionLocal, engine, init_db
+from app.exploration.policy import EvidenceSignal, ScoreSignal
+
+
+# P1 Task 4: pure-policy signal factories (no database involved). Defaults are
+# a deliberately unremarkable mid-range claim with grounded, supporting
+# evidence: no fatal flags, no recommended actions, and every threshold
+# predicate in ExplorationPolicy left un-fired. A test therefore states, in its
+# keyword overrides alone, exactly which predicates it means to exercise.
+@pytest.fixture()
+def make_score_signal():
+    def _make(**overrides) -> ScoreSignal:
+        data: dict = {
+            "node_id": "node-1",
+            "claim_type": "empirical",
+            "strength": 0.62,
+            "uncertainty": 0.24,
+            "impact": 0.55,
+            "evidence_quality": 0.65,
+            "logical_validity": 0.72,
+            "assumption_risk": 0.28,
+            "counter_resilience": 0.58,
+            "holes": (),
+            "fatal_flags": (),
+            "recommended_actions": (),
+        }
+        data.update(overrides)
+        # holes/fatal_flags/recommended_actions are tuple fields; accept any
+        # iterable from the caller so tests can pass plain lists.
+        for sequence_field in ("holes", "fatal_flags", "recommended_actions"):
+            data[sequence_field] = tuple(data[sequence_field])
+        return ScoreSignal(**data)
+
+    return _make
+
+
+@pytest.fixture()
+def make_evidence_signal():
+    def _make(**overrides) -> EvidenceSignal:
+        data: dict = {
+            # str values are coerced to EvidenceStatus/EntailmentLabel by
+            # EvidenceSignal.__post_init__, so tests may pass either form.
+            "status": "grounded",
+            "base_score": 0.72,
+            "uncertainty": 0.18,
+            "entailment": "SUPPORTS",
+            "caveats": (),
+        }
+        data.update(overrides)
+        data["caveats"] = tuple(data["caveats"])
+        return EvidenceSignal(**data)
+
+    return _make
 
 
 @pytest.fixture()

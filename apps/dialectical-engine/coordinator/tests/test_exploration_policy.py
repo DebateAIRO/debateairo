@@ -283,17 +283,27 @@ def test_seek_evidence_via_weak_evidence_quality_threshold_is_scalar() -> None:
     assert decision.signal_class == "scalar"
 
 
-def test_seek_evidence_with_scalar_uncertainty_blocker_fails_closed_to_scalar() -> None:
-    # The categorical seek reason fires, but the appended abandon blocker
-    # consults uncertainty/impact thresholds: one scalar consult anywhere in
-    # the recorded grounding fails the whole decision closed to scalar.
+def test_seek_evidence_stays_categorical_despite_a_scalar_abandon_blocker() -> None:
+    # P1 Task 4 (was: ..._fails_closed_to_scalar). The GROUNDING here is the
+    # single reason "empirical evidence is not grounded", and it fired through
+    # two categorical predicates only: claim_type in EVIDENCE_REQUIRED_CLAIM_
+    # TYPES, and evidence.status MISSING in UNRESOLVED_EVIDENCE_STATUSES.
+    # evidence_quality is 0.9, so the scalar weak-evidence threshold did NOT
+    # participate. That reason is independently sufficient: it is the sole
+    # element of _seek_evidence_reasons, and the caller fires seek_evidence on
+    # that list being non-empty (policy.decide) without consulting blockers at
+    # all. The uncertainty/impact abandon blocker is a reason NOT to abandon,
+    # not grounding for seeking evidence, so it no longer contaminates the
+    # class -- but it is still annotated on the record, never silently dropped.
     decision = decide(
         score_signal(claim_type="empirical", uncertainty=0.5, impact=0.6, evidence_quality=0.9),
         evidence_signal(status=EvidenceStatus.MISSING),
     )
 
     assert decision.action == "seek_evidence"
-    assert decision.signal_class == "scalar"
+    assert decision.signal_class == "categorical"
+    assert "empirical evidence is not grounded" in decision.reasons
+    assert "abandon blocked while high-impact uncertainty remains" in decision.reasons
 
 
 def test_deepen_from_assumption_risk_threshold_is_scalar() -> None:

@@ -17,11 +17,17 @@ EXPANSION_ACTIONS = {"continue", "deepen", "seek_evidence", "challenge", "abando
 # only when its grounding consulted exclusively categorical predicates:
 # evidence status, entailment verdicts, fatal flags, claim-type evidence
 # requirements (explicit user approval is categorical too, but lives outside
-# this policy). Any consult of a scalar score/threshold anywhere in the
-# decision's recorded grounding fails the whole decision closed to "scalar".
-# Classification is structural (derived from which predicates fired), never a
-# judgment about the values themselves. Priorities are ranking metadata, not
-# grounding, and do not participate.
+# this policy). P1 Task 4 refined the rule to match how the decision is
+# actually made: a decision is categorical iff AT LEAST ONE of its GROUNDING
+# reasons is categorical, because every reason in a grounding tuple is
+# independently sufficient to fire the action -- so that categorical reason
+# alone would have produced the same decision. A decision with no categorical
+# grounding reason still fails closed to "scalar", as does one with no
+# grounding at all. Classification is structural (derived from which
+# predicates fired), never a judgment about the values themselves. Priorities
+# are ranking metadata, not grounding, and do not participate; neither do
+# blockers (reasons NOT to abandon), which are recorded on the decision for
+# the audit trail but never ground it.
 CATEGORICAL_SIGNAL = "categorical"
 SCALAR_SIGNAL = "scalar"
 SIGNAL_CLASSES = {CATEGORICAL_SIGNAL, SCALAR_SIGNAL}
@@ -218,7 +224,12 @@ class ExplorationPolicy:
                 score,
                 "seek_evidence",
                 priority=max(score.impact, score.uncertainty, 1.0 - score.evidence_quality),
-                reasons=tuple(evidence_reasons + abandon_blockers),
+                reasons=tuple(evidence_reasons),
+                # P1 Task 4: blockers are reasons NOT to abandon; they are
+                # recorded as context but never ground the seek_evidence
+                # decision, so a scalar blocker can no longer contaminate a
+                # categorically-grounded one.
+                blockers=tuple(abandon_blockers),
             )
 
         deepen_reasons = self._deepen_reasons(score)
@@ -341,21 +352,31 @@ class ExplorationPolicy:
         *,
         priority: float,
         reasons: tuple[tuple[str, str], ...],
+        blockers: tuple[tuple[str, str], ...] = (),
         keeps_path_active: bool = True,
     ) -> ExpansionDecision:
-        # Structural classification: categorical iff every recorded grounding
-        # reason is categorical (fail-closed to scalar on any scalar consult
-        # or on an empty grounding).
+        # P1 Task 4: categorical iff AT LEAST ONE grounding reason is
+        # categorical. Every reason in _challenge_reasons /
+        # _seek_evidence_reasons is independently sufficient to fire its
+        # action (the caller fires on a non-empty list), so a categorical
+        # reason alone would have produced this same decision. The previous
+        # all() rule meant additional scalar corroboration DOWNGRADED a
+        # categorically-grounded decision, which is backwards -- and it is
+        # why 6 of 6 production decisions were scalar.
+        #
+        # THE LAW is unchanged in substance: a decision with no categorical
+        # reason still cannot spawn. Blockers never participate.
         signal_class = (
             CATEGORICAL_SIGNAL
-            if reasons and all(reason_class == CATEGORICAL_SIGNAL for _, reason_class in reasons)
+            if any(reason_class == CATEGORICAL_SIGNAL for _, reason_class in reasons)
             else SCALAR_SIGNAL
         )
         return ExpansionDecision(
             node_id=score.node_id,
             action=action,
             priority=min(1.0, max(0.0, priority)),
-            reasons=tuple(reason for reason, _ in reasons),
+            reasons=tuple(reason for reason, _ in reasons)
+            + tuple(reason for reason, _ in blockers),
             keeps_path_active=keeps_path_active,
             signal_class=signal_class,
         )
