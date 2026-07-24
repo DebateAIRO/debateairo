@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, or_, select, update
 from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
@@ -586,6 +586,12 @@ def score_node_with_provider(
             contract_hash=lookup_contract_hash,
         )
         if cached_payload is not None:
+            # Task 22 Fix B sub-cause 2: attribute this cache-served node to the
+            # CURRENT scoring job so a resumed (force_refresh=False) pass can
+            # persist a complete aggregated run (see the helper's docstring).
+            _relink_cached_node_artifacts_to_current_job(
+                db, debate_id=debate.id, node_id=node.id, input_hash=input_hash
+            )
             return _with_cache_metadata(cached_payload, hit=True)
         stale_cache_metadata = lookup_stale_scoring_cache_metadata(
             db,
@@ -939,6 +945,56 @@ def score_nodes_with_provider(
             provider_call_latencies_ms=provider_call_latencies_ms,
         )
     return payload
+
+
+def _relink_cached_node_artifacts_to_current_job(
+    db: Session,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+) -> None:
+    """Task 22 Fix B sub-cause 2: re-attribute a cache-served node's judge
+    artifacts to the CURRENT scoring job.
+
+    When a force_refresh=False pass serves a node from the NodeScoringResult
+    input-hash cache, no judge call runs, so _persist_judge_output_artifact
+    (which re-stamps a freshly-judged node's artifact onto the current job)
+    never runs for it. But _ensure_job_has_required_judge_artifacts is job-
+    scoped: it requires EVERY scored node to have a durable artifact under the
+    running job's id. Without this re-stamp, a RESUMED pass (which serves the
+    already-judged head nodes from cache) could never satisfy that guard for
+    those head nodes, so it would fail to persist the aggregated node_scoring
+    run even though every node is durably judged -- exactly the smoke3 failure
+    where a partial pass left cache rows but no aggregated run, and each retry
+    (force_refresh=True) restarted all nodes to re-stamp them at full judge cost.
+
+    Only artifacts matching the node's CURRENT input_hash are moved (a stale,
+    older-content artifact is never falsely re-attributed), and analyzer_run_id
+    is nulled so the resuming pass's run links them -- mirroring exactly the job
+    re-stamp _persist_judge_output_artifact already applies to judged nodes.
+    This is a single bulk UPDATE that no-ops when the artifacts are already under
+    the current job; it rides the caller's existing per-node commit_write, so it
+    adds no new commit point. force_refresh=True never reaches this path (it
+    bypasses the cache and re-judges).
+    """
+    current_job_id = _current_scoring_job_id(db, debate_id)
+    if current_job_id is None:
+        return
+    db.execute(
+        update(JudgeOutputArtifact)
+        .where(
+            JudgeOutputArtifact.debate_id == debate_id,
+            JudgeOutputArtifact.node_id == node_id,
+            JudgeOutputArtifact.input_hash == input_hash,
+            or_(
+                JudgeOutputArtifact.job_id.is_(None),
+                JudgeOutputArtifact.job_id != current_job_id,
+            ),
+        )
+        .values(job_id=current_job_id, analyzer_run_id=None)
+        .execution_options(synchronize_session=False)
+    )
 
 
 def _persist_judge_output_artifact(

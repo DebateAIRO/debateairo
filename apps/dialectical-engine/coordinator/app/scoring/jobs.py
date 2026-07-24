@@ -19,6 +19,7 @@ from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_af
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
 from app.protocol.runner import run_protocol_analysis
 from app.providers import ProviderError, ProviderRegistry, detect_scoring_provider_config
+from app.scoring.judge_panel import panel_model_ids
 from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import max_job_attempts
 from app.scoring.service import (
@@ -26,6 +27,7 @@ from app.scoring.service import (
     SCORING_ANALYZER_TYPE,
     STALE_SCORING_JOB_ERROR,
     RegistryScoringProvider,
+    _debate_node_ids,
     queue_scoring_job,
     score_debate_with_provider_registry,
 )
@@ -33,7 +35,55 @@ from app.scoring.service import (
 LOGGER = logging.getLogger(__name__)
 
 
+# Base (and single-judge) background scoring deadline. Task 22 Fix B keeps this
+# as the panel-OFF value byte-identical: a single-judge pass completes well
+# within 30 min, so compute_scoring_job_deadline_seconds returns exactly this
+# whenever no panel is configured.
 SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
+# Task 22 Fix B sub-cause 1: per node, per configured panel judge (BEYOND the
+# primary the base already covers). A panel pass adds one in-coordinator CLI
+# judge call per node per panel judge, each up to ~120s; the 50-node x 3-judge
+# smoke3 pass blew straight through the 30-min blanket deadline. The deadline is
+# scaled by node count x panel-judge count so a large panel pass gets the wall-
+# clock it actually needs.
+#
+# Trade-off (noted per the brief): F2 startup recovery of a restart-orphaned
+# score_debate job is deadline-gated (recover_orphaned_scoring_jobs only resets
+# rows whose deadline is already PAST), and the reaper deliberately excludes
+# score_debate. So a larger panel deadline lengthens the window before a
+# restart-orphaned panel job is recovered. This is the accepted cost of not
+# prematurely expiring a legitimately long panel pass; single-judge (the common
+# case) keeps the original 30-min window exactly.
+SCORING_PANEL_PER_NODE_JUDGE_DEADLINE_SECONDS = 120
+
+
+def compute_scoring_job_deadline_seconds(*, node_count: int, panel_judge_count: int) -> int:
+    """Panel/size-aware background scoring deadline in seconds.
+
+    Pure function of the pass size so it is unit-testable without a DB. Panel
+    OFF (``panel_judge_count <= 0``) -- or an empty tree -- returns the base
+    30-min deadline unchanged (single-judge byte-identical). Otherwise scales
+    linearly: base + node_count * panel_judge_count * per-node-judge budget.
+    """
+    if panel_judge_count <= 0 or node_count <= 0:
+        return SCORING_BACKGROUND_JOB_DEADLINE_SECONDS
+    return (
+        SCORING_BACKGROUND_JOB_DEADLINE_SECONDS
+        + node_count * panel_judge_count * SCORING_PANEL_PER_NODE_JUDGE_DEADLINE_SECONDS
+    )
+
+
+def _scoring_job_deadline_seconds(db: Session, debate: Debate) -> int:
+    """Resolve the size-aware deadline for THIS debate's next scoring pass:
+    the count of nodes that will be scored (_debate_node_ids -- the exact set
+    the pass judges) times the configured panel-judge count. Panel off -> the
+    base deadline, so the single-judge path is unchanged."""
+    return compute_scoring_job_deadline_seconds(
+        node_count=len(_debate_node_ids(db, debate.id)),
+        panel_judge_count=len(panel_model_ids()),
+    )
+
+
 SCORING_JOB_COMPLETION_PERSISTENCE_ERROR = (
     "Failed to persist scoring job completion after judge artifacts were produced."
 )
@@ -88,7 +138,7 @@ def run_scoring_job_background(
             db, job, from_status=job.status, to_status="running", channel="scoring_run"
         )
         job.status = "running"
-        job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
+        job.deadline = now_utc() + timedelta(seconds=_scoring_job_deadline_seconds(db, debate))
         job.error = None
         commit_write(db)
         try:
@@ -384,7 +434,7 @@ def wake_pending_internal_scoring_job(
             db, job, from_status=job.status, to_status="claimed", channel="scoring_wake"
         )
         job.status = "claimed"
-        job.deadline = now_utc() + timedelta(seconds=SCORING_BACKGROUND_JOB_DEADLINE_SECONDS)
+        job.deadline = now_utc() + timedelta(seconds=_scoring_job_deadline_seconds(db, debate))
         job.error = None
         commit_write(db)
     background_tasks.add_task(background_runner, job.id, debate.id)

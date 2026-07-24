@@ -42,6 +42,7 @@ from app.exploration.expansion_dispatch import (
     record_adaptive_stop,
     stopped_because_of,
 )
+from app.scoring.judge_panel import panel_model_ids
 from app.scoring.lineage import lineage_family
 from app.scoring.normalizer import classify_claim_type
 from app.services.events import event_bus
@@ -1102,6 +1103,40 @@ def score_before_synthesis_enabled() -> bool:
     """P3.4 sequencing fix: score the tree before synthesis so the synthesis
     prompt reflects measured standing. Default ON; env kill-switch."""
     return bool_env("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", True)
+
+
+def defer_panel_scoring_during_generation() -> bool:
+    """Task 22 Fix B sub-cause 3: True when a judge panel is configured
+    (DIALECTICAL_JUDGE_PANEL_MODELS set).
+
+    The multi-judge panel scoring pass is write-heavy -- one JudgeOutputArtifact
+    (+ a NodeScoringResult cache row) per node per judge. Cold-started mid-
+    generation it loses those writes to the generation/adversarial/cross-exam/
+    evidence write-storm under SQLite's single writer (the 2026-07-24 smoke run:
+    both score_debate jobs failed on 'database is locked'). So when a panel is
+    on, the pre-synthesis scoring trigger is deferred until generation quiesces
+    (see should_fire_pre_synthesis_scoring), letting the heavy pass run against a
+    calm writer. Panel off -> False: the single-judge pre-synthesis overlap-
+    with-generation behavior is byte-identical to before Fix B."""
+    return bool(panel_model_ids())
+
+
+def should_fire_pre_synthesis_scoring(*, generation_pending: bool) -> bool:
+    """Task 22 Fix B sub-cause 3: whether a branch/expansion completion should
+    fire the pre-synthesis internal scoring trigger right now.
+
+    Off when score-before-synthesis is disabled (unchanged). Panel OFF -> always
+    fires (byte-identical overlap-with-generation, even while generation is
+    pending). Panel ON -> fires only once generation has quiesced
+    (generation_pending is False), so the write-heavy panel pass never cold-
+    starts into the generation write-storm. The always-on post-synthesis trigger
+    (persist_v2_synthesis) remains the backstop that runs after generation is
+    fully done."""
+    if not score_before_synthesis_enabled():
+        return False
+    if defer_panel_scoring_during_generation() and generation_pending:
+        return False
+    return True
 
 
 def synthesizer_rotation_enabled() -> bool:
@@ -3071,8 +3106,11 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         # repeated triggers only judge new/changed nodes. Best-effort: it must
         # never fail or delay POV completion (matches persist_v2_synthesis's
         # trigger_internal_scoring_after_completion guard). Flag off -> today's
-        # post-synthesis-only scoring flow, untouched.
-        if score_before_synthesis_enabled():
+        # post-synthesis-only scoring flow, untouched. Task 22 Fix B sub-cause 3:
+        # with a panel configured, defer until this was the LAST branch (no
+        # pending branches) so the write-heavy panel pass does not cold-start
+        # into the generation write-storm; panel off fires immediately as before.
+        if should_fire_pre_synthesis_scoring(generation_pending=bool(pending_branches)):
             try:
                 trigger_internal_scoring_after_completion(debate.id)
             except Exception as exc:
@@ -3126,8 +3164,13 @@ async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: d
         # exam jobs so the adaptive-expansion path's own scoring behavior
         # (below) stays byte-identical; gated on the same
         # DIALECTICAL_SCORE_BEFORE_SYNTHESIS flag. Best-effort/fire-and-forget,
-        # matching every other trigger site in this function.
-        if (_is_adversarial_attacker_job(job) or _is_cross_exam_expand_job(job)) and score_before_synthesis_enabled():
+        # matching every other trigger site in this function. Task 22 Fix B sub-
+        # cause 3: with a panel configured, defer until the attack was the LAST
+        # pending node so the write-heavy panel pass does not cold-start into the
+        # generation write-storm; panel off fires immediately as before.
+        if (_is_adversarial_attacker_job(job) or _is_cross_exam_expand_job(job)) and should_fire_pre_synthesis_scoring(
+            generation_pending=bool(pending_nodes)
+        ):
             try:
                 trigger_internal_scoring_after_completion(debate.id)
             except Exception as exc:

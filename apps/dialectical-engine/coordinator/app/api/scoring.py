@@ -152,11 +152,33 @@ def start_scoring_job(
 
 
 def _run_scoring_job_background(job_id: str, debate_id: str) -> None:
+    # The EXPLICIT user-invoked POST /{debate_id}/scoring/jobs start: force a
+    # full refresh (run_scoring_job_background's default force_refresh=True) --
+    # the user asked for a fresh judging of every node (T20).
     run_scoring_job_background(
         job_id,
         debate_id,
         registry_factory=scoring_provider_registry_dependency,
         scoring_runner=score_debate_with_provider_registry,
+    )
+
+
+def _resume_scoring_job_background(job_id: str, debate_id: str) -> None:
+    # Task 22 Fix B sub-cause 2: the browser-poll wake is a RETRY of an existing
+    # pending/stale scoring job (a partial or failed prior pass), NOT a fresh
+    # user request. Resume from the NodeScoringResult input-hash cache
+    # (force_refresh=False) so a retry re-judges only the uncached tail instead
+    # of RESTARTING every node -- cumulative passes then converge and the final
+    # one persists the aggregated run, rather than each retry re-hitting the
+    # deadline from scratch. A cold cache still judges every node (cache miss),
+    # so the FIRST pass of a never-scored debate is unaffected. The explicit
+    # POST above keeps force_refresh=True.
+    run_scoring_job_background(
+        job_id,
+        debate_id,
+        registry_factory=scoring_provider_registry_dependency,
+        scoring_runner=score_debate_with_provider_registry,
+        force_refresh=False,
     )
 
 
@@ -166,7 +188,7 @@ def _wake_pending_internal_scoring_job(db: Session, debate: Debate, background_t
         debate,
         background_tasks,
         registry_factory=scoring_provider_registry_dependency,
-        background_runner=_run_scoring_job_background,
+        background_runner=_resume_scoring_job_background,
     )
 
 

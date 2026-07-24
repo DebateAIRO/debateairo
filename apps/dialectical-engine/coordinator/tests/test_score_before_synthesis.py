@@ -699,9 +699,10 @@ def test_incremental_pass_rejudges_new_node_but_not_unchanged_siblings(db) -> No
 
 
 def test_explicit_scoring_pass_forces_rejudge_despite_warm_cache(db) -> None:
-    """The explicit user-facing path (run_scoring_job_background's default
-    force_refresh=True -- used by the POST start endpoint and the browser-poll
-    wake) re-judges every node even when the cache is warm and nothing changed."""
+    """The explicit user-facing POST start endpoint (run_scoring_job_background's
+    default force_refresh=True) re-judges every node even when the cache is warm
+    and nothing changed. (Task 22 Fix B moved the browser-poll wake to
+    force_refresh=False so a retry RESUMES from cache instead of restarting.)"""
     worker = real_codex_worker(db)
     debate = service.create_dialectical_debate(db, TOPIC, {})
     _complete_all_povs(db, debate, worker)
