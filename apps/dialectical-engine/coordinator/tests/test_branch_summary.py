@@ -188,7 +188,11 @@ def _v2_synthesize_job(db, debate: Debate) -> Job:
     return job
 
 
-def test_load_bearing_k_default_is_twenty():
+def test_load_bearing_k_default_is_twenty(monkeypatch):
+    # Read the production default, not whatever this machine/CI runner happens
+    # to export.
+    monkeypatch.delenv("DIALECTICAL_SYNTHESIS_LOAD_BEARING_K", raising=False)
+
     assert synthesis_load_bearing_k() == 20
 
 
@@ -199,10 +203,21 @@ def test_payload_is_bounded_and_reports_omissions(db):
 
     assert len(payload["load_bearing"]) == 20
     assert payload["omitted_count"] > 0
-    total_represented = (
-        len(payload["load_bearing"]) + len(payload["contested"]) + payload["omitted_count"]
-    )
-    assert total_represented + len(payload["branches"]) >= 120
+    # Conservation is an EXACT identity, not a lower bound: every node in the
+    # debate is accounted for exactly once, as a branch entry, a full record,
+    # or an omission. A >= assertion would still pass if omitted_count double-
+    # counted nodes already carried elsewhere, or simply reported len(nodes) --
+    # and Task 7 consumes omitted_count for the coverage record, so an inflated
+    # count is exactly the failure mode that must not slip through. This is
+    # strictly stronger than the brief's bound: if the identity holds, so does
+    # the brief's `>= 120`.
+    all_nodes = db.scalars(select(Node).where(Node.debate_id == debate.id)).all()
+    assert (
+        len(payload["load_bearing"])
+        + len(payload["contested"])
+        + len(payload["branches"])
+        + payload["omitted_count"]
+    ) == len(all_nodes)
 
 
 def test_load_bearing_ranked_by_impact_times_strength(db):
