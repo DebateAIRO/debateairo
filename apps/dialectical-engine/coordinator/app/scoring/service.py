@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import event, func, or_, select, update
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
@@ -947,6 +947,20 @@ def score_nodes_with_provider(
     return payload
 
 
+def _current_contract_hash_for_role(judge_role: str) -> str | None:
+    """The contract_hash the CURRENT active contract for `judge_role` would
+    stamp. The primary "judge" and each per-family panel role resolve to
+    DISTINCT contracts (panel_contract gives every family its own judge_id, so
+    its own contract_hash), so this is looked up per role rather than assumed
+    single. None when no contract is registered for the role -- the legacy
+    NULL-contract lane, matched only against NULL-contract artifacts, exactly
+    as lookup_scoring_cache and _persist_judge_output_artifact treat NULL."""
+    try:
+        return active_contract(judge_role).contract_hash
+    except KeyError:
+        return None
+
+
 def _relink_cached_node_artifacts_to_current_job(
     db: Session,
     *,
@@ -969,32 +983,43 @@ def _relink_cached_node_artifacts_to_current_job(
     where a partial pass left cache rows but no aggregated run, and each retry
     (force_refresh=True) restarted all nodes to re-stamp them at full judge cost.
 
-    Only artifacts matching the node's CURRENT input_hash are moved (a stale,
-    older-content artifact is never falsely re-attributed), and analyzer_run_id
-    is nulled so the resuming pass's run links them -- mirroring exactly the job
-    re-stamp _persist_judge_output_artifact already applies to judged nodes.
-    This is a single bulk UPDATE that no-ops when the artifacts are already under
-    the current job; it rides the caller's existing per-node commit_write, so it
-    adds no new commit point. force_refresh=True never reaches this path (it
-    bypasses the cache and re-judges).
+    Contract-scoped, per role. input_hash deliberately EXCLUDES the judge
+    contract (see cache.node_scoring_input_hash), so an artifact from a
+    superseded contract can share the current input_hash. Each artifact is moved
+    ONLY when its contract_hash equals the CURRENT active contract for ITS
+    judge_role -- so the primary judge AND every current panel member (each a
+    distinct contract) are re-attributed together, while a superseded-contract
+    artifact is left untouched and the resuming run never absorbs an
+    out-of-contract judgment. analyzer_run_id is nulled on the moved artifacts so
+    the resuming pass's run links them, mirroring the (job, contract) re-stamp
+    _persist_judge_output_artifact already applies to judged nodes. Rides the
+    caller's existing per-node commit_write, so it adds no new commit point;
+    force_refresh=True never reaches this path (it bypasses the cache and
+    re-judges).
     """
     current_job_id = _current_scoring_job_id(db, debate_id)
     if current_job_id is None:
         return
-    db.execute(
-        update(JudgeOutputArtifact)
-        .where(
+    artifacts = db.scalars(
+        select(JudgeOutputArtifact).where(
             JudgeOutputArtifact.debate_id == debate_id,
             JudgeOutputArtifact.node_id == node_id,
             JudgeOutputArtifact.input_hash == input_hash,
-            or_(
-                JudgeOutputArtifact.job_id.is_(None),
-                JudgeOutputArtifact.job_id != current_job_id,
-            ),
         )
-        .values(job_id=current_job_id, analyzer_run_id=None)
-        .execution_options(synchronize_session=False)
-    )
+    ).all()
+    relinked = False
+    for artifact in artifacts:
+        if artifact.job_id == current_job_id:
+            continue
+        if artifact.contract_hash != _current_contract_hash_for_role(artifact.judge_role):
+            # Superseded/other-contract artifact sharing this input_hash: never
+            # absorbed by the resuming run.
+            continue
+        artifact.job_id = current_job_id
+        artifact.analyzer_run_id = None
+        relinked = True
+    if relinked:
+        db.flush()
 
 
 def _persist_judge_output_artifact(

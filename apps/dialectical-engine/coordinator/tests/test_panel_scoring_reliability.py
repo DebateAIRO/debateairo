@@ -17,22 +17,30 @@ Three sub-causes, each covered here:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
 from sqlalchemy import select
 
-from app.models.entities import AnalyzerRun, Job, NodeScoringResult
-from app.scoring import queue_scoring_job
+from app.models.entities import AnalyzerRun, Job, JudgeOutputArtifact, NodeScoringResult, now_utc
+from app.scoring import ScoringProviderResult, queue_scoring_job
 from app.scoring.jobs import (
     SCORING_BACKGROUND_JOB_DEADLINE_SECONDS,
     SCORING_PANEL_PER_NODE_JUDGE_DEADLINE_SECONDS,
     compute_scoring_job_deadline_seconds,
     run_scoring_job_background,
 )
-from app.scoring.service import SCORING_ANALYZER_TYPE
+from app.scoring.judge_panel import JudgePanelMember
+from app.scoring.judge_registry import active_contract, judge_panel_role
+from app.scoring import service as scoring_service
+from app.scoring.service import (
+    SCORING_ANALYZER_TYPE,
+    _relink_cached_node_artifacts_to_current_job,
+)
 from app.services import dialectical_v2 as service
 
+from test_node_scoring import base_assessment
 from test_score_before_synthesis import (
     _CountingJudgeProvider,
     _add_node,
@@ -172,6 +180,148 @@ def test_partial_pass_then_resume_persists_aggregated_run(db, monkeypatch) -> No
     latest = max(runs, key=lambda r: (r.seq or 0))
     scored_ids = {item["node_id"] for item in latest.output.get("items", [])}
     assert set(scoring_order) <= scored_ids
+
+
+def _seed_artifact(db, *, debate_id, node_id, input_hash, judge_role, contract_hash, job_id, marker):
+    raw = f"RAW-{marker}"
+    artifact = JudgeOutputArtifact(
+        debate_id=debate_id,
+        node_id=node_id,
+        input_hash=input_hash,
+        judge_role=judge_role,
+        provider="codex",
+        model="codex-test-model",
+        raw_output=raw,
+        raw_output_sha256=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        parse_status="available",
+        assessment=None,
+        checked_at=now_utc(),
+        job_id=job_id,
+        contract_hash=contract_hash,
+    )
+    db.add(artifact)
+    return artifact
+
+
+def test_relink_skips_superseded_contract_artifact_sharing_input_hash(db) -> None:
+    """input_hash EXCLUDES the contract, so a superseded-contract artifact can
+    share the current input_hash. The re-stamp must move ONLY the current-
+    contract artifact and leave the superseded one attributed to its old job."""
+    debate, root = _bare_debate(db)
+    old_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    old_job.status = "failed"
+    running_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    running_job.status = "running"
+    db.flush()
+
+    input_hash = "shared-input-hash"
+    current_art = _seed_artifact(
+        db,
+        debate_id=debate.id,
+        node_id=root.id,
+        input_hash=input_hash,
+        judge_role="judge",
+        contract_hash=active_contract("judge").contract_hash,
+        job_id=old_job.id,
+        marker="CURRENT",
+    )
+    superseded_art = _seed_artifact(
+        db,
+        debate_id=debate.id,
+        node_id=root.id,
+        input_hash=input_hash,
+        judge_role="judge",
+        contract_hash="superseded-old-contract-hash",
+        job_id=old_job.id,
+        marker="SUPERSEDED",
+    )
+    db.commit()
+
+    _relink_cached_node_artifacts_to_current_job(
+        db, debate_id=debate.id, node_id=root.id, input_hash=input_hash
+    )
+    db.commit()
+    db.expire_all()
+
+    # Current-contract artifact moved to the running job (and unlinked so the
+    # resuming run relinks it); superseded artifact left on its old job.
+    assert db.get(JudgeOutputArtifact, current_art.id).job_id == running_job.id
+    assert db.get(JudgeOutputArtifact, superseded_art.id).job_id == old_job.id
+
+
+class _PanelJudgeProvider(_CountingJudgeProvider):
+    """A distinct-family panel judge that returns a valid assessment for any
+    node -- distinct judge_role => distinct contract => its OWN artifact per
+    node, so a resumed cache-hit node carries 2+ judge artifacts to re-link."""
+
+    provider = "claude"
+    model = "panel-model-x"
+
+
+def test_panel_partial_pass_then_resume_links_all_judge_artifacts(db, monkeypatch) -> None:
+    """The panel case the re-stamp exists for: with 2+ judges per node, a
+    partial pass then resume persists the aggregated run AND links EVERY current
+    judge's artifact (primary + panel) for the cache-served head node to the
+    final run."""
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "panel-model-x")
+    panel_role = judge_panel_role("claude")
+    member = JudgePanelMember(
+        family="claude",
+        model_id="panel-model-x",
+        judge_role=panel_role,
+        provider=_PanelJudgeProvider(),
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([member], []))
+
+    debate, root = _bare_debate(db)
+    children = [
+        _add_node(db, debate, root, node_type="CON" if i % 2 else "PRO", position=i + 1, claim=f"Child {i}")
+        for i in range(3)
+    ]
+    db.commit()
+    scoring_order = [root.id, *[c.id for c in children]]
+    poison_id = children[1].id  # 3rd overall
+
+    primary = _PoisonThenHealProvider(fail_node_id=poison_id)
+    factory = _counting_judge_registry(primary)
+
+    # Pass 1: the head nodes get BOTH a primary and a panel artifact; the primary
+    # dies on the poison node, so the pass fails with no aggregated run.
+    job1 = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(job1.id, debate.id, registry_factory=factory, force_refresh=False)
+    db.expire_all()
+    assert db.get(Job, job1.id).status == "failed"
+    assert _complete_scoring_runs(db, debate.id) == []
+    # root (a head node) already carries two distinct-role judge artifacts.
+    head_roles = set(
+        db.scalars(select(JudgeOutputArtifact.judge_role).where(JudgeOutputArtifact.node_id == root.id)).all()
+    )
+    assert {"judge", panel_role} <= head_roles
+
+    # Resume.
+    primary.fail_node_id = None
+    job2 = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(job2.id, debate.id, registry_factory=factory, force_refresh=False)
+    db.expire_all()
+
+    assert db.get(Job, job2.id).status == "complete"
+    runs = _complete_scoring_runs(db, debate.id)
+    assert len(runs) >= 1
+    latest = max(runs, key=lambda r: (r.seq or 0))
+    assert set(scoring_order) <= {item["node_id"] for item in latest.output.get("items", [])}
+
+    # The cache-served head node's BOTH judge artifacts were re-stamped onto the
+    # resuming job and linked to its aggregated run -- panel provenance survives
+    # the resume, not just the primary.
+    head_artifacts = db.scalars(
+        select(JudgeOutputArtifact).where(JudgeOutputArtifact.node_id == root.id)
+    ).all()
+    assert {a.judge_role for a in head_artifacts} >= {"judge", panel_role}
+    for artifact in head_artifacts:
+        assert artifact.job_id == job2.id
+        assert artifact.analyzer_run_id == latest.id
 
 
 # ---------------------------------------------------------------------------
