@@ -1,7 +1,7 @@
 ---
 name: heartbeat-protocol
-description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine.
-version: 3.0.0
+description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine. All agent launches use /goal.
+version: 3.1.0
 spine_version: 3.0.0
 ---
 
@@ -47,6 +47,29 @@ Hermes-Verifier's (spine §5.2: independent verification, Kanban board custody +
 crafting, Manual QA runs). Claude-Router consumes Hermes-Verifier's verdicts; it
 never produces one, never marks work Done, and never mutates the board's review
 state.
+
+## The /goal launch law (V ruling, 2026-07-24)
+
+Every agent launch goes through that agent's own `/goal` command — goals are
+commonplace across the fleet's CLIs and one of the most stable invocation
+patterns available:
+
+1. **The Main Orchestrator launches every worker, reviewer, and loop owner with
+   `/goal <bounded goal packet>`.** The packet carries the ticket contract
+   (spine §4 launch-packet bounds apply) and ends with the return rule:
+   *"Do not come back to the Orchestrator unless you need its review — work the
+   goal to a spine handoff (READY FOR PEER REVIEW / READY FOR HERMES [STAGE]
+   REVIEW), a genuine blocker, or an IMPORTANT OPERATION. Silence is normal;
+   unchanged state needs no message."*
+2. **Chained calls inherit the law:** when any model calls another model (Codex
+   dispatching a lane subagent, Grok launching a checker, a reviewer spawning a
+   verifier), it also calls it with that agent's `/goal` command and the same
+   return rule. Goals all the way down.
+3. **The One-Prompt Machine and chain of command are unchanged:** `/goal`
+   packets flow DOWN the authority lattice; only spine-legal surfaces flow up
+   (review handoffs, blockers, V DECISIONS PACKET rows). A `/goal` never grants
+   question authority — a launched agent that needs a design decision routes it
+   up the lattice, never to V.
 
 ## Claude worker instances (spawned, not the orchestrator)
 
