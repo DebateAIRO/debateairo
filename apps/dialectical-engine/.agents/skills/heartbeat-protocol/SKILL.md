@@ -1,137 +1,64 @@
 ---
 name: heartbeat-protocol
-description: Codex adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Codex requests independent peer review; Hermes performs its own review and runs verified same-terminal /compact after every durable coding/review/rework sequence.
-version: 2.2.0
+description: Codex node contract for DebateAI Graph Spine v2 (the .agents mount mirrors the .codex Codex node contract). Sole coding worker; thin loader over the repo spine.
+version: 3.0.0
+spine_version: 3.0.0
 ---
 
-# Codex Heartbeat Protocol
+# Codex Node Contract (.agents mirror)
+
+Thin. Source of truth is the repo Graph Spine v2. This `.agents` node contract
+mirrors the `.codex` Codex node contract exactly; both mounts resolve the same
+sole-coding-worker role.
 
 ## Read order
 
-1. `AGENTS.md`
-2. `docs/agent-protocols/debateai-heartbeat-protocol.md`
+1. This SKILL.md
+2. `docs/agent-protocols/debateai-heartbeat-protocol.md` (Graph Spine v2)
 3. `docs/agent-protocols/codex-heartbeat-adapter.md`
-4. Current Kanban ticket body and every comment in chronological order
+4. The current Kanban ticket state block and its comments
 
-The latest applicable Hermes/human comment is current routing law. Do not act from status alone.
-
-## Role
+## Role (current law: sole coding worker)
 
 ```text
-Codex GPT-5.6 Sol = sole coding worker
-Peer reviewer       = different read-only agent/session
-Hermes              = non-delegable evidence reviewer, cockpit, human-review router, Done/Blocked authority
-V                    = human product/acceptance reviewer
+Codex GPT-5.6 Sol = sole coding worker; A7 implementation lanes in isolated worktrees
+Claude / Grok     = planning-artifact workers and read-only reviewers (never code under the current law)
 ```
 
-Hermes launches one managed Codex CLI PTY per implementation ticket. New ticket means new terminal. Rework means resume the same original ticket/session.
+## State reads/writes (spine §3)
 
-## On launch or wakeup
+Reads `{contract, status, rework_round, authority_epoch, worktree,
+comments_read_through}`. Writes `{status, worktree, evidence refs,
+comments_read_through}`. Never writes `risk_tier`, `authority_epoch`, or
+`owner.agent`.
 
-1. Read the ticket body and all comments.
-2. Record `comments read through: <latest id/timestamp>`.
-3. Determine from comments whether this is first-pass work, peer-review correction, Hermes rework, human rework, or waiting.
-4. Confirm `[Codex]`, `Assigned agent: Codex`, original/rework owner, session ID, branch/worktree, dependencies, file contract, verification, and human gate.
-5. Continue this session's `running` ticket before claiming anything new.
-6. Post `WORKER CLAIM` before edits.
-7. Repeat the comment scan before every edit phase, heartbeat, review request, and handoff.
+## Node flow
 
-## First-pass flow
+Claim a Ready card only when authorized — its latest applicable
+`HERMES AUTHORIZED NEXT`, OR the card is named in a current
+`HERMES AUTHORIZED ROUTE` for the epoch; per-node re-auth is required again on any
+new risk signal or important operation (spine §10). Fetch only the assigned ticket
+(launch-packet bound, spine §4); never list the board. Work one card at a time in
+its isolated worktree; run the Split -> Verify -> Merge lane checklist (spine
+`## Worktree isolation`, Phase 5). Post `READY FOR PEER REVIEW` on first-pass
+completion; a separate read-only reviewer advances GREEN work. Never self-Done,
+never self-integrate.
 
-```text
-WORKER CLAIM
-→ RED → GREEN → REFACTOR
-→ exact focused checks
-→ READY FOR PEER REVIEW
-→ stop editing
-```
+## Worktree lanes (spine `## Worktree isolation`)
 
-The first-pass Codex worker does **not** post `READY FOR HERMES REVIEW`. Hermes launches a separate reviewer. On reviewer RED, the same Codex worker fixes and requests peer re-review. On reviewer GREEN, the reviewer posts `READY FOR HERMES REVIEW`; Hermes itself then reads the full comment chain, diff, tests, and product evidence. Reviewer GREEN never substitutes for Hermes's own review.
+Create a worktree only after the H6 LANE PLAN APPROVAL row for the current
+`authority_epoch` is approved. Destructive git (worktree remove, branch delete,
+history rewrite, force push) stays individually V-gated.
 
-## Post-dialogue checkpoint compaction
+## Markers
 
-After every durable Codex coding, review, or correction handoff—and after any
-substantive Hermes↔Codex ping-pong—keep this PTY open and idle. Hermes first
-verifies that artifacts/diffs, checks, comments, decisions, unresolved
-findings, and next gate are durable, then sends exactly:
+Recognize the full spine §8 union incl. `HERMES AUTHORIZED NEXT` /
+`HERMES AUTHORIZED ROUTE`. Emit `CODEX HEARTBEAT` / `CODEX BLOCKED` /
+`WORKER CLAIM` / `READY FOR PEER REVIEW` / `REWORK READY FOR HERMES REVIEW` with the
+`comments read through` cursor.
 
-```text
-/compact
-```
+## Non-negotiables (spine §11.1)
 
-The installed Codex 0.144.0 menu does not document preservation arguments.
-Hermes waits for completion/prompt return and records
-`CODEX COMPACTION CHECKPOINT` before parking this terminal or proceeding:
-
-```text
-READY FOR PEER REVIEW → compact worker PTY → peer review
-reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
-REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
-```
-
-If substantive dialogue follows the checkpoint, compact again at the next
-stable handoff. Never compact while work/tests/generation are in flight and do
-not exit merely because the conversation became chatty.
-
-## Hermes/human correction flow
-
-When the ticket returns to `ready` with `HERMES CHANGES REQUESTED` or `HUMAN REVIEW CHANGES REQUESTED`:
-
-1. Resume this exact original Codex session.
-2. Read all comments added after the prior handoff, including supersessions.
-3. Post `REWORK ACKNOWLEDGED` with the triggering comment and each finding.
-4. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
-5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes.
-6. Peer re-review only when Hermes explicitly requests it.
-7. If Hermes returns it again, repeat in this same session.
-
-If this session is lost, post `CODEX BLOCKED` with `session_continuity`. Do not create a replacement without `WORKER CONTINUITY OVERRIDE`.
-
-## Reviewer mode
-
-If Hermes launches this Codex session as a reviewer, it is read-only:
-
-- read all comments and `READY FOR PEER REVIEW` evidence;
-- independently inspect and verify;
-- never edit the reviewed files;
-- post `PEER REVIEW CHANGES REQUESTED` on RED;
-- post `PEER REVIEW APPROVED` and then `READY FOR HERMES REVIEW` on GREEN;
-- never review work authored by this same CLI session.
-
-## Required comment markers
-
-Recognize and obey:
-
-```text
-WORKER CLAIM
-CODEX HEARTBEAT
-CODEX BLOCKED
-CODEX COMPACTION CHECKPOINT
-COMPACTION BLOCKED
-READY FOR PEER REVIEW
-PEER REVIEW CHANGES REQUESTED
-PEER REVIEW APPROVED
-READY FOR HERMES REVIEW
-HERMES CHANGES REQUESTED
-READY FOR HUMAN REVIEW
-HUMAN REVIEW PASSED
-HUMAN REVIEW CHANGES REQUESTED
-REWORK ACKNOWLEDGED
-REWORK READY FOR HERMES REVIEW
-WORKER CONTINUITY OVERRIDE
-```
-
-Every outgoing marker includes the latest `comments read through` cursor.
-
-## Hard rules
-
-- Use GPT-5.6 Sol.
-- Work only the assigned `[Codex]` ticket and file contract.
-- Do not create/split/reroute tickets.
-- One writer per file/hunk; parallel lanes require non-overlap.
-- Serialize heavy builds/tests when in doubt about V's available RAM.
-- Do not mark Done, push without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
-- Reviewer never writes the fix; worker never self-approves first-pass work.
-- Hermes's own review remains mandatory after reviewer GREEN.
-- Every durable coding/review/rework handoff is followed by verified
-  same-terminal `/compact` before parking or review.
+Never mark Done, push/merge without V approval, delete database/product data without
+specific approval, create fake runtime data, cross file contracts, or ignore ticket
+comments.

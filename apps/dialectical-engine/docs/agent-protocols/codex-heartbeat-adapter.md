@@ -15,7 +15,7 @@ Before branch creation, subagents, edits, tests, or handoff:
 1. Read `AGENTS.md`.
 2. Read `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 3. Read this adapter and `.codex/skills/heartbeat-protocol/SKILL.md` when available.
-4. List Kanban for the active tenant.
+4. Fetch only your assigned ticket (its state block and declared upstream artifact paths). Do not list the board or other tenants' tickets — route topology lives in Kanban and Claude-Router, not in the worker.
 5. Continue a `[Codex]` ticket already `running` in this CLI session before claiming new work.
 6. For a `ready` ticket, read the full body and **all comments** before deciding whether it is first-pass work or returned rework.
 7. Record `comments read through: <latest id/timestamp>`.
@@ -127,22 +127,52 @@ PEER REVIEW CHANGES REQUESTED
 PEER REVIEW APPROVED
 READY FOR HERMES REVIEW
 HERMES CHANGES REQUESTED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
 READY FOR HUMAN REVIEW
 HUMAN REVIEW PASSED
 HUMAN REVIEW CHANGES REQUESTED
 REWORK ACKNOWLEDGED
 REWORK READY FOR HERMES REVIEW
 WORKER CONTINUITY OVERRIDE
+HERMES DONE
+HERMES BLOCKED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
+V DECISIONS PACKET
+V STEERING REQUIRED
+AUTHORITY EPOCH
+HERMES LIVENESS REQUESTED
+READY FOR EXTERNAL REVIEW
+EXTERNAL REVIEW PASSED
+EXTERNAL REVIEW CHANGES REQUESTED
+REWORK ROUND
 ```
 
 Latest applicable Hermes/human comments override older routing. Do not skip earlier unresolved findings unless a newer comment explicitly supersedes them.
+
+## State reads/writes
+
+Codex-worker declares its access to the typed ticket-state object:
+
+```text
+reads:  { contract, status, rework_round, authority_epoch }
+writes: { status, worktree, evidence refs, comments_read_through, wakes_since_transition }
+never writes: { risk_tier, authority_epoch, owner.agent }
+```
+
+Codex sets `owner.session` to its own CLI session only on `WORKER CLAIM`. It
+moves `status` only among worker-legal values (`working`, and the `waiting_*` /
+`changes_requested` / `failed_tooling` statuses it reaches via a `CODEX BLOCKED`
+marker). It never writes `risk_tier` or `authority_epoch`; both are
+Hermes/cockpit-only.
 
 ## Worktree and parallelism
 
 - Use the branch/worktree declared by the ticket.
 - One writer per file/hunk.
 - Parallel Codex ticket PTYs require non-overlapping file contracts.
-- Serialize heavy builds/tests on V's current laptop when in doubt.
+- Heavy builds/tests honor the spine `max_concurrent_heavy` semaphore (declared in `debateai-heartbeat-protocol.md` -> `## Parallelism and file ownership`; laptop = 1).
 - Never cross into another ticket's files without Hermes routing.
 - A returned ticket remains with its original Codex worker; idle workers do not absorb it.
 
@@ -176,4 +206,5 @@ Post `CODEX BLOCKED` and stop when:
   in that same Codex PTY before parking or review.
 - Reviewer sends first-pass work to Hermes.
 - Rework stays with the same worker/session and returns directly to Hermes unless re-review is requested.
+- A `CODEX BLOCKED` marker requests a transition to the mapped `waiting_*` status from the spine "Blocked-meaning → status mapping" table; the ticket status is never a bare `blocked`.
 - Codex never marks Done, pushes without V approval, deletes database/product data without specific approval, or creates fake runtime data.
