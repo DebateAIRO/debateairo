@@ -48,7 +48,9 @@ def test_sqlite_pragmas_enable_wal_foreign_keys_and_busy_timeout(db) -> None:
 
     assert journal_mode == "wal"
     assert foreign_keys == 1
-    assert busy_timeout == 5000
+    # F3 (2026-07-24 incident hardening): raised 5s -> 30s so brief legitimate
+    # write bursts wait for the single writer instead of 500ing.
+    assert busy_timeout == 30000
 
 
 def test_only_one_active_generation_per_node_is_enforced(db) -> None:

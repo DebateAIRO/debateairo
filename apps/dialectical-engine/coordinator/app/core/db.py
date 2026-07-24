@@ -70,7 +70,13 @@ def set_sqlite_pragma(dbapi_connection, connection_record):  # type: ignore[no-u
     try:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        # F3 (2026-07-24 incident hardening): 30s (was 5s) so a brief
+        # legitimate write burst waits for the single SQLite writer instead of
+        # 500ing with "database is locked". A mitigation that absorbs normal
+        # contention -- NOT a substitute for keeping long CLI calls out of the
+        # write transaction (WAL is already enabled above; writers still
+        # serialize, readers never block).
+        cursor.execute("PRAGMA busy_timeout=30000")
     finally:
         cursor.close()
 
