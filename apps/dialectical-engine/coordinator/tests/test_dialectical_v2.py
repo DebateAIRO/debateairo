@@ -1402,3 +1402,98 @@ def test_scoring_job_queueing_ignores_worker_routing_allowlist(db) -> None:
     # Worker-routed job types still enforce the allowlist.
     with pytest.raises(ValueError, match="not currently allowed"):
         create_job(db, debate.id, "v2_pov", "v2_generator", None, required_model="gpt-5.6sol-medium")
+
+
+def _v2_debate_with_n_outstanding_expand_jobs(db, n: int) -> tuple[Debate, entities.Node, list[entities.Node]]:
+    """P1 Task 2 fixture: a v2 debate with `n` outstanding v2_expand jobs.
+
+    Mirrors complete_worker_v2_plan_pipeline's real POV completion (four
+    materialized POV branches, each with nested PRO/CON stance cards under
+    every stance node), then fans a single-node expansion out across `n`
+    distinct completed argument nodes via queue_v2_expand_job -- the only
+    expansion spawn path -- so each expand job targets its own fresh
+    placeholder child (never the same parent twice, matching production
+    fan-out). Returns (debate, root, placeholder_nodes): placeholder_nodes
+    are the `n` still-pending children the outstanding jobs target, i.e.
+    exactly what pending_generation_nodes is expected to surface.
+    """
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    complete_worker_v2_plan_pipeline(db, debate, worker)
+
+    # Depth >= 2 (stance cards and their nested PRO/CON children) keeps this
+    # to node types already proven as valid expansion sources elsewhere in
+    # this file (see first_pov_pro in test_v2_expand.py); 24 are available
+    # for the standard fixed-quartet tree, comfortably above n.
+    source_nodes = db.scalars(
+        select(entities.Node)
+        .where(
+            entities.Node.debate_id == debate.id,
+            entities.Node.status == "complete",
+            entities.Node.depth >= 2,
+            entities.Node.node_type.notin_(["ROOT_CLAIM", "EVIDENCE"]),
+        )
+        .order_by(entities.Node.depth, entities.Node.position, entities.Node.id)
+    ).all()
+    assert len(source_nodes) >= n, (
+        f"fixture needs {n} distinct completed argument nodes to expand from, "
+        f"only found {len(source_nodes)}"
+    )
+
+    placeholders: list[entities.Node] = []
+    for index, source in enumerate(source_nodes[:n]):
+        polarity = "PRO" if index % 2 == 0 else "CON"
+        job = service.queue_v2_expand_job(db, debate, source, polarity, f"Coverage gap {index}.")
+        placeholder = db.get(entities.Node, job.node_id)
+        assert placeholder is not None
+        placeholders.append(placeholder)
+
+    root = db.get(entities.Node, debate.root_node_id)
+    assert root is not None
+    return debate, root, placeholders
+
+
+def test_pending_generation_nodes_uses_bounded_query_count(db, monkeypatch) -> None:
+    """P1 Task 2: quiescence must not issue one query per outstanding node.
+
+    Runs on every POV/expand completion; at 150 expansions the per-node
+    db.get loop competes with the judge panel for SQLite's single writer.
+    """
+    from sqlalchemy import event
+
+    from app.services.dialectical_v2 import pending_generation_nodes
+
+    debate, root, nodes = _v2_debate_with_n_outstanding_expand_jobs(db, n=12)
+    # Capture plain ids before attaching the listener: debate/root/nodes were
+    # all last touched several commits ago, so touching an expired ORM
+    # attribute inside the instrumented window would add a stray refresh
+    # SELECT and corrupt the statement count this test asserts on.
+    debate_id = debate.id
+    root_id = root.id
+    expected_ids = {node.id for node in nodes}
+    # Every placeholder node was created (db.add + flush) through THIS same
+    # session a moment ago, so it is already warm in the identity map;
+    # db.get() would return it straight from memory with no SQL at all,
+    # masking the very per-node query storm this test exists to catch.
+    # Evicting the identity map (not just expiring it -- db.get() still
+    # short-circuits on a merely-expired-but-present instance) forces a
+    # genuinely cold lookup, matching production: the session handling one
+    # completion never already holds the other outstanding nodes in memory.
+    db.expunge_all()
+
+    statements: list[str] = []
+
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(db.bind, "before_cursor_execute", _count)
+    try:
+        pending = pending_generation_nodes(db, debate_id, root_id)
+    finally:
+        event.remove(db.bind, "before_cursor_execute", _count)
+
+    assert {node.id for node in pending} >= expected_ids
+    # Bounded: container query + outstanding-ids query + one bulk node
+    # query. Must not scale with n=12 (the old per-node db.get loop hit 14+).
+    assert len(statements) <= 4, f"expected <=4 statements, got {len(statements)}: {statements}"

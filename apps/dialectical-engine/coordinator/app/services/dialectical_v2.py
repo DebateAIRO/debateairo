@@ -2495,11 +2495,14 @@ def pending_generation_nodes(db: Session, debate_id: str, root_node_id: str) -> 
             Job.node_id.is_not(None),
         )
     ).all()
-    for node_id in outstanding_node_ids:
-        if node_id and node_id not in pending:
-            node = db.get(Node, node_id)
-            if node is not None:
-                pending[node_id] = node
+    # P1 Task 2: one bulk fetch instead of a db.get per outstanding job.
+    # This runs on every POV/expand completion; the per-node loop was a
+    # quadratic query storm against SQLite's single writer at frontier
+    # budgets. Semantics are unchanged: same node set, missing rows skipped.
+    missing_ids = {node_id for node_id in outstanding_node_ids if node_id and node_id not in pending}
+    if missing_ids:
+        for node in db.scalars(select(Node).where(Node.id.in_(missing_ids))).all():
+            pending[node.id] = node
     return list(pending.values())
 
 
