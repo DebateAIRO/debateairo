@@ -26,6 +26,7 @@ approval (the approvals endpoint reuses ``admit_and_spawn`` below).
 from __future__ import annotations
 
 import logging
+from datetime import timezone
 from typing import Any, Callable
 
 from sqlalchemy import select
@@ -69,6 +70,11 @@ OUTCOME_BELOW_PRIORITY_FLOOR = "below_priority_floor"
 # wide open. Annotating it "budget_exhausted" would render (via reason_copy)
 # as expansion pausing "after reaching its budget for this debate" -- false.
 OUTCOME_WAVE_FULL = "wave_full"
+# P1 Task 7: the two whole-debate stop conditions. A pass that stops for the
+# debate refuses every record it was handed, so each one is annotated with the
+# stop that refused it rather than left NULL -- see _annotate_and_stop.
+OUTCOME_CONVERGED = "converged"
+OUTCOME_WALL_CLOCK = "wall_clock"
 
 # debate.config stopped_because vocabulary (why growth stopped).
 STOPPED_BUDGET_EXHAUSTED = "budget_exhausted"
@@ -78,6 +84,29 @@ STOPPED_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
 STOPPED_GENERATION_EXHAUSTED = "generation_exhausted"
 STOPPED_BELOW_PRIORITY_FLOOR = "below_priority_floor"
 STOPPED_WAVE_FULL = "wave_full"
+STOPPED_CONVERGED = "converged"
+STOPPED_WALL_CLOCK = "wall_clock"
+
+# P1 Task 7: stop conditions beyond budget exhaustion. smoke4's post-scoring
+# protocol run recorded converged=false, maxDelta=0.226 against epsilon=0.05 --
+# scores still moving at 4.5x the stability threshold when the engine stopped.
+# The convergence test existed, ran, and failed, and NOTHING consumed it; with
+# 12 waves available the loop has to stop when the tree settles rather than
+# when the budget runs out.
+#
+# debate.config["adaptive_expansion"] bookkeeping (flag-on writes only):
+#   converged_waves        -- consecutive settled waves observed so far
+#   converged_wave_run_id  -- the protocol run the count last consumed, so a
+#                             replayed pass cannot read one wave as two
+CONVERGED_WAVES_KEY = "converged_waves"
+CONVERGED_WAVE_RUN_KEY = "converged_wave_run_id"
+
+# Two consecutive settled waves, not one: a single wave under epsilon can be
+# noise, and stopping a 12-wave budget on noise is the expensive mistake here.
+REQUIRED_CONSECUTIVE_CONVERGED_WAVES = 2
+
+DEBATE_WALL_CLOCK_SECONDS_ENV = "DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS"
+DEFAULT_DEBATE_WALL_CLOCK_SECONDS = 4 * 60 * 60
 
 # Decision -> work mapping: challenge probes the decided node with a
 # challenging (CON) child; the seek_evidence/support family adds a
@@ -312,6 +341,153 @@ def stopped_because_of(debate: Debate) -> str | None:
     return None
 
 
+def debate_wall_clock_seconds() -> int:
+    """Ceiling on how long one debate may keep growing, in seconds.
+
+    The lower bound of 60 is deliberate: a value below it would mean "stop
+    before the first wave can finish", which is a misconfiguration rather than
+    an aggressive setting, and int_env clamps into range rather than honouring
+    it.
+    """
+    return int_env(
+        DEBATE_WALL_CLOCK_SECONDS_ENV, DEFAULT_DEBATE_WALL_CLOCK_SECONDS, 60, 24 * 60 * 60
+    )
+
+
+def debate_elapsed_seconds(debate: Debate) -> float:
+    """Seconds since the debate was created, tolerant of a NAIVE timestamp.
+
+    ``now_utc()`` is timezone-AWARE and ``Debate.created_at`` is declared
+    ``DateTime(timezone=True)``, but that is not what comes back: SQLAlchemy's
+    SQLite DATETIME drops the offset on the way in and never restores it on the
+    way out, so the loaded value is a tz-NAIVE datetime holding the UTC wall
+    clock (verified empirically on this deployment's database, and pinned by
+    tests/test_frontier_priority.py's tzinfo assertion). Subtracting the two
+    forms directly raises ``TypeError: can't subtract offset-naive and
+    offset-aware datetimes`` -- on the gate below that would take down EVERY
+    dispatch pass, so the naive form is stamped UTC rather than assumed away.
+    Note that a naive value read as LOCAL time would be wrong by a whole
+    timezone offset, which is why the stamp is explicit.
+
+    A missing created_at answers 0.0: an unmeasurable age must not stop a
+    debate on a ceiling nothing was compared against.
+    """
+    from app.models.entities import now_utc
+
+    created_at = debate.created_at
+    if created_at is None:
+        return 0.0
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    return (now_utc() - created_at).total_seconds()
+
+
+def _latest_convergence(db: Session, debate_id: str) -> tuple[str | None, dict[str, Any]]:
+    """The newest complete protocol run's convergence block, with its run id.
+
+    Ordered by ``seq`` first (then created_at, then id), matching
+    app/scoring/service.py's latest-AnalyzerRun read: ``id`` is a random UUID4
+    and ``created_at`` is coarse wall-clock, so same-tick runs are routine and
+    neither can order them (see AnalyzerRun.seq's own docstring). This IS a
+    genuine "latest" read -- unlike the frontier ranker above, which reads the
+    decision's OWN grounding run by primary key. There is no grounding run in
+    scope here: convergence is debate-level state, read at dispatch time.
+
+    Answers ``{}`` for anything unreadable, which the caller treats as "this
+    wave said nothing" rather than as movement.
+    """
+    from app.models.entities import AnalyzerRun
+    from app.protocol.runner import PROTOCOL_ANALYSIS_TYPE
+
+    run = db.scalars(
+        select(AnalyzerRun)
+        .where(
+            AnalyzerRun.debate_id == debate_id,
+            AnalyzerRun.analyzer_type == PROTOCOL_ANALYSIS_TYPE,
+            AnalyzerRun.status == "complete",
+        )
+        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
+        .limit(1)
+    ).first()
+    if run is None:
+        return None, {}
+    output = getattr(run, "output", None)
+    convergence = output.get("convergence") if isinstance(output, dict) else None
+    return run.id, (convergence if isinstance(convergence, dict) else {})
+
+
+def _record_convergence_wave(
+    debate: Debate, run_id: str | None, convergence: dict[str, Any]
+) -> int:
+    """Advance (or reset) the hysteresis counter; returns CONSECUTIVE settled waves.
+
+    Three cases, all deliberate:
+
+    * The run MEASURED the drift (``maxDelta`` and ``epsilon`` both real
+      numbers): settled increments, moving resets to 0. The predicate is
+      ``max_delta <= epsilon`` -- byte-for-byte the one app/protocol/runner.py
+      uses to write ``converged`` on the same payload, so the stop condition
+      and the reported convergence flag can never disagree at the boundary.
+    * The run could NOT measure it -- the runner's first_evaluation /
+      topology_changed / semantics_changed / strengths_unavailable branches
+      write no ``maxDelta`` at all. The count carries forward untouched:
+      resetting would treat silence as movement, incrementing would invent a
+      measurement neither the runner nor this module made.
+    * The run was ALREADY counted (same ``run_id`` as the last pass that
+      consumed one). Dispatch is best-effort at its call site and so is the
+      protocol re-run immediately before it, so a retried scoring tail can
+      hand this the same latest run twice. Hysteresis exists to demand two
+      INDEPENDENT observations; reading one wave twice would defeat exactly
+      the property it is here to provide.
+
+    Mutates only ``debate.config`` (no flush, no commit) -- the write joins the
+    caller's transaction, which is what keeps this off the "hold a SQLite write
+    transaction across a CLI call" path entirely.
+    """
+    state = adaptive_expansion_state(debate)
+    previous = state.get(CONVERGED_WAVES_KEY)
+    count = (
+        previous
+        if isinstance(previous, int) and not isinstance(previous, bool) and previous >= 0
+        else 0
+    )
+    if run_id is not None and run_id == state.get(CONVERGED_WAVE_RUN_KEY):
+        return count
+    max_delta = convergence.get("maxDelta")
+    epsilon = convergence.get("epsilon")
+    if not (_is_real_number(max_delta) and _is_real_number(epsilon)):
+        return count
+    count = count + 1 if float(max_delta) <= float(epsilon) else 0
+    state[CONVERGED_WAVES_KEY] = count
+    state[CONVERGED_WAVE_RUN_KEY] = run_id
+    _write_adaptive_expansion_state(debate, state)
+    return count
+
+
+def _annotate_and_stop(
+    db: Session,
+    debate: Debate,
+    dispatchable: list[LifecycleDecisionRecord],
+    *,
+    reason: str,
+    outcome: str,
+) -> None:
+    """Record a whole-debate stop, annotating every record it refused.
+
+    The stop returns before the dispatch loop, so without this every record the
+    pass was handed would keep a NULL dispatch_outcome -- a silent drop, and
+    the pre-change code would have annotated each of them. Only NULLs are
+    filled: a record that genuinely spawned on an earlier pass keeps
+    ``spawned``, because overwriting it would have the audit trail deny an
+    expansion whose job is sitting in the jobs table.
+    """
+    for record in dispatchable:
+        if record.dispatch_outcome is None:
+            record.dispatch_outcome = outcome
+    record_adaptive_stop(db, debate, reason)
+    commit_write(db)
+
+
 def debate_expand_jobs(db: Session, debate_id: str) -> list[Job]:
     """Every v2_expand job ever created for the debate, ANY status: a failed
     expansion consumed budget too (bounded growth beats retry-spawn loops)."""
@@ -458,6 +634,13 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     shape of queue_v2_expand_job cannot overspawn on a mid-loop retry.
     Commits its annotations; raises only unexpected errors (the caller wraps
     the call best-effort).
+
+    P1 Task 7: two WHOLE-DEBATE stop conditions run before the per-record
+    dispatch loop -- the debate's wall clock, and convergence hysteresis (two
+    consecutive waves whose max strength drift stayed within epsilon). Either
+    one ends growth for the debate rather than for this pass, so each records
+    its own stopped_because AND annotates every record it declined to
+    consider; neither leaves an audited record silently un-outcomed.
     """
     debate = db.get(Debate, debate_id)
     if debate is None or debate.status == "archived":
@@ -481,6 +664,35 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
         ).all()
     )
     dispatchable = [record for record in records if record.decision in DECISION_POLARITY]
+
+    # P1 Task 7: whole-debate stop conditions, checked BEFORE any ranking (the
+    # ranker's per-node judge-evidence reads are pointless on a pass that is
+    # stopping) but AFTER the records are in hand, so the early return can
+    # still annotate everything it refuses instead of dropping it silently.
+    #
+    # Wall clock first, and it returns WITHOUT touching the convergence
+    # counter. The counter measures consecutive settled waves as OBSERVED by
+    # the dispatcher; a pass that never looked at the frontier observed no
+    # wave, and recording one would corrupt the streak of a debate that is
+    # ending for an unrelated reason anyway.
+    if debate_elapsed_seconds(debate) >= debate_wall_clock_seconds():
+        _annotate_and_stop(
+            db, debate, dispatchable, reason=STOPPED_WALL_CLOCK, outcome=OUTCOME_WALL_CLOCK
+        )
+        return
+
+    convergence_run_id, convergence = _latest_convergence(db, debate_id)
+    if _record_convergence_wave(debate, convergence_run_id, convergence) >= (
+        REQUIRED_CONSECUTIVE_CONVERGED_WAVES
+    ):
+        _annotate_and_stop(
+            db, debate, dispatchable, reason=STOPPED_CONVERGED, outcome=OUTCOME_CONVERGED
+        )
+        return
+    # Not stopping: the counter's mutation stays uncommitted here and joins
+    # this pass's own commit at the tail of the dispatch loop below (or is
+    # rolled back with it). adaptive_expansion_state re-reads debate.config, so
+    # the tail's bookkeeping preserves it rather than clobbering it.
 
     # P1 Task 6: rank the ALREADY-AUTHORISED set, then take the wave. Scalar
     # records stay in the list so they still receive their honest

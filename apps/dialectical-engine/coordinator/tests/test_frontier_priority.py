@@ -331,6 +331,239 @@ def test_ranking_ignores_a_run_of_the_wrong_analyzer_type(
     assert records[0].dispatch_outcome == "spawned"
 
 
+# ---------------------------------------------------------------------------
+# P1 Task 7: convergence and wall-clock stop conditions.
+#
+# smoke4 stopped with converged=false, maxDelta=0.226 against epsilon=0.05 --
+# scores still moving at 4.5x the stability threshold when the budget ran out.
+# The convergence test existed, ran, and failed, and nothing consumed it.
+# ---------------------------------------------------------------------------
+
+
+def test_one_converged_wave_does_not_stop_the_loop(db, monkeypatch, converged_run_factory):
+    """Hysteresis: a single wave under epsilon can be noise."""
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_id = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    assert stopped_because_of(debate) != "converged"
+    # The wave WAS counted -- it just is not enough on its own.
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+
+
+def test_two_consecutive_converged_waves_stop_the_loop(db, monkeypatch, converged_run_factory):
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    debate, run_b = converged_run_factory(db, max_delta=0.02, epsilon=0.05, debate=debate)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+
+    assert stopped_because_of(debate) == STOPPED_CONVERGED
+
+
+def test_a_moving_wave_resets_the_converged_counter(db, monkeypatch, converged_run_factory):
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    debate, run_b = converged_run_factory(db, max_delta=0.30, epsilon=0.05, debate=debate)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+    debate, run_c = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_c)
+
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+
+
+def test_replaying_one_wave_does_not_count_it_twice(db, monkeypatch, converged_run_factory):
+    """Hysteresis demands two INDEPENDENT observations, not two readings of one.
+
+    ``expansion_dispatch`` is best-effort at its call site and the protocol
+    re-run immediately before it is best-effort too -- so a retried
+    scoring-completion tail whose protocol re-run failed calls dispatch again
+    against the SAME latest protocol run. Counting that run twice would let a
+    single settled wave trip a stop condition that exists precisely because one
+    wave is not evidence.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_id = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+
+
+def test_unreadable_convergence_neither_counts_nor_resets(db, monkeypatch, converged_run_factory):
+    """A wave the protocol runner could not MEASURE is not a wave that moved.
+
+    On its non-comparable branches (first_evaluation, topology_changed,
+    semantics_changed, strengths_unavailable) the runner writes no ``maxDelta``
+    at all. Treating that absence as "still moving" would reset a real
+    hysteresis streak on a run that said nothing; treating it as settled would
+    invent a measurement. It carries the count forward untouched.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+
+    debate, run_b = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
+    unmeasured = db.get(AnalyzerRun, run_b)
+    # Exactly what runner.py writes when the graph's topology changed.
+    unmeasured.output = {
+        **unmeasured.output,
+        "convergence": {"converged": None, "reason": "topology_changed", "epsilon": 0.05},
+    }
+    db.commit()
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    assert stopped_because_of(debate) != "converged"
+
+
+def test_wall_clock_ceiling_stops_expansion(db, monkeypatch, categorical_decisions_factory):
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    monkeypatch.setenv("DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS", "1")
+    from app.exploration.expansion_dispatch import (
+        OUTCOME_WALL_CLOCK,
+        STOPPED_WALL_CLOCK,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9])
+    debate.created_at = debate.created_at.replace(year=debate.created_at.year - 1)
+    db.flush()
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    db.expire_all()
+    assert stopped_because_of(debate) == STOPPED_WALL_CLOCK
+    assert all(r.dispatch_outcome != "spawned" for r in records)
+    assert expand_jobs(db, debate.id) == []
+    # Nobody is silently dropped: the early return still annotates every
+    # record it declined to consider (binding: every refusal is annotated on
+    # the audited record).
+    assert all(r.dispatch_outcome == OUTCOME_WALL_CLOCK for r in records)
+
+
+def test_a_stop_never_overwrites_an_outcome_a_pass_already_earned(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """The stop annotation fills NULLs; it never rewrites recorded history.
+
+    A record that really did spawn on an earlier pass keeps ``spawned``. Saying
+    "wall_clock" over it would make the audit trail claim the expansion never
+    happened, while the job it queued is sitting in the table.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        OUTCOME_SPAWNED,
+        STOPPED_WALL_CLOCK,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9])
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    db.expire_all()
+    assert records[0].dispatch_outcome == OUTCOME_SPAWNED
+
+    monkeypatch.setenv("DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS", "1")
+    debate = db.get(Debate, debate.id)
+    debate.created_at = debate.created_at.replace(year=debate.created_at.year - 1)
+    db.flush()
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    db.expire_all()
+    assert stopped_because_of(debate) == STOPPED_WALL_CLOCK
+    assert records[0].dispatch_outcome == OUTCOME_SPAWNED
+
+
+def test_elapsed_reads_the_naive_utc_timestamps_sqlite_hands_back(db):
+    """VERIFIED EMPIRICALLY, not assumed: ``Debate.created_at`` comes back
+    timezone-NAIVE.
+
+    ``now_utc()`` is tz-AWARE and the column is declared
+    ``DateTime(timezone=True)``, but SQLAlchemy's SQLite DATETIME drops the
+    offset on the way in and never restores it on the way out (the stored text
+    is the UTC wall clock with no zone). Subtracting the two directly raises
+    ``TypeError: can't subtract offset-naive and offset-aware datetimes`` --
+    which, on the wall-clock gate, would take down EVERY dispatch pass. The
+    assertion on ``tzinfo`` below is the load-bearing one: it pins the fact
+    that makes the normalisation necessary, so a driver change that starts
+    returning aware datetimes fails here loudly rather than silently.
+
+    The tolerance is tight enough to catch the other half of the bug: reading
+    the naive stamp as LOCAL time instead of UTC would answer a whole timezone
+    offset here, not ~0.
+    """
+    from app.exploration.expansion_dispatch import debate_elapsed_seconds
+
+    debate = Debate(topic="timezone probe")
+    db.add(debate)
+    db.commit()
+
+    assert debate.created_at.tzinfo is None
+    assert debate_elapsed_seconds(debate) == pytest.approx(0.0, abs=60)
+
+
+def test_a_young_debate_is_not_stopped_by_the_wall_clock(db, monkeypatch, converged_run_factory):
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        STOPPED_WALL_CLOCK,
+        debate_wall_clock_seconds,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    assert debate_wall_clock_seconds() == 4 * 60 * 60
+    debate, run_id = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    assert stopped_because_of(debate) != STOPPED_WALL_CLOCK
+
+
+def test_both_new_stop_reasons_have_human_copy(db):
+    """A raw code must never reach the product surface."""
+    from app.exploration.expansion_dispatch import STOPPED_CONVERGED, STOPPED_WALL_CLOCK
+    from app.exploration.reason_copy import DEFAULT_REASON_HUMAN_COPY, humanize_reason
+
+    for code in (STOPPED_CONVERGED, STOPPED_WALL_CLOCK):
+        copy = humanize_reason(code)
+        assert copy and copy != code
+        assert copy != DEFAULT_REASON_HUMAN_COPY
+
+
 def _scoring_run(db, debate, *, run_id, created_at, priority_by_node):
     from test_node_scoring import explicit_depth_pressure_payload
 

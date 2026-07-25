@@ -287,6 +287,56 @@ def scalar_decisions_factory():
     return _frontier_decisions_factory("scalar")
 
 
+# P1 Task 7: convergence-run factory. Builds a REAL v2 debate (or reuses the
+# one handed in, so a test can lay down a SEQUENCE of waves against one debate)
+# and persists a REAL complete protocol_analysis AnalyzerRun.
+#
+# The output shape is NOT invented here: it is exactly what
+# app/protocol/runner.py writes on the comparable branch -- a "convergence"
+# dict carrying converged / maxDelta / nodesCompared / epsilon, alongside
+# "convergenceVersion". `converged` is derived with the runner's own predicate
+# (max_delta <= epsilon, runner.py's comparable branch) rather than passed in,
+# so a factory-built run can never disagree with itself the way a hand-written
+# literal could.
+@pytest.fixture()
+def converged_run_factory():
+    def _make(db, *, max_delta: float, epsilon: float, debate=None):
+        from app.models.entities import AnalyzerRun, next_analyzer_run_seq
+        from app.protocol.runner import CONVERGENCE_VERSION, PROTOCOL_ANALYSIS_TYPE
+        from app.services.dialectical_v2 import first_branch
+
+        from test_v2_expand import codex_worker, make_v2_debate
+
+        if debate is None:
+            debate = make_v2_debate(db, codex_worker(db))
+        run = AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=first_branch(db, debate.id).id,
+            analyzer_type=PROTOCOL_ANALYSIS_TYPE,
+            output={
+                "convergence": {
+                    "converged": max_delta <= epsilon,
+                    "maxDelta": max_delta,
+                    "nodesCompared": 4,
+                    "nodesAdded": 0,
+                    "nodesRemoved": 0,
+                    "epsilon": epsilon,
+                },
+                "convergenceVersion": CONVERGENCE_VERSION,
+            },
+            status="complete",
+            provenance={"scoring_source": "protocol_analysis", "debate_id": debate.id},
+        )
+        # next_analyzer_run_seq assigns run.seq, db.add()s and db.flush()es as
+        # one lock-covered critical section -- do NOT db.add() separately.
+        # seq is what orders successive waves; created_at ties are routine.
+        next_analyzer_run_seq(db, run)
+        db.commit()
+        return debate, run.id
+
+    return _make
+
+
 @pytest.fixture()
 def db():
     # Per-connection SQLite state survives in the engine's pool across tests

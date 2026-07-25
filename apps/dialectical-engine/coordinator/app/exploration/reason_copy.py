@@ -72,6 +72,21 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
         "Automatic expansion paused because it had already started as many "
         "lines of inquiry as it takes on at once; the rest remain in line."
     ),
+    # P1 Task 7: the two whole-debate stop conditions. Both say STOPPED, not
+    # "paused": unlike every code above them, neither clears on the next pass
+    # -- a settled tree stays settled and elapsed time does not run backwards.
+    # The convergence copy deliberately claims only that the conclusions stopped
+    # MOVING, which is exactly what was measured (max strength drift under the
+    # stability threshold, twice running); it does not claim the question is
+    # settled or the answer is right.
+    "converged": (
+        "Automatic expansion stopped because the analysis had settled: further "
+        "rounds were no longer changing the conclusions."
+    ),
+    "wall_clock": (
+        "Automatic expansion stopped because this debate reached the time limit "
+        "set for how long it may keep growing."
+    ),
     # Lifecycle-input resolver component codes (defensive; not reachable on
     # any wire payload today -- see module docstring).
     "score_stale": "The score behind this step was too old to act on, so nothing changed.",
