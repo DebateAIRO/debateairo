@@ -17,8 +17,10 @@ EXPANSION_ACTIONS = {"continue", "deepen", "seek_evidence", "challenge", "abando
 # cold-start/config values, never learned), so a decision may steer real work
 # only when its grounding consulted exclusively categorical predicates:
 # evidence status, entailment verdicts, fatal flags, claim-type evidence
-# requirements (explicit user approval is categorical too, but lives outside
-# this policy). P1 Task 4 refined the rule to match how the decision is
+# requirements, and (P1 Task 5) the persisted cross-judge disagreement label
+# -- a recorded fact about the judging process rather than a judge score
+# (explicit user approval is categorical too, but lives outside this
+# policy). P1 Task 4 refined the rule to match how the decision is
 # actually made: a decision is categorical iff AT LEAST ONE of its GROUNDING
 # reasons is categorical, because every reason in a grounding tuple is
 # independently sufficient to fire the action -- so that categorical reason
@@ -278,12 +280,28 @@ class ExplorationPolicy:
             # Fatal-flag membership: categorical predicate.
             reasons.append(("high-severity contradiction should be challenged", CATEGORICAL_SIGNAL))
         if score.judges_disagree:
-            # Categorical: a MEMBERSHIP test over persisted judge artifacts
-            # ("these families assigned materially different values"), not an
-            # uncalibrated scalar treated as ground truth. Same character as
-            # the contradiction:high fatal-flag test above. See
-            # docs/superpowers/specs/2026-07-24-contested-frontier-
-            # deliberation-design.md section 5.2.
+            # Categorical at THIS layer because the policy consults a
+            # persisted LABEL, never a score: score_provenance
+            # .disagreement_status.status == "present", carried onto the
+            # lifecycle envelope by scoring_input_resolver._score_value.
+            # What that label asserts is a fact about the JUDGING PROCESS --
+            # two persisted artifacts scored the same rubric field
+            # materially differently -- and not any judge's score treated as
+            # truth about the claim.
+            #
+            # Where the seam is, stated plainly: "materially" is not a
+            # natural kind. It is fixed upstream by a CHOSEN per-field
+            # threshold -- app/scoring/disagreement.py computes
+            # max(values) - min(values) >= DISAGREEMENT_FIELD_THRESHOLD over
+            # the judges' values for one rubric field. The categorical claim
+            # is about what the label denotes, not about that threshold
+            # being calibrated; it is not.
+            #
+            # NOT the same character as the contradiction:high test above,
+            # despite the surface similarity: that test consumes a label the
+            # judge MODEL emitted, whereas this one consumes a label OUR OWN
+            # code minted out of judge scalars. See docs/superpowers/specs/
+            # 2026-07-24-contested-frontier-deliberation-design.md sec 5.2.
             reasons.append(("judge families materially disagree", CATEGORICAL_SIGNAL))
         return tuple(reasons)
 

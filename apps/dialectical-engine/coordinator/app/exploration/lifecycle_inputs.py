@@ -455,6 +455,12 @@ def _parse_score_value(
     }
     if not required.issubset(payload):
         raise ValueError("score_value is missing required fields")
+    # P1 Task 5: strict, matching the nested score_values block below. Without
+    # it a rename or typo on the producer side
+    # (scoring_input_resolver._score_value) would land as an unread extra key
+    # and judges_disagree would silently default to False forever -- "never
+    # contested", no error, feature dead. Fail loudly instead.
+    _strict_keys(payload, required | {"judges_disagree"}, "score_value")
     node_id = _non_empty(payload["node_id"], "score_value.node_id")
     if node_id != expected.node_id:
         raise _CandidateProblem("mismatched", "score_value_node_mismatch")

@@ -190,15 +190,20 @@ def test_agreeing_panel_leaves_the_challenge_route_closed(make_score_signal, mak
     assert decision.action != "challenge"
 
 
-def _score_payload(*, disagreement_status: dict | None) -> NodeScoringPayload:
+def _score_payload(
+    *,
+    disagreement_status: dict | None,
+    reducer_version: str | None = None,
+    rubric_version: str | None = None,
+) -> NodeScoringPayload:
     from app.scoring.reducer import REDUCER_VERSION, RUBRIC_VERSION
 
     provenance: dict = {
         "raw_judge_output_kind": "claim_assessment",
         "raw_judge_output_included": False,
         "final_score_source": "deterministic_reducer",
-        "reducer_version": REDUCER_VERSION,
-        "rubric_version": RUBRIC_VERSION,
+        "reducer_version": reducer_version or REDUCER_VERSION,
+        "rubric_version": rubric_version or RUBRIC_VERSION,
     }
     if disagreement_status is not None:
         provenance["disagreement_status"] = disagreement_status
@@ -287,6 +292,62 @@ def test_grounded_lifecycle_inputs_carry_judges_disagree_onto_the_score_signal()
     signals = policy_signals_for_lifecycle(mapped)
     assert signals is not None
     assert signals[0].judges_disagree is True
+
+
+def test_persisted_disagreement_label_confers_categorical_spawn_authority(monkeypatch) -> None:
+    """End-to-end over the chain that actually grants spawn authority.
+
+    Every link below is pinned individually elsewhere in this file, but the
+    other policy test INJECTS judges_disagree=True into the signal fixture.
+    This one derives it, starting from a persisted score_provenance and
+    running the real production path:
+
+        score_provenance.disagreement_status
+          -> scoring_input_resolver._score_value   (envelope)
+          -> lifecycle_inputs._parse_score_value   (AuthoritativeScore)
+          -> policy_signals_for_lifecycle          (ScoreSignal)
+          -> ExplorationPolicy.decide              (challenge / categorical)
+
+    "categorical" is the only signal_class expansion_dispatch's THE LAW
+    check will spawn work on, so this is the chain that confers spawn
+    authority end to end.
+    """
+    from app.exploration.scoring_input_resolver import _score_value
+    from test_lifecycle_inputs import (
+        expected_correlation,
+        grounded_evidence_candidate,
+        grounded_score_candidate,
+        scoring_contract_payload,
+    )
+
+    monkeypatch.setenv(FIELD_DISAGREEMENT_FLAG, "true")
+    # Match the contract the lifecycle fixtures declare, read from the same
+    # helper, so the versions cannot drift apart silently.
+    contract = scoring_contract_payload()
+    payload = _score_payload(
+        disagreement_status={"status": "present", "derived_from": "persisted_judge_artifacts"},
+        reducer_version=str(contract["reducer_version"]),
+        rubric_version=str(contract["rubric_version"]),
+    )
+    candidate = grounded_score_candidate()
+    candidate["value"] = _score_value(payload)
+
+    mapped = map_lifecycle_inputs(
+        expected=expected_correlation(with_evidence=True),
+        score_candidates=(candidate,),
+        evidence_candidates=(grounded_evidence_candidate(),),
+    )
+    assert isinstance(mapped, GroundedLifecycleInputs)
+    signals = policy_signals_for_lifecycle(mapped)
+    assert signals is not None
+    score_signal, evidence_signal = signals
+    assert score_signal.judges_disagree is True
+
+    decision = ExplorationPolicy().decide(score=score_signal, evidence=evidence_signal)
+
+    assert decision.action == "challenge"
+    assert decision.signal_class == CATEGORICAL_SIGNAL
+    assert "judge families materially disagree" in decision.reasons
 
 
 def test_legacy_score_envelope_without_the_field_defaults_to_no_disagreement() -> None:

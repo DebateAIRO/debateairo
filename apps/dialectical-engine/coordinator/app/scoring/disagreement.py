@@ -83,9 +83,19 @@ PIVOTAL_FIELDS: tuple[tuple[str, str], ...] = (
     ("evidence", "evidence_quality"),
     ("context", "impact"),
 )
-# Chosen against smoke4's real artifacts, not defended: 0.25 makes 13 of 26
-# nodes contested (0.20 -> 16, 0.30 -> 8), versus 0 of 26 under the composite
-# gate. See tests/test_cross_family_disagreement_replay.py.
+# Set from the MEASURED dispersion of the live panel, not from the frontier
+# size it happens to produce. Across the 26 nodes of debate f67ad244 the
+# per-field spread on critic.logical_validity averaged 0.196 and reached
+# 0.45, and the other pivotal fields ran 0.114-0.168 mean. The superseded
+# gate compared a five-field weighted COMPOSITE at 0.35 against a
+# largest-observed composite spread of 0.11 -- it sat above the data's
+# ceiling and so could not fire at all. 0.25 lies inside the observed
+# per-field range and above its mean, separating the panel's routine
+# scatter from its genuine splits.
+#
+# Recorded as evidence, NOT as the rationale for the value: at 0.20 / 0.25 /
+# 0.30 this marks 16 / 13 / 8 of those 26 nodes contested, versus 0 under
+# the composite gate. See tests/test_cross_family_disagreement_replay.py.
 DISAGREEMENT_FIELD_THRESHOLD = 0.25
 
 
@@ -119,8 +129,18 @@ def judges_disagree_from_provenance(score_provenance: object) -> bool:
 
 
 def field_spreads(judge_evidence: list[dict]) -> dict[str, float]:
-    """Per-field max-minus-min across distinct judges. Fields any judge
-    omitted are absent from the result rather than defaulted to zero.
+    """Per-field max-minus-min across the distinct, parseable judgments.
+
+    What actually happens to an incomplete judgment (describing behaviour
+    that PRE-DATES P1 Task 5, not introducing it): every PIVOTAL_FIELDS leaf
+    is a REQUIRED field on ClaimAssessment, so a judgment missing one fails
+    model_validate inside _distinct_persisted_judge_evidence and that WHOLE
+    judgment is discarded from the panel -- silently, with no annotation on
+    any audited record. The per-field `len(values) >= 2` guard below is
+    therefore a defensive floor that a missing leaf never reaches, not the
+    mechanism that handles one. The consequence worth knowing at the call
+    site: a three-judge panel with one unparseable judgment silently becomes
+    a two-judge panel, and those two survivors can still trip the gate.
 
     Deliberately UNGATED: this is a pure measurement with no side effects,
     and the flag gates the gate (detect_persisted_judge_disagreements), not
