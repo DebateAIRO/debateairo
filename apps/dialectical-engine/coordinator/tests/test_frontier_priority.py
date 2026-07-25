@@ -15,18 +15,22 @@ of a mantissa.
 from __future__ import annotations
 
 import hashlib
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
 
 from app.exploration.expansion_dispatch import (
     OUTCOME_BELOW_PRIORITY_FLOOR,
+    OUTCOME_BUDGET_EXHAUSTED,
+    OUTCOME_WAVE_FULL,
     STOPPED_BELOW_PRIORITY_FLOOR,
     adaptive_expansion_state,
     expansion_dispatch,
     expansion_priority_floor,
     expansion_wave_width,
     frontier_priority,
+    frontier_priority_or_none,
 )
 from app.models.entities import (
     AnalyzerRun,
@@ -69,6 +73,24 @@ def test_missing_scores_yield_zero_priority():
     assert frontier_priority({"scores": {"impact": True, "uncertainty": 0.5}}) == 0.0
 
 
+def test_unreadable_scores_are_none_not_zero_for_the_rankability_aware_form():
+    """0.0 cannot express "never measured" -- that is what None is for.
+
+    Every shape here is an item the dispatcher must treat as UNRANKED, so the
+    floor cannot refuse it on a merit measurement that never happened.
+    """
+    assert frontier_priority_or_none(None) is None
+    assert frontier_priority_or_none({}) is None
+    assert frontier_priority_or_none({"scores": None}) is None
+    assert frontier_priority_or_none({"scores": "0.5"}) is None
+    assert frontier_priority_or_none({"scores": {"impact": 0.8}}) is None
+    assert frontier_priority_or_none({"scores": {"impact": None, "uncertainty": 0.5}}) is None
+    assert frontier_priority_or_none({"scores": {"impact": "0.8", "uncertainty": 0.5}}) is None
+    assert frontier_priority_or_none({"scores": {"impact": True, "uncertainty": 0.5}}) is None
+    # A genuine, measured zero is NOT None -- it was read, it is just worthless.
+    assert frontier_priority_or_none({"scores": {"impact": 0.0, "uncertainty": 0.5}}) == 0.0
+
+
 def test_dispatch_orders_by_priority_and_truncates_to_wave_width(
     db, monkeypatch, categorical_decisions_factory
 ):
@@ -99,7 +121,11 @@ def test_dispatch_orders_by_priority_and_truncates_to_wave_width(
     # the wave each carry their own honest refusal.
     by_priority = {round(r.frontier_priority, 6): r.dispatch_outcome for r in records}
     assert by_priority[0.1] == OUTCOME_BELOW_PRIORITY_FLOOR
-    assert by_priority[0.3] == "budget_exhausted"
+    # The wave's own refusal, NOT budget_exhausted: the per-debate budget is 6
+    # and only 3 were spent, so "reached its budget for this debate" would be
+    # a false statement about an untouched budget.
+    assert by_priority[0.3] == OUTCOME_WAVE_FULL
+    assert OUTCOME_BUDGET_EXHAUSTED not in {r.dispatch_outcome for r in records}
 
 
 def test_below_floor_is_refused_with_an_honest_outcome(
@@ -136,6 +162,36 @@ def test_unranked_node_is_exempt_from_the_floor_not_refused_by_it(
     # simply says nothing about this node.
     run = db.get(AnalyzerRun, run_id)
     run.output = {**run.output, "items": []}
+    db.commit()
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    db.expire_all()
+    assert records[0].frontier_priority is None
+    assert records[0].dispatch_outcome == "spawned"
+    assert len(expand_jobs(db, debate.id)) == 1
+
+
+def test_item_with_unreadable_scores_is_unranked_not_floored(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """The second door onto the same failure mode as the test above.
+
+    Here the node DOES have an item in its scoring run -- the run just says
+    nothing numeric about it (schema drift renaming ``scores``, or a run
+    writing nulls). Treating that as a 0.0 merit and refusing it
+    ``below_priority_floor`` would floor out every record at once and switch
+    adaptive expansion off wholesale, while claiming a measurement that never
+    happened.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.5])
+    run = db.get(AnalyzerRun, run_id)
+    items = [dict(item) for item in run.output["items"]]
+    # The item is still here, and still names the node. Only its scores are
+    # unreadable.
+    items[0]["scores"] = {"impact": None, "uncertainty": None}
+    run.output = {**run.output, "items": items}
     db.commit()
 
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
@@ -204,59 +260,75 @@ def test_cross_family_spread_promotes_a_node_it_would_otherwise_rank_below(
     assert contested.frontier_priority == pytest.approx(0.5 * 1.40)
     assert uncontested.frontier_priority == pytest.approx(0.5)
     assert contested.dispatch_outcome == "spawned"
-    assert uncontested.dispatch_outcome == "budget_exhausted"
+    assert uncontested.dispatch_outcome == OUTCOME_WAVE_FULL
 
 
-def test_same_created_at_tick_resolved_by_seq_at_frontier_ranking_site(
+def test_ranking_uses_the_decisions_own_run_not_the_latest_one(
     db, monkeypatch, categorical_decisions_factory
 ):
-    """Fourth "latest AnalyzerRun" read site (see AnalyzerRun.seq on the model
-    and tests/test_analyzer_run_seq.py for the other three).
+    """Every audited frontier_priority is derived from the scores that
+    GROUNDED its decision.
 
-    ``_score_items_by_node`` reads the latest complete node_scoring run to
-    rank the frontier. ``id`` is a random UUID4 and ``created_at`` is coarse
-    wall-clock, and same-tick runs are routine under incremental scoring, so
-    ordering on ``(created_at DESC, id DESC)`` alone would read a stale run
-    and rank the wrong nodes. Two runs are crafted here with an IDENTICAL
-    created_at and ids chosen so ``id DESC`` alone picks the OLDER one.
+    The records are selected by ``score_run_id == analyzer_run_id``, so the
+    decision's own run is in hand and is what the ranker reads. A NEWER
+    complete node_scoring run carrying different scores for the same nodes
+    must not touch the ranking -- ranking a decision on numbers it was never
+    made from would make the audit trail unfalsifiable.
+
+    This replaces an earlier "latest run resolved by seq" test: that test
+    enshrined ranking from a run other than the decision's, which is the
+    behaviour being removed here. Reading by primary key has no stale-run
+    hazard to resolve in the first place.
     """
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
     monkeypatch.setenv("DIALECTICAL_EXPANSION_WAVE_WIDTH", "1")
-    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.5, 0.5])
+    # The decision's own run ranks `first` above `second`.
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9, 0.2])
     first, second = records
 
-    frozen = now_utc()
-    stale = _scoring_run(
+    # A strictly newer, complete node_scoring run that REVERSES the ranking.
+    newer = _scoring_run(
         db,
         debate,
-        run_id="id-zzzzzzzz-older-but-lexicographically-last",
-        created_at=frozen,
-        priority_by_node={first.node_id: 0.9, second.node_id: 0.1},
+        run_id="newer-run-that-must-not-be-consulted",
+        created_at=now_utc() + timedelta(hours=1),
+        priority_by_node={first.node_id: 0.2, second.node_id: 0.9},
     )
-    fresh = _scoring_run(
-        db,
-        debate,
-        run_id="id-aaaaaaaa-newer-but-lexicographically-first",
-        created_at=frozen,
-        priority_by_node={first.node_id: 0.1, second.node_id: 0.9},
-    )
-    # Pre-fix ambiguity check, so this is a provable repro rather than an
-    # assertion of the new behaviour: created_at is tied, and id DESC alone
-    # ranks the stale run first.
-    assert stale.created_at == fresh.created_at
-    assert max(stale.id, fresh.id) == stale.id
-    assert fresh.seq > stale.seq
+    own_run = db.get(AnalyzerRun, run_id)
+    assert newer.seq > own_run.seq and newer.created_at > own_run.created_at
 
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
 
     db.expire_all()
-    # seq wins: the FRESH run's ranking is used, so `second` (0.9 there, 0.1
-    # in the stale run) takes the single-slot wave. Under the superseded
-    # (created_at, id) ordering `first` would have spawned instead.
-    assert second.frontier_priority == pytest.approx(0.9)
-    assert second.dispatch_outcome == "spawned"
-    assert first.frontier_priority == pytest.approx(0.1)
-    assert first.dispatch_outcome == OUTCOME_BELOW_PRIORITY_FLOOR
+    # The decision's own run wins on every axis: the recorded priorities are
+    # its numbers, and `first` takes the single-slot wave. Had the ranker
+    # consulted `newer`, `second` would have spawned and the priorities would
+    # be 0.2 / 0.9.
+    assert first.frontier_priority == pytest.approx(0.9)
+    assert second.frontier_priority == pytest.approx(0.2)
+    assert first.dispatch_outcome == "spawned"
+    assert second.dispatch_outcome == OUTCOME_WAVE_FULL
+
+
+def test_ranking_ignores_a_run_of_the_wrong_analyzer_type(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """Defensive: items are only ever read off a complete node_scoring run.
+
+    Anything else leaves every record honestly UNRANKED (NULL, exempt from
+    the floor) rather than ranked off some other analyzer's payload.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.5])
+    run = db.get(AnalyzerRun, run_id)
+    run.analyzer_type = "protocol_analysis"
+    db.commit()
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    db.expire_all()
+    assert records[0].frontier_priority is None
+    assert records[0].dispatch_outcome == "spawned"
 
 
 def _scoring_run(db, debate, *, run_id, created_at, priority_by_node):

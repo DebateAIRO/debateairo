@@ -65,6 +65,13 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
         "Automatic expansion paused because the remaining points looked less "
         "worth pursuing than the work already done."
     ),
+    # P1 Task 6: deliberately NOT the budget_exhausted copy above. This pass
+    # filled its own wave; the debate's expansion budget is untouched and the
+    # remaining points stay eligible on the next pass.
+    "wave_full": (
+        "Automatic expansion paused because it had already started as many "
+        "lines of inquiry as it takes on at once; the rest remain in line."
+    ),
     # Lifecycle-input resolver component codes (defensive; not reachable on
     # any wire payload today -- see module docstring).
     "score_stale": "The score behind this step was too old to act on, so nothing changed.",

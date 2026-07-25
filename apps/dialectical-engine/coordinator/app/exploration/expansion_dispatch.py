@@ -64,6 +64,11 @@ OUTCOME_BUDGET_EXHAUSTED = "budget_exhausted"
 OUTCOME_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
 OUTCOME_TARGET_NOT_EXPANDABLE = "target_not_expandable"
 OUTCOME_BELOW_PRIORITY_FLOOR = "below_priority_floor"
+# P1 Task 6: distinct from OUTCOME_BUDGET_EXHAUSTED on purpose. This pass's
+# wave filled up; the debate's expansion budget was NOT reached and may be
+# wide open. Annotating it "budget_exhausted" would render (via reason_copy)
+# as expansion pausing "after reaching its budget for this debate" -- false.
+OUTCOME_WAVE_FULL = "wave_full"
 
 # debate.config stopped_because vocabulary (why growth stopped).
 STOPPED_BUDGET_EXHAUSTED = "budget_exhausted"
@@ -72,6 +77,7 @@ STOPPED_QUIESCENT_NO_DECISIONS = "quiescent_no_decisions"
 STOPPED_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
 STOPPED_GENERATION_EXHAUSTED = "generation_exhausted"
 STOPPED_BELOW_PRIORITY_FLOOR = "below_priority_floor"
+STOPPED_WAVE_FULL = "wave_full"
 
 # Decision -> work mapping: challenge probes the decided node with a
 # challenging (CON) child; the seek_evidence/support family adds a
@@ -134,13 +140,18 @@ def expansion_max_per_debate(debate: Debate | None = None) -> int:
 # the same act as authorising it, which is why this is consistent with the
 # categorical-only steering law rather than an exception to it.
 #
-# UNRANKED IS NOT LOW-RANKED. A record whose node has no readable item in the
-# latest scoring run gets frontier_priority NULL and is EXEMPT from the floor
-# -- it still faces every pre-existing budget and capacity check, exactly as
-# it did before this task. Refusing it as "below_priority_floor" would assert
-# a merit measurement that was never made, and would silently switch adaptive
-# expansion off wholesale in any deployment where the item read comes back
-# empty. The floor may only refuse a priority that actually exists.
+# UNRANKED IS NOT LOW-RANKED. A record gets frontier_priority NULL and is
+# EXEMPT from the floor whenever its merit could not be READ -- whether the
+# node had no item in the decision's scoring run at all, or had one whose
+# `scores` was missing, null, or non-numeric. Both are the same fact: nothing
+# was measured. Refusing either as "below_priority_floor" would assert a merit
+# measurement that never happened, and a schema drift renaming `scores` (or a
+# run writing null scores) would then floor out every record and silently
+# switch adaptive expansion off wholesale. The floor may only refuse a
+# priority that actually exists; an unranked record still faces every
+# pre-existing budget and capacity check, exactly as it did before this task.
+# frontier_priority_or_none() is the rankability-aware form the dispatch loop
+# uses; frontier_priority() stays a pure rank that answers 0.0.
 EXPANSION_PRIORITY_FLOOR_ENV = "DIALECTICAL_EXPANSION_PRIORITY_FLOOR"
 EXPANSION_WAVE_WIDTH_ENV = "DIALECTICAL_EXPANSION_WAVE_WIDTH"
 # Measured, not guessed: across the 250 scored nodes in the 7 complete
@@ -161,6 +172,34 @@ def expansion_wave_width() -> int:
     return int_env(EXPANSION_WAVE_WIDTH_ENV, EXPANSION_WAVE_WIDTH, 1, 64)
 
 
+def frontier_priority_or_none(score_item: dict[str, Any] | None) -> float | None:
+    """The RANKABILITY-aware form: ``None`` means "never measured".
+
+    Returns ``None`` -- not 0.0 -- when the item is absent, is not a dict, has
+    no ``scores`` dict, or whose ``impact``/``uncertainty`` are missing or not
+    real numbers. Every one of those is the same fact: this node's merit could
+    not be read. The dispatch loop uses this form so the priority floor can
+    only ever refuse a merit that actually exists (see the
+    unranked-is-not-low-ranked note above).
+
+    ``bool`` is excluded from the numeric test deliberately -- ``True`` is an
+    ``int`` in Python, and a boolean landing in a score field is corrupt
+    input, not an impact of 1.0.
+    """
+    if not isinstance(score_item, dict):
+        return None
+    scores = score_item.get("scores")
+    if not isinstance(scores, dict):
+        return None
+    impact = scores.get("impact")
+    uncertainty = scores.get("uncertainty")
+    if not _is_real_number(impact) or not _is_real_number(uncertainty):
+        return None
+    spread = score_item.get("max_field_spread")
+    spread_value = float(spread) if _is_real_number(spread) else 0.0
+    return float(impact) * float(uncertainty) * (1.0 + spread_value)
+
+
 def frontier_priority(score_item: dict[str, Any]) -> float:
     """impact x uncertainty x (1 + max cross-family field spread).
 
@@ -168,26 +207,14 @@ def frontier_priority(score_item: dict[str, Any]) -> float:
     below its own impact x uncertainty merit -- disagreement promotes, it
     never demotes.
 
-    Returns 0.0 (not a guess) whenever either factor is absent or is not a
-    real number: there is no merit here to rank on, and 0.0 sorts it to the
-    back of the wave. ``bool`` is excluded deliberately -- ``True`` is an
-    ``int`` in Python, and a boolean landing in a score field is corrupt
-    input, not an impact of 1.0.
-
-    This is a pure RANK. Whether a node was rankable at all is a separate
-    question the caller answers (see the unranked-is-not-low-ranked note
-    above): 0.0 here means "ranks last", never "measured as worthless".
+    This is a pure RANK, and it answers 0.0 for anything it cannot read.
+    Whether a node was rankable AT ALL is a separate question, and 0.0 cannot
+    express it: 0.0 here means "ranks last", never "measured as worthless".
+    Callers that must tell those apart -- the dispatch loop does, because the
+    floor may not refuse an unmeasured node -- use frontier_priority_or_none.
     """
-    scores = score_item.get("scores") if isinstance(score_item, dict) else None
-    if not isinstance(scores, dict):
-        return 0.0
-    impact = scores.get("impact")
-    uncertainty = scores.get("uncertainty")
-    if not _is_real_number(impact) or not _is_real_number(uncertainty):
-        return 0.0
-    spread = score_item.get("max_field_spread")
-    spread_value = float(spread) if _is_real_number(spread) else 0.0
-    return float(impact) * float(uncertainty) * (1.0 + spread_value)
+    value = frontier_priority_or_none(score_item)
+    return 0.0 if value is None else value
 
 
 def _is_real_number(value: object) -> bool:
@@ -195,20 +222,28 @@ def _is_real_number(value: object) -> bool:
 
 
 def _score_items_by_node(
-    db: Session, debate_id: str, node_ids: set[str]
+    db: Session, debate_id: str, analyzer_run_id: str, node_ids: set[str]
 ) -> dict[str, dict[str, Any]]:
-    """Latest node_scoring items for ``node_ids``, keyed by node id, each
-    annotated with the node's widest cross-family field spread (P1 Task 5) so
-    frontier_priority can read both from one dict.
+    """Items of THE DECISION'S OWN scoring run for ``node_ids``, keyed by node
+    id, each annotated with the node's widest cross-family field spread (P1
+    Task 5) so frontier_priority can read both from one dict.
 
-    ``seq`` is the primary sort key, matching every other "latest
-    AnalyzerRun" read site (see AnalyzerRun.seq on the model): ``id`` is a
-    random UUID4 and ``created_at`` is coarse wall-clock, so same-tick runs --
-    routine under incremental scoring -- would otherwise resolve to a stale
-    run and rank the wrong nodes.
+    Reads ``analyzer_run_id`` by primary key rather than re-deriving "the
+    latest complete node_scoring run". The records being ranked were already
+    selected by ``score_run_id == analyzer_run_id`` (see the caller), so the
+    run that GROUNDED each decision is in hand -- and every audited
+    frontier_priority is then provably derived from the same scores that
+    grounded the decision it ranks. Re-deriving "latest" would rank a
+    decision on numbers it was never made from whenever a newer run landed in
+    between, and would carry a stale-run hazard (same-tick ``seq`` ties) that
+    reading by id does not have at all.
+
+    Defensive on type: a run that is not a complete ``node_scoring`` run
+    yields ``{}``, i.e. every record is honestly UNRANKED (and so exempt from
+    the floor) rather than ranked off some other analyzer's payload.
 
     ``node_ids`` bounds the per-node judge-evidence reads to the records
-    actually being ranked, rather than every scored node in the debate.
+    actually being ranked, rather than every scored node in the run.
     """
     from app.models.entities import AnalyzerRun
     from app.scoring.disagreement import field_spreads
@@ -216,16 +251,14 @@ def _score_items_by_node(
 
     if not node_ids:
         return {}
-    run = db.scalars(
-        select(AnalyzerRun)
-        .where(
-            AnalyzerRun.debate_id == debate_id,
-            AnalyzerRun.analyzer_type == "node_scoring",
-            AnalyzerRun.status == "complete",
-        )
-        .order_by(AnalyzerRun.seq.desc(), AnalyzerRun.created_at.desc(), AnalyzerRun.id.desc())
-        .limit(1)
-    ).first()
+    run = db.get(AnalyzerRun, analyzer_run_id)
+    if (
+        run is None
+        or run.debate_id != debate_id
+        or run.analyzer_type != "node_scoring"
+        or run.status != "complete"
+    ):
+        return {}
     output = getattr(run, "output", None)
     items = output.get("items") if isinstance(output, dict) else None
     if not isinstance(items, list):
@@ -400,6 +433,16 @@ def _stopped_because_for_pass(outcomes: list[str]) -> str:
         return STOPPED_DEFERRED_NO_CAPACITY
     if OUTCOME_SCALAR_ANNOTATE_ONLY in outcomes:
         return STOPPED_NO_CATEGORICAL_SIGNALS
+    # Defensively mapped, currently unreachable BY CONSTRUCTION: the wave
+    # width is clamped to >= 1, so OUTCOME_WAVE_FULL can only be appended
+    # after at least one spawn, and a pass that spawned never asks for a
+    # stopped_because at all (see expansion_dispatch's bookkeeping tail). It
+    # is mapped anyway so a future change to either invariant cannot leak a
+    # pass whose growth stopped at the wave into the wrong reason -- the same
+    # defensive discipline reason_copy.py already documents for the
+    # lifecycle-resolver component codes.
+    if OUTCOME_WAVE_FULL in outcomes:
+        return STOPPED_WAVE_FULL
     if OUTCOME_BELOW_PRIORITY_FLOOR in outcomes:
         return STOPPED_BELOW_PRIORITY_FLOOR
     return STOPPED_QUIESCENT_NO_DECISIONS
@@ -444,12 +487,16 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     # annotate_only outcome below -- ordering must not silence them, and the
     # signal_class gate below still runs BEFORE either knob, so neither the
     # floor nor the wave width can ever admit a record THE LAW refuses.
-    score_items = _score_items_by_node(db, debate_id, {record.node_id for record in dispatchable})
+    score_items = _score_items_by_node(
+        db, debate_id, analyzer_run_id, {record.node_id for record in dispatchable}
+    )
     for record in dispatchable:
-        item = score_items.get(record.node_id)
-        # NULL when the node had no readable item: honestly "never ranked",
-        # not "ranked zero" (see the unranked-is-not-low-ranked note above).
-        record.frontier_priority = frontier_priority(item) if item is not None else None
+        # NULL whenever the merit could not be READ -- no item for the node,
+        # or an item whose scores are missing/null/non-numeric. Both mean
+        # "never measured", not "measured zero" (see the
+        # unranked-is-not-low-ranked note above), and only a non-NULL value
+        # may be refused by the floor.
+        record.frontier_priority = frontier_priority_or_none(score_items.get(record.node_id))
     dispatchable.sort(key=lambda r: (-(r.frontier_priority or 0.0), r.created_at, r.id))
     floor = expansion_priority_floor()
     width = expansion_wave_width()
@@ -485,11 +532,12 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
                 outcomes.append(OUTCOME_BELOW_PRIORITY_FLOOR)
                 continue
             if spawned >= width:
-                # The wave is full. `spawned` IS the admitted count (the two
-                # only ever advance together), so a record refused downstream
-                # by a budget or by capacity never consumes wave width.
-                record.dispatch_outcome = OUTCOME_BUDGET_EXHAUSTED
-                outcomes.append(OUTCOME_BUDGET_EXHAUSTED)
+                # The wave is full -- NOT the debate's budget, which may be
+                # wide open. `spawned` IS the admitted count (the two only
+                # ever advance together), so a record refused downstream by a
+                # budget or by capacity never consumes wave width.
+                record.dispatch_outcome = OUTCOME_WAVE_FULL
+                outcomes.append(OUTCOME_WAVE_FULL)
                 continue
             if rounds_exhausted:
                 record.dispatch_outcome = OUTCOME_BUDGET_EXHAUSTED

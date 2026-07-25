@@ -201,9 +201,11 @@ def make_judge_evidence():
 # wave-width test ahead of the wave width itself.
 def _frontier_decisions_factory(signal_class: str):
     def _make(db, *, priorities):
+        from datetime import timedelta
+
         from sqlalchemy import select
 
-        from app.models.entities import AnalyzerRun, Node, next_analyzer_run_seq
+        from app.models.entities import AnalyzerRun, Node, next_analyzer_run_seq, now_utc
         from app.services.dialectical_v2 import first_branch
 
         from test_adaptive_expansion import persist_decision
@@ -260,6 +262,16 @@ def _frontier_decisions_factory(signal_class: str):
             )
             for node in chosen
         ]
+        # Pin DISTINCT, ascending created_at values. The dispatcher's sort
+        # tiebreaks on (created_at, id), so if these rows shared a tick the
+        # pre-sort walk would fall back to random-UUID id order -- and an
+        # ordering test would then only detect a broken sort about three runs
+        # in four. Distinct timestamps make creation order deterministic, so
+        # "creation order" is a real, reproducible baseline to sort away from.
+        base = now_utc()
+        for offset, record in enumerate(records):
+            record.created_at = base + timedelta(seconds=offset)
+        db.commit()
         return debate, records, run.id
 
     return _make
