@@ -7,6 +7,8 @@ O(branches + K) instead, and must never silently drop nodes.
 """
 from __future__ import annotations
 
+import hashlib
+
 from sqlalchemy import select
 
 from app.models.entities import (
@@ -15,6 +17,7 @@ from app.models.entities import (
     DebateBranch,
     Generation,
     Job,
+    JudgeOutputArtifact,
     Node,
     Worker,
     next_analyzer_run_seq,
@@ -25,6 +28,7 @@ from app.services import dialectical_v2 as service
 from app.services.dialectical_v2 import V2_CODEX_MODEL_ID
 from app.synthesis.branch_summary import (
     build_synthesis_tree_payload,
+    synthesis_contested_k,
     synthesis_load_bearing_k,
 )
 
@@ -33,6 +37,67 @@ from test_protocol_runner import _scoring_payload_for_node
 TOPIC = "Should cities ban cars downtown?"
 POV_TYPES = ("SCIENTIFIC_POV", "STATISTICAL_POV", "ETHICAL_POV", "PRACTICAL_POV")
 
+CONTESTED_K = 30
+
+
+def _assert_node_conservation(db, debate: Debate, payload: dict) -> None:
+    """The EXACT conservation identity (P1 Task 3, extended by Task 8).
+
+    Every node in the debate is accounted for exactly once, as a branch
+    entry, a full record, or an omission -- with the denominator queried
+    from the database rather than hard-coded. A `>=` assertion would still
+    pass if omitted_count double-counted nodes already carried elsewhere, or
+    simply reported len(nodes), and Task 7 consumes omitted_count for the
+    coverage record, so an inflated count is exactly the failure mode that
+    must not slip through.
+
+    Task 8 makes this load-bearing in a second way: `contested` is now
+    CAPPED, and the nodes cut by that cap have to land in omitted_count. A
+    cut contested node that fell out of the identity would be a silent drop
+    of the very nodes the run exists to surface.
+    """
+    all_nodes = db.scalars(select(Node).where(Node.debate_id == debate.id)).all()
+    assert (
+        len(payload["load_bearing"])
+        + len(payload["contested"])
+        + len(payload["branches"])
+        + payload["omitted_count"]
+    ) == len(all_nodes)
+
+
+def _seed_two_family_panel(
+    db, debate: Debate, node: Node, *, spread: float, make_judge_evidence
+) -> None:
+    """Persist a two-family judge panel for `node` that disagrees on
+    critic.logical_validity by exactly `spread`, the way production persists
+    it (one JudgeOutputArtifact per family, same input_hash, distinct
+    (judge_role, provider, model) identities). This is the evidence
+    `app.scoring.disagreement.field_spreads` actually reads -- through the
+    real `latest_judge_evidence_for_node` resolution, not a stub.
+    """
+    base = round((1.0 - spread) / 2, 4)
+    for judge_role, logical_validity in (
+        ("critic", base),
+        ("critic_b", round(base + spread, 4)),
+    ):
+        evidence = make_judge_evidence(judge_role=judge_role, logical_validity=logical_validity)
+        raw_output = f"{node.id}:{judge_role}:{logical_validity}"
+        db.add(
+            JudgeOutputArtifact(
+                debate_id=debate.id,
+                node_id=node.id,
+                input_hash=f"branch-summary-input-hash-{node.id}",
+                judge_role=evidence["judge_role"],
+                provider=evidence["provider"],
+                model=evidence["model"],
+                raw_output=raw_output,
+                raw_output_sha256=hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
+                parse_status="available",
+                assessment=evidence["assessment"],
+                checked_at=now_utc(),
+            )
+        )
+
 
 def _v2_debate_with_deep_scored_tree(
     db,
@@ -40,6 +105,8 @@ def _v2_debate_with_deep_scored_tree(
     contested_node_index: int | None = None,
     *,
     scoring_run_id: str | None = None,
+    contested_node_spreads: dict[int, float] | None = None,
+    make_judge_evidence=None,
 ) -> tuple[Debate, Node]:
     """A v2 debate whose tree carries `node_count` complete PRO/CON argument
     nodes, chained deep under four POV branches, each with an active
@@ -57,6 +124,11 @@ def _v2_debate_with_deep_scored_tree(
     the way app/scoring/service.py:1386 marks it: a `score_provenance
     ["disagreement_status"]["status"] == "present"` block plus the
     dispersion-derived `uncertainty_source`.
+
+    `contested_node_spreads` ({argument index: logical_validity spread})
+    marks each listed node contested the same way AND persists a real
+    two-family judge panel carrying that exact per-field spread, so P1 Task
+    8's contested ranking reads measured dispersion rather than a stub.
     """
     worker = Worker(
         name="branch-summary-worker",
@@ -141,7 +213,10 @@ def _v2_debate_with_deep_scored_tree(
         # produces a real ranking rather than a flat tie.
         strength = round(0.9 - (index % 20) * 0.04, 4)
         item = _scoring_payload_for_node(node.id, node.claim, strength_override=strength)
-        if contested_node_index is not None and index == contested_node_index:
+        spreads = contested_node_spreads or {}
+        if (contested_node_index is not None and index == contested_node_index) or (
+            index in spreads
+        ):
             item["uncertainty_source"] = "dispersion"
             item["score_provenance"] = {
                 **item["score_provenance"],
@@ -150,6 +225,17 @@ def _v2_debate_with_deep_scored_tree(
                     "derived_from": "persisted_judge_artifacts",
                 },
             }
+        if index in spreads:
+            assert make_judge_evidence is not None, (
+                "contested_node_spreads needs the make_judge_evidence fixture"
+            )
+            _seed_two_family_panel(
+                db,
+                debate,
+                node,
+                spread=spreads[index],
+                make_judge_evidence=make_judge_evidence,
+            )
         items.append(item)
 
     _persist_scoring_run(db, debate, items, run_id=scoring_run_id)
@@ -199,31 +285,23 @@ def test_load_bearing_k_default_is_twenty(monkeypatch):
 def test_payload_is_bounded_and_reports_omissions(db):
     debate, root = _v2_debate_with_deep_scored_tree(db, node_count=120)
 
-    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=20)
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=20, contested_k=CONTESTED_K
+    )
 
     assert len(payload["load_bearing"]) == 20
     assert payload["omitted_count"] > 0
-    # Conservation is an EXACT identity, not a lower bound: every node in the
-    # debate is accounted for exactly once, as a branch entry, a full record,
-    # or an omission. A >= assertion would still pass if omitted_count double-
-    # counted nodes already carried elsewhere, or simply reported len(nodes) --
-    # and Task 7 consumes omitted_count for the coverage record, so an inflated
-    # count is exactly the failure mode that must not slip through. This is
-    # strictly stronger than the brief's bound: if the identity holds, so does
-    # the brief's `>= 120`.
-    all_nodes = db.scalars(select(Node).where(Node.debate_id == debate.id)).all()
-    assert (
-        len(payload["load_bearing"])
-        + len(payload["contested"])
-        + len(payload["branches"])
-        + payload["omitted_count"]
-    ) == len(all_nodes)
+    # This is strictly stronger than the brief's bound: if the identity
+    # holds, so does the brief's `>= 120`.
+    _assert_node_conservation(db, debate, payload)
 
 
 def test_load_bearing_ranked_by_impact_times_strength(db):
     debate, root = _v2_debate_with_deep_scored_tree(db, node_count=30)
 
-    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5)
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=5, contested_k=CONTESTED_K
+    )
 
     products = [item["impact"] * item["strength"] for item in payload["load_bearing"]]
     assert products == sorted(products, reverse=True)
@@ -235,7 +313,9 @@ def test_contested_nodes_are_always_included_even_below_k(db):
         db, node_count=30, contested_node_index=29
     )
 
-    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5)
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=5, contested_k=CONTESTED_K
+    )
 
     contested_ids = {item["node_id"] for item in payload["contested"]}
     assert len(contested_ids) == 1
@@ -243,10 +323,98 @@ def test_contested_nodes_are_always_included_even_below_k(db):
     assert contested_ids.isdisjoint({item["node_id"] for item in payload["load_bearing"]})
 
 
+def test_contested_k_default_is_thirty(monkeypatch):
+    # Read the production default, not whatever this machine/CI runner
+    # happens to export.
+    monkeypatch.delenv("DIALECTICAL_SYNTHESIS_CONTESTED_K", raising=False)
+
+    assert synthesis_contested_k() == 30
+
+
+def test_contested_is_capped_and_the_cut_nodes_are_counted_as_omitted(
+    db, make_judge_evidence
+):
+    """P1 Task 8: `contested` was Task 3's one unbounded term, on the
+    reasoning that a contested node is the point of the run. Task 5 then
+    measured 13 of 26 production nodes contested at the chosen threshold --
+    50% -- so at frontier scale the unbounded term re-unbounds the payload
+    Task 3 exists to bound. The cap is real, and the nodes it cuts are
+    counted honestly rather than silently dropped.
+    """
+    spreads = {index: round(0.10 + index * 0.05, 4) for index in range(8)}
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db,
+        node_count=30,
+        contested_node_spreads=spreads,
+        make_judge_evidence=make_judge_evidence,
+    )
+
+    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5, contested_k=3)
+
+    assert len(payload["contested"]) == 3
+    _assert_node_conservation(db, debate, payload)
+    # The 5 cut contested nodes are in omitted_count, not in load_bearing:
+    # they had their privileged shot and lost it on spread, so they must not
+    # come back in through the ordinary ranking.
+    surviving = {item["node_id"] for item in payload["contested"]}
+    load_bearing_ids = {item["node_id"] for item in payload["load_bearing"]}
+    cut = {
+        node_id
+        for node_id in _contested_node_ids(db, debate)
+        if node_id not in surviving
+    }
+    assert len(cut) == 5
+    assert cut.isdisjoint(load_bearing_ids)
+
+
+def test_capped_contested_survivors_are_the_widest_spread(db, make_judge_evidence):
+    """Rank contested by widest cross-family field spread, descending, so the
+    most-disagreed nodes survive the cut."""
+    spreads = {0: 0.10, 1: 0.50, 2: 0.20, 3: 0.60, 4: 0.30}
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db,
+        node_count=30,
+        contested_node_spreads=spreads,
+        make_judge_evidence=make_judge_evidence,
+    )
+    argument_ids = _argument_node_ids(db, debate)
+
+    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5, contested_k=2)
+
+    # 0.60 (index 3) and 0.50 (index 1) are the two widest; nothing else.
+    assert [item["node_id"] for item in payload["contested"]] == [
+        argument_ids[3],
+        argument_ids[1],
+    ]
+
+
+def _argument_node_ids(db, debate: Debate) -> list[str]:
+    """The debate's PRO/CON argument node ids in the order
+    `_v2_debate_with_deep_scored_tree` indexes them by -- read off the
+    persisted scoring run's item list, which the factory builds in exactly
+    that order (node created_at is coarse wall clock and ties here)."""
+    run = db.scalars(
+        select(AnalyzerRun).where(
+            AnalyzerRun.debate_id == debate.id,
+            AnalyzerRun.analyzer_type == SCORING_ANALYZER_TYPE,
+        )
+    ).one()
+    return [item["node_id"] for item in run.output["items"]]
+
+
+def _contested_node_ids(db, debate: Debate) -> set[str]:
+    from app.synthesis.branch_summary import _is_contested, _scored_items
+
+    scored = _scored_items(db, debate)
+    return {node_id for node_id, item in scored.items() if _is_contested(item)}
+
+
 def test_full_argument_text_only_for_load_bearing_and_contested(db):
     debate, root = _v2_debate_with_deep_scored_tree(db, node_count=60)
 
-    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=10)
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=10, contested_k=CONTESTED_K
+    )
 
     for item in payload["load_bearing"]:
         assert item.get("argument")
@@ -294,7 +462,9 @@ def test_same_created_at_tick_resolved_by_seq_not_random_id(db):
     assert max(stale.id, fresh.id) == stale.id
     assert fresh.seq > stale.seq
 
-    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5)
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=5, contested_k=CONTESTED_K
+    )
 
     # 0.99 comes only from the seq-winner; the stale run's top strength is 0.90.
     assert {item["strength"] for item in payload["load_bearing"]} == {0.99}

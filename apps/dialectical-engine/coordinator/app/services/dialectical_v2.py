@@ -2877,11 +2877,15 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
         if bool_env("DIALECTICAL_HIERARCHICAL_SYNTHESIS", False):
             from app.synthesis.branch_summary import (
                 build_synthesis_tree_payload,
+                synthesis_contested_k,
                 synthesis_load_bearing_k,
             )
 
             tree_nodes = build_synthesis_tree_payload(
-                db, debate, load_bearing_k=synthesis_load_bearing_k()
+                db,
+                debate,
+                load_bearing_k=synthesis_load_bearing_k(),
+                contested_k=synthesis_contested_k(),
             )
         else:
             tree_nodes = [

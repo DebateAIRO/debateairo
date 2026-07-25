@@ -8,10 +8,23 @@ it fails at the last step of a multi-hour run.
 The payload is now O(branches + K):
   - one bounded summary per POV branch
   - the top-K load-bearing nodes in full, ranked by impact x strength
-  - every contested node in full, regardless of rank (a contested node is
-    the point of the run -- see docs/superpowers/specs/
+  - the top-C contested nodes in full, ranked by widest cross-family field
+    spread, selected BEFORE load-bearing ranking so a contested node never
+    loses its slot to a higher impact x strength ordinary node (see
+    docs/superpowers/specs/
     2026-07-24-contested-frontier-deliberation-design.md section 5.2)
   - an honest omitted_count; nodes are never silently dropped
+
+P1 Task 8 capped the contested term. Task 3 deliberately left it unbounded
+-- a contested node is the point of the run and must never be cut for rank
+-- and that held only while contested was effectively zero. Task 5 then
+measured the live panel: 13 of 26 production nodes are contested at the
+chosen per-field threshold, i.e. 50%. At frontier scale (several hundred
+nodes) an unbounded contested term re-unbounds the very payload this module
+exists to bound, and it fails at the final synthesis step after hours of
+compute. So contested is capped too -- ranked by widest field spread so the
+most-disagreed nodes survive -- and the remainder is counted honestly into
+omitted_count rather than silently dropped.
 
 This module is READ-ONLY: it never opens a write transaction and never
 shells out. (The 2026-07-24 nine-hour production wedge came from a stage
@@ -30,6 +43,16 @@ from app.models.entities import AnalyzerRun, Debate, Generation, Node
 
 SYNTHESIS_LOAD_BEARING_K = 20
 
+# P1 Task 8: the contested cap. Sized against the measured contested RATE,
+# not against a frontier size we hope for: Task 5 measured 13 of 26 live
+# nodes contested (50%), so a 400-node frontier carries ~200 contested nodes
+# and the uncapped term alone is an order of magnitude over what fits. 30
+# keeps the contested section HALF AGAIN LARGER than the load-bearing one
+# (SYNTHESIS_LOAD_BEARING_K = 20), so the payload stays deliberately tilted
+# toward disagreement, while the total full-text record count stays bounded
+# at 50 -- inside the envelope the pre-P1 payload already synthesised at.
+SYNTHESIS_CONTESTED_K = 30
+
 # Per-branch summary budget, in characters of CLAIM text (claims, not
 # arguments -- full argument prose is what blew the context window, and only
 # load-bearing/contested nodes get it). Bounded so the branch section cannot
@@ -39,6 +62,10 @@ BRANCH_SUMMARY_CHAR_BUDGET = 1200
 
 def synthesis_load_bearing_k() -> int:
     return int_env("DIALECTICAL_SYNTHESIS_LOAD_BEARING_K", SYNTHESIS_LOAD_BEARING_K, 5, 100)
+
+
+def synthesis_contested_k() -> int:
+    return int_env("DIALECTICAL_SYNTHESIS_CONTESTED_K", SYNTHESIS_CONTESTED_K, 5, 100)
 
 
 def _scored_items(db: Session, debate: Debate) -> dict[str, dict[str, Any]]:
@@ -96,8 +123,53 @@ def _is_contested(item: dict[str, Any]) -> bool:
     return isinstance(status, dict) and status.get("status") == "present"
 
 
+def _rank_and_cap_contested(
+    db: Session, debate: Debate, contested: list[Node], contested_k: int
+) -> list[Node]:
+    """The `contested_k` widest-disagreed contested nodes (P1 Task 8).
+
+    Ranked by the node's WIDEST cross-family field spread, descending, using
+    ``app.scoring.disagreement.field_spreads`` -- the same pure, ungated
+    measurement ``app/exploration/expansion_dispatch.py`` ranks the frontier
+    with, read off the same per-node judge evidence
+    (``latest_judge_evidence_for_node``). Ties break on node id so the cut is
+    deterministic.
+
+    A contested node whose panel can no longer be read -- fewer than two
+    distinct parseable judgments survive, or the artifacts have aged out --
+    scores 0.0 and therefore ranks LAST among contested. That is deliberate:
+    it is still contested (the persisted disagreement_status label says so,
+    and it keeps its privileged position ahead of every ordinary node), but
+    with no measurable spread there is nothing to argue it should outrank a
+    node whose disagreement we can still see. It can also be reached by a
+    node marked contested under the historical composite gate, which never
+    recorded a per-field spread at all.
+
+    The spread reads happen ONLY when the cap actually binds: they cost one
+    query per contested node, and when everything fits, the ranking cannot
+    change which nodes appear -- just their order within a section that is
+    carried whole. Under the cap the payload keeps its
+    materialized_path-ordered listing; over it, spread-descending order.
+
+    Read-only, like the rest of this module: no write transaction, no CLI.
+    """
+    if len(contested) <= contested_k:
+        return contested
+
+    from app.scoring.disagreement import field_spreads
+    from app.scoring.service import latest_judge_evidence_for_node
+
+    widest: dict[str, float] = {}
+    for node in contested:
+        spreads = field_spreads(
+            latest_judge_evidence_for_node(db, debate_id=debate.id, node_id=node.id)
+        )
+        widest[node.id] = max(spreads.values()) if spreads else 0.0
+    return sorted(contested, key=lambda n: (-widest[n.id], n.id))[:contested_k]
+
+
 def build_synthesis_tree_payload(
-    db: Session, debate: Debate, *, load_bearing_k: int
+    db: Session, debate: Debate, *, load_bearing_k: int, contested_k: int
 ) -> dict[str, Any]:
     nodes = list(
         db.scalars(
@@ -125,10 +197,21 @@ def build_synthesis_tree_payload(
         value = scores.get(field) if isinstance(scores, dict) else None
         return float(value) if isinstance(value, (int, float)) else 0.0
 
-    contested_nodes = [n for n in nodes if _is_contested(scored.get(n.id) or {})]
+    # Contested selection runs FIRST and off its own ranking, so a contested
+    # node is never displaced by a higher impact x strength ordinary node.
+    all_contested = [n for n in nodes if _is_contested(scored.get(n.id) or {})]
+    all_contested_ids = {n.id for n in all_contested}
+    contested_nodes = _rank_and_cap_contested(db, debate, all_contested, contested_k)
     contested_ids = {n.id for n in contested_nodes}
 
-    rankable = [n for n in nodes if n.node_type in {"PRO", "CON"} and n.id not in contested_ids]
+    # Excluded on ALL contested, not just the survivors: a node cut by the
+    # contested cap lost on the widest-spread ranking after having had the
+    # privileged first pick, and it does not get a second entry through the
+    # ordinary impact x strength pool. It lands in omitted_count instead --
+    # counted, never silently dropped.
+    rankable = [
+        n for n in nodes if n.node_type in {"PRO", "CON"} and n.id not in all_contested_ids
+    ]
     rankable.sort(key=lambda n: (-(_score(n, "impact") * _score(n, "strength")), n.id))
     load_bearing = rankable[:load_bearing_k]
     load_bearing_ids = {n.id for n in load_bearing}
