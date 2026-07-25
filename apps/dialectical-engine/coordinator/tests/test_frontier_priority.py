@@ -533,6 +533,86 @@ def test_a_debate_that_never_expanded_is_never_stopped_as_converged(
     assert stopped_because_of(debate) == STOPPED_QUIESCENT_NO_DECISIONS
 
 
+def test_movement_during_a_user_approval_interlude_breaks_the_streak(
+    db, monkeypatch, converged_run_factory
+):
+    """REVIEW ROUND 2. The round guard may gate the increment, never the reset.
+
+    ``rounds_completed`` is advanced only by ``expansion_dispatch``'s own tail,
+    never by ``admit_and_spawn`` -- so a debate that keeps growing through the
+    user-approval endpoint has a FROZEN round counter while its graph is still
+    changing. And the runner will not rescue us with ``topology_changed``:
+    ordinary node addition leaves the node-strength key sets overlapping, so
+    those readings come back COMPARABLE.
+
+    The interleave below is the residual hole. With the reset gated behind the
+    round guard, the moving reading in the middle is swallowed before it ever
+    reaches the ``maxDelta`` test -- so the stale pre-interlude count survives,
+    combines with the single fresh measurement at the end, reaches 2, and
+    stamps ``converged`` on a debate whose graph was demonstrably still moving.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        rounds_completed,
+        stopped_because_of,
+    )
+
+    # 1. A real dispatcher-driven round completes and is counted.
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    frozen_round = rounds_completed(debate)
+
+    # 2. Growth continues by USER APPROVAL only: the round counter is frozen,
+    #    the reading is comparable, and it shows real movement.
+    debate, run_b = converged_run_factory(
+        db, max_delta=0.30, epsilon=0.05, debate=debate, expanded=False
+    )
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+    assert rounds_completed(debate) == frozen_round
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 0
+
+    # 3. The dispatcher resumes and produces ONE settled measurement. That is
+    #    one fresh observation, not two -- the streak restarted at the movement.
+    debate, run_c = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_c)
+
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+
+
+def test_a_repeated_reading_of_a_moving_run_still_resets(
+    db, monkeypatch, converged_run_factory
+):
+    """The reset is ungated on the run id too, not just on the round.
+
+    A retried scoring tail can hand the dispatcher the same latest run twice.
+    The run-id guard exists to stop counting one wave twice; suppressing a
+    RESET on the same grounds would let observed movement go unrecorded purely
+    because it had been seen before.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        expansion_dispatch,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+
+    # The SAME run re-read after being rewritten to show movement.
+    _rewrite_convergence(
+        db, run_a, {"converged": False, "maxDelta": 0.30, "epsilon": 0.05}
+    )
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 0
+
+
 def test_two_readings_with_no_expansion_between_them_count_as_one_wave(
     db, monkeypatch, converged_run_factory
 ):

@@ -490,6 +490,20 @@ def _latest_convergence(db: Session, debate_id: str) -> tuple[str | None, dict[s
     return run.id, (convergence if isinstance(convergence, dict) else {})
 
 
+def _reset_streak(debate: Debate, state: dict[str, Any], count: int) -> int:
+    """Break the hysteresis streak; always answers 0.
+
+    Deliberately leaves ``converged_wave_run_id`` / ``converged_wave_round``
+    alone: a reset is not a count, so it must not mark a wave consumed and
+    block a later legitimate increment. Skips the write when the streak is
+    already 0 so a quiet debate does not rewrite debate.config every pass.
+    """
+    if count:
+        state[CONVERGED_WAVES_KEY] = 0
+        _write_adaptive_expansion_state(debate, state)
+    return 0
+
+
 def _record_convergence_wave(
     debate: Debate, run_id: str | None, convergence: dict[str, Any]
 ) -> int:
@@ -507,37 +521,61 @@ def _record_convergence_wave(
     guard below they would trip the stop and overwrite the honest diagnosis
     the pass would otherwise have recorded.
 
-    The guards, in order:
+    THE ONE PRINCIPLE (review round 2): **the round guard exists to stop
+    double-COUNTING a single wave, and it has no business suppressing a RESET.**
+    Divergence is divergence whether or not a round advanced. So the increment
+    is gated and the reset is not, which makes the guarantee honest in both
+    directions -- the counter can never over-count a wave, and it can never
+    carry a settled streak across observed movement.
+
+    That asymmetry is load-bearing because ``rounds_completed`` is advanced
+    ONLY by ``expansion_dispatch``'s own tail, never by ``admit_and_spawn``.
+    Growth driven purely by user approval (app/api/scoring.py) therefore leaves
+    the round counter frozen. With a gated reset, every reading during such an
+    interlude was swallowed before it ever reached the ``maxDelta`` test, so
+    real divergence neither reset the streak nor was recorded anywhere -- and a
+    stale pre-interlude count could later combine with one fresh measurement to
+    present itself as "two consecutive settled waves" while the graph was in
+    fact still growing.
+
+    Do NOT reach for the basis-changed reason as a safety net here. The runner
+    classifies a run ``topology_changed`` only when the two node-strength key
+    sets have ZERO intersection, or when an evidence-verifier tau edge appeared
+    or disappeared (app/protocol/runner.py). Ordinary node addition -- exactly
+    what ``admit_and_spawn`` produces -- leaves the intersection non-empty and
+    is classified COMPARABLE. The ungated reset below, not the reason check, is
+    what actually catches user-approved growth.
+
+    In order:
 
     1. **The comparison basis changed** (``reason`` in
-       ``CONVERGENCE_BASIS_CHANGED_REASONS``) -- reset to 0. Checked FIRST, and
-       deliberately ahead of the round guard: a user-approved expansion reaches
-       the tree through ``admit_and_spawn`` WITHOUT advancing
-       ``rounds_completed``, so a topology change is the only signal that the
-       graph moved under us. The wave is not marked consumed, so a real
-       measurement later in the same round is still counted.
-    2. **No expansion round has EVER completed** (``rounds_completed == 0``) --
-       refuse to count at all. Nothing has grown, so nothing can have settled.
-    3. **This exact run was already counted** (same ``run_id``). Dispatch is
-       best-effort at its call site and so is the protocol re-run immediately
-       before it, so a retried scoring tail can hand this the same latest run
-       twice.
-    4. **No expansion round since the last counted wave**
-       (``rounds_completed <= converged_wave_round``). Two protocol runs with
-       no growth between them are two readings of one state, not two waves.
-       Guards 3 and 4 answer different questions and neither subsumes the
-       other: a round CAN advance while the protocol re-run fails, leaving the
-       same stale run as "latest".
-    5. **The run could not MEASURE the drift** (no real ``maxDelta`` /
+       ``CONVERGENCE_BASIS_CHANGED_REASONS``) -- reset to 0. The wave is not
+       marked consumed, so a real measurement later in the same round is still
+       counted.
+    2. **The run could not MEASURE the drift** (no real ``maxDelta`` /
        ``epsilon``) -- the runner's ``first_evaluation`` /
        ``strengths_unavailable`` branches. The count carries forward untouched:
        resetting would treat silence as movement, incrementing would invent a
        measurement neither the runner nor this module made.
+    3. **The drift EXCEEDED epsilon** -- reset to 0, unconditionally. Not gated
+       on the round, not gated on the run id: the scores were observed moving,
+       and no bookkeeping question changes that fact.
+    4. Only now, for a SETTLED reading, the anti-double-count gates on the
+       increment:
+       a. ``rounds_completed == 0`` -- nothing ever grew, so nothing can have
+          settled.
+       b. same ``run_id`` as the last counted wave -- one reading, not two.
+          Dispatch is best-effort at its call site and so is the protocol
+          re-run before it, so a retried tail can hand over the same run twice.
+       c. ``rounds_completed <= converged_wave_round`` -- no round since the
+          last counted wave. (b) and (c) answer different questions and neither
+          subsumes the other: a round CAN advance while the protocol re-run
+          fails, leaving the same stale run as "latest".
 
-    Past all five, settled increments and moving resets to 0. The predicate is
-    ``max_delta <= epsilon`` -- byte-for-byte the one app/protocol/runner.py
-    uses to write ``converged`` on the same payload, so the stop condition and
-    the reported convergence flag can never disagree at the boundary.
+    The settled predicate is ``max_delta <= epsilon`` -- byte-for-byte the one
+    app/protocol/runner.py uses to write ``converged`` on the same payload, so
+    the stop condition and the reported convergence flag can never disagree at
+    the boundary.
 
     Mutates only ``debate.config`` (no flush, no commit) -- the write joins the
     caller's transaction, which is what keeps this off the "hold a SQLite write
@@ -553,10 +591,16 @@ def _record_convergence_wave(
 
     reason = convergence.get("reason")
     if isinstance(reason, str) and reason in CONVERGENCE_BASIS_CHANGED_REASONS:
-        if count:
-            state[CONVERGED_WAVES_KEY] = 0
-            _write_adaptive_expansion_state(debate, state)
-        return 0
+        return _reset_streak(debate, state, count)
+
+    max_delta = convergence.get("maxDelta")
+    epsilon = convergence.get("epsilon")
+    if not (_is_real_number(max_delta) and _is_real_number(epsilon)):
+        return count
+    if float(max_delta) > float(epsilon):
+        # Observed movement. UNGATED on purpose -- see THE ONE PRINCIPLE above.
+        # The wave is deliberately not marked consumed: a reset is not a count.
+        return _reset_streak(debate, state, count)
 
     rounds = rounds_completed(debate)
     if rounds == 0:
@@ -567,11 +611,7 @@ def _record_convergence_wave(
     if isinstance(last_round, int) and not isinstance(last_round, bool) and rounds <= last_round:
         return count
 
-    max_delta = convergence.get("maxDelta")
-    epsilon = convergence.get("epsilon")
-    if not (_is_real_number(max_delta) and _is_real_number(epsilon)):
-        return count
-    count = count + 1 if float(max_delta) <= float(epsilon) else 0
+    count += 1
     state[CONVERGED_WAVES_KEY] = count
     state[CONVERGED_WAVE_RUN_KEY] = run_id
     state[CONVERGED_WAVE_ROUND_KEY] = rounds
