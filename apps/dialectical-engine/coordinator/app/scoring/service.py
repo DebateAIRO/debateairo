@@ -839,6 +839,16 @@ def score_nodes_with_provider(
     model_metadata: dict | None = None
     cache_metadata: dict | None = None
     batch_cache_hit: bool | None = None
+    # FW2 P1.8: per-node cache hits vs misses. `batch_cache_hit` above is an
+    # AND-fold -- it answers "was EVERY node cached", which is False the
+    # moment one node misses and so cannot express "119 of 120 were cached".
+    # That ratio is the dominant CLI cost of the frontier run and nobody has
+    # modelled it: each spawn invalidates its PARENT's judge input hash
+    # (children are part of the hash, see node_scoring_input_hash), so
+    # re-judge volume compounds across 12 waves. This is the number most
+    # likely to explain "why is this taking four hours".
+    cache_hits = 0
+    cache_misses = 0
     model_call_count = 0
     provider_call_latencies_ms: list[int] = []
     for node_id in scored_node_ids:
@@ -875,6 +885,15 @@ def score_nodes_with_provider(
         node_cache = node_payload.get("cache") if isinstance(node_payload.get("cache"), dict) else None
         if isinstance(node_cache, dict) and isinstance(node_cache.get("hit"), bool):
             batch_cache_hit = node_cache["hit"] if batch_cache_hit is None else batch_cache_hit and node_cache["hit"]
+            # Counted off the SAME per-node signal the AND-fold above reads,
+            # so the two can never disagree about what a hit is. A node whose
+            # payload carries no cache block is counted as neither: it did
+            # not report, and inventing a miss for it would overstate the
+            # judge cost this metric exists to explain.
+            if node_cache["hit"]:
+                cache_hits += 1
+            else:
+                cache_misses += 1
         if cache_metadata is None and isinstance(node_cache, dict) and node_cache.get("stale"):
             cache_metadata = node_cache
         if node_payload.get("model_metadata"):
@@ -944,6 +963,18 @@ def score_nodes_with_provider(
             latency_ms=_elapsed_latency_ms(scoring_started_at),
             provider_call_latencies_ms=provider_call_latencies_ms,
         )
+    log_event(
+        LOGGER,
+        "scoring.cache",
+        debate_id=debate.id,
+        judge_role=judge_role,
+        force_refresh=force_refresh,
+        requested_nodes=len(scored_node_ids),
+        cache_hits=cache_hits,
+        cache_misses=cache_misses,
+        model_call_count=model_call_count,
+        duration_ms=_elapsed_latency_ms(scoring_started_at),
+    )
     return payload
 
 

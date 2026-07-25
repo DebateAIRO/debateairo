@@ -26,6 +26,8 @@ approval (the approvals endpoint reuses ``admit_and_spawn`` below).
 from __future__ import annotations
 
 import logging
+import time
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -33,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import bool_env, float_env, int_env
+from app.core.oplog import log_event
 from app.core.write_lock import commit_write
 from app.models.entities import Debate, Generation, Job, LifecycleDecisionRecord, Node
 
@@ -167,6 +170,33 @@ CONVERGED_WAVES_KEY = "converged_waves"
 CONVERGED_WAVE_RUN_KEY = "converged_wave_run_id"
 CONVERGED_WAVE_ROUND_KEY = "converged_wave_round"
 GROWTH_STARTED_AT_KEY = "growth_started_at"
+
+# FW2 P0.3 / P1.5: the two per-pass diagnostics that must OUTLIVE the log
+# stream, because they are what the operator reads back when a run has
+# already finished (or when the log rotated). Both ride the SAME
+# debate.config state dict, and the SAME commit, that the bookkeeping tail
+# already writes -- deliberately NOT a new commit point, because no new stage
+# may open a write transaction on this path (the 2026-07-24 nine-hour wedge).
+#
+# FRONTIER_DISTRIBUTION_KEY answers the question a bare "nothing expanded"
+# cannot: {min, p50, max} say WHERE the frontier sat relative to the floor,
+# and n_ranked / n_unranked / n_below_floor separate three failures that look
+# identical from outside and need three different fixes --
+#   * n_below_floor high, n_ranked high  -> the floor is too high;
+#   * n_unranked high                    -> nothing was RANKABLE (no scoring
+#                                           item, or non-numeric scores);
+#   * both low with records present      -> no categorical decisions existed
+#                                           at all (THE LAW refused them),
+#                                           which the census's
+#                                           outcome_annotate_only_scalar_signal
+#                                           count confirms.
+FRONTIER_DISTRIBUTION_KEY = "frontier_priority_distribution"
+# WAVE_POLARITY_KEY is the direct instrument for a known open risk:
+# _challenge_reasons is evaluated first in decide() and short-circuits, so
+# roughly half of all nodes may be diverted to `challenge` (CON) expansion.
+# Whether CON actually dominates the frontier has never been measured; this
+# is the number that measures it.
+WAVE_POLARITY_KEY = "wave_polarity"
 
 # Two consecutive settled waves, not one: a single wave under epsilon can be
 # noise, and stopping a 12-wave budget on noise is the expensive mistake here.
@@ -349,6 +379,48 @@ def _is_real_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _frontier_distribution(priorities: list[float | None], floor: float) -> dict[str, Any]:
+    """FW2 P0.3: the shape of one pass's frontier, as {min, p50, max, n_*}.
+
+    Derived PURELY from the priorities already written onto the records and
+    from the floor already read -- it never re-queries, never re-ranks, and
+    is computed before the dispatch loop is entered, so it cannot observe or
+    influence any gate. That independence is the point: it describes what the
+    ranking looked like, which is a different question from what each gate
+    then did with it (the census's per-outcome counts answer that), and it
+    stays answerable for records THE LAW refuses before the floor is ever
+    reached.
+
+    ``n_below_floor`` therefore counts records whose priority IS below the
+    floor, not records the floor actually refused -- the two differ whenever
+    a low-priority record is refused earlier (scalar signal class) or later
+    (the wave filled first), and the ranking-shaped number is the one that
+    answers "is the floor set too high".
+
+    ``min``/``p50``/``max`` are over the RANKED records only. An unranked
+    record was never measured (see the unranked-is-not-low-ranked note
+    above), and folding it in as 0.0 would drag the reported distribution
+    toward a floor breach that no measurement supports. With nothing ranked
+    they are absent rather than 0.0, for the same reason.
+
+    p50 is the lower-median (the n//2-th of the ascending values), not an
+    interpolated one: these are a handful of values read for triage, and an
+    interpolated median would report a priority that no record actually has.
+    """
+    ranked = sorted(value for value in priorities if value is not None)
+    distribution: dict[str, Any] = {
+        "n_ranked": len(ranked),
+        "n_unranked": sum(1 for value in priorities if value is None),
+        "n_below_floor": sum(1 for value in ranked if value < floor),
+        "floor": floor,
+    }
+    if ranked:
+        distribution["min"] = ranked[0]
+        distribution["p50"] = ranked[len(ranked) // 2]
+        distribution["max"] = ranked[-1]
+    return distribution
+
+
 def _score_items_by_node(
     db: Session, debate_id: str, analyzer_run_id: str, node_ids: set[str]
 ) -> dict[str, dict[str, Any]]:
@@ -372,6 +444,15 @@ def _score_items_by_node(
 
     ``node_ids`` bounds the per-node judge-evidence reads to the records
     actually being ranked, rather than every scored node in the run.
+
+    FW2 P1.6: this is one of the two N+1 sites on the frontier path -- one
+    ``latest_judge_evidence_for_node`` round trip PER RANKED NODE, each of
+    which is itself two queries after the Part A join. It was entirely
+    unmeasured, so a pass that got slow gave the operator nothing to look at.
+    It now emits ``expansion.score_items`` with ``duration_ms`` and
+    ``n_nodes``; ``n_nodes`` is the number of nodes actually read (the
+    intersection of the run's items with the requested ids), not the number
+    requested, so cost per node is directly divisible.
     """
     from app.models.entities import AnalyzerRun
     from app.scoring.disagreement import field_spreads
@@ -379,6 +460,7 @@ def _score_items_by_node(
 
     if not node_ids:
         return {}
+    started = time.monotonic()
     run = db.get(AnalyzerRun, analyzer_run_id)
     if (
         run is None
@@ -405,6 +487,15 @@ def _score_items_by_node(
         enriched = dict(item)
         enriched["max_field_spread"] = max(spreads.values()) if spreads else 0.0
         by_node[str(node_id)] = enriched
+    log_event(
+        LOGGER,
+        "expansion.score_items",
+        debate_id=debate_id,
+        analyzer_run_id=analyzer_run_id,
+        n_nodes=len(by_node),
+        n_requested=len(node_ids),
+        duration_ms=int((time.monotonic() - started) * 1000),
+    )
     return by_node
 
 
@@ -741,10 +832,22 @@ def _annotate_and_stop(
     filled: a record that genuinely spawned on an earlier pass keeps
     ``spawned``, because overwriting it would have the audit trail deny an
     expansion whose job is sitting in the jobs table.
+
+    FW2 P0.2: a run ENDING is the single most important event this system
+    produces, and until now it produced no log line at all -- growth simply
+    stopped and the operator reconstructed why by hand-querying SQLite. It is
+    logged twice, on purpose, because the two lines answer to different
+    readers: ``log_event`` gives one greppable JSON record (the module's
+    established structured form, which is INFO-only by construction), and the
+    WARNING carries the same facts to anyone watching the level rather than
+    the stream. Neither is emitted until the annotations are DURABLE -- a
+    stop logged before a failed commit would be a stop that did not happen.
     """
+    refused = 0
     for record in dispatchable:
         if record.dispatch_outcome is None:
             record.dispatch_outcome = outcome
+            refused += 1
     record_adaptive_stop(db, debate, reason)
     try:
         commit_write(db)
@@ -757,6 +860,27 @@ def _annotate_and_stop(
         # raise stays a raise; only the session is cleaned up.
         db.rollback()
         raise
+    elapsed = round(growth_elapsed_seconds(debate), 1)
+    rounds = rounds_completed(debate)
+    log_event(
+        LOGGER,
+        "expansion.stop",
+        debate_id=debate.id,
+        reason=reason,
+        outcome=outcome,
+        records_refused=refused,
+        growth_elapsed_s=elapsed,
+        rounds_completed=rounds,
+    )
+    LOGGER.warning(
+        "adaptive expansion STOPPED for debate=%s reason=%s records_refused=%d "
+        "growth_elapsed_s=%s rounds_completed=%d",
+        debate.id,
+        reason,
+        refused,
+        elapsed,
+        rounds,
+    )
 
 
 def debate_expand_jobs(db: Session, debate_id: str) -> list[Job]:
@@ -948,6 +1072,77 @@ def _stopped_because_for_pass(outcomes: list[str]) -> str:
     return STOPPED_QUIESCENT_NO_DECISIONS
 
 
+def _log_dispatch_census(
+    debate: Debate,
+    *,
+    analyzer_run_id: str,
+    records_total: int,
+    dispatchable_count: int,
+    spawned: int,
+    replayed: int,
+    outcomes: list[str],
+    distribution: dict[str, Any],
+    spawned_by_polarity: Counter[str],
+    width: int,
+    floor: float,
+    converged_waves: int,
+    convergence: dict[str, Any],
+) -> None:
+    """FW2 P0.1: ONE structured line carrying a whole dispatch pass's decisions.
+
+    The module that decides everything on this path carried exactly one log
+    statement before this (a defensive warning), so a pass that wedged or
+    stalled was reconstructed by hand-querying SQLite. This line is sized to
+    answer most post-hoc questions without that: what came in, what went out,
+    why each refusal happened, and what the three stop conditions read.
+
+    Per-outcome counts are flattened to one ``outcome_<code>`` key EACH
+    rather than nested under a single dict, because the operator greps these
+    -- ``grep expansion.census | grep outcome_below_priority_floor`` has to
+    work on a raw log line. Codes with a zero count are absent rather than
+    zero: the vocabulary grows (FW1 added three codes), and emitting the full
+    cross-product would make every line mostly zeros.
+
+    ``max_delta`` / ``epsilon`` are the RAW values the convergence read
+    returned, not a derived verdict, so the stop condition can be checked
+    against its own inputs. ``log_event`` drops None-valued fields, so their
+    ABSENCE is itself the signal that the protocol run could not measure the
+    drift (the runner's first_evaluation / strengths_unavailable branches) --
+    which is a different fact from a measured zero, and the streak treats it
+    differently (see _record_convergence_wave).
+
+    Purely a reporter: every value is already computed, and it neither reads
+    the database nor mutates anything.
+    """
+    counts = Counter(outcomes)
+    log_event(
+        LOGGER,
+        "expansion.census",
+        debate_id=debate.id,
+        analyzer_run_id=analyzer_run_id,
+        records_total=records_total,
+        dispatchable=dispatchable_count,
+        spawned=spawned,
+        replayed=replayed,
+        rounds_completed=rounds_completed(debate),
+        wave_width=width,
+        floor=floor,
+        growth_elapsed_s=round(growth_elapsed_seconds(debate), 1),
+        converged_waves=converged_waves,
+        max_delta=convergence.get("maxDelta"),
+        epsilon=convergence.get("epsilon"),
+        spawned_pro=spawned_by_polarity.get("PRO", 0),
+        spawned_con=spawned_by_polarity.get("CON", 0),
+        n_ranked=distribution.get("n_ranked"),
+        n_unranked=distribution.get("n_unranked"),
+        n_below_floor=distribution.get("n_below_floor"),
+        priority_min=distribution.get("min"),
+        priority_p50=distribution.get("p50"),
+        priority_max=distribution.get("max"),
+        **{f"outcome_{code}": count for code, count in sorted(counts.items())},
+    )
+
+
 def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> None:
     """One dispatch pass over the scoring run's fresh authenticated decisions.
 
@@ -1012,9 +1207,12 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
         return
 
     convergence_run_id, convergence = _latest_convergence(db, debate_id)
-    if _record_convergence_wave(debate, convergence_run_id, convergence) >= (
-        REQUIRED_CONSECUTIVE_CONVERGED_WAVES
-    ):
+    # Bound to a name ONLY so the census below can report it (FW2 P0.1). The
+    # call, its arguments, its position and the comparison are unchanged --
+    # the streak is still advanced exactly once, here, before the gate reads
+    # it.
+    converged_waves = _record_convergence_wave(debate, convergence_run_id, convergence)
+    if converged_waves >= REQUIRED_CONSECUTIVE_CONVERGED_WAVES:
         _annotate_and_stop(
             db, debate, dispatchable, reason=STOPPED_CONVERGED, outcome=OUTCOME_CONVERGED
         )
@@ -1042,9 +1240,21 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     dispatchable.sort(key=lambda r: (-(r.frontier_priority or 0.0), r.created_at, r.id))
     floor = expansion_priority_floor()
     width = expansion_wave_width()
+    # FW2 P0.3: snapshot the frontier's SHAPE here, off the priorities just
+    # written and the floor just read, BEFORE the dispatch loop runs. Reading
+    # it here rather than from the loop is what keeps it an observation: it
+    # cannot see a gate, so it cannot be perturbed by one, and it still
+    # describes records that a gate above the floor will refuse.
+    distribution = _frontier_distribution(
+        [record.frontier_priority for record in dispatchable], floor
+    )
 
     spawned = 0
     replayed = 0
+    # FW2 P1.5: PRO vs CON of what actually SPAWNED (not of what was
+    # decided), so the ratio measures where budget went rather than what the
+    # policy proposed.
+    spawned_by_polarity: Counter[str] = Counter()
     outcomes: list[str] = []
     rounds_exhausted = rounds_completed(debate) >= expansion_max_rounds(debate)
     # Budgets are derived from COMMITTED Job rows, and that guarantee is what
@@ -1131,26 +1341,64 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
                 record.child_spawn_count = 0
                 continue
             spawned += 1
+            spawned_by_polarity[DECISION_POLARITY[record.decision]] += 1
             # A committed v2_expand row now exists that `jobs` does not know
             # about; every budget below must see it.
             budgets_stale = True
 
         state = adaptive_expansion_state(debate)
+        # FW2 P0.3 / P1.5: both diagnostics ride the state dict the branches
+        # below ALREADY write, and the single commit_write they already share
+        # -- deliberately no new commit point on a path that must never hold
+        # a write transaction across a CLI call.
+        pass_stats = {
+            FRONTIER_DISTRIBUTION_KEY: distribution,
+            WAVE_POLARITY_KEY: {
+                "PRO": spawned_by_polarity.get("PRO", 0),
+                "CON": spawned_by_polarity.get("CON", 0),
+            },
+        }
         if spawned:
             state[ROUNDS_COMPLETED_KEY] = rounds_completed(debate) + 1
             # Growth resumed: a stale stop reason would be dishonest.
             state.pop(STOPPED_BECAUSE_KEY, None)
+            state.update(pass_stats)
             _write_adaptive_expansion_state(debate, state)
         elif replayed and not outcomes:
             # Pure replay pass: nothing changed, leave the bookkeeping alone.
+            # The diagnostics are deliberately NOT written here either -- this
+            # pass made no decisions, so recording a distribution for it would
+            # overwrite the real one from the pass that did.
             pass
         else:
             state[STOPPED_BECAUSE_KEY] = _stopped_because_for_pass(outcomes)
+            state.update(pass_stats)
             _write_adaptive_expansion_state(debate, state)
         commit_write(db)
     except Exception:
         db.rollback()
         raise
+
+    # FW2 P0.1. Emitted AFTER the commit and outside the try, so the census
+    # only ever describes durable state -- and so a census that is present is
+    # proof the pass landed, which is the first thing to check when a run
+    # wedges. The existing call-site log (app/scoring/jobs.py) says a pass
+    # happened and how long it took; this says what it DECIDED.
+    _log_dispatch_census(
+        debate,
+        analyzer_run_id=analyzer_run_id,
+        records_total=len(records),
+        dispatchable_count=len(dispatchable),
+        spawned=spawned,
+        replayed=replayed,
+        outcomes=outcomes,
+        distribution=distribution,
+        spawned_by_polarity=spawned_by_polarity,
+        width=width,
+        floor=floor,
+        converged_waves=converged_waves,
+        convergence=convergence,
+    )
 
 
 def maybe_queue_rescore_after_expansion(

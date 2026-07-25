@@ -5,8 +5,11 @@ GET /api/ops/verdict-shadow evidence-gate shadow aggregates over the most
                             recent completed debates (the W6 G-A/G-D flip
                             evidence feed). Computed on demand from the
                             single verdict derivation path; no persistence.
+GET /api/ops/expansion      adaptive-expansion state per debate: why growth
+                            stopped, the dispatch_outcome histogram, and the
+                            frontier's top records by priority (FW2 P0.4).
 
-Auth (documented choice): both endpoints gate on the user token, matching
+Auth (documented choice): all endpoints gate on the user token, matching
 how the existing admin-ish surface does it (GET /api/settings depends on
 require_user_token). Nothing under /api/ops is a public-read path.
 """
@@ -23,7 +26,21 @@ from sqlalchemy.orm import Session
 from app.core.auth import AuthContext, require_user_token
 from app.core.config import bool_env
 from app.core.db import get_db
-from app.models.entities import Debate, Job, JobTransition
+from app.exploration.expansion_dispatch import (
+    CONVERGED_WAVES_KEY,
+    FRONTIER_DISTRIBUTION_KEY,
+    GROWTH_STARTED_AT_KEY,
+    ROUNDS_COMPLETED_KEY,
+    STOPPED_BECAUSE_KEY,
+    WAVE_POLARITY_KEY,
+    adaptive_expansion_enabled,
+    adaptive_expansion_state,
+    expansion_priority_floor,
+    expansion_wave_width,
+    growth_elapsed_seconds,
+    rounds_completed,
+)
+from app.models.entities import Debate, Job, JobTransition, LifecycleDecisionRecord
 from app.services.serialization import derive_debate_verdict, iso
 
 LOGGER = logging.getLogger(__name__)
@@ -34,6 +51,10 @@ DEFAULT_TRANSITIONS_LIMIT = 100
 MAX_TRANSITIONS_LIMIT = 500
 DEFAULT_SHADOW_LIMIT = 50
 MAX_SHADOW_LIMIT = 200
+DEFAULT_EXPANSION_LIMIT = 10
+MAX_EXPANSION_LIMIT = 50
+DEFAULT_EXPANSION_TOP = 10
+MAX_EXPANSION_TOP = 100
 
 
 def _transition_to_dict(row: JobTransition) -> dict[str, Any]:
@@ -168,4 +189,129 @@ def verdict_shadow(
             "coverageHistogram": dict(sorted(coverage_histogram.items())),
             "claimTypeHistogram": dict(sorted(claim_type_histogram.items())),
         },
+    }
+
+
+def _expansion_record_row(record: LifecycleDecisionRecord) -> dict[str, Any]:
+    return {
+        "recordId": record.id,
+        "nodeId": record.node_id,
+        "decision": record.decision,
+        "signalClass": record.signal_class,
+        # NULL stays null, meaning NEVER MEASURED -- not measured zero. The
+        # priority floor makes exactly that distinction (an unranked record
+        # is exempt from it), so collapsing it here would misreport which
+        # records the floor could even refuse.
+        "frontierPriority": record.frontier_priority,
+        "dispatchOutcome": record.dispatch_outcome,
+        "childSpawnCount": record.child_spawn_count,
+        "createdAt": iso(record.created_at),
+    }
+
+
+def _expansion_row(db: Session, debate: Debate, *, top: int) -> dict[str, Any]:
+    """One debate's adaptive-expansion state, outcome histogram and frontier head.
+
+    Read-only, and derived through the dispatcher's OWN accessors
+    (adaptive_expansion_state, rounds_completed, growth_elapsed_seconds)
+    rather than by re-reading debate.config here -- so this surface cannot
+    drift from what the dispatcher actually believes, which is the entire
+    point of pointing the operator at it.
+    """
+    state = adaptive_expansion_state(debate)
+    outcome_rows = db.execute(
+        select(LifecycleDecisionRecord.dispatch_outcome, func.count(LifecycleDecisionRecord.id))
+        .where(LifecycleDecisionRecord.debate_id == debate.id)
+        .group_by(LifecycleDecisionRecord.dispatch_outcome)
+    ).all()
+    histogram: dict[str, int] = {}
+    records_total = 0
+    unoutcomed = 0
+    for outcome, count in outcome_rows:
+        records_total += int(count)
+        if outcome is None:
+            # Non-dispatchable decisions (continue/deepen/abandon/reopen)
+            # legitimately keep a NULL outcome -- they are not
+            # expansion-bearing. Reported separately rather than bucketed
+            # under a made-up code, so the histogram stays the vocabulary the
+            # dispatcher actually writes.
+            unoutcomed += int(count)
+            continue
+        histogram[str(outcome)] = int(count)
+    top_records = list(
+        db.scalars(
+            select(LifecycleDecisionRecord)
+            .where(LifecycleDecisionRecord.debate_id == debate.id)
+            # NULLs sort last under DESC in SQLite, so ranked records lead and
+            # an all-unranked frontier is still visible rather than hidden.
+            # (created_at, id) makes equal priorities a stable read.
+            .order_by(
+                LifecycleDecisionRecord.frontier_priority.desc(),
+                LifecycleDecisionRecord.created_at.desc(),
+                LifecycleDecisionRecord.id.desc(),
+            )
+            .limit(top)
+        ).all()
+    )
+    converged = state.get(CONVERGED_WAVES_KEY)
+    return {
+        "debateId": debate.id,
+        "status": debate.status,
+        "roundsCompleted": rounds_completed(debate),
+        "stoppedBecause": state.get(STOPPED_BECAUSE_KEY),
+        "convergedWaves": converged if isinstance(converged, int) else 0,
+        "growthStartedAt": state.get(GROWTH_STARTED_AT_KEY),
+        "growthElapsedSeconds": round(growth_elapsed_seconds(debate), 1),
+        # FW2 P0.3 / P1.5, persisted by the dispatcher's bookkeeping tail.
+        # Absent (null) on a debate that has not completed a deciding pass.
+        "frontierPriorityDistribution": state.get(FRONTIER_DISTRIBUTION_KEY),
+        "wavePolarity": state.get(WAVE_POLARITY_KEY),
+        "recordsTotal": records_total,
+        "recordsWithoutOutcome": unoutcomed,
+        "dispatchOutcomeHistogram": dict(sorted(histogram.items())),
+        "topRecords": [_expansion_record_row(record) for record in top_records],
+    }
+
+
+@router.get("/expansion")
+def ops_expansion(
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[AuthContext, Depends(require_user_token)],
+    debate_id: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_EXPANSION_LIMIT)] = DEFAULT_EXPANSION_LIMIT,
+    top: Annotated[int, Query(ge=1, le=MAX_EXPANSION_TOP)] = DEFAULT_EXPANSION_TOP,
+) -> dict[str, Any]:
+    """Adaptive-expansion state per debate (FW2 P0.4).
+
+    The flip plan directs the operator to ``/api/ops/*`` and there was
+    nothing there for any of this: whether growth is running, why it stopped,
+    where the frontier sat relative to the floor, and which records won the
+    budget. Reconstructing that meant hand-querying SQLite on a live box.
+
+    ``debate_id`` narrows to one debate; without it the most recently created
+    non-archived debates are returned. Both are bounded, and the per-debate
+    work is two grouped/limited queries -- read-only, no derivation, no
+    writes, matching the discipline of the two endpoints above.
+
+    The knobs (``floor``, ``waveWidth``) are echoed alongside the state
+    because every distribution here is only interpretable against them, and
+    the operator reading this surface is deciding whether to move exactly
+    those numbers.
+    """
+    query = select(Debate).where(Debate.status != "archived")
+    if debate_id:
+        query = select(Debate).where(Debate.id == debate_id)
+    debates = list(
+        db.scalars(
+            query.order_by(Debate.created_at.desc(), Debate.id.desc()).limit(limit)
+        ).all()
+    )
+    return {
+        "limit": limit,
+        "top": top,
+        "debateId": debate_id,
+        "adaptiveExpansionEnabled": adaptive_expansion_enabled(),
+        "floor": expansion_priority_floor(),
+        "waveWidth": expansion_wave_width(),
+        "debates": [_expansion_row(db, debate, top=top) for debate in debates],
     }

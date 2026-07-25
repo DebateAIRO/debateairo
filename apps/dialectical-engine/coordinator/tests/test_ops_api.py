@@ -227,3 +227,104 @@ def test_verdict_shadow_never_raises_and_counts_bad_debates(db, monkeypatch) -> 
     payload = response.json()
     assert payload["sampled"] == 1 and payload["errors"] == 1
     assert [row["debateId"] for row in payload["debates"]] == [good.id]
+
+
+# ---------------------------------------------------------------------------
+# /api/ops/expansion (FW2 P0.4)
+#
+# The flip plan directs the operator to /api/ops/* and there was nothing
+# there for adaptive expansion at all: whether growth is running, why it
+# stopped, where the frontier sat relative to the floor, and which records
+# won the budget were all reconstructable only by hand-querying SQLite on a
+# live box.
+# ---------------------------------------------------------------------------
+
+
+def test_ops_expansion_requires_user_token(db) -> None:
+    client = TestClient(app)
+    assert client.get("/api/ops/expansion").status_code == 401
+    assert (
+        client.get("/api/ops/expansion", headers={"Authorization": "Bearer wrong"}).status_code
+        == 403
+    )
+
+
+def test_ops_expansion_reports_state_histogram_and_frontier_head(
+    db, monkeypatch, categorical_decisions_factory
+) -> None:
+    from app.exploration.expansion_dispatch import expansion_dispatch
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_WAVE_WIDTH", "2")
+    debate, _records, run_id = categorical_decisions_factory(
+        db, priorities=[0.9, 0.7, 0.5, 0.01]
+    )
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    client = TestClient(app)
+    payload = client.get(f"/api/ops/expansion?debate_id={debate.id}", headers=AUTH).json()
+
+    assert payload["adaptiveExpansionEnabled"] is True
+    assert payload["floor"] == 0.15
+    assert payload["waveWidth"] == 2
+    assert len(payload["debates"]) == 1
+    row = payload["debates"][0]
+    assert row["debateId"] == debate.id
+    assert row["roundsCompleted"] == 1
+    assert row["growthStartedAt"]
+    assert row["growthElapsedSeconds"] >= 0
+    # The three stop-rail-adjacent diagnostics the flip plan needs.
+    assert row["frontierPriorityDistribution"]["n_ranked"] == 4
+    assert row["frontierPriorityDistribution"]["n_below_floor"] == 1
+    assert row["wavePolarity"] == {"PRO": 0, "CON": 2}
+    assert row["dispatchOutcomeHistogram"] == {
+        "spawned": 2,
+        "wave_full": 1,
+        "below_priority_floor": 1,
+    }
+    # Frontier head, priority-descending: the order budget was spent in.
+    priorities = [record["frontierPriority"] for record in row["topRecords"]]
+    assert priorities == sorted(priorities, reverse=True)
+    assert priorities[0] == 0.9
+    assert row["topRecords"][0]["dispatchOutcome"] == "spawned"
+    assert row["topRecords"][0]["signalClass"] == "categorical"
+
+
+def test_ops_expansion_is_bounded_and_read_only(
+    db, monkeypatch, categorical_decisions_factory
+) -> None:
+    from app.exploration.expansion_dispatch import expansion_dispatch
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, _records, run_id = categorical_decisions_factory(db, priorities=[0.9, 0.7, 0.5])
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    before = dict(db.get(Debate, debate.id).config or {})
+
+    client = TestClient(app)
+    bounded = client.get("/api/ops/expansion?top=1&limit=1", headers=AUTH).json()
+
+    assert len(bounded["debates"]) == 1
+    assert len(bounded["debates"][0]["topRecords"]) == 1
+    assert client.get("/api/ops/expansion?limit=0", headers=AUTH).status_code == 422
+    assert client.get("/api/ops/expansion?top=0", headers=AUTH).status_code == 422
+    # Read-only discipline, like the two endpoints above: serving the surface
+    # must never mutate the state it reports.
+    db.expire_all()
+    assert dict(db.get(Debate, debate.id).config or {}) == before
+
+
+def test_ops_expansion_reports_a_debate_that_never_dispatched(db) -> None:
+    """A debate with no adaptive-expansion state is reported honestly --
+    nulls, not fabricated zeros -- so "never ran" and "ran and found nothing"
+    stay distinguishable."""
+    debate, _root, _branch = _completed_debate(db, topic="Untouched debate", offset_s=5)
+
+    client = TestClient(app)
+    row = client.get(f"/api/ops/expansion?debate_id={debate.id}", headers=AUTH).json()["debates"][0]
+
+    assert row["roundsCompleted"] == 0
+    assert row["stoppedBecause"] is None
+    assert row["frontierPriorityDistribution"] is None
+    assert row["wavePolarity"] is None
+    assert row["dispatchOutcomeHistogram"] == {}
+    assert row["topRecords"] == []

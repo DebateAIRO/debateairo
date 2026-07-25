@@ -34,13 +34,19 @@ app/scoring/service.py:1137-1159.)
 """
 from __future__ import annotations
 
+import json
+import logging
+import time
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import int_env
+from app.core.oplog import log_event
 from app.models.entities import AnalyzerRun, Debate, Generation, Node
+
+LOGGER = logging.getLogger(__name__)
 
 SYNTHESIS_LOAD_BEARING_K = 20
 
@@ -165,8 +171,32 @@ def _rank_and_cap_contested(
     materialized_path-ordered listing; over it, spread-descending order.
 
     Read-only, like the rest of this module: no write transaction, no CLI.
+
+    FW2 P1.6: this is the second of the two N+1 sites on the frontier path
+    (``expansion_dispatch._score_items_by_node`` is the other), and it was
+    equally unmeasured. It emits ``synthesis.contested_rank`` with
+    ``duration_ms`` and ``n_nodes`` on BOTH paths, including the early
+    return: an operator who greps and finds nothing must be able to conclude
+    the code did not run, not that it ran unmeasured. ``capped`` distinguishes
+    them -- ``capped=false`` means zero judge-evidence reads happened and the
+    duration is the O(1) length check, so a large ``n_nodes`` there is cheap
+    and a large one under ``capped=true`` is the thing to suspect.
     """
+    started = time.monotonic()
+
+    def _log(capped: bool) -> None:
+        log_event(
+            LOGGER,
+            "synthesis.contested_rank",
+            debate_id=debate.id,
+            n_nodes=len(contested),
+            contested_k=contested_k,
+            capped=capped,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+
     if len(contested) <= contested_k:
+        _log(False)
         return contested
 
     from app.scoring.disagreement import field_spreads
@@ -178,7 +208,9 @@ def _rank_and_cap_contested(
             latest_judge_evidence_for_node(db, debate_id=debate.id, node_id=node.id)
         )
         widest[node.id] = max(spreads.values()) if spreads else 0.0
-    return sorted(contested, key=lambda n: (-widest[n.id], n.id))[:contested_k]
+    ranked = sorted(contested, key=lambda n: (-widest[n.id], n.id))[:contested_k]
+    _log(True)
+    return ranked
 
 
 def build_synthesis_tree_payload(
@@ -291,9 +323,37 @@ def build_synthesis_tree_payload(
     represented = load_bearing_ids | contested_ids | {b["node_id"] for b in branches}
     omitted_count = len([n for n in nodes if n.id not in represented])
 
-    return {
+    payload = {
         "branches": branches,
         "load_bearing": [_full(n) for n in load_bearing],
         "contested": [_full(n) for n in contested_nodes],
         "omitted_count": omitted_count,
     }
+    # FW2 P1.7: the payload's SHAPE at build time. Two jobs.
+    #
+    # First, the conservation identity -- branches + load_bearing + contested
+    # + omitted_count == n_nodes -- is what flip-plan step 7a asks the
+    # operator to verify BY HAND. Emitting all five terms (n_nodes included,
+    # which the identity needs and the payload itself does not carry) makes
+    # that check mechanical instead of manual, on every build rather than
+    # once.
+    #
+    # Second, total_chars gives the size trend across a long run. This module
+    # exists because the pre-P1 payload grew without bound and failed at the
+    # LAST step of a multi-hour run; a trend that climbs toward the context
+    # window is visible hours before it lands there. It is measured as the
+    # JSON-serialised length -- the closest honest proxy for what the prompt
+    # carries, and bounded work because the payload is bounded by
+    # construction (<= load_bearing_k + contested_k full records).
+    log_event(
+        LOGGER,
+        "synthesis.payload_shape",
+        debate_id=debate.id,
+        n_nodes=len(nodes),
+        branches=len(branches),
+        load_bearing=len(load_bearing),
+        contested=len(contested_nodes),
+        omitted_count=omitted_count,
+        total_chars=len(json.dumps(payload, default=str)),
+    )
+    return payload
