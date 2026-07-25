@@ -1318,6 +1318,133 @@ def test_lifecycle_decisions_outcome_buckets_are_honest(db) -> None:
     assert outcome_by_node[node_ids["annotate"]] == "annotate_only"
 
 
+def test_growth_stop_outcomes_are_not_collapsed_into_annotate_only(db) -> None:
+    """FW1 (I2): every refusal that answers "why did growth STOP" reaches the
+    wire as itself.
+
+    ``annotate_only`` means "was never in line to spawn" -- the bucket for a
+    scalar signal or a target that is gone. A frontier record refused by the
+    priority floor, the wave width, a depth rail, convergence or the wall
+    clock WAS in line, and each names a different, actionable stop. Rendering
+    all of them as ``annotate_only`` made the one operator question this
+    payload exists to answer unanswerable from the wire.
+    """
+    from app.exploration.expansion_dispatch import (
+        OUTCOME_BELOW_PRIORITY_FLOOR,
+        OUTCOME_CONVERGED,
+        OUTCOME_DEPTH_LIMIT,
+        OUTCOME_NODE_BUDGET_EXHAUSTED,
+        OUTCOME_ROUNDS_EXHAUSTED,
+        OUTCOME_WALL_CLOCK,
+        OUTCOME_WAVE_FULL,
+    )
+
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    distinct = [
+        OUTCOME_ROUNDS_EXHAUSTED,
+        OUTCOME_NODE_BUDGET_EXHAUSTED,
+        OUTCOME_BELOW_PRIORITY_FLOOR,
+        OUTCOME_WAVE_FULL,
+        OUTCOME_CONVERGED,
+        OUTCOME_WALL_CLOCK,
+        OUTCOME_DEPTH_LIMIT,
+    ]
+    node_ids: dict[str, str] = {}
+    for index, outcome in enumerate(distinct):
+        node = Node(
+            debate_id=debate.id,
+            parent_id=root.id,
+            node_type="PRO",
+            depth=1,
+            position=index,
+            claim=f"{outcome} branch",
+            status="complete",
+            materialized_path=f"0/{index}",
+        )
+        db.add(node)
+        db.flush()
+        node_ids[outcome] = node.id
+        record = persist_lifecycle_decision(
+            db,
+            snapshot=_lifecycle_snapshot(
+                idempotency_key=f"eval-{outcome}",
+                node_id=node.id,
+                debate_id=debate.id,
+                decision="challenge",
+                stopping_reason="evidence refutes or contradicts the claim",
+                signal_class="categorical",
+                decision_timestamp=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            ),
+        ).record
+        record.dispatch_outcome = outcome
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    outcome_by_node = {entry["nodeId"]: entry["outcome"] for entry in payload["lifecycleDecisions"]}
+
+    for outcome in distinct:
+        assert outcome_by_node[node_ids[outcome]] == outcome, (
+            f"{outcome} must reach the wire as itself, not as annotate_only"
+        )
+
+
+def test_lifecycle_decision_payload_carries_the_audited_frontier_priority(db) -> None:
+    """FW1 (I3): frontier_priority is persisted and migrated for exactly one
+    reason -- "the order in which expansion budget was spent is auditable" --
+    and it reached no wire payload at all. Unranked stays honestly null."""
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={})
+    db.add(debate)
+    db.flush()
+    root = _root(db, debate)
+    ranked = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="ranked branch",
+        status="complete",
+        materialized_path="0/0",
+    )
+    unranked = Node(
+        debate_id=debate.id,
+        parent_id=root.id,
+        node_type="CON",
+        depth=1,
+        position=1,
+        claim="unranked branch",
+        status="complete",
+        materialized_path="0/1",
+    )
+    db.add_all([ranked, unranked])
+    db.flush()
+    for index, node in enumerate((ranked, unranked)):
+        record = persist_lifecycle_decision(
+            db,
+            snapshot=_lifecycle_snapshot(
+                idempotency_key=f"eval-priority-{index}",
+                node_id=node.id,
+                debate_id=debate.id,
+                decision="challenge",
+                stopping_reason="evidence refutes or contradicts the claim",
+                signal_class="categorical",
+                decision_timestamp=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            ),
+        ).record
+        # The dispatcher writes the rank after decision-time persistence.
+        record.frontier_priority = 0.42 if node is ranked else None
+    db.commit()
+
+    payload = debate_to_dict(db, db.get(Debate, debate.id))
+    by_node = {entry["nodeId"]: entry for entry in payload["lifecycleDecisions"]}
+
+    assert by_node[ranked.id]["frontierPriority"] == 0.42
+    assert by_node[unranked.id]["frontierPriority"] is None
+
+
 def test_lifecycle_decisions_empty_when_debate_has_none(db) -> None:
     debate = Debate(topic="Should cities ban cars?", status="complete", config={})
     db.add(debate)

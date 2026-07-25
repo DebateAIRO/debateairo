@@ -70,7 +70,21 @@ STOPPED_BECAUSE_KEY = "stopped_because"
 # not expansion-bearing decisions.
 OUTCOME_SPAWNED = "spawned"
 OUTCOME_SCALAR_ANNOTATE_ONLY = "annotate_only_scalar_signal"
+# THE PER-DEBATE RAIL ONLY. Fix wave 1 (I1) split the two other rails that
+# used to share this code out into their own, because the three demand
+# OPPOSITE operator responses and the flip plan tells the operator a stop is
+# a finding to act on:
+#   * this one   -> the debate spent its whole spawn ceiling; raise
+#                   DIALECTICAL_EXPANSION_MAX_PER_DEBATE (or accept the cap);
+#   * rounds     -> the debate ran out of PASSES with its spawn budget
+#                   possibly untouched; raise DIALECTICAL_EXPANSION_MAX_ROUNDS;
+#   * node       -> ONE node absorbed its own share; investigate that node,
+#                   raising either debate-level knob would change nothing.
+# At the P1 Task 8 budgets the rounds rail is the one that binds first in
+# practice: 12 rounds x 12 wave width = 144 < the 150 per-debate ceiling.
 OUTCOME_BUDGET_EXHAUSTED = "budget_exhausted"
+OUTCOME_ROUNDS_EXHAUSTED = "rounds_exhausted"
+OUTCOME_NODE_BUDGET_EXHAUSTED = "node_budget_exhausted"
 OUTCOME_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
 OUTCOME_TARGET_NOT_EXPANDABLE = "target_not_expandable"
 OUTCOME_BELOW_PRIORITY_FLOOR = "below_priority_floor"
@@ -84,9 +98,47 @@ OUTCOME_WAVE_FULL = "wave_full"
 # stop that refused it rather than left NULL -- see _annotate_and_stop.
 OUTCOME_CONVERGED = "converged"
 OUTCOME_WALL_CLOCK = "wall_clock"
+# Fix wave 1 (I4): the depth guardrail's DISPATCHER-level refusal. The
+# primitive has had this rail since P1 Task 1; the dispatcher reached it only
+# by catching the primitive's ValueError, which logged a WARNING and
+# annotated target_not_expandable. At 12 rounds against a depth-10 rail that
+# is a routine, expected refusal -- not a warning, and not the same fact as
+# "the node was staled, abandoned, or never completed".
+OUTCOME_DEPTH_LIMIT = "depth_limit"
 
-# debate.config stopped_because vocabulary (why growth stopped).
+# The refusals that answer "WHY DID GROWTH STOP" rather than merely "did it".
+# Consumed by app.services.serialization._decision_outcome, which renders
+# each of these as itself and buckets everything else as annotate_only. The
+# set lives HERE, next to the vocabulary it is drawn from, so a new outcome
+# code cannot be added without deciding which side of that line it falls on.
+#
+# Deliberately EXCLUDED, because each is honestly "was never in line to
+# spawn" rather than a growth stop:
+#   * OUTCOME_SCALAR_ANNOTATE_ONLY -- THE LAW refused it at the gate;
+#   * OUTCOME_TARGET_NOT_EXPANDABLE -- the target is gone (staled, abandoned,
+#     incomplete), which is a property of the node, not of the frontier;
+#   * OUTCOME_SPAWNED -- growth did not stop at all.
+GROWTH_STOP_OUTCOMES: frozenset[str] = frozenset(
+    {
+        OUTCOME_BUDGET_EXHAUSTED,
+        OUTCOME_ROUNDS_EXHAUSTED,
+        OUTCOME_NODE_BUDGET_EXHAUSTED,
+        OUTCOME_DEFERRED_NO_CAPACITY,
+        OUTCOME_BELOW_PRIORITY_FLOOR,
+        OUTCOME_WAVE_FULL,
+        OUTCOME_CONVERGED,
+        OUTCOME_WALL_CLOCK,
+        OUTCOME_DEPTH_LIMIT,
+    }
+)
+
+# debate.config stopped_because vocabulary (why growth stopped). The three
+# budget rails stay distinct all the way to the operator surface: a shared
+# code here would re-collapse what OUTCOME_* above just separated, since this
+# is what reaches completion.reasonCode / humanReason via reason_copy.
 STOPPED_BUDGET_EXHAUSTED = "budget_exhausted"
+STOPPED_ROUNDS_EXHAUSTED = "rounds_exhausted"
+STOPPED_NODE_BUDGET_EXHAUSTED = "node_budget_exhausted"
 STOPPED_NO_CATEGORICAL_SIGNALS = "no_categorical_signals"
 STOPPED_QUIESCENT_NO_DECISIONS = "quiescent_no_decisions"
 STOPPED_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
@@ -694,9 +746,28 @@ def _expand_job_count_for_node(jobs: list[Job], node_id: str) -> int:
     return sum(1 for job in jobs if _job_payload(job).get("parent_node_id") == node_id)
 
 
+def _node_at_depth_limit(node: Node | None) -> bool:
+    """The primitive's P1 Task 1 depth rail, mirrored at the dispatch boundary.
+
+    Named separately from the rest of ``_node_expandable`` for one reason: at
+    12 rounds against a depth-10 rail this refusal is ROUTINE and EXPECTED,
+    while every other clause of that predicate describes a target that is
+    gone. Folding the two together (as the pre-FW1 code did, via the
+    primitive's ValueError) reported an expected rail as an anomaly and made
+    the audit trail unable to tell them apart.
+
+    Lazy import for the documented reason the rest of this module uses one:
+    app.services.dialectical_v2 imports back into this dependency region.
+    """
+    from app.services.dialectical_v2 import expansion_depth_limit
+
+    return node is not None and node.depth >= expansion_depth_limit()
+
+
 def _node_expandable(debate: Debate, node: Node | None) -> bool:
-    # Mirrors queue_v2_expand_job's validations plus the W3 rule that an
-    # abandoned path is never re-expanded.
+    # Mirrors queue_v2_expand_job's validations -- INCLUDING its depth rail
+    # (see _node_at_depth_limit) -- plus the W3 rule that an abandoned path
+    # is never re-expanded.
     return (
         node is not None
         and node.debate_id == debate.id
@@ -704,6 +775,7 @@ def _node_expandable(debate: Debate, node: Node | None) -> bool:
         and node.status == "complete"
         and bool(node.active_generation_id)
         and node.path_status != "abandoned"
+        and not _node_at_depth_limit(node)
     )
 
 
@@ -747,12 +819,22 @@ def admit_and_spawn(
     if jobs is None:
         jobs = debate_expand_jobs(db, debate.id)
     if not _node_expandable(debate, node):
+        # Name the depth rail rather than folding it into "the target is
+        # gone" (I4): at the depth rail the node is perfectly healthy and
+        # the tree simply may not grow deeper THERE, which is a different
+        # finding from a staled / abandoned / incomplete target and is
+        # answered by a different knob (DIALECTICAL_MAX_EXPANSION_DEPTH).
+        if _node_at_depth_limit(node):
+            return None, OUTCOME_DEPTH_LIMIT
         return None, OUTCOME_TARGET_NOT_EXPANDABLE
     assert node is not None
     if len(jobs) >= expansion_max_per_debate(debate):
         return None, OUTCOME_BUDGET_EXHAUSTED
     if _expand_job_count_for_node(jobs, node.id) >= expansion_max_per_node(debate):
-        return None, OUTCOME_BUDGET_EXHAUSTED
+        # Its OWN code (I1): the debate budget above may be wide open, and
+        # "one hot node absorbed its share" is a different finding from "the
+        # debate spent its ceiling".
+        return None, OUTCOME_NODE_BUDGET_EXHAUSTED
     # Capacity admission: spawn only when a capable online worker exists for
     # the expansion's model; otherwise defer honestly (no spawn, eligible
     # again on a later pass). The model is chosen once here (challenger-
@@ -771,8 +853,17 @@ def admit_and_spawn(
             decision_record_id=decision_record_id,
         )
     except ValueError as exc:
-        # Defensive backstop: _node_expandable mirrors the primitive's
-        # validations, so this should not fire in practice.
+        # Defensive backstop for a validation _node_expandable does NOT
+        # mirror. That comment ("mirrors the primitive's validations, so this
+        # should not fire in practice") was true when written and silently
+        # stopped being true when P1 Task 1 added the primitive's depth rail
+        # -- at 12 rounds against a depth-10 limit this path then became a
+        # routine occurrence logged at WARNING (I4). The rail is mirrored
+        # again above, so this is once more a genuine should-not-happen: it
+        # now covers only the primitive-only checks (polarity, blank reason,
+        # ROOT_CLAIM/EVIDENCE type, non-v2 pipeline), none of which the
+        # dispatcher can produce. Keep WARNING -- if it fires, it IS an
+        # anomaly, which is exactly what the depth rail had stopped being.
         LOGGER.warning(
             "adaptive expansion target refused by queue_v2_expand_job debate=%s node=%s: %s",
             debate.id,
@@ -784,8 +875,22 @@ def admit_and_spawn(
 
 
 def _stopped_because_for_pass(outcomes: list[str]) -> str:
+    # The rounds rail is tested first because it is the one that binds first
+    # at the P1 Task 8 budgets (12 rounds x 12 wave width = 144 < 150). It
+    # and the per-debate rail are in fact mutually exclusive within one pass
+    # -- a rounds-exhausted pass never reaches admit_and_spawn, which is the
+    # only source of OUTCOME_BUDGET_EXHAUSTED -- so this order records intent
+    # rather than resolving a real collision.
+    if OUTCOME_ROUNDS_EXHAUSTED in outcomes:
+        return STOPPED_ROUNDS_EXHAUSTED
     if OUTCOME_BUDGET_EXHAUSTED in outcomes:
         return STOPPED_BUDGET_EXHAUSTED
+    if OUTCOME_NODE_BUDGET_EXHAUSTED in outcomes:
+        # Mapped, not left to fall through to quiescent_no_decisions: before
+        # I1 the per-node rail emitted OUTCOME_BUDGET_EXHAUSTED and so DID
+        # reach a stopped_because. Dropping it would trade one wrong reason
+        # for a worse one ("has not found anything to grow yet").
+        return STOPPED_NODE_BUDGET_EXHAUSTED
     if OUTCOME_DEFERRED_NO_CAPACITY in outcomes:
         return STOPPED_DEFERRED_NO_CAPACITY
     if OUTCOME_SCALAR_ANNOTATE_ONLY in outcomes:
@@ -939,8 +1044,13 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
                 outcomes.append(OUTCOME_WAVE_FULL)
                 continue
             if rounds_exhausted:
-                record.dispatch_outcome = OUTCOME_BUDGET_EXHAUSTED
-                outcomes.append(OUTCOME_BUDGET_EXHAUSTED)
+                # The ROUNDS rail, not the debate's spawn budget (I1): this
+                # pass may have its whole per-debate budget untouched, so
+                # annotating budget_exhausted here made the audited record --
+                # and the operator-facing copy -- claim a spend that never
+                # happened, and pointed at the wrong knob.
+                record.dispatch_outcome = OUTCOME_ROUNDS_EXHAUSTED
+                outcomes.append(OUTCOME_ROUNDS_EXHAUSTED)
                 continue
             node = db.get(Node, record.node_id)
             # Write the real spawn outcome BEFORE the primitive's internal

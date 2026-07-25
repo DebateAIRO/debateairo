@@ -61,3 +61,71 @@ def test_queue_v2_expand_job_allows_one_below_the_limit(db):
     child = db.scalars(select(Node).where(Node.parent_id == node.id)).first()
     assert child is not None
     assert child.depth == expansion_depth_limit()
+
+
+# ---------------------------------------------------------------------------
+# FW1 (I4): the DISPATCHER-level refusal. Everything above tests the
+# primitive. The dispatcher reached the rail only by catching the primitive's
+# ValueError -- a path whose own comment said it "should not fire in
+# practice", which stopped being true the moment the primitive gained a depth
+# check the dispatcher's admission predicate did not mirror. At 12 rounds
+# against a depth-10 rail it fires routinely, and it fired at WARNING while
+# annotating target_not_expandable, conflating "at the depth rail" with "the
+# node was staled / abandoned / never completed".
+# ---------------------------------------------------------------------------
+
+
+def test_admit_and_spawn_names_the_depth_rail_without_warning(db, caplog) -> None:
+    import logging
+
+    from app.exploration import expansion_dispatch as dispatch
+
+    debate, node = _v2_debate_with_complete_node(db)
+    node.depth = expansion_depth_limit()
+    db.flush()
+
+    with caplog.at_level(logging.WARNING, logger=dispatch.LOGGER.name):
+        job, outcome = dispatch.admit_and_spawn(
+            db, debate, node, polarity="CON", reason="probe the deepest node"
+        )
+
+    assert job is None
+    assert outcome == dispatch.OUTCOME_DEPTH_LIMIT
+    assert outcome != dispatch.OUTCOME_TARGET_NOT_EXPANDABLE
+    # An expected rail is not an anomaly. Logging it at WARNING every pass is
+    # what trains an operator to ignore the channel.
+    assert caplog.records == []
+    # No placeholder child was created -- the primitive was never reached.
+    assert db.scalars(select(Node).where(Node.parent_id == node.id)).first() is None
+
+
+def test_admit_and_spawn_still_allows_one_below_the_depth_limit(db) -> None:
+    from app.exploration import expansion_dispatch as dispatch
+
+    debate, node = _v2_debate_with_complete_node(db)
+    node.depth = expansion_depth_limit() - 1
+    db.flush()
+
+    job, outcome = dispatch.admit_and_spawn(
+        db, debate, node, polarity="CON", reason="probe one below the rail"
+    )
+
+    assert outcome == dispatch.OUTCOME_SPAWNED
+    assert job is not None
+
+
+def test_depth_rail_is_distinct_from_a_gone_target(db) -> None:
+    """The two facts the old code conflated. An abandoned path and a node at
+    the depth rail demand different reads of the audit trail."""
+    from app.exploration import expansion_dispatch as dispatch
+
+    debate, node = _v2_debate_with_complete_node(db)
+    node.depth = 2
+    node.path_status = "abandoned"
+    db.flush()
+
+    _job, outcome = dispatch.admit_and_spawn(
+        db, debate, node, polarity="CON", reason="probe an abandoned node"
+    )
+
+    assert outcome == dispatch.OUTCOME_TARGET_NOT_EXPANDABLE

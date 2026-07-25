@@ -520,6 +520,19 @@ def _decision_outcome(record: LifecycleDecisionRecord) -> str:
     longer expandable, never yet dispatched/flag off) -- those are audit-trail
     detail, not product-facing causality; budget/capacity refusals are kept
     distinct because they answer "why did growth stop", not just "did it".
+
+    Fix wave 1 (I2) applied that governing rule to the codes P1 added. The
+    frontier's priority floor, wave width, per-node and rounds rails, the
+    depth guardrail, convergence and the wall clock are ALL "why did growth
+    stop" answers, and every one of them was rendering as ``annotate_only``
+    -- a bucket whose own meaning is "was never in line to spawn". Each of
+    those records WAS in line, and each names a different operator response,
+    so each reaches the wire as itself.
+
+    What stays ``annotate_only`` is exactly what the bucket claims: a scalar
+    or unclassified signal (THE LAW refused it, so it was never in line), a
+    target that is gone (staled/abandoned/incomplete), and a record never
+    dispatched at all (flag off).
     """
     if (record.child_spawn_count or 0) > 0:
         return "spawned"
@@ -529,12 +542,12 @@ def _decision_outcome(record: LifecycleDecisionRecord) -> str:
     # app.scoring -> app.services.orchestrator -> app.services.serialization
     # cycle via any future import added there. Matches the lazy-import
     # convention expansion_dispatch.py itself already uses for the same reason.
-    from app.exploration.expansion_dispatch import OUTCOME_BUDGET_EXHAUSTED, OUTCOME_DEFERRED_NO_CAPACITY
+    from app.exploration.expansion_dispatch import GROWTH_STOP_OUTCOMES
 
-    if record.dispatch_outcome == OUTCOME_BUDGET_EXHAUSTED:
-        return "budget_exhausted"
-    if record.dispatch_outcome == OUTCOME_DEFERRED_NO_CAPACITY:
-        return "deferred_no_capacity"
+    if record.dispatch_outcome in GROWTH_STOP_OUTCOMES:
+        # The code IS the bucket: these are a closed, machine-owned
+        # vocabulary, so re-listing them here would only let the two drift.
+        return str(record.dispatch_outcome)
     return "annotate_only"
 
 
@@ -566,6 +579,13 @@ def _lifecycle_decisions_payload(db: Session, debate_id: str) -> list[dict[str, 
             "reason": _humanize_reason(record.stopping_reason),
             "childSpawnCount": record.child_spawn_count,
             "outcome": _decision_outcome(record),
+            # FW1 (I3): the rank the dispatcher ordered this record by, the
+            # column's whole justification being that "the order in which
+            # expansion budget was spent is auditable" -- which no wire
+            # payload carried. NULL is meaningful and stays null: it means
+            # the node's merit was never MEASURED (and so was exempt from
+            # the priority floor), not that it measured zero.
+            "frontierPriority": record.frontier_priority,
             "decidedAt": iso(record.decision_timestamp),
         }
         for record in ordered

@@ -17,6 +17,8 @@ from __future__ import annotations
 from app.exploration.expansion_dispatch import (
     BUDGET_BOUNDS,
     OUTCOME_BUDGET_EXHAUSTED,
+    OUTCOME_NODE_BUDGET_EXHAUSTED,
+    OUTCOME_ROUNDS_EXHAUSTED,
     OUTCOME_SPAWNED,
     admit_and_spawn,
     expansion_max_per_debate,
@@ -78,7 +80,24 @@ def test_per_node_config_override_is_honored(db, monkeypatch) -> None:
     second_job, second_outcome = admit_and_spawn(db, debate, node, polarity="PRO", reason="support two")
 
     assert first_outcome == OUTCOME_SPAWNED
-    assert second_job is None and second_outcome == OUTCOME_BUDGET_EXHAUSTED
+    # FW1 (I1): the PER-NODE rail is its own code. It is NOT
+    # OUTCOME_BUDGET_EXHAUSTED: the debate budget here is 10 and only one of
+    # it is spent, so "reaching its budget for this debate" would be false,
+    # and the operator response ("investigate one hot node" vs "raise the
+    # debate budget") is the opposite one.
+    assert second_job is None and second_outcome == OUTCOME_NODE_BUDGET_EXHAUSTED
+    assert second_outcome != OUTCOME_BUDGET_EXHAUSTED
+
+
+def test_the_three_expansion_stop_rails_have_distinct_codes() -> None:
+    """FW1 (I1): max_rounds, max_per_debate and max_per_node are three
+    different findings demanding three different operator responses. At the
+    new budgets 12 rounds x 12 wave width = 144 < 150, so max_rounds binds
+    FIRST in practice -- and a rounds-exhausted pass has an UNTOUCHED debate
+    budget, which is exactly what the shared code used to deny."""
+    assert len(
+        {OUTCOME_ROUNDS_EXHAUSTED, OUTCOME_BUDGET_EXHAUSTED, OUTCOME_NODE_BUDGET_EXHAUSTED}
+    ) == 3
 
 
 def test_frontier_budget_defaults(monkeypatch) -> None:

@@ -331,8 +331,12 @@ def test_budget_refusals_annotate_honestly(db, monkeypatch) -> None:
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id="run-w4-rounds")
     db.expire_all()
     assert expand_jobs(db, debate.id) == []
-    assert db.get(LifecycleDecisionRecord, rounds_record.id).dispatch_outcome == "budget_exhausted"
-    assert adaptive_config(db, debate.id)["stopped_because"] == "budget_exhausted"
+    # FW1 (I1): the ROUNDS rail is its own code, not budget_exhausted. This
+    # pass's per-debate budget is 6 with zero jobs spent -- wide open -- so
+    # "paused after reaching its budget for this debate" would be a false
+    # claim, and the operator fix (raise max_rounds) is a different fix.
+    assert db.get(LifecycleDecisionRecord, rounds_record.id).dispatch_outcome == "rounds_exhausted"
+    assert adaptive_config(db, debate.id)["stopped_because"] == "rounds_exhausted"
 
 
 def test_no_capable_online_worker_defers_honestly(db, monkeypatch) -> None:

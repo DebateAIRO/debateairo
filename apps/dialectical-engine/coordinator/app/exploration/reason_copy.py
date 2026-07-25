@@ -50,6 +50,19 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
     "debate_generation_failed": "Debate generation failed and could not be completed.",
     # Adaptive expansion stopped_because vocabulary (W4).
     "budget_exhausted": "Automatic expansion paused after reaching its budget for this debate.",
+    # Fix wave 1 (I1): the two rails that used to share the copy above. All
+    # three say "paused", not "stopped", for the reason the convergence /
+    # wall-clock note below spells out -- a budget rail is a number an
+    # operator can raise, so it does not claim to be final. Each names a
+    # DIFFERENT limit, because "raise the round budget", "raise the debate
+    # budget" and "look at one hot node" are three different responses.
+    "rounds_exhausted": (
+        "Automatic expansion paused after using all the growth rounds allowed for this debate."
+    ),
+    "node_budget_exhausted": (
+        "Automatic expansion paused because the points it wanted to pursue had already "
+        "been grown as many times as any single point may be."
+    ),
     "deferred_no_capacity": (
         "Automatic expansion paused because no capable worker was available; "
         "it will resume when one is."
@@ -86,6 +99,17 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
     "wall_clock": (
         "Automatic expansion stopped because this debate reached the time limit "
         "set for how long it may keep growing."
+    ),
+    # Fix wave 1 (I4): the depth guardrail. Defensive, in the same sense the
+    # lifecycle-resolver codes below are: depth_limit is a dispatch_outcome,
+    # and no write path feeds a dispatch_outcome through humanize_reason
+    # today. Mapped anyway so one never leaks as a raw code, and so it can
+    # never fall back to the generic copy if a stop reason is ever derived
+    # from it. Says "here", not "for this debate": the rail is per-branch and
+    # the rest of the frontier keeps growing.
+    "depth_limit": (
+        "Automatic expansion stopped growing this line of argument because it had "
+        "already reached the deepest level allowed."
     ),
     # Lifecycle-input resolver component codes (defensive; not reachable on
     # any wire payload today -- see module docstring).

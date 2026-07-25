@@ -625,7 +625,28 @@ export type LifecycleDecision = {
   signalClass: "categorical" | "scalar" | null;
   reason: string | null;
   childSpawnCount: number;
-  outcome: "spawned" | "annotate_only" | "budget_exhausted" | "deferred_no_capacity" | (string & {});
+  /** "annotate_only" means the decision was never in line to spawn (scalar
+   * signal, or the target is gone). Every other non-"spawned" value names
+   * WHY growth stopped -- see the coordinator's
+   * expansion_dispatch.GROWTH_STOP_OUTCOMES, which this union mirrors. */
+  outcome:
+    | "spawned"
+    | "annotate_only"
+    | "budget_exhausted"
+    | "rounds_exhausted"
+    | "node_budget_exhausted"
+    | "deferred_no_capacity"
+    | "below_priority_floor"
+    | "wave_full"
+    | "converged"
+    | "wall_clock"
+    | "depth_limit"
+    | (string & {});
+  /** The impact x uncertainty x dispersion rank the adaptive dispatcher
+   * ordered the frontier by. null means the node's merit was never measured
+   * (and so was exempt from the priority floor), never that it measured
+   * zero. Absent on payloads cached before this key shipped. */
+  frontierPriority?: number | null;
   decidedAt: string;
 };
 

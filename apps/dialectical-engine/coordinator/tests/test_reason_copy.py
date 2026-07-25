@@ -27,6 +27,11 @@ def test_known_codes_map_to_plain_language_copy() -> None:
     for code in (
         "generation_exhausted",
         "budget_exhausted",
+        # FW1 (I1): the two stop rails split out of budget_exhausted. Each
+        # must have its OWN copy -- a shared sentence is what made a
+        # rounds-exhausted stop claim an untouched debate budget was spent.
+        "rounds_exhausted",
+        "node_budget_exhausted",
         "deferred_no_capacity",
         "no_categorical_signals",
         "quiescent_no_decisions",
