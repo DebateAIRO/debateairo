@@ -37,13 +37,23 @@ def _v2_debate_with_complete_node(db) -> tuple:
     return debate, node
 
 
-def test_expansion_depth_limit_default_is_ten():
+def test_expansion_depth_limit_default_is_ten(monkeypatch):
+    # Read the PRODUCTION default, not whatever this machine or CI runner
+    # happens to export -- the same discipline as
+    # test_budgeted_expansion.test_frontier_budget_defaults. The imminent
+    # flip makes a runner that sets this knob likely.
+    monkeypatch.delenv("DIALECTICAL_MAX_EXPANSION_DEPTH", raising=False)
+
     assert expansion_depth_limit() == 10
 
 
 def test_queue_v2_expand_job_refuses_beyond_depth_limit(db):
+    # The literal 10, not expansion_depth_limit(): deriving the input from
+    # the function under test makes the assertion self-referential, and a
+    # mutation returning 10,000 would satisfy it. The default is pinned
+    # independently above.
     debate, node = _v2_debate_with_complete_node(db)
-    node.depth = expansion_depth_limit()
+    node.depth = 10
     db.flush()
 
     with pytest.raises(ValueError, match="depth limit"):
@@ -52,7 +62,7 @@ def test_queue_v2_expand_job_refuses_beyond_depth_limit(db):
 
 def test_queue_v2_expand_job_allows_one_below_the_limit(db):
     debate, node = _v2_debate_with_complete_node(db)
-    node.depth = expansion_depth_limit() - 1
+    node.depth = 9
     db.flush()
 
     job = queue_v2_expand_job(db, debate, node, "CON", "probe", "")
@@ -60,7 +70,7 @@ def test_queue_v2_expand_job_allows_one_below_the_limit(db):
     assert job is not None
     child = db.scalars(select(Node).where(Node.parent_id == node.id)).first()
     assert child is not None
-    assert child.depth == expansion_depth_limit()
+    assert child.depth == 10
 
 
 # ---------------------------------------------------------------------------

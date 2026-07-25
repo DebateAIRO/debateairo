@@ -69,6 +69,12 @@ def _smoke4_shaped_panel(make_judge_evidence) -> list[dict]:
 
 
 def test_threshold_default_is_point_two_five():
+    # No monkeypatch.delenv here, deliberately (FW2 Part C): unlike
+    # expansion_priority_floor() / expansion_wave_width() /
+    # expansion_depth_limit(), DISAGREEMENT_FIELD_THRESHOLD is a module-level
+    # LITERAL with no env read behind it (app/scoring/disagreement.py) -- so
+    # no runner env can perturb this assertion, and a delenv would be dead
+    # code implying a configurability that does not exist.
     assert DISAGREEMENT_FIELD_THRESHOLD == 0.25
 
 

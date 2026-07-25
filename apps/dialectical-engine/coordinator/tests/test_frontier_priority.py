@@ -51,7 +51,15 @@ def expand_jobs(db, debate_id: str) -> list[Job]:
     )
 
 
-def test_defaults():
+def test_defaults(monkeypatch):
+    # Read the PRODUCTION defaults, not whatever this machine or CI runner
+    # happens to export -- the same discipline as
+    # test_budgeted_expansion.test_frontier_budget_defaults. Both knobs are
+    # on the flip plan, so a runner that sets them is exactly what the
+    # imminent flip makes likely.
+    monkeypatch.delenv("DIALECTICAL_EXPANSION_PRIORITY_FLOOR", raising=False)
+    monkeypatch.delenv("DIALECTICAL_EXPANSION_WAVE_WIDTH", raising=False)
+
     assert expansion_priority_floor() == 0.15
     assert expansion_wave_width() == 12
 

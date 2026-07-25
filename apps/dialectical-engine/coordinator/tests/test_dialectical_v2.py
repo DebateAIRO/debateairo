@@ -1493,7 +1493,12 @@ def test_pending_generation_nodes_uses_bounded_query_count(db, monkeypatch) -> N
     finally:
         event.remove(db.bind, "before_cursor_execute", _count)
 
-    assert {node.id for node in pending} >= expected_ids
+    # EQUALITY, not superset (FW2 Part C): `>=` was satisfied by any
+    # implementation returning a SUPERSET, including one returning every node
+    # in the debate -- which would pass while doing the opposite of what
+    # "pending generation nodes" means, and would defeat the bounded-query
+    # point of this very test.
+    assert {node.id for node in pending} == expected_ids
     # Bounded: container query + outstanding-ids query + one bulk node
     # query. Must not scale with n=12 (the old per-node db.get loop hit 14+).
     assert len(statements) <= 4, f"expected <=4 statements, got {len(statements)}: {statements}"
