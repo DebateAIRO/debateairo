@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { loadCss } from "../../tests/loadCss.mjs";
 
 const debatePageSource = readFileSync("app/debate/[id]/DebatePageClient.tsx", "utf8");
-const globalsSource = readFileSync("app/globals.css", "utf8");
+const globalsSource = loadCss();
 
 test("scoring insights are contained before the debate tree shell", () => {
   const scoringPanelIndex = debatePageSource.indexOf('className="scoringInsightsPanel"');

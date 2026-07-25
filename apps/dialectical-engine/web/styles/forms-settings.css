@@ -1,0 +1,157 @@
+
+/* ============================================================
+   Settings
+   ============================================================ */
+
+.settingsLabel {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin: 32px 0 12px;
+}
+
+.modelTable {
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.modelRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+  border-bottom: 1px solid oklch(0.93 0.005 80);
+}
+.modelRow:last-child {
+  border-bottom: none;
+}
+.modelRow.off {
+  opacity: 0.55;
+}
+.modelRow .modelDot {
+  width: 10px;
+  height: 10px;
+}
+.modelName {
+  flex: 0 0 130px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.roleChips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.roleChip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: oklch(0.95 0.005 80);
+  border: 1px solid var(--line-2);
+  padding: 3px 9px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.modelSpend {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  width: 64px;
+  text-align: right;
+}
+.capInput {
+  flex: 0 0 auto;
+  width: 90px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  outline: none;
+  text-align: right;
+}
+.capInput:focus {
+  border-color: var(--focus);
+}
+.switch {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  border-radius: 12px;
+  background: oklch(0.85 0.008 80);
+  position: relative;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: background 0.2s;
+}
+.switch[aria-checked="true"] {
+  background: oklch(0.6 0.09 165);
+}
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px oklch(0.4 0.02 70 / 0.4);
+  transition: left 0.2s;
+}
+.switch[aria-checked="true"] .knob {
+  left: 18px;
+}
+
+.cardRow {
+  display: flex;
+  gap: 14px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.miniCard {
+  flex: 1;
+  min-width: 220px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.miniCard h3 {
+  margin: 0 0 3px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.miniCard .optionHint {
+  margin-bottom: 12px;
+  display: block;
+}
+.miniCard .big {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.miniCard .big small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-2);
+}
+.miniCard input[type="range"] {
+  flex: 1;
+  accent-color: oklch(0.5 0.06 165);
+}
