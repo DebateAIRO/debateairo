@@ -557,6 +557,13 @@ grep expansion.stop    /tmp/dialectical-coordinator.{out,err}.log   # WHY growth
 grep scoring.cache     /tmp/dialectical-coordinator.{out,err}.log   # re-judge volume = the CLI bill
 ```
 
+**Do not count census lines to count waves.** A pass that ends growth for the
+debate returns before the dispatch loop, so it emits `expansion.stop` and *no*
+`expansion.census` — census lines undercount passes by exactly the terminal
+one. Read `roundsCompleted` (or the census's own `rounds_completed` field) for
+the wave count, and treat the absence of a trailing census as normal when an
+`expansion.stop` is present.
+
 **Verification** (this is the P1 acceptance list; record the actual numbers,
 P2's plan depends on them):
 1. Uncomment the 7c block, `make install-services`.

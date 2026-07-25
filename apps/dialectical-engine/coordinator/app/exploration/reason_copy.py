@@ -100,15 +100,25 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
         "Automatic expansion stopped because this debate reached the time limit "
         "set for how long it may keep growing."
     ),
-    # Fix wave 1 (I4): the depth guardrail. Defensive, in the same sense the
-    # lifecycle-resolver codes below are: depth_limit is a dispatch_outcome,
-    # and no write path feeds a dispatch_outcome through humanize_reason
-    # today. Mapped anyway so one never leaks as a raw code, and so it can
-    # never fall back to the generic copy if a stop reason is ever derived
-    # from it. Says "here", not "for this debate": the rail is per-branch and
-    # the rest of the frontier keeps growing.
+    # Fix wave 1 (I4): the depth guardrail. FW2 promoted this from defensive
+    # to LIVE -- expansion_dispatch.STOPPED_DEPTH_LIMIT now derives a real
+    # stopped_because from it, so this copy reaches completion.humanReason on
+    # any pass whose every target sat at the rail (expected late in a
+    # 12-round run against a depth-10 rail).
+    #
+    # Reworded for that promotion, to match its structural neighbour
+    # node_budget_exhausted above -- the other PER-NODE rail:
+    #   * PLURAL ("the points it wanted to pursue"), because a stop reason
+    #     summarises a whole pass; the old singular "this line of argument"
+    #     was written for the per-record outcome sense and understates it.
+    #   * "paused", not "stopped", for the reason the budget rails give:
+    #     DIALECTICAL_MAX_EXPANSION_DEPTH is a number an operator can raise,
+    #     so this must not claim to be final the way converged / wall_clock
+    #     legitimately do.
+    # It still declines to say "for this debate": the rail is per-branch, and
+    # a later pass on shallower nodes keeps growing.
     "depth_limit": (
-        "Automatic expansion stopped growing this line of argument because it had "
+        "Automatic expansion paused because the points it wanted to pursue had "
         "already reached the deepest level allowed."
     ),
     # Lifecycle-input resolver component codes (defensive; not reachable on

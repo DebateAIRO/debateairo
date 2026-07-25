@@ -17,9 +17,13 @@ from __future__ import annotations
 from app.exploration.expansion_dispatch import (
     BUDGET_BOUNDS,
     OUTCOME_BUDGET_EXHAUSTED,
+    OUTCOME_DEPTH_LIMIT,
     OUTCOME_NODE_BUDGET_EXHAUSTED,
     OUTCOME_ROUNDS_EXHAUSTED,
     OUTCOME_SPAWNED,
+    STOPPED_DEPTH_LIMIT,
+    STOPPED_QUIESCENT_NO_DECISIONS,
+    _stopped_because_for_pass,
     admit_and_spawn,
     expansion_max_per_debate,
     expansion_max_per_node,
@@ -98,6 +102,33 @@ def test_the_three_expansion_stop_rails_have_distinct_codes() -> None:
     assert len(
         {OUTCOME_ROUNDS_EXHAUSTED, OUTCOME_BUDGET_EXHAUSTED, OUTCOME_NODE_BUDGET_EXHAUSTED}
     ) == 3
+
+
+def test_an_all_depth_rail_pass_names_the_depth_rail_not_quiescence() -> None:
+    """FW2: OUTCOME_DEPTH_LIMIT joined GROWTH_STOP_OUTCOMES in FW1 (I4) but
+    never reached _stopped_because_for_pass, so a pass whose every record was
+    refused by the depth rail recorded `quiescent_no_decisions` -- rendered
+    as "Automatic expansion has not found anything to grow yet", which is
+    FALSE: it found targets and the rail refused them. An all-depth-rail pass
+    is expected late in a 12-round run against a depth-10 rail.
+    """
+    assert _stopped_because_for_pass([OUTCOME_DEPTH_LIMIT]) == STOPPED_DEPTH_LIMIT
+    assert _stopped_because_for_pass([OUTCOME_DEPTH_LIMIT]) != STOPPED_QUIESCENT_NO_DECISIONS
+    # A genuinely empty pass still says quiescent -- the depth rail only
+    # claims the pass when the rail actually fired.
+    assert _stopped_because_for_pass([]) == STOPPED_QUIESCENT_NO_DECISIONS
+
+
+def test_the_depth_rail_yields_to_every_wave_and_debate_level_rail() -> None:
+    """Ordering, not just membership: the depth rail is PER-BRANCH, so it is
+    the weakest claim about why a whole pass stopped and must not mask a rail
+    the operator answers with a debate-level knob."""
+    for stronger in (
+        OUTCOME_ROUNDS_EXHAUSTED,
+        OUTCOME_BUDGET_EXHAUSTED,
+        OUTCOME_NODE_BUDGET_EXHAUSTED,
+    ):
+        assert _stopped_because_for_pass([OUTCOME_DEPTH_LIMIT, stronger]) != STOPPED_DEPTH_LIMIT
 
 
 def test_frontier_budget_defaults(monkeypatch) -> None:

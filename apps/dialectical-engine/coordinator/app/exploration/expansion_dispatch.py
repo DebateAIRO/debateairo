@@ -150,6 +150,15 @@ STOPPED_BELOW_PRIORITY_FLOOR = "below_priority_floor"
 STOPPED_WAVE_FULL = "wave_full"
 STOPPED_CONVERGED = "converged"
 STOPPED_WALL_CLOCK = "wall_clock"
+# FW2 fix wave: the depth rail's stopped_because. OUTCOME_DEPTH_LIMIT joined
+# GROWTH_STOP_OUTCOMES above (FW1 I4) but never reached
+# _stopped_because_for_pass, so a pass whose every record was refused by the
+# depth rail recorded `quiescent_no_decisions` -- "Automatic expansion has not
+# found anything to grow yet", which is false: it found targets and the rail
+# refused them. That is precisely the drift the co-located-vocabulary note
+# above says this pairing exists to prevent, and an all-depth-rail pass is
+# EXPECTED late in a 12-round run against a depth-10 rail.
+STOPPED_DEPTH_LIMIT = "depth_limit"
 
 # P1 Task 7: stop conditions beyond budget exhaustion. smoke4's post-scoring
 # protocol run recorded converged=false, maxDelta=0.226 against epsilon=0.05 --
@@ -1069,6 +1078,16 @@ def _stopped_because_for_pass(outcomes: list[str]) -> str:
         return STOPPED_WAVE_FULL
     if OUTCOME_BELOW_PRIORITY_FLOOR in outcomes:
         return STOPPED_BELOW_PRIORITY_FLOOR
+    # LAST among the real rails, and above the quiescent fallback (FW2 fix
+    # wave). Ordered here rather than higher because every rail above it
+    # describes a limit on the WAVE or the DEBATE, which an operator answers
+    # by moving a debate-level knob; the depth rail is per-branch, so it is
+    # the weakest claim about why the pass as a whole stopped and should only
+    # win when nothing else fired. It must still beat
+    # STOPPED_QUIESCENT_NO_DECISIONS: "has not found anything to grow yet" is
+    # simply untrue of a pass that found targets and hit a rail on them.
+    if OUTCOME_DEPTH_LIMIT in outcomes:
+        return STOPPED_DEPTH_LIMIT
     return STOPPED_QUIESCENT_NO_DECISIONS
 
 
@@ -1351,13 +1370,35 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
         # below ALREADY write, and the single commit_write they already share
         # -- deliberately no new commit point on a path that must never hold
         # a write transaction across a CLI call.
-        pass_stats = {
-            FRONTIER_DISTRIBUTION_KEY: distribution,
-            WAVE_POLARITY_KEY: {
-                "PRO": spawned_by_polarity.get("PRO", 0),
-                "CON": spawned_by_polarity.get("CON", 0),
-            },
-        }
+        #
+        # WRITTEN ONLY WHEN THIS PASS HAD A FRONTIER TO DESCRIBE (FW2 fix
+        # wave). A pass with no dispatchable records -- no records at all, or
+        # only continue/deepen/abandon/reopen decisions, which are not
+        # expansion-bearing -- has spawned == 0, replayed == 0 and outcomes
+        # == [], so it falls to the `else` branch below. Without this gate it
+        # would write _frontier_distribution([], floor) and a zeroed
+        # wave_polarity OVER the last real pass's numbers.
+        #
+        # That is the same reasoning the pure-replay branch below already
+        # applies, and it has to cover this case too: the dispatcher runs on
+        # EVERY scoring completion, so no-dispatchable-decision passes become
+        # the common case as a debate settles, and both whole-debate stops
+        # return before this block. What the operator reads from
+        # /api/ops/expansion after a finished run is therefore whatever the
+        # last NON-stopping pass wrote -- frequently the zeros, which read as
+        # "nothing was rankable": one of the three failure modes P0.3 exists
+        # to tell apart. An empty dict makes the state.update calls below
+        # no-ops, so the last pass that actually ranked a frontier keeps its
+        # numbers.
+        pass_stats: dict[str, Any] = {}
+        if dispatchable:
+            pass_stats = {
+                FRONTIER_DISTRIBUTION_KEY: distribution,
+                WAVE_POLARITY_KEY: {
+                    "PRO": spawned_by_polarity.get("PRO", 0),
+                    "CON": spawned_by_polarity.get("CON", 0),
+                },
+            }
         if spawned:
             state[ROUNDS_COMPLETED_KEY] = rounds_completed(debate) + 1
             # Growth resumed: a stale stop reason would be dishonest.

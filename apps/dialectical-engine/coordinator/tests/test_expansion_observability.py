@@ -304,6 +304,75 @@ def test_wave_polarity_is_persisted_and_logged(
     assert line["spawned_pro"] == 0
 
 
+def test_a_pass_with_no_dispatchable_records_keeps_the_last_real_distribution(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """The zeroing bug P0.3 defeated itself with.
+
+    A pass with nothing dispatchable has spawned == 0, replayed == 0 and
+    outcomes == [], so it falls through to the stopped_because branch. Before
+    the gate it wrote _frontier_distribution([], floor) -- all zeros, no
+    min/p50/max -- straight over the last real pass's numbers, which reads
+    exactly like "nothing was rankable": one of the three failure modes this
+    diagnostic exists to tell apart.
+
+    It is not a corner case. The dispatcher runs on EVERY scoring completion,
+    both whole-debate stops return before the bookkeeping tail, and
+    no-dispatchable-decision passes become the common case as a debate
+    settles -- so the zeros are frequently the LAST thing written, and
+    therefore what /api/ops/expansion serves after a finished run.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9, 0.5])
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    real = adaptive_state(db, debate.id)[FRONTIER_DISTRIBUTION_KEY]
+    real_polarity = adaptive_state(db, debate.id)[WAVE_POLARITY_KEY]
+    assert real["n_ranked"] == 2 and real_polarity == {"PRO": 0, "CON": 2}
+
+    # A second pass over the SAME run whose decisions are all
+    # non-expansion-bearing: `deepen` is not in DECISION_POLARITY, so
+    # `dispatchable` is empty while `records` is not.
+    for record in records:
+        record.decision = "deepen"
+    db.commit()
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    state = adaptive_state(db, debate.id)
+    assert state[FRONTIER_DISTRIBUTION_KEY] == real, "the real pass's numbers survive"
+    assert state[WAVE_POLARITY_KEY] == real_polarity
+    # The pass still records WHY it did nothing -- only the diagnostics are
+    # withheld, never the stop reason.
+    assert state["stopped_because"] == "quiescent_no_decisions"
+
+
+def test_a_debate_with_no_records_at_all_writes_no_distribution(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """The other empty-frontier shape: no grounded records for the run."""
+    from app.models.entities import AnalyzerRun, next_analyzer_run_seq
+    from app.services.dialectical_v2 import first_branch
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, _records, _run_id = categorical_decisions_factory(db, priorities=[0.9])
+    # A DIFFERENT complete scoring run, which no decision record points at.
+    empty_run = AnalyzerRun(
+        debate_id=debate.id,
+        branch_id=first_branch(db, debate.id).id,
+        analyzer_type="node_scoring",
+        output={"status": "available", "items": []},
+        status="complete",
+        provenance={"scoring_source": "judge_outputs"},
+    )
+    next_analyzer_run_seq(db, empty_run)
+    db.commit()
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=empty_run.id)
+
+    assert FRONTIER_DISTRIBUTION_KEY not in adaptive_state(db, debate.id)
+    assert WAVE_POLARITY_KEY not in adaptive_state(db, debate.id)
+
+
 def test_distribution_is_a_pure_function_of_priorities_and_floor():
     """Unit-level, because the helper must never consult a gate: the whole
     argument that it cannot perturb dispatch rests on it being pure."""

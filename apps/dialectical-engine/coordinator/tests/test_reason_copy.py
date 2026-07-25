@@ -32,6 +32,9 @@ def test_known_codes_map_to_plain_language_copy() -> None:
         # rounds-exhausted stop claim an untouched debate budget was spent.
         "rounds_exhausted",
         "node_budget_exhausted",
+        # FW2: promoted from defensive to live -- STOPPED_DEPTH_LIMIT now
+        # derives a real stopped_because, so this copy reaches the wire.
+        "depth_limit",
         "deferred_no_capacity",
         "no_categorical_signals",
         "quiescent_no_decisions",
