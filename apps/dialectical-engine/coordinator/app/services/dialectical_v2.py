@@ -2887,7 +2887,33 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
                 load_bearing_k=synthesis_load_bearing_k(),
                 contested_k=synthesis_contested_k(),
             )
+            # FW1 (T3 #11): the flag changes tree_nodes from "every node" to a
+            # deliberately PARTIAL view, and nothing in the prompt said so.
+            # omitted_count was the whole point of bounding the payload
+            # honestly rather than silently dropping nodes -- and an honest
+            # number nobody explains is not honest to the only reader that
+            # matters here. Without this the synthesiser reads a sample as a
+            # census and writes "the debate contains no X" about an X it was
+            # never shown. Flag-gated: with the flag OFF the payload really is
+            # every node, so this paragraph would itself be the false claim.
+            tree_payload_note = (
+                "The tree_nodes block is a bounded view of the argument tree and is "
+                "not a complete list of its nodes: `branches` carries one summary per "
+                "perspective branch, `load_bearing` the full text of the nodes ranked "
+                "highest by impact x strength, `contested` the full text of the nodes "
+                "the judge families disagreed about most, ranked by widest cross-family "
+                "field spread, and `omitted_count` the number of further nodes that "
+                "exist in this debate but are NOT included here, having ranked out on "
+                "impact x strength or on narrow disagreement. Treat those omitted nodes "
+                "as real and unread: do not describe the tree as exhaustive, and do not "
+                "conclude that a point is missing from the debate merely because it is "
+                "missing from this payload. "
+            )
         else:
+            # Flag OFF: every node, with full argument text -- so there is
+            # nothing partial to declare and the prompt text stays
+            # byte-identical (pinned by test_branch_summary.py).
+            tree_payload_note = ""
             tree_nodes = [
                 {
                     "id": node.id,
@@ -2935,6 +2961,7 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
             "measured strength or verification standing, say so explicitly, and account for "
             "the perspectives in the failure_manifest instead of treating the surviving "
             "branches as the whole debate. "
+            f"{tree_payload_note}"
             "Do not declare a winner and do not say Pro wins or Con wins. Do not return status wrappers.\n"
             f"{adaptive_context}"
             f"Context JSON:\n{json.dumps({**base_context, 'agent_runs': completed_runs, 'tree_nodes': tree_nodes, 'measured_standing': measured_standing}, default=str)}"

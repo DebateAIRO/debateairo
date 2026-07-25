@@ -664,3 +664,62 @@ def test_flag_on_renders_bounded_payload(db, monkeypatch):
     assert '"load_bearing"' in rendered
     assert '"omitted_count"' in rendered
     assert '"active_generation"' not in rendered
+
+
+# ---------------------------------------------------------------------------
+# FW1 (T3 #11): the flag-ON payload is a DIFFERENT SHAPE, and the prompt never
+# said so. With the flag on, tree_nodes stops being "every node" and becomes
+# {branches, load_bearing, contested, omitted_count} -- a deliberately partial
+# view. A synthesiser told nothing about that reads it as the whole tree and
+# writes conclusions over a sample as if over a census.
+# ---------------------------------------------------------------------------
+
+
+def test_flag_on_prompt_tells_the_synthesiser_its_view_is_partial(db, monkeypatch):
+    from app.services.dialectical_v2 import render_v2_job_prompt
+
+    monkeypatch.setenv("DIALECTICAL_HIERARCHICAL_SYNTHESIS", "true")
+    debate, root = _v2_debate_with_deep_scored_tree(db, node_count=40)
+    job = _v2_synthesize_job(db, debate)
+
+    _system, rendered = render_v2_job_prompt(db, job)
+
+    # The prose, not merely the JSON keys: the keys were always there and are
+    # exactly what a model can misread without being told what they mean.
+    instructions = rendered.split("Context JSON:")[0]
+    for phrase in ("branches", "load_bearing", "contested", "omitted_count"):
+        assert phrase in instructions, f"the flag-ON prompt must describe {phrase}"
+    # It must say plainly that nodes are MISSING, and why they were ranked out.
+    assert "not a complete list" in instructions
+    assert "impact x strength" in instructions
+    assert "field spread" in instructions
+
+
+def test_flag_off_prompt_text_is_unchanged_byte_for_byte(db, monkeypatch):
+    """The partial-view paragraph is FLAG-GATED. With the flag off the payload
+    really is every node, so the same paragraph would be a false statement --
+    and flag-off byte-identity is this branch's binding invariant."""
+    from app.services.dialectical_v2 import render_v2_job_prompt
+
+    monkeypatch.delenv("DIALECTICAL_HIERARCHICAL_SYNTHESIS", raising=False)
+    debate, root = _v2_debate_with_deep_scored_tree(db, node_count=8)
+    job = _v2_synthesize_job(db, debate)
+
+    _system, rendered = render_v2_job_prompt(db, job)
+
+    instructions = rendered.split("Context JSON:")[0]
+    assert instructions == (
+        "Return a non-adjudicating synthesis JSON with exactly this shape: "
+        '{"title":"Synthesis","content":"...","tensions":["..."],"agreements":["..."],'
+        '"evidence_gaps":["..."],"key_takeaways":["..."],'
+        '"provenance":{"model_id":"...","worker_id":"...","prompt_id":"...","job_id":"..."}}. '
+        "Summarize tensions, agreements, evidence gaps, and key takeaways. "
+        "Ground the synthesis in the measured_standing block (per-node node_scores, "
+        "verification_statuses, unresolved_attacks, and the failure_manifest), not the "
+        "argument prose alone. Where a branch's prose confidence disagrees with its "
+        "measured strength or verification standing, say so explicitly, and account for "
+        "the perspectives in the failure_manifest instead of treating the surviving "
+        "branches as the whole debate. "
+        "Do not declare a winner and do not say Pro wins or Con wins. "
+        "Do not return status wrappers.\n"
+    )

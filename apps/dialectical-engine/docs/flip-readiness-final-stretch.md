@@ -247,7 +247,7 @@ change is proposed here.
   real latency per node, not a one-time cost, and it compounds under
   adaptive expansion: the loop re-scores the whole debate after every
   completed expand round (`maybe_queue_rescore_after_expansion`), so up to
-  `DIALECTICAL_EXPANSION_MAX_ROUNDS` (2, default) additional full re-scores
+  `DIALECTICAL_EXPANSION_MAX_ROUNDS` (12, default) additional full re-scores
   per debate each pay the verification cost again for every evidence node
   then in the tree. This compounding is why a soak, not a smoke test, is the
   bar.
@@ -373,9 +373,15 @@ choose to.
 ## Config surface audit
 
 Every `DIALECTICAL_*` / `NEXT_PUBLIC_*` flag this branch (`lane/final-stretch-v1`,
-W0–W5b) introduced or touches. Verified against the code (`bool_env`/
-`int_env`/`float_env` call sites and their defaults/clamps), not copied
-blind from a wave report.
+W0–W5b) and the P1 contested-frontier phase introduced or touch. Verified
+against the code (`bool_env`/`int_env`/`float_env` call sites and their
+defaults/clamps), not copied blind from a wave report.
+
+**This table is the complete operator surface.** An operator mid-incident who
+needs to widen the wave, extend the clock or narrow the synthesis payload
+looks here and nowhere else, so a knob missing from it is a knob that does not
+exist when it is needed. The eight P1 rows below were added by fix wave 1
+(I8) for exactly that reason.
 
 | Flag | Default | Type / clamp | What flipping it does | Introduced / touched |
 |---|---|---|---|---|
@@ -388,6 +394,14 @@ blind from a wave report.
 | `DIALECTICAL_EXPANSION_MAX_ROUNDS` | `12` | int, 0–20 | Per-debate cap on automatic dispatch passes (soft loop bound — the per-debate job budget below is the hard cap). | **W4** (new) |
 | `DIALECTICAL_EXPANSION_MAX_PER_NODE` | `3` | int, 0–20 | Cap on `v2_expand` jobs (any status) whose `parent_node_id` is a given node. | **W4** (new) |
 | `DIALECTICAL_EXPANSION_MAX_PER_DEBATE` | `150` | int, 0–200 | Cap on `v2_expand` jobs (any status) per debate — the hard spawn ceiling. Raised from 6 (clamp 0–100) by P1 Task 8. | **W4** (new) |
+| `DIALECTICAL_EXPANSION_PRIORITY_FLOOR` | `0.15` | float, 0.0–1.0 | Minimum `frontier_priority` (impact × uncertainty × dispersion) a **ranked** record must clear to spend an expansion; below it the record is refused `below_priority_floor`. An UNRANKED record (priority NULL — its merit was never measured) is exempt, never refused by this. Lower it to let the frontier roam wider, raise it to spend only on the strongest disagreements. | **P1 Task 6** (new) |
+| `DIALECTICAL_EXPANSION_WAVE_WIDTH` | `12` | int, 1–64 | Maximum spawns admitted per dispatch pass. Records beyond it are refused `wave_full` and stay eligible next pass — this is *not* a budget. Widen it mid-incident to drain a backlog faster; note that 12 rounds × 12 width = 144, just under the 150 per-debate ceiling, so widening it makes the per-debate budget bind before the rounds budget. | **P1 Task 6** (new) |
+| `DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS` | `14400` (4 h) | int, 60–86400 | Ceiling on how long ONE debate may keep GROWING, measured from its first flag-on dispatch pass (not from row creation), after which growth stops `wall_clock`. The 60 s floor is deliberate: below it the clock would expire before the first wave could finish. Raise it to let a long run continue. | **P1 Task 7** (new) |
+| `DIALECTICAL_MAX_EXPANSION_DEPTH` | `10` | int, 1–32 | Hard depth guardrail: a node at or beyond this depth is never expanded (`depth_limit`). A safety rail against unbounded chains, **not** a target — the priority floor is what stops healthy branches. The v2 pipeline had no depth check at all before this. | **P1 Task 1** (new) |
+| `DIALECTICAL_FIELD_DISAGREEMENT` | OFF | bool | ON: per-field cross-family judge spread (threshold `0.25` on the four pivotal fields) counts as a **categorical** grounding reason, which is what steers expansion toward contested nodes; it also feeds the `frontier_priority` dispersion term. OFF: no decision is ever grounded this way. | **P1 Task 5** (new) |
+| `DIALECTICAL_HIERARCHICAL_SYNTHESIS` | OFF | bool | ON: the v2 synthesis prompt carries a **bounded** `tree_nodes` payload (`branches` + `load_bearing` + `contested` + an honest `omitted_count`), O(branches + K), and the prompt tells the synthesiser the view is partial. OFF: the historical every-node-with-full-argument list, byte-identical. Required before frontier budgets — the unbounded payload fails at the last step of a multi-hour run. | **P1 Task 3** (new) |
+| `DIALECTICAL_SYNTHESIS_LOAD_BEARING_K` | `20` | int, 5–100 | How many nodes ride in the flag-ON synthesis payload with full argument text, ranked by impact × strength. Everything cut is counted into `omitted_count`, never silently dropped. Only read when `DIALECTICAL_HIERARCHICAL_SYNTHESIS` is ON. | **P1 Task 3** (new) |
+| `DIALECTICAL_SYNTHESIS_CONTESTED_K` | `30` | int, 5–100 | Same, for the contested section (ranked by widest cross-family field spread, selected *before* load-bearing ranking so a contested node never loses its slot). Deliberately larger than `LOAD_BEARING_K` so the payload stays tilted toward disagreement; total full-text records stay bounded at 50. Only read when `DIALECTICAL_HIERARCHICAL_SYNTHESIS` is ON. | **P1 Task 8** (new) |
 | `DIALECTICAL_REAPER_INTERVAL_S` | `60.0` | float, 0.05–3600 | Coordinator lifespan reaper's sweep interval for expired claimed/running jobs (excludes `score_debate`, which has its own stale-expiry path). | **W5b** (new) |
 | `DIALECTICAL_ALLOW_MULTI_INSTANCE` | OFF | bool | ON: skips the single-instance advisory-lock guard at startup, allowing multiple coordinator processes against the same DB — an operator override for a deliberate multi-instance setup. | **W5b** (new) |
 
