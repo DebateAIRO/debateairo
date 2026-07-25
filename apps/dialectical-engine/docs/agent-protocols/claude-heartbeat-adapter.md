@@ -129,9 +129,47 @@ HUMAN REVIEW CHANGES REQUESTED
 REWORK ACKNOWLEDGED
 REWORK READY FOR HERMES REVIEW
 WORKER CONTINUITY OVERRIDE
+HERMES DONE
+HERMES BLOCKED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
+V DECISIONS PACKET
+V STEERING REQUIRED
+AUTHORITY EPOCH
+HERMES LIVENESS REQUESTED
+READY FOR EXTERNAL REVIEW
+EXTERNAL REVIEW PASSED
+EXTERNAL REVIEW CHANGES REQUESTED
+REWORK ROUND
 ```
 
 A `ready` status may mean returned rework, not a new assignment. Comments determine which.
+
+## State reads/writes
+
+Claude (planning-artifact worker or peer reviewer) declares its access to the
+typed ticket-state object:
+
+```text
+reads:  { contract, status, rework_round, authority_epoch, risk_tier }
+writes: { status, evidence refs (artifact paths), comments_read_through }
+never writes: { risk_tier, authority_epoch, worktree, owner.agent }
+```
+
+Claude sets `owner.session` to its own CLI session only on `WORKER CLAIM`. As a
+reviewer it records verdicts through comment markers, not by writing `risk_tier`.
+It never writes `risk_tier`, `authority_epoch`, or `worktree`; all three are
+Hermes/cockpit-only.
+
+## Worktree and parallelism
+
+Claude does not create, merge, or delete git worktrees: under the current law only Codex writes code, and worktree lifecycle belongs to Codex lanes plus Claude-Router integration. Claude's role around worktrees is read-only.
+
+- When reviewing a Codex lane, read inside the lane's declared `worktree.path`; never edit files there and never run `git worktree add/remove` or any merge/rebase/branch operation.
+- Record the exact `worktree.path`, branch, and commit SHA you reviewed in the review verdict so Claude-Router can match your evidence to the right lane.
+- Separate the committed range you reviewed from any uncommitted worktree state. A dirty RED test may be legitimate active TDD for a running lane; it is not a green tree and must be called out explicitly, never certified.
+- Do not consume the heavy slot: read-only checks may overlap other lanes only when they honor the spine `max_concurrent_heavy` semaphore (declared in `debateai-heartbeat-protocol.md` -> `## Parallelism and file ownership`; laptop = 1).
+- For planning/artifact work, stay in your assigned stage workdir; never open a Codex implementation lane's worktree to edit.
 
 ## Polling and live output
 
@@ -167,4 +205,5 @@ Post `CLAUDE BLOCKED` and stop when:
 - Hermes itself reviews Step 2 and Step 4 artifacts before the next stage; delegated approval cannot replace this gate.
 - When Claude is assigned as a separate ticket peer reviewer, reviewer GREEN uses `READY FOR HERMES REVIEW`.
 - Claude never implements code while Codex-only coding is active.
+- A `CLAUDE BLOCKED` marker requests a transition to the mapped `waiting_*` status from the spine "Blocked-meaning → status mapping" table; the ticket status is never a bare `blocked`.
 - Claude never marks Done, pushes without V approval, deletes database/product data, creates fake runtime data, or crosses file contracts.
