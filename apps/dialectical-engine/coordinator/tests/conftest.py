@@ -44,6 +44,9 @@ os.environ.setdefault("DIALECTICAL_ADVERSARIAL_POV", "false")
 # the production default.
 os.environ.setdefault("DIALECTICAL_CROSS_EXAM", "false")
 
+import hashlib
+import json
+
 import pytest
 
 import app.main  # noqa: F401 — warms the orchestrator<->scoring<->serialization import cycle so collection order can't break imports
@@ -74,6 +77,11 @@ def make_score_signal():
             "holes": (),
             "fatal_flags": (),
             "recommended_actions": (),
+            # P1 Task 5: the persisted panel-disagreement predicate. Default
+            # False keeps the baseline signal "an unremarkable claim with no
+            # fired predicate" -- a test that means to exercise the
+            # cross-family challenge ground says so with judges_disagree=True.
+            "judges_disagree": False,
         }
         data.update(overrides)
         # holes/fatal_flags/recommended_actions are tuple fields; accept any
@@ -100,6 +108,80 @@ def make_evidence_signal():
         data.update(overrides)
         data["caveats"] = tuple(data["caveats"])
         return EvidenceSignal(**data)
+
+    return _make
+
+
+# P1 Task 5: persisted judge-evidence factory. The dict shape is NOT invented
+# here -- it is the exact shape app/scoring/service.py's
+# _persisted_judge_evidence_for_node builds from a JudgeOutputArtifact row and
+# app/scoring/disagreement.py's _distinct_persisted_judge_evidence consumes:
+# judge_role / provider / model / raw_output_sha256 (four non-empty strings,
+# all four required by the distinctness rule) plus "assessment". "assessment"
+# is a RAW dict, not a ClaimAssessment instance, because the production
+# builder copies JudgeOutputArtifact.assessment (a JSON column) through
+# unparsed -- _distinct_persisted_judge_evidence is what model_validates it.
+# The default assessment is a mid-range, no-fatal-flag judgment; a test names
+# the leaf score fields it means to move as keyword arguments.
+_JUDGE_ASSESSMENT_DEFAULTS: dict[str, dict[str, float]] = {
+    "steelman": {"charitable_strength": 0.60, "confidence": 0.70},
+    "critic": {
+        "logical_validity": 0.60,
+        "assumption_risk": 0.30,
+        "counterargument_strength": 0.35,
+    },
+    "evidence": {
+        "evidence_quality": 0.55,
+        "evidence_relevance": 0.60,
+        "evidence_sufficiency": 0.50,
+        "source_reliability": 0.55,
+        "freshness": 0.50,
+    },
+    "context": {"relevance": 0.65, "impact": 0.55, "dependency_weight": 0.40},
+    "fallacy": {"logical_consistency": 0.70},
+}
+_JUDGE_ASSESSMENT_FIELD_SECTION = {
+    field_name: section
+    for section, fields in _JUDGE_ASSESSMENT_DEFAULTS.items()
+    for field_name in fields
+}
+
+
+@pytest.fixture()
+def make_judge_evidence():
+    def _make(
+        *,
+        judge_role: str = "judge",
+        provider: str | None = None,
+        model: str | None = None,
+        raw_output_sha256: str | None = None,
+        **assessment_fields: float,
+    ) -> dict:
+        assessment = {
+            section: dict(fields) for section, fields in _JUDGE_ASSESSMENT_DEFAULTS.items()
+        }
+        for field_name, value in assessment_fields.items():
+            section = _JUDGE_ASSESSMENT_FIELD_SECTION.get(field_name)
+            if section is None:
+                raise TypeError(f"unknown ClaimAssessment score field: {field_name}")
+            assessment[section][field_name] = value
+        # Identity defaults track judge_role so a three-role panel is three
+        # DISTINCT judgments under the (judge_role, provider, model) rule, and
+        # the raw-output digest is derived from the whole judgment so two
+        # byte-identical judgments still collapse exactly as production's
+        # raw_output_sha256 dedupe collapses them.
+        provider = provider if provider is not None else f"{judge_role}-provider"
+        model = model if model is not None else f"{judge_role}-model"
+        if raw_output_sha256 is None:
+            digest_source = json.dumps([judge_role, provider, model, assessment], sort_keys=True)
+            raw_output_sha256 = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()
+        return {
+            "judge_role": judge_role,
+            "provider": provider,
+            "model": model,
+            "raw_output_sha256": raw_output_sha256,
+            "assessment": assessment,
+        }
 
     return _make
 

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
+from app.core.config import bool_env
 from app.scoring.models import ClaimAssessment, JudgeDisagreement
 
 # Task 4 (uncertainty -> labeled drivers + dispersion-derived numeric,
 # docs/improvement-plan-2026-07-22.md Sec P2.1): documented map from a
 # judge-panel strength spread to a [0, 1] uncertainty value. Calibrated so
 # the same 0.35 strength gap that already flags a persisted_judge_strength_
-# gap disagreement (see detect_persisted_judge_disagreements below) lands
-# at 0.5 uncertainty: uncertainty = clamp(spread * DISPERSION_UNCERTAINTY_SLOPE).
+# gap disagreement (see _composite_strength_gap_disagreements below -- P1
+# Task 5 moved that gate onto the DIALECTICAL_FIELD_DISAGREEMENT flag-off
+# path but did not change its 0.35 comparison, so this calibration still
+# refers to a live threshold) lands at 0.5 uncertainty:
+# uncertainty = clamp(spread * DISPERSION_UNCERTAINTY_SLOPE).
 DISPERSION_UNCERTAINTY_SLOPE = 0.5 / 0.35
 
 
@@ -56,7 +61,127 @@ def detect_disagreements(assessment: ClaimAssessment) -> list[JudgeDisagreement]
     return disagreements
 
 
+# P1 Task 5: per-field cross-family detection. The previous gate compared
+# _claim_strength_signal -- a weighted composite of five fields -- at 0.35.
+# Averaging across fields shrinks spread: smoke4's root node had a raw
+# logical_validity spread of 0.17 (0.38/0.55/0.50) but a composite spread of
+# 0.11, and the panel's largest observed composite spread across 26 nodes
+# was 0.11. The gate could not fire and never did.
+#
+# NEW FLAG, default OFF (project-owner ruling): the judge panel is live in
+# production, so shipping this unflagged would move
+# score_provenance.disagreement_status for every scored node the instant the
+# code deployed, before any deliberate flip. Flag OFF keeps the historical
+# composite gate below byte-for-byte; P1 Task 8 flips the flag.
+FIELD_DISAGREEMENT_FLAG = "DIALECTICAL_FIELD_DISAGREEMENT"
+
+# (ClaimAssessment section, leaf score field) pairs -- one per judge role, so
+# a family that dissents in only its own specialty is still visible.
+PIVOTAL_FIELDS: tuple[tuple[str, str], ...] = (
+    ("critic", "logical_validity"),
+    ("steelman", "charitable_strength"),
+    ("evidence", "evidence_quality"),
+    ("context", "impact"),
+)
+# Chosen against smoke4's real artifacts, not defended: 0.25 makes 13 of 26
+# nodes contested (0.20 -> 16, 0.30 -> 8), versus 0 of 26 under the composite
+# gate. See tests/test_cross_family_disagreement_replay.py.
+DISAGREEMENT_FIELD_THRESHOLD = 0.25
+
+
+def field_disagreement_enabled() -> bool:
+    return bool_env(FIELD_DISAGREEMENT_FLAG, False)
+
+
+def judges_disagree_from_provenance(score_provenance: object) -> bool:
+    """Read the persisted panel-disagreement fact off a scoring item.
+
+    Reads exactly where app/scoring/service.py writes it --
+    ``score_provenance["disagreement_status"]["status"] == "present"`` --
+    mirroring app/synthesis/branch_summary.py's ``_is_contested``. Accepts
+    either the raw dict or the ScoreProvenance model (which carries the key
+    as a pydantic extra).
+
+    Behind the same flag as the detection itself, because this is the input
+    to a NEW route (``challenge`` on judge disagreement). With the flag off
+    it always returns False, so no lifecycle decision can move -- not even
+    for a node whose historical composite gate DID fire, which is the one
+    case gating only ``detect_persisted_judge_disagreements`` would miss.
+    """
+    if not field_disagreement_enabled():
+        return False
+    if isinstance(score_provenance, Mapping):
+        status = score_provenance.get("disagreement_status")
+    else:
+        extra = getattr(score_provenance, "model_extra", None) or {}
+        status = extra.get("disagreement_status")
+    return isinstance(status, Mapping) and status.get("status") == "present"
+
+
+def field_spreads(judge_evidence: list[dict]) -> dict[str, float]:
+    """Per-field max-minus-min across distinct judges. Fields any judge
+    omitted are absent from the result rather than defaulted to zero.
+
+    Deliberately UNGATED: this is a pure measurement with no side effects,
+    and the flag gates the gate (detect_persisted_judge_disagreements), not
+    the ability to measure dispersion.
+    """
+    return _field_spreads(_distinct_persisted_judge_evidence(judge_evidence))
+
+
+def _field_spreads(distinct_evidence: list[dict]) -> dict[str, float]:
+    spreads: dict[str, float] = {}
+    if len(distinct_evidence) < 2:
+        return spreads
+    for section, field in PIVOTAL_FIELDS:
+        values: list[float] = []
+        for item in distinct_evidence:
+            assessment = item.get("assessment")
+            block = getattr(assessment, section, None)
+            value = getattr(block, field, None)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                values.append(float(value))
+        if len(values) >= 2:
+            spreads[field] = max(values) - min(values)
+    return spreads
+
+
 def detect_persisted_judge_disagreements(judge_evidence: list[dict]) -> list[JudgeDisagreement]:
+    if not field_disagreement_enabled():
+        return _composite_strength_gap_disagreements(judge_evidence)
+    distinct_evidence = _distinct_persisted_judge_evidence(judge_evidence)
+    if len(distinct_evidence) < 2:
+        return []
+    spreads = _field_spreads(distinct_evidence)
+    contested = {
+        field: spread
+        for field, spread in spreads.items()
+        if spread >= DISAGREEMENT_FIELD_THRESHOLD
+    }
+    if not contested:
+        return []
+    widest = max(contested.items(), key=lambda pair: pair[1])
+    return [
+        JudgeDisagreement(
+            judges=sorted({str(item["judge_role"]) for item in distinct_evidence}),
+            type="cross_family_field_spread",
+            severity="high",
+            description=(
+                f"Judge families disagree on {widest[0]} by {widest[1]:.2f} "
+                f"(threshold {DISAGREEMENT_FIELD_THRESHOLD})."
+            ),
+        )
+    ]
+
+
+def _composite_strength_gap_disagreements(judge_evidence: list[dict]) -> list[JudgeDisagreement]:
+    """Historical (pre-P1-Task-5) gate, kept verbatim for the flag-off path.
+
+    This is the ORIGINAL body of detect_persisted_judge_disagreements, moved
+    without a single character changed -- not reformatted, not tidied -- so
+    that "flag off is byte-identical to today" is verifiable by reading the
+    diff rather than taken on trust.
+    """
     distinct_evidence = _distinct_persisted_judge_evidence(judge_evidence)
     if len(distinct_evidence) < 2:
         return []

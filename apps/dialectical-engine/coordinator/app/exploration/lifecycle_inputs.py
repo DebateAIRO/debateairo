@@ -192,6 +192,11 @@ class AuthoritativeScore:
     final_score_source: Literal["deterministic_reducer"]
     reducer_version: str
     rubric_version: str
+    # P1 Task 5: the persisted panel-disagreement fact, written into the
+    # envelope by scoring_input_resolver._score_value. Defaults False so a
+    # score envelope produced before this field existed maps to "no recorded
+    # disagreement" rather than failing to parse.
+    judges_disagree: bool = False
 
 
 @dataclass(frozen=True)
@@ -478,6 +483,9 @@ def _parse_score_value(
     contract = expected.active_scoring_contract
     if reducer_version != contract.reducer_version or rubric_version != contract.rubric_version:
         raise _CandidateProblem("mismatched", "score_value_contract_version_mismatch")
+    judges_disagree = payload.get("judges_disagree", False)
+    if not isinstance(judges_disagree, bool):
+        raise ValueError("judges_disagree must be a boolean")
     return AuthoritativeScore(
         node_id=node_id,
         claim_type=claim_type,
@@ -488,6 +496,7 @@ def _parse_score_value(
         final_score_source="deterministic_reducer",
         reducer_version=reducer_version,
         rubric_version=rubric_version,
+        judges_disagree=judges_disagree,
     )
 
 
@@ -997,6 +1006,7 @@ def policy_signals_for_lifecycle(
             holes=score.holes,
             fatal_flags=score.fatal_flags,
             recommended_actions=score.recommended_actions,
+            judges_disagree=score.judges_disagree,
         ),
         EvidenceSignal(
             status=evidence.status,

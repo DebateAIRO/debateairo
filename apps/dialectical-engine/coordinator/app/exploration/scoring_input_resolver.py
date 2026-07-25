@@ -18,6 +18,7 @@ from app.exploration.lifecycle_inputs import (
 )
 from app.exploration.policy import ScoreSignal
 from app.models.entities import NodeScoringResult
+from app.scoring.disagreement import judges_disagree_from_provenance
 from app.scoring.models import NodeScoringPayload
 
 
@@ -360,6 +361,11 @@ def _score_value(payload: NodeScoringPayload) -> dict[str, object]:
         "final_score_source": payload.score_provenance.final_score_source,
         "reducer_version": payload.score_provenance.reducer_version,
         "rubric_version": payload.score_provenance.rubric_version,
+        # P1 Task 5: carry the persisted panel-disagreement fact onto the
+        # lifecycle envelope so ExplorationPolicy can use it as a categorical
+        # challenge ground. Flag-gated inside the helper: with
+        # DIALECTICAL_FIELD_DISAGREEMENT off this is always False.
+        "judges_disagree": judges_disagree_from_provenance(payload.score_provenance),
     }
 
 

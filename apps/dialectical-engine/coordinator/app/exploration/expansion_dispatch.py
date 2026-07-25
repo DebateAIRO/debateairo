@@ -9,8 +9,9 @@ turns them into bounded real work through the W3 primitive
 The categorical-only steering LAW (machine-checked here, at the dispatch
 boundary): there is no calibrated ground truth for scalar judge scores
 (``app/scoring/calibration.py``), so a decision may spawn work ONLY when its
-persisted ``signal_class`` is ``"categorical"`` (grounding consulted nothing
-but categorical predicates -- see ``app.exploration.policy``). Scalar or
+persisted ``signal_class`` is ``"categorical"`` (P1 Task 4: at least one of
+its grounding reasons is categorical, each being independently sufficient to
+fire the action -- see ``app.exploration.policy``). Scalar or
 unclassified (legacy NULL) decisions annotate only; the ``config_override``
 escape hatch is deliberately NOT implemented (the record field exists and
 stays honestly empty). Decision->work mapping: ``challenge`` spawns a CON

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from app.evidence.model import EntailmentLabel, EvidenceScore, EvidenceStatus
+from app.scoring.disagreement import judges_disagree_from_provenance
 from app.scoring.models import ClaimType, NodeScoringPayload
 
 
@@ -73,6 +74,8 @@ class ScoreSignal:
     holes: tuple[str, ...] = ()
     fatal_flags: tuple[str, ...] = ()
     recommended_actions: tuple[str, ...] = ()
+    # P1 Task 5: set when the persisted panel disagreed on a pivotal field.
+    judges_disagree: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "node_id", _non_empty(self.node_id, "node_id"))
@@ -93,6 +96,7 @@ class ScoreSignal:
             "recommended_actions",
             tuple(str(action) for action in self.recommended_actions),
         )
+        object.__setattr__(self, "judges_disagree", bool(self.judges_disagree))
 
     @classmethod
     def from_scoring_payload(cls, payload: NodeScoringPayload) -> "ScoreSignal":
@@ -109,6 +113,7 @@ class ScoreSignal:
             holes=tuple(hole.type for hole in payload.holes),
             fatal_flags=tuple(f"{flag.type}:{flag.severity}" for flag in payload.fatal_flags),
             recommended_actions=tuple(item.action for item in payload.recommended_investigations),
+            judges_disagree=judges_disagree_from_provenance(payload.score_provenance),
         )
 
 
@@ -272,6 +277,14 @@ class ExplorationPolicy:
         if any(flag.startswith("contradiction:high") for flag in score.fatal_flags):
             # Fatal-flag membership: categorical predicate.
             reasons.append(("high-severity contradiction should be challenged", CATEGORICAL_SIGNAL))
+        if score.judges_disagree:
+            # Categorical: a MEMBERSHIP test over persisted judge artifacts
+            # ("these families assigned materially different values"), not an
+            # uncalibrated scalar treated as ground truth. Same character as
+            # the contradiction:high fatal-flag test above. See
+            # docs/superpowers/specs/2026-07-24-contested-frontier-
+            # deliberation-design.md section 5.2.
+            reasons.append(("judge families materially disagree", CATEGORICAL_SIGNAL))
         return tuple(reasons)
 
     def _seek_evidence_reasons(
