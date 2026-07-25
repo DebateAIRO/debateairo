@@ -543,6 +543,20 @@ default 4h). Every refusal is annotated on the audited
 reason (`wave_full` is deliberately *not* `budget_exhausted`, because a
 full wave does not mean the debate's budget was reached).
 
+**Where to read all of this.** `GET /api/ops/expansion?debate_id=<id>`
+(bearer user token, read-only) serves the `adaptive_expansion` state
+(`roundsCompleted`, `stoppedBecause`, `convergedWaves`, `growthStartedAt`),
+the `dispatch_outcome` histogram, the persisted frontier priority
+distribution and PRO:CON wave split, and the top records by
+`frontier_priority` — i.e. steps 3 and 4 below without hand-querying SQLite.
+In the log, one structured line per dispatch pass carries the same census:
+
+```
+grep expansion.census  /tmp/dialectical-coordinator.{out,err}.log   # per-pass decisions
+grep expansion.stop    /tmp/dialectical-coordinator.{out,err}.log   # WHY growth ended (also WARNING)
+grep scoring.cache     /tmp/dialectical-coordinator.{out,err}.log   # re-judge volume = the CLI bill
+```
+
 **Verification** (this is the P1 acceptance list; record the actual numbers,
 P2's plan depends on them):
 1. Uncomment the 7c block, `make install-services`.

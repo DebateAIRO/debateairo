@@ -324,6 +324,11 @@ def test_ops_expansion_reports_a_debate_that_never_dispatched(db) -> None:
 
     assert row["roundsCompleted"] == 0
     assert row["stoppedBecause"] is None
+    # Not the debate's ROW AGE: the growth clock was never stamped, and
+    # reporting age as growth time on this surface would read as a debate
+    # that has been growing for as long as it has existed.
+    assert row["growthStartedAt"] is None
+    assert row["growthElapsedSeconds"] is None
     assert row["frontierPriorityDistribution"] is None
     assert row["wavePolarity"] is None
     assert row["dispatchOutcomeHistogram"] == {}

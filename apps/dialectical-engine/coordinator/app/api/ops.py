@@ -30,13 +30,13 @@ from app.exploration.expansion_dispatch import (
     CONVERGED_WAVES_KEY,
     FRONTIER_DISTRIBUTION_KEY,
     GROWTH_STARTED_AT_KEY,
-    ROUNDS_COMPLETED_KEY,
     STOPPED_BECAUSE_KEY,
     WAVE_POLARITY_KEY,
     adaptive_expansion_enabled,
     adaptive_expansion_state,
     expansion_priority_floor,
     expansion_wave_width,
+    growth_clock_started_at,
     growth_elapsed_seconds,
     rounds_completed,
 )
@@ -261,7 +261,17 @@ def _expansion_row(db: Session, debate: Debate, *, top: int) -> dict[str, Any]:
         "stoppedBecause": state.get(STOPPED_BECAUSE_KEY),
         "convergedWaves": converged if isinstance(converged, int) else 0,
         "growthStartedAt": state.get(GROWTH_STARTED_AT_KEY),
-        "growthElapsedSeconds": round(growth_elapsed_seconds(debate), 1),
+        # NULL when the growth clock was never stamped, i.e. no flag-on
+        # dispatch pass has run. growth_elapsed_seconds() deliberately falls
+        # back to debate.created_at for a MISSING or CORRUPT stamp, which is
+        # right for the wall-clock gate (it must never fail open) but would
+        # report a never-grown debate's ROW AGE as growth time on a surface
+        # whose whole job is telling the operator whether growth is running.
+        "growthElapsedSeconds": (
+            round(growth_elapsed_seconds(debate), 1)
+            if growth_clock_started_at(debate) is not None
+            else None
+        ),
         # FW2 P0.3 / P1.5, persisted by the dispatcher's bookkeeping tail.
         # Absent (null) on a debate that has not completed a deciding pass.
         "frontierPriorityDistribution": state.get(FRONTIER_DISTRIBUTION_KEY),
