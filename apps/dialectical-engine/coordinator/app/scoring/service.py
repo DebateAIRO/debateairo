@@ -1544,16 +1544,56 @@ def latest_judge_evidence_for_node(db: Session, *, debate_id: str, node_id: str)
     than recomputed, so the answer describes judgments that actually exist. A
     node that has never been judged (or whose every judgment failed to parse)
     yields ``[]`` -- never a fabricated panel.
+
+    ORDERING (FW2 Part A). ``JudgeOutputArtifact`` has no ``seq`` of its own,
+    ``created_at`` ties are routine (coarse wall clock), and ``id`` is a
+    random UUID4 -- so ``(created_at, id)`` alone resolved a SAME-TICK
+    re-judge effectively at random, silently ranking the frontier and the
+    contested synthesis cap off whichever panel won a coin flip. The
+    tiebreak is the PRODUCING RUN's ``seq``, reached through the artifact's
+    ``analyzer_run_id`` link:
+
+    * ``seq`` is this codebase's established monotonic discriminator for
+      exactly this problem -- see AnalyzerRun.seq's own docstring, and
+      app/exploration/lifecycle_decision_service.py, which already resolves
+      "the latest judge artifact" by joining to AnalyzerRun and ordering on
+      ``seq``. It is assigned under the write lock and carries a partial
+      UNIQUE index, so two runs can never share one.
+    * It stays a TIEBREAK, not the primary key. A cache-hit re-stamp
+      (_relink_cached_artifacts_to_current_job) relinks an OLD artifact to a
+      NEWER run without moving its ``created_at``, so promoting ``seq`` to
+      primary would change which panel wins in cases the wall clock already
+      answers correctly. The wall clock leads; ``seq`` only breaks its ties.
+    * The join is an OUTER join and ``seq`` is nullable, so an artifact not
+      yet linked to a run (written during a pass whose aggregated run has not
+      landed, or orphaned by an interrupted job) is still a candidate. In
+      SQLite a DESC sort puts those NULLs LAST, so at an otherwise-exact tie
+      a panel with provable run provenance beats one without -- the same
+      preference lifecycle_decision_service encodes by requiring the join.
+
+    RESIDUAL, stated rather than papered over: two artifacts sharing a
+    ``created_at`` tick AND both unlinked (both ``analyzer_run_id`` NULL)
+    still fall through to the random-UUID ``id``. Fully closing that needs a
+    per-artifact monotonic column, i.e. a schema change, which this phase is
+    not taking. It is the strictly smaller residual: it requires an
+    interrupted or in-flight pass rather than merely a same-tick re-judge,
+    which is the case the frontier makes routine.
     """
     input_hash = db.scalars(
         select(JudgeOutputArtifact.input_hash)
+        .select_from(JudgeOutputArtifact)
+        .outerjoin(AnalyzerRun, JudgeOutputArtifact.analyzer_run_id == AnalyzerRun.id)
         .where(
             JudgeOutputArtifact.debate_id == debate_id,
             JudgeOutputArtifact.node_id == node_id,
             JudgeOutputArtifact.parse_status == "available",
             JudgeOutputArtifact.assessment.is_not(None),
         )
-        .order_by(JudgeOutputArtifact.created_at.desc(), JudgeOutputArtifact.id.desc())
+        .order_by(
+            JudgeOutputArtifact.created_at.desc(),
+            AnalyzerRun.seq.desc(),
+            JudgeOutputArtifact.id.desc(),
+        )
         .limit(1)
     ).first()
     if not input_hash:
