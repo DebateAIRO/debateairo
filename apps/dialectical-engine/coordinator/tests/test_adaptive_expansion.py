@@ -31,6 +31,7 @@ from app.exploration.decision_repository import (
     persist_lifecycle_decision,
 )
 from app.exploration.expansion_dispatch import (
+    DEFAULT_EXPANSION_MAX_ROUNDS,
     expansion_dispatch,
     maybe_queue_rescore_after_expansion,
 )
@@ -316,9 +317,12 @@ def test_budget_refusals_annotate_honestly(db, monkeypatch) -> None:
     # even with the per-debate budget open again.
     monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "6")
     exhausted = db.get(Debate, debate.id)
+    # Derived from the production default rather than hard-coded, so P1 Task
+    # 8's raise (2 -> 12) cannot quietly turn "rounds exhausted" into "rounds
+    # wide open" and leave this asserting the wrong refusal.
     exhausted.config = {
         **exhausted.config,
-        "adaptive_expansion": {"rounds_completed": 2},
+        "adaptive_expansion": {"rounds_completed": DEFAULT_EXPANSION_MAX_ROUNDS},
     }
     db.commit()
     rounds_record = persist_decision(

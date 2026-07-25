@@ -40,15 +40,24 @@ LOGGER = logging.getLogger(__name__)
 
 ADAPTIVE_EXPANSION_FLAG = "DIALECTICAL_ADAPTIVE_EXPANSION"
 
-# Budget knobs, read at decision time. Conservative documented defaults
-# (pending the economics review): at most 2 adaptive dispatch rounds per
-# debate, 2 expansions under any single node, 6 expansions per debate.
+# Budget knobs, read at decision time.
 EXPANSION_MAX_ROUNDS_ENV = "DIALECTICAL_EXPANSION_MAX_ROUNDS"
 EXPANSION_MAX_PER_NODE_ENV = "DIALECTICAL_EXPANSION_MAX_PER_NODE"
 EXPANSION_MAX_PER_DEBATE_ENV = "DIALECTICAL_EXPANSION_MAX_PER_DEBATE"
-DEFAULT_EXPANSION_MAX_ROUNDS = 2
-DEFAULT_EXPANSION_MAX_PER_NODE = 2
-DEFAULT_EXPANSION_MAX_PER_DEBATE = 6
+# P1 Task 8: frontier budgets. The previous values (2/2/6) were the
+# conservative pre-economics defaults for a feature that never spawned. The
+# frontier's real bound is the priority floor plus convergence hysteresis;
+# these are the outer rails.
+#
+# ORDERING NOTE (this phase's strictest constraint): every piece of
+# deep-tree safety lands BEFORE this raise -- the depth guardrail (Task 1),
+# the bounded synthesis payload including its contested cap (Task 3 + Task
+# 8), the frontier priority floor and wave width (Task 6), and the
+# convergence / wall-clock stop conditions (Task 7). Raising these numbers
+# without those in place is the failure this phase exists to prevent.
+DEFAULT_EXPANSION_MAX_ROUNDS = 12
+DEFAULT_EXPANSION_MAX_PER_NODE = 3
+DEFAULT_EXPANSION_MAX_PER_DEBATE = 150
 
 # debate.config additive bookkeeping (written ONLY with the flag on):
 # {"adaptive_expansion": {"rounds_completed": int, "stopped_because": str}}.
@@ -145,10 +154,14 @@ def adaptive_expansion_enabled() -> bool:
 # only, clamped to the same bounds as the env knob. merged_debate_config
 # sanitizes the client-supplied dict at creation time (only these keys, only
 # bounded ints), so runtime bookkeeping keys can never be injected.
+#
+# P1 Task 8 raised the max_per_debate ceiling from 100 to 200: the new
+# DEFAULT is 150, and a bound that cannot admit its own default would
+# silently clamp every explicit operator override back below it.
 BUDGET_BOUNDS: dict[str, tuple[int, int]] = {
     "max_rounds": (0, 20),
     "max_per_node": (0, 20),
-    "max_per_debate": (0, 100),
+    "max_per_debate": (0, 200),
 }
 
 
@@ -162,21 +175,34 @@ def _config_budget(debate: Debate | None, key: str, env_value: int) -> int:
     return env_value
 
 
+# The env clamp and the debate.config clamp read the SAME BUDGET_BOUNDS
+# entry, so the two override routes cannot drift apart -- an env value the
+# config route would accept can never be silently clamped, and vice versa.
 def expansion_max_rounds(debate: Debate | None = None) -> int:
     return _config_budget(
-        debate, "max_rounds", int_env(EXPANSION_MAX_ROUNDS_ENV, DEFAULT_EXPANSION_MAX_ROUNDS, 0, 20)
+        debate,
+        "max_rounds",
+        int_env(EXPANSION_MAX_ROUNDS_ENV, DEFAULT_EXPANSION_MAX_ROUNDS, *BUDGET_BOUNDS["max_rounds"]),
     )
 
 
 def expansion_max_per_node(debate: Debate | None = None) -> int:
     return _config_budget(
-        debate, "max_per_node", int_env(EXPANSION_MAX_PER_NODE_ENV, DEFAULT_EXPANSION_MAX_PER_NODE, 0, 20)
+        debate,
+        "max_per_node",
+        int_env(EXPANSION_MAX_PER_NODE_ENV, DEFAULT_EXPANSION_MAX_PER_NODE, *BUDGET_BOUNDS["max_per_node"]),
     )
 
 
 def expansion_max_per_debate(debate: Debate | None = None) -> int:
     return _config_budget(
-        debate, "max_per_debate", int_env(EXPANSION_MAX_PER_DEBATE_ENV, DEFAULT_EXPANSION_MAX_PER_DEBATE, 0, 100)
+        debate,
+        "max_per_debate",
+        int_env(
+            EXPANSION_MAX_PER_DEBATE_ENV,
+            DEFAULT_EXPANSION_MAX_PER_DEBATE,
+            *BUDGET_BOUNDS["max_per_debate"],
+        ),
     )
 
 

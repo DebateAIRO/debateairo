@@ -83,6 +83,12 @@ explicitly independent and may run concurrently with any other step.
 | 4 | `DIALECTICAL_ADAPTIVE_EXPANSION` | 1 + 2 (needs real evidence signals) |
 | 5 | `DIALECTICAL_ADVERSARIAL_POV` / `DIALECTICAL_CROSS_EXAM` | independent of everything else; cost-bearing |
 | 6 | `DIALECTICAL_VERDICT_EVIDENCE_GATE` + `NEXT_PUBLIC_VERDICT_FIRST_UI` | LAST — see the G-A doc |
+| 7 | `DIALECTICAL_HIERARCHICAL_SYNTHESIS` → `DIALECTICAL_FIELD_DISAGREEMENT` → `DIALECTICAL_ADAPTIVE_EXPANSION` | P1 contested frontier; 7c supersedes row 4 |
+
+Row 7 is P1's three-flag stage, added after this table's original six were
+written. It **supersedes row 4**: `DIALECTICAL_ADAPTIVE_EXPANSION` must not
+be flipped on its own any more — it is now stage 7c and has two P1
+preconditions of its own (7a and 7b) on top of row 4's steps 1 + 2.
 
 ---
 
@@ -405,6 +411,187 @@ already reads real (if until-now sparse) evidence signals from steps 1–2.
 
 ---
 
+### 7. P1 contested frontier — `DIALECTICAL_HIERARCHICAL_SYNTHESIS`, `DIALECTICAL_FIELD_DISAGREEMENT`, `DIALECTICAL_ADAPTIVE_EXPANSION`
+
+Plan: [`docs/superpowers/plans/2026-07-24-p1-contested-frontier.md`](./superpowers/plans/2026-07-24-p1-contested-frontier.md).
+Design: `docs/superpowers/specs/2026-07-24-contested-frontier-deliberation-design.md` (repo root).
+
+**What P1 changed, and why these three flags are one stage.** The engine had
+adaptive expansion available but had never spawned a single categorical
+decision in production (all-time count before P1: **0**). P1 makes the engine
+spend its budget where model families disagree: a hard depth guardrail, a
+bounded synthesis payload, a signal-class classification fix, per-field
+cross-family disagreement detection, frontier priority ranking with a
+12-wide wave, and convergence / wall-clock stop conditions. The three flags
+below are the only P1 behaviour that is not already live, and they are
+ordered because **turning expansion on before bounded synthesis is verified
+is the exact failure this phase exists to prevent** — a run that grows for
+hours and then dies at the final synthesis step.
+
+**Budgets were raised in code by this stage's own commit** (`app/exploration/
+expansion_dispatch.py`): `DIALECTICAL_EXPANSION_MAX_ROUNDS` 2 → **12**,
+`_PER_NODE` 2 → **3**, `_PER_DEBATE` 6 → **150** (and `BUDGET_BOUNDS
+["max_per_debate"]` 100 → 200, so an operator override can actually reach the
+new default). These raises are **inert while 7c is off** — nothing dispatches
+at all with `DIALECTICAL_ADAPTIVE_EXPANSION` unset. They are the outer rails,
+not the intended stopping point: the frontier's real bound is the priority
+floor plus convergence hysteresis, which is why a `stopped_because` of
+`budget_exhausted` is a **finding**, not a success (see verification below).
+
+**The template ships these three COMMENTED OUT, on purpose.**
+`deploy/launchd/coordinator.plist` carries all three key/string pairs inside
+XML comments, one clearly-labelled block per sub-step. This is not an
+oversight and re-commenting is the rollback. The reason is the watchdog:
+`com.dialectical.watchdog` calls `make install-services` **on its own**
+whenever a launchd service check fails, regenerating the live plist from the
+git-tracked template — so an active key committed to the template reaches the
+running coordinator with no operator action at all. Uncomment exactly one
+block, `make install-services`, verify, then move on.
+
+#### 7a. `DIALECTICAL_HIERARCHICAL_SYNTHESIS` — FIRST
+
+**What it does.** Default OFF. ON: the v2 synthesis prompt stops serialising
+every node with its full argument text (O(nodes × argument length), uncapped)
+and renders a bounded payload instead — one summary per POV branch, the top-K
+load-bearing nodes in full (`DIALECTICAL_SYNTHESIS_LOAD_BEARING_K`, default
+20), the top-C contested nodes in full ranked by widest cross-family field
+spread (`DIALECTICAL_SYNTHESIS_CONTESTED_K`, default 30), and an honest
+`omitted_count`. Flag OFF renders the historical every-node list
+byte-identically. See `app/synthesis/branch_summary.py`.
+
+**Precondition.** None beyond a working synthesis path. This is the flag that
+makes the other two safe, so it goes first.
+
+**Verification.**
+1. Uncomment the 7a block, `make install-services`.
+2. Run one **normal-size** debate (not a frontier run) end to end and confirm
+   it synthesises correctly — the synthesis is coherent and references real
+   claims, not a truncated or empty tree.
+3. Confirm the conservation identity holds on the rendered payload:
+   `len(load_bearing) + len(contested) + len(branches) + omitted_count`
+   equals the debate's node count. A node is never silently dropped; if the
+   caps bind, the remainder must show up in `omitted_count`.
+4. Sanity-check the omission rate: on a small debate `omitted_count` should
+   be small or zero. A large `omitted_count` on a 20-node debate means the
+   ranking is reading the wrong scoring run.
+
+**Rollback.** Re-comment the block, `make install-services`. Flag-off is the
+historical payload byte-for-byte; no persisted data is written by this flag
+in either direction.
+
+#### 7b. `DIALECTICAL_FIELD_DISAGREEMENT` — SECOND
+
+**What it does.** Default OFF. ON: cross-judge disagreement is detected
+**per rubric field** (`critic.logical_validity`, `steelman.charitable_
+strength`, `evidence.evidence_quality`, `context.impact`) at a 0.25 spread
+threshold, replacing a gate that compared a five-field weighted *composite*
+at 0.35. Averaging across fields shrinks spread: the largest composite spread
+observed across 26 live nodes was 0.11, i.e. the old gate sat **above the
+data's ceiling and could never fire**, which is why production has zero
+contested nodes today. The new gate also becomes a categorical `challenge`
+ground in `app/exploration/policy.py`. See `app/scoring/disagreement.py`.
+
+**Why it is separately flagged** (project-owner ruling during P1 Task 5): the
+judge panel is live in production, so shipping this unflagged would move
+`score_provenance.disagreement_status` for every scored node the instant the
+code deployed, before any deliberate flip.
+
+**Precondition — 7a verified.** This flag is what makes the contested section
+of the synthesis payload non-empty. Flipping it before 7a puts contested
+nodes into the *unbounded* legacy payload, which is the wrong direction.
+It also wants step 3 (`DIALECTICAL_JUDGE_PANEL_MODELS`) genuinely
+participating: with a single judge there is no cross-family spread to
+measure and this flag is a silent no-op.
+
+**Expect this to change numbers, not just add them.** Measured on the live
+panel across 26 nodes of debate `f67ad244`, the 0.25 threshold marks **13 of
+26 nodes (50%)** contested, against 0 under the composite gate. That is the
+intended effect. Nodes scored *before* the flip keep whatever
+`disagreement_status` they were persisted with — the column will hold a mix.
+
+**Verification.**
+1. Uncomment the 7b block, `make install-services`.
+2. Score a debate and confirm `disagreement_status: "present"` appears on
+   **≥3 nodes** (the P1 acceptance number; smoke4 had 0).
+3. Confirm the synthesis payload's `contested` section is non-empty and
+   still ≤ `DIALECTICAL_SYNTHESIS_CONTESTED_K`, with the remainder counted
+   into `omitted_count` — i.e. 7a's cap is doing its job under real load.
+4. Confirm no `LifecycleDecisionRecord` spawned anything yet: 7c is still
+   off, so every categorical decision must annotate only.
+
+**Rollback.** Re-comment, `make install-services`. The flag gates both the
+detection and its consumption (`judges_disagree_from_provenance` returns
+False when off), so no lifecycle decision can move on a stale label.
+Already-persisted `disagreement_status` values are left exactly as written.
+
+#### 7c. `DIALECTICAL_ADAPTIVE_EXPANSION` — LAST
+
+**This is row 4 of the table above, re-staged.** Everything in [step
+4](#4-dialectical_adaptive_expansion) still applies — including its steps 1 +
+2 precondition (verification is the sole source of grounded evidence signals,
+so with `DIALECTICAL_EVIDENCE_VERIFICATION` off no authenticated decision can
+exist at all) and its documented synthesis-race interaction. P1 adds the
+guardrails that make it safe to actually spend a budget, and two more
+preconditions: **7a and 7b verified**.
+
+**What P1 added around it.** Hard depth guardrail on v2 expansion; frontier
+priority ranking (`impact × uncertainty × dispersion`) with a priority floor
+(0.15) and a 12-wide wave; convergence hysteresis (two consecutive settled
+waves) and a wall-clock stop (`DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS`,
+default 4h). Every refusal is annotated on the audited
+`LifecycleDecisionRecord` — never a silent drop — with a distinct outcome per
+reason (`wave_full` is deliberately *not* `budget_exhausted`, because a
+full wave does not mean the debate's budget was reached).
+
+**Verification** (this is the P1 acceptance list; record the actual numbers,
+P2's plan depends on them):
+1. Uncomment the 7c block, `make install-services`.
+2. Run one frontier debate. Confirm at least one branch reaches **depth ≥8**
+   and at least one terminates at **depth ≤3** — an even depth profile means
+   the priority ranking is not discriminating.
+3. Confirm `debate.config["adaptive_expansion"]["stopped_because"]` is
+   `converged` or `below_priority_floor` — **not** `budget_exhausted`. A
+   `budget_exhausted` stop means the frontier ran out of rails before it ran
+   out of disagreement, and is a finding to feed back into P2, not a pass.
+4. Confirm at least one `LifecycleDecisionRecord` has `signal_class ==
+   "categorical"` **and** `dispatch_outcome == "spawned"` (all-time
+   production count before P1: **0**).
+5. Confirm the synthesis at the end of that run completes — the whole point
+   of ordering 7a first.
+6. Confirm no `database is locked` errors in
+   `/tmp/dialectical-coordinator.err.log` during the run.
+
+**Rollback.** Re-comment, `make install-services`. No new dispatch occurs;
+already-spawned nodes, jobs, and audited records are left exactly as
+persisted. The raised budgets stay in code and stay inert.
+
+#### Recorded rule change: `lifecycle_decision_records.signal_class` holds a MIX of two classification rules
+
+**This shipped unflagged and changes a persisted value**, so it is recorded
+here rather than staged. The project owner ratified the deviation on the
+condition that this boundary is written down.
+
+P1 Task 4 fixed a real bug in `app/exploration/policy.py`: a decision's
+`signal_class` was computed with `all()` over its grounding reasons, so a
+single *scalar* reason attached alongside a *categorical* one downgraded the
+whole decision to `scalar`. Under the categorical-only steering law that
+silently stripped spawn authority from correctly-grounded categorical
+decisions. The fix computes it with `any()` — a decision is categorical when
+**at least one** of its grounding reasons is categorical, each being
+independently sufficient to fire the action. Blockers (reasons *not* to
+abandon) no longer participate in the classification at all.
+
+**The boundary, plainly:** `lifecycle_decision_records` rows created
+**before 2026-07-25** were classified with the old `all()` rule; rows created
+on or after use `any()`. The column therefore holds a mix of two rules, and
+`signal_class` is **not comparable across that date**. Rows are never
+retroactively reclassified. Only **6 historical rows exist** (all `scalar`,
+all written 2026-07-24), so the affected population is negligible — but any
+future analysis that groups by `signal_class` across that date must say which
+rule each row was written under.
+
+---
+
 ## Flags already default-ON from this branch
 
 Operators should know the full surface, not just what's still off:
@@ -441,6 +628,15 @@ picture.
    — LAST, only after `/api/ops/verdict-shadow` shows `wouldSuppress` is no
    longer ~100% on empirical-claim roots. Gate first, banner second (G-A
    doc).
+7. **P1 contested frontier, in three sub-steps, never together:**
+   **7a `DIALECTICAL_HIERARCHICAL_SYNTHESIS`** (verify one normal-size debate
+   synthesises) → **7b `DIALECTICAL_FIELD_DISAGREEMENT`** (verify
+   `disagreement_status: "present"` on ≥3 nodes and the contested cap
+   holding) → **7c `DIALECTICAL_ADAPTIVE_EXPANSION`** (verify a
+   `converged`/`below_priority_floor` stop, not `budget_exhausted`). 7c
+   replaces item 4 above; do not flip item 4 separately. All three ship
+   commented out in `deploy/launchd/coordinator.plist` — the watchdog
+   installs the template unattended, so an active key there is a deployment.
 
 Every flip above is an explicit operator decision made after reviewing the
 corresponding evidence — this document schedules none of them.

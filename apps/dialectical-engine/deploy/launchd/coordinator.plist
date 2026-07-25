@@ -32,6 +32,53 @@
     <string>1</string>
     <key>DIALECTICAL_CROSS_EXAM</key>
     <string>1</string>
+
+    <!-- ==================================================================
+         Flip plan stage 7 — P1 contested frontier
+         (docs/superpowers/plans/2026-07-24-p1-contested-frontier.md;
+          preconditions/verification/rollback: docs/flip-plan-2026-07.md#7)
+
+         STAGED IN THREE SUB-STEPS, DELIBERATELY LEFT COMMENTED OUT.
+         Uncomment ONE block, `make install-services`, verify it per the flip
+         plan, and only then uncomment the next. Turning expansion on before
+         bounded synthesis is verified is exactly the ordering P1 exists to
+         prevent: a frontier run that grows for hours and then fails at the
+         final synthesis step.
+
+         WHY COMMENTED RATHER THAN SET TO 1: `com.dialectical.watchdog` calls
+         `make install-services` on its own whenever a launchd service check
+         fails, regenerating the live plist from THIS template. An active key
+         committed here therefore reaches the running coordinator without any
+         operator action. Each block below is one uncomment away from live and
+         must stay an explicit operator decision.
+
+         Rollback for any block: re-comment it (or delete the keys) and run
+         `make install-services`. All three are additive and flag-off is
+         byte-identical to the pre-flip path; nothing already persisted is
+         rewritten or reinterpreted in either direction.
+         ================================================================== -->
+
+    <!-- Stage 7a — bounded hierarchical synthesis payload. FIRST. Verify one
+         NORMAL-SIZE debate synthesises correctly before going further.
+    <key>DIALECTICAL_HIERARCHICAL_SYNTHESIS</key>
+    <string>1</string>
+    -->
+
+    <!-- Stage 7b — per-field cross-family disagreement detection. Moves
+         score_provenance.disagreement_status for every newly scored node
+         (measured: ~50% become "present"), which is what makes the frontier
+         and the synthesis payload's contested section non-empty. Requires 7a
+         verified, because it is what fills the bounded payload.
+    <key>DIALECTICAL_FIELD_DISAGREEMENT</key>
+    <string>1</string>
+    -->
+
+    <!-- Stage 7c — adaptive expansion. LAST. This is the flag that makes the
+         raised budgets (12 rounds / 3 per node / 150 per debate) actually
+         spend. Requires 7a AND 7b verified.
+    <key>DIALECTICAL_ADAPTIVE_EXPANSION</key>
+    <string>1</string>
+    -->
   </dict>
   <key>ProgramArguments</key>
   <array>

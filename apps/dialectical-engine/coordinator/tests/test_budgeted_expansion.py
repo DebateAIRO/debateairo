@@ -15,6 +15,7 @@ Design under test:
 from __future__ import annotations
 
 from app.exploration.expansion_dispatch import (
+    BUDGET_BOUNDS,
     OUTCOME_BUDGET_EXHAUSTED,
     OUTCOME_SPAWNED,
     admit_and_spawn,
@@ -78,6 +79,40 @@ def test_per_node_config_override_is_honored(db, monkeypatch) -> None:
 
     assert first_outcome == OUTCOME_SPAWNED
     assert second_job is None and second_outcome == OUTCOME_BUDGET_EXHAUSTED
+
+
+def test_frontier_budget_defaults(monkeypatch) -> None:
+    """P1 Task 8's raise, read from the production defaults rather than from
+    whatever this machine/CI runner happens to export."""
+    for name in (
+        "DIALECTICAL_EXPANSION_MAX_ROUNDS",
+        "DIALECTICAL_EXPANSION_MAX_PER_NODE",
+        "DIALECTICAL_EXPANSION_MAX_PER_DEBATE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert expansion_max_rounds() == 12
+    assert expansion_max_per_node() == 3
+    assert expansion_max_per_debate() == 150
+
+
+def test_budget_bounds_admit_their_own_defaults(monkeypatch) -> None:
+    """A bound that cannot admit its own default silently clamps every
+    explicit operator override back below it -- which is exactly what
+    max_per_debate's (0, 100) ceiling would have done to the new 150 default.
+    The env route and the debate.config route read the SAME bounds, so this
+    pins both.
+    """
+    assert BUDGET_BOUNDS["max_per_debate"] == (0, 200)
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "150")
+    assert expansion_max_per_debate() == 150
+
+    debate = Debate(
+        topic="t",
+        status="generating",
+        config={"adaptive_expansion": {"max_per_debate": 150}},
+    )
+    assert expansion_max_per_debate(debate) == 150
 
 
 def test_budget_helpers_read_config_overrides_and_env_defaults(db, monkeypatch) -> None:

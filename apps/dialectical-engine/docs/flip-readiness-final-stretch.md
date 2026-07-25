@@ -256,9 +256,15 @@ change is proposed here.
 
   | env | default | clamp |
   |---|---|---|
-  | `DIALECTICAL_EXPANSION_MAX_ROUNDS` | 2 | 0–20 |
-  | `DIALECTICAL_EXPANSION_MAX_PER_NODE` | 2 | 0–20 |
-  | `DIALECTICAL_EXPANSION_MAX_PER_DEBATE` | 6 | 0–100 |
+  | `DIALECTICAL_EXPANSION_MAX_ROUNDS` | 12 | 0–20 |
+  | `DIALECTICAL_EXPANSION_MAX_PER_NODE` | 3 | 0–20 |
+  | `DIALECTICAL_EXPANSION_MAX_PER_DEBATE` | 150 | 0–200 |
+
+  **Raised by P1 Task 8** from 2/2/6 (clamp 0–100 on the per-debate knob).
+  The old values were the conservative pre-economics defaults for a feature
+  that had never spawned anything. The frontier's real bound is now the
+  priority floor plus convergence hysteresis, not these rails — see
+  [`flip-plan-2026-07.md` step 7](./flip-plan-2026-07.md#7-p1-contested-frontier--dialectical_hierarchical_synthesis-dialectical_field_disagreement-dialectical_adaptive_expansion).
 
 ### What the contract shrink will change
 
@@ -379,9 +385,9 @@ blind from a wave report.
 | `DIALECTICAL_EVIDENCE_VERIFICATION` | OFF | bool | ON: real judge-provider verification call per EVIDENCE node on every scoring run; unlocks authenticated (grounded) lifecycle decisions — the only source of automatic categorical expansion signals. | Pre-branch (Phase 7); **interlocked by W4** (documented hard dependency for automatic adaptive dispatch) |
 | `DIALECTICAL_DYNAMIC_PERSPECTIVES` | ON | bool | ON (current default): claim-type classification selects 2–5 dynamic lens perspectives at creation. OFF: legacy fixed-quartet path. Binding invariant: this default does not change on this branch. | Pre-branch (landed 2026-07-18); **touched by W5a** (`derivation` = claim_type/markers/lens_set serialization when ON) |
 | `DIALECTICAL_ADAPTIVE_EXPANSION` | OFF | bool | ON: the scoring-completion tail dispatches categorical-grounded lifecycle decisions into bounded `v2_expand` jobs (real tree growth) and re-scores after each completed round. OFF: dispatcher never invoked, `child_spawn_count` stays 0, byte-identical payloads. | **W4** (new) |
-| `DIALECTICAL_EXPANSION_MAX_ROUNDS` | `2` | int, 0–20 | Per-debate cap on automatic dispatch passes (soft loop bound — the per-debate job budget below is the hard cap). | **W4** (new) |
-| `DIALECTICAL_EXPANSION_MAX_PER_NODE` | `2` | int, 0–20 | Cap on `v2_expand` jobs (any status) whose `parent_node_id` is a given node. | **W4** (new) |
-| `DIALECTICAL_EXPANSION_MAX_PER_DEBATE` | `6` | int, 0–100 | Cap on `v2_expand` jobs (any status) per debate — the hard spawn ceiling. | **W4** (new) |
+| `DIALECTICAL_EXPANSION_MAX_ROUNDS` | `12` | int, 0–20 | Per-debate cap on automatic dispatch passes (soft loop bound — the per-debate job budget below is the hard cap). | **W4** (new) |
+| `DIALECTICAL_EXPANSION_MAX_PER_NODE` | `3` | int, 0–20 | Cap on `v2_expand` jobs (any status) whose `parent_node_id` is a given node. | **W4** (new) |
+| `DIALECTICAL_EXPANSION_MAX_PER_DEBATE` | `150` | int, 0–200 | Cap on `v2_expand` jobs (any status) per debate — the hard spawn ceiling. Raised from 6 (clamp 0–100) by P1 Task 8. | **W4** (new) |
 | `DIALECTICAL_REAPER_INTERVAL_S` | `60.0` | float, 0.05–3600 | Coordinator lifespan reaper's sweep interval for expired claimed/running jobs (excludes `score_debate`, which has its own stale-expiry path). | **W5b** (new) |
 | `DIALECTICAL_ALLOW_MULTI_INSTANCE` | OFF | bool | ON: skips the single-instance advisory-lock guard at startup, allowing multiple coordinator processes against the same DB — an operator override for a deliberate multi-instance setup. | **W5b** (new) |
 
