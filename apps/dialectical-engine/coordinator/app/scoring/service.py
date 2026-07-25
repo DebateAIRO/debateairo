@@ -1526,6 +1526,43 @@ def _persisted_judge_evidence_for_node(
     return evidence
 
 
+def latest_judge_evidence_for_node(db: Session, *, debate_id: str, node_id: str) -> list[dict]:
+    """The node's persisted judge panel for the input it was MOST RECENTLY
+    judged on, in the same shape ``_persisted_judge_evidence_for_node``
+    returns (that helper, keyed on a caller-supplied ``input_hash``, does the
+    distinctness work; this only resolves which input_hash to ask for).
+
+    Promoted to a public name rather than importing the private helper across
+    package boundaries, because the out-of-module caller
+    (``app.exploration.expansion_dispatch``'s frontier ranking, P1 Task 6)
+    genuinely cannot supply an ``input_hash``: it reads audited decision
+    records after the scoring pass has finished, and recomputing the hash
+    would mean re-normalizing the claim and re-fetching the node's children
+    just to look up a measurement.
+
+    "Most recently judged" is read off the newest available artifact rather
+    than recomputed, so the answer describes judgments that actually exist. A
+    node that has never been judged (or whose every judgment failed to parse)
+    yields ``[]`` -- never a fabricated panel.
+    """
+    input_hash = db.scalars(
+        select(JudgeOutputArtifact.input_hash)
+        .where(
+            JudgeOutputArtifact.debate_id == debate_id,
+            JudgeOutputArtifact.node_id == node_id,
+            JudgeOutputArtifact.parse_status == "available",
+            JudgeOutputArtifact.assessment.is_not(None),
+        )
+        .order_by(JudgeOutputArtifact.created_at.desc(), JudgeOutputArtifact.id.desc())
+        .limit(1)
+    ).first()
+    if not input_hash:
+        return []
+    return _persisted_judge_evidence_for_node(
+        db, debate_id=debate_id, node_id=node_id, input_hash=input_hash
+    )
+
+
 def _current_scoring_job_id(db: Session, debate_id: str) -> str | None:
     job = db.scalars(
         select(Job)

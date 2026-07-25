@@ -58,6 +58,13 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
         "Automatic expansion paused because nothing found so far meets the bar for automatic growth."
     ),
     "quiescent_no_decisions": "Automatic expansion has not found anything to grow yet.",
+    # P1 Task 6: the frontier was ranked and nothing left on it cleared the
+    # bar. Deliberately says "not worth the effort", not "not important" --
+    # the floor compares a relative priority, it does not judge the claim.
+    "below_priority_floor": (
+        "Automatic expansion paused because the remaining points looked less "
+        "worth pursuing than the work already done."
+    ),
     # Lifecycle-input resolver component codes (defensive; not reachable on
     # any wire payload today -- see module docstring).
     "score_stale": "The score behind this step was too old to act on, so nothing changed.",

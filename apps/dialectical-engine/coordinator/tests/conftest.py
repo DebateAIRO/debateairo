@@ -186,6 +186,95 @@ def make_judge_evidence():
     return _make
 
 
+# P1 Task 6: frontier-ordering factories. Each builds a REAL v2 debate, a
+# REAL complete node_scoring AnalyzerRun, and one REAL LifecycleDecisionRecord
+# per node -- the priority is never stubbed in, it is whatever
+# frontier_priority derives from the persisted scoring item. The requested
+# priority is fed as `impact`, with `uncertainty` pinned to 1.0 and no judge
+# artifacts (so max_field_spread is 0.0): multiplying by 1.0 is exact in
+# IEEE-754, so the recorded priority is bit-for-bit the requested value and
+# an ordering assertion cannot fail on a mantissa artefact.
+#
+# Nodes are the depth-2 strongest-PRO/strongest-CON pair under each POV
+# container (8 of them after the fixed quartet), one decision per node, so
+# neither the per-node (2) nor the per-debate (6) budget default truncates a
+# wave-width test ahead of the wave width itself.
+def _frontier_decisions_factory(signal_class: str):
+    def _make(db, *, priorities):
+        from sqlalchemy import select
+
+        from app.models.entities import AnalyzerRun, Node, next_analyzer_run_seq
+        from app.services.dialectical_v2 import first_branch
+
+        from test_adaptive_expansion import persist_decision
+        from test_node_scoring import explicit_depth_pressure_payload
+        from test_v2_expand import codex_worker, make_v2_debate
+
+        worker = codex_worker(db)
+        debate = make_v2_debate(db, worker)
+        nodes = list(
+            db.scalars(
+                select(Node)
+                .where(
+                    Node.debate_id == debate.id,
+                    Node.node_type.in_(("PRO", "CON")),
+                    Node.status == "complete",
+                    Node.depth == 2,
+                )
+                .order_by(Node.materialized_path.asc(), Node.id.asc())
+            ).all()
+        )
+        assert len(nodes) >= len(priorities), (
+            f"fixture needs {len(priorities)} expandable depth-2 nodes, found {len(nodes)}"
+        )
+        chosen = nodes[: len(priorities)]
+        run = AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=first_branch(db, debate.id).id,
+            analyzer_type="node_scoring",
+            output={
+                "status": "available",
+                "items": [
+                    explicit_depth_pressure_payload(
+                        node_id=node.id, impact=priority, uncertainty=1.0
+                    ).model_dump(mode="json")
+                    for node, priority in zip(chosen, priorities)
+                ],
+                "producer": "stored-judge-output",
+            },
+            status="complete",
+            provenance={"scoring_source": "judge_outputs"},
+        )
+        # next_analyzer_run_seq assigns run.seq, db.add()s and db.flush()es as
+        # one lock-covered critical section -- do NOT db.add() separately.
+        next_analyzer_run_seq(db, run)
+        db.commit()
+        records = [
+            persist_decision(
+                db,
+                debate_id=debate.id,
+                node_id=node.id,
+                decision="challenge",
+                signal_class=signal_class,
+                run_id=run.id,
+            )
+            for node in chosen
+        ]
+        return debate, records, run.id
+
+    return _make
+
+
+@pytest.fixture()
+def categorical_decisions_factory():
+    return _frontier_decisions_factory("categorical")
+
+
+@pytest.fixture()
+def scalar_decisions_factory():
+    return _frontier_decisions_factory("scalar")
+
+
 @pytest.fixture()
 def db():
     # Per-connection SQLite state survives in the engine's pool across tests

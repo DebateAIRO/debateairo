@@ -448,6 +448,13 @@ class LifecycleDecisionRecord(Base):
     signal_class: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     config_override: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     dispatch_outcome: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    # P1 Task 6 additive column (nullable, default None): the
+    # impact x uncertainty x dispersion rank the adaptive dispatcher used to
+    # ORDER an already-authorised frontier, recorded so the order in which
+    # expansion budget was spent is auditable. Written only by
+    # app.exploration.expansion_dispatch, i.e. only with
+    # DIALECTICAL_ADAPTIVE_EXPANSION on; NULL everywhere else, honestly.
+    frontier_priority: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

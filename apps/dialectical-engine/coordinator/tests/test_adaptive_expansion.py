@@ -808,6 +808,13 @@ def test_real_contradicted_verifier_verdict_authenticates_challenge_and_dispatch
 
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    # P1 Task 6: this fixture's fake judge emits impact 0.2 / uncertainty 0.3,
+    # so its frontier priority is 0.06 -- genuinely below the 0.15 production
+    # floor (which 86% of the 250 real scored nodes on this deployment clear).
+    # This test is about verifier-verdict AUTHENTICATION reaching a real
+    # dispatch, not about ranking, so the floor is pinned off rather than the
+    # fixture's numbers being inflated to dodge it.
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_PRIORITY_FLOOR", "0")
     worker = codex_worker(db)
     debate = make_v2_debate(db, worker)
     target = first_pov_pro(db, debate)
@@ -851,6 +858,13 @@ def test_real_unverifiable_verifier_verdict_authenticates_seek_evidence_and_disp
 ) -> None:
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
     monkeypatch.setenv("DIALECTICAL_EVIDENCE_VERIFICATION", "true")
+    # P1 Task 6: this fixture's fake judge emits impact 0.2 / uncertainty 0.3,
+    # so its frontier priority is 0.06 -- genuinely below the 0.15 production
+    # floor (which 86% of the 250 real scored nodes on this deployment clear).
+    # This test is about verifier-verdict AUTHENTICATION reaching a real
+    # dispatch, not about ranking, so the floor is pinned off rather than the
+    # fixture's numbers being inflated to dodge it.
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_PRIORITY_FLOOR", "0")
     worker = codex_worker(db)
     debate = make_v2_debate(db, worker)
     target = first_pov_pro(db, debate)
