@@ -25,7 +25,7 @@
 .threadRootClaim {
   font-family: var(--font-serif);
   font-weight: 600;
-  font-size: 21px;
+  font-size: clamp(18px, 1rem + 0.75vw, 21px);
   line-height: 1.28;
   color: var(--text-strong);
   letter-spacing: -0.008em;

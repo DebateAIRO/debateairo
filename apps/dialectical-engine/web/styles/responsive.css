@@ -12,6 +12,12 @@
   }
 }
 
+@media (max-width: 768px) {
+  :where(button, input, textarea, select) {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 @media (max-width: 640px) {
   .composer {
     flex-direction: column;
@@ -26,7 +32,7 @@
     grid-template-columns: 1fr;
   }
   .drawer {
-    width: 100vw;
+    width: 100%;
   }
   .scoringIssueStrip,
   .adaptiveDepthStrip {

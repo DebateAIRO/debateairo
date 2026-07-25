@@ -77,6 +77,26 @@
   --font-sans: var(--font-sans), "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
+  /* canonical responsive breakpoints */
+  --bp-480: 480px;
+  --bp-640: 640px;
+  --bp-768: 768px;
+  --bp-920: 920px;
+  --bp-1200: 1200px;
+
+  /* collision map */
+  --safe-b: env(safe-area-inset-bottom, 0px);      /* requires viewportFit: "cover" (§3.1) */
+  --dock-w: min(360px, calc(100vw - 36px));        /* EXPANDED (unlock form) width cap */
+  --dock-collapsed-w: 168px;                       /* hard cap on the COLLAPSED dock button */
+  --dock-max-h: 96px;                              /* CAP for the EXPANDED unlock form (wrap allowed,
+                                                      internal scroll beyond cap); collapsed ≈ 44px */
+  --dock-offset-b: calc(18px + var(--safe-b));
+  --zoom-cluster-w: 52px;                          /* 44px controls + padding, vertical stack */
+  --zoom-cluster-offset-b: calc(var(--dock-offset-b) + var(--dock-max-h) + 12px);
+  --token-dock-clearance: calc(18px + var(--dock-max-h));  /* .debateView padding-bottom input */
+  --z-canvas-sticky: 4; --z-zoom-cluster: 5; --z-dock: 40; --z-sheet: 50;
+  --z-drawer: 55; --z-pop: 60; --z-modal: 70;
+
   /* radii + shadow */
   --r-card: 13px;
   --r-panel: 12px;
@@ -89,6 +109,11 @@
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html,

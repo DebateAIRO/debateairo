@@ -16,7 +16,7 @@
 }
 .outlineRoot {
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: clamp(20px, 1.1rem + 0.8vw, 24px);
   font-weight: 600;
   line-height: 1.25;
   color: var(--text-strong);

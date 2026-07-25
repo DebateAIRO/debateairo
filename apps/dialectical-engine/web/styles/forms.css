@@ -265,18 +265,18 @@ a:focus-visible {
   margin: 0;
 }
 .display.lg {
-  font-size: 34px;
+  font-size: clamp(30px, 1.25rem + 2vw, 34px);
 }
 .display.md {
-  font-size: 30px;
+  font-size: clamp(27px, 1.35rem + 1vw, 30px);
 }
 .display.sm {
-  font-size: 26px;
+  font-size: clamp(24px, 1.25rem + 0.75vw, 26px);
 }
 
 .lede {
   font-family: var(--font-serif);
-  font-size: 16px;
+  font-size: clamp(15px, 0.875rem + 0.25vw, 16px);
   line-height: 1.5;
   color: var(--text-2);
   margin: 12px 0 0;

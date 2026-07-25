@@ -15,7 +15,7 @@
   right: 0;
   bottom: 0;
   width: 468px;
-  max-width: 100vw;
+  max-width: 100%;
   z-index: 55;
   background: var(--surface-2);
   border-left: 1px solid var(--line-strong);
@@ -44,7 +44,7 @@
 }
 .drawerClaim {
   font-family: var(--font-serif);
-  font-size: 21px;
+  font-size: clamp(18px, 1rem + 0.75vw, 21px);
   font-weight: 600;
   line-height: 1.28;
   letter-spacing: -0.01em;
