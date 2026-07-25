@@ -26,7 +26,7 @@ approval (the approvals endpoint reuses ``admit_and_spawn`` below).
 from __future__ import annotations
 
 import logging
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from sqlalchemy import select
@@ -98,12 +98,33 @@ STOPPED_WALL_CLOCK = "wall_clock"
 #   converged_waves        -- consecutive settled waves observed so far
 #   converged_wave_run_id  -- the protocol run the count last consumed, so a
 #                             replayed pass cannot read one wave as two
+#   converged_wave_round   -- the rounds_completed value that count was taken
+#                             at, so two readings with NO EXPANSION between
+#                             them cannot be read as two waves
+#   growth_started_at      -- ISO instant of the first flag-on dispatch pass
 CONVERGED_WAVES_KEY = "converged_waves"
 CONVERGED_WAVE_RUN_KEY = "converged_wave_run_id"
+CONVERGED_WAVE_ROUND_KEY = "converged_wave_round"
+GROWTH_STARTED_AT_KEY = "growth_started_at"
 
 # Two consecutive settled waves, not one: a single wave under epsilon can be
 # noise, and stopping a 12-wave budget on noise is the expensive mistake here.
 REQUIRED_CONSECUTIVE_CONVERGED_WAVES = 2
+
+# The runner's non-comparable `reason` values split in two, and the split is
+# load-bearing (review finding 2):
+#
+#   * "strengths_unavailable" / "first_evaluation" -- the engine failed to
+#     MEASURE. Silence about the drift is not evidence the drift was large.
+#     The streak carries forward.
+#   * "topology_changed" / "semantics_changed" -- positive evidence that the
+#     COMPARISON BASIS itself changed. A topology change IS a further round
+#     changing the graph, so letting a settled-before/settled-after pair
+#     straddle one would make the stop's own claim ("further rounds were no
+#     longer changing the conclusions") false at the moment it is asserted.
+#     The streak resets. A tree whose shape keeps changing has not converged,
+#     and that is exactly the case the loop is supposed to keep running on.
+CONVERGENCE_BASIS_CHANGED_REASONS = frozenset({"topology_changed", "semantics_changed"})
 
 DEBATE_WALL_CLOCK_SECONDS_ENV = "DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS"
 DEFAULT_DEBATE_WALL_CLOCK_SECONDS = 4 * 60 * 60
@@ -354,32 +375,85 @@ def debate_wall_clock_seconds() -> int:
     )
 
 
-def debate_elapsed_seconds(debate: Debate) -> float:
-    """Seconds since the debate was created, tolerant of a NAIVE timestamp.
+def _as_utc(value: datetime) -> datetime:
+    """Stamp a NAIVE datetime as UTC; pass an aware one through unchanged.
 
-    ``now_utc()`` is timezone-AWARE and ``Debate.created_at`` is declared
-    ``DateTime(timezone=True)``, but that is not what comes back: SQLAlchemy's
-    SQLite DATETIME drops the offset on the way in and never restores it on the
-    way out, so the loaded value is a tz-NAIVE datetime holding the UTC wall
-    clock (verified empirically on this deployment's database, and pinned by
-    tests/test_frontier_priority.py's tzinfo assertion). Subtracting the two
-    forms directly raises ``TypeError: can't subtract offset-naive and
-    offset-aware datetimes`` -- on the gate below that would take down EVERY
-    dispatch pass, so the naive form is stamped UTC rather than assumed away.
-    Note that a naive value read as LOCAL time would be wrong by a whole
-    timezone offset, which is why the stamp is explicit.
+    Both forms genuinely occur here and mixing them raises ``TypeError: can't
+    subtract offset-naive and offset-aware datetimes`` -- which, at the
+    wall-clock gate, would take down EVERY dispatch pass. Verified empirically
+    against this deployment's database rather than assumed, for BOTH sources
+    (review finding 3 asked for exactly this on the value we now write
+    ourselves):
 
-    A missing created_at answers 0.0: an unmeasurable age must not stop a
-    debate on a ceiling nothing was compared against.
+    * ``Debate.created_at`` comes back **naive**, despite the column being
+      declared ``DateTime(timezone=True)``. SQLAlchemy's SQLite DATETIME drops
+      the offset on the way in and never restores it on the way out; the stored
+      text is the UTC wall clock with no zone.
+    * ``growth_started_at`` is a string in a JSON column, so it round-trips
+      byte-for-byte and ``datetime.fromisoformat`` returns it **aware**
+      (``now_utc().isoformat()`` carries ``+00:00``).
+
+    Naive values are stamped UTC, never read as local time -- the stored wall
+    clock IS UTC, and reading it as local would be wrong by a whole offset.
+    Both facts are pinned by tests so a driver or serialisation change fails
+    loudly instead of silently.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def growth_clock_started_at(debate: Debate) -> datetime | None:
+    """The stamped start of this debate's GROWTH clock, or None if unusable.
+
+    Answers None for an absent, non-string, blank, or unparseable value, so a
+    corrupt stamp degrades to the ``created_at`` fallback rather than raising
+    inside the dispatch gate.
+    """
+    raw = adaptive_expansion_state(debate).get(GROWTH_STARTED_AT_KEY)
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return datetime.fromisoformat(raw.strip())
+    except ValueError:
+        return None
+
+
+def _mark_growth_started(debate: Debate) -> None:
+    """Start the growth clock on the FIRST flag-on dispatch pass; then never
+    move it again (mutates debate.config only -- no flush, no commit)."""
+    from app.models.entities import now_utc
+
+    if growth_clock_started_at(debate) is not None:
+        return
+    state = adaptive_expansion_state(debate)
+    state[GROWTH_STARTED_AT_KEY] = now_utc().isoformat()
+    _write_adaptive_expansion_state(debate, state)
+
+
+def growth_elapsed_seconds(debate: Debate) -> float:
+    """Seconds this debate has been allowed to GROW -- not the age of its row.
+
+    The ceiling bounds how long a debate may keep growing. Measuring total
+    debate age instead would mean that on the day the flag is flipped, every
+    pre-existing debate in production is already past four hours and the very
+    first dispatch pass stamps ``wall_clock`` before adaptive expansion does
+    anything at all (review finding 3, project-owner ruling). The clock
+    therefore starts at the first flag-on dispatch pass
+    (``_mark_growth_started``, called immediately before this is read, so a
+    debate's first pass always measures ~0 no matter how old the row is).
+
+    ``debate.created_at`` is the fallback for a MISSING or CORRUPT stamp only
+    -- for a debate mid-flight when this shipped, or config that lost the key.
+    It is deliberately not the primary source.
+
+    A debate with neither answers 0.0: an unmeasurable age must not stop growth
+    against a ceiling nothing was compared to.
     """
     from app.models.entities import now_utc
 
-    created_at = debate.created_at
-    if created_at is None:
+    started_at = growth_clock_started_at(debate) or debate.created_at
+    if started_at is None:
         return 0.0
-    if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
-    return (now_utc() - created_at).total_seconds()
+    return (now_utc() - _as_utc(started_at)).total_seconds()
 
 
 def _latest_convergence(db: Session, debate_id: str) -> tuple[str | None, dict[str, Any]]:
@@ -421,24 +495,49 @@ def _record_convergence_wave(
 ) -> int:
     """Advance (or reset) the hysteresis counter; returns CONSECUTIVE settled waves.
 
-    Three cases, all deliberate:
+    A "wave" is an EXPANSION ROUND followed by a fresh measurement of the
+    drift it caused -- NOT merely a dispatch pass. Those are not the same
+    thing, and conflating them is how a debate that never expanded once gets
+    annotated "the analysis had settled: further rounds were no longer
+    changing the conclusions" (review finding 1). ``run_protocol_analysis``
+    appends a run on EVERY scoring completion (app/scoring/jobs.py), and
+    scoring completions arrive from paths that have nothing to do with
+    adaptive expansion -- pre-synthesis scoring, cold start, the API. Two of
+    those measure near-zero drift on a tree nobody grew, and without the round
+    guard below they would trip the stop and overwrite the honest diagnosis
+    the pass would otherwise have recorded.
 
-    * The run MEASURED the drift (``maxDelta`` and ``epsilon`` both real
-      numbers): settled increments, moving resets to 0. The predicate is
-      ``max_delta <= epsilon`` -- byte-for-byte the one app/protocol/runner.py
-      uses to write ``converged`` on the same payload, so the stop condition
-      and the reported convergence flag can never disagree at the boundary.
-    * The run could NOT measure it -- the runner's first_evaluation /
-      topology_changed / semantics_changed / strengths_unavailable branches
-      write no ``maxDelta`` at all. The count carries forward untouched:
-      resetting would treat silence as movement, incrementing would invent a
-      measurement neither the runner nor this module made.
-    * The run was ALREADY counted (same ``run_id`` as the last pass that
-      consumed one). Dispatch is best-effort at its call site and so is the
-      protocol re-run immediately before it, so a retried scoring tail can
-      hand this the same latest run twice. Hysteresis exists to demand two
-      INDEPENDENT observations; reading one wave twice would defeat exactly
-      the property it is here to provide.
+    The guards, in order:
+
+    1. **The comparison basis changed** (``reason`` in
+       ``CONVERGENCE_BASIS_CHANGED_REASONS``) -- reset to 0. Checked FIRST, and
+       deliberately ahead of the round guard: a user-approved expansion reaches
+       the tree through ``admit_and_spawn`` WITHOUT advancing
+       ``rounds_completed``, so a topology change is the only signal that the
+       graph moved under us. The wave is not marked consumed, so a real
+       measurement later in the same round is still counted.
+    2. **No expansion round has EVER completed** (``rounds_completed == 0``) --
+       refuse to count at all. Nothing has grown, so nothing can have settled.
+    3. **This exact run was already counted** (same ``run_id``). Dispatch is
+       best-effort at its call site and so is the protocol re-run immediately
+       before it, so a retried scoring tail can hand this the same latest run
+       twice.
+    4. **No expansion round since the last counted wave**
+       (``rounds_completed <= converged_wave_round``). Two protocol runs with
+       no growth between them are two readings of one state, not two waves.
+       Guards 3 and 4 answer different questions and neither subsumes the
+       other: a round CAN advance while the protocol re-run fails, leaving the
+       same stale run as "latest".
+    5. **The run could not MEASURE the drift** (no real ``maxDelta`` /
+       ``epsilon``) -- the runner's ``first_evaluation`` /
+       ``strengths_unavailable`` branches. The count carries forward untouched:
+       resetting would treat silence as movement, incrementing would invent a
+       measurement neither the runner nor this module made.
+
+    Past all five, settled increments and moving resets to 0. The predicate is
+    ``max_delta <= epsilon`` -- byte-for-byte the one app/protocol/runner.py
+    uses to write ``converged`` on the same payload, so the stop condition and
+    the reported convergence flag can never disagree at the boundary.
 
     Mutates only ``debate.config`` (no flush, no commit) -- the write joins the
     caller's transaction, which is what keeps this off the "hold a SQLite write
@@ -451,8 +550,23 @@ def _record_convergence_wave(
         if isinstance(previous, int) and not isinstance(previous, bool) and previous >= 0
         else 0
     )
+
+    reason = convergence.get("reason")
+    if isinstance(reason, str) and reason in CONVERGENCE_BASIS_CHANGED_REASONS:
+        if count:
+            state[CONVERGED_WAVES_KEY] = 0
+            _write_adaptive_expansion_state(debate, state)
+        return 0
+
+    rounds = rounds_completed(debate)
+    if rounds == 0:
+        return count
     if run_id is not None and run_id == state.get(CONVERGED_WAVE_RUN_KEY):
         return count
+    last_round = state.get(CONVERGED_WAVE_ROUND_KEY)
+    if isinstance(last_round, int) and not isinstance(last_round, bool) and rounds <= last_round:
+        return count
+
     max_delta = convergence.get("maxDelta")
     epsilon = convergence.get("epsilon")
     if not (_is_real_number(max_delta) and _is_real_number(epsilon)):
@@ -460,6 +574,7 @@ def _record_convergence_wave(
     count = count + 1 if float(max_delta) <= float(epsilon) else 0
     state[CONVERGED_WAVES_KEY] = count
     state[CONVERGED_WAVE_RUN_KEY] = run_id
+    state[CONVERGED_WAVE_ROUND_KEY] = rounds
     _write_adaptive_expansion_state(debate, state)
     return count
 
@@ -675,7 +790,13 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     # the dispatcher; a pass that never looked at the frontier observed no
     # wave, and recording one would corrupt the streak of a debate that is
     # ending for an unrelated reason anyway.
-    if debate_elapsed_seconds(debate) >= debate_wall_clock_seconds():
+    #
+    # The stamp goes in BEFORE the read, not after: the clock bounds how long
+    # a debate may keep GROWING, so a debate's first flag-on pass must measure
+    # ~0 however old its row is. Reading first would make the flag flip stop
+    # every pre-existing debate in production on its first pass.
+    _mark_growth_started(debate)
+    if growth_elapsed_seconds(debate) >= debate_wall_clock_seconds():
         _annotate_and_stop(
             db, debate, dispatchable, reason=STOPPED_WALL_CLOCK, outcome=OUTCOME_WALL_CLOCK
         )

@@ -417,14 +417,24 @@ def test_replaying_one_wave_does_not_count_it_twice(db, monkeypatch, converged_r
     assert stopped_because_of(debate) != STOPPED_CONVERGED
 
 
-def test_unreadable_convergence_neither_counts_nor_resets(db, monkeypatch, converged_run_factory):
+def _rewrite_convergence(db, run_id: str, convergence: dict) -> None:
+    """Replace one persisted protocol run's convergence block in place."""
+    run = db.get(AnalyzerRun, run_id)
+    run.output = {**run.output, "convergence": convergence}
+    db.commit()
+
+
+@pytest.mark.parametrize("reason", ["first_evaluation", "strengths_unavailable"])
+def test_an_unmeasurable_wave_neither_counts_nor_resets(
+    db, monkeypatch, converged_run_factory, reason
+):
     """A wave the protocol runner could not MEASURE is not a wave that moved.
 
-    On its non-comparable branches (first_evaluation, topology_changed,
-    semantics_changed, strengths_unavailable) the runner writes no ``maxDelta``
-    at all. Treating that absence as "still moving" would reset a real
-    hysteresis streak on a run that said nothing; treating it as settled would
-    invent a measurement. It carries the count forward untouched.
+    These are the two branches where the engine failed to measure at all and
+    wrote no ``maxDelta``. Treating that silence as "still moving" would reset
+    a real hysteresis streak on a run that said nothing; treating it as settled
+    would invent a measurement. Contrast the basis-changed reasons below, which
+    are positive evidence and DO reset.
     """
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
     from app.exploration.expansion_dispatch import (
@@ -437,17 +447,134 @@ def test_unreadable_convergence_neither_counts_nor_resets(db, monkeypatch, conve
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
 
     debate, run_b = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
-    unmeasured = db.get(AnalyzerRun, run_b)
-    # Exactly what runner.py writes when the graph's topology changed.
-    unmeasured.output = {
-        **unmeasured.output,
-        "convergence": {"converged": None, "reason": "topology_changed", "epsilon": 0.05},
-    }
-    db.commit()
+    _rewrite_convergence(db, run_b, {"converged": None, "reason": reason, "epsilon": 0.05})
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
 
     assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
     assert stopped_because_of(debate) != "converged"
+
+
+@pytest.mark.parametrize("reason", ["topology_changed", "semantics_changed"])
+def test_a_changed_comparison_basis_resets_the_streak(
+    db, monkeypatch, converged_run_factory, reason
+):
+    """REVIEW FINDING 2. A changed basis is evidence, not silence.
+
+    ``topology_changed`` says the graph itself moved between the two runs --
+    which IS a further round changing the conclusions. Letting a settled-before
+    and a settled-after straddle it would have the stop assert "further rounds
+    were no longer changing the conclusions" at the exact moment the engine
+    recorded that the graph changed shape. ``semantics_changed`` is the same
+    fact about the scoring basis rather than the graph.
+
+    A tree whose shape keeps changing has not converged, and that is precisely
+    the case the loop is supposed to keep running on.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+
+    debate, run_b = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
+    _rewrite_convergence(db, run_b, {"converged": None, "reason": reason, "epsilon": 0.05})
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 0
+
+    # The streak really restarted: the very next settled wave is worth 1, not
+    # the 2 that would have stopped the debate had the reset been a no-op.
+    debate, run_c = converged_run_factory(db, max_delta=0.01, epsilon=0.05, debate=debate)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_c)
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+
+
+def test_a_debate_that_never_expanded_is_never_stopped_as_converged(
+    db, monkeypatch, converged_run_factory
+):
+    """REVIEW FINDING 1. The counter counts WAVES, not dispatch passes.
+
+    A debate whose decisions are all non-categorical never spawns, but
+    ``run_protocol_analysis`` appends a fresh run on every scoring completion,
+    and scoring completions arrive from paths that have nothing to do with
+    adaptive expansion (pre-synthesis scoring, cold start, the API). Two such
+    passes measure near-zero drift on a tree nobody grew. Counting them would
+    annotate the debate "the analysis had settled: further rounds were no
+    longer changing the conclusions" when ZERO rounds ever ran -- and would
+    overwrite the honest diagnosis the pass would otherwise have recorded.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        STOPPED_CONVERGED,
+        STOPPED_QUIESCENT_NO_DECISIONS,
+        expansion_dispatch,
+        rounds_completed,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.0, epsilon=0.05, expanded=False)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    debate, run_b = converged_run_factory(
+        db, max_delta=0.0, epsilon=0.05, debate=debate, expanded=False
+    )
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+
+    assert rounds_completed(debate) == 0
+    assert adaptive_expansion_state(debate).get(CONVERGED_WAVES_KEY, 0) == 0
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+    # And the honest diagnosis it would otherwise have recorded survives.
+    assert stopped_because_of(debate) == STOPPED_QUIESCENT_NO_DECISIONS
+
+
+def test_two_readings_with_no_expansion_between_them_count_as_one_wave(
+    db, monkeypatch, converged_run_factory
+):
+    """REVIEW FINDING 1, the partial case: growth happens, then stalls.
+
+    One real expansion round happened, so the first reading is a real wave. The
+    second protocol run comes from a scoring completion with no expansion round
+    between the two -- a second reading of one state, not a second wave. The
+    ``run_id`` guard alone does not catch this: the run ids differ.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        CONVERGED_WAVES_KEY,
+        STOPPED_CONVERGED,
+        expansion_dispatch,
+        stopped_because_of,
+    )
+
+    debate, run_a = converged_run_factory(db, max_delta=0.01, epsilon=0.05)
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_a)
+    debate, run_b = converged_run_factory(
+        db, max_delta=0.01, epsilon=0.05, debate=debate, expanded=False
+    )
+    assert run_a != run_b
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_b)
+
+    assert adaptive_expansion_state(debate)[CONVERGED_WAVES_KEY] == 1
+    assert stopped_because_of(debate) != STOPPED_CONVERGED
+
+
+def _age_growth_clock(db, debate, *, days: int) -> None:
+    """Backdate the debate's GROWTH clock, as if it had been growing that long."""
+    from app.exploration.expansion_dispatch import (
+        ADAPTIVE_EXPANSION_CONFIG_KEY,
+        GROWTH_STARTED_AT_KEY,
+        adaptive_expansion_state,
+    )
+
+    state = adaptive_expansion_state(debate)
+    state[GROWTH_STARTED_AT_KEY] = (now_utc() - timedelta(days=days)).isoformat()
+    debate.config = {**(debate.config or {}), ADAPTIVE_EXPANSION_CONFIG_KEY: state}
+    db.commit()
 
 
 def test_wall_clock_ceiling_stops_expansion(db, monkeypatch, categorical_decisions_factory):
@@ -461,8 +588,7 @@ def test_wall_clock_ceiling_stops_expansion(db, monkeypatch, categorical_decisio
     )
 
     debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9])
-    debate.created_at = debate.created_at.replace(year=debate.created_at.year - 1)
-    db.flush()
+    _age_growth_clock(db, debate, days=365)
 
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
 
@@ -499,9 +625,7 @@ def test_a_stop_never_overwrites_an_outcome_a_pass_already_earned(
     assert records[0].dispatch_outcome == OUTCOME_SPAWNED
 
     monkeypatch.setenv("DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS", "1")
-    debate = db.get(Debate, debate.id)
-    debate.created_at = debate.created_at.replace(year=debate.created_at.year - 1)
-    db.flush()
+    _age_growth_clock(db, db.get(Debate, debate.id), days=365)
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
 
     db.expire_all()
@@ -509,7 +633,7 @@ def test_a_stop_never_overwrites_an_outcome_a_pass_already_earned(
     assert records[0].dispatch_outcome == OUTCOME_SPAWNED
 
 
-def test_elapsed_reads_the_naive_utc_timestamps_sqlite_hands_back(db):
+def test_the_created_at_fallback_reads_the_naive_utc_timestamp_sqlite_hands_back(db):
     """VERIFIED EMPIRICALLY, not assumed: ``Debate.created_at`` comes back
     timezone-NAIVE.
 
@@ -527,14 +651,72 @@ def test_elapsed_reads_the_naive_utc_timestamps_sqlite_hands_back(db):
     the naive stamp as LOCAL time instead of UTC would answer a whole timezone
     offset here, not ~0.
     """
-    from app.exploration.expansion_dispatch import debate_elapsed_seconds
+    from app.exploration.expansion_dispatch import (
+        growth_clock_started_at,
+        growth_elapsed_seconds,
+    )
 
     debate = Debate(topic="timezone probe")
     db.add(debate)
     db.commit()
 
+    assert growth_clock_started_at(debate) is None  # no stamp -> the fallback
     assert debate.created_at.tzinfo is None
-    assert debate_elapsed_seconds(debate) == pytest.approx(0.0, abs=60)
+    assert growth_elapsed_seconds(debate) == pytest.approx(0.0, abs=60)
+
+
+def test_the_growth_stamp_round_trips_through_json_as_an_aware_utc_instant(db):
+    """The other clock source, verified rather than assumed (review finding 3).
+
+    ``growth_started_at`` is a string in a JSON column, so unlike ``created_at``
+    it round-trips byte-for-byte and ``fromisoformat`` hands back an AWARE
+    datetime. Both forms therefore really do occur in this one subtraction,
+    which is why the normalisation has to accept either -- and why this is
+    pinned rather than assumed from the fact that we wrote the value ourselves.
+    """
+    from app.exploration.expansion_dispatch import (
+        ADAPTIVE_EXPANSION_CONFIG_KEY,
+        GROWTH_STARTED_AT_KEY,
+        growth_clock_started_at,
+        growth_elapsed_seconds,
+    )
+
+    debate = Debate(
+        topic="growth clock probe",
+        config={
+            ADAPTIVE_EXPANSION_CONFIG_KEY: {
+                GROWTH_STARTED_AT_KEY: (now_utc() - timedelta(hours=3)).isoformat()
+            }
+        },
+    )
+    db.add(debate)
+    db.commit()
+    db.expire_all()
+    debate = db.get(Debate, debate.id)
+
+    stamped = growth_clock_started_at(debate)
+    assert stamped is not None and stamped.tzinfo is not None
+    assert growth_elapsed_seconds(debate) == pytest.approx(3 * 60 * 60, abs=60)
+
+
+def test_a_corrupt_growth_stamp_degrades_to_created_at_rather_than_raising(db):
+    """The gate runs first in every dispatch pass; it may not raise."""
+    from app.exploration.expansion_dispatch import (
+        ADAPTIVE_EXPANSION_CONFIG_KEY,
+        GROWTH_STARTED_AT_KEY,
+        growth_clock_started_at,
+        growth_elapsed_seconds,
+    )
+
+    for corrupt in ("not-a-timestamp", "", 12345, None):
+        debate = Debate(
+            topic="corrupt stamp probe",
+            config={ADAPTIVE_EXPANSION_CONFIG_KEY: {GROWTH_STARTED_AT_KEY: corrupt}},
+        )
+        db.add(debate)
+        db.commit()
+        assert growth_clock_started_at(debate) is None
+        assert growth_elapsed_seconds(debate) == pytest.approx(0.0, abs=60)
 
 
 def test_a_young_debate_is_not_stopped_by_the_wall_clock(db, monkeypatch, converged_run_factory):
@@ -551,6 +733,62 @@ def test_a_young_debate_is_not_stopped_by_the_wall_clock(db, monkeypatch, conver
     expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
 
     assert stopped_because_of(debate) != STOPPED_WALL_CLOCK
+
+
+def test_flag_flip_does_not_instantly_kill_debates_older_than_the_ceiling(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """REVIEW FINDING 3, project-owner ruling: measure from the first flag-on pass.
+
+    The ceiling bounds how long a debate may keep GROWING, not the age of its
+    row. Measuring total debate age would mean that on the day the flag is
+    flipped, every pre-existing debate in production is already years past four
+    hours, and its first dispatch pass stamps ``wall_clock`` before adaptive
+    expansion does a single thing. This debate's row is two years old and its
+    first flag-on pass must still do real work.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        STOPPED_WALL_CLOCK,
+        expansion_dispatch,
+        growth_clock_started_at,
+        stopped_because_of,
+    )
+
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9])
+    debate.created_at = now_utc() - timedelta(days=730)
+    db.commit()
+    assert growth_clock_started_at(debate) is None
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    db.expire_all()
+    assert stopped_because_of(debate) != STOPPED_WALL_CLOCK
+    # It did real work rather than being stopped on arrival.
+    assert records[0].dispatch_outcome == "spawned"
+    # And the growth clock is now running, from this pass rather than from the
+    # row's birthday.
+    started = growth_clock_started_at(db.get(Debate, debate.id))
+    assert started is not None
+    assert (now_utc() - started).total_seconds() == pytest.approx(0.0, abs=60)
+
+
+def test_the_growth_clock_is_stamped_once_and_never_moves(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """A clock restamped on every pass would never expire."""
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import (
+        expansion_dispatch,
+        growth_clock_started_at,
+    )
+
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9])
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    first = growth_clock_started_at(db.get(Debate, debate.id))
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+
+    assert growth_clock_started_at(db.get(Debate, debate.id)) == first
 
 
 def test_both_new_stop_reasons_have_human_copy(db):

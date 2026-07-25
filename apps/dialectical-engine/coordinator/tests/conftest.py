@@ -298,9 +298,22 @@ def scalar_decisions_factory():
 # (max_delta <= epsilon, runner.py's comparable branch) rather than passed in,
 # so a factory-built run can never disagree with itself the way a hand-written
 # literal could.
+#
+# `expanded` models the OTHER half of a wave. A wave is an expansion round
+# followed by a measurement of the drift it caused, so the default call
+# advances `rounds_completed` exactly as a spawning dispatch pass would.
+# `expanded=False` builds the case that matters for the counter's correctness:
+# a protocol run produced by some OTHER scoring completion (pre-synthesis, cold
+# start, the API) on a tree that nobody grew.
 @pytest.fixture()
 def converged_run_factory():
-    def _make(db, *, max_delta: float, epsilon: float, debate=None):
+    def _make(db, *, max_delta: float, epsilon: float, debate=None, expanded: bool = True):
+        from app.exploration.expansion_dispatch import (
+            ADAPTIVE_EXPANSION_CONFIG_KEY,
+            ROUNDS_COMPLETED_KEY,
+            adaptive_expansion_state,
+            rounds_completed,
+        )
         from app.models.entities import AnalyzerRun, next_analyzer_run_seq
         from app.protocol.runner import CONVERGENCE_VERSION, PROTOCOL_ANALYSIS_TYPE
         from app.services.dialectical_v2 import first_branch
@@ -309,6 +322,10 @@ def converged_run_factory():
 
         if debate is None:
             debate = make_v2_debate(db, codex_worker(db))
+        if expanded:
+            state = adaptive_expansion_state(debate)
+            state[ROUNDS_COMPLETED_KEY] = rounds_completed(debate) + 1
+            debate.config = {**(debate.config or {}), ADAPTIVE_EXPANSION_CONFIG_KEY: state}
         run = AnalyzerRun(
             debate_id=debate.id,
             branch_id=first_branch(db, debate.id).id,
