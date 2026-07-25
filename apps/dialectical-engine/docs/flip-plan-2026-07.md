@@ -581,14 +581,32 @@ decisions. The fix computes it with `any()` — a decision is categorical when
 independently sufficient to fire the action. Blockers (reasons *not* to
 abandon) no longer participate in the classification at all.
 
-**The boundary, plainly:** `lifecycle_decision_records` rows created
-**before 2026-07-25** were classified with the old `all()` rule; rows created
-on or after use `any()`. The column therefore holds a mix of two rules, and
-`signal_class` is **not comparable across that date**. Rows are never
-retroactively reclassified. Only **6 historical rows exist** (all `scalar`,
-all written 2026-07-24), so the affected population is negligible — but any
-future analysis that groups by `signal_class` across that date must say which
-rule each row was written under.
+**The boundary, plainly — and it is a RESTART, not a date.** The coordinator
+runs source straight from the working tree (`Makefile:388` seds `__ROOT__` →
+`$(CURDIR)`; there is no build artifact and no separate deployment), so the
+new rule takes effect **at the coordinator's first restart that picked up
+commit `1dad2f5`** — not at the moment the commit was authored. Nothing has
+been deployed as of this writing, so that restart has **not happened yet** and
+every row in the table is still on the old side of it.
+
+- Rows written **before** that restart: classified with the old `all()` rule.
+- Rows written **after** it: classified with `any()`.
+
+The column therefore holds a mix of two rules and `signal_class` is **not
+comparable across that restart**. Rows are never retroactively reclassified.
+
+**Operators: record the restart instant when you do the P1 deploy**, and write
+it in here. Until it is recorded, the only safe reading is "every row predates
+the change" — which is true today (see below) but stops being true silently the
+moment the coordinator comes back up on this branch.
+
+Why the distinction is not pedantic: dating the boundary to 2026-07-25 would
+mislabel any row written on 2026-07-25 *before* the restart as `any()`-classified
+when it was in fact `all()`-classified. Impact is bounded — as of this writing
+only **6 rows exist** (all `signal_class = 'scalar'`, all written 2026-07-24,
+all therefore pre-boundary under either reading) — but the rule for
+interpreting the column has to be stated correctly for the rows that come next,
+which is the entire point of recording it.
 
 ---
 

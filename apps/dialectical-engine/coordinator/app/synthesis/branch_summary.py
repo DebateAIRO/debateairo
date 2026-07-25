@@ -10,8 +10,9 @@ The payload is now O(branches + K):
   - the top-K load-bearing nodes in full, ranked by impact x strength
   - the top-C contested nodes in full, ranked by widest cross-family field
     spread, selected BEFORE load-bearing ranking so a contested node never
-    loses its slot to a higher impact x strength ordinary node (see
-    docs/superpowers/specs/
+    loses its slot to a higher impact x strength ordinary node; POV branch
+    nodes are excluded, because a branch entry is already their
+    representation (see docs/superpowers/specs/
     2026-07-24-contested-frontier-deliberation-design.md section 5.2)
   - an honest omitted_count; nodes are never silently dropped
 
@@ -123,6 +124,18 @@ def _is_contested(item: dict[str, Any]) -> bool:
     return isinstance(status, dict) and status.get("status") == "present"
 
 
+def _is_branch_node(node: Node) -> bool:
+    """True for a POV node, i.e. a node the payload represents with its own
+    `branches` entry.
+
+    Deliberately the single definition of "is a branch", consumed both by the
+    `branches` section and by the contested exclusion below, so the two can
+    never drift into disagreeing about which nodes are branches -- which is
+    exactly the drift that would re-open the double-counting bug.
+    """
+    return (node.node_type or "").endswith("_POV")
+
+
 def _rank_and_cap_contested(
     db: Session, debate: Debate, contested: list[Node], contested_k: int
 ) -> list[Node]:
@@ -199,7 +212,26 @@ def build_synthesis_tree_payload(
 
     # Contested selection runs FIRST and off its own ranking, so a contested
     # node is never displaced by a higher impact x strength ordinary node.
-    all_contested = [n for n in nodes if _is_contested(scored.get(n.id) or {})]
+    #
+    # BRANCH NODES ARE EXCLUDED. Production scores POV nodes (39 of the 250
+    # scored nodes in the live database are `*_POV`, 11 of them already
+    # carrying a disagreement_status block), so a contested POV node is a
+    # real shape, not a corner case -- and it would otherwise be emitted
+    # TWICE: once as its `branches` entry and again as a full contested
+    # record. Two costs, one of them silent:
+    #   * `represented` is a set, so the duplicate is counted once there
+    #     while both section LISTS carry it -- the conservation identity
+    #     would read len(nodes) + k for k contested POV nodes, and flip-plan
+    #     step 7a asks the operator to verify exactly that identity by hand.
+    #   * it burns one of the contested_k slots re-emitting, in full argument
+    #     text, a node that already has a section of its own.
+    # A POV node is a LENS, not a claim under dispute in this payload's
+    # sense; its branch entry is its representation.
+    all_contested = [
+        n
+        for n in nodes
+        if not _is_branch_node(n) and _is_contested(scored.get(n.id) or {})
+    ]
     all_contested_ids = {n.id for n in all_contested}
     contested_nodes = _rank_and_cap_contested(db, debate, all_contested, contested_k)
     contested_ids = {n.id for n in contested_nodes}
@@ -230,7 +262,7 @@ def build_synthesis_tree_payload(
 
     branches = []
     for node in nodes:
-        if not (node.node_type or "").endswith("_POV"):
+        if not _is_branch_node(node):
             continue
         prefix = node.materialized_path or ""
         # Inclusive of the POV node itself (its own path is a prefix of

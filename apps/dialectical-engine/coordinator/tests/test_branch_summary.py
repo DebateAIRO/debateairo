@@ -107,6 +107,7 @@ def _v2_debate_with_deep_scored_tree(
     scoring_run_id: str | None = None,
     contested_node_spreads: dict[int, float] | None = None,
     make_judge_evidence=None,
+    contested_pov_indexes: tuple[int, ...] = (),
 ) -> tuple[Debate, Node]:
     """A v2 debate whose tree carries `node_count` complete PRO/CON argument
     nodes, chained deep under four POV branches, each with an active
@@ -129,6 +130,12 @@ def _v2_debate_with_deep_scored_tree(
     marks each listed node contested the same way AND persists a real
     two-family judge panel carrying that exact per-field spread, so P1 Task
     8's contested ranking reads measured dispersion rather than a stub.
+
+    `contested_pov_indexes` gives the listed POV BRANCH nodes their own
+    scoring item, marked contested the same way. Production really does score
+    POV nodes -- 39 of the 250 scored nodes in the live database are `*_POV`,
+    and 11 of those already carry a `score_provenance.disagreement_status`
+    block -- so this is a real shape, not a synthetic edge case.
     """
     worker = Worker(
         name="branch-summary-worker",
@@ -237,6 +244,19 @@ def _v2_debate_with_deep_scored_tree(
                 make_judge_evidence=make_judge_evidence,
             )
         items.append(item)
+
+    for pov_index in contested_pov_indexes:
+        pov = povs[pov_index]
+        pov_item = _scoring_payload_for_node(pov.id, pov.claim, strength_override=0.5)
+        pov_item["uncertainty_source"] = "dispersion"
+        pov_item["score_provenance"] = {
+            **pov_item["score_provenance"],
+            "disagreement_status": {
+                "status": "present",
+                "derived_from": "persisted_judge_artifacts",
+            },
+        }
+        items.append(pov_item)
 
     _persist_scoring_run(db, debate, items, run_id=scoring_run_id)
     db.commit()
@@ -388,18 +408,163 @@ def test_capped_contested_survivors_are_the_widest_spread(db, make_judge_evidenc
     ]
 
 
+def test_conservation_holds_when_a_pov_branch_node_is_contested(db):
+    """A POV node is already represented by its branch summary. If it ALSO
+    entered `contested`, the payload's two section lists would each carry it
+    while `represented` (a set union) counted it once -- so the conservation
+    identity would report `len(nodes) + 1` and fail.
+
+    This is not hypothetical. Of the 250 scored nodes in the live database,
+    39 are `*_POV` and 11 of those already carry a `score_provenance
+    .disagreement_status` block -- non-"present" today only because the
+    composite gate sits above the data's ceiling. Flip 7b marks ~50% of
+    scored nodes contested, so contested POV nodes arrive on the first
+    flipped debate.
+
+    The operational cost is what makes this blocking: flip-plan-2026-07.md
+    §7a verification step 3 asks the operator to confirm exactly this
+    identity on the rendered payload. A false conservation failure would
+    land during precisely the flip where a real one must be believed.
+    """
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db, node_count=20, contested_pov_indexes=(0, 2)
+    )
+
+    payload = build_synthesis_tree_payload(
+        db, debate, load_bearing_k=5, contested_k=CONTESTED_K
+    )
+
+    _assert_node_conservation(db, debate, payload)
+    branch_ids = {branch["node_id"] for branch in payload["branches"]}
+    contested_ids = {item["node_id"] for item in payload["contested"]}
+    # Excluding a contested POV node from `contested` is only justified
+    # because its branch entry IS its representation -- so pin that, not just
+    # the absence. EVERY POV node in the debate still gets a branch entry,
+    # contested or not. Without this the exclusion could degrade into a
+    # silent drop that conservation would happily accept (the node would just
+    # land in omitted_count).
+    all_pov_ids = {
+        node.id
+        for node in db.scalars(select(Node).where(Node.debate_id == debate.id)).all()
+        if (node.node_type or "").endswith("_POV")
+    }
+    assert all_pov_ids  # premise: the debate really does have POV branches
+    assert branch_ids == all_pov_ids
+    # ...and none of them is re-emitted in full argument text as a contested
+    # record, which would also burn a contested slot on a node that already
+    # has a section of its own.
+    assert contested_ids.isdisjoint(branch_ids)
+
+
+def test_contested_node_with_an_unreadable_panel_ranks_last(db, make_judge_evidence):
+    """The documented migration case, exercised rather than asserted in prose.
+
+    A node marked contested under the HISTORICAL composite gate never
+    recorded a per-field spread, so `field_spreads` yields {} and the node
+    scores 0.0. It stays contested and stays ahead of every ordinary node,
+    but among contested it ranks last -- there is nothing to argue it should
+    outrank a node whose disagreement is still measurable. This shape exists
+    the moment 7a runs against pre-flip data.
+    """
+    # Index 0 is contested with NO judge panel at all (the composite-gate
+    # migration shape); 1 and 2 carry real, measurable panels.
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db,
+        node_count=30,
+        contested_node_index=0,
+        contested_node_spreads={1: 0.30, 2: 0.50},
+        make_judge_evidence=make_judge_evidence,
+    )
+    argument_ids = _argument_node_ids(db, debate)
+
+    # Premise: the unreadable node really has no readable panel, so this test
+    # cannot pass by accident on a node that simply scored low.
+    from app.scoring.disagreement import field_spreads
+    from app.scoring.service import latest_judge_evidence_for_node
+
+    assert (
+        field_spreads(
+            latest_judge_evidence_for_node(
+                db, debate_id=debate.id, node_id=argument_ids[0]
+            )
+        )
+        == {}
+    )
+
+    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5, contested_k=2)
+
+    # 0.50 then 0.30 survive; the unreadable one is the node that got cut.
+    assert [item["node_id"] for item in payload["contested"]] == [
+        argument_ids[2],
+        argument_ids[1],
+    ]
+    _assert_node_conservation(db, debate, payload)
+
+
+def test_contested_exactly_at_the_cap_is_carried_whole(db, make_judge_evidence):
+    """The early return: at exactly `contested_k` nothing is cut, and the
+    ranking (which cannot change WHICH nodes appear) is not even computed."""
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db,
+        node_count=30,
+        contested_node_spreads={0: 0.30, 1: 0.50, 2: 0.40},
+        make_judge_evidence=make_judge_evidence,
+    )
+    argument_ids = _argument_node_ids(db, debate)
+
+    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5, contested_k=3)
+
+    assert {item["node_id"] for item in payload["contested"]} == {
+        argument_ids[0],
+        argument_ids[1],
+        argument_ids[2],
+    }
+    _assert_node_conservation(db, debate, payload)
+
+
+def test_contested_ties_break_on_node_id(db, make_judge_evidence):
+    """Equal spreads must not make the cut depend on row order."""
+    debate, root = _v2_debate_with_deep_scored_tree(
+        db,
+        node_count=30,
+        contested_node_spreads={0: 0.40, 1: 0.40, 2: 0.40},
+        make_judge_evidence=make_judge_evidence,
+    )
+    argument_ids = _argument_node_ids(db, debate)
+    tied = sorted(argument_ids[:3])
+
+    payload = build_synthesis_tree_payload(db, debate, load_bearing_k=5, contested_k=2)
+
+    assert [item["node_id"] for item in payload["contested"]] == tied[:2]
+
+
 def _argument_node_ids(db, debate: Debate) -> list[str]:
     """The debate's PRO/CON argument node ids in the order
     `_v2_debate_with_deep_scored_tree` indexes them by -- read off the
     persisted scoring run's item list, which the factory builds in exactly
-    that order (node created_at is coarse wall clock and ties here)."""
+    that order (node created_at is coarse wall clock and ties here).
+
+    POV items (which the factory appends after the arguments) are filtered
+    out by node type rather than by position, so the indices stay the
+    argument indices even for a debate that scores its POV nodes.
+    """
     run = db.scalars(
         select(AnalyzerRun).where(
             AnalyzerRun.debate_id == debate.id,
             AnalyzerRun.analyzer_type == SCORING_ANALYZER_TYPE,
         )
     ).one()
-    return [item["node_id"] for item in run.output["items"]]
+    argument_ids = {
+        node.id
+        for node in db.scalars(
+            select(Node).where(
+                Node.debate_id == debate.id, Node.node_type.in_(("PRO", "CON"))
+            )
+        ).all()
+    }
+    return [
+        item["node_id"] for item in run.output["items"] if item["node_id"] in argument_ids
+    ]
 
 
 def _contested_node_ids(db, debate: Debate) -> set[str]:
