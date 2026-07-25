@@ -906,3 +906,111 @@ def _scoring_run(db, debate, *, run_id, created_at, priority_by_node):
     next_analyzer_run_seq(db, run)
     db.commit()
     return run
+
+
+# ---------------------------------------------------------------------------
+# FW1 (I6): the per-record budget re-read.
+#
+# debate_expand_jobs() is a FULL SCAN of the debate's v2_expand rows, and it
+# sat inside the per-record loop -- one scan per dispatchable record. With
+# ~100 dispatchable records that is ~100 scans per pass x 12 passes, against
+# SQLite's single writer: the same shape P1 Task 2 exists to eliminate.
+#
+# The re-read is REQUIRED, and stays: queue_v2_expand_job commits N times, so
+# budgets derived from anything but committed rows could overspawn on a
+# mid-loop retry. What was not required is re-reading when NOTHING CHANGED.
+# Spawns are capped at the wave width (12), so the count now tracks spawns
+# rather than records, with byte-identical budget semantics.
+# ---------------------------------------------------------------------------
+
+# The exact SQL debate_expand_jobs emits (a full-column select of one debate's
+# jobs of one type). Matched by shape rather than by wrapping the function, so
+# a regression that reintroduces the scan by some OTHER route is caught too.
+_EXPAND_JOB_SCAN_PREFIX = "SELECT jobs.id, jobs.node_id, jobs.debate_id, jobs.job_type"
+_EXPAND_JOB_SCAN_WHERE = "WHERE jobs.debate_id = ? AND jobs.job_type = ?"
+
+
+def _count_expand_job_scans(db, run) -> int:
+    from sqlalchemy import event
+
+    statements: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(" ".join(statement.split()))
+
+    event.listen(db.bind, "before_cursor_execute", _record)
+    try:
+        run()
+    finally:
+        event.remove(db.bind, "before_cursor_execute", _record)
+    return sum(
+        1
+        for statement in statements
+        if statement.startswith(_EXPAND_JOB_SCAN_PREFIX) and _EXPAND_JOB_SCAN_WHERE in statement
+    )
+
+
+def test_budget_rescan_does_not_run_once_per_record_when_nothing_spawns(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """A pass that spawns nothing needs exactly ONE budget read."""
+    from app.exploration.expansion_dispatch import (
+        ADAPTIVE_EXPANSION_CONFIG_KEY,
+        ROUNDS_COMPLETED_KEY,
+        expansion_max_rounds,
+    )
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9] * 5)
+    # Rounds exhausted -> every record is refused below THE LAW's gate and
+    # nothing spawns, so no committed row can change under the loop.
+    debate.config = {
+        **(debate.config or {}),
+        ADAPTIVE_EXPANSION_CONFIG_KEY: {ROUNDS_COMPLETED_KEY: expansion_max_rounds()},
+    }
+    db.commit()
+    debate_id = debate.id
+    # Same guard as test_dialectical_v2's statement-count test: every row here
+    # was written through THIS session moments ago, so a warm identity map can
+    # silently absorb reads that production would issue. Evict it (expiring is
+    # not enough -- db.get short-circuits on a present-but-expired instance)
+    # so the instrumented window measures a genuinely cold session.
+    db.expunge_all()
+
+    scans = _count_expand_job_scans(
+        db, lambda: expansion_dispatch(db, debate_id=debate_id, analyzer_run_id=run_id)
+    )
+
+    assert scans == 1, f"expected 1 budget scan for a non-spawning pass, got {scans}"
+
+
+def test_budget_rescan_tracks_spawns_not_records(
+    db, monkeypatch, categorical_decisions_factory
+):
+    """With 5 dispatchable records and a wave width of 1 the loop spawns once.
+
+    The count must follow the SPAWN (1 initial read + 1 re-read after the
+    committed row landed = 2), not the record count (5, which is what the
+    per-record re-read cost). This is the assertion that fails if the re-read
+    drifts back inside the loop head.
+    """
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_WAVE_WIDTH", "1")
+    debate, records, run_id = categorical_decisions_factory(db, priorities=[0.9] * 5)
+    debate_id = debate.id
+    # Plain ids before the eviction below -- a detached instance cannot be
+    # asked for its id afterwards.
+    record_type = type(records[0])
+    record_ids = [record.id for record in records]
+    db.expunge_all()
+
+    scans = _count_expand_job_scans(
+        db, lambda: expansion_dispatch(db, debate_id=debate_id, analyzer_run_id=run_id)
+    )
+
+    db.expire_all()
+    # The behaviour is unchanged -- one spawn, four honest wave_full refusals.
+    outcomes = [db.get(record_type, record_id).dispatch_outcome for record_id in record_ids]
+    assert outcomes.count("spawned") == 1
+    assert outcomes.count(OUTCOME_WAVE_FULL) == 4
+    assert scans == 2, f"expected 2 budget scans (1 + 1 spawn), got {scans}"

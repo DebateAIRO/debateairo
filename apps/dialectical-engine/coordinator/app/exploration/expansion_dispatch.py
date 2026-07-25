@@ -433,6 +433,34 @@ def record_adaptive_stop(db: Session, debate: Debate, reason: str, *, overwrite:
     _write_adaptive_expansion_state(debate, state)
 
 
+def clear_adaptive_stop(debate: Debate) -> None:
+    """Drop a now-false stop reason (additive; no commit -- the write joins
+    the caller's transaction). Callers gate on the flag.
+
+    The mirror of record_adaptive_stop, for the one thing that makes a
+    recorded stop false: growth resumed. The dispatcher's spawn tail has
+    always done this inline; the USER-APPROVAL path (app/api/scoring.py) did
+    not, so an approved expansion generated real nodes while the debate went
+    on rendering "the analysis had settled: further rounds were no longer
+    changing the conclusions".
+
+    Clears the stop reason ONLY. It deliberately does not advance
+    rounds_completed and does not touch the convergence streak:
+
+    * rounds_completed is the AUTOMATION's budget, and an operator override
+      must not consume it. _record_convergence_wave documents that
+      asymmetry as load-bearing and compensates for it with an UNGATED reset,
+      so advancing the counter here would work against that design rather
+      than with it;
+    * the streak records what was MEASURED. An approval is not a measurement,
+      and the next real protocol run resets it if the approved growth moved
+      anything.
+    """
+    state = adaptive_expansion_state(debate)
+    if state.pop(STOPPED_BECAUSE_KEY, None) is not None:
+        _write_adaptive_expansion_state(debate, state)
+
+
 def stopped_because_of(debate: Debate) -> str | None:
     value = adaptive_expansion_state(debate).get(STOPPED_BECAUSE_KEY)
     if isinstance(value, str) and value.strip():
@@ -718,7 +746,17 @@ def _annotate_and_stop(
         if record.dispatch_outcome is None:
             record.dispatch_outcome = outcome
     record_adaptive_stop(db, debate, reason)
-    commit_write(db)
+    try:
+        commit_write(db)
+    except Exception:
+        # Symmetric with the dispatch loop's own tail. This runs on the
+        # SHARED scoring-completion session, so a failed commit that is not
+        # rolled back leaves it dirty for whatever runs after the scoring
+        # tail -- which would then inherit this pass's half-written
+        # annotations. The caller wraps the dispatch best-effort, so the
+        # raise stays a raise; only the session is cleaned up.
+        db.rollback()
+        raise
 
 
 def debate_expand_jobs(db: Session, debate_id: str) -> list[Job]:
@@ -1009,9 +1047,28 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
     replayed = 0
     outcomes: list[str] = []
     rounds_exhausted = rounds_completed(debate) >= expansion_max_rounds(debate)
+    # Budgets are derived from COMMITTED Job rows, and that guarantee is what
+    # makes the N-commits shape of queue_v2_expand_job safe against a mid-loop
+    # retry -- so this read must stay a real read of committed state. It just
+    # must not run once per RECORD (I6): a full scan per iteration is ~100
+    # scans per pass x 12 passes at frontier volume, against SQLite's single
+    # writer, which is the shape P1 Task 2 exists to eliminate.
+    #
+    # A spawn is the ONLY thing inside this loop that adds a v2_expand row, so
+    # re-reading is necessary exactly after one and pointless otherwise. The
+    # flag is consumed at the TOP of the next iteration rather than refreshed
+    # at the spawn site, so a pass whose last record spawns does not pay for a
+    # scan nothing will read. Spawns are capped at the wave width, so the scan
+    # count now tracks spawns (<= 12) instead of records, with the committed-
+    # rows guarantee unchanged: every budget test below still runs against
+    # rows read after the last commit that could have changed them.
+    jobs = debate_expand_jobs(db, debate_id)
+    budgets_stale = False
     try:
         for record in dispatchable:
-            jobs = debate_expand_jobs(db, debate_id)
+            if budgets_stale:
+                jobs = debate_expand_jobs(db, debate_id)
+                budgets_stale = False
             existing = _existing_job_for_decision(jobs, record.id)
             if existing is not None:
                 # Idempotent replay: the decision already spawned. Heal the
@@ -1068,10 +1125,15 @@ def expansion_dispatch(db: Session, *, debate_id: str, analyzer_run_id: str) -> 
             )
             outcomes.append(outcome)
             if job is None:
+                # A refusal committed nothing, so the budgets in hand are
+                # still exact -- no rescan.
                 record.dispatch_outcome = outcome
                 record.child_spawn_count = 0
                 continue
             spawned += 1
+            # A committed v2_expand row now exists that `jobs` does not know
+            # about; every budget below must see it.
+            budgets_stale = True
 
         state = adaptive_expansion_state(debate)
         if spawned:

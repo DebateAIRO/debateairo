@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 from app.core.auth import bearer_token, require_user_token
 from app.core.db import get_db
 from app.core.write_lock import commit_write
-from app.exploration.expansion_dispatch import adaptive_expansion_enabled, admit_and_spawn
+from app.exploration.expansion_dispatch import (
+    adaptive_expansion_enabled,
+    admit_and_spawn,
+    clear_adaptive_stop,
+)
 from app.models.entities import Debate, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
@@ -464,6 +468,15 @@ async def approve_adaptive_depth_expansion(
         outcomes.append(
             {"node_id": item.node_id, "applied": True, "reason": "expansion_queued", "job_id": job.id}
         )
+    if queued_node_ids:
+        # FW1 (Minor): growth just resumed, so any recorded stop reason is now
+        # false -- and a `converged` / `wall_clock` stop would otherwise keep
+        # the debate asserting that further rounds change nothing while these
+        # approved rounds generate real nodes. Only the dispatcher's spawn
+        # tail used to clear it. Deliberately NOT paired with a
+        # rounds_completed bump: an operator override must not spend the
+        # automation's budget (see clear_adaptive_stop).
+        clear_adaptive_stop(debate)
     # Real applied outcomes join the audit record written above.
     audit_record.metadata_json = {**audit_record.metadata_json, "applied_outcomes": outcomes}
     commit_write(db)

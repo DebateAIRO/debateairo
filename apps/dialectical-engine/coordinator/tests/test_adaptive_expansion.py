@@ -679,6 +679,83 @@ def test_user_approved_expansion_queues_real_v2_expand_job_flag_on(db, monkeypat
     assert audit.metadata_json["applied_outcomes"] == body["outcomes"]
 
 
+def test_user_approved_spawn_clears_a_stale_stop_reason(db, monkeypatch) -> None:
+    """FW1 (Minor): the approval path contradicted the recorded stop reason.
+
+    Only the dispatcher's spawn tail ever popped ``stopped_because``, so after
+    a ``converged`` or ``wall_clock`` stop an operator-approved expansion
+    generated real nodes while the debate kept rendering "the analysis had
+    settled: further rounds were no longer changing the conclusions" -- a
+    false claim asserted at the exact moment the tree grew.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.exploration.expansion_dispatch import STOPPED_CONVERGED, record_adaptive_stop
+    from app.main import app
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    _seed_expand_dry_run(db, debate, target)
+    record_adaptive_stop(db, debate, STOPPED_CONVERGED)
+    # The convergence streak is what PRODUCED that stop; the approval must not
+    # silently rewind it, only stop the debate claiming growth is over.
+    debate.config = {
+        **debate.config,
+        "adaptive_expansion": {**debate.config["adaptive_expansion"], "converged_waves": 2},
+    }
+    db.commit()
+    assert adaptive_config(db, debate.id)["stopped_because"] == STOPPED_CONVERGED
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/adaptive-depth/approvals",
+        headers={"Authorization": "Bearer user_test_token"},
+        json={"debate_id": debate.id, "selected_node_ids": [target.id]},
+    )
+
+    assert response.status_code == 202
+    db.expire_all()
+    assert len(expand_jobs(db, debate.id)) == 1
+    state = adaptive_config(db, debate.id)
+    assert "stopped_because" not in state
+    # An operator override does NOT consume the automation's budget: the round
+    # counter is the dispatcher's alone (see _record_convergence_wave, which
+    # depends on that fact), and the rest of the bookkeeping is untouched.
+    assert state.get("rounds_completed", 0) == 0
+    assert state["converged_waves"] == 2
+
+
+def test_user_approved_expansion_that_queues_nothing_leaves_the_stop_reason(
+    db, monkeypatch
+) -> None:
+    """A refused approval changed nothing, so the recorded stop is still true."""
+    from fastapi.testclient import TestClient
+
+    from app.exploration.expansion_dispatch import STOPPED_WALL_CLOCK, record_adaptive_stop
+    from app.main import app
+
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
+    monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "0")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker)
+    target = first_pov_pro(db, debate)
+    _seed_expand_dry_run(db, debate, target)
+    record_adaptive_stop(db, debate, STOPPED_WALL_CLOCK)
+    db.commit()
+
+    response = TestClient(app).post(
+        f"/api/debates/{debate.id}/scoring/adaptive-depth/approvals",
+        headers={"Authorization": "Bearer user_test_token"},
+        json={"debate_id": debate.id, "selected_node_ids": [target.id]},
+    )
+
+    assert response.status_code == 200
+    db.expire_all()
+    assert expand_jobs(db, debate.id) == []
+    assert adaptive_config(db, debate.id)["stopped_because"] == STOPPED_WALL_CLOCK
+
+
 def test_user_approved_expansion_refuses_budget_honestly_flag_on(db, monkeypatch) -> None:
     from fastapi.testclient import TestClient
 
