@@ -46,6 +46,7 @@ os.environ.setdefault("DIALECTICAL_CROSS_EXAM", "false")
 
 import hashlib
 import json
+import logging
 from uuid import uuid4
 
 import pytest
@@ -58,6 +59,33 @@ from app.core.auth import ensure_user_token
 from app.core.db import Base, SessionLocal, engine, init_db
 from app.exploration.policy import EvidenceSignal, ScoreSignal
 from app.models.entities import Setting
+
+
+@pytest.fixture(autouse=True)
+def _isolate_app_logger_configuration():
+    """Contain app startup's ONE global side effect: the `app` logger.
+
+    app.main.run_startup_tasks calls app.core.log_config.configure_app_logging,
+    which sets a level, installs a stderr handler, and -- to guarantee no
+    double-printing -- sets `propagate = False` on the `app` logger. That is
+    process-wide and permanent, so any test that boots the real lifespan
+    (`with TestClient(app):` in test_instance_lock / test_reaper_lifespan)
+    silently reconfigured logging for every test that ran afterwards, and
+    caplog-based assertions on `app.*` records in LATER files stopped seeing
+    anything (caplog captures via propagation to root).
+
+    Snapshot/restore rather than "don't configure": the production behaviour
+    under test is exactly that startup configures this logger.
+    """
+
+    logger = logging.getLogger("app")
+    handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
+    try:
+        yield
+    finally:
+        logger.handlers = handlers
+        logger.setLevel(level)
+        logger.propagate = propagate
 
 
 # P1 Task 4: pure-policy signal factories (no database involved). Defaults are

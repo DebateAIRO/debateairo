@@ -16,6 +16,7 @@ from app.core.auth import ensure_user_token
 from app.core.config import load_settings
 from app.core.db import SessionLocal, get_engine, init_db
 from app.core.instance_lock import acquire_single_instance_lock, release_single_instance_lock
+from app.core.log_config import configure_app_logging
 from app.scoring.jobs import recover_orphaned_scoring_jobs_at_startup
 from app.services.reaper import reaper_loop
 
@@ -24,6 +25,12 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 
 
 def run_startup_tasks() -> None:
+    # FIRST, before anything that could log: uvicorn configures only its own
+    # `uvicorn*` loggers, so without this the whole `app.*` namespace falls
+    # through to logging.lastResort at WARNING and every structured FW2 event
+    # (expansion.census, expansion.stop, scoring.run, ...) is dropped before
+    # it reaches launchd's StandardErrorPath. See app/core/log_config.py.
+    configure_app_logging()
     init_db()
     with SessionLocal() as db:
         settings.apply_persisted_runtime_settings(db)
