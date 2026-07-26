@@ -15,19 +15,23 @@ export default defineConfig({
   projects: [
     ...[320, 375].map((width) => ({
       name: `chromium-${width}`,
-      grepInvert: /@webkit-short/,
+      grepInvert: /@short-round2/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width, height: 900 }
       }
     })),
-    {
-      name: "webkit-short-568x320",
-      grep: /@webkit-short/,
+    ...[
+      { browserName: "chromium", device: devices["Desktop Chrome"] },
+      { browserName: "firefox", device: devices["Desktop Firefox"] },
+      { browserName: "webkit", device: devices["Desktop Safari"] }
+    ].map(({ browserName, device }) => ({
+      name: `${browserName}-short-568x320`,
+      grep: /@short-round2/,
       use: {
-        ...devices["Desktop Safari"],
+        ...device,
         viewport: { width: 568, height: 320 }
       }
-    }
+    }))
   ]
 });
