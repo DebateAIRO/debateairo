@@ -282,3 +282,57 @@ a:focus-visible {
   margin: 12px 0 0;
   max-width: 600px;
 }
+
+@media (max-width: 640px) {
+  .screenInner {
+    padding: 32px 16px;
+  }
+
+  /* These selectors intentionally outrank the later route-specific source files. */
+  .screenInner .optionRow,
+  .modelTable .modelRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .screenInner .optionControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .screenInner .optionControl input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  .modelTable .modelName {
+    flex-basis: auto;
+  }
+
+  .modelTable .roleChips {
+    flex: none;
+  }
+
+  .modelTable .capInput {
+    width: 100%;
+  }
+
+  .modelTable .modelSpend {
+    width: auto;
+    text-align: left;
+  }
+
+  .modelTable .switch {
+    align-self: flex-start;
+  }
+
+  .workerMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workerMetrics .miniCard {
+    min-width: 0;
+  }
+}
