@@ -32,6 +32,12 @@ def test_known_codes_map_to_plain_language_copy() -> None:
         # rounds-exhausted stop claim an untouched debate budget was spent.
         "rounds_exhausted",
         "node_budget_exhausted",
+        # FW3 (I-4): the OPERATOR rail's two refusals. Same principle as the
+        # split above -- these name a ceiling only DIALECTICAL_OPERATOR_* can
+        # move, so borrowing the automation's copy would send an operator to a
+        # knob that cannot help. Tone is pinned in test_budgeted_expansion.
+        "operator_budget_exhausted",
+        "operator_node_budget_exhausted",
         # FW2: promoted from defensive to live -- STOPPED_DEPTH_LIMIT now
         # derives a real stopped_because, so this copy reaches the wire.
         "depth_limit",
