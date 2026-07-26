@@ -77,18 +77,15 @@
   margin-top: 9px;
 }
 
-@media (max-width: 760px) {
-  .splitColumns {
-    flex-direction: column;
+@media (max-width: 480px) {
+  .mapInner {
+    padding: 18px 12px 76px;
   }
-  .splitColumn.pro,
-  .splitColumn.con {
-    padding: 0;
+  .mapReadout {
+    padding: 12px;
   }
-  .splitBattleLine {
-    display: none;
-  }
-  .splitPerspectives {
-    grid-template-columns: 1fr;
+  .mapReadoutHead {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }

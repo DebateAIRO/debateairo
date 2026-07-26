@@ -4,6 +4,7 @@
    ============================================================ */
 
 .thread {
+  --thread-lane: 30px;
   flex: 1;
   min-width: 0;
   overflow: auto;
@@ -34,7 +35,7 @@
 .threadStub {
   position: relative;
   height: 14px;
-  margin-left: 14px;
+  margin-left: calc(var(--thread-lane) / 2 - 1px);
 }
 .threadStub::before {
   content: "";
@@ -52,28 +53,28 @@
   position: relative;
 }
 .threadLane {
-  flex: 0 0 30px;
-  width: 30px;
+  flex: 0 0 var(--thread-lane);
+  width: var(--thread-lane);
   position: relative;
 }
 .threadLaneLine {
   position: absolute;
-  left: 14px;
+  left: calc(var(--thread-lane) / 2 - 1px);
   top: -14px;
   bottom: 0;
   width: 2px;
   background: oklch(0.88 0.006 80);
 }
 .threadElbow {
-  flex: 0 0 30px;
-  width: 30px;
+  flex: 0 0 var(--thread-lane);
+  width: var(--thread-lane);
   position: relative;
 }
 .threadElbowShape {
   position: absolute;
-  left: 14px;
+  left: calc(var(--thread-lane) / 2 - 1px);
   top: -14px;
-  width: 15px;
+  width: calc(var(--thread-lane) / 2);
   height: 42px;
   border-left: 2px solid;
   border-bottom: 2px solid;
@@ -81,7 +82,7 @@
 }
 .threadElbowContinue {
   position: absolute;
-  left: 14px;
+  left: calc(var(--thread-lane) / 2 - 1px);
   top: 28px;
   bottom: 0;
   width: 2px;
@@ -150,4 +151,19 @@
 .threadCollapseSign {
   font-size: 12px;
   line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .thread {
+    --thread-lane: 14px;
+  }
+  .threadInner {
+    padding: 20px 12px 80px;
+  }
+  .threadCard {
+    padding: 12px;
+  }
+  .threadLane:nth-last-of-type(n + 6) {
+    display: none;
+  }
 }

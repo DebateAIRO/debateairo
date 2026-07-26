@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useState } from "react";
 import type { Synthesis } from "@/lib/types";
 
 export type SynthesisView = {
@@ -18,17 +19,56 @@ export type SynthesisView = {
 };
 
 export function SynthesisPanel(view: SynthesisView) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const panelId = useId();
   const verdictBody =
     view.verdictGate?.state === "suppressed_no_evidence"
       ? "Endorsed verdict withheld — no evidence in this run."
       : view.verdict || "Pending";
 
   return (
-    <aside className="synthPanel scroll" aria-label="Synthesis">
+    <>
+      <button
+        type="button"
+        className="synthTab"
+        data-synth-tab
+        aria-controls={panelId}
+        aria-expanded={sheetOpen}
+        aria-label={sheetOpen ? "Close synthesis and verdict" : "Open synthesis and verdict"}
+        onClick={() => setSheetOpen((open) => !open)}
+      >
+        <span className="synthTabDiamond" aria-hidden />
+        <span className="synthTabLabel">Synthesis</span>
+        <span className="synthTabVerdict">Verdict</span>
+      </button>
+
+      {sheetOpen ? (
+        <button
+          type="button"
+          className="synthScrim"
+          aria-label="Close synthesis and verdict"
+          onClick={() => setSheetOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        id={panelId}
+        className={`synthPanel scroll${sheetOpen ? " synthPanelOpen" : ""}`}
+        aria-label="Synthesis"
+        data-sheet-state={sheetOpen ? "expanded" : "collapsed"}
+      >
       <div className="synthInner">
         <div className="synthTitle">
           <span className="synthDiamond" aria-hidden />
           <span>Synthesis</span>
+          <button
+            type="button"
+            className="synthClose"
+            aria-label="Close synthesis and verdict"
+            onClick={() => setSheetOpen(false)}
+          >
+            ×
+          </button>
         </div>
         <div className="synthSubtitle">The strongest case on each side, plus a verdict.</div>
 
@@ -96,6 +136,7 @@ export function SynthesisPanel(view: SynthesisView) {
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
