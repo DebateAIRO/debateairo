@@ -69,6 +69,45 @@ their env is set where the loop is launched, not here.
 > The individual steps below say "flip … and restart the coordinator" — do that
 > via this template path, never by editing the installed plist in place.
 
+## Run pending migrations BEFORE flipping anything (READ SECOND)
+
+**`make install-services` does not run migrations.** It rebuilds the web bundle,
+regenerates both plists, and reloads launchd — nothing more. If the branch you
+just deployed carries an Alembic revision, the running code will expect columns
+the live database does not have, and the failure surfaces as an HTTP 500 on the
+first request that touches the affected table.
+
+This is not hypothetical: on 2026-07-26 the stage-7 flip shipped migration
+`0017_lifecycle_frontier_priority` while `~/.dialectical/db.sqlite3` was still at
+`0016_job_last_worker`. The first `POST /api/debates` after the flip returned 500
+with `no such column: lifecycle_decision_records.frontier_priority`. The debate
+row itself committed fine — only the response serialisation failed — so the
+symptom was a 500 on a request that had actually succeeded, which is worse than a
+clean failure.
+
+Before any flip:
+
+```bash
+# 1. What does the live DB think it is?
+sqlite3 "file:$HOME/.dialectical/db.sqlite3?mode=ro" -readonly \
+  "SELECT version_num FROM alembic_version;"
+
+# 2. Back up first — cheap, and this is production data.
+sqlite3 "$HOME/.dialectical/db.sqlite3" \
+  ".backup '$HOME/.dialectical/db.sqlite3.pre-flip.$(date +%Y%m%d-%H%M%S).bak'"
+
+# 3. Upgrade.
+cd apps/dialectical-engine/coordinator && \
+  DYLD_LIBRARY_PATH=/opt/homebrew/opt/expat/lib ../.venv313/bin/python -m alembic upgrade head
+
+# 4. Confirm the revision moved and the expected column exists.
+```
+
+Rollback: `alembic downgrade -1`. Migration 0017 specifically is additive,
+nullable and inspector-guarded in both directions, so the downgrade is safe — but
+restore the backup rather than improvising if a revision is not obviously
+reversible.
+
 ## Staged flip order
 
 Preconditions are cumulative: each step assumes every earlier step is
