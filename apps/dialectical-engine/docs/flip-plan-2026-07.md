@@ -477,6 +477,40 @@ not the intended stopping point: the frontier's real bound is the priority
 floor plus convergence hysteresis, which is why a `stopped_because` of
 `budget_exhausted` is a **finding**, not a success (see verification below).
 
+**What those two rails COUNT changed on 2026-07-26 (commit `b1bce5e`), and
+this paragraph used to describe the old meaning.** They now count
+**adaptive-origin expansions only** — a `v2_expand` job carrying a
+`decision_record_id`, which only the adaptive dispatcher's own loop writes.
+The **ruling precedent** is the approval endpoint's own rule, already in
+`app/api/scoring.py`: an approved expansion clears the adaptive stop reason
+but is "deliberately NOT paired with a `rounds_completed` bump: an operator
+override must not spend the automation's budget". The per-node and per-debate
+rails are the same kind of quantity as `rounds_completed`, so the same rule
+applies to them. It was not academic: on live debate `0f688d87` the cross-exam
+and adversarial-POV waves had already put six nodes at 2 of `max_per_node=3`
+— including the only node that could authenticate a decision at all — so the
+adaptive frontier had at most one spawn left per node, for budget it never
+spent.
+
+**Consequently `150` no longer bounds a debate's total growth.** What bounds
+each other origin now:
+
+| Origin | Marker | Bounded by |
+|---|---|---|
+| Adaptive dispatcher | `decision_record_id` | `_MAX_ROUNDS` / `_MAX_PER_NODE` / `_MAX_PER_DEBATE`, the priority floor, the wave width, convergence and wall clock |
+| Operator approval | `approval_audit_id` | `DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE` (**3**) and `DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE` (**150**) — added 2026-07-26 (fix wave 3), env-only, refusal-only |
+| Cross-exam / adversarial POV | neither | their own feature's rules (one wave per debate, fixed job counts) |
+| All origins | — | `DIALECTICAL_MAX_EXPANSION_DEPTH`, `_node_expandable`, worker capacity |
+
+**So step 3 of the verification below now asks a narrower question**: a
+`stopped_because` of `budget_exhausted` means the *automation* spent its own
+150, with feature and operator growth excluded from that count. A debate can
+therefore hold more than 150 `v2_expand` jobs in total without ever recording
+`budget_exhausted` — count jobs by origin, not in total, when reading that
+criterion. The operator rail has its own refusal codes
+(`operator_budget_exhausted`, `operator_node_budget_exhausted`) and never
+appears as a `stopped_because`: it refuses an approval, not the frontier.
+
 **The template ships these three COMMENTED OUT, on purpose.**
 `deploy/launchd/coordinator.plist` carries all three key/string pairs inside
 XML comments, one clearly-labelled block per sub-step. This is not an
@@ -613,6 +647,10 @@ P2's plan depends on them):
    `converged` or `below_priority_floor` — **not** `budget_exhausted`. A
    `budget_exhausted` stop means the frontier ran out of rails before it ran
    out of disagreement, and is a finding to feed back into P2, not a pass.
+   *(Since 2026-07-26 that rail counts adaptive-origin spawns only — see the
+   origin table above. Count `v2_expand` jobs whose payload carries a
+   `decision_record_id`, not every `v2_expand` job, or the number will not
+   match the rail the stop reason is talking about.)*
 4. Confirm at least one `LifecycleDecisionRecord` has `signal_class ==
    "categorical"` **and** `dispatch_outcome == "spawned"` (all-time
    production count before P1: **0**).
@@ -667,6 +705,70 @@ only **6 rows exist** (all `signal_class = 'scalar'`, all written 2026-07-24,
 all therefore pre-boundary under either reading) — but the rule for
 interpreting the column has to be stated correctly for the rows that come next,
 which is the entire point of recording it.
+
+#### Recorded rule change: `lifecycle_decision_records` freshness and reason codes (`260d33e`)
+
+**Unflagged, changes persisted and operator-facing values**, recorded here
+under the same condition the project owner ratified above.
+
+Contract v1 §6.1 was amended on 2026-07-26: **a score component no longer
+ages out**. By the time age was consulted, a score candidate had already been
+required to carry `input_hash == current_score_input_hash` and a
+`scoring_contract` equal to the active contract — both checked first, per the
+contract's own "identity validation happens before age is trusted". A
+candidate surviving both IS, by construction, the judgment of exactly this
+input under exactly this contract, and nothing about it can drift while the
+clock runs. Evidence keeps its age gate unconditionally: an evidence verdict
+is an observation of the world outside this database, so for it wall-clock age
+is real information.
+
+What this did in production before the amendment: `app.scoring.cache` serves
+an unchanged node from its existing `NodeScoringResult` row and never rewrites
+`checked_at`, so one hour after a node was first judged its score was
+permanently `stale`. On a live 84-node debate that collapsed 32
+lifecycle-eligible nodes to **0** authenticated decisions (26 refused
+`score_stale`).
+
+**The boundary is the coordinator's first restart on this branch** — same
+mechanism and same reasoning as the `signal_class` entry above (source runs
+straight from the working tree; there is no build artifact). Across it:
+
+- `score_freshness` / `input_state`: rows written **before** the restart may
+  read `stale` purely because of elapsed time; rows written **after** it never
+  will.
+- `reason_codes`: `score_stale` **remains a defined historical reason code**
+  and keeps its meaning on old rows. It is simply no longer produced.
+- Rows are never retroactively reclassified, so `score_freshness` is **not
+  comparable across the restart**.
+
+#### Recorded rule change: expansion budget semantics and the new operator rail (`b1bce5e` + fix wave 3)
+
+**Unflagged, changes an operator-facing vocabulary**, recorded here for the
+same reason.
+
+`budget_exhausted` and `node_budget_exhausted` — as `dispatch_outcome` values
+on `lifecycle_decision_records`, and as `debate.config["adaptive_expansion"]
+["stopped_because"]` — used to mean "all `v2_expand` growth of any origin
+reached the rail". They now mean "**adaptive-origin** growth reached the
+rail"; see the origin table in the 7c section above for the full accounting
+and the ruling precedent.
+
+Fix wave 3 completes that change rather than extending it: operator approvals
+were left bounded by no quantitative rail at all, and now have their own —
+`DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE` (3) and
+`DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE` (150), env-only, refusal-only,
+with their own codes `operator_budget_exhausted` /
+`operator_node_budget_exhausted`. Those two codes are **new vocabulary**: an
+operator reading approval outcomes recorded before the restart will never see
+them, and must not read their absence as "the ceiling was not reached".
+
+**Boundary: the coordinator's first restart on this branch**, exactly as
+above. Rows and `stopped_because` values written before it are counted under
+the old all-origin rule; after it, per origin. Not comparable across the
+restart, and never rewritten.
+
+**Operators: record the restart instant once, here** — it is the same instant
+for all three of these entries.
 
 ---
 
