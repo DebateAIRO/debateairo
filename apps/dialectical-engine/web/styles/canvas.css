@@ -385,6 +385,16 @@
 }
 
 @media (max-height: 640px) and (orientation: landscape) {
+  .canvasStickyToggle,
+  .canvasZoomCluster {
+    pointer-events: none;
+  }
+
+  .canvasStickyToggle > input,
+  .canvasZoomButton {
+    pointer-events: auto;
+  }
+
   .canvasZoomCluster {
     right: calc(var(--dock-w) + 30px);
     bottom: var(--dock-offset-b);
@@ -392,6 +402,13 @@
     max-width: calc(100% - var(--dock-w) - 48px);
     flex-direction: row;
     flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 769px) and (max-height: 640px) and (orientation: landscape) {
+  .canvasZoomCluster {
+    top: 12px;
+    bottom: auto;
   }
 }
 

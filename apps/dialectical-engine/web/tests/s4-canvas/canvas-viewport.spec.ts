@@ -185,6 +185,54 @@ test("overview tap zooms to the card, then the same card opens at 1:1", async ({
   await expect(page.getByRole("dialog")).toBeVisible();
 });
 
+test("844x390 short-height chrome leaves the overview card center clickable", async ({
+  page,
+  browserName
+}) => {
+  const canvas = await openCanvas(page, 844, 390);
+  await page.getByRole("button", { name: "Fit whole tree (overview)" }).click();
+  await expect(page.locator(".canvasInner")).toHaveAttribute("data-zoom-band", "overview");
+
+  const card = page.locator('.nodeWrap[data-node-id="node-1"] .node');
+  const hitTest = await card.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const point = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+    const hit = document.elementFromPoint(point.x, point.y);
+    const sticky = document.querySelector<HTMLElement>(".canvasStickyToggle");
+    const cluster = document.querySelector<HTMLElement>(".canvasZoomCluster");
+    const toRect = (target: HTMLElement | null) => {
+      if (!target) return null;
+      const bounds = target.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        top: bounds.top,
+        bottom: bounds.bottom
+      };
+    };
+
+    return {
+      browser: navigator.userAgent,
+      cardOwnsCenter: hit === element || (hit !== null && element.contains(hit)),
+      cardRect: toRect(element as HTMLElement),
+      clusterRect: toRect(cluster),
+      hitClass: hit instanceof HTMLElement ? hit.className : null,
+      hitLabel: hit instanceof HTMLElement ? hit.getAttribute("aria-label") : null,
+      hitTag: hit?.tagName ?? null,
+      point,
+      stickyRect: toRect(sticky)
+    };
+  });
+
+  expect(hitTest.cardOwnsCenter, `${browserName}: ${JSON.stringify(hitTest)}`).toBe(true);
+  await card.click({ timeout: 5_000 });
+  await expect(canvas).toHaveAttribute("data-zoom", "1.0000");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("PE, WebKit GestureEvent, tier-3 touch, and precision-wheel paths each mutate once", async ({
   page
 }) => {

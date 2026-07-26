@@ -21,11 +21,18 @@ function claimNode(id, nodeType, depth, claim, children = []) {
   };
 }
 
+const deeperEvidence = claimNode(
+  "node-4",
+  "PRO",
+  4,
+  "A deeper supporting claim keeps whole-tree Fit inside the overview readability band."
+);
 const evidence = claimNode(
   "node-3",
   "EVIDENCE",
   3,
-  "A concrete evidence claim at the deepest visible level."
+  "A concrete evidence claim at the deepest visible level.",
+  [deeperEvidence]
 );
 const counter = claimNode(
   "node-2",
@@ -83,7 +90,7 @@ const debate = {
   provenance_records: [],
   workers: [],
   models: [],
-  node_count: 5
+  node_count: 6
 };
 
 function json(response, status, payload) {
