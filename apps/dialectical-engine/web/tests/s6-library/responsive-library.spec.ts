@@ -6,6 +6,8 @@ const protectedRoutes = [
   { path: "/admin/workers", heading: "Workers" }
 ] as const;
 
+const topBarRoutes = ["/", ...protectedRoutes.map((route) => route.path)] as const;
+
 const settingsPayload = {
   routing: {
     proposer: ["gpt-5"],
@@ -55,6 +57,41 @@ async function installStoredToken(page: Page) {
 async function mockValidSettings(page: Page) {
   await page.route("**/api/settings", (route) => fulfillJson(route, settingsPayload));
 }
+
+test("global TopBar keeps every 320px shell inside the document", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-320", "The F-01 regression is specific to the 320px tier.");
+
+  const shellGeometry = [];
+  for (const path of topBarRoutes) {
+    const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+    expect(response?.ok()).toBe(true);
+    await expect(page.locator(".topBar")).toHaveCount(1);
+
+    shellGeometry.push(
+      await page.evaluate((routePath) => {
+        const actions = document.querySelector(".topBarActions")!.getBoundingClientRect();
+        const settings = document.querySelector<HTMLAnchorElement>('.topBarActions a[href="/settings"]')!
+          .getBoundingClientRect();
+        return {
+          path: routePath,
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          actionsRight: actions.right,
+          settingsRight: settings.right
+        };
+      }, path)
+    );
+  }
+
+  expect.soft(
+    shellGeometry.map(({ path, clientWidth, scrollWidth }) => ({ path, clientWidth, scrollWidth }))
+  ).toEqual(topBarRoutes.map((path) => ({ path, clientWidth: 320, scrollWidth: 320 })));
+  expect(
+    shellGeometry.flatMap(({ path, actionsRight, settingsRight }) =>
+      actionsRight <= 320 && settingsRight <= 320 ? [] : [{ path, actionsRight, settingsRight }]
+    )
+  ).toEqual([]);
+});
 
 test("library cards preserve a 12ch ordinary-English claim column without mid-word breaks", async ({ page }) => {
   const response = await page.goto("/", { waitUntil: "domcontentloaded" });
