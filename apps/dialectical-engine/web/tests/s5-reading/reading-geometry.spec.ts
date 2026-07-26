@@ -169,14 +169,54 @@ test("expanded synthesis is a scrimmed sheet no taller than 70dvh", async ({ pag
   await expect(panel.getByText("Prioritize transit while preserving accessible exceptions.")).toBeVisible();
 });
 
-test("@webkit-short collapsed synthesis tab leaves Reset zoom actionable at 568x320", async ({
+test("@short-round2 collapsed synthesis tab clears every zoom control at 568x320", async ({
   page
 }) => {
   await page.setContent(`
     <style>
       ${productionCss}
-      .testZoomCluster {
-        position: fixed;
+      body {
+        margin: 0;
+      }
+      .testIntegratedRoute {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        padding-bottom: var(--token-dock-clearance);
+      }
+      .testTopChrome {
+        flex: 0 0 104px;
+      }
+      .testScoringChrome {
+        flex: 0 0 44px;
+      }
+      .debateMain {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      .testCanvasHost {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+      }
+      .canvasViewport {
+        position: relative;
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+      }
+      .canvas {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+      }
+      .canvasZoomCluster {
+        position: absolute;
         right: calc(var(--dock-w) + 30px);
         bottom: var(--dock-offset-b);
         z-index: var(--z-zoom-cluster);
@@ -188,32 +228,52 @@ test("@webkit-short collapsed synthesis tab leaves Reset zoom actionable at 568x
         gap: 4px;
         padding: 4px;
         border: 1px solid var(--line-2);
+        pointer-events: none;
       }
-      .testZoomButton {
+      .canvasZoomButton {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         min-width: 44px;
         min-height: 44px;
+        pointer-events: auto;
       }
-      .testZoomPercent {
+      .canvasZoomPercent {
+        display: inline-flex;
         min-width: 44px;
         min-height: 26px;
       }
     </style>
-    <main class="debateView">
-      <div class="testZoomCluster" role="group" aria-label="Canvas zoom controls">
-        <button type="button" class="testZoomButton" aria-label="Zoom in">+</button>
-        <button type="button" class="testZoomButton" aria-label="Zoom out">−</button>
-        <button type="button" class="testZoomButton" aria-label="Fit whole tree">Fit</button>
-        <button
-          type="button"
-          class="testZoomButton"
-          aria-label="Reset zoom to 1:1"
-          onclick="this.dataset.clicked = 'true'"
-        >
-          1:1
-        </button>
-        <output class="testZoomPercent">100%</output>
+    <main class="debateView testIntegratedRoute">
+      <header class="testTopChrome"></header>
+      <section class="testScoringChrome"></section>
+      <div class="debateMain">
+        <div class="testCanvasHost">
+          <div class="canvasViewport">
+            <div class="canvas"></div>
+            <div class="canvasZoomCluster" role="group" aria-label="Canvas zoom controls">
+              <button type="button" class="canvasZoomButton" aria-label="Zoom in">+</button>
+              <button type="button" class="canvasZoomButton" aria-label="Zoom out">−</button>
+              <button type="button" class="canvasZoomButton" aria-label="Fit whole tree">Fit</button>
+              <button
+                type="button"
+                class="canvasZoomButton canvasZoomOne"
+                aria-label="Reset zoom to 1:1"
+                onclick="this.dataset.clicked = 'true'"
+              >
+                1:1
+              </button>
+              <output class="canvasZoomPercent">100%</output>
+            </div>
+          </div>
+        </div>
       </div>
-      <button type="button" class="synthTab" data-synth-tab>
+      <button
+        type="button"
+        class="synthTab"
+        data-synth-tab
+        aria-expanded="false"
+      >
         <span class="synthTabDiamond"></span>
         <span class="synthTabLabel">Synthesis</span>
         <span class="synthTabVerdict">Verdict</span>
@@ -221,13 +281,31 @@ test("@webkit-short collapsed synthesis tab leaves Reset zoom actionable at 568x
     </main>
   `);
 
+  expect(page.viewportSize()).toEqual({ width: 568, height: 320 });
+  const tab = page.locator("[data-synth-tab]");
   const reset = page.getByRole("button", { name: "Reset zoom to 1:1" });
-  await reset.click({ timeout: 1_000 });
+  await expect(tab).toHaveAttribute("aria-expanded", "false");
+  const tabBox = await tab.evaluate((element) => {
+    const value = element.getBoundingClientRect();
+    return { x: value.x, y: value.y, width: value.width, height: value.height };
+  });
+  const controlBoxes = await page.locator(".canvasZoomButton").evaluateAll((elements) =>
+    elements.map((element) => {
+      const value = element.getBoundingClientRect();
+      return { x: value.x, y: value.y, width: value.width, height: value.height };
+    })
+  );
+  const intersectingControls = controlBoxes.filter((box) => intersects(tabBox, box));
+  let clickError: string | null = null;
+  try {
+    await reset.click({ timeout: 1_000 });
+  } catch (error) {
+    clickError = error instanceof Error ? error.message : String(error);
+  }
 
-  const tabBox = await page.locator("[data-synth-tab]").boundingBox();
-  const zoomBox = await page.locator(".testZoomCluster").boundingBox();
-  expect(tabBox).not.toBeNull();
-  expect(zoomBox).not.toBeNull();
-  expect(intersects(tabBox!, zoomBox!)).toBe(false);
+  expect
+    .soft(intersectingControls, JSON.stringify({ tab: tabBox, controls: controlBoxes }))
+    .toEqual([]);
+  expect(clickError, clickError ?? "Reset zoom should remain actionable").toBeNull();
   await expect(reset).toHaveAttribute("data-clicked", "true");
 });
