@@ -8,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import AsyncIterator
 from copy import deepcopy
@@ -39,6 +40,105 @@ GEMINI_LOOP_MODEL = "gemini-3.5-flash-loop"
 GEMINI_CLI_MODEL = "gemini-3.5-flash-high"
 DEFAULT_COORDINATOR_URL = "https://dezbatere.ro"
 DEFAULT_LOOP_STATE_DIR = Path("/private/tmp/dialectical-subscription-loops")
+
+# --- CLI prompt transport --------------------------------------------------
+# execve() charges argv AND envp against one kernel limit. On macOS/BSD that is
+# ARG_MAX (1 048 576 here, `getconf ARG_MAX`); Linux adds a hard 128 KiB cap on
+# any SINGLE argument (MAX_ARG_STRLEN). Passing a rendered debate prompt as one
+# argv element therefore fails with
+#   OSError: [Errno 7] Argument list too long: 'agy'
+# once the tree is big enough -- which is exactly what took the gemini loop down
+# live on 2026-07-26 (debate 0f688d87 at 91 nodes: claim -> crash -> 10-minute
+# deadline requeue, four times, without ever reaching the model).
+ARGV_HEADROOM_BYTES = 64 * 1024
+LINUX_MAX_SINGLE_ARG_BYTES = 128 * 1024  # MAX_ARG_STRLEN
+
+
+class PromptTooLargeForCli(RuntimeError):
+    """The prompt cannot be exec'd as an argv element and this CLI offers no
+    off-argv channel for it. Raised instead of letting execve fail with E2BIG,
+    so the loop reports a retryable job failure rather than dying."""
+
+
+class CliInvocation:
+    """One provider CLI run: what to exec, and how the prompt reaches it.
+
+    `stdin_text` is piped to the process (claude); `cleanup_paths` are prompt
+    files written for a CLI that reads the prompt from disk (grok) and must be
+    removed once the run is over.
+
+    Written out by hand rather than as a @dataclass: this module is also loaded
+    through importlib.util.spec_from_file_location (see the tests), which leaves
+    it out of sys.modules, and dataclasses cannot resolve the string annotations
+    that `from __future__ import annotations` produces for a module it cannot
+    find there.
+    """
+
+    def __init__(
+        self,
+        command: list[str],
+        stdin_text: str | None = None,
+        env: dict[str, str] | None = None,
+        cleanup_paths: tuple[Path, ...] = (),
+    ) -> None:
+        self.command = list(command)
+        self.stdin_text = stdin_text
+        self.env: dict[str, str] = dict(env or {})
+        self.cleanup_paths = tuple(cleanup_paths)
+
+    def with_command(self, command: list[str]) -> CliInvocation:
+        return CliInvocation(
+            command=command,
+            stdin_text=self.stdin_text,
+            env=self.env,
+            cleanup_paths=self.cleanup_paths,
+        )
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return (
+            f"CliInvocation(command={self.command!r}, "
+            f"stdin_bytes={len(self.stdin_text or '')}, env={self.env!r}, "
+            f"cleanup_paths={self.cleanup_paths!r})"
+        )
+
+    def cleanup(self) -> None:
+        for path in self.cleanup_paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as exc:  # noqa: BLE001 - never fail a finished job on cleanup
+                print(f"[loop] prompt file cleanup failed (non-fatal): {exc!r}", flush=True)
+
+
+def argv_bytes(command: list[str]) -> int:
+    """Exec footprint of an argv list: each element plus its NUL terminator."""
+    return sum(len(str(part).encode("utf-8")) + 1 for part in command)
+
+
+def argv_capacity_bytes(extra_env: dict[str, str] | None = None) -> int:
+    """How many argv bytes this machine can actually exec, after charging the
+    environment (execve counts argv + envp together) and keeping headroom for
+    the pointer array and the kernel's own bookkeeping."""
+    try:
+        limit = int(os.sysconf("SC_ARG_MAX"))
+    except (ValueError, OSError, AttributeError):  # pragma: no cover - platform fallback
+        limit = 256 * 1024
+    merged = {**os.environ, **(extra_env or {})}
+    env_bytes = sum(len(f"{key}={value}".encode()) + 1 for key, value in merged.items())
+    capacity = limit - env_bytes - ARGV_HEADROOM_BYTES
+    if sys.platform.startswith("linux"):
+        capacity = min(capacity, LINUX_MAX_SINGLE_ARG_BYTES - 4096)
+    return max(0, capacity)
+
+
+def ensure_argv_fits(command: list[str], env: dict[str, str] | None = None, *, detail: str = "") -> None:
+    size = argv_bytes(command)
+    capacity = argv_capacity_bytes(env)
+    if size > capacity:
+        executable = command[0] if command else "command"
+        raise PromptTooLargeForCli(
+            f"{executable} argv is {size} bytes, past this machine's {capacity}-byte "
+            f"exec budget (ARG_MAX covers argv and env together).{detail}"
+        )
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
@@ -375,12 +475,17 @@ async def run_cli_with_liveness(
     capabilities: list[str],
     timeout_seconds: int,
     env: dict[str, str] | None = None,
+    stdin_text: str | None = None,
     heartbeat_seconds: float = 30.0,
 ) -> subprocess.CompletedProcess:
     """Run the model CLI while proving liveness to the coordinator. The CLI
     thinks silently for minutes; without heartbeats the job lease expires
     mid-run and the claim is torn away (the doom-loop that killed 4 of 7
     branches in debate 90bad9c5)."""
+    # Backstop for every provider: an argv that would make execve fail with
+    # E2BIG raises a typed error the caller can report as a job failure,
+    # instead of an OSError that takes the whole loop iteration down.
+    ensure_argv_fits(command, env)
     CoordinatorClient, _, _, _ = worker_runtime()
     client = CoordinatorClient(config)
     stop = asyncio.Event()
@@ -401,6 +506,8 @@ async def run_cli_with_liveness(
     )
     if env:
         run_kwargs["env"] = {**os.environ, **env}
+    if stdin_text is not None:
+        run_kwargs["input"] = stdin_text
     try:
         return await asyncio.to_thread(subprocess.run, command, **run_kwargs)
     finally:
@@ -475,26 +582,77 @@ async def fail_from_job_file(args: argparse.Namespace) -> int:
     return 0
 
 
-def build_gemini_command(model: str, prompt: str) -> tuple[list[str], dict[str, str]]:
-    return ["agy", "--print", prompt, "--model", model, "--effort", "high"], {}
+def build_gemini_command(model: str, prompt: str) -> CliInvocation:
+    """agy: argv, guarded.
+
+    The Antigravity CLI has no off-argv prompt channel -- verified against the
+    installed binary on 2026-07-26: piped stdin is ignored entirely (a marker
+    token on stdin never reaches the model), `--print ""` exits with "empty
+    prompt", there is no --prompt-file/--input-file flag in `--help` or in the
+    binary's strings, and the `@path` mention syntax routes through the agent's
+    read_file TOOL, which headless mode auto-denies (and which would need either
+    a settings.json allow-rule or --dangerously-skip-permissions -- unacceptable
+    while the prompt carries untrusted debate content). So the prompt stays on
+    argv exactly as before, and an oversized one is refused BEFORE exec: a typed
+    error the caller turns into a retryable job failure, never the raw OSError
+    that killed the loop process live.
+    """
+    command = ["agy", "--print", prompt, "--model", model, "--effort", "high"]
+    ensure_argv_fits(
+        command,
+        detail=(
+            f" The rendered prompt is {len(prompt.encode('utf-8'))} bytes, and agy has no"
+            " stdin or prompt-file channel to deliver it off argv; this job needs a"
+            " provider whose CLI reads the prompt from stdin (claude) or a file (grok)."
+        ),
+    )
+    return CliInvocation(command=command)
 
 
-def build_claude_command(model: str, prompt: str) -> list[str]:
-    return ["claude", "-p", prompt, "--model", model, "--effort", "high", "--output-format", "text"]
+def build_claude_command(model: str, prompt: str) -> CliInvocation:
+    """claude: stdin.
+
+    `claude -p` with no prompt argument reads the prompt from stdin ("Print
+    response and exit (useful for pipes)"); verified end to end on 2026-07-26 --
+    a marker token piped in came back verbatim. Every other flag is unchanged.
+    """
+    return CliInvocation(
+        command=["claude", "-p", "--model", model, "--effort", "high", "--output-format", "text"],
+        stdin_text=prompt,
+    )
 
 
-def build_grok_command(model: str, prompt: str) -> list[str]:
-    return [
-        "grok",
-        "--single",
-        prompt,
-        "--model",
-        model,
-        "--reasoning-effort",
-        "high",
-        "--output-format",
-        "plain",
-    ]
+def build_grok_command(model: str, prompt: str, *, prompt_dir: Path | None = None) -> CliInvocation:
+    """grok: prompt file.
+
+    The grok CLI is TUI-first and its headless prompt flags all take a value;
+    it does document a first-class file source -- `--prompt-file <PATH>`,
+    "Single-turn prompt from a file" -- which is the exact peer of `--single
+    <PROMPT>` and was verified end to end on 2026-07-26. That is preferred over
+    probing undocumented stdin behaviour on an interactive binary. The file goes
+    in the loop's own state dir (0600, alongside the job file this run already
+    writes) and the caller removes it via CliInvocation.cleanup().
+    """
+    directory = Path(prompt_dir) if prompt_dir is not None else DEFAULT_LOOP_STATE_DIR / "grok"
+    directory.mkdir(parents=True, exist_ok=True)
+    handle, raw_path = tempfile.mkstemp(prefix="prompt-", suffix=".txt", dir=str(directory))
+    prompt_path = Path(raw_path)
+    with os.fdopen(handle, "w", encoding="utf-8") as prompt_file:
+        prompt_file.write(prompt)
+    return CliInvocation(
+        command=[
+            "grok",
+            "--prompt-file",
+            str(prompt_path),
+            "--model",
+            model,
+            "--reasoning-effort",
+            "high",
+            "--output-format",
+            "plain",
+        ],
+        cleanup_paths=(prompt_path,),
+    )
 
 
 def gemini_response_text(stdout: str) -> str:
@@ -533,24 +691,33 @@ async def claude_once(args: argparse.Namespace) -> int:
         job=job,
         state_dir=Path(args.state_dir),
     )
-    command = build_claude_command(args.claude_model, render_model_prompt(job))
-    # Task 10 (P1.1) evidence-acquisition seam: retrieval rides the Claude CLI's
-    # own web search. Only v2_evidence jobs get the tool -- every other job type
-    # keeps its byte-identical argv (no search, no tool surface). The job dict
-    # written by poll carries job_type, so no coordinator round-trip is needed.
-    if str(job.get("job_type") or "") == "v2_evidence":
-        command = [*command, "--allowedTools", "WebSearch"]
+    invocation: CliInvocation | None = None
     try:
+        invocation = build_claude_command(args.claude_model, render_model_prompt(job))
+        # Task 10 (P1.1) evidence-acquisition seam: retrieval rides the Claude CLI's
+        # own web search. Only v2_evidence jobs get the tool -- every other job type
+        # keeps its byte-identical argv (no search, no tool surface). The job dict
+        # written by poll carries job_type, so no coordinator round-trip is needed.
+        if str(job.get("job_type") or "") == "v2_evidence":
+            invocation = invocation.with_command([*invocation.command, "--allowedTools", "WebSearch"])
         process = await run_cli_with_liveness(
             config,
-            command,
+            invocation.command,
             capabilities=[args.advertised_model],
             timeout_seconds=args.timeout_seconds,
+            env=invocation.env,
+            stdin_text=invocation.stdin_text,
         )
+    except PromptTooLargeForCli as exc:
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=str(exc)[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     except subprocess.TimeoutExpired:
         reason = f"claude CLI exceeded {args.timeout_seconds}s"
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
         return await fail_from_job_file(fail_args)
+    finally:
+        if invocation is not None:
+            invocation.cleanup()
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"claude exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
@@ -580,19 +747,31 @@ async def gemini_once(args: argparse.Namespace) -> int:
         job=job,
         state_dir=Path(args.state_dir),
     )
-    command, extra_env = build_gemini_command(args.gemini_model, render_model_prompt(job))
+    invocation: CliInvocation | None = None
     try:
+        invocation = build_gemini_command(args.gemini_model, render_model_prompt(job))
         process = await run_cli_with_liveness(
             config,
-            command,
+            invocation.command,
             capabilities=[args.advertised_model],
             timeout_seconds=args.timeout_seconds,
-            env=extra_env,
+            env=invocation.env,
+            stdin_text=invocation.stdin_text,
         )
+    except PromptTooLargeForCli as exc:
+        # agy can only take the prompt on argv (see build_gemini_command), so a
+        # frontier-scale prompt is reported as a retryable failure. That is what
+        # the live crash could not do: the loop process died before it could say
+        # anything, and the coordinator saw only a silent deadline requeue.
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=str(exc)[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     except subprocess.TimeoutExpired:
         reason = f"gemini CLI exceeded {args.timeout_seconds}s"
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
         return await fail_from_job_file(fail_args)
+    finally:
+        if invocation is not None:
+            invocation.cleanup()
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"gemini exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
@@ -622,17 +801,33 @@ async def grok_once(args: argparse.Namespace) -> int:
         job=job,
         state_dir=Path(args.state_dir),
     )
+    invocation: CliInvocation | None = None
     try:
+        invocation = build_grok_command(
+            args.grok_model,
+            render_model_prompt(job),
+            prompt_dir=job_file.parent,
+        )
         process = await run_cli_with_liveness(
             config,
-            build_grok_command(args.grok_model, render_model_prompt(job)),
+            invocation.command,
             capabilities=[args.advertised_model],
             timeout_seconds=args.timeout_seconds,
+            env=invocation.env,
+            stdin_text=invocation.stdin_text,
         )
+    except PromptTooLargeForCli as exc:
+        fail_args = argparse.Namespace(job_file=str(job_file), reason=str(exc)[:2000], permanent=False)
+        return await fail_from_job_file(fail_args)
     except subprocess.TimeoutExpired:
         reason = f"grok CLI exceeded {args.timeout_seconds}s"
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
         return await fail_from_job_file(fail_args)
+    finally:
+        # The rendered prompt carries the untrusted debate content -- it does not
+        # outlive the run in the loop state dir.
+        if invocation is not None:
+            invocation.cleanup()
     if process.returncode != 0:
         reason = (process.stderr or process.stdout or f"grok exited {process.returncode}").strip()
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
