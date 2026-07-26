@@ -1,0 +1,528 @@
+
+/* ============================================================
+   Drawers (detail / investigation / workspace)
+   ============================================================ */
+
+.drawerScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: oklch(0.3 0.02 70 / 0.2);
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 468px;
+  max-width: 100%;
+  z-index: 55;
+  background: var(--surface-2);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-drawer);
+  display: flex;
+  flex-direction: column;
+  animation: de-slidein 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.drawerHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.drawerHeadMeta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.drawerBody {
+  flex: 1;
+  overflow: auto;
+  padding: 22px;
+}
+.drawerClaim {
+  font-family: var(--font-serif);
+  font-size: clamp(18px, 1rem + 0.75vw, 21px);
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+.drawerProse {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--text-2);
+  margin-top: 13px;
+}
+.drawerSelectHint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-2);
+  margin-top: 9px;
+}
+.drawerActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+.drawerHintMuted {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.drawerScoringUnavailable,
+.drawerScoringRationale {
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 12px 13px;
+  margin-top: 16px;
+}
+.drawerSectionTitle {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.drawerScoringUnavailable p,
+.drawerScoringRationale p {
+  margin: 7px 0 0;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.drawerScoringFindings {
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 12px 13px;
+  margin-top: 12px;
+}
+.drawerFindingGroup {
+  margin-top: 11px;
+}
+.drawerFindingGroupTitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.drawerFindingList {
+  list-style: none;
+  padding: 0;
+  margin: 7px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.drawerFindingItem {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 9px;
+}
+.drawerFindingItem.fatal {
+  border-left-color: oklch(0.54 0.18 28);
+}
+.drawerFindingMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.drawerFindingMeta span:not(:last-child)::after {
+  content: "/";
+  margin-left: 5px;
+  color: var(--line-strong);
+}
+.drawerFindingText {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.recommendationsPanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px 22px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid oklch(0.9 0.02 75);
+}
+
+.recommendationsHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendationsEyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: oklch(0.46 0.06 64);
+}
+
+.recommendationsCount {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.recommendationsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.recommendationsPrimary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.recommendationsDetails {
+  display: grid;
+  gap: 10px;
+}
+
+.recommendationsSummary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.recommendationsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.recommendationsSummary::after {
+  content: "Open";
+  margin-left: 8px;
+  color: var(--muted-2);
+}
+
+.recommendationsDetails[open] .recommendationsSummary::after {
+  content: "Close";
+}
+
+.recommendationItem {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  padding: 11px 12px;
+}
+
+.recommendationMeta,
+.recommendationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recommendationMeta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recommendationReason {
+  color: var(--text-2);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.recommendationsPanel p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+}
+
+.drawerDivider {
+  height: 1px;
+  background: var(--line);
+  margin: 22px 0 16px;
+}
+.drawerHistoryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.linkBtn {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--link);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.historyCard {
+  text-align: left;
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  border-radius: 11px;
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: border-color 0.18s;
+}
+.historyCard.selected {
+  border-color: oklch(0.66 0.05 70);
+  background: oklch(0.97 0.012 75);
+}
+.historyCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.historyTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-2);
+  text-transform: uppercase;
+}
+.historyCardBody {
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  line-height: 1.52;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.compareRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.compareCell {
+  flex: 1;
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  padding: 13px;
+  background: var(--surface);
+}
+.compareCell.current {
+  background: var(--surface);
+}
+.compareCellHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.compareTag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--pro-text);
+}
+.compareClaim {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.34;
+  color: var(--text-strong);
+}
+
+/* investigation */
+.invLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.invFlagged {
+  border-left: 3px solid;
+  padding: 4px 0 4px 13px;
+}
+.invFlaggedClaim {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.36;
+  color: var(--text-strong);
+}
+.invFlaggedSpan {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+  margin-top: 7px;
+}
+.invResolutions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.invResolution {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  border-radius: var(--r-btn);
+  padding: 7px 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.invResolution .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.invFinal {
+  margin-top: 16px;
+  padding: 15px 16px;
+  border-radius: var(--r-panel);
+  border: 1px solid;
+}
+.invFinalText {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+.invWorking {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: oklch(0.55 0.04 60);
+}
+.invWorkingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.68 0.12 75);
+  animation: de-pulse 1s ease-in-out infinite;
+}
+
+/* workspace */
+.wsSection {
+  margin-bottom: 22px;
+}
+.wsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wsCard {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: 13px 14px;
+}
+.wsCard h3 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+.wsCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.wsCard p {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.wsMuted {
+  color: var(--muted) !important;
+  font-family: var(--font-mono);
+  font-size: 11px !important;
+}
+.wsColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.wsColLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.wsColumns ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.wsColumns li {
+  margin-bottom: 6px;
+}

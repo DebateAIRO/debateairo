@@ -1,0 +1,119 @@
+
+/* ============================================================
+   New debate composer
+   ============================================================ */
+
+.textareaSerif {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text);
+  padding: 16px 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.18s;
+}
+.textareaSerif:focus {
+  border-color: var(--focus);
+}
+
+.optionsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 0;
+}
+
+.optionsPanel {
+  margin-top: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.optionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.optionLabel {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.optionHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.optionControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.optionControl input[type="range"] {
+  width: 160px;
+  accent-color: oklch(0.5 0.06 165);
+}
+.optionValue {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  width: 18px;
+  text-align: right;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 18px;
+}
+.fieldGroup label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.fieldGroup textarea,
+.fieldGroup input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  outline: none;
+}
+.fieldGroup textarea {
+  min-height: 96px;
+  resize: vertical;
+}
