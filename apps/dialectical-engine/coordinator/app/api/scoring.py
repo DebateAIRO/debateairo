@@ -454,9 +454,18 @@ async def approve_adaptive_depth_expansion(
         node = db.get(Node, item.node_id)
         # FW3 (I-4): the audit id goes IN, not on afterwards. It is both the
         # audit linkage and the operator-origin marker the operator budget
-        # rail counts (expansion_dispatch._operator_expand_jobs), so it must
-        # be committed atomically with the job -- patched-on afterwards it
-        # would not be visible to the very next iteration's rail check.
+        # rail counts (expansion_dispatch._operator_expand_jobs), and
+        # queue_v2_expand_job COMMITS the job it creates.
+        #
+        # Patched on after the call it would still be visible to THIS session
+        # (SQLAlchemy's identity map keeps the dirty attribute, so the next
+        # iteration's SELECT sees it -- probed, not assumed; the commit
+        # message for this change overstates it as invisible). The real defect
+        # is DURABILITY: between queue_v2_expand_job's commit and this
+        # handler's final commit_write, a crash leaves a durable,
+        # operator-approved expansion job carrying no marker, which the rail
+        # would then never count against the ceiling. Passing it through
+        # writes it in the same transaction as the job.
         job, outcome = admit_and_spawn(
             db,
             debate,
