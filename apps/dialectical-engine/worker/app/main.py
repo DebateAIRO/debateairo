@@ -34,6 +34,12 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def parse_result(job: dict[str, Any], text: str) -> Any:
+    # KEEP IN SYNC with scripts/subscription_loop.py parse_model_response --
+    # the loop workers carry a twin of this set. v2_evidence drifted out of
+    # this copy when T10 added it to the loop's: Worker A then wrapped
+    # evidence output as {"argument": prose} and the coordinator's
+    # validate_evidence_contract correctly 400'd every completion (observed
+    # live 2026-07-26, 5 of 6 evidence jobs failed on debate 0f688d87).
     if job["job_type"] in {
         "decompose",
         "synthesize",
@@ -45,6 +51,7 @@ def parse_result(job: dict[str, Any], text: str) -> Any:
         "v2_expand",
         "v2_agent_run",
         "v2_synthesize",
+        "v2_evidence",
     }:
         return extract_json_object(text)
     return {"argument": text.strip()}

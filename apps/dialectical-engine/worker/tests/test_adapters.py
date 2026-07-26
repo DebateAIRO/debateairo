@@ -1547,3 +1547,29 @@ async def test_coordinator_client_truncates_failure_reason_to_api_limit() -> Non
         await client.aclose()
 
     assert calls == [{"reason": "x" * 2000, "retryable": True}]
+
+
+def test_parse_result_extracts_json_for_v2_evidence() -> None:
+    """Regression: v2_evidence was missing from parse_result's JSON job-type
+    set (the subscription loop's twin, scripts/subscription_loop.py
+    parse_model_response, gained it in T10; this copy drifted). Worker A then
+    shipped {"argument": "<prose>"} for evidence jobs and the coordinator's
+    validate_evidence_contract correctly 400'd every completion -- observed
+    live on 2026-07-26 as 5 of 6 evidence jobs failing on debate 0f688d87.
+
+    The model output deliberately embeds the JSON inside prose, because that
+    is exactly the shape the claude CLI produced in the live failure."""
+    text = (
+        "The polling loop found no queued job -- answering directly. "
+        'Let me search for sources.{"sources":[{"url":"https://example.org/a",'
+        '"quote":"q","publisher":"Example","date":null,"retrieval_query":"rq",'
+        '"stance":"supports"}],"provenance":{"model_id":"m","worker_id":"w",'
+        '"prompt_id":null,"job_id":"j"}}'
+    )
+
+    result = parse_result({"job_type": "v2_evidence"}, text)
+
+    assert isinstance(result, dict)
+    assert isinstance(result.get("sources"), list)
+    assert result["sources"][0]["url"] == "https://example.org/a"
+    assert "argument" not in result
