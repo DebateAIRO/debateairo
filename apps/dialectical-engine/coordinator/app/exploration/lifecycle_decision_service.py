@@ -41,6 +41,7 @@ from app.exploration.scoring_input_resolver import (
 from app.models.entities import (
     AnalyzerRun,
     Debate,
+    EvidenceLifecycleSnapshot,
     Generation,
     JudgeOutputArtifact,
     Node,
@@ -175,45 +176,138 @@ def _current_score_input_hash(db: Session, debate: Debate, node: Node) -> str:
     )
 
 
+def _evidence_source_kind(source: Node) -> str | None:
+    if isinstance(source.evidence_metadata, Mapping):
+        raw_kind = source.evidence_metadata.get("evidenceKind")
+        if isinstance(raw_kind, str) and raw_kind.strip():
+            return raw_kind.strip()
+    return None
+
+
+def _evidence_source_identity(node: Node, source: Node) -> EvidenceSourceIdentity | None:
+    """The correlation identity for ONE evidence child, or None if it cannot
+    produce one (no active generation, or no recorded evidence kind)."""
+
+    kind = _evidence_source_kind(source)
+    if not source.active_generation_id or kind is None:
+        return None
+    return EvidenceSourceIdentity(
+        evidence_node_id=source.id,
+        claim_node_id=node.id,
+        generation_id=source.active_generation_id,
+        reference=f"evidence-node:{source.id}",
+        content_sha256=hashlib.sha256(source.claim.encode("utf-8")).hexdigest(),
+        evidence_kind=kind,
+    )
+
+
+def _select_evidence_source(
+    db: Session,
+    *,
+    debate: Debate,
+    node: Node,
+    usable: list[tuple[Node, EvidenceSourceIdentity]],
+) -> EvidenceSourceIdentity:
+    """Pick ONE evidence child to correlate the decision against.
+
+    `usable` arrives in document order -- (position, id) -- which is already a
+    deterministic answer. This refines it with the only fact that makes one
+    child a better correlation target than another: whether a verification
+    verdict exists for the child AS IT IS NOW (matching its current generation
+    and content hash), and whether that verdict is AUTHORITATIVE
+    (availability == "present", i.e. the verifier returned real values, as
+    opposed to "terminal_unverifiable", which honestly withholds them).
+
+    Rank: authoritative-and-current beats verdict-of-any-kind beats no verdict
+    at all; within a rank the newest verification run (highest sequence)
+    wins; ties fall back to document order. Never refuses -- refusing for the
+    COUNT of children is the bug this replaced.
+    """
+
+    by_evidence_node = {
+        identity.evidence_node_id: (order, identity)
+        for order, (_source, identity) in enumerate(usable)
+    }
+    rows = db.scalars(
+        select(EvidenceLifecycleSnapshot).where(
+            EvidenceLifecycleSnapshot.debate_id == debate.id,
+            EvidenceLifecycleSnapshot.node_id == node.id,
+            EvidenceLifecycleSnapshot.evidence_node_id.in_(list(by_evidence_node)),
+        )
+    ).all()
+    best: tuple[int, int, int] | None = None
+    selected = usable[0][1]
+    for row in rows:
+        entry = by_evidence_node.get(row.evidence_node_id or "")
+        if entry is None:
+            continue
+        order, identity = entry
+        # A verdict recorded against a SUPERSEDED generation or different text
+        # says nothing about the child as it is now, so it does not rank it.
+        if row.generation_id != identity.generation_id:
+            continue
+        if row.content_sha256 != identity.content_sha256:
+            continue
+        rank = 1 if row.availability == "present" else 0
+        sequence = row.sequence if isinstance(row.sequence, int) else 0
+        candidate = (rank, sequence, -order)
+        if best is None or candidate > best:
+            best = candidate
+            selected = identity
+    return selected
+
+
 def _expected_evidence_source(
     db: Session,
     *,
     debate: Debate,
     node: Node,
 ) -> tuple[EvidenceSourceIdentity | None, str | None]:
+    """Resolve the claim's evidence children to ONE correlation identity.
+
+    FW3 (I-7): this used to refuse any count other than exactly one with
+    `evidence_source_ambiguous`. DIALECTICAL_EVIDENCE_MAX_PER_NODE defaults to
+    2 and one v2_evidence job persists a whole `sources` list, so the evidence
+    feature's own default output permanently disqualified the node it had just
+    enriched -- adding MORE evidence made a node LESS decidable, which is the
+    tell of a resolver describing its own limitation as a fact about the node.
+    On the live P1 debate that silently removed 12 of 32 claim nodes from the
+    frontier. Plurality is now resolved by selection (see
+    _select_evidence_source), never by refusal.
+
+    ZERO children still refuses, and that is design, not oversight (T16): a
+    node that WAS searched and yielded nothing resolves `no_info` and does
+    authenticate, so refusing a node nobody ever searched is the honest
+    distinction between "we looked and found nothing" and "we never looked".
+    """
     sources = db.scalars(
-        select(Node).where(
+        select(Node)
+        .where(
             Node.debate_id == debate.id,
             Node.parent_id == node.id,
             Node.node_type == "EVIDENCE",
             Node.status != "stale",
         )
+        .order_by(Node.position.asc(), Node.id.asc())
     ).all()
     if not sources:
         return None, "evidence_source_missing"
-    if len(sources) != 1:
-        return None, "evidence_source_ambiguous"
-    source = sources[0]
-    if not source.active_generation_id:
-        return None, "evidence_source_generation_missing"
-    kind = None
-    if isinstance(source.evidence_metadata, Mapping):
-        raw_kind = source.evidence_metadata.get("evidenceKind")
-        if isinstance(raw_kind, str) and raw_kind.strip():
-            kind = raw_kind.strip()
-    if kind is None:
+    usable = [
+        (source, identity)
+        for source in sources
+        if (identity := _evidence_source_identity(node, source)) is not None
+    ]
+    if not usable:
+        # Every child is defective. Report the FIRST one's specific defect --
+        # "this evidence node has no generation" is actionable, "there were
+        # three of them" never was.
+        first = sources[0]
+        if not first.active_generation_id:
+            return None, "evidence_source_generation_missing"
         return None, "evidence_source_kind_missing"
-    return (
-        EvidenceSourceIdentity(
-            evidence_node_id=source.id,
-            claim_node_id=node.id,
-            generation_id=source.active_generation_id,
-            reference=f"evidence-node:{source.id}",
-            content_sha256=hashlib.sha256(source.claim.encode("utf-8")).hexdigest(),
-            evidence_kind=kind,
-        ),
-        None,
-    )
+    if len(usable) == 1:
+        return usable[0][1], None
+    return _select_evidence_source(db, debate=debate, node=node, usable=usable), None
 
 
 def _matching_item(payload: object, node_id: str) -> Mapping[str, object] | None:

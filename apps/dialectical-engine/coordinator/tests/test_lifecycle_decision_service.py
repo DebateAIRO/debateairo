@@ -334,23 +334,31 @@ def _persist_grounded_evidence(
     worker: Worker,
     observed_at: datetime,
     reference_suffix: str = "",
+    # FW3 (I-7): the identity knobs a MULTI-child test needs. Every default
+    # reproduces the original single-child fixture byte for byte, so the
+    # tests written against it are untouched.
+    evidence_node_id: str = "evidence-node-current",
+    position: int = 10_000,
+    claim: str = "A persisted evidence source.",
+    run_id: str = "evidence-run-current",
+    sequence: int = 2,
 ) -> str:
     evidence_node = Node(
-        id="evidence-node-current",
+        id=evidence_node_id,
         debate_id=debate.id,
         parent_id=node.id,
         node_type="EVIDENCE",
         depth=node.depth + 1,
-        position=10_000,
-        claim="A persisted evidence source.",
+        position=position,
+        claim=claim,
         status="completed",
-        materialized_path=f"{node.materialized_path}/10000",
+        materialized_path=f"{node.materialized_path}/{position}",
         evidence_metadata={"evidenceKind": "citation"},
     )
     db.add(evidence_node)
     db.flush()
     generation = Generation(
-        id="evidence-generation-current",
+        id=f"{evidence_node_id}-generation",
         node_id=evidence_node.id,
         model_id="fixture-arguer",
         role="proposer",
@@ -383,8 +391,8 @@ def _persist_grounded_evidence(
             "observed_at": observed_text,
             "provenance": {
                 "source_kind": "evidence_verification_run",
-                "source_record_id": "evidence-run-current",
-                "run": {"run_id": "evidence-run-current", "sequence": 2},
+                "source_record_id": run_id,
+                "run": {"run_id": run_id, "sequence": sequence},
                 "producer": "fixture-evidence-evaluator",
                 "recorded_at": observed_text,
                 "checked_at": observed_text,
@@ -1298,3 +1306,243 @@ def test_aged_and_hash_mismatched_score_still_refuses(db) -> None:
     assert outcome.authentic_policy_decision is False
     assert outcome.input_state == "mismatched"
     assert "score_input_hash_mismatch" in outcome.reason_codes
+
+
+# ---------------------------------------------------------------------------
+# FW3 (I-7 / M5): the evidence-source PLURALITY gate was vestigial.
+#
+# _expected_evidence_source refused any claim with a number of non-stale
+# EVIDENCE children other than exactly one, with `evidence_source_ambiguous`.
+# But DIALECTICAL_EVIDENCE_MAX_PER_NODE defaults to 2 and a single v2_evidence
+# job persists a whole `sources` list, so the evidence feature's own default
+# output permanently disqualified the node it had just enriched: adding MORE
+# evidence made a node LESS decidable. On the live P1 debate, 12 of 32 claim
+# nodes carried 2-5 non-stale evidence children and could never produce a
+# lifecycle decision at all.
+#
+# `evidence_source_missing` (ZERO children) is a different thing and stays:
+# "we looked and found nothing" resolves `no_info` and DOES authenticate,
+# while "we never looked" must not. That is the T16 design, untouched below.
+#
+# The replacement is a deterministic SELECTION rule, not a refusal: among the
+# usable children, prefer the one whose latest matching verification snapshot
+# is authoritative, newest sequence first, tie-broken by (position, id).
+# Refusals that remain are facts about the evidence, never about the
+# resolver's own arithmetic.
+# ---------------------------------------------------------------------------
+
+
+def _unverified_evidence_child(
+    db,
+    *,
+    node: Node,
+    worker: Worker,
+    evidence_node_id: str,
+    position: int,
+    with_generation: bool = True,
+) -> Node:
+    """An EVIDENCE child with no verification snapshot -- the ordinary state
+    of a node the verifier has not reached yet, and the exact shape the old
+    plurality gate turned into a permanent veto."""
+
+    evidence_node = Node(
+        id=evidence_node_id,
+        debate_id=node.debate_id,
+        parent_id=node.id,
+        node_type="EVIDENCE",
+        depth=node.depth + 1,
+        position=position,
+        claim=f"An unverified evidence source ({evidence_node_id}).",
+        status="completed",
+        materialized_path=f"{node.materialized_path}/{position}",
+        evidence_metadata={"evidenceKind": "citation"},
+    )
+    db.add(evidence_node)
+    db.flush()
+    if with_generation:
+        generation = Generation(
+            id=f"{evidence_node_id}-generation",
+            node_id=evidence_node.id,
+            model_id="fixture-arguer",
+            role="proposer",
+            argument=evidence_node.claim,
+            prompt_version="v1",
+            worker_id=worker.id,
+            is_active=True,
+        )
+        db.add(generation)
+        db.flush()
+        evidence_node.active_generation_id = generation.id
+        db.flush()
+    return evidence_node
+
+
+def _grounded_score(db):
+    debate, node, generation, worker, branch = _subject(db)
+    score_row = _persist_score(
+        db,
+        debate=debate,
+        node=node,
+        generation=generation,
+        branch=branch,
+        observed_at=DECISION_TIME - timedelta(minutes=5),
+    )
+    return debate, node, worker, score_row
+
+
+def test_one_evidence_child_authenticates(db) -> None:
+    """The count that always worked, restated as the first of 1 / 2 / N."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    snapshot_id = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=4),
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert outcome.authentic_policy_decision is True
+    assert outcome.evidence_snapshot_id == snapshot_id
+
+
+def test_two_evidence_children_authenticate_instead_of_refusing_for_plurality(db) -> None:
+    """The engine's own default output (EVIDENCE_MAX_PER_NODE=2) used to be
+    permanently undecidable. The second child here carries no verdict yet --
+    the ordinary state mid-verification -- and must not veto the first."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    verified = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=4),
+        evidence_node_id="evidence-node-verified",
+        position=10_000,
+        claim="A verified evidence source.",
+        run_id="evidence-run-verified",
+        sequence=2,
+    )
+    _unverified_evidence_child(db, node=node, worker=worker, evidence_node_id="evidence-node-pending", position=10_001)
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert "evidence_source_ambiguous" not in outcome.reason_codes
+    assert outcome.authentic_policy_decision is True
+    assert outcome.input_state == "grounded"
+    assert outcome.evidence_snapshot_id == verified
+
+
+def test_many_evidence_children_resolve_from_the_newest_authoritative_verdict(db) -> None:
+    """N children, two of them verified: the decision reads the NEWEST
+    verdict (highest verification run sequence), not whichever row the
+    database happened to return first."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    older = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=8),
+        evidence_node_id="evidence-node-older",
+        position=10_000,
+        claim="An older verified evidence source.",
+        run_id="evidence-run-older",
+        sequence=2,
+    )
+    newer = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=3),
+        evidence_node_id="evidence-node-newer",
+        position=10_001,
+        claim="A newer verified evidence source.",
+        run_id="evidence-run-newer",
+        sequence=7,
+    )
+    _unverified_evidence_child(db, node=node, worker=worker, evidence_node_id="evidence-node-pending-a", position=10_002)
+    _unverified_evidence_child(db, node=node, worker=worker, evidence_node_id="evidence-node-pending-b", position=10_003)
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert outcome.authentic_policy_decision is True
+    assert outcome.evidence_snapshot_id == newer
+    assert outcome.evidence_snapshot_id != older
+
+
+def test_many_unverified_evidence_children_refuse_about_the_evidence_not_the_count(db) -> None:
+    """No verdict anywhere is a genuine unresolved input, and it must be
+    reported as such -- and deterministically, so two passes over the same
+    tree cannot disagree about which child they were talking about."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    for index in range(4):
+        _unverified_evidence_child(
+            db,
+            node=node,
+            worker=worker,
+            evidence_node_id=f"evidence-node-pending-{index}",
+            position=10_000 + index,
+        )
+
+    first = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+    second = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert first.authentic_policy_decision is False
+    assert "evidence_source_ambiguous" not in first.reason_codes
+    assert first.reason_codes == ("evidence_missing",)
+    assert second.reason_codes == first.reason_codes
+
+
+def test_plural_unusable_evidence_children_still_name_their_own_defect(db) -> None:
+    """Selection must not swallow the specific refusals. Two children,
+    neither with an active generation: still `evidence_source_generation_
+    missing`, not a count complaint."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    for index in range(2):
+        _unverified_evidence_child(
+            db,
+            node=node,
+            worker=worker,
+            evidence_node_id=f"evidence-node-headless-{index}",
+            position=10_000 + index,
+            with_generation=False,
+        )
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert outcome.authentic_policy_decision is False
+    assert outcome.reason_codes == ("evidence_source_generation_missing",)
+
+
+def test_zero_evidence_children_still_refuse_because_nobody_looked(db) -> None:
+    """T16 design, deliberately NOT changed by this fix: "we looked and found
+    nothing" resolves no_info and authenticates; "we never looked" must not."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert outcome.authentic_policy_decision is False
+    assert outcome.reason_codes == ("evidence_source_missing",)
