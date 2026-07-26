@@ -168,3 +168,66 @@ test("expanded synthesis is a scrimmed sheet no taller than 70dvh", async ({ pag
   expect(await scrim.evaluate((element) => getComputedStyle(element).zIndex)).toBe("50");
   await expect(panel.getByText("Prioritize transit while preserving accessible exceptions.")).toBeVisible();
 });
+
+test("@webkit-short collapsed synthesis tab leaves Reset zoom actionable at 568x320", async ({
+  page
+}) => {
+  await page.setContent(`
+    <style>
+      ${productionCss}
+      .testZoomCluster {
+        position: fixed;
+        right: calc(var(--dock-w) + 30px);
+        bottom: var(--dock-offset-b);
+        z-index: var(--z-zoom-cluster);
+        display: flex;
+        width: auto;
+        max-width: calc(100% - var(--dock-w) - 48px);
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--line-2);
+      }
+      .testZoomButton {
+        min-width: 44px;
+        min-height: 44px;
+      }
+      .testZoomPercent {
+        min-width: 44px;
+        min-height: 26px;
+      }
+    </style>
+    <main class="debateView">
+      <div class="testZoomCluster" role="group" aria-label="Canvas zoom controls">
+        <button type="button" class="testZoomButton" aria-label="Zoom in">+</button>
+        <button type="button" class="testZoomButton" aria-label="Zoom out">−</button>
+        <button type="button" class="testZoomButton" aria-label="Fit whole tree">Fit</button>
+        <button
+          type="button"
+          class="testZoomButton"
+          aria-label="Reset zoom to 1:1"
+          onclick="this.dataset.clicked = 'true'"
+        >
+          1:1
+        </button>
+        <output class="testZoomPercent">100%</output>
+      </div>
+      <button type="button" class="synthTab" data-synth-tab>
+        <span class="synthTabDiamond"></span>
+        <span class="synthTabLabel">Synthesis</span>
+        <span class="synthTabVerdict">Verdict</span>
+      </button>
+    </main>
+  `);
+
+  const reset = page.getByRole("button", { name: "Reset zoom to 1:1" });
+  await reset.click({ timeout: 1_000 });
+
+  const tabBox = await page.locator("[data-synth-tab]").boundingBox();
+  const zoomBox = await page.locator(".testZoomCluster").boundingBox();
+  expect(tabBox).not.toBeNull();
+  expect(zoomBox).not.toBeNull();
+  expect(intersects(tabBox!, zoomBox!)).toBe(false);
+  await expect(reset).toHaveAttribute("data-clicked", "true");
+});
