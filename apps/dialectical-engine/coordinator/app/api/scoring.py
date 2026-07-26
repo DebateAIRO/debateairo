@@ -15,6 +15,7 @@ from app.exploration.expansion_dispatch import (
     admit_and_spawn,
     clear_adaptive_stop,
 )
+from app.exploration.reason_copy import humanize_reason
 from app.models.entities import Debate, Job, Node, NodeFeedbackVote, NodeScoringResult, now_utc
 from app.providers import ProviderRegistry, detect_codex_scoring_config
 from app.scoring import AdaptiveDepthDryRunItem, DebateScoringResponse
@@ -451,18 +452,33 @@ async def approve_adaptive_depth_expansion(
     queued_node_ids: list[str] = []
     for item in recorded_items:
         node = db.get(Node, item.node_id)
+        # FW3 (I-4): the audit id goes IN, not on afterwards. It is both the
+        # audit linkage and the operator-origin marker the operator budget
+        # rail counts (expansion_dispatch._operator_expand_jobs), so it must
+        # be committed atomically with the job -- patched-on afterwards it
+        # would not be visible to the very next iteration's rail check.
         job, outcome = admit_and_spawn(
             db,
             debate,
             node,
             polarity="CON",
             reason=_user_approved_expansion_reason(item, payload.approval_reason),
+            approval_audit_id=audit_record.id,
         )
         if job is None:
-            outcomes.append({"node_id": item.node_id, "applied": False, "reason": outcome})
+            # Every refusal annotated, in the operator's own words as well as
+            # the raw code: the audit record below carries these outcomes, and
+            # `reason_human` is what a person reads when the ceiling that just
+            # refused them is one only an operator knob can move.
+            outcomes.append(
+                {
+                    "node_id": item.node_id,
+                    "applied": False,
+                    "reason": outcome,
+                    "reason_human": humanize_reason(outcome),
+                }
+            )
             continue
-        # Audit linkage travels with the job (additive payload key).
-        job.payload = {**(job.payload or {}), "approval_audit_id": audit_record.id}
         queued_node_ids.append(item.node_id)
         jobs_payload.append({"node_id": item.node_id, "job_id": job.id, "status": "queued"})
         outcomes.append(

@@ -62,6 +62,30 @@ DEFAULT_EXPANSION_MAX_ROUNDS = 12
 DEFAULT_EXPANSION_MAX_PER_NODE = 3
 DEFAULT_EXPANSION_MAX_PER_DEBATE = 150
 
+# FW3 (I-4): the OPERATOR rail, PARALLEL to the adaptive rails above and
+# never shared with them.
+#
+# The rails above count adaptive-origin jobs only (see _adaptive_expand_jobs)
+# because an operator override must not SPEND the automation's budget -- the
+# ruling precedent app/api/scoring.py already followed for rounds_completed.
+# That is right, and it is also not the whole rule: "does not spend the
+# automation's budget" and "has no ceiling at all" are different claims, and
+# narrowing the rails collapsed them, leaving approved growth bounded only by
+# the depth rail, _node_expandable and worker capacity.
+#
+# So approvals get their own quantitative ceiling, counted over their own
+# jobs. Defaults deliberately equal the adaptive ones and are deliberately
+# generous: this is a backstop against operator error, UI double-submission
+# or a scripted loop immediately before the first deep frontier run -- not a
+# policy on how much an operator may explore. Env-only, and deliberately NOT
+# in BUDGET_BOUNDS: that dict is what merged_debate_config lets a CLIENT set
+# at debate creation, and a client must not be able to raise the ceiling that
+# bounds it.
+OPERATOR_EXPANSION_MAX_PER_NODE_ENV = "DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE"
+OPERATOR_EXPANSION_MAX_PER_DEBATE_ENV = "DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE"
+DEFAULT_OPERATOR_EXPANSION_MAX_PER_NODE = DEFAULT_EXPANSION_MAX_PER_NODE
+DEFAULT_OPERATOR_EXPANSION_MAX_PER_DEBATE = DEFAULT_EXPANSION_MAX_PER_DEBATE
+
 # debate.config additive bookkeeping (written ONLY with the flag on):
 # {"adaptive_expansion": {"rounds_completed": int, "stopped_because": str}}.
 ADAPTIVE_EXPANSION_CONFIG_KEY = "adaptive_expansion"
@@ -88,6 +112,14 @@ OUTCOME_SCALAR_ANNOTATE_ONLY = "annotate_only_scalar_signal"
 OUTCOME_BUDGET_EXHAUSTED = "budget_exhausted"
 OUTCOME_ROUNDS_EXHAUSTED = "rounds_exhausted"
 OUTCOME_NODE_BUDGET_EXHAUSTED = "node_budget_exhausted"
+# FW3 (I-4): the operator rail's two refusals, distinct from the automation's
+# for the same reason the three above are distinct from each other -- they
+# demand a different response. Neither DIALECTICAL_EXPANSION_MAX_PER_DEBATE
+# nor _PER_NODE can move these; only the DIALECTICAL_OPERATOR_* knobs can,
+# and an operator who has genuinely approved 150 expansions on one debate
+# should be told that, not told the automation ran out of budget.
+OUTCOME_OPERATOR_BUDGET_EXHAUSTED = "operator_budget_exhausted"
+OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED = "operator_node_budget_exhausted"
 OUTCOME_DEFERRED_NO_CAPACITY = "deferred_no_capacity"
 OUTCOME_TARGET_NOT_EXPANDABLE = "target_not_expandable"
 OUTCOME_BELOW_PRIORITY_FLOOR = "below_priority_floor"
@@ -120,7 +152,12 @@ OUTCOME_DEPTH_LIMIT = "depth_limit"
 #   * OUTCOME_SCALAR_ANNOTATE_ONLY -- THE LAW refused it at the gate;
 #   * OUTCOME_TARGET_NOT_EXPANDABLE -- the target is gone (staled, abandoned,
 #     incomplete), which is a property of the node, not of the frontier;
-#   * OUTCOME_SPAWNED -- growth did not stop at all.
+#   * OUTCOME_SPAWNED -- growth did not stop at all;
+#   * OUTCOME_OPERATOR_* (FW3, I-4) -- these refuse an APPROVAL, not a
+#     lifecycle decision. Nothing on that path writes a dispatch_outcome (the
+#     approval endpoint annotates its own audit record instead), and the
+#     automatic frontier's growth did not stop when an operator hit their own
+#     ceiling. They are still annotated, and still have their own human copy.
 GROWTH_STOP_OUTCOMES: frozenset[str] = frozenset(
     {
         OUTCOME_BUDGET_EXHAUSTED,
@@ -255,6 +292,17 @@ BUDGET_BOUNDS: dict[str, tuple[int, int]] = {
     "max_per_debate": (0, 200),
 }
 
+# FW3 (I-4): kept OUT of BUDGET_BOUNDS deliberately -- app.services.
+# orchestrator.merged_debate_config iterates BUDGET_BOUNDS to decide which
+# budget keys a client may set in debate.config at creation time, and the
+# ceiling that bounds operator approvals must not be settable by the caller
+# it bounds. Same ranges as their adaptive twins so the two rails clamp
+# alike.
+OPERATOR_BUDGET_BOUNDS: dict[str, tuple[int, int]] = {
+    "operator_max_per_node": BUDGET_BOUNDS["max_per_node"],
+    "operator_max_per_debate": BUDGET_BOUNDS["max_per_debate"],
+}
+
 
 def _config_budget(debate: Debate | None, key: str, env_value: int) -> int:
     if debate is None:
@@ -294,6 +342,25 @@ def expansion_max_per_debate(debate: Debate | None = None) -> int:
             DEFAULT_EXPANSION_MAX_PER_DEBATE,
             *BUDGET_BOUNDS["max_per_debate"],
         ),
+    )
+
+
+# FW3 (I-4): no `debate` parameter and no _config_budget route on purpose --
+# the operator rails are env-only (see OPERATOR_BUDGET_BOUNDS above), so a
+# debate.config a client supplied at creation can never widen them.
+def operator_expansion_max_per_node() -> int:
+    return int_env(
+        OPERATOR_EXPANSION_MAX_PER_NODE_ENV,
+        DEFAULT_OPERATOR_EXPANSION_MAX_PER_NODE,
+        *OPERATOR_BUDGET_BOUNDS["operator_max_per_node"],
+    )
+
+
+def operator_expansion_max_per_debate() -> int:
+    return int_env(
+        OPERATOR_EXPANSION_MAX_PER_DEBATE_ENV,
+        DEFAULT_OPERATOR_EXPANSION_MAX_PER_DEBATE,
+        *OPERATOR_BUDGET_BOUNDS["operator_max_per_debate"],
     )
 
 
@@ -946,6 +1013,30 @@ def _adaptive_expand_jobs(jobs: list[Job]) -> list[Job]:
     return [job for job in jobs if _job_payload(job).get("decision_record_id")]
 
 
+def _operator_expand_jobs(jobs: list[Job]) -> list[Job]:
+    """The v2_expand jobs an OPERATOR approved (FW3, I-4).
+
+    Marked by `approval_audit_id`, which app/api/scoring.py's approval loop
+    passes into admit_and_spawn and queue_v2_expand_job writes into the
+    payload ATOMICALLY WITH THE JOB -- the same mechanism, and the same
+    unspoofability argument, as `decision_record_id` for adaptive origin
+    (`payload_extra` may set neither: see _RESERVED_EXPAND_PAYLOAD_KEYS in
+    app.services.dialectical_v2).
+
+    The two origins are disjoint by construction: the dispatcher supplies a
+    decision_record_id and no audit id, the approval endpoint supplies an
+    audit id and no decision_record_id. A job carrying neither is feature
+    growth (cross-examination, adversarial POV), which never passes through
+    admit_and_spawn and therefore spends neither rail -- unchanged by this.
+    """
+    return [
+        job
+        for job in jobs
+        if _job_payload(job).get("approval_audit_id")
+        and not _job_payload(job).get("decision_record_id")
+    ]
+
+
 def _existing_job_for_decision(jobs: list[Job], record_id: str) -> Job | None:
     for job in jobs:
         if _job_payload(job).get("decision_record_id") == record_id:
@@ -1016,13 +1107,16 @@ def admit_and_spawn(
     polarity: str,
     reason: str,
     decision_record_id: str | None = None,
+    approval_audit_id: str | None = None,
     jobs: list[Job] | None = None,
 ) -> tuple[Job | None, str]:
     """Budget + capacity admission, then spawn through the W3 primitive.
 
     Returns (job, outcome): outcome is OUTCOME_SPAWNED with the committed Job,
-    or an honest refusal code with None. Shared by the adaptive dispatcher and
-    the user-approval path (same budgets, same capacity admission).
+    or an honest refusal code with None. Shared by the adaptive dispatcher
+    (which supplies `decision_record_id`) and the operator-approval path
+    (which supplies `approval_audit_id`): same capacity admission, same
+    primitive, PARALLEL budget rails -- see the rail block below.
     """
     from app.services.dialectical_v2 import queue_v2_expand_job
     from app.services.orchestrator import capable_online_workers
@@ -1039,20 +1133,36 @@ def admit_and_spawn(
             return None, OUTCOME_DEPTH_LIMIT
         return None, OUTCOME_TARGET_NOT_EXPANDABLE
     assert node is not None
-    # Both rails count ADAPTIVE-ORIGIN expansions only (see
-    # _adaptive_expand_jobs for the mechanism, the ruling precedent it
-    # follows, and the live measurement that forced it). A cross-exam,
-    # adversarial-POV or operator-approved expansion is real growth, and it
-    # is still bounded by its own feature's rules, the depth rail and
-    # _node_expandable -- it simply does not spend the automation's budget.
-    adaptive_jobs = _adaptive_expand_jobs(jobs)
-    if len(adaptive_jobs) >= expansion_max_per_debate(debate):
-        return None, OUTCOME_BUDGET_EXHAUSTED
-    if _expand_job_count_for_node(adaptive_jobs, node.id) >= expansion_max_per_node(debate):
-        # Its OWN code (I1): the debate budget above may be wide open, and
-        # "one hot node absorbed its share" is a different finding from "the
-        # debate spent its ceiling".
-        return None, OUTCOME_NODE_BUDGET_EXHAUSTED
+    # TWO PARALLEL RAILS, never shared (FW3, I-4).
+    #
+    # Adaptive rails count ADAPTIVE-ORIGIN jobs only (see _adaptive_expand_jobs
+    # for the mechanism, the ruling precedent it follows, and the live
+    # measurement that forced it): an operator override must not SPEND the
+    # automation's budget. Operator rails count OPERATOR-ORIGIN jobs only, for
+    # the mirror-image reason -- an operator must not be refused for budget
+    # the automation spent, and must still have a ceiling.
+    #
+    # Each origin is measured against its own rail and only its own. Both
+    # branches are refusal-only: nothing here can admit a record, only refuse
+    # one, and THE LAW (signal_class == "categorical") runs earlier, in the
+    # dispatch loop, and is untouched. Feature growth (cross-exam,
+    # adversarial POV) carries neither marker and never reaches this function
+    # at all, so it spends neither rail -- unchanged.
+    if approval_audit_id:
+        operator_jobs = _operator_expand_jobs(jobs)
+        if len(operator_jobs) >= operator_expansion_max_per_debate():
+            return None, OUTCOME_OPERATOR_BUDGET_EXHAUSTED
+        if _expand_job_count_for_node(operator_jobs, node.id) >= operator_expansion_max_per_node():
+            return None, OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED
+    else:
+        adaptive_jobs = _adaptive_expand_jobs(jobs)
+        if len(adaptive_jobs) >= expansion_max_per_debate(debate):
+            return None, OUTCOME_BUDGET_EXHAUSTED
+        if _expand_job_count_for_node(adaptive_jobs, node.id) >= expansion_max_per_node(debate):
+            # Its OWN code (I1): the debate budget above may be wide open, and
+            # "one hot node absorbed its share" is a different finding from
+            # "the debate spent its ceiling".
+            return None, OUTCOME_NODE_BUDGET_EXHAUSTED
     # Capacity admission: spawn only when a capable online worker exists for
     # the expansion's model; otherwise defer honestly (no spawn, eligible
     # again on a later pass). The model is chosen once here (challenger-
@@ -1069,6 +1179,7 @@ def admit_and_spawn(
             reason,
             expansion_model,
             decision_record_id=decision_record_id,
+            approval_audit_id=approval_audit_id,
         )
     except ValueError as exc:
         # Defensive backstop for a validation _node_expandable does NOT

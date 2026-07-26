@@ -729,14 +729,21 @@ def test_user_approved_spawn_clears_a_stale_stop_reason(db, monkeypatch) -> None
 def test_user_approved_expansion_that_queues_nothing_leaves_the_stop_reason(
     db, monkeypatch
 ) -> None:
-    """A refused approval changed nothing, so the recorded stop is still true."""
+    """A refused approval changed nothing, so the recorded stop is still true.
+
+    FW3 amendment (I-4): the knob that refuses an approval is now the
+    OPERATOR rail, not the automation's. The adaptive rails count adaptive-
+    origin jobs only (b1bce5e) and this call has none, so
+    DIALECTICAL_EXPANSION_MAX_PER_DEBATE=0 no longer refuses it -- it only
+    ever did because zero refuses any count. Same refusal, honestly sourced.
+    """
     from fastapi.testclient import TestClient
 
     from app.exploration.expansion_dispatch import STOPPED_WALL_CLOCK, record_adaptive_stop
     from app.main import app
 
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
-    monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "0")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "0")
     worker = codex_worker(db)
     debate = make_v2_debate(db, worker)
     target = first_pov_pro(db, debate)
@@ -757,12 +764,23 @@ def test_user_approved_expansion_that_queues_nothing_leaves_the_stop_reason(
 
 
 def test_user_approved_expansion_refuses_budget_honestly_flag_on(db, monkeypatch) -> None:
+    """FW3 amendment (I-4): approvals are refused by the OPERATOR rail.
+
+    Before b1bce5e both rails counted every v2_expand job, so an approval was
+    bounded by the automation's budget -- which charged an operator override
+    for budget the automation spent. b1bce5e fixed that and left approvals
+    bounded by nothing quantitative at all. They now have a parallel rail with
+    its own knob and its own refusal code, so the operator is never told to
+    raise DIALECTICAL_EXPANSION_MAX_PER_DEBATE for a stop that knob cannot
+    move. This test was written against the shared rail; it now pins the
+    operator one.
+    """
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "true")
-    monkeypatch.setenv("DIALECTICAL_EXPANSION_MAX_PER_DEBATE", "0")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "0")
     worker = codex_worker(db)
     debate = make_v2_debate(db, worker)
     target = first_pov_pro(db, debate)
@@ -780,12 +798,27 @@ def test_user_approved_expansion_refuses_budget_honestly_flag_on(db, monkeypatch
     assert body["queued_node_ids"] == []
     assert body["jobs"] == []
     assert body["outcomes"] == [
-        {"node_id": target.id, "applied": False, "reason": "budget_exhausted"}
+        {
+            "node_id": target.id,
+            "applied": False,
+            "reason": "operator_budget_exhausted",
+            # Every refusal annotated, and readable: the raw code alone would
+            # send an operator to the wrong knob.
+            "reason_human": (
+                "This debate has already had as many approved expansions as "
+                "approvals may add to one debate."
+            ),
+        }
     ]
-    assert "budget_exhausted" in body["reason"]
+    assert "operator_budget_exhausted" in body["reason"]
     assert body["audit_record_id"] is not None
     db.expire_all()
     assert expand_jobs(db, debate.id) == []
+    # The refusal is durable on the audit record, not only in the response.
+    from app.models.entities import ProvenanceRecord
+
+    audit = db.get(ProvenanceRecord, body["audit_record_id"])
+    assert audit.metadata_json["applied_outcomes"] == body["outcomes"]
 
 
 # ---------------------------------------------------------------------------

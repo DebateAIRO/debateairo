@@ -1862,6 +1862,13 @@ def branch_lens_label(db: Session, node: Node) -> str:
     return str((current.claim if current is not None else "") or "").strip()
 
 
+# FW3 (I-8): the two payload keys that decide which budget rail an expansion
+# is counted against (app.exploration.expansion_dispatch._adaptive_expand_jobs
+# / ._operator_expand_jobs). Each has its own keyword argument; `payload_extra`
+# may not set either.
+_RESERVED_EXPAND_PAYLOAD_KEYS = frozenset({"decision_record_id", "approval_audit_id"})
+
+
 def queue_v2_expand_job(
     db: Session,
     debate: Debate,
@@ -1871,6 +1878,7 @@ def queue_v2_expand_job(
     model_id: str | None = None,
     *,
     decision_record_id: str | None = None,
+    approval_audit_id: str | None = None,
     payload_extra: dict[str, Any] | None = None,
 ) -> Job:
     """Queue ONE single-node expansion under `node` (the W3 primitive).
@@ -1962,10 +1970,32 @@ def queue_v2_expand_job(
         # this job travels in the payload, committed atomically with the job,
         # so a dispatch replay can never double-spawn for the same decision.
         payload["decision_record_id"] = decision_record_id
+    if approval_audit_id:
+        # FW3 (I-4): the operator-approval linkage, written HERE rather than
+        # patched onto job.payload after the fact, for the same reason
+        # decision_record_id is -- it is committed atomically with the job, so
+        # the operator budget rail (expansion_dispatch._operator_expand_jobs)
+        # counts a marker that exists from the job's first durable instant.
+        payload["approval_audit_id"] = approval_audit_id
     if payload_extra:
         # Additive markers/provenance for the caller (e.g. Task 14's adversarial
-        # attacker markers), committed atomically with the job. Never overrides
-        # the structural keys above.
+        # attacker markers), committed atomically with the job.
+        #
+        # FW3 (I-8): the ORIGIN keys are reserved and rejected outright. The
+        # old `setdefault` merge claimed it "never overrides the structural
+        # keys above", which was true only for keys already PRESENT --
+        # decision_record_id and approval_audit_id are absent whenever their
+        # kwarg is falsy, so payload_extra could have forged either origin.
+        # No caller does, but both keys now carry budget authority, and a
+        # forged origin would spend (or dodge) a rail. Raising beats dropping:
+        # a caller passing an origin key is confused about which mechanism it
+        # is using, and should hear about it.
+        forged = _RESERVED_EXPAND_PAYLOAD_KEYS.intersection(payload_extra)
+        if forged:
+            raise ValueError(
+                "payload_extra may not set expansion origin keys: "
+                + ", ".join(sorted(forged))
+            )
         for key, value in payload_extra.items():
             payload.setdefault(key, value)
     job.payload = payload

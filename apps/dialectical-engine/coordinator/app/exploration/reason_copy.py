@@ -63,6 +63,20 @@ REASON_CODE_HUMAN_COPY: dict[str, str] = {
         "Automatic expansion paused because the points it wanted to pursue had already "
         "been grown as many times as any single point may be."
     ),
+    # FW3 (I-4): the OPERATOR rail's two refusals. Deliberately never say
+    # "Automatic expansion": nothing automatic stopped, and the automation's
+    # budget may be untouched. They name the approvals, because the only knobs
+    # that move these are DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE /
+    # _PER_NODE -- telling an operator to raise the automation's budget here
+    # would be advice that cannot work.
+    "operator_budget_exhausted": (
+        "This debate has already had as many approved expansions as approvals "
+        "may add to one debate."
+    ),
+    "operator_node_budget_exhausted": (
+        "This point has already had as many approved expansions as approvals "
+        "may add to any single point."
+    ),
     "deferred_no_capacity": (
         "Automatic expansion paused because no capable worker was available; "
         "it will resume when one is."

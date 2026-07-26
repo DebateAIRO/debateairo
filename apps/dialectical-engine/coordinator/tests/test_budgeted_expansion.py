@@ -16,9 +16,12 @@ from __future__ import annotations
 
 from app.exploration.expansion_dispatch import (
     BUDGET_BOUNDS,
+    OPERATOR_BUDGET_BOUNDS,
     OUTCOME_BUDGET_EXHAUSTED,
     OUTCOME_DEPTH_LIMIT,
     OUTCOME_NODE_BUDGET_EXHAUSTED,
+    OUTCOME_OPERATOR_BUDGET_EXHAUSTED,
+    OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED,
     OUTCOME_ROUNDS_EXHAUSTED,
     OUTCOME_SPAWNED,
     STOPPED_DEPTH_LIMIT,
@@ -28,6 +31,8 @@ from app.exploration.expansion_dispatch import (
     expansion_max_per_debate,
     expansion_max_per_node,
     expansion_max_rounds,
+    operator_expansion_max_per_debate,
+    operator_expansion_max_per_node,
 )
 from app.models.entities import Debate
 from app.services.orchestrator import merged_debate_config
@@ -357,3 +362,233 @@ def test_operator_approved_spawns_do_not_consume_the_adaptive_budget(db, monkeyp
 
     assert approved_outcome == OUTCOME_SPAWNED and approved is not None
     assert adaptive_outcome == OUTCOME_SPAWNED and adaptive is not None
+
+
+# ---------------------------------------------------------------------------
+# FW3 (I-4): the OPERATOR rail, parallel to the adaptive one
+#
+# b1bce5e narrowed both adaptive rails to adaptive-origin jobs, which was
+# right -- an operator override must not SPEND the automation's budget (the
+# ruling precedent in app/api/scoring.py, clear_adaptive_stop) -- but it left
+# operator-approved growth bounded by no quantitative rail at all. "Does not
+# spend the automation's budget" and "has no ceiling" are different claims;
+# the fix conflated them. The approval path now counts its OWN jobs against
+# its OWN env-tunable limits: same generous defaults (3 per node, 150 per
+# debate), refusal-only, and its own outcome codes so an operator stop can
+# never be misread as the automation running out.
+# ---------------------------------------------------------------------------
+
+
+def _approved(db, debate, node, *, reason: str, audit_id: str = "audit-1"):
+    """Exactly the call app/api/scoring.py's approval loop makes."""
+
+    return admit_and_spawn(
+        db,
+        debate,
+        node,
+        polarity="CON",
+        reason=reason,
+        approval_audit_id=audit_id,
+    )
+
+
+def test_operator_approvals_are_refused_at_their_own_per_node_ceiling(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "2")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "50")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+
+    first, first_outcome = _approved(db, debate, node, reason="operator approved one")
+    second, second_outcome = _approved(db, debate, node, reason="operator approved two")
+    third, third_outcome = _approved(db, debate, node, reason="operator approved three")
+
+    assert (first_outcome, second_outcome) == (OUTCOME_SPAWNED, OUTCOME_SPAWNED)
+    assert first is not None and second is not None
+    # Refusal-only, and its own code: "the operator hit their own per-node
+    # ceiling" is not "one hot node absorbed the automation's share".
+    assert third is None and third_outcome == OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED
+
+
+def test_operator_approvals_are_refused_at_their_own_per_debate_ceiling(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "5")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "1")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+
+    first, first_outcome = _approved(db, debate, node, reason="operator approved one")
+    second, second_outcome = _approved(db, debate, node, reason="operator approved two")
+
+    assert first_outcome == OUTCOME_SPAWNED and first is not None
+    assert second is None and second_outcome == OUTCOME_OPERATOR_BUDGET_EXHAUSTED
+
+
+def test_a_spent_adaptive_budget_never_refuses_an_operator_approval(db, monkeypatch) -> None:
+    """The precedent this preserves: an override must not be charged for
+    budget the automation spent."""
+
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "5")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "50")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 1, "max_per_debate": 1})
+
+    adaptive, adaptive_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree", decision_record_id="decision-1"
+    )
+    exhausted, exhausted_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree again", decision_record_id="decision-2"
+    )
+    approved, approved_outcome = _approved(db, debate, node, reason="operator approved this")
+
+    assert adaptive_outcome == OUTCOME_SPAWNED and adaptive is not None
+    assert exhausted is None and exhausted_outcome == OUTCOME_BUDGET_EXHAUSTED
+    assert approved_outcome == OUTCOME_SPAWNED and approved is not None
+
+
+def test_operator_approvals_never_spend_the_adaptive_rails(db, monkeypatch) -> None:
+    """The other direction of the same rule, now that operator jobs are
+    counted: filling the operator rail must leave the automation's budget
+    untouched."""
+
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "2")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "50")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 1, "max_per_debate": 50})
+
+    _approved(db, debate, node, reason="operator approved one")
+    _approved(db, debate, node, reason="operator approved two")
+    adaptive, adaptive_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree", decision_record_id="decision-1"
+    )
+
+    assert adaptive_outcome == OUTCOME_SPAWNED and adaptive is not None
+
+
+def test_adaptive_spawns_never_spend_the_operator_rails(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "1")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "50")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 5, "max_per_debate": 50})
+
+    admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree", decision_record_id="decision-1"
+    )
+    approved, approved_outcome = _approved(db, debate, node, reason="operator approved this")
+
+    assert approved_outcome == OUTCOME_SPAWNED and approved is not None
+
+
+def test_feature_expansions_spend_neither_rail(db, monkeypatch) -> None:
+    """Cross-exam and adversarial-POV jobs carry neither marker: they never
+    reached admit_and_spawn in the first place, so neither rail counts them
+    and this fix does not quietly start charging them to the operator."""
+
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE", "1")
+    monkeypatch.setenv("DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE", "1")
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _non_adaptive_expand_job(db, debate, node, reason="cross-examine this claim")
+
+    approved, approved_outcome = _approved(db, debate, node, reason="operator approved this")
+
+    assert approved_outcome == OUTCOME_SPAWNED and approved is not None
+
+
+def test_operator_rail_defaults_match_the_adaptive_rails(monkeypatch) -> None:
+    """Deliberately generous: this is a backstop against operator error, UI
+    double-submission or a scripted loop, not a policy on how much an
+    operator may explore."""
+
+    for name in (
+        "DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_NODE",
+        "DIALECTICAL_OPERATOR_EXPANSION_MAX_PER_DEBATE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert operator_expansion_max_per_node() == 3
+    assert operator_expansion_max_per_debate() == 150
+    assert OPERATOR_BUDGET_BOUNDS["operator_max_per_debate"] == (0, 200)
+
+
+def test_operator_rails_are_env_only_and_not_settable_from_debate_config() -> None:
+    """A client must not be able to raise the ceiling that bounds it. The
+    creation-time sanitizer reads BUDGET_BOUNDS, so the operator knobs stay
+    out of it."""
+
+    assert "operator_max_per_node" not in BUDGET_BOUNDS
+    assert "operator_max_per_debate" not in BUDGET_BOUNDS
+    merged = merged_debate_config(
+        {"adaptive_expansion": {"operator_max_per_node": 99, "max_rounds": 3}}
+    )
+    assert merged["adaptive_expansion"] == {"max_rounds": 3}
+
+
+def test_the_five_expansion_stop_rails_have_distinct_codes() -> None:
+    """FW1's I1 principle, extended: five rails, five findings, five operator
+    responses. Merging the operator codes into the adaptive ones would tell an
+    operator to raise DIALECTICAL_EXPANSION_MAX_PER_DEBATE for a stop that
+    knob cannot move."""
+
+    assert len(
+        {
+            OUTCOME_ROUNDS_EXHAUSTED,
+            OUTCOME_BUDGET_EXHAUSTED,
+            OUTCOME_NODE_BUDGET_EXHAUSTED,
+            OUTCOME_OPERATOR_BUDGET_EXHAUSTED,
+            OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED,
+        }
+    ) == 5
+
+
+def test_every_operator_refusal_code_has_its_own_human_copy() -> None:
+    """Every refusal is annotated, and the annotation reaches a human without
+    the generic fallback."""
+
+    from app.exploration.reason_copy import DEFAULT_REASON_HUMAN_COPY, humanize_reason
+
+    for code in (OUTCOME_OPERATOR_BUDGET_EXHAUSTED, OUTCOME_OPERATOR_NODE_BUDGET_EXHAUSTED):
+        copy = humanize_reason(code)
+        assert copy and copy != DEFAULT_REASON_HUMAN_COPY
+        # Not the automation's copy: this stop is about the approvals the
+        # operator made, and says so.
+        assert "Automatic expansion" not in copy
+
+
+def test_payload_extra_cannot_forge_an_expansion_origin(db) -> None:
+    """FW3 (I-8): both origin markers now carry budget authority.
+
+    The old `payload.setdefault(key, value)` merge was documented as never
+    overriding the structural keys, which held only for keys already PRESENT
+    -- and an origin key is absent whenever its kwarg is falsy. A caller
+    passing `payload_extra={"decision_record_id": ...}` could therefore have
+    forged adaptive origin and dodged the operator rail (or, now, the reverse).
+    No caller does; the keys are reserved before one starts.
+    """
+
+    import pytest
+
+    from app.services.dialectical_v2 import queue_v2_expand_job
+
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+
+    for forged in ({"decision_record_id": "forged"}, {"approval_audit_id": "forged"}):
+        with pytest.raises(ValueError, match="expansion origin keys"):
+            queue_v2_expand_job(db, debate, node, "CON", "forge an origin", payload_extra=forged)
+
+    # The legitimate additive markers still pass untouched.
+    job = queue_v2_expand_job(
+        db, debate, node, "CON", "cross-examine this claim", payload_extra={"cross_exam": True}
+    )
+    assert job.payload["cross_exam"] is True
+    assert "decision_record_id" not in job.payload
+    assert "approval_audit_id" not in job.payload
