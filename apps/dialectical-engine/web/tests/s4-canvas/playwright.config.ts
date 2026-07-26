@@ -6,6 +6,17 @@ const mockPort = Number(process.env.S4_MOCK_PORT ?? 8104);
 const baseURL = `http://127.0.0.1:${webPort}`;
 const mockURL = `http://127.0.0.1:${mockPort}`;
 const webRoot = resolve(__dirname, "../..");
+const requestedBrowser = process.env.S4_BROWSER;
+const browserName =
+  requestedBrowser === "firefox" || requestedBrowser === "webkit"
+    ? requestedBrowser
+    : "chromium";
+const desktopDevice =
+  browserName === "firefox"
+    ? devices["Desktop Firefox"]
+    : browserName === "webkit"
+      ? devices["Desktop Safari"]
+      : devices["Desktop Chrome"];
 
 export default defineConfig({
   testDir: ".",
@@ -17,9 +28,9 @@ export default defineConfig({
   workers: 1,
   reporter: "line",
   use: {
-    ...devices["Desktop Chrome"],
+    ...desktopDevice,
     baseURL,
-    browserName: "chromium",
+    browserName,
     trace: "retain-on-failure",
     viewport: { width: 1440, height: 900 }
   },
