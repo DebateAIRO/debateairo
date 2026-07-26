@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, hold_write_lock
 from app.evidence.verification_evaluator import (
     evaluate_evidence_verdict,
     evidence_node_verification_eligible,
@@ -290,33 +290,65 @@ def reevaluate_lifecycle_after_scoring_completion(
         # releases SQLite's RESERVED writer, which the flushed-but-uncommitted
         # verification writes were holding.
         #
-        # NO OUTER WRITE LOCK (FW3, I-6; corrected 2026-07-26). This phase
-        # used to run inside one hold_write_lock() spanning the whole per-node
-        # loop, justified as keeping a read snapshot fresh. That justification
-        # was wrong -- a pure ORM read opens no SQLite transaction here (see
-        # app/scoring/service.py's pre-CLI commit comment for the corrected
-        # mechanism) -- and the hold was not free: it scaled with eligible-node
-        # count (34 on the live P1 debate), and every other in-process writer
-        # (worker heartbeat `last_seen` UPDATEs, job lease refreshes,
-        # generation completion) blocked on it for the whole span, with
-        # POST /api/workers/{id}/poll doing blocking SQLite on the event loop
-        # so the stall reached SSE and every async endpoint too.
+        # TWO PHASES, AND THE LOCK COVERS EXACTLY THE SECOND (FW3 re-review,
+        # NB-1). THE RULE, and it is general: never leave SQLite's RESERVED
+        # writer held while the process write lock is free.
         #
-        # The one operation that genuinely needs serializing is
-        # persist_lifecycle_decision's idempotency-key check-then-insert, and
-        # it takes the same process-wide RLock itself, around exactly that --
-        # so the lock is already exactly as narrow as it needs to be.
+        # Why that is the rule. Every in-process writer goes through
+        # app.core.write_lock, so it takes the RLock and THEN talks to SQLite.
+        # If this phase holds RESERVED (which it does from the first
+        # authenticated INSERT to the final commit) with the RLock free, a
+        # worker heartbeat, a job lease refresh or a generation completion
+        # acquires the RLock, blocks inside SQLite on our RESERVED lock, and we
+        # can no longer commit -- committing needs that same RLock. Neither
+        # side can move until busy_timeout (30s in production) expires and the
+        # contender dies with "database is locked". That is the failure family
+        # this branch exists to remove, and the string the flip plan's
+        # acceptance step 6 greps for.
+        #
+        # I-6's objection is still answered, and better than by the shape it
+        # objected to. The expensive part of this phase is the per-node
+        # compute -- decide_lifecycle_for_node issues several reads per node,
+        # 34 nodes on the live P1 debate -- and it takes no locks and writes
+        # nothing. It now runs FIRST, entirely outside the critical section.
+        # What remains inside is bounded and I/O-light: one INSERT per
+        # AUTHENTICATED decision, the node attribute updates, the run marker,
+        # and the commit. So the hold is proportional to decisions persisted,
+        # not to nodes considered, and contains no query loop and no CLI.
+        #
+        # Splitting the phases is semantically free: decide_lifecycle_for_node
+        # reads persisted score/evidence/artifact rows plus the node's own
+        # path_status, and no node's decision reads anything another node's
+        # decision writes -- each node is decided exactly once, and the
+        # decision_timestamp was already captured once for all of them above.
+        #
+        # KNOWN REMAINING INSTANCE of the rule above, deliberately not changed
+        # here: the verification loop overhead just before this. _persist_
+        # verification_attempt(commit=False) flushes under the lock and returns
+        # with the lock released and RESERVED still held, until the NEXT
+        # evidence node's pre-CLI commit_write. That window is short -- a
+        # handful of queries, never a CLI, since the CLI runs after that commit
+        # -- and closing it means changing when verification verdicts become
+        # durable, which is its own decision with its own incident history (see
+        # the commit-not-rollback note above). Recorded so the rule is not read
+        # as already universal.
         commit_write(db)
-        _persist_lifecycle_decisions(
+        decisions = _decide_lifecycle_outcomes(
             db,
             debate=debate,
-            debate_id=debate_id,
-            job_id=job_id,
-            run=run,
             eligible=eligible,
             decision_timestamp=decision_timestamp,
-            event_handoffs=event_handoffs,
         )
+        with hold_write_lock():
+            _persist_lifecycle_decisions(
+                db,
+                debate_id=debate_id,
+                job_id=job_id,
+                run=run,
+                decisions=decisions,
+                decision_timestamp=decision_timestamp,
+                event_handoffs=event_handoffs,
+            )
     except Exception:
         db.rollback()
         raise
@@ -328,33 +360,51 @@ def reevaluate_lifecycle_after_scoring_completion(
         )
 
 
-def _persist_lifecycle_decisions(
+def _decide_lifecycle_outcomes(
     db: Session,
     *,
     debate: Debate,
+    eligible: list[Node],
+    decision_timestamp,
+) -> list[tuple[Node, object]]:
+    """PHASE 1: decide every eligible node. Reads only, no lock, no writes.
+
+    This is the expensive half -- several queries per node -- and none of it
+    needs the write lock or belongs inside it (see the caller's NB-1 note).
+    """
+    return [
+        (
+            node,
+            decide_lifecycle_for_node(
+                db,
+                debate=debate,
+                node=node,
+                decision_timestamp=decision_timestamp,
+            ),
+        )
+        for node in eligible
+    ]
+
+
+def _persist_lifecycle_decisions(
+    db: Session,
+    *,
     debate_id: str,
     job_id: str,
     run: AnalyzerRun,
-    eligible: list[Node],
+    decisions: list[tuple[Node, object]],
     decision_timestamp,
     event_handoffs: list[LifecycleDecisionPersistence],
 ) -> None:
-    """The decision phase of the lifecycle tail.
+    """PHASE 2: persist the authenticated decisions, the run marker, commit.
 
-    One authenticated decision per eligible node, then the run's
-    reevaluation marker and a single commit. Runs under NO outer write lock:
-    the only critical section here is persist_lifecycle_decision's
-    idempotency-key check-then-insert, which holds the process-wide lock
-    itself -- see the caller's comment for why the loop-wide hold this was
-    extracted for was removed.
+    MUST be called with the process write lock already held (the caller does
+    it). Every write in the lifecycle tail happens here, so holding the lock
+    across the whole function is what guarantees SQLite's RESERVED writer --
+    taken by the first INSERT below -- is never held while the lock is free.
+    See the caller's NB-1 note for what that prevents.
     """
-    for node in eligible:
-        outcome = decide_lifecycle_for_node(
-            db,
-            debate=debate,
-            node=node,
-            decision_timestamp=decision_timestamp,
-        )
+    for node, outcome in decisions:
         if not _authenticates_completed_run(
             outcome,
             run=run,
@@ -411,7 +461,7 @@ def _persist_lifecycle_decisions(
             "status": "complete",
             "job_id": job_id,
             "analyzer_run_id": run.id,
-            "node_ids": [node.id for node in eligible],
+            "node_ids": [node.id for node, _outcome in decisions],
         },
     }
     commit_write(db)

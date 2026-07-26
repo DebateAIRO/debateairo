@@ -2,15 +2,28 @@ from __future__ import annotations
 
 import hashlib
 import threading
+import time
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import OperationalError
 
 from app.core.db import SessionLocal
-from app.core.write_lock import hold_write_lock
+from app.core.write_lock import commit_write
 from app.exploration import scoring_completion_lifecycle
-from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, Node, now_utc
+from app.models.entities import (
+    AnalyzerRun,
+    Debate,
+    DebateBranch,
+    Job,
+    JudgeOutputArtifact,
+    LifecycleDecisionRecord,
+    Node,
+    Setting,
+    now_utc,
+)
 from app.providers import ProviderRegistry
 from app.scoring import jobs as scoring_jobs
 from app.scoring.service import queue_scoring_job
@@ -206,65 +219,149 @@ def test_scoring_completion_reevaluates_only_exact_eligible_run_nodes(db, monkey
     assert len(decided_node_ids) == 3
 
 
-def _another_thread_can_take_the_write_lock(timeout: float = 2.0) -> bool:
-    """Can any OTHER in-process writer make progress right now?
+def _start_contending_writer(note: dict[str, object]) -> threading.Thread:
+    """A real in-process writer, started mid-decision-phase.
 
-    The write lock is an RLock, so asking on THIS thread would always say yes
-    (re-entry). A worker heartbeat's `UPDATE workers SET last_seen`, a job
-    lease refresh and a generation completion all run on other threads, and
-    they are what a long hold starves -- so the probe has to be one of them.
+    Shaped exactly like the writers this path competes with in production --
+    a worker heartbeat's `UPDATE workers SET last_seen`, a job lease refresh,
+    a generation completion -- which all write through app.core.write_lock's
+    `commit_write`, i.e. they take the process-wide RLock and THEN talk to
+    SQLite. That order is the whole point: a writer that holds the RLock while
+    blocking inside SQLite on someone else's RESERVED lock deadlocks anything
+    that needs the RLock to release that RESERVED lock.
+
+    `busy_timeout` is pinned low so a wedge fails in a second instead of the
+    production 30, and restored on the same connection before it returns to
+    the pool (see the `db` fixture's dispose note in conftest).
     """
 
-    outcome: dict[str, bool] = {}
-
-    def probe() -> None:
+    def write() -> None:
+        started = time.monotonic()
         try:
-            with hold_write_lock():
-                outcome["acquired"] = True
-        except Exception:  # pragma: no cover - defensive
-            outcome["acquired"] = False
+            with SessionLocal() as other:
+                other.execute(text("PRAGMA busy_timeout=1000"))
+                try:
+                    other.add(Setting(key=f"contender-{uuid4().hex}", value={"probe": True}))
+                    commit_write(other)
+                    note["committed"] = True
+                except OperationalError as exc:
+                    other.rollback()
+                    note["error"] = f"{type(exc).__name__}: {exc}"
+                finally:
+                    other.execute(text("PRAGMA busy_timeout=30000"))
+                    other.commit()
+        except Exception as exc:  # pragma: no cover - defensive
+            note["error"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            note["seconds"] = time.monotonic() - started
 
-    thread = threading.Thread(target=probe, daemon=True)
+    thread = threading.Thread(target=write, daemon=True)
     thread.start()
-    thread.join(timeout)
-    return outcome.get("acquired", False)
+    return thread
 
 
-def test_the_decision_loop_does_not_hold_the_process_write_lock_across_nodes(db, monkeypatch) -> None:
-    """FW3 (I-6): the decision phase must not run inside one write-lock hold.
+def _authentic_outcome(*, run_id: str, node_id: str, decision_timestamp):
+    return SimpleNamespace(
+        authentic_policy_decision=True,
+        input_state="grounded",
+        action="continue",
+        keeps_path_active=True,
+        stopping_reason=f"Authenticated completed-run decision for {node_id}",
+        score_run_id=run_id,
+        score_run_sequence=1,
+        score_record_id=f"score-row-{node_id}",
+        evidence_snapshot_id=f"evidence-{node_id}",
+        current_score_input_hash="a" * 64,
+        scoring_contract_hash="b" * 64,
+        decision_timestamp=decision_timestamp,
+        reason_codes=(),
+        signal_class="scalar",
+    )
 
-    The lock was taken around the WHOLE per-node loop on the (since
-    disproved) theory that it protected a read snapshot. Under the real
-    mechanism it protects nothing there -- persist_lifecycle_decision takes
-    the same lock itself, around exactly the check-then-insert that needs it
-    -- while the hold scaled with eligible-node count (34 on the live
-    debate), blocking every other in-process writer for the whole span. Since
-    POST /api/workers/{id}/poll is an `async def` doing blocking SQLite on the
-    event loop, that hold stalls SSE and every async endpoint with it.
+
+def test_a_contending_writer_is_never_wedged_by_the_decision_phase(db, monkeypatch) -> None:
+    """FW3 re-review NB-1: the decision phase must never leave SQLite's
+    RESERVED writer held while the process write lock is free.
+
+    The first authenticated decision's INSERT takes SQLite's single RESERVED
+    writer, and the session does not commit until the end of the phase. If the
+    RLock is free during that span, this happens: another in-process writer
+    takes the RLock, blocks inside SQLite on our RESERVED lock, and we cannot
+    commit (and so cannot release RESERVED) because committing needs that same
+    RLock. Nothing breaks it but `busy_timeout` -- 30 seconds in production --
+    after which the contender fails with "database is locked", which is the
+    exact string the flip plan's acceptance step 6 greps for.
+
+    So the honest assertion is not "is the lock free" (the previous version of
+    this test asked that, and patched every decision to non-authenticating, so
+    no write ever happened and it could not fail). It is: with real decisions
+    being persisted, can a real in-process writer still get its work done?
+    Under the correct shape it waits on the RLock and then commits; under the
+    broken one it dies on busy_timeout.
     """
 
     debate_id, job_id, run_id, nodes = _persist_completed_operation(db)
-    lock_free_during_decision: list[bool] = []
+    contender: dict[str, object] = {}
+    threads: list[threading.Thread] = []
+    persist_calls = {"count": 0}
+    real_persist = scoring_completion_lifecycle.persist_lifecycle_decision
 
-    def probing_decision(_db, *, debate, node, decision_timestamp):
-        lock_free_during_decision.append(_another_thread_can_take_the_write_lock())
-        return SimpleNamespace(authentic_policy_decision=False)
+    def persist_and_contend(session, *, snapshot):
+        persist_calls["count"] += 1
+        # Fired once the FIRST decision is already flushed, i.e. while
+        # RESERVED is genuinely held and the phase still has work left. Started
+        # and NOT joined here: joining inside would deadlock the test itself
+        # against the very lock discipline under test.
+        if persist_calls["count"] == 2:
+            threads.append(_start_contending_writer(contender))
+            time.sleep(0.05)
+        return real_persist(session, snapshot=snapshot)
 
     monkeypatch.setattr(
         scoring_completion_lifecycle,
         "decide_lifecycle_for_node",
-        probing_decision,
+        lambda _db, *, debate, node, decision_timestamp: _authentic_outcome(
+            run_id=run_id, node_id=node.id, decision_timestamp=decision_timestamp
+        ),
+    )
+    monkeypatch.setattr(
+        scoring_completion_lifecycle,
+        "persist_lifecycle_decision",
+        persist_and_contend,
     )
 
+    started = time.monotonic()
     scoring_completion_lifecycle.reevaluate_lifecycle_after_scoring_completion(
         db,
         debate_id=debate_id,
         job_id=job_id,
         analyzer_run_id=run_id,
     )
+    elapsed = time.monotonic() - started
+    for thread in threads:
+        thread.join(10)
 
-    assert len(lock_free_during_decision) == 3
-    assert all(lock_free_during_decision)
+    # The decisions really were persisted -- without this the probe above
+    # would be measuring an empty loop, which is how the previous version of
+    # this test managed to pass against a broken implementation.
+    assert persist_calls["count"] == 3
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(LifecycleDecisionRecord)
+            .where(LifecycleDecisionRecord.debate_id == debate_id)
+        )
+        == 3
+    )
+    assert contender.get("error") is None, (
+        "an ordinary in-process writer was wedged by the decision phase and "
+        f"failed: {contender.get('error')}"
+    )
+    assert contender.get("committed") is True
+    # A wedge is not merely slow, it is busy_timeout long. Both sides of the
+    # contention finish in milliseconds when the lock discipline is right.
+    assert elapsed < 1.0
+    assert float(contender.get("seconds", 0.0)) < 1.0
 
 
 def test_scoring_completion_rejects_noncanonical_lowercase_node_kind(db, monkeypatch) -> None:
