@@ -65,7 +65,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.core.config import bool_env
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, hold_write_lock
 from app.evidence.lifecycle_input_repository import (
     build_verification_lifecycle_snapshot,
     persist_evidence_lifecycle_snapshot,
@@ -384,8 +384,61 @@ def _persist_verification_attempt(
     lifecycle_evidence: Mapping[str, object] | None = None,
     commit: bool = True,
 ) -> None:
-    """Persist one verifier attempt and its honest lifecycle projection."""
+    """Persist one verifier attempt and its honest lifecycle projection.
 
+    2026-07-26 stale-snapshot discipline: every caller reaches this right
+    after a verifier CLI attempt (success, timeout, provider error, or parse
+    failure alike), so the session's transaction -- if one is open -- dates
+    from BEFORE that CLI ran and its snapshot is stale the moment any other
+    thread committed meanwhile (worker heartbeats do, every few seconds).
+    next_analyzer_run_seq's own hold_write_lock cannot help: the lock must be
+    held when the transaction's FIRST read opens the snapshot, not just at
+    the flush. So: shed any stale snapshot, then run the entire persist --
+    first read through flush (and the commit, when requested) -- inside one
+    hold_write_lock critical section, during which no in-process writer can
+    advance the WAL. There is nothing pending to lose at entry: the pre-CLI
+    commit_write in evaluate_evidence_verdict made every earlier write
+    durable (the killed lifecycle tail of score job 39cf6b82 is the incident
+    copy: 24 verification runs persisted, the 25th flush died, the whole
+    tail -- and with it every lifecycle decision -- was lost).
+
+    The snapshot-shedding rollback lives in evaluate_evidence_verdict
+    immediately after the CLI returns (the one instant guaranteed to have
+    nothing pending); putting it here discarded the caller's in-session
+    verdict mutations and reverted verificationStatus to
+    pending_verification (caught by the lifecycle suite)."""
+    with hold_write_lock():
+        _persist_verification_attempt_locked(
+            db,
+            debate=debate,
+            claim_node=claim_node,
+            evidence_node=evidence_node,
+            judge_role=judge_role,
+            status=status,
+            reason=reason,
+            lineage_metadata=lineage_metadata,
+            checked_at=checked_at,
+            authoritative_evidence=authoritative_evidence,
+            lifecycle_evidence=lifecycle_evidence,
+            commit=commit,
+        )
+
+
+def _persist_verification_attempt_locked(
+    db: Session,
+    *,
+    debate: Debate,
+    claim_node: Node,
+    evidence_node: Node,
+    judge_role: str,
+    status: str,
+    reason: str | None,
+    lineage_metadata: dict,
+    checked_at: datetime | str | None = None,
+    authoritative_evidence: Mapping[str, object] | None = None,
+    lifecycle_evidence: Mapping[str, object] | None = None,
+    commit: bool = True,
+) -> None:
     # Task 12 (P1.3): the verifier's grounded evidence.base_score, when
     # present -- ONLY ever non-None here when status=="supported" AND
     # _authoritative_evidence_payload validated the whole evidence
@@ -540,7 +593,13 @@ def evaluate_evidence_verdict(
     commit_write(db)
     try:
         result = provider.judge_node(request)
+        # Shed the snapshot the CLI wait made stale, at the one instant
+        # guaranteed to have nothing pending (the commit above cleared the
+        # session; the CLI touches no ORM state). Every session mutation and
+        # the locked persist below then run on a fresh view.
+        db.rollback()
     except TimeoutError:
+        db.rollback()
         _persist_verification_attempt(
             db,
             debate=debate,
@@ -554,6 +613,7 @@ def evaluate_evidence_verdict(
         )
         return {"status": "unverifiable", "reason": "verification_judge_call_timed_out"}
     except ProviderError:
+        db.rollback()
         _persist_verification_attempt(
             db,
             debate=debate,

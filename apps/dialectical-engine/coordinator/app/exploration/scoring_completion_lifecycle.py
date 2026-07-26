@@ -1,12 +1,15 @@
 """Lifecycle reevaluation triggered by one durably completed scoring run."""
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, hold_write_lock
+
+LOGGER = logging.getLogger(__name__)
 from app.evidence.verification_evaluator import (
     evaluate_evidence_verdict,
     evidence_node_verification_eligible,
@@ -248,16 +251,91 @@ def reevaluate_lifecycle_after_scoring_completion(
     try:
         for node in eligible:
             for evidence_node in evidence_by_parent.get(node.id, []):
-                evaluate_evidence_verdict(
-                    db,
-                    debate,
-                    node,
-                    evidence_node,
-                    verification_provider,
-                    commit=False,
-                )
+                # 2026-07-26: per-node degradation, matching the judge-panel
+                # precedent -- one evidence node's verification failure must
+                # never kill the whole lifecycle tail. Before this guard, one
+                # transient persist error 25 evidence nodes into the loop
+                # (score job 39cf6b82) discarded all lifecycle decisions and
+                # with them the entire adaptive-expansion dispatch: the P1
+                # frontier never ran. An unverified evidence node is an
+                # honest, fail-closed lifecycle input (the resolver treats a
+                # missing verdict as unresolved); a dead tail is neither.
+                try:
+                    evaluate_evidence_verdict(
+                        db,
+                        debate,
+                        node,
+                        evidence_node,
+                        verification_provider,
+                        commit=False,
+                    )
+                except Exception:
+                    LOGGER.exception(
+                        "evidence verification degraded (non-fatal) debate=%s claim=%s evidence=%s",
+                        debate_id,
+                        node.id,
+                        evidence_node.id,
+                    )
+                    db.rollback()
         decision_timestamp = now_utc()
-        for node in eligible:
+        # 2026-07-26 stale-snapshot discipline: the whole decision phase --
+        # first read through the final commit_write below -- runs inside one
+        # hold_write_lock critical section, so its FIRST read opens a fresh
+        # snapshot while the lock excludes every in-process writer: nothing
+        # can advance the WAL between that read and the commit, which is the
+        # only way a deferred SQLite transaction's write upgrade is
+        # guaranteed not to hit an immediate, unretried SQLITE_BUSY. No CLI
+        # runs inside the block (decide_lifecycle_for_node is persisted-data
+        # compute), so the lock is held for milliseconds, never across a
+        # provider call.
+        #
+        # commit -- NOT rollback -- before taking the lock: the verification
+        # loop's commit=False persists are flushed but uncommitted, so a
+        # rollback here would silently discard every verification verdict
+        # (the lifecycle suite caught exactly that as verificationStatus
+        # reverting to pending_verification). Committing makes the expensive
+        # CLI-derived verifications durable-early -- the same call the F1
+        # panel fix made deliberately -- and a crash between here and the
+        # decision commit leaves durable verifications + no decisions, which
+        # the next scoring pass redecides benignly.
+        commit_write(db)
+        with hold_write_lock():
+            _persist_lifecycle_decisions_locked(
+                db,
+                debate=debate,
+                debate_id=debate_id,
+                job_id=job_id,
+                run=run,
+                eligible=eligible,
+                decision_timestamp=decision_timestamp,
+                event_handoffs=event_handoffs,
+            )
+    except Exception:
+        db.rollback()
+        raise
+    for persistence in event_handoffs:
+        event_bus.publish_from_sync(
+            debate_id,
+            "dialectical_exploration",
+            _lifecycle_event_payload(persistence),
+        )
+
+
+def _persist_lifecycle_decisions_locked(
+    db: Session,
+    *,
+    debate: Debate,
+    debate_id: str,
+    job_id: str,
+    run: AnalyzerRun,
+    eligible: list[Node],
+    decision_timestamp,
+    event_handoffs: list[LifecycleDecisionPersistence],
+) -> None:
+    """The decision phase of the lifecycle tail, extracted verbatim so the
+    caller can run it inside one hold_write_lock critical section (see the
+    call site's comment for the stale-snapshot mechanism)."""
+    for node in eligible:
             outcome = decide_lifecycle_for_node(
                 db,
                 debate=debate,
@@ -313,23 +391,14 @@ def reevaluate_lifecycle_after_scoring_completion(
             )
             if persistence.persistence_result == "created":
                 event_handoffs.append(persistence)
-        run.provenance = {
-            **dict(run.provenance),
-            _REEVALUATION_KEY: {
-                "schema_version": _REEVALUATION_SCHEMA_VERSION,
-                "status": "complete",
-                "job_id": job_id,
-                "analyzer_run_id": run.id,
-                "node_ids": [node.id for node in eligible],
-            },
-        }
-        commit_write(db)
-    except Exception:
-        db.rollback()
-        raise
-    for persistence in event_handoffs:
-        event_bus.publish_from_sync(
-            debate_id,
-            "dialectical_exploration",
-            _lifecycle_event_payload(persistence),
-        )
+    run.provenance = {
+        **dict(run.provenance),
+        _REEVALUATION_KEY: {
+            "schema_version": _REEVALUATION_SCHEMA_VERSION,
+            "status": "complete",
+            "job_id": job_id,
+            "analyzer_run_id": run.id,
+            "node_ids": [node.id for node in eligible],
+        },
+    }
+    commit_write(db)
