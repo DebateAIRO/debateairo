@@ -38,6 +38,11 @@ test("phone geometry contract reserves visible 44px controls at 320 and 375", ()
     /\.debateTopBar \.iconBtn\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
     "Scoring diagnostics and overflow triggers should retain exact 44px boxes"
   );
+  assert.match(
+    globalsSource,
+    /@media \(max-width:\s*640px\) and \(max-height:\s*400px\)\s*\{[\s\S]*?\.debateView \.scoringInsightsSummary\s*\{[\s\S]*?height:\s*44px;[\s\S]*?flex-direction:\s*row;[\s\S]*?\}/,
+    "Short landscape phones should compact the insights summary to one 44px row instead of collapsing the selected view"
+  );
 });
 
 test("scoring status is structurally moved to both insights summaries", () => {

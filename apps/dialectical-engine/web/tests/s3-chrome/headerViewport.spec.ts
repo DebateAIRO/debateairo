@@ -24,7 +24,22 @@ const debateFixture = {
     materialized_path: "root",
     active_generation_id: null,
     active_generation: null,
-    children: []
+    children: [
+      {
+        id: "short-height-card",
+        debate_id: debateId,
+        parent_id: "root",
+        node_type: "PRO",
+        depth: 1,
+        position: 0,
+        claim: "Short-height tree cards remain clickable",
+        status: "complete",
+        materialized_path: "root/pro",
+        active_generation_id: null,
+        active_generation: null,
+        children: []
+      }
+    ]
   },
   scoring: null,
   synthesis: null,
@@ -40,7 +55,7 @@ const debateFixture = {
   provenance_records: [],
   workers: [],
   models: [],
-  node_count: 1
+  node_count: 2
 };
 
 async function installCoordinatorRoutes(page: Page) {
@@ -83,6 +98,32 @@ async function expectFullyVisibleTapTarget(locator: Locator, viewportWidth: numb
   expect(box!.height).toBeGreaterThanOrEqual(44);
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewportWidth);
+}
+
+async function shortHeightGeometry(page: Page) {
+  return page.evaluate(() => {
+    const rect = (selector: string) => {
+      const box = document.querySelector(selector)?.getBoundingClientRect();
+      return box
+        ? {
+            x: Math.round(box.x * 100) / 100,
+            y: Math.round(box.y * 100) / 100,
+            width: Math.round(box.width * 100) / 100,
+            height: Math.round(box.height * 100) / 100,
+            bottom: Math.round(box.bottom * 100) / 100
+          }
+        : null;
+    };
+
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      header: rect(".debateTopBar"),
+      insights: rect(".scoringInsightsPanel"),
+      main: rect(".debateMain"),
+      thread: rect(".thread"),
+      card: rect(".node")
+    };
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -166,4 +207,27 @@ test("@wide actions stay inline above the phone overflow breakpoint", async ({ p
     expect(identityBox!.y).toBeLessThan(controlBox!.y + controlBox!.height);
     expect(controlBox!.y).toBeLessThan(identityBox!.y + identityBox!.height);
   }
+});
+
+test("@short selected views retain a visible interaction surface at 568x320", async ({ page }, testInfo) => {
+  const threadButton = page.getByRole("button", { name: "Thread", exact: true });
+
+  await threadButton.click();
+  await expect(threadButton).toHaveAttribute("aria-pressed", "true");
+  console.log(`F02 ${testInfo.project.name} thread geometry ${JSON.stringify(await shortHeightGeometry(page))}`);
+
+  const thread = page.locator(".thread");
+  await expect(thread).toBeVisible();
+  const threadBox = await thread.boundingBox();
+  expect(threadBox).not.toBeNull();
+  expect(threadBox!.height).toBeGreaterThanOrEqual(44);
+});
+
+test("@short scoring insights do not intercept tree-card clicks at 568x320", async ({ page }, testInfo) => {
+  const treeCard = page.locator(".node").filter({ hasText: "Short-height tree cards remain clickable" });
+
+  await expect(treeCard).toBeVisible();
+  console.log(`F02 ${testInfo.project.name} tree geometry ${JSON.stringify(await shortHeightGeometry(page))}`);
+  await treeCard.click({ timeout: 3_000 });
+  await expect(page.getByRole("dialog", { name: "Argument detail" })).toBeVisible();
 });

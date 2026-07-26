@@ -35,6 +35,19 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         viewport: { width, height: 900 }
       }
+    })),
+    ...[
+      { name: "chromium", browserName: "chromium" as const, device: devices["Desktop Chrome"] },
+      { name: "firefox", browserName: "firefox" as const, device: devices["Desktop Firefox"] },
+      { name: "webkit", browserName: "webkit" as const, device: devices["Desktop Safari"] }
+    ].map(({ name, browserName, device }) => ({
+      name: `${name}-short-568x320`,
+      grep: /@short/,
+      use: {
+        ...device,
+        browserName,
+        viewport: { width: 568, height: 320 }
+      }
     }))
   ],
   webServer: {
