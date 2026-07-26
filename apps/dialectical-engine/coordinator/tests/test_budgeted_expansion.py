@@ -42,6 +42,12 @@ def _set_budgets(db, debate: Debate, budgets: dict) -> None:
 
 # ---------------------------------------------------------------------------
 # Config overrides (lower and raise) with env defaults as the baseline
+#
+# These exercise the rails through ADAPTIVE spawns (a decision_record_id in
+# the payload). Since 2026-07-26 the budgets count adaptive-origin expansions
+# only -- see _adaptive_expand_jobs and the origin tests at the bottom of this
+# file -- so an origin-less call no longer consumes them and could not
+# demonstrate a knob at all.
 # ---------------------------------------------------------------------------
 
 
@@ -51,7 +57,9 @@ def test_config_override_lowers_per_debate_budget(db, monkeypatch) -> None:
     node = first_pov_pro(db, debate)
     _set_budgets(db, debate, {"max_per_debate": 0})
 
-    job, outcome = admit_and_spawn(db, debate, node, polarity="CON", reason="challenge it")
+    job, outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="challenge it", decision_record_id="decision-1"
+    )
 
     assert job is None
     assert outcome == OUTCOME_BUDGET_EXHAUSTED
@@ -64,9 +72,15 @@ def test_config_override_raises_budget_above_env_default(db, monkeypatch) -> Non
     node = first_pov_pro(db, debate)
     _set_budgets(db, debate, {"max_per_debate": 2, "max_per_node": 2})
 
-    first_job, first_outcome = admit_and_spawn(db, debate, node, polarity="CON", reason="challenge one")
-    second_job, second_outcome = admit_and_spawn(db, debate, node, polarity="PRO", reason="support two")
-    third_job, third_outcome = admit_and_spawn(db, debate, node, polarity="CON", reason="challenge three")
+    first_job, first_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="challenge one", decision_record_id="decision-1"
+    )
+    second_job, second_outcome = admit_and_spawn(
+        db, debate, node, polarity="PRO", reason="support two", decision_record_id="decision-2"
+    )
+    third_job, third_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="challenge three", decision_record_id="decision-3"
+    )
 
     assert (first_outcome, second_outcome) == (OUTCOME_SPAWNED, OUTCOME_SPAWNED)
     assert first_job is not None and second_job is not None
@@ -80,8 +94,12 @@ def test_per_node_config_override_is_honored(db, monkeypatch) -> None:
     node = first_pov_pro(db, debate)
     _set_budgets(db, debate, {"max_per_node": 1, "max_per_debate": 10})
 
-    _job, first_outcome = admit_and_spawn(db, debate, node, polarity="CON", reason="challenge one")
-    second_job, second_outcome = admit_and_spawn(db, debate, node, polarity="PRO", reason="support two")
+    _job, first_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="challenge one", decision_record_id="decision-1"
+    )
+    second_job, second_outcome = admit_and_spawn(
+        db, debate, node, polarity="PRO", reason="support two", decision_record_id="decision-2"
+    )
 
     assert first_outcome == OUTCOME_SPAWNED
     # FW1 (I1): the PER-NODE rail is its own code. It is NOT
@@ -206,3 +224,136 @@ def test_merged_debate_config_drops_non_dict_or_valueless_budgets() -> None:
     assert "adaptive_expansion" not in merged_debate_config({"adaptive_expansion": "wide open"})
     assert "adaptive_expansion" not in merged_debate_config({"adaptive_expansion": {"junk": 1}})
     assert "adaptive_expansion" not in merged_debate_config({})
+
+
+# ---------------------------------------------------------------------------
+# P1 contested-frontier fix (2026-07-26): the expansion budgets bound the
+# ADAPTIVE automation, and only it. See
+# .superpowers/sdd/2026-07-24-p1-contested-frontier/frontier-fix-report.md.
+#
+# Live evidence (acceptance-path-report.md §5.2): cross-exam and adversarial-
+# POV waves queue v2_expand jobs through the same primitive but never through
+# admit_and_spawn, so they consumed the adaptive rails without ever being
+# checked against them. Six nodes on debate 0f688d87 were already at 2 of
+# max_per_node=3 from those features alone -- including the only node that
+# could authenticate -- so the adaptive frontier had at most ONE spawn left
+# per node before the rail refused, and a whole-debate stop would have been
+# attributed to `node_budget_exhausted`.
+# ---------------------------------------------------------------------------
+
+
+def _non_adaptive_expand_job(db, debate, node, *, reason: str):
+    """A v2_expand job with no decision_record_id: exactly the shape
+    _queue_cross_exam_jobs / _queue_adversarial_attack_jobs produce."""
+
+    from app.services.dialectical_v2 import queue_v2_expand_job
+
+    return queue_v2_expand_job(db, debate, node, "CON", reason, payload_extra={"cross_exam": True})
+
+
+def test_non_adaptive_expand_jobs_do_not_consume_the_adaptive_per_node_budget(db, monkeypatch) -> None:
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 2, "max_per_debate": 50})
+    _non_adaptive_expand_job(db, debate, node, reason="cross-examine this claim")
+    _non_adaptive_expand_job(db, debate, node, reason="adversarially attack this claim")
+
+    job, outcome = admit_and_spawn(
+        db,
+        debate,
+        node,
+        polarity="CON",
+        reason="judge families materially disagree",
+        decision_record_id="decision-1",
+    )
+
+    assert outcome == OUTCOME_SPAWNED
+    assert job is not None
+
+
+def test_adaptive_spawns_are_still_refused_at_the_per_node_budget(db, monkeypatch) -> None:
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 2, "max_per_debate": 50})
+
+    first, first_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree one", decision_record_id="decision-1"
+    )
+    second, second_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree two", decision_record_id="decision-2"
+    )
+    third, third_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree three", decision_record_id="decision-3"
+    )
+
+    assert (first_outcome, second_outcome) == (OUTCOME_SPAWNED, OUTCOME_SPAWNED)
+    assert first is not None and second is not None
+    # Refusal-only, and still the per-node code rather than the debate one.
+    assert third is None and third_outcome == OUTCOME_NODE_BUDGET_EXHAUSTED
+
+
+def test_non_adaptive_expand_jobs_do_not_consume_the_adaptive_per_debate_budget(db, monkeypatch) -> None:
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_debate": 1, "max_per_node": 5})
+    _non_adaptive_expand_job(db, debate, node, reason="cross-examine this claim")
+
+    job, outcome = admit_and_spawn(
+        db,
+        debate,
+        node,
+        polarity="CON",
+        reason="judge families materially disagree",
+        decision_record_id="decision-1",
+    )
+
+    assert outcome == OUTCOME_SPAWNED
+    assert job is not None
+
+
+def test_adaptive_spawns_are_still_refused_at_the_per_debate_budget(db, monkeypatch) -> None:
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_debate": 1, "max_per_node": 5})
+
+    first, first_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree one", decision_record_id="decision-1"
+    )
+    second, second_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="disagree two", decision_record_id="decision-2"
+    )
+
+    assert first_outcome == OUTCOME_SPAWNED and first is not None
+    assert second is None and second_outcome == OUTCOME_BUDGET_EXHAUSTED
+
+
+def test_operator_approved_spawns_do_not_consume_the_adaptive_budget(db, monkeypatch) -> None:
+    """The same ruling precedent the approval path already follows for
+    rounds_completed (app/api/scoring.py: clear_adaptive_stop is deliberately
+    NOT paired with a rounds bump -- "an operator override must not spend the
+    automation's budget"). An approved expansion reaches admit_and_spawn with
+    no decision_record_id, so it is not adaptive-origin either."""
+
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=1)
+    node = first_pov_pro(db, debate)
+    _set_budgets(db, debate, {"max_per_node": 1, "max_per_debate": 50})
+
+    approved, approved_outcome = admit_and_spawn(
+        db, debate, node, polarity="CON", reason="operator approved this expansion"
+    )
+    adaptive, adaptive_outcome = admit_and_spawn(
+        db,
+        debate,
+        node,
+        polarity="CON",
+        reason="judge families materially disagree",
+        decision_record_id="decision-1",
+    )
+
+    assert approved_outcome == OUTCOME_SPAWNED and approved is not None
+    assert adaptive_outcome == OUTCOME_SPAWNED and adaptive is not None

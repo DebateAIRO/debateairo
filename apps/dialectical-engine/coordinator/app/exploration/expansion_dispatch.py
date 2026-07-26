@@ -893,8 +893,13 @@ def _annotate_and_stop(
 
 
 def debate_expand_jobs(db: Session, debate_id: str) -> list[Job]:
-    """Every v2_expand job ever created for the debate, ANY status: a failed
-    expansion consumed budget too (bounded growth beats retry-spawn loops)."""
+    """Every v2_expand job ever created for the debate, ANY status.
+
+    Used for TWO different questions, and the difference matters: idempotent
+    replay detection (`_existing_job_for_decision`) must see every job,
+    whatever produced it, while the budget rails must see only the ADAPTIVE
+    ones -- see `_adaptive_expand_jobs`.
+    """
     return list(
         db.scalars(
             select(Job).where(Job.debate_id == debate_id, Job.job_type == "v2_expand")
@@ -904,6 +909,41 @@ def debate_expand_jobs(db: Session, debate_id: str) -> list[Job]:
 
 def _job_payload(job: Job) -> dict[str, Any]:
     return job.payload if isinstance(job.payload, dict) else {}
+
+
+def _adaptive_expand_jobs(jobs: list[Job]) -> list[Job]:
+    """The v2_expand jobs the ADAPTIVE dispatcher itself created.
+
+    An adaptive spawn is the only kind that carries `decision_record_id` in
+    its payload -- `queue_v2_expand_job` writes that key only when the caller
+    supplies the audited LifecycleDecisionRecord id, which only
+    `expansion_dispatch`'s own loop does. Everything else that queues a
+    `v2_expand` (the cross-examination wave and the adversarial-POV attack
+    jobs, which call the primitive directly, and the operator-approval
+    endpoint, which reaches `admit_and_spawn` with no record id) is
+    non-adaptive growth.
+
+    RULING PRECEDENT (app/api/scoring.py, the approval path): approved
+    expansions clear the adaptive stop reason but are "deliberately NOT
+    paired with a rounds_completed bump: an operator override must not spend
+    the automation's budget". The per-node and per-debate rails are the same
+    kind of quantity as `rounds_completed` -- they bound how far the
+    AUTOMATION may grow a debate on its own -- so operator-approved and
+    feature-driven expansions must not spend them either.
+
+    This was not academic. On live debate 0f688d87 the cross-exam and
+    adversarial-POV waves had already put SIX nodes at 2 of `max_per_node=3`
+    -- including 90e7b398, the only node that could authenticate a decision
+    at all -- so the adaptive frontier had at most ONE spawn left per node,
+    and the debate's whole-debate `stopped_because` would have read
+    `node_budget_exhausted` for budget the automation never spent.
+
+    Still refusal-only: this narrows what a gate COUNTS, never what it
+    authorizes. Nothing here can admit a record; the gates below can only
+    refuse one, and THE LAW (signal_class == "categorical") runs earlier and
+    is untouched.
+    """
+    return [job for job in jobs if _job_payload(job).get("decision_record_id")]
 
 
 def _existing_job_for_decision(jobs: list[Job], record_id: str) -> Job | None:
@@ -999,9 +1039,16 @@ def admit_and_spawn(
             return None, OUTCOME_DEPTH_LIMIT
         return None, OUTCOME_TARGET_NOT_EXPANDABLE
     assert node is not None
-    if len(jobs) >= expansion_max_per_debate(debate):
+    # Both rails count ADAPTIVE-ORIGIN expansions only (see
+    # _adaptive_expand_jobs for the mechanism, the ruling precedent it
+    # follows, and the live measurement that forced it). A cross-exam,
+    # adversarial-POV or operator-approved expansion is real growth, and it
+    # is still bounded by its own feature's rules, the depth rail and
+    # _node_expandable -- it simply does not spend the automation's budget.
+    adaptive_jobs = _adaptive_expand_jobs(jobs)
+    if len(adaptive_jobs) >= expansion_max_per_debate(debate):
         return None, OUTCOME_BUDGET_EXHAUSTED
-    if _expand_job_count_for_node(jobs, node.id) >= expansion_max_per_node(debate):
+    if _expand_job_count_for_node(adaptive_jobs, node.id) >= expansion_max_per_node(debate):
         # Its OWN code (I1): the debate budget above may be wide open, and
         # "one hot node absorbed its share" is a different finding from "the
         # debate spent its ceiling".
