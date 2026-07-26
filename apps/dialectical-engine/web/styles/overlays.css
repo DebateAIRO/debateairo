@@ -1,5 +1,22 @@
 
 /* ============================================================
+   Viewport-clamped popover
+   ============================================================ */
+
+.popAnchor {
+  inset: 0;
+  transform: none;
+  pointer-events: none;
+}
+.popCard {
+  position: absolute;
+  left: var(--popover-x);
+  top: var(--popover-y);
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+}
+
+/* ============================================================
    Guide modal + toast
    ============================================================ */
 
@@ -102,4 +119,58 @@
   height: 7px;
   border-radius: 50%;
   background: oklch(0.62 0.1 165);
+}
+
+/* This selector intentionally outranks the later legacy tokenDock rule. */
+.tokenDock,
+body .tokenDock {
+  bottom: var(--dock-offset-b);
+  max-width: var(--dock-w);
+  max-height: var(--dock-max-h);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-dock);
+}
+.tokenDock > .tokenForm {
+  max-height: var(--dock-max-h);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.tokenDock > .btn {
+  max-width: var(--dock-collapsed-w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .popAnchor {
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: none;
+    overflow: auto;
+  }
+  .popCard {
+    position: relative;
+    left: auto;
+    top: auto;
+    max-width: 100%;
+    max-height: 100dvh;
+    margin: auto;
+    overflow-y: auto;
+    transform: none;
+  }
+
+  /* S3's phone chrome has a 104px two-row minimum height. */
+  .toast.toast {
+    top: 104px;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    max-width: var(--dock-w);
+    transform: translateX(-50%);
+    justify-content: center;
+  }
 }

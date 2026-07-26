@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { CHALLENGE_ACTIONS, type PopoverState } from "@/lib/scrutiny";
 
 export function ChallengePopover({
@@ -14,7 +15,13 @@ export function ChallengePopover({
   return (
     <>
       <div className="popScrim" onClick={onClose} />
-      <div className="popAnchor" style={{ left: state.x, top: state.y }}>
+      <div
+        className="popAnchor"
+        style={{
+          "--popover-x": `${state.x}px`,
+          "--popover-y": `${state.y}px`
+        } as CSSProperties}
+      >
         <div className="popCard">
           {state.text ? <div className="popQuote">“{state.text}”</div> : null}
           <div className="popLabel">Challenge this</div>
