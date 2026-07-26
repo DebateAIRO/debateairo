@@ -307,3 +307,9 @@
     background: var(--surface-2);
   }
 }
+
+@media (max-width: 920px) and (max-height: 640px) and (orientation: landscape) {
+  .synthTab {
+    bottom: max(var(--dock-offset-b), var(--zoom-cluster-offset-b));
+  }
+}
