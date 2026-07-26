@@ -531,6 +531,13 @@ def evaluate_evidence_verdict(
         },
     )
 
+    # 2026-07-26: F1 discipline -- close the session's read transaction before
+    # the verification judge's CLI call, exactly as in
+    # scoring/service.py score_node_with_provider (see the comment there for
+    # the stale-snapshot mechanism). The node/generation reads above opened a
+    # deferred transaction; a write after a minutes-long CLI on that stale
+    # snapshot fails with an immediate, unretried SQLITE_BUSY.
+    commit_write(db)
     try:
         result = provider.judge_node(request)
     except TimeoutError:

@@ -10468,3 +10468,69 @@ def test_score_nodes_with_provider_skips_failed_pov_container_no_judge_call(db) 
     assert [item["node_id"] for item in payload["items"]] == [root.id, live_pov.id]
     assert provider.requested_node_ids == [root.id, live_pov.id]
     assert dead_pov.id not in provider.requested_node_ids
+
+
+def test_primary_judge_cli_runs_outside_any_open_transaction(db) -> None:
+    """Regression for the recurring 'database is locked' scoring failures
+    (2026-07-26, score_debate jobs c7223724 and a2a988f6; 102 historical).
+
+    Mechanism: score_node_with_provider's cache-lookup reads open a deferred
+    SQLite transaction; the judge CLI then runs for ~a minute while worker
+    heartbeats commit continuously; the post-CLI INSERT upgrades a STALE read
+    snapshot, which SQLite rejects with an immediate SQLITE_BUSY that
+    busy_timeout never retries. The F1 fix gave the PANEL loop this
+    discipline (commit_write before each member's CLI); the primary judge
+    path never got it.
+
+    The seam contract: by the time the provider is invoked, the session must
+    hold NO open transaction -- neither pending writes (F1's symptom) nor a
+    read snapshot (today's)."""
+
+    observed: list[bool] = []
+
+    class TransactionObservingProvider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def judge_node(self, request):
+            observed.append(db.in_transaction())
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment().model_dump(mode="json")),
+                latency_ms=15,
+                checked_at="2026-07-26T10:44:13+00:00",
+            )
+
+    debate = Debate(topic="Does snapshot staleness break scoring?", status="complete")
+    worker = Worker(id="worker-txn", name="Worker Txn", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="node-txn-1",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="The judge CLI must run outside any open transaction.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-txn-1",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="A stale read snapshot fails its write upgrade immediately.",
+        worker_id="worker-txn",
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.commit()
+
+    payload = score_node_with_provider(db, debate, node.id, TransactionObservingProvider())
+
+    assert payload["status"] == "available"
+    assert observed == [False], (
+        "provider.judge_node was invoked with an open session transaction; "
+        "a long CLI call here makes the post-CLI write fail on a stale "
+        f"snapshot (observed in_transaction={observed})"
+    )

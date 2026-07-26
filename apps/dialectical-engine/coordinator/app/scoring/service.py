@@ -649,6 +649,25 @@ def score_node_with_provider(
         debate_question=debate.topic,
         children=children,
     )
+    # 2026-07-26: the F1 discipline (release SQLite before a judge CLI call),
+    # applied to the PRIMARY judge -- the panel loop got it in F1, this path
+    # never did. The cache-lookup/children reads above opened a deferred read
+    # transaction; the CLI below runs for up to a minute while worker
+    # heartbeats commit continuously; the post-CLI artifact INSERT then
+    # upgrades a STALE snapshot, which SQLite rejects with an immediate
+    # SQLITE_BUSY that busy_timeout never retries (it only waits on held
+    # locks, not snapshot conflicts). That killed score_debate twice on
+    # 2026-07-26 (c7223724, a2a988f6) and is the mechanism behind the
+    # historical "database is locked" family. There are no pending writes at
+    # this point (the cache-hit path returned above; per-node commits happen
+    # in the caller), so this commit only closes the read snapshot.
+    #
+    # Captured BEFORE the commit: the commit expires the session's ORM
+    # objects, so a post-CLI `generation.model_id` read would silently issue
+    # a refresh SELECT (the tree-aware-payload test pins the query count and
+    # caught exactly that).
+    arguer_model_id = generation.model_id if generation else None
+    commit_write(db)
     try:
         result = None
         for attempt in range(1, SCORING_PROVIDER_MAX_ATTEMPTS + 1):
@@ -698,7 +717,7 @@ def score_node_with_provider(
                 cache_contract = None
             payload.update(
                 judge_lineage_metadata(
-                    arguer_model_id=generation.model_id if generation else None,
+                    arguer_model_id=arguer_model_id,
                     judge_provider=_public_metadata_text(provider_name),
                     judge_model_id=_public_metadata_text(model_name),
                 )
@@ -741,7 +760,7 @@ def score_node_with_provider(
         node_id=node.id,
         input_hash=input_hash,
         claim=claim,
-        arguer_model_id=generation.model_id if generation else None,
+        arguer_model_id=arguer_model_id,
         judge_panel_notes=judge_panel_notes,
     )
     payload = {
@@ -761,7 +780,7 @@ def score_node_with_provider(
             cache_contract = None
         payload.update(
             judge_lineage_metadata(
-                arguer_model_id=generation.model_id if generation else None,
+                arguer_model_id=arguer_model_id,
                 judge_provider=_public_metadata_text(provider_name),
                 judge_model_id=_public_metadata_text(model_name),
             )
