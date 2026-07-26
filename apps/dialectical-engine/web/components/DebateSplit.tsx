@@ -81,7 +81,11 @@ export function DebateSplit({
               const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
               const isLeaf = index === path.length - 1;
               return (
-                <div key={node.id} className="splitChip" style={{ marginLeft: index * 16 }}>
+                <div
+                  key={node.id}
+                  className="splitChip"
+                  style={{ ["--split-chip-indent" as string]: `${index * 16}px` }}
+                >
                   <span className="splitChipArrow" aria-hidden>
                     ↳
                   </span>

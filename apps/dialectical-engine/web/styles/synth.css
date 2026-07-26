@@ -10,6 +10,11 @@
   background: var(--surface-1);
   overflow: auto;
 }
+.synthTab,
+.synthScrim,
+.synthClose {
+  display: none;
+}
 .synthInner {
   padding: 22px 22px 28px;
 }
@@ -186,4 +191,119 @@
   vertical-align: -2px;
   background: currentColor;
   animation: de-blink 1s step-end infinite;
+}
+
+@media (max-width: 920px) {
+  .synthTab {
+    position: fixed;
+    left: 14px;
+    bottom: var(--dock-offset-b);
+    z-index: var(--z-sheet);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    max-width: calc(100vw - 14px - var(--dock-collapsed-w) - 30px);
+    padding: 0 11px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: oklch(0.27 0.012 70);
+    box-shadow: 0 8px 22px -12px oklch(0.2 0.02 70 / 0.5);
+    color: oklch(0.94 0.005 85);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .synthTabDiamond {
+    flex: 0 0 9px;
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    background: oklch(0.78 0.05 75);
+    transform: rotate(45deg);
+  }
+  .synthTabLabel {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .synthTabVerdict {
+    flex: 0 0 auto;
+    font-family: var(--font-serif);
+    font-size: 12px;
+    color: oklch(0.78 0.05 75);
+  }
+  .debateView:has(.tokenForm) [data-synth-tab] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .synthScrim {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-sheet);
+    display: block;
+    padding: 0;
+    border: 0;
+    background: oklch(0.18 0.01 70 / 0.48);
+    cursor: pointer;
+  }
+  .synthPanel.synthPanel {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: calc(var(--z-sheet) + 1);
+    display: block;
+    flex: none;
+    width: 100%;
+    max-height: 70vh;
+    max-height: 70dvh;
+    overflow: auto;
+    border-top: 1px solid var(--line-strong);
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -18px 44px -24px oklch(0.18 0.02 70 / 0.62);
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(100%);
+    transition:
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+  }
+  .synthPanel.synthPanelOpen {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+    transition-delay: 0s;
+  }
+  .synthInner {
+    padding: 18px 16px calc(24px + var(--safe-b));
+  }
+  .synthTitle {
+    min-height: 36px;
+  }
+  .synthClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: -8px -8px -8px auto;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .synthClose:hover {
+    background: var(--surface-2);
+  }
 }
