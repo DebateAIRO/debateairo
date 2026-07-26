@@ -38,47 +38,62 @@
          (docs/superpowers/plans/2026-07-24-p1-contested-frontier.md;
           preconditions/verification/rollback: docs/flip-plan-2026-07.md#7)
 
-         STAGED IN THREE SUB-STEPS, DELIBERATELY LEFT COMMENTED OUT.
-         Uncomment ONE block, `make install-services`, verify it per the flip
-         plan, and only then uncomment the next. Turning expansion on before
-         bounded synthesis is verified is exactly the ordering P1 exists to
-         prevent: a frontier run that grows for hours and then fails at the
-         final synthesis step.
+         ALL THREE ENABLED TOGETHER 2026-07-25, operator-requested, for a
+         single end-to-end shakeout run rather than three staged verifications.
 
-         WHY COMMENTED RATHER THAN SET TO 1: `com.dialectical.watchdog` calls
-         `make install-services` on its own whenever a launchd service check
-         fails, regenerating the live plist from THIS template. An active key
-         committed here therefore reaches the running coordinator without any
-         operator action. Each block below is one uncomment away from live and
-         must stay an explicit operator decision.
+         The staged ordering below is retained as the record of what was
+         overridden and why it is safe to override THIS way: the hazard the
+         staging exists to prevent is expansion running WITHOUT bounded
+         synthesis (a frontier that grows for hours, then fails at the final
+         synthesis step). Enabling all three simultaneously does not create
+         that hazard -- 7a is active whenever 7c is. What is given up is
+         ATTRIBUTION: if the run misbehaves, the operator cannot tell which
+         flag caused it from the flags alone, and 7a is exercised for the
+         first time by a deep run rather than a short one.
+
+         Mitigation, and the reason this is acceptable: run ONE normal-size
+         debate first as a smoke check before starting a deep run, and read
+         `expansion.census` / `GET /api/ops/expansion` to attribute behaviour
+         to a stage. Rollback is per-block and independent -- re-comment any
+         one of the three and `make install-services`.
+
+         WHY THIS TEMPLATE IS THE ONLY PLACE TO SET THESE: editing the live
+         `~/Library/LaunchAgents/com.dialectical.coordinator.plist` does NOT
+         persist. `com.dialectical.watchdog` calls `make install-services` on
+         its own whenever a launchd service check fails, regenerating the live
+         plist from THIS file and discarding any hand edit. The corollary now
+         that these keys are active: they reach the running coordinator on the
+         watchdog's next repair even without an operator running anything.
 
          Rollback for any block: re-comment it (or delete the keys) and run
          `make install-services`. All three are additive and flag-off is
          byte-identical to the pre-flip path; nothing already persisted is
-         rewritten or reinterpreted in either direction.
+         rewritten or reinterpreted in either direction. Rolling back 7b does
+         not un-mark nodes already scored as contested -- it stops NEW scoring
+         runs from marking them.
          ================================================================== -->
 
-    <!-- Stage 7a — bounded hierarchical synthesis payload. FIRST. Verify one
-         NORMAL-SIZE debate synthesises correctly before going further.
+    <!-- Stage 7a — bounded hierarchical synthesis payload. ENABLED 2026-07-25. -->
     <key>DIALECTICAL_HIERARCHICAL_SYNTHESIS</key>
     <string>1</string>
-    -->
 
-    <!-- Stage 7b — per-field cross-family disagreement detection. Moves
-         score_provenance.disagreement_status for every newly scored node
-         (measured: ~50% become "present"), which is what makes the frontier
-         and the synthesis payload's contested section non-empty. Requires 7a
-         verified, because it is what fills the bounded payload.
+    <!-- Stage 7b — per-field cross-family disagreement detection. ENABLED
+         2026-07-25. Moves score_provenance.disagreement_status for every newly
+         scored node (measured on 78 real judge artifacts: 13 of 26 nodes become
+         "present" at the 0.25 threshold, versus 0 under the superseded composite
+         gate), which is what makes the frontier and the synthesis payload's
+         contested section non-empty. -->
     <key>DIALECTICAL_FIELD_DISAGREEMENT</key>
     <string>1</string>
-    -->
 
-    <!-- Stage 7c — adaptive expansion. LAST. This is the flag that makes the
-         raised budgets (12 rounds / 3 per node / 150 per debate) actually
-         spend. Requires 7a AND 7b verified.
+    <!-- Stage 7c — adaptive expansion. ENABLED 2026-07-25. This is the flag
+         that makes the raised budgets (12 rounds / 3 per node / 150 per debate)
+         actually spend. Watch for: stopped_because landing on `wall_clock` or
+         `rounds_exhausted` rather than `converged` (convergence may structurally
+         never fire if CON expansion dominates and keeps maxDelta above epsilon),
+         and the spawned_pro/spawned_con ratio in `expansion.census`. -->
     <key>DIALECTICAL_ADAPTIVE_EXPANSION</key>
     <string>1</string>
-    -->
   </dict>
   <key>ProgramArguments</key>
   <array>
