@@ -220,6 +220,14 @@ class ExpectedLifecycleCorrelation:
     active_scoring_contract: ScoringContractIdentity
     expected_evidence_source: EvidenceSourceIdentity | None
     decision_timestamp: datetime
+    # Contract v1 §6.1 amendment (2026-07-26): RECORDED, NOT APPLIED. The
+    # score component no longer ages out -- see the long note in
+    # _classify_candidate for why a hash-matched, contract-matched judgment
+    # cannot go stale by clock alone. The field stays on the correlation
+    # because it is part of persisted lifecycle-input-persistence/v1 (dropping
+    # it is a schema break) and because it still records the freshness policy
+    # a historical decision ran under. It is still validated as a positive
+    # integer so a caller cannot pass nonsense and believe it meant something.
     score_max_age_seconds: int
     evidence_max_age_seconds: int
 
@@ -765,19 +773,60 @@ def _classify_candidate(
         if candidate.get("provenance") is None:
             raise _CandidateProblem("malformed", "present_provenance_missing")
         provenance = _parse_provenance(candidate["provenance"], component=component)
-        max_age = (
-            expected.score_max_age_seconds
-            if component == "score"
-            else expected.evidence_max_age_seconds
-        )
-        age_seconds = (expected.decision_timestamp - observed_at).total_seconds()
-        if age_seconds > max_age:
-            raise _CandidateProblem(
-                "stale",
-                f"{component}_stale",
-                freshness="stale",
-                provenance=provenance,
-            )
+        # Contract v1 §6.1 amendment (2026-07-26, P1 contested frontier): the
+        # AGE gate applies to EVIDENCE only. For a SCORE, freshness is
+        # identity, not wall clock.
+        #
+        # Why: by the time control reaches here, a score candidate has already
+        # been required to carry `input_hash == expected.current_score_input_
+        # hash` and a scoring_contract equal to the active contract (both
+        # raise `mismatched` above, before age is ever consulted -- §6's own
+        # "identity validation happens before age is trusted"). The input hash
+        # covers claim, argument text, debate question and the rendered
+        # children digest (app.scoring.cache.node_scoring_input_hash); the
+        # contract hash covers judge id/version/role and every rubric, prompt,
+        # schema and reducer version. A candidate that survives both IS, by
+        # construction, the judgment of exactly this input under exactly this
+        # contract. Nothing about it can drift while the clock runs, because
+        # every input that could drift is inside one of those two hashes --
+        # and when one DOES drift, the resolver already says so precisely
+        # (`score_input_hash_mismatch` / `scoring_contract_mismatch`), which
+        # is the honest statement the age gate was being mistaken for.
+        #
+        # What the age gate actually did in production (evidence:
+        # .superpowers/sdd/2026-07-24-p1-contested-frontier/
+        # acceptance-path-report.md §2.4): app.scoring.cache serves an
+        # unchanged node from its existing NodeScoringResult row and never
+        # rewrites `checked_at`, so one hour after a node was first judged its
+        # score was permanently `stale` and it could never authenticate a
+        # lifecycle decision again -- unless its input hash changed and it was
+        # really re-judged. On a live 84-node debate that collapsed 32
+        # lifecycle-eligible nodes to 0 authenticated decisions (26 refused
+        # `score_stale`) and degenerated the contested frontier to
+        # re-challenging the one node that had just expanded.
+        #
+        # Rejected alternative: refresh the row's `checked_at` on a cache hit.
+        # app.exploration.lifecycle_decision_service._run_authenticates_row
+        # requires the row's `checked_at` to EQUAL its judge artifact's
+        # `checked_at`, and the cache-hit path (service._relink_cached_node_
+        # artifacts_to_current_job) deliberately re-attributes the ORIGINAL
+        # artifact rather than writing a new one. Bumping the row alone breaks
+        # that authentication link outright; bumping the artifact too would
+        # falsify the durable record of when a judge was actually called. The
+        # honest move is to stop asking a question whose answer we do not need.
+        #
+        # EVIDENCE keeps its age gate unconditionally: an evidence verdict is
+        # an observation of the world outside this database (sources move,
+        # 404, get retracted), so for it wall-clock age is real information.
+        if component == "evidence":
+            age_seconds = (expected.decision_timestamp - observed_at).total_seconds()
+            if age_seconds > expected.evidence_max_age_seconds:
+                raise _CandidateProblem(
+                    "stale",
+                    "evidence_stale",
+                    freshness="stale",
+                    provenance=provenance,
+                )
         if candidate.get("value") is None:
             raise _CandidateProblem(
                 "malformed",

@@ -801,6 +801,11 @@ def test_mixed_grounded_score_and_missing_evidence_continue_fail_safe(db) -> Non
 
 
 def test_stale_correlated_inputs_continue_fail_safe(db) -> None:
+    # Contract v1 §6.1 amendment (2026-07-26, P1 contested frontier): this
+    # used to assert {"score_stale", "evidence_stale"}. The score component no
+    # longer ages out (its input hash and contract still match, so it IS the
+    # judgment of this input); the EVIDENCE component still does, and one
+    # stale component is enough to keep the whole decision fail-safe.
     debate, node, generation, worker, branch = _subject(db)
     stale_time = DECISION_TIME - timedelta(hours=2)
     _persist_score(
@@ -830,7 +835,7 @@ def test_stale_correlated_inputs_continue_fail_safe(db) -> None:
     assert outcome.keeps_path_active is True
     assert outcome.authentic_policy_decision is False
     assert outcome.input_state == "stale"
-    assert set(outcome.reason_codes) == {"score_stale", "evidence_stale"}
+    assert set(outcome.reason_codes) == {"evidence_stale"}
 
 
 def test_mismatched_current_evidence_source_cannot_abandon(db) -> None:
@@ -930,8 +935,10 @@ def test_stale_inputs_persist_fail_safe_continuation_and_retry_is_idempotent(db,
     db.flush()
 
     # First spawn: `node` was still childless when the lifecycle decision
-    # ran, so the persisted (stale) score's input_hash still matches --
-    # staleness alone (not a tree change) drives the fail-safe "continue".
+    # ran, so the persisted score's input_hash still matches. Contract v1
+    # §6.1 amendment (2026-07-26): the score is therefore NOT stale despite
+    # being two hours old -- the aged EVIDENCE is what drives the fail-safe
+    # "continue" here.
     children = db.scalars(
         select(Node).where(Node.parent_id == node.id, Node.node_type != "EVIDENCE")
     ).all()
@@ -940,7 +947,7 @@ def test_stale_inputs_persist_fail_safe_continuation_and_retry_is_idempotent(db,
     assert node.path_status == "active"
     assert node.stopping_status == "continue"
     assert node.stopping_reason
-    assert "score_stale" in node.stopping_reason
+    assert "score_stale" not in node.stopping_reason
     assert "evidence_stale" in node.stopping_reason
     assert len(children) == 2
     assert len(jobs) == 2
@@ -1185,3 +1192,109 @@ def test_abandoned_parent_preserves_prior_stop_for_non_authentic_inputs(
         select(Node).where(Node.parent_id == node.id, Node.node_type != "EVIDENCE")
     ).all() == []
     assert db.scalars(select(Job).where(Job.node_id == node.id)).all() == []
+
+
+# ---------------------------------------------------------------------------
+# P1 contested-frontier fix (2026-07-26): score freshness is IDENTITY, not
+# wall clock. See docs/contracts/lifecycle-input-persistence-v1.md §6.1 and
+# .superpowers/sdd/2026-07-24-p1-contested-frontier/frontier-fix-report.md.
+#
+# Live evidence these two tests encode (acceptance-path-report.md §2.4):
+# 32 lifecycle-eligible nodes produced 0 authenticated decisions, 26 of them
+# refused `score_stale` -- because the scoring cache serves an UNCHANGED node
+# from its existing NodeScoringResult row without refreshing `checked_at`, so
+# one hour after first judging every unchanged node was permanently stale.
+# ---------------------------------------------------------------------------
+
+
+def test_aged_but_hash_matched_score_still_authenticates(db) -> None:
+    """A cache-served judgment of the CURRENT input is not aged out.
+
+    The persisted row's input_hash equals the node's live input hash and its
+    contract equals the active contract, so it is definitionally the judgment
+    of exactly this input -- wall-clock age adds no information about whether
+    it still describes the node.
+    """
+
+    debate, node, generation, worker, branch = _subject(db)
+    aged = DECISION_TIME - timedelta(hours=6)
+    _persist_score(
+        db,
+        debate=debate,
+        node=node,
+        generation=generation,
+        branch=branch,
+        observed_at=aged,
+    )
+    _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=5),
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db,
+        debate=debate,
+        node=node,
+        decision_timestamp=DECISION_TIME,
+    )
+
+    assert outcome.authentic_policy_decision is True
+    assert outcome.input_state == "grounded"
+    assert outcome.reason_codes == ()
+    assert "score_stale" not in outcome.stopping_reason
+    assert outcome.score_record_id == "score-record-current"
+
+
+def test_aged_and_hash_mismatched_score_still_refuses(db) -> None:
+    """Age never authenticates: a changed TREE is still an honest refusal.
+
+    Same aged row as above, but the node has since gained a real PRO child,
+    so `_node_children_for_judge` changes the live input hash. The persisted
+    judgment is no longer the judgment of this input, and the resolver says
+    so with its own reason code -- the one the age gate was being mistaken
+    for.
+    """
+
+    debate, node, generation, worker, branch = _subject(db)
+    aged = DECISION_TIME - timedelta(hours=6)
+    _persist_score(
+        db,
+        debate=debate,
+        node=node,
+        generation=generation,
+        branch=branch,
+        observed_at=aged,
+    )
+    _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=5),
+    )
+    child = Node(
+        debate_id=debate.id,
+        parent_id=node.id,
+        node_type="PRO",
+        depth=node.depth + 1,
+        position=0,
+        claim="A child that changed the judged input.",
+        status="complete",
+        materialized_path=f"{node.materialized_path}/0",
+    )
+    db.add(child)
+    db.flush()
+
+    outcome = decide_lifecycle_for_node(
+        db,
+        debate=debate,
+        node=node,
+        decision_timestamp=DECISION_TIME,
+    )
+
+    assert outcome.authentic_policy_decision is False
+    assert outcome.input_state == "mismatched"
+    assert "score_input_hash_mismatch" in outcome.reason_codes

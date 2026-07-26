@@ -271,10 +271,24 @@ def test_payload_for_another_debate_is_mismatched() -> None:
     assert_unavailable(result, state="mismatched", reason="score_payload_debate_mismatch")
 
 
-def test_current_result_is_stale_only_against_explicit_decision_time() -> None:
+def test_current_result_does_not_age_out_when_its_input_hash_still_matches() -> None:
+    """Contract v1 §6.1 amendment (2026-07-26, P1 contested frontier).
+
+    Was `test_current_result_is_stale_only_against_explicit_decision_time`,
+    which asserted the score aged out at `score_max_age_seconds`. The scoring
+    cache serves an unchanged node from its existing row without rewriting
+    `checked_at`, so that rule made every unchanged node permanently
+    unauthenticatable one hour after it was first judged. A candidate that
+    reaches the age test has already matched the current input hash AND the
+    active contract, so it is the judgment of exactly this input: age adds
+    nothing. See app.exploration.lifecycle_inputs._classify_candidate.
+    """
+
     result = resolve(candidate(checked_at="2026-07-15T11:49:59Z"))
 
-    assert_unavailable(result, state="stale", reason="score_stale")
+    assert result.resolution.state == "grounded"
+    assert result.resolution.freshness == "fresh"
+    assert result.signal is not None
 
 
 @pytest.mark.parametrize("reverse", [False, True])

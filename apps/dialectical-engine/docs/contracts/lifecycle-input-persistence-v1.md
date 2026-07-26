@@ -336,6 +336,19 @@ Freshness is calculated independently for score and evidence using the explicit 
 
 Freshness policy values are inputs to the mapper. Changing a maximum age changes eligibility, not persisted source history.
 
+### 6.1 Amendment 2026-07-26 — the age gate applies to EVIDENCE only
+
+The age rules above apply to the **evidence** component. For the **score** component, freshness is **identity, not wall clock**: a score candidate that reaches the age test has already been required to match `current_score_input_hash` and the active scoring contract, so it MUST be treated as `fresh` regardless of age, and `score_stale` is no longer a producible resolution.
+
+Justification:
+
+- The identity gate is strictly stronger than the age gate for a score. The input hash covers the claim, the argument text, the debate question and the rendered children digest; the contract hash covers judge id/version/role and every rubric, prompt, output-schema and reducer version. A candidate that matches both IS, by construction, the judgment of exactly this input under exactly this contract. Every input that could drift while the clock runs is inside one of those two hashes, and when one does drift the mapper already refuses precisely — `score_input_hash_mismatch` or `scoring_contract_mismatch`. Wall-clock age carried no additional information; it only expressed the *absence* of a re-judge, which is what the cache exists to avoid.
+- The rule was actively harmful in production. The scoring cache serves an unchanged node from its existing `NodeScoringResult` row and does not rewrite `checked_at`, so one hour after a node was first judged its score was permanently `stale` and it could never authenticate a lifecycle decision again. Measured on a live 84-node debate: 32 lifecycle-eligible nodes produced 0 authenticated decisions, 26 refused `score_stale`, and the contested frontier degenerated to repeatedly re-challenging the single node that had just expanded (the only node whose input hash had changed, hence the only one really re-judged).
+- Recording a cache hit as a `checked_at` refresh was rejected: the row's `checked_at` is required to equal its judge artifact's `checked_at` for run authentication, and a cache hit re-attributes the original artifact rather than producing a new one. Bumping the row alone breaks authentication; bumping the artifact too would falsify when a judge was actually called.
+- Evidence keeps its age gate unconditionally: an evidence verdict is an observation of the world outside this database (sources move, 404, get retracted), so for it wall-clock age is real information.
+
+`score_max_age_seconds` remains a required, positive-integer field of `ExpectedLifecycleCorrelation` — it is part of the persisted `lifecycle-input-persistence/v1` envelope and still records the freshness policy a historical decision ran under — but it is **recorded, not applied**. `score_stale` remains a defined historical reason code: decisions persisted before this amendment still carry it and still need operator-facing copy.
+
 ## 7. State semantics and deterministic validation
 
 Each component is validated independently. All component states and reason codes are retained. The aggregate result is `grounded` only when both components are grounded.
@@ -348,7 +361,7 @@ Each component is validated independently. All component states and reason codes
 | `pending` | A correlated current run exists but has not produced a terminal authoritative value, or a newer correlated pending run supersedes an older result. | none |
 | `malformed` | A candidate exists but fails schema, type, enum, range, timestamp, hash-shape, or required-field validation. | none |
 | `mismatched` | A structurally parseable candidate belongs to another debate, node, input hash, scoring contract, evidence source, run pairing, schema contract, or temporal decision context. | none |
-| `stale` | A structurally valid, identity-matched terminal candidate exceeds its component freshness limit. | none |
+| `stale` | A structurally valid, identity-matched terminal candidate exceeds its component freshness limit. **Evidence only — see §6.1.** | none |
 | `unverifiable` | A terminal or legacy candidate cannot establish authoritative provenance or semantics, including provider failure, timeout, parse failure, no independent judge, missing run identity, or missing legacy provenance. | none |
 | `grounded` | A terminal candidate is structurally valid, exactly correlated, fresh, authentic, and complete. | complete authoritative value |
 
@@ -366,7 +379,7 @@ The mapper MUST apply this order:
 2. Parse the envelope and declared schema (`malformed` on structural failure).
 3. Validate exact schema version and all correlation identities (`mismatched` on conflict).
 4. Validate terminal authenticity and provenance (`unverifiable` when authenticity cannot be established).
-5. Evaluate freshness (`stale` when expired).
+5. Evaluate freshness (`stale` when expired; evidence only — see §6.1).
 6. Validate the complete authoritative value and its internal identity (`malformed` or `mismatched` as applicable).
 7. Return `grounded` only after every prior gate passes.
 
@@ -536,7 +549,7 @@ A downstream implementation is not conforming unless tests can derive at least t
 ### 14.4 Freshness
 
 - Treat age equal to the maximum as fresh.
-- Treat age above the maximum as stale.
+- Treat age above the maximum as stale for evidence, and treat an identity-matched score as fresh at any age (§6.1).
 - Treat an artifact timestamp after the decision timestamp as mismatched.
 - Treat unparsable time as malformed and legacy null time as unverifiable.
 - Evaluate score and evidence freshness independently.

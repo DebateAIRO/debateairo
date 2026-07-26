@@ -268,9 +268,7 @@ def score_candidates_for_state(state: str) -> tuple[dict[str, object], ...]:
     if state == "missing":
         return ()
     candidate = grounded_score_candidate()
-    if state == "stale":
-        candidate["observed_at"] = "2026-07-14T19:54:59Z"
-    elif state == "malformed":
+    if state == "malformed":
         candidate["value"]["values"]["strength"] = True
     elif state == "mismatched":
         candidate["scoring_contract"]["contract_hash"] = "d" * 64
@@ -289,7 +287,11 @@ def score_candidates_for_state(state: str) -> tuple[dict[str, object], ...]:
 
 @pytest.mark.parametrize(
     "state",
-    ["missing", "stale", "malformed", "mismatched", "pending", "unverifiable"],
+    # "stale" is deliberately absent for the SCORE component: contract v1
+    # §6.1 amendment (2026-07-26, P1 contested frontier) applies the age gate
+    # to evidence only, so a score can no longer resolve to `stale`. The
+    # evidence parametrization below still covers every one of the six states.
+    ["missing", "malformed", "mismatched", "pending", "unverifiable"],
 )
 def test_every_unavailable_state_withholds_values_and_blocks_policy(state: str) -> None:
     result = map_lifecycle_inputs(
@@ -320,6 +322,51 @@ def test_age_equal_to_maximum_is_fresh() -> None:
 
     assert isinstance(result, GroundedLifecycleInputs)
     assert result.score_resolution.freshness == "fresh"
+
+
+def test_score_far_past_its_max_age_is_still_fresh_when_identity_matches() -> None:
+    """Contract v1 §6.1 amendment (2026-07-26, P1 contested frontier).
+
+    The score component's freshness is identity, not wall clock: this
+    candidate is 5 hours past a 300-second `score_max_age_seconds`, but its
+    input hash and scoring contract are the current ones, so it is by
+    construction the judgment of exactly this input.
+    """
+
+    score = grounded_score_candidate()
+    score["observed_at"] = "2026-07-14T15:00:00Z"
+
+    result = map_lifecycle_inputs(
+        expected=expected_correlation(with_evidence=True),
+        score_candidates=(score,),
+        evidence_candidates=(grounded_evidence_candidate(),),
+    )
+
+    assert isinstance(result, GroundedLifecycleInputs)
+    assert result.score_resolution.freshness == "fresh"
+
+
+def test_evidence_keeps_its_age_gate_when_the_score_no_longer_ages_out() -> None:
+    """The amendment is scoped to score. An evidence verdict observes the
+    world outside this database, so for it wall-clock age is real information
+    and `evidence_stale` must still fire -- even alongside an equally old but
+    identity-matched score."""
+
+    score = grounded_score_candidate()
+    score["observed_at"] = "2026-07-14T15:00:00Z"
+    evidence = grounded_evidence_candidate()
+    evidence["observed_at"] = "2026-07-14T15:00:00Z"
+
+    result = map_lifecycle_inputs(
+        expected=expected_correlation(with_evidence=True),
+        score_candidates=(score,),
+        evidence_candidates=(evidence,),
+    )
+
+    assert isinstance(result, UnavailableLifecycleInputs)
+    assert result.score_resolution.state == "grounded"
+    assert result.evidence_resolution.state == "stale"
+    assert result.reason_codes == ("evidence_stale",)
 
 
 def test_artifact_after_decision_timestamp_is_mismatched() -> None:
