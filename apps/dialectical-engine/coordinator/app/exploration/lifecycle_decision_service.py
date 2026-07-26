@@ -201,6 +201,38 @@ def _evidence_source_identity(node: Node, source: Node) -> EvidenceSourceIdentit
     )
 
 
+# Verdict precedence for selecting among a claim's evidence children, in the
+# SAME order and on the SAME vocabulary as
+# app.evidence.verification_evaluator.rollup_claim_verification_status (any
+# "contradicted" wins, else any "supported", else nothing upgrades). Duplicated
+# as a rank rather than imported as a rollup because this answers "which single
+# child does the correlation read" and that one answers "what does the claim
+# show" -- but they must never disagree about which verdict dominates, which is
+# what test_the_selected_verdict_agrees_with_the_claim_level_rollup pins.
+_ADVERSE_VERIFICATION_STATUS = "contradicted"
+_SUPPORTING_VERIFICATION_STATUS = "supported"
+_VERDICT_RANK_ADVERSE = 3
+_VERDICT_RANK_SUPPORTING = 2
+_VERDICT_RANK_OTHER_AUTHORITATIVE = 1
+_VERDICT_RANK_WITHHELD = 0
+
+
+def _verdict_rank(row: EvidenceLifecycleSnapshot) -> int:
+    if row.availability != "present":
+        # Withheld (terminal_unverifiable) or absent: a real verdict of any
+        # polarity outranks it, because it carries no authoritative values.
+        return _VERDICT_RANK_WITHHELD
+    if row.verification_status == _ADVERSE_VERIFICATION_STATUS:
+        return _VERDICT_RANK_ADVERSE
+    if row.verification_status == _SUPPORTING_VERIFICATION_STATUS:
+        return _VERDICT_RANK_SUPPORTING
+    # A real but non-polar verdict (a judged "unverifiable", which projects to
+    # a no_info lifecycle value). Authoritative enough to authenticate a
+    # seek_evidence decision, never enough to outrank a verdict that took a
+    # side -- the same order the rollup gives it.
+    return _VERDICT_RANK_OTHER_AUTHORITATIVE
+
+
 def _select_evidence_source(
     db: Session,
     *,
@@ -211,17 +243,40 @@ def _select_evidence_source(
     """Pick ONE evidence child to correlate the decision against.
 
     `usable` arrives in document order -- (position, id) -- which is already a
-    deterministic answer. This refines it with the only fact that makes one
-    child a better correlation target than another: whether a verification
-    verdict exists for the child AS IT IS NOW (matching its current generation
-    and content hash), and whether that verdict is AUTHORITATIVE
-    (availability == "present", i.e. the verifier returned real values, as
-    opposed to "terminal_unverifiable", which honestly withholds them).
+    deterministic answer. Two facts refine it, in this order:
 
-    Rank: authoritative-and-current beats verdict-of-any-kind beats no verdict
-    at all; within a rank the newest verification run (highest sequence)
-    wins; ties fall back to document order. Never refuses -- refusing for the
-    COUNT of children is the bug this replaced.
+    1. VERDICT POLARITY, mirroring `rollup_claim_verification_status`
+       (app.evidence.verification_evaluator), which is the house's existing
+       answer to "how do several evidence verdicts combine": any
+       `contradicted` wins, else any `supported`, else nothing upgrades. The
+       same precedence applies here so one claim cannot carry a
+       `verificationStatus` of "contradicted" from the rollup and a lifecycle
+       decision correlated against a grounded sibling at the same time.
+    2. RECENCY, but only WITHIN a verdict class: the newest verification run
+       (highest sequence), ties falling back to document order.
+
+    Ranking on recency alone -- which the first version of this rule did, by
+    testing only `availability == "present"` -- silently drops a contradicted
+    sibling whenever a supported one is verified later. That is not cosmetic:
+    an adverse verdict is a CATEGORICAL `challenge` reason in
+    app.exploration.policy, so dropping it removes a spawn THE LAW authorises,
+    and `_can_abandon` / `_should_reopen` both require GROUNDED, so it also
+    lets a refuted claim be abandoned as settled.
+
+    A verdict only ranks a child if it describes the child AS IT IS NOW
+    (matching its current generation and content hash) and is AUTHORITATIVE
+    (`availability == "present"` -- the verifier returned real values, as
+    opposed to `terminal_unverifiable`, which honestly withholds them).
+
+    WHAT THIS STILL CANNOT DO: it selects, it does not aggregate. The decision
+    is correlated against ONE evidence identity, because
+    `ExpectedLifecycleCorrelation.expected_evidence_source` is one identity;
+    a claim with two contradicted children is decided on one of them. The
+    selection is recorded durably (`evidence_snapshot_id` on the decision
+    record), so which child won is always answerable afterwards. Aggregating
+    across children is an open design question, not something this rule
+    quietly settles. Never refuses for the COUNT of children -- that was the
+    bug this replaced.
     """
 
     by_evidence_node = {
@@ -248,7 +303,7 @@ def _select_evidence_source(
             continue
         if row.content_sha256 != identity.content_sha256:
             continue
-        rank = 1 if row.availability == "present" else 0
+        rank = _verdict_rank(row)
         sequence = row.sequence if isinstance(row.sequence, int) else 0
         candidate = (rank, sequence, -order)
         if best is None or candidate > best:

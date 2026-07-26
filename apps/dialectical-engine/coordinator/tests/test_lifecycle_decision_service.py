@@ -12,6 +12,7 @@ from app.models.entities import (
     AnalyzerRun,
     Debate,
     DebateBranch,
+    EvidenceLifecycleSnapshot,
     Generation,
     JudgeOutputArtifact,
     Job,
@@ -425,28 +426,37 @@ def _persist_adverse_evidence(
     entailment: str,
     base_score: float,
     uncertainty: float,
+    # FW3 re-review (NB-2): the identity knobs a MIXED-verdict test needs.
+    # Defaults reproduce the original single-child fixture byte for byte.
+    evidence_node_id: str | None = None,
+    position: int = 10_000,
+    claim: str = "A persisted evidence source.",
+    run_id: str | None = None,
+    sequence: int = 2,
 ) -> str:
     """Task 16 (P3.2): a REAL, judge-produced adverse verdict -- mirrors
     _persist_grounded_evidence's shape exactly, but with a status/entailment
     pair OTHER than grounded/SUPPORTS (contradicted+REFUTES, no_info+NOINFO),
     exactly what app.evidence.verification_evaluator now persists for a real
     "contradicted"/"unverifiable" verifier verdict."""
+    evidence_node_id = evidence_node_id or f"evidence-node-adverse-{status}"
+    run_id = run_id or f"evidence-run-adverse-{status}"
     evidence_node = Node(
-        id=f"evidence-node-adverse-{status}",
+        id=evidence_node_id,
         debate_id=debate.id,
         parent_id=node.id,
         node_type="EVIDENCE",
         depth=node.depth + 1,
-        position=10_000,
-        claim="A persisted evidence source.",
+        position=position,
+        claim=claim,
         status="completed",
-        materialized_path=f"{node.materialized_path}/10000",
+        materialized_path=f"{node.materialized_path}/{position}",
         evidence_metadata={"evidenceKind": "citation"},
     )
     db.add(evidence_node)
     db.flush()
     generation = Generation(
-        id=f"evidence-generation-adverse-{status}",
+        id=f"{evidence_node_id}-generation",
         node_id=evidence_node.id,
         model_id="fixture-arguer",
         role="proposer",
@@ -479,8 +489,8 @@ def _persist_adverse_evidence(
             "observed_at": observed_text,
             "provenance": {
                 "source_kind": "evidence_verification_run",
-                "source_record_id": f"evidence-run-adverse-{status}",
-                "run": {"run_id": f"evidence-run-adverse-{status}", "sequence": 2},
+                "source_record_id": run_id,
+                "run": {"run_id": run_id, "sequence": sequence},
                 "producer": "fixture-evidence-evaluator",
                 "recorded_at": observed_text,
                 "checked_at": observed_text,
@@ -1546,3 +1556,161 @@ def test_zero_evidence_children_still_refuse_because_nobody_looked(db) -> None:
 
     assert outcome.authentic_policy_decision is False
     assert outcome.reason_codes == ("evidence_source_missing",)
+
+
+# ---------------------------------------------------------------------------
+# FW3 re-review (NB-2): verdict POLARITY, not recency, decides which sibling
+# the decision is correlated against.
+#
+# The first version of the selection rule ranked purely on
+# `availability == "present"`, which is written for ANY real judge verdict --
+# supported, contradicted and a genuine unverifiable alike -- so among current
+# authoritative verdicts the newest sequence won. A contradicted sibling could
+# therefore be silently dropped in favour of a newer supported one, and the
+# same claim node would carry `verificationStatus == "contradicted"` from
+# rollup_claim_verification_status while its lifecycle decision authenticated
+# as GROUNDED. That suppresses the categorical `challenge` route
+# (app/exploration/policy.py) and opens `abandon`/`reopen`, both of which
+# require GROUNDED -- the engine misrepresenting the exact disagreement it
+# exists to surface.
+#
+# The rule now mirrors the house's own answer to "how do multiple evidence
+# verdicts combine" (rollup_claim_verification_status: any contradicted wins,
+# else any supported, else pending), with recency as the tiebreaker WITHIN a
+# verdict class. One question, one rule.
+# ---------------------------------------------------------------------------
+
+
+def test_a_contradicted_sibling_outranks_a_newer_supported_one(db) -> None:
+    debate, node, worker, score_row = _grounded_score(db)
+    contradicted = _persist_adverse_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=8),
+        status="contradicted",
+        entailment="REFUTES",
+        base_score=0.05,
+        uncertainty=0.90,
+        evidence_node_id="evidence-node-contradicted",
+        position=10_000,
+        claim="Evidence that refutes the claim.",
+        run_id="evidence-run-contradicted",
+        sequence=2,
+    )
+    supported = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=3),
+        evidence_node_id="evidence-node-supported",
+        position=10_001,
+        claim="Evidence that supports the claim.",
+        run_id="evidence-run-supported",
+        sequence=7,
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    # The adverse verdict is what the decision is built on, even though the
+    # supporting one was verified five minutes later.
+    assert outcome.evidence_snapshot_id == contradicted
+    assert outcome.evidence_snapshot_id != supported
+    # And the consequence, which is the whole point: this score is weak and
+    # low-impact, so reading the supported sibling instead yields "abandon"
+    # (see test_grounded_correlated_persisted_inputs_authenticate_abandonment
+    # on the same fixture). The contradiction must produce a categorical
+    # challenge instead -- a spawn THE LAW authorises, which recency-ranking
+    # silently suppressed.
+    assert outcome.authentic_policy_decision is True
+    assert outcome.action == "challenge"
+    assert outcome.signal_class == "categorical"
+    assert outcome.stopping_reason == "evidence refutes or contradicts the claim"
+
+
+def test_the_selected_verdict_agrees_with_the_claim_level_rollup(db) -> None:
+    """Two rules for one question is the failure this whole finding is about.
+    Pin them to the same answer directly, on the same verdict set."""
+
+    from app.evidence.verification_evaluator import rollup_claim_verification_status
+
+    debate, node, worker, score_row = _grounded_score(db)
+    _persist_adverse_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=8),
+        status="contradicted",
+        entailment="REFUTES",
+        base_score=0.05,
+        uncertainty=0.90,
+        evidence_node_id="evidence-node-contradicted",
+        position=10_000,
+        claim="Evidence that refutes the claim.",
+        run_id="evidence-run-contradicted",
+        sequence=2,
+    )
+    _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=3),
+        evidence_node_id="evidence-node-supported",
+        position=10_001,
+        claim="Evidence that supports the claim.",
+        run_id="evidence-run-supported",
+        sequence=7,
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+    snapshot = db.get(EvidenceLifecycleSnapshot, outcome.evidence_snapshot_id)
+
+    assert rollup_claim_verification_status(["supported", "contradicted"]) == "contradicted"
+    assert snapshot is not None
+    assert snapshot.verification_status == "contradicted"
+
+
+def test_a_newer_supported_verdict_still_wins_within_its_own_verdict_class(db) -> None:
+    """Recency is the tiebreaker, not the rule it replaced: with no adverse
+    verdict in the set, the newest supported one is still selected."""
+
+    debate, node, worker, score_row = _grounded_score(db)
+    older = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=8),
+        evidence_node_id="evidence-node-older-supported",
+        position=10_000,
+        claim="An older supporting evidence source.",
+        run_id="evidence-run-older-supported",
+        sequence=2,
+    )
+    newer = _persist_grounded_evidence(
+        db,
+        debate=debate,
+        node=node,
+        worker=worker,
+        observed_at=DECISION_TIME - timedelta(minutes=3),
+        evidence_node_id="evidence-node-newer-supported",
+        position=10_001,
+        claim="A newer supporting evidence source.",
+        run_id="evidence-run-newer-supported",
+        sequence=7,
+    )
+
+    outcome = decide_lifecycle_for_node(
+        db, debate=debate, node=node, decision_timestamp=DECISION_TIME
+    )
+
+    assert outcome.evidence_snapshot_id == newer
+    assert outcome.evidence_snapshot_id != older
