@@ -109,6 +109,50 @@ test("card offsetHeight survives zoom and overview-band toggles while visual bou
   expect(restored.visualHeight).toBeCloseTo(normal.visualHeight, 1);
 });
 
+test("sticky toggle has no transformed ancestor after the entrance animation settles", async ({
+  page
+}) => {
+  await openCanvas(page, 375, 900);
+  await page.waitForTimeout(600);
+
+  const stickyState = await page.evaluate(() => {
+    const sticky = document.querySelector<HTMLElement>(".canvasStickyToggle");
+    const sizer = document.querySelector<HTMLElement>(".canvasSizer");
+    if (!sticky || !sizer) throw new Error("Missing sticky toggle or canvas sizer");
+
+    const transformedAncestors: Array<{
+      className: string;
+      tagName: string;
+      transform: string;
+    }> = [];
+    let ancestor = sticky.parentElement;
+    while (ancestor) {
+      const transform = getComputedStyle(ancestor).transform;
+      if (transform !== "none") {
+        transformedAncestors.push({
+          className: ancestor.className,
+          tagName: ancestor.tagName,
+          transform
+        });
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    return {
+      siblingBeforeSizer:
+        sticky.parentElement === sizer.parentElement &&
+        sticky.nextElementSibling === sizer,
+      transformedAncestors
+    };
+  });
+
+  expect(stickyState.siblingBeforeSizer).toBe(true);
+  expect(
+    stickyState.transformedAncestors,
+    JSON.stringify(stickyState.transformedAncestors)
+  ).toEqual([]);
+});
+
 test("drag pans without opening the node drawer", async ({ page }) => {
   const canvas = await openCanvas(page, 375, 900);
   await page.getByRole("button", { name: "Reset zoom to 1:1" }).click();

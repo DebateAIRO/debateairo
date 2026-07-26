@@ -198,6 +198,48 @@ export function CanvasViewport({
   }, [fitState.zoom]);
 
   useLayoutEffect(() => {
+    const entranceHost = surfaceRef.current?.closest<HTMLElement>(".fadeup");
+    if (!entranceHost) return;
+
+    let fallbackId: number | undefined;
+    const clearEntranceClass = () => {
+      entranceHost.classList.remove("fadeup");
+      if (fallbackId !== undefined) window.clearTimeout(fallbackId);
+    };
+    const handleEntranceEnd = (event: AnimationEvent) => {
+      if (event.target === entranceHost && event.animationName === "de-fadeup") {
+        clearEntranceClass();
+      }
+    };
+
+    entranceHost.addEventListener("animationend", handleEntranceEnd);
+    entranceHost.addEventListener("animationcancel", handleEntranceEnd);
+
+    const animations =
+      typeof entranceHost.getAnimations === "function"
+        ? entranceHost.getAnimations({ subtree: false })
+        : [];
+    const hasEntranceAnimation = getComputedStyle(entranceHost)
+      .animationName.split(",")
+      .some((name) => name.trim() === "de-fadeup");
+    if (
+      !hasEntranceAnimation ||
+      (animations.length > 0 &&
+        animations.every((animation) => animation.playState === "finished"))
+    ) {
+      clearEntranceClass();
+    } else {
+      fallbackId = window.setTimeout(clearEntranceClass, 600);
+    }
+
+    return () => {
+      entranceHost.removeEventListener("animationend", handleEntranceEnd);
+      entranceHost.removeEventListener("animationcancel", handleEntranceEnd);
+      if (fallbackId !== undefined) window.clearTimeout(fallbackId);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
     const surface = surfaceRef.current;
     if (!surface) return;
 
