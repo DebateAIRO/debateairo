@@ -1425,6 +1425,25 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
                 child.id,
                 exclude_models=claim_author_exclusions(db, role, node, debate),
             )
+        # TRANSACTION BOUNDARY (FW3, I-2). Everything above is flushed and
+        # UNCOMMITTED at this point -- the Generation, node.claim, the staled
+        # descendants, the child Nodes and their argue Jobs -- so this session
+        # holds SQLite's RESERVED writer until the commit below. That is safe
+        # because the hook queues scoring; it does not judge. No provider CLI
+        # runs inside this window (ensure_node_scoring_on_completion serves a
+        # contract-keyed cache hit or queues a score_debate job and returns;
+        # the judge CLI runs later in run_scoring_job_background's own
+        # session), so the writer is held for queries, not for a minute-long
+        # subprocess. Pinned by
+        # test_generation_completion_queues_scoring_instead_of_judging_inline.
+        #
+        # The one mid-flow commit reachable from here is
+        # _expire_stale_scoring_jobs (app/scoring/service.py), and only when it
+        # actually expires a timed-out scoring job; a crash after that point
+        # leaves the expiry durable and this completion rolled back, which the
+        # job's own retry re-drives. Anything that puts a provider call inside
+        # this window must move it out or commit first -- see the pre-CLI
+        # commit comment in score_node_with_provider.
         ensure_default_scoring_for_completed_generation(db, debate, node)
         commit_write(db)
         await event_bus.publish(job.debate_id, "tree_ready", {"tree": debate_to_dict(db, debate)})
@@ -1436,6 +1455,12 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
             raise ValueError("Node not found")
         argument = result.get("argument") if isinstance(result, dict) else str(result)
         generation = create_generation(db, job, node, argument, job.stream_buffer or str(result), metadata)
+        # TRANSACTION BOUNDARY (FW3, I-2): same shape as the decompose branch
+        # above -- the Generation and this job's completion are flushed and
+        # uncommitted from here to the commit_write below, and the whole span
+        # (scoring hook, lifecycle decision, child spawns, synthesis queueing)
+        # is one transaction with no provider call inside it. See the decompose
+        # branch's note for the reasoning and the test that pins it.
         ensure_default_scoring_for_completed_generation(db, debate, node)
         lifecycle_decision = exploration_decision_for_node(db, debate, node)
         child_spawn_count = spawn_child_argument_jobs(

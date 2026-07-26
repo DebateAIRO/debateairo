@@ -63,6 +63,11 @@ from app.scoring.normalizer import normalize_claim
 from app.scoring.service import _node_children_for_judge
 
 
+# RECORDED, NOT APPLIED since the contract v1 §6.1 amendment (2026-07-26):
+# a score no longer ages out -- see ExpectedLifecycleCorrelation.
+# score_max_age_seconds and the long note in lifecycle_inputs._classify_
+# candidate. The name is kept because the value is still part of the persisted
+# lifecycle-input-persistence/v1 correlation.
 DEFAULT_SCORE_MAX_AGE_SECONDS = 60 * 60
 DEFAULT_EVIDENCE_MAX_AGE_SECONDS = 60 * 60
 SCORING_ANALYZER_TYPE = "node_scoring"

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
 
 from app.core.db import SessionLocal
+from app.core.write_lock import hold_write_lock
 from app.exploration import scoring_completion_lifecycle
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, Node, now_utc
 from app.providers import ProviderRegistry
@@ -202,6 +204,67 @@ def test_scoring_completion_reevaluates_only_exact_eligible_run_nodes(db, monkey
 
     assert set(decided_node_ids) == {nodes["root"].id, nodes["pro"].id, nodes["con"].id}
     assert len(decided_node_ids) == 3
+
+
+def _another_thread_can_take_the_write_lock(timeout: float = 2.0) -> bool:
+    """Can any OTHER in-process writer make progress right now?
+
+    The write lock is an RLock, so asking on THIS thread would always say yes
+    (re-entry). A worker heartbeat's `UPDATE workers SET last_seen`, a job
+    lease refresh and a generation completion all run on other threads, and
+    they are what a long hold starves -- so the probe has to be one of them.
+    """
+
+    outcome: dict[str, bool] = {}
+
+    def probe() -> None:
+        try:
+            with hold_write_lock():
+                outcome["acquired"] = True
+        except Exception:  # pragma: no cover - defensive
+            outcome["acquired"] = False
+
+    thread = threading.Thread(target=probe, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    return outcome.get("acquired", False)
+
+
+def test_the_decision_loop_does_not_hold_the_process_write_lock_across_nodes(db, monkeypatch) -> None:
+    """FW3 (I-6): the decision phase must not run inside one write-lock hold.
+
+    The lock was taken around the WHOLE per-node loop on the (since
+    disproved) theory that it protected a read snapshot. Under the real
+    mechanism it protects nothing there -- persist_lifecycle_decision takes
+    the same lock itself, around exactly the check-then-insert that needs it
+    -- while the hold scaled with eligible-node count (34 on the live
+    debate), blocking every other in-process writer for the whole span. Since
+    POST /api/workers/{id}/poll is an `async def` doing blocking SQLite on the
+    event loop, that hold stalls SSE and every async endpoint with it.
+    """
+
+    debate_id, job_id, run_id, nodes = _persist_completed_operation(db)
+    lock_free_during_decision: list[bool] = []
+
+    def probing_decision(_db, *, debate, node, decision_timestamp):
+        lock_free_during_decision.append(_another_thread_can_take_the_write_lock())
+        return SimpleNamespace(authentic_policy_decision=False)
+
+    monkeypatch.setattr(
+        scoring_completion_lifecycle,
+        "decide_lifecycle_for_node",
+        probing_decision,
+    )
+
+    scoring_completion_lifecycle.reevaluate_lifecycle_after_scoring_completion(
+        db,
+        debate_id=debate_id,
+        job_id=job_id,
+        analyzer_run_id=run_id,
+    )
+
+    assert len(lock_free_during_decision) == 3
+    assert all(lock_free_during_decision)
 
 
 def test_scoring_completion_rejects_noncanonical_lowercase_node_kind(db, monkeypatch) -> None:

@@ -20,6 +20,10 @@ from app.core.log_config import configure_app_logging
 from app.scoring.jobs import recover_orphaned_scoring_jobs_at_startup
 from app.services.reaper import reaper_loop
 
+# Import-time, and therefore BEFORE configure_app_logging() runs in
+# run_startup_tasks(): anything this call logs still falls through to
+# logging.lastResort and is dropped. Accepted (it is quiet in practice) --
+# recorded here so nobody re-debugs a missing startup log line.
 settings_obj = load_settings()
 RATE_LIMIT_WINDOW_SECONDS = 60
 

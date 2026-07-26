@@ -649,18 +649,48 @@ def score_node_with_provider(
         debate_question=debate.topic,
         children=children,
     )
-    # 2026-07-26: the F1 discipline (release SQLite before a judge CLI call),
-    # applied to the PRIMARY judge -- the panel loop got it in F1, this path
-    # never did. The cache-lookup/children reads above opened a deferred read
-    # transaction; the CLI below runs for up to a minute while worker
-    # heartbeats commit continuously; the post-CLI artifact INSERT then
-    # upgrades a STALE snapshot, which SQLite rejects with an immediate
-    # SQLITE_BUSY that busy_timeout never retries (it only waits on held
-    # locks, not snapshot conflicts). That killed score_debate twice on
-    # 2026-07-26 (c7223724, a2a988f6) and is the mechanism behind the
-    # historical "database is locked" family. There are no pending writes at
-    # this point (the cache-hit path returned above; per-node commits happen
-    # in the caller), so this commit only closes the read snapshot.
+    # 2026-07-26: the F1 discipline (release the SQLite WRITER before a judge
+    # CLI call), applied to the PRIMARY judge -- the panel loop got it in F1
+    # (see the F1 comment further down this file), this path never did.
+    #
+    # MECHANISM, CORRECTED 2026-07-26. The commit that introduced this line
+    # (f625b32, already pushed and therefore immutable) and the original text
+    # here both blamed a STALE SNAPSHOT: a deferred read transaction whose
+    # write upgrade fails with an immediate SQLITE_BUSY that busy_timeout
+    # never retries. That failure mode is real in SQLite but UNREACHABLE from
+    # this application's ORM read paths, and the fix wave's probes
+    # demonstrated it: app/core/db.py builds the sessionmaker with
+    # autoflush=False and nothing here uses the pysqlite isolation_level=None
+    # + explicit-BEGIN recipe, so the driver emits BEGIN only ahead of DML.
+    # A pure ORM read opens no SQLite transaction at all -- there is no
+    # snapshot to go stale, and a holder's own later write cannot lose a
+    # snapshot race to itself.
+    #
+    # What actually bites is writer-HOLDER STARVATION: a session that has
+    # FLUSHED and then makes a long call holds SQLite's single RESERVED writer
+    # for the call's whole duration, and every other writer in the process and
+    # on the machine (worker heartbeats, job lease refreshes, the separate-
+    # process writers) waits out busy_timeout=30000 and then fails "database
+    # is locked". That is the mechanism behind the historical "database is
+    # locked" family, including the two score_debate deaths on 2026-07-26
+    # (c7223724, a2a988f6).
+    #
+    # WHAT THIS COMMIT IS WORTH HERE (measured, not assumed). Both production
+    # callers reach this line with nothing pending: run_scoring_job_background
+    # commits before it starts the batch, and score_nodes_with_provider
+    # commits after every node. So on today's paths this releases a read-only
+    # session and no writer is actually held. It stays, unconditionally,
+    # because this is the ONE place every primary-judge CLI is issued, and the
+    # invariant it enforces -- no open transaction, and therefore no held
+    # writer, when a CLI starts -- must not depend on every present and future
+    # caller remembering to commit first.
+    #
+    # It does NOT split job completion into two transactions: the generation-
+    # completion path (orchestrator.py:1428/:1439) never reaches this function
+    # at all -- ensure_node_scoring_on_completion serves a cache hit or queues
+    # a score_debate job and returns, and the judge CLI runs later in the job
+    # runner's own session (pinned by
+    # test_generation_completion_queues_scoring_instead_of_judging_inline).
     #
     # Captured BEFORE the commit: the commit expires the session's ORM
     # objects, so a post-CLI `generation.model_id` read would silently issue

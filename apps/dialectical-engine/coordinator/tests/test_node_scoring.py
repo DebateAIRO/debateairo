@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError
 from app.main import app
 from app.core.auth import hash_token
 from app.core.db import SessionLocal, get_engine
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, flush_write
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Generation, Job, JudgeOutputArtifact, Node, NodeScoringResult, ProvenanceRecord, Worker, now_utc
 from app.api import scoring as scoring_api
 from app.providers import AgentConfig, FakeProvider, ProviderError, ProviderRegistry
@@ -84,6 +84,7 @@ from app.scoring import (
 from app.scoring.judge_panel import JudgePanelMember
 from app.scoring.judge_registry import PRIMARY_NODE_SCORING_JUDGE, judge_panel_role
 from app.scoring.lineage import panel_vendor_family
+from app.scoring import service as scoring_service
 from app.scoring.service import NO_INDEPENDENT_JUDGE_REASON, ensure_node_scoring_on_completion
 from app.services.orchestrator import claim_pending_job, complete_job
 
@@ -10474,17 +10475,21 @@ def test_primary_judge_cli_runs_outside_any_open_transaction(db) -> None:
     """Regression for the recurring 'database is locked' scoring failures
     (2026-07-26, score_debate jobs c7223724 and a2a988f6; 102 historical).
 
-    Mechanism: score_node_with_provider's cache-lookup reads open a deferred
-    SQLite transaction; the judge CLI then runs for ~a minute while worker
-    heartbeats commit continuously; the post-CLI INSERT upgrades a STALE read
-    snapshot, which SQLite rejects with an immediate SQLITE_BUSY that
-    busy_timeout never retries. The F1 fix gave the PANEL loop this
-    discipline (commit_write before each member's CLI); the primary judge
-    path never got it.
+    Mechanism, CORRECTED 2026-07-26 (this docstring first said "stale
+    snapshot", which the fix wave's probes disproved): with autoflush=False
+    and no explicit-BEGIN recipe, a pure ORM read opens no SQLite transaction,
+    so there is no snapshot to go stale. What starves the coordinator is
+    holding SQLite's single RESERVED WRITER across the minute-long judge CLI:
+    every other writer then waits out busy_timeout=30000 and fails "database
+    is locked". The F1 fix gave the PANEL loop this discipline (commit_write
+    before each member's CLI); the primary judge path never got it.
 
-    The seam contract: by the time the provider is invoked, the session must
-    hold NO open transaction -- neither pending writes (F1's symptom) nor a
-    read snapshot (today's)."""
+    The seam contract, unchanged by the correction: by the time the provider
+    is invoked, the session must hold NO open transaction -- and therefore no
+    writer. `in_transaction()` is the STRICTER of the two available probes
+    (it is True for a read-only session holding no lock, see the
+    `independent_writer_can_commit` fixture), so asserting it False here
+    proves the writer is released as well."""
 
     observed: list[bool] = []
 
@@ -10531,6 +10536,122 @@ def test_primary_judge_cli_runs_outside_any_open_transaction(db) -> None:
     assert payload["status"] == "available"
     assert observed == [False], (
         "provider.judge_node was invoked with an open session transaction; "
-        "a long CLI call here makes the post-CLI write fail on a stale "
-        f"snapshot (observed in_transaction={observed})"
+        "a long CLI call here holds SQLite's single writer for its whole "
+        "duration and starves every other writer into busy_timeout expiry "
+        f"(observed in_transaction={observed})"
     )
+
+
+def test_generation_completion_queues_scoring_instead_of_judging_inline(db, monkeypatch) -> None:
+    """FW3 (I-2): job completion is NOT split into two transactions.
+
+    The firefight review read app/services/orchestrator.py:1428 (decompose)
+    and :1439 (argue) as reaching score_node_with_provider through
+    ensure_default_scoring_for_completed_generation, and concluded that the
+    pre-CLI commit_write added to that function made the completion's flushed
+    work -- the Generation, node.status='complete', staled descendants, child
+    Nodes and child argue Jobs -- durable BEFORE a judge CLI, turning one
+    atomic completion into two transactions with an unreviewed crash window
+    between them.
+
+    The call chain does not exist. ensure_node_scoring_on_completion never
+    calls score_node_with_provider: it serves a contract-keyed cache hit,
+    reports "no provider configured", or QUEUES a score_debate job (flush
+    only, no commit) and returns. Every judge CLI runs later, in
+    run_scoring_job_background's OWN session on a background thread, which
+    commits before it starts. So the completion path never reaches the pre-CLI
+    commit, its transaction is never split there, and there is no new crash
+    window to reason about.
+
+    This test pins all three legs: no judge call, no score_node_with_provider
+    call, and the completion's flushed work still invisible to any other
+    connection when the hook returns. The one mid-flow commit that path CAN
+    hit is _expire_stale_scoring_jobs (service.py), which commits only when it
+    actually expires a timed-out scoring job -- pre-existing, unrelated to
+    this range, and not triggered here.
+    """
+
+    debate = Debate(topic="Does completion judge inline?", status="generating")
+    worker = Worker(id="worker-inline", name="Worker Inline", token_hash="hash", capabilities=["debate"])
+    node = Node(
+        id="completion-root",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Completion must not run a judge CLI inside its own transaction.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="completion-generation",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="The completion hook queues scoring; it does not judge.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.flush()
+    debate.root_node_id = node.id
+    db.commit()
+
+    def _must_not_run(*args, **kwargs):  # pragma: no cover - the assertion is the point
+        raise AssertionError("the completion hook must not judge inline")
+
+    monkeypatch.setattr(scoring_service, "score_node_with_provider", _must_not_run)
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": FakeProvider()},
+    )
+
+    # Exactly the shape orchestrator.complete_job is in when it calls the
+    # hook: real work flushed, nothing committed yet.
+    child = Node(
+        id="completion-child",
+        debate=debate,
+        parent_id=node.id,
+        node_type="PRO",
+        depth=1,
+        position=0,
+        claim="A child the completion flushed but has not committed.",
+        status="pending",
+        materialized_path="/0",
+    )
+    db.add(child)
+    flush_write(db)
+
+    payload = ensure_node_scoring_on_completion(db, debate, node, registry)
+
+    assert payload["pending"] == [
+        {
+            "node_id": node.id,
+            "status": "pending",
+            "reason": "Scoring has been queued for this node.",
+        }
+    ]
+    with SessionLocal() as probe:
+        assert probe.get(Node, "completion-child") is None, (
+            "the completion hook committed the caller's in-flight work; job "
+            "completion is no longer one transaction"
+        )
+        assert (
+            probe.scalars(
+                select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")
+            ).all()
+            == []
+        )
+
+    # Positive control: the probe above can see this work the moment the
+    # caller's own commit runs, so its silence was durability, not a blind
+    # spot in the probe.
+    commit_write(db)
+    with SessionLocal() as probe:
+        assert probe.get(Node, "completion-child") is not None
+        assert (
+            probe.scalars(
+                select(Job).where(Job.debate_id == debate.id, Job.job_type == "score_debate")
+            ).all()
+            != []
+        )

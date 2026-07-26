@@ -7,9 +7,7 @@ from collections.abc import Mapping
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.write_lock import commit_write, hold_write_lock
-
-LOGGER = logging.getLogger(__name__)
+from app.core.write_lock import commit_write
 from app.evidence.verification_evaluator import (
     evaluate_evidence_verdict,
     evidence_node_verification_eligible,
@@ -25,6 +23,8 @@ from app.exploration.policy import EXPANSION_ACTIONS
 from app.models.entities import AnalyzerRun, Debate, Job, JudgeOutputArtifact, Node, now_utc
 from app.scoring.judges import ScoringProvider
 from app.services.events import event_bus
+
+LOGGER = logging.getLogger(__name__)
 
 
 # "ROOT_CLAIM" is the real root node_type at every creation site
@@ -278,38 +278,45 @@ def reevaluate_lifecycle_after_scoring_completion(
                     )
                     db.rollback()
         decision_timestamp = now_utc()
-        # 2026-07-26 stale-snapshot discipline: the whole decision phase --
-        # first read through the final commit_write below -- runs inside one
-        # hold_write_lock critical section, so its FIRST read opens a fresh
-        # snapshot while the lock excludes every in-process writer: nothing
-        # can advance the WAL between that read and the commit, which is the
-        # only way a deferred SQLite transaction's write upgrade is
-        # guaranteed not to hit an immediate, unretried SQLITE_BUSY. No CLI
-        # runs inside the block (decide_lifecycle_for_node is persisted-data
-        # compute), so the lock is held for milliseconds, never across a
-        # provider call.
+        # commit -- NOT rollback -- before the decision phase: the
+        # verification loop's commit=False persists are flushed but
+        # uncommitted, so a rollback here would silently discard every
+        # verification verdict (the lifecycle suite caught exactly that as
+        # verificationStatus reverting to pending_verification). Committing
+        # makes the expensive CLI-derived verifications durable-early -- the
+        # same call the F1 panel fix made deliberately -- and a crash between
+        # here and the decision commit leaves durable verifications + no
+        # decisions, which the next scoring pass redecides benignly. It also
+        # releases SQLite's RESERVED writer, which the flushed-but-uncommitted
+        # verification writes were holding.
         #
-        # commit -- NOT rollback -- before taking the lock: the verification
-        # loop's commit=False persists are flushed but uncommitted, so a
-        # rollback here would silently discard every verification verdict
-        # (the lifecycle suite caught exactly that as verificationStatus
-        # reverting to pending_verification). Committing makes the expensive
-        # CLI-derived verifications durable-early -- the same call the F1
-        # panel fix made deliberately -- and a crash between here and the
-        # decision commit leaves durable verifications + no decisions, which
-        # the next scoring pass redecides benignly.
+        # NO OUTER WRITE LOCK (FW3, I-6; corrected 2026-07-26). This phase
+        # used to run inside one hold_write_lock() spanning the whole per-node
+        # loop, justified as keeping a read snapshot fresh. That justification
+        # was wrong -- a pure ORM read opens no SQLite transaction here (see
+        # app/scoring/service.py's pre-CLI commit comment for the corrected
+        # mechanism) -- and the hold was not free: it scaled with eligible-node
+        # count (34 on the live P1 debate), and every other in-process writer
+        # (worker heartbeat `last_seen` UPDATEs, job lease refreshes,
+        # generation completion) blocked on it for the whole span, with
+        # POST /api/workers/{id}/poll doing blocking SQLite on the event loop
+        # so the stall reached SSE and every async endpoint too.
+        #
+        # The one operation that genuinely needs serializing is
+        # persist_lifecycle_decision's idempotency-key check-then-insert, and
+        # it takes the same process-wide RLock itself, around exactly that --
+        # so the lock is already exactly as narrow as it needs to be.
         commit_write(db)
-        with hold_write_lock():
-            _persist_lifecycle_decisions_locked(
-                db,
-                debate=debate,
-                debate_id=debate_id,
-                job_id=job_id,
-                run=run,
-                eligible=eligible,
-                decision_timestamp=decision_timestamp,
-                event_handoffs=event_handoffs,
-            )
+        _persist_lifecycle_decisions(
+            db,
+            debate=debate,
+            debate_id=debate_id,
+            job_id=job_id,
+            run=run,
+            eligible=eligible,
+            decision_timestamp=decision_timestamp,
+            event_handoffs=event_handoffs,
+        )
     except Exception:
         db.rollback()
         raise
@@ -321,7 +328,7 @@ def reevaluate_lifecycle_after_scoring_completion(
         )
 
 
-def _persist_lifecycle_decisions_locked(
+def _persist_lifecycle_decisions(
     db: Session,
     *,
     debate: Debate,
@@ -332,65 +339,71 @@ def _persist_lifecycle_decisions_locked(
     decision_timestamp,
     event_handoffs: list[LifecycleDecisionPersistence],
 ) -> None:
-    """The decision phase of the lifecycle tail, extracted verbatim so the
-    caller can run it inside one hold_write_lock critical section (see the
-    call site's comment for the stale-snapshot mechanism)."""
+    """The decision phase of the lifecycle tail.
+
+    One authenticated decision per eligible node, then the run's
+    reevaluation marker and a single commit. Runs under NO outer write lock:
+    the only critical section here is persist_lifecycle_decision's
+    idempotency-key check-then-insert, which holds the process-wide lock
+    itself -- see the caller's comment for why the loop-wide hold this was
+    extracted for was removed.
+    """
     for node in eligible:
-            outcome = decide_lifecycle_for_node(
-                db,
-                debate=debate,
-                node=node,
-                decision_timestamp=decision_timestamp,
-            )
-            if not _authenticates_completed_run(
-                outcome,
-                run=run,
-                decision_timestamp=decision_timestamp,
-            ):
-                continue
-            node.stopping_status = outcome.action
-            node.stopping_reason = outcome.stopping_reason.strip()
-            node.path_status = (
-                "active"
-                if outcome.keeps_path_active and outcome.action != "abandon"
-                else "abandoned"
-            )
-            persistence = persist_lifecycle_decision(
-                db,
-                snapshot=LifecycleDecisionSnapshot(
-                    schema_version=LIFECYCLE_DECISION_SCHEMA_VERSION,
-                    idempotency_key=f"scoring-completion:{run.id}:{node.id}",
-                    debate_id=debate_id,
-                    node_id=node.id,
-                    decision=outcome.action,
-                    stopping_reason=node.stopping_reason,
-                    path_status=node.path_status,
-                    stopping_status=node.stopping_status,
-                    input_state=outcome.input_state,
-                    reason_codes=outcome.reason_codes,
-                    score_availability="present",
-                    score_freshness="fresh",
-                    evidence_availability="present",
-                    evidence_freshness="fresh",
-                    current_score_input_hash=outcome.current_score_input_hash,
-                    scoring_contract_hash=outcome.scoring_contract_hash,
-                    score_record_id=outcome.score_record_id,
-                    score_run_id=outcome.score_run_id,
-                    score_run_sequence=outcome.score_run_sequence,
-                    evidence_snapshot_id=outcome.evidence_snapshot_id,
-                    decision_timestamp=outcome.decision_timestamp,
-                    # Always 0 at decision time: real spawning happens in the
-                    # adaptive dispatcher AFTER this reevaluation (W4), which
-                    # writes the real count back onto the record it consumed.
-                    child_spawn_count=0,
-                    # Fail-closed: a missing classification reads as scalar
-                    # and therefore can never steer work.
-                    signal_class=getattr(outcome, "signal_class", "scalar"),
-                    config_override=None,
-                ),
-            )
-            if persistence.persistence_result == "created":
-                event_handoffs.append(persistence)
+        outcome = decide_lifecycle_for_node(
+            db,
+            debate=debate,
+            node=node,
+            decision_timestamp=decision_timestamp,
+        )
+        if not _authenticates_completed_run(
+            outcome,
+            run=run,
+            decision_timestamp=decision_timestamp,
+        ):
+            continue
+        node.stopping_status = outcome.action
+        node.stopping_reason = outcome.stopping_reason.strip()
+        node.path_status = (
+            "active"
+            if outcome.keeps_path_active and outcome.action != "abandon"
+            else "abandoned"
+        )
+        persistence = persist_lifecycle_decision(
+            db,
+            snapshot=LifecycleDecisionSnapshot(
+                schema_version=LIFECYCLE_DECISION_SCHEMA_VERSION,
+                idempotency_key=f"scoring-completion:{run.id}:{node.id}",
+                debate_id=debate_id,
+                node_id=node.id,
+                decision=outcome.action,
+                stopping_reason=node.stopping_reason,
+                path_status=node.path_status,
+                stopping_status=node.stopping_status,
+                input_state=outcome.input_state,
+                reason_codes=outcome.reason_codes,
+                score_availability="present",
+                score_freshness="fresh",
+                evidence_availability="present",
+                evidence_freshness="fresh",
+                current_score_input_hash=outcome.current_score_input_hash,
+                scoring_contract_hash=outcome.scoring_contract_hash,
+                score_record_id=outcome.score_record_id,
+                score_run_id=outcome.score_run_id,
+                score_run_sequence=outcome.score_run_sequence,
+                evidence_snapshot_id=outcome.evidence_snapshot_id,
+                decision_timestamp=outcome.decision_timestamp,
+                # Always 0 at decision time: real spawning happens in the
+                # adaptive dispatcher AFTER this reevaluation (W4), which
+                # writes the real count back onto the record it consumed.
+                child_spawn_count=0,
+                # Fail-closed: a missing classification reads as scalar
+                # and therefore can never steer work.
+                signal_class=getattr(outcome, "signal_class", "scalar"),
+                config_override=None,
+            ),
+        )
+        if persistence.persistence_result == "created":
+            event_handoffs.append(persistence)
     run.provenance = {
         **dict(run.provenance),
         _REEVALUATION_KEY: {

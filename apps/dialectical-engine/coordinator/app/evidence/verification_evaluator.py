@@ -386,27 +386,34 @@ def _persist_verification_attempt(
 ) -> None:
     """Persist one verifier attempt and its honest lifecycle projection.
 
-    2026-07-26 stale-snapshot discipline: every caller reaches this right
-    after a verifier CLI attempt (success, timeout, provider error, or parse
-    failure alike), so the session's transaction -- if one is open -- dates
-    from BEFORE that CLI ran and its snapshot is stale the moment any other
-    thread committed meanwhile (worker heartbeats do, every few seconds).
-    next_analyzer_run_seq's own hold_write_lock cannot help: the lock must be
-    held when the transaction's FIRST read opens the snapshot, not just at
-    the flush. So: shed any stale snapshot, then run the entire persist --
-    first read through flush (and the commit, when requested) -- inside one
-    hold_write_lock critical section, during which no in-process writer can
-    advance the WAL. There is nothing pending to lose at entry: the pre-CLI
-    commit_write in evaluate_evidence_verdict made every earlier write
-    durable (the killed lifecycle tail of score job 39cf6b82 is the incident
-    copy: 24 verification runs persisted, the 25th flush died, the whole
-    tail -- and with it every lifecycle decision -- was lost).
+    2026-07-26 write discipline. WHY THE LOCK (corrected 2026-07-26): this
+    persist is a READ-MODIFY-WRITE and the lock exists to make it atomic, not
+    to protect a snapshot. next_analyzer_run_seq computes MAX(seq)+1 and then
+    flushes the row, and persist_evidence_lifecycle_snapshot does a
+    check-then-insert on identity_sha256; two threads interleaving either pair
+    corrupt the sequence or race the idempotency check. Holding the
+    process-wide write lock across the whole persist -- first read through
+    flush (and the commit, when requested) -- is what serializes them.
 
-    The snapshot-shedding rollback lives in evaluate_evidence_verdict
-    immediately after the CLI returns (the one instant guaranteed to have
-    nothing pending); putting it here discarded the caller's in-session
-    verdict mutations and reverted verificationStatus to
-    pending_verification (caught by the lifecycle suite)."""
+    The original text here justified the same lock as stale-snapshot
+    protection ("the session's transaction ... its snapshot is stale the
+    moment any other thread committed"). That justification was wrong: with
+    autoflush=False and no explicit-BEGIN recipe, a pure ORM read opens no
+    SQLite transaction, so there is no snapshot to protect (see the corrected
+    mechanism in app/scoring/service.py's pre-CLI commit comment). The lock
+    stays, for the atomicity reason above; only the reason changed.
+
+    There is nothing pending to lose at entry: the pre-CLI commit_write in
+    evaluate_evidence_verdict made every earlier write durable (the killed
+    lifecycle tail of score job 39cf6b82 is the incident copy: 24 verification
+    runs persisted, the 25th flush died, the whole tail -- and with it every
+    lifecycle decision -- was lost).
+
+    The post-CLI rollback lives in evaluate_evidence_verdict immediately after
+    the CLI returns (the one instant guaranteed to have nothing pending);
+    putting it here discarded the caller's in-session verdict mutations and
+    reverted verificationStatus to pending_verification (caught by the
+    lifecycle suite)."""
     with hold_write_lock():
         _persist_verification_attempt_locked(
             db,
@@ -584,19 +591,32 @@ def evaluate_evidence_verdict(
         },
     )
 
-    # 2026-07-26: F1 discipline -- close the session's read transaction before
-    # the verification judge's CLI call, exactly as in
-    # scoring/service.py score_node_with_provider (see the comment there for
-    # the stale-snapshot mechanism). The node/generation reads above opened a
-    # deferred transaction; a write after a minutes-long CLI on that stale
-    # snapshot fails with an immediate, unretried SQLITE_BUSY.
+    # 2026-07-26: F1 discipline -- release the SQLite WRITER before the
+    # verification judge's CLI call, exactly as in scoring/service.py
+    # score_node_with_provider (see the comment there for the corrected
+    # mechanism and the probes behind it).
+    #
+    # MECHANISM, CORRECTED 2026-07-26: the original text here blamed a stale
+    # snapshot taken by the node/generation reads above. Those reads open no
+    # SQLite transaction (autoflush=False, no explicit BEGIN), so there is no
+    # snapshot. The seam is writer-HOLDER starvation, and on the lifecycle
+    # tail it is real per evidence node: scoring_completion_lifecycle calls
+    # this with commit=False, so the PREVIOUS evidence node's
+    # _persist_verification_attempt has FLUSHED (next_analyzer_run_seq
+    # materializes the run) and still holds SQLite's RESERVED writer. Without
+    # this commit, evidence node N+1's minutes-long CLI runs with that writer
+    # held and every other writer waits out busy_timeout=30000 before failing
+    # "database is locked".
     commit_write(db)
     try:
         result = provider.judge_node(request)
-        # Shed the snapshot the CLI wait made stale, at the one instant
-        # guaranteed to have nothing pending (the commit above cleared the
-        # session; the CLI touches no ORM state). Every session mutation and
-        # the locked persist below then run on a fresh view.
+        # Defence in depth, not a snapshot shed (corrected 2026-07-26): the
+        # commit above already closed the transaction and the CLI touches no
+        # ORM state, so on the happy path there is nothing here to roll back.
+        # It stays because this is the one instant guaranteed to have nothing
+        # pending, and expiring the identity map means every session mutation
+        # and the locked persist below re-read row values rather than trusting
+        # values loaded before a minutes-long wait.
         db.rollback()
     except TimeoutError:
         db.rollback()
