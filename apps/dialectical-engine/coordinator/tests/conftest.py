@@ -46,14 +46,18 @@ os.environ.setdefault("DIALECTICAL_CROSS_EXAM", "false")
 
 import hashlib
 import json
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 import app.main  # noqa: F401 — warms the orchestrator<->scoring<->serialization import cycle so collection order can't break imports
 
 from app.core.auth import ensure_user_token
 from app.core.db import Base, SessionLocal, engine, init_db
 from app.exploration.policy import EvidenceSignal, ScoreSignal
+from app.models.entities import Setting
 
 
 # P1 Task 4: pure-policy signal factories (no database involved). Defaults are
@@ -371,6 +375,52 @@ def db():
     with SessionLocal() as session:
         ensure_user_token(session, "user_test_token")
         yield session
+
+
+@pytest.fixture()
+def independent_writer_can_commit():
+    """Callable -> True iff a SECOND connection can commit a write RIGHT NOW.
+
+    The seam probe for "is this code path holding SQLite's single writer?".
+    Call it from inside a stubbed long call (judge CLI, planner CLI, citation
+    fetch) to assert that the rest of the coordinator -- worker heartbeats'
+    `UPDATE workers SET last_seen`, job lease refreshes, generation completion
+    -- can still make progress while that call is out. A path that flushes
+    before a long call holds the RESERVED writer for its whole duration and
+    starves every other writer into busy_timeout expiry and "database is
+    locked" (the 2026-07-24 coordinator wedge).
+
+    Probed at the connection level, NOT with `db.in_transaction()`: the
+    pysqlite driver does not emit BEGIN until a DML statement runs, so
+    SQLAlchemy reports an open transaction for read-only sessions that hold no
+    SQLite lock at all. What starves other writers is the lock, so the honest
+    probe is whether anyone else can still commit.
+
+    busy_timeout is pinned low on the probe connection so a held writer fails
+    the probe in milliseconds instead of blocking the suite for the 30s
+    production timeout (app.core.db.set_sqlite_pragma).
+    """
+
+    def _probe() -> bool:
+        with SessionLocal() as probe:
+            probe.execute(text("PRAGMA busy_timeout=200"))
+            try:
+                probe.add(Setting(key=f"writer-probe-{uuid4().hex}", value={"probe": True}))
+                try:
+                    probe.commit()
+                except OperationalError:
+                    probe.rollback()
+                    return False
+                return True
+            finally:
+                # Restore the production value before this connection goes back
+                # to the pool: closing a Session returns the connection, it does
+                # not reconnect, and the connect-time pragma listener only fires
+                # on a fresh connect (see the `db` fixture's dispose comment).
+                probe.execute(text("PRAGMA busy_timeout=30000"))
+                probe.commit()
+
+    return _probe
 
 
 @pytest.fixture(autouse=True)

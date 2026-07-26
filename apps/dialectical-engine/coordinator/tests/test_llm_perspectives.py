@@ -233,3 +233,73 @@ def test_llm_flag_off_never_touches_the_planner(db, monkeypatch) -> None:
     debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
 
     assert debate.config["perspective_derivation"]["source"] == "markers"
+
+
+# ---------------------------------------------------------------------------
+# Seam contract: the planner CLI must never run inside an open write
+# transaction (the 2026-07-24-class coordinator wedge)
+# ---------------------------------------------------------------------------
+
+
+def probing_planner_registry(response_text: str, observed: list[bool], probe) -> ProviderRegistry:
+    """planner_registry, but every generate() first records whether the
+    coordinator's single SQLite writer was free at call time."""
+    registry = planner_registry(response_text)
+    inner = registry.providers["fake"]
+
+    class WriterProbingProvider:
+        def generate(self, *args, **kwargs):
+            observed.append(probe())
+            return inner.generate(*args, **kwargs)
+
+    registry.providers["fake"] = WriterProbingProvider()
+    return registry
+
+
+def test_perspective_planner_cli_runs_outside_any_open_write_transaction(
+    db, monkeypatch, independent_writer_can_commit
+) -> None:
+    """Regression for the coordinator-wide wedge that app.scoring.service's F1
+    fix cured for the judge panel but debate creation never got.
+
+    Mechanism: create_dialectical_debate flushed the Debate, root Node and
+    DebateBranch rows -- taking SQLite's single RESERVED writer -- and only
+    THEN called the perspective planner, a codex CLI subprocess bounded at
+    DIALECTICAL_PERSPECTIVE_PLANNER_TIMEOUT_S (45s default, 120s max). For that
+    entire window every other writer in the process (worker heartbeats'
+    `UPDATE workers SET last_seen`, job lease refreshes, generation completion)
+    blocked on busy_timeout and then failed with "database is locked".
+
+    The seam contract: the planner runs before ANY write, so an unrelated
+    writer can still commit while the CLI is out. Ordering is the whole fix --
+    the planner needs only the topic and the rule-based candidates, never the
+    database -- which also keeps debate creation a single atomic transaction
+    (no half-created "generating" debate if the planner or job queueing dies).
+    """
+    monkeypatch.setenv(FLAG_DYNAMIC, "true")
+    monkeypatch.setenv(FLAG_LLM, "true")
+    codex_worker(db)
+    observed: list[bool] = []
+    response = planner_payload(
+        [
+            {"label": "Mechanism POV", "lens": "Evaluate the causal mechanism.", "why": ""},
+            {"label": "Ethical POV", "lens": "Evaluate who bears the cost.", "why": ""},
+            {"label": "Practical POV", "lens": "Evaluate whether it is feasible.", "why": ""},
+        ]
+    )
+    monkeypatch.setattr(
+        service,
+        "_planner_registry",
+        lambda: probing_planner_registry(response, observed, independent_writer_can_commit),
+    )
+
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    assert debate.config["perspective_derivation"]["source"] == "llm"
+    assert pov_roles(db, debate) == ["Mechanism POV", "Ethical POV", "Practical POV"]
+    assert observed == [True], (
+        "the perspective planner CLI ran while debate creation held SQLite's "
+        "single writer: for the CLI's whole run every other coordinator writer "
+        "blocks on busy_timeout and then fails with 'database is locked' "
+        f"(observed independent-writer-can-commit={observed})"
+    )

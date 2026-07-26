@@ -3376,6 +3376,65 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
         # debate itself. A triage/state bug must never block debate creation.
         print(f"[dialectical_v2] protocol_state init failed (non-fatal): {exc!r}")
     model_id = require_v2_codex_model(db)
+
+    # Dynamic perspectives (DEFAULT ON): derive a claim-type-appropriate lens
+    # set instead of the fixed quartet. When the flag is off, `perspectives` is
+    # exactly POV_BRANCHES, so the loop below is byte-identical to the legacy
+    # path. Only the (node_type, label) source list changes; the per-perspective
+    # Node + v2_pov job mechanics are shared.
+    #
+    # SEAM (ordering is load-bearing): this block runs BEFORE the first write
+    # below, because plan_perspectives_with_llm shells out to the codex CLI for
+    # up to DIALECTICAL_PERSPECTIVE_PLANNER_TIMEOUT_S (45s default, 120s max).
+    # It used to run AFTER the Debate/root Node/DebateBranch flushes, which
+    # meant debate creation held SQLite's single RESERVED writer across that
+    # whole subprocess -- starving every other writer in the process (worker
+    # heartbeats' `UPDATE workers SET last_seen`, job lease refreshes,
+    # generation completion) into busy_timeout expiry and "database is locked"
+    # 500s. Same defect app.scoring.service's F1 fix cured for the judge panel.
+    # The planner needs only the topic and the rule-based candidates -- never
+    # the database -- so hoisting it is a pure reordering that keeps debate
+    # creation ONE atomic transaction (a planner or job-queueing failure still
+    # leaves no half-created "generating" debate behind).
+    if bool_env("DIALECTICAL_DYNAMIC_PERSPECTIVES", True):
+        claim_type, markers, selected = _classify_and_select_perspectives(topic)
+        source = "markers" if claim_type != "unknown" else "fallback"
+        if bool_env("DIALECTICAL_LLM_PERSPECTIVES", True):
+            planned = plan_perspectives_with_llm(
+                topic, candidates=[(label, lens) for _node_type, label, lens in selected]
+            )
+            if planned is not None:
+                planned_claim_type, labelled = planned
+                selected = _attach_pov_node_types(labelled)
+                source = "llm"
+                if planned_claim_type:
+                    claim_type = planned_claim_type
+        perspectives = [(node_type, label) for node_type, label, _lens in selected]
+        # W5a: persist the derivation that produced this debate's lens set
+        # (additive; NEW debates only -- see serialization.debate_to_dict's
+        # `derivation` key). Folded into the config the Debate is CONSTRUCTED
+        # with, so there is no ORM dirty-tracking concern at all (debate.config
+        # is a plain JSON column, not a MutableDict, so an in-place update on a
+        # persisted row would not be tracked -- cf. the reassign-wholesale
+        # pattern in app.exploration.expansion_dispatch._write_adaptive_expansion_state).
+        # `lenses` is load-bearing for LLM-planned debates: render_v2_job_prompt
+        # resolves an LLM-authored label's lens text from here, since no static
+        # map can know it.
+        debate_config = {
+            **debate_config,
+            "perspective_derivation": {
+                "claim_type": claim_type,
+                "markers": list(markers),
+                "lens_set": [label for _node_type, label, _lens in selected],
+                "source": source,
+                "lenses": {label: lens for _node_type, label, lens in selected},
+            },
+        }
+    else:
+        perspectives = list(POV_BRANCHES)
+
+    # First write of the request: everything from here to the commit_write
+    # below is local DB work only -- no CLI, no network (see the SEAM note).
     debate = Debate(topic=topic, status="generating", config=debate_config)
     db.add(debate)
     flush_write(db)
@@ -3395,48 +3454,6 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
     branch = DebateBranch(debate_id=debate.id, parent_branch_id=None, root_node_id=root.id, status="active")
     db.add(branch)
     flush_write(db)
-
-    # Dynamic perspectives (DEFAULT ON): derive a claim-type-appropriate lens
-    # set instead of the fixed quartet. When the flag is off, `perspectives` is
-    # exactly POV_BRANCHES, so the loop below is byte-identical to the legacy
-    # path. Only the (node_type, label) source list changes; the per-perspective
-    # Node + v2_pov job mechanics are shared.
-    if bool_env("DIALECTICAL_DYNAMIC_PERSPECTIVES", True):
-        claim_type, markers, selected = _classify_and_select_perspectives(topic)
-        source = "markers" if claim_type != "unknown" else "fallback"
-        if bool_env("DIALECTICAL_LLM_PERSPECTIVES", True):
-            planned = plan_perspectives_with_llm(
-                topic, candidates=[(label, lens) for _node_type, label, lens in selected]
-            )
-            if planned is not None:
-                planned_claim_type, labelled = planned
-                selected = _attach_pov_node_types(labelled)
-                source = "llm"
-                if planned_claim_type:
-                    claim_type = planned_claim_type
-        perspectives = [(node_type, label) for node_type, label, _lens in selected]
-        # W5a: persist the derivation that produced this debate's lens set
-        # (additive; NEW debates only -- see serialization.debate_to_dict's
-        # `derivation` key). Reassigned wholesale (not mutated in place):
-        # debate.config is a plain JSON column, not a MutableDict, so an
-        # in-place update would not be tracked as dirty by the ORM (matches
-        # the existing debate.config write pattern used elsewhere, e.g.
-        # app.exploration.expansion_dispatch._write_adaptive_expansion_state).
-        # `lenses` is load-bearing for LLM-planned debates: render_v2_job_prompt
-        # resolves an LLM-authored label's lens text from here, since no static
-        # map can know it.
-        debate.config = {
-            **debate.config,
-            "perspective_derivation": {
-                "claim_type": claim_type,
-                "markers": list(markers),
-                "lens_set": [label for _node_type, label, _lens in selected],
-                "source": source,
-                "lenses": {label: lens for _node_type, label, lens in selected},
-            },
-        }
-    else:
-        perspectives = list(POV_BRANCHES)
 
     # Multi-model collaboration: POV branches round-robin across every online
     # real worker model (anchor first), so the perspectives are argued by

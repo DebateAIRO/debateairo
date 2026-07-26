@@ -343,6 +343,52 @@ def test_resolve_and_stamp_marks_found_missing_and_unreachable(db) -> None:
     assert db.get(Node, "ev-refused").evidence_metadata["resolution_status"] == UNREACHABLE
 
 
+def test_citation_fetches_run_without_holding_the_single_writer(
+    db, independent_writer_can_commit
+) -> None:
+    """Seam contract (2026-07-26 sweep): _resolve_and_stamp_async holds ONE
+    session open across every node's network fetch -- 46 evidence nodes at up
+    to CITATION_FETCH_TIMEOUT_SECONDS each is minutes -- and stamps them all in
+    a single terminal commit_write.
+
+    That is only safe because nothing in the loop emits DML: SessionLocal is
+    built with autoflush=False, so `db.get` never flushes the pending
+    `evidence_metadata` assignments, and the pysqlite driver does not BEGIN
+    until a DML statement runs. SQLite's single RESERVED writer is therefore
+    taken only by the final commit, never held across a fetch.
+
+    This test pins that property rather than the code shape: turning autoflush
+    on, or adding a flush_write inside the loop, would silently start holding
+    the writer for the whole fetch run and starve every other coordinator
+    writer into "database is locked" -- and would fail here.
+    """
+    d1, _ = _evidence_node(
+        db, node_id="ev-writer-1", url="https://example.org/a", quote="first quote"
+    )
+    _evidence_node(db, node_id="ev-writer-2", url="https://example.org/b", quote="second quote")
+    _evidence_node(db, node_id="ev-writer-3", url="https://example.org/c", quote="third quote")
+    observed: list[bool] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(independent_writer_can_commit())
+        return httpx.Response(200, text="page body containing the first quote and more")
+
+    resolve_and_stamp_citations(
+        d1.id,
+        ["ev-writer-1", "ev-writer-2", "ev-writer-3"],
+        transport=httpx.MockTransport(handler),
+    )
+
+    db.expire_all()
+    assert db.get(Node, "ev-writer-3").evidence_metadata["resolution_status"] is not None
+    assert observed == [True, True, True], (
+        "a citation fetch ran while the resolution pass held SQLite's single "
+        "writer; every other coordinator writer blocks on busy_timeout and "
+        "then fails with 'database is locked' for the whole fetch run "
+        f"(observed independent-writer-can-commit={observed})"
+    )
+
+
 def test_resolve_and_stamp_never_raises_on_bad_node_ids(db) -> None:
     # Best-effort contract: unknown node ids are skipped, never raised.
     resolve_and_stamp_citations(
