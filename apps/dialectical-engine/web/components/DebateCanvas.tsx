@@ -17,6 +17,7 @@ import { modelMeta } from "@/lib/models";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import { formatScoreBadgeLabel, formatScorePercent } from "@/lib/scoringFormat";
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
+import { CanvasViewport } from "@/components/CanvasViewport";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
@@ -119,69 +120,56 @@ export function DebateCanvas({
   }, [root, showSetAsidePaths]);
 
   return (
-    <div className="canvas scroll" ref={canvasRef}>
-      <label
-        style={{
-          position: "sticky",
-          top: 12,
-          left: 12,
-          zIndex: 4,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          margin: 12,
-          padding: "7px 10px",
-          border: "1px solid var(--line-2)",
-          borderRadius: 8,
-          background: "var(--surface)",
-          color: "var(--text-2)",
-          boxShadow: "var(--shadow-card)"
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={showSetAsidePaths}
-          onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
-        />
-        Show set-aside paths
-      </label>
-      <div className="canvasInner" style={{ width: layout.width, height: layout.height }}>
-        <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
-          {layout.connectors.map((c) => (
-            <path
-              key={c.id}
-              d={c.d}
-              fill="none"
-              stroke={c.color}
-              strokeWidth={c.width}
-              strokeDasharray={c.dash}
-              opacity={c.opacity}
-            />
-          ))}
-        </svg>
-        {layout.placed.map((placed) => (
-          <CanvasCard
-            key={placed.id}
-            placed={placed}
-            expanded={expanded.has(placed.id)}
-            selected={selectedNodeId === placed.id}
-            scrutinyStatus={scrutiny[placed.id]}
-            scoring={scoringByNodeId?.get(placed.id)}
-            scoringError={scoringErrorsByNodeId?.get(placed.id)}
-            scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
-            meta={meta}
-            registerRef={(el) => {
-              cardRefs.current[placed.id] = el;
-            }}
-            onOpenNode={onOpenNode}
-            onChallengeNode={onChallengeNode}
-            onRegenNode={onRegenNode}
-            onToggleExpand={onToggleExpand}
-            onProseSelect={onProseSelect}
+    <CanvasViewport
+      layoutWidth={layout.width}
+      layoutHeight={layout.height}
+      canvasRef={canvasRef}
+      stickyControl={
+        <label className="canvasStickyToggle">
+          <input
+            type="checkbox"
+            checked={showSetAsidePaths}
+            onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
+          />
+          Show set-aside paths
+        </label>
+      }
+    >
+      <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
+        {layout.connectors.map((c) => (
+          <path
+            key={c.id}
+            d={c.d}
+            fill="none"
+            stroke={c.color}
+            strokeWidth={c.width}
+            strokeDasharray={c.dash}
+            opacity={c.opacity}
           />
         ))}
-      </div>
-    </div>
+      </svg>
+      {layout.placed.map((placed) => (
+        <CanvasCard
+          key={placed.id}
+          placed={placed}
+          expanded={expanded.has(placed.id)}
+          selected={selectedNodeId === placed.id}
+          scrutinyStatus={scrutiny[placed.id]}
+          scoring={scoringByNodeId?.get(placed.id)}
+          scoringError={scoringErrorsByNodeId?.get(placed.id)}
+          scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
+          meta={meta}
+          registerRef={(el) => {
+            cardRefs.current[placed.id] = el;
+          }}
+          onOpenNode={onOpenNode}
+          onChallengeNode={onChallengeNode}
+          onRegenNode={onRegenNode}
+          onToggleExpand={onToggleExpand}
+          onProseSelect={onProseSelect}
+        />
+      ))}
+    </CanvasViewport>
   );
 }
 
@@ -269,6 +257,7 @@ function CanvasCard({
     <div
       className="nodeWrap"
       style={cardStyle}
+      data-node-id={node.id}
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
       data-set-aside={setAside ? "true" : undefined}
     >
