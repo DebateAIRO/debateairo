@@ -41,6 +41,51 @@ def test_db_import_does_not_initialize_runtime_side_effects(tmp_path) -> None:
     assert result.stdout.splitlines() == ["False", "False"]
 
 
+def _engine_pool_numbers(tmp_path, extra_env: dict[str, str]) -> list[str]:
+    """Build the engine in a subprocess (the established idiom above -- the
+    in-process engine is a suite-wide singleton) and report its QueuePool
+    sizing as "size max_overflow timeout"."""
+    home = tmp_path / "dialectical-home"
+    env = os.environ.copy()
+    env["DIALECTICAL_HOME"] = str(home)
+    env["DIALECTICAL_DATABASE_URL"] = f"sqlite:///{home / 'test.sqlite3'}"
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    env.update(extra_env)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import app.core.db as db; e = db.get_engine(); "
+            "print(e.pool.size(), e.pool._max_overflow, int(e.pool._timeout))",
+        ],
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.split()
+
+
+def test_engine_pool_sizing_is_explicit_not_sqlalchemy_default(tmp_path) -> None:
+    """2026-07-26 incident: the engine was built with SQLAlchemy's implicit
+    QueuePool defaults (5 + 10 overflow, 30s timeout) and production exhausted
+    all 15 slots. Sizing must be explicit and give WAL-mode SQLite real
+    headroom -- connections are just file handles; the single-writer constraint
+    is serialized at the app layer (write_lock), not by starving readers."""
+    assert _engine_pool_numbers(tmp_path, {}) == ["10", "20", "30"]
+
+
+def test_engine_pool_sizing_env_overrides(tmp_path) -> None:
+    assert _engine_pool_numbers(
+        tmp_path,
+        {
+            "DIALECTICAL_DB_POOL_SIZE": "7",
+            "DIALECTICAL_DB_MAX_OVERFLOW": "3",
+            "DIALECTICAL_DB_POOL_TIMEOUT_S": "5",
+        },
+    ) == ["7", "3", "5"]
+
+
 def test_sqlite_pragmas_enable_wal_foreign_keys_and_busy_timeout(db) -> None:
     journal_mode = str(db.execute(text("PRAGMA journal_mode")).scalar_one()).lower()
     foreign_keys = int(db.execute(text("PRAGMA foreign_keys")).scalar_one())

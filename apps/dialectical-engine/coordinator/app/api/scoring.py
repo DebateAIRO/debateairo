@@ -24,7 +24,11 @@ from app.scoring import get_debate_scoring as get_debate_scoring_payload
 from app.scoring import queue_scoring_job
 from app.scoring import record_approved_adaptive_expansion
 from app.scoring import score_debate_with_provider_registry
-from app.scoring.jobs import run_scoring_job_background, wake_pending_internal_scoring_job
+from app.scoring.jobs import (
+    run_scoring_job_background,
+    scoring_pass_gate,
+    wake_pending_internal_scoring_job,
+)
 from app.scoring.models import ManualInvestigationRequest, ManualInvestigationResponse
 from app.scoring.service import (
     ACTIVE_SCORING_JOB_STATUSES,
@@ -217,8 +221,17 @@ def get_debate_scoring(
         if not debate or debate.status == "archived":
             raise HTTPException(status_code=404, detail="Debate not found")
         provider_registry = scoring_provider_registry_dependency()
-        payload = score_debate_with_provider_registry(db, debate, provider_registry, force_refresh=True)
-        commit_write(db)
+        # 2026-07-26 pool-exhaustion fix: this inline pass counts against the
+        # same process-wide gate as the background passes -- it is exactly the
+        # same full-judge workload, just on a request thread. Release the
+        # request session's read transaction first (the auth + debate reads
+        # above checked a QueuePool connection out), so waiting for a slot
+        # never pins a pool slot; the pass re-reads what it needs on a fresh
+        # transaction once it holds the gate.
+        db.rollback()
+        with scoring_pass_gate():
+            payload = score_debate_with_provider_registry(db, debate, provider_registry, force_refresh=True)
+            commit_write(db)
         return attach_feedback_to_scoring_payload(db, payload, raw_user_token=raw_user_token)
     debate = db.get(Debate, debate_id)
     if not debate or debate.status == "archived":

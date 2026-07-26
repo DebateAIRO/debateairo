@@ -247,6 +247,100 @@ def test_classic_decompose_completion_queues_root_scoring_state(db) -> None:
     assert db.scalars(select(NodeScoringResult).where(NodeScoringResult.debate_id == debate.id)).all() == []
 
 
+def test_decompose_completion_serializes_the_debate_once(db, monkeypatch) -> None:
+    """2026-07-26 pool-exhaustion sweep (path 5): debate_to_dict is ~14
+    debate-wide SELECTs (1.3-2.1s on a 91-node debate), each run holding a
+    QueuePool connection for its whole duration -- and a decompose completion
+    used to run it TWICE back to back (once into the tree_ready SSE payload,
+    once as the /complete response), on the event loop. One serialization must
+    feed both consumers."""
+    import app.services.orchestrator as orchestrator_module
+
+    worker = Worker(
+        name="mac-mini",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    debate = Debate(topic="Should cities ban cars?", status="generating", config={"max_depth": 1, "branching": 2})
+    db.add_all([worker, debate])
+    db.flush()
+    root = Node(
+        debate_id=debate.id,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim=debate.topic,
+        status="pending",
+        materialized_path="/0",
+    )
+    db.add(root)
+    db.flush()
+    debate.root_node_id = root.id
+    job = Job(
+        debate_id=debate.id,
+        node_id=root.id,
+        job_type="decompose",
+        required_role="decomposer",
+        required_model="mock-local",
+        status="claimed",
+        worker_id=worker.id,
+        deadline=now_utc(),
+    )
+    db.add(job)
+    db.flush()
+    worker.current_job_id = job.id
+    db.commit()
+
+    serialize_calls = {"count": 0}
+    real_serialize = orchestrator_module.debate_to_dict
+
+    def counting_serialize(session, debate_arg):
+        serialize_calls["count"] += 1
+        return real_serialize(session, debate_arg)
+
+    monkeypatch.setattr(orchestrator_module, "debate_to_dict", counting_serialize)
+
+    published: list[tuple[str, dict]] = []
+    real_publish = event_bus.publish
+
+    async def recording_publish(debate_id, event, payload):
+        published.append((event, payload))
+        return await real_publish(debate_id, event, payload)
+
+    monkeypatch.setattr(event_bus, "publish", recording_publish)
+
+    result = asyncio.run(
+        complete_job(
+            db,
+            job,
+            {
+                "root_claim": "Updated root claim.",
+                "argument": "The root has been decomposed.",
+                "children": [
+                    {"node_type": "PRO", "claim": "New pro opening."},
+                    {"node_type": "CON", "claim": "New con opening."},
+                ],
+            },
+            {"latency_ms": 12},
+        )
+    )
+
+    tree_payloads = [payload for event, payload in published if event == "tree_ready"]
+    assert len(tree_payloads) == 1
+    assert tree_payloads[0]["tree"] == result, (
+        "the tree_ready SSE payload and the /complete response diverged -- "
+        "they must come from the same serialization"
+    )
+    assert result["id"] == debate.id
+    assert serialize_calls["count"] == 1, (
+        "a decompose completion serialized the debate "
+        f"{serialize_calls['count']} times; each pass holds a pool connection "
+        "for its whole 14-SELECT run and they are byte-identical"
+    )
+
+
 def test_markdown_export_formats_structured_v2_synthesis(db) -> None:
     debate = complete_mock_debate(db)
     synthesis = db.get(Synthesis, debate.synthesis_id)

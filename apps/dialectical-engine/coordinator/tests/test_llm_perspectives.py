@@ -27,6 +27,7 @@ import json
 
 from sqlalchemy import select
 
+from app.core.db import engine
 from app.models.entities import Job, Node, Worker, now_utc
 from app.providers import AgentConfig, FakeProvider, ProviderRegistry
 from app.services import dialectical_v2 as service
@@ -302,4 +303,65 @@ def test_perspective_planner_cli_runs_outside_any_open_write_transaction(
         "single writer: for the CLI's whole run every other coordinator writer "
         "blocks on busy_timeout and then fails with 'database is locked' "
         f"(observed independent-writer-can-commit={observed})"
+    )
+
+
+def pool_probing_registry(response_text: str, observed: list[dict], session) -> ProviderRegistry:
+    """planner_registry, but every generate() first records whether the creating
+    session still holds an open transaction / a checked-out pool connection."""
+    registry = planner_registry(response_text)
+    inner = registry.providers["fake"]
+
+    class PoolProbingProvider:
+        def generate(self, *args, **kwargs):
+            observed.append(
+                {
+                    "in_transaction": session.in_transaction(),
+                    "checked_out": engine.pool.checkedout(),
+                }
+            )
+            return inner.generate(*args, **kwargs)
+
+    registry.providers["fake"] = PoolProbingProvider()
+    return registry
+
+
+def test_perspective_planner_cli_holds_no_pool_connection(db, monkeypatch) -> None:
+    """Regression for the 2026-07-26 QueuePool exhaustion: the RESERVED-writer
+    seam above is necessary but not sufficient. A pure ORM read opens no SQLite
+    write transaction, but it DOES check a connection out of the QueuePool and
+    keeps it until commit/rollback/close -- and debate creation reads on the
+    request session (require_user_token, require_v2_codex_model) before the
+    planner CLI goes out for 45-120s. Each concurrent creation therefore pinned
+    one of the pool's 15 slots for the subprocess's whole run.
+
+    The contract: by the time the planner CLI starts, the creating session must
+    have ended its read transaction (releasing its pool slot). in_transaction()
+    is the session-level observable; pool.checkedout() is the incident metric
+    (`lsof` showed the coordinator holding all 15 connections)."""
+    monkeypatch.setenv(FLAG_DYNAMIC, "true")
+    monkeypatch.setenv(FLAG_LLM, "true")
+    codex_worker(db)
+    observed: list[dict] = []
+    response = planner_payload(
+        [
+            {"label": "Mechanism POV", "lens": "Evaluate the causal mechanism.", "why": ""},
+            {"label": "Ethical POV", "lens": "Evaluate who bears the cost.", "why": ""},
+            {"label": "Practical POV", "lens": "Evaluate whether it is feasible.", "why": ""},
+        ]
+    )
+    monkeypatch.setattr(
+        service,
+        "_planner_registry",
+        lambda: pool_probing_registry(response, observed, db),
+    )
+
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+
+    assert debate.config["perspective_derivation"]["source"] == "llm"
+    assert observed == [{"in_transaction": False, "checked_out": 0}], (
+        "the perspective planner CLI ran while the creating session still held "
+        "its pooled connection: every concurrent debate creation pins a "
+        "QueuePool slot for the CLI's whole 45-120s run "
+        f"(observed={observed})"
     )

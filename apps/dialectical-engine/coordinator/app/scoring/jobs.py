@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.config import bool_env
+from app.core.config import bool_env, int_env
 from app.core.db import SessionLocal
 from app.core.oplog import log_event
 from app.core.write_lock import commit_write, hold_write_lock
@@ -23,6 +23,7 @@ from app.scoring.judge_panel import panel_model_ids
 from app.services.job_ledger import record_job_transition
 from app.services.orchestrator import max_job_attempts
 from app.scoring.service import (
+    ACTIVE_SCORING_JOB_STATUSES,
     JUDGE_OUTPUT_SOURCE,
     SCORING_ANALYZER_TYPE,
     STALE_SCORING_JOB_ERROR,
@@ -84,6 +85,50 @@ def _scoring_job_deadline_seconds(db: Session, debate: Debate) -> int:
     )
 
 
+# ---------------------------------------------------------------------------
+# 2026-07-26 pool-exhaustion fix: bound on concurrently RUNNING scoring passes.
+#
+# score_debate passes start from five v2 completion sites (one daemon thread
+# each), the browser-poll wake (BackgroundTasks), startup restart-recovery,
+# and the inline GET ?force_refresh=true path -- per-debate creation is
+# deduped (_active_scoring_job_exists), but across debates nothing bounded
+# how many passes ran at once. A running pass holds a QueuePool connection
+# between each of its commits, and -- because write_lock.py deliberately
+# orders pool -> RLock -- every pass queued on the process-wide write lock
+# holds its connection while it waits. Unbounded passes therefore translate
+# directly into pinned pool slots (the 2026-07-26 incident: all 15 held).
+#
+# The gate is acquired BEFORE any session opens, so a pass waiting its turn
+# holds no pool connection at all; resource order is gate -> pool -> RLock,
+# consistent everywhere, so it can introduce no deadlock. Sized by env so an
+# operator can tune it without a deploy; passes hold the gate across their
+# judge CLI calls too, which also bounds concurrent judge subprocesses.
+# ---------------------------------------------------------------------------
+SCORING_MAX_CONCURRENT_PASSES_ENV = "DIALECTICAL_SCORING_MAX_CONCURRENT_PASSES"
+_scoring_pass_gate_lock = threading.Lock()
+_scoring_pass_gate_semaphore: threading.BoundedSemaphore | None = None
+_scoring_pass_gate_size: int | None = None
+
+
+def scoring_pass_concurrency() -> int:
+    return int_env(SCORING_MAX_CONCURRENT_PASSES_ENV, 2, 1, 16)
+
+
+def scoring_pass_gate() -> threading.BoundedSemaphore:
+    """The process-wide scoring-pass semaphore, rebuilt if the env-configured
+    size changed since it was last handed out. A pass that acquired the old
+    semaphore releases the same object it acquired (`with gate:` pins the
+    reference), so a live resize can transiently exceed the new bound but can
+    never leak or over-release a permit."""
+    global _scoring_pass_gate_semaphore, _scoring_pass_gate_size
+    size = scoring_pass_concurrency()
+    with _scoring_pass_gate_lock:
+        if _scoring_pass_gate_semaphore is None or _scoring_pass_gate_size != size:
+            _scoring_pass_gate_semaphore = threading.BoundedSemaphore(size)
+            _scoring_pass_gate_size = size
+        return _scoring_pass_gate_semaphore
+
+
 SCORING_JOB_COMPLETION_PERSISTENCE_ERROR = (
     "Failed to persist scoring job completion after judge artifacts were produced."
 )
@@ -127,10 +172,37 @@ def run_scoring_job_background(
     # _run_internal_scoring_job) so an incremental pass only (re)judges
     # new/changed nodes via the NodeScoringResult input-hash cache instead of
     # fully re-judging every live node on every branch-completion trigger.
+    #
+    # Gate first, session second: a pass waiting its turn must hold no pooled
+    # connection (see the scoring_pass_gate comment).
+    with scoring_pass_gate():
+        _run_scoring_job_pass(
+            job_id,
+            debate_id,
+            registry_factory=registry_factory,
+            scoring_runner=scoring_runner,
+            force_refresh=force_refresh,
+        )
+
+
+def _run_scoring_job_pass(
+    job_id: str,
+    debate_id: str,
+    *,
+    registry_factory: RegistryFactory,
+    scoring_runner: ScoringRunner,
+    force_refresh: bool,
+) -> None:
     with SessionLocal() as db:
         job = db.get(Job, job_id)
         debate = db.get(Debate, debate_id)
         if not job or not debate or debate.status == "archived":
+            return
+        if job.status not in ACTIVE_SCORING_JOB_STATUSES:
+            # The job went terminal while this pass queued for the gate (a
+            # status poll expired it stale, or it completed elsewhere). Never
+            # resurrect a terminal job into "running" -- that would burn a
+            # full judge pass on a job its watchers already saw finish.
             return
         registry = registry_factory()
         run_started = time.monotonic()

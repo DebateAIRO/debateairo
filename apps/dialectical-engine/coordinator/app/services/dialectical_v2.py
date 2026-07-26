@@ -3430,6 +3430,17 @@ def create_dialectical_debate(db: Session, topic: str, config: dict[str, Any] | 
         claim_type, markers, selected = _classify_and_select_perspectives(topic)
         source = "markers" if claim_type != "unknown" else "fallback"
         if bool_env("DIALECTICAL_LLM_PERSPECTIVES", True):
+            # 2026-07-26 pool-exhaustion fix: the SEAM note above keeps the
+            # planner out of the WRITE transaction, but the request session has
+            # already READ (require_user_token, require_v2_codex_model above),
+            # and a read is enough to check a QueuePool connection out and hold
+            # it until the transaction ends. Release it before the CLI goes out
+            # for 45-120s, or every concurrent debate creation pins one of the
+            # pool's slots for the subprocess's whole run. rollback() is the
+            # right primitive: nothing is dirty yet (first write is below), it
+            # only ends the read transaction, and everything captured so far
+            # (model_id, debate_config, selected) is plain Python data.
+            db.rollback()
             planned = plan_perspectives_with_llm(
                 topic, candidates=[(label, lens) for _node_type, label, lens in selected]
             )
