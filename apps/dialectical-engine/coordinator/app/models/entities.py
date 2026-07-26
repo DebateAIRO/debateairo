@@ -310,7 +310,7 @@ def next_analyzer_run_seq(db: Session, run: "AnalyzerRun") -> int:
     Returns the assigned seq value for convenience (callers may still want it
     for logging), but the primary effect is the mutation of `run` in place.
     """
-    with hold_write_lock():
+    with hold_write_lock(db):
         current_max = db.scalar(select(func.max(AnalyzerRun.seq)))
         run.seq = (current_max or 0) + 1
         db.add(run)

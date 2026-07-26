@@ -22,6 +22,7 @@ from app.models.entities import (
     LifecycleDecisionRecord,
     Node,
     Setting,
+    next_analyzer_run_seq,
     now_utc,
 )
 from app.providers import ProviderRegistry
@@ -301,6 +302,35 @@ def test_a_contending_writer_is_never_wedged_by_the_decision_phase(db, monkeypat
     """
 
     debate_id, job_id, run_id, nodes = _persist_completed_operation(db)
+
+    # THE BLIND SPOT THIS SETUP USED TO HAVE (2026-07-26 21:08 incident). The
+    # probe used to start from a session with NOTHING PENDING, so the tail was
+    # entered holding no writer at all and the only RESERVED lock in the test
+    # was the one the decision phase took itself. The live coordinator enters
+    # this function the opposite way: the verification loop above it runs with
+    # commit=False, so `_persist_verification_attempt` has FLUSHED the last
+    # evidence node's AnalyzerRun (next_analyzer_run_seq materializes it) and
+    # NOT committed it -- the tail begins with SQLite's RESERVED writer already
+    # held and the process RLock free. Seed exactly that state, so any future
+    # change that leaves this pre-existing writer held across the decide loop,
+    # or that queues for a pooled connection while holding the write lock, is
+    # caught here rather than in production.
+    branch = db.scalars(select(DebateBranch).where(DebateBranch.debate_id == debate_id)).first()
+    assert branch is not None
+    pending_verification = AnalyzerRun(
+        debate_id=debate_id,
+        branch_id=branch.id,
+        analyzer_type="evidence_verification",
+        status="complete",
+        output={"evidenceNodeId": nodes["evidence"].id, "status": "supported"},
+        provenance={"judge_role": "verifier"},
+    )
+    # Flushes under the write lock and deliberately does NOT commit -- the exact
+    # `commit=False` shape of app/evidence/verification_evaluator.py.
+    next_analyzer_run_seq(db, pending_verification)
+    assert pending_verification.seq is not None
+    pending_verification_id = pending_verification.id
+
     contender: dict[str, object] = {}
     threads: list[threading.Thread] = []
     persist_calls = {"count": 0}
@@ -317,12 +347,28 @@ def test_a_contending_writer_is_never_wedged_by_the_decision_phase(db, monkeypat
             time.sleep(0.05)
         return real_persist(session, snapshot=snapshot)
 
+    decide_calls = {"count": 0}
+    decide_contender: dict[str, object] = {}
+
+    def decide_and_contend(_db, *, debate, node, decision_timestamp):
+        decide_calls["count"] += 1
+        # Fired inside the LOCK-FREE decide loop -- the half that carries the
+        # seeded verification flush's RESERVED writer if the tail ever stops
+        # committing before this phase. That is the shape the round-2 probe
+        # could not see: its session had nothing pending, so there was no
+        # writer to strand here and the decide loop was harmless by accident
+        # rather than by construction. On the live P1 debate this loop walks
+        # 34-91 nodes with several reads each, so a writer stranded across it
+        # is a multi-second-to-minutes hold, not a blip.
+        if decide_calls["count"] == 1:
+            threads.append(_start_contending_writer(decide_contender))
+            time.sleep(0.05)
+        return _authentic_outcome(run_id=run_id, node_id=node.id, decision_timestamp=decision_timestamp)
+
     monkeypatch.setattr(
         scoring_completion_lifecycle,
         "decide_lifecycle_for_node",
-        lambda _db, *, debate, node, decision_timestamp: _authentic_outcome(
-            run_id=run_id, node_id=node.id, decision_timestamp=decision_timestamp
-        ),
+        decide_and_contend,
     )
     monkeypatch.setattr(
         scoring_completion_lifecycle,
@@ -358,10 +404,28 @@ def test_a_contending_writer_is_never_wedged_by_the_decision_phase(db, monkeypat
         f"failed: {contender.get('error')}"
     )
     assert contender.get("committed") is True
+    assert decide_calls["count"] == 3
+    assert decide_contender.get("error") is None, (
+        "an ordinary in-process writer was wedged by the DECIDE phase and "
+        f"failed: {decide_contender.get('error')} -- the tail entered the "
+        "lock-free decide loop still holding the verification loop's "
+        "uncommitted flush, so SQLite's RESERVED writer was held with the "
+        "process lock free for the whole loop"
+    )
+    assert decide_contender.get("committed") is True
+    assert float(decide_contender.get("seconds", 0.0)) < 1.0
     # A wedge is not merely slow, it is busy_timeout long. Both sides of the
     # contention finish in milliseconds when the lock discipline is right.
     assert elapsed < 1.0
     assert float(contender.get("seconds", 0.0)) < 1.0
+    # The pre-existing verification flush was carried to durability by the
+    # tail's own commit rather than discarded -- the tail commits (never rolls
+    # back) before the decide phase precisely so these expensive CLI-derived
+    # verdicts survive, and the contender above proves it no longer costs
+    # anyone a 30s stall.
+    assert db.get(AnalyzerRun, pending_verification_id) is not None
+    with SessionLocal() as reader:
+        assert reader.get(AnalyzerRun, pending_verification_id) is not None
 
 
 def test_scoring_completion_rejects_noncanonical_lowercase_node_kind(db, monkeypatch) -> None:

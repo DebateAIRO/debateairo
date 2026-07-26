@@ -414,7 +414,7 @@ def _persist_verification_attempt(
     putting it here discarded the caller's in-session verdict mutations and
     reverted verificationStatus to pending_verification (caught by the
     lifecycle suite)."""
-    with hold_write_lock():
+    with hold_write_lock(db):
         _persist_verification_attempt_locked(
             db,
             debate=debate,

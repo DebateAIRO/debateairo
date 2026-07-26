@@ -339,7 +339,7 @@ def reevaluate_lifecycle_after_scoring_completion(
             eligible=eligible,
             decision_timestamp=decision_timestamp,
         )
-        with hold_write_lock():
+        with hold_write_lock(db):
             _persist_lifecycle_decisions(
                 db,
                 debate_id=debate_id,

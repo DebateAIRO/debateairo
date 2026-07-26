@@ -347,7 +347,7 @@ def wake_pending_internal_scoring_job(
     # trigger can never both observe the same pending job and double-run it.
     # The RLock is reentrant, so the nested commit_write/flush_write calls
     # inside this section are safe no-op re-entries.
-    with hold_write_lock():
+    with hold_write_lock(db):
         # Establish a fresh read snapshot now that we hold the write lock. A
         # concurrent create+claim+commit (separate session) -- or a pass claimed
         # since this session's transaction began -- must be visible to the

@@ -326,7 +326,7 @@ def persist_lifecycle_decision(
 
     values = _normalized(snapshot)
     snapshot_sha256 = _snapshot_sha256(values)
-    with hold_write_lock():
+    with hold_write_lock(db):
         existing = db.scalar(
             select(LifecycleDecisionRecord).where(
                 LifecycleDecisionRecord.idempotency_key == values["idempotency_key"]
