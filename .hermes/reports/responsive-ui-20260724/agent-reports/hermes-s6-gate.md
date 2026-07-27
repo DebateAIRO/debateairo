@@ -1,0 +1,16 @@
+# Hermes S6 gate self-report
+- The ticket thread was complete and gave a precise commit, diff base, file contract, and rework owner.
+- The worker handoff included concrete RED metrics instead of a generic claim that tests once failed.
+- Grok's review was legally independent: read-only, different agent family, and different from the Codex worker session.
+- The changed-path list was small enough to compare exactly against the Allowed set.
+- AuthGate immutability was easy to prove by identical Git object IDs at base and head.
+- The CSS changes matched the acceptance intent: remove fixed flex reservations, stack controls, and preserve narrow geometry.
+- The S6 Playwright suite used component bounding boxes rather than relying only on page scroll width.
+- The heavy-lock wrapper serialized all four reruns and a trap released the lock on every exit path.
+- All focused gates were reproducible from the lane worktree without product-file edits.
+- The documented source-suite baseline remained exact at 145/146 with only the suspicious-category expectation failing.
+- What fought me: the Kanban board slug was not the default and had to be discovered before the full thread was available.
+- What fought me: Next.js repeatedly warned about the unrelated home-directory lockfile, adding noise but not changing results.
+- I would put the authoritative board slug directly in every gate launch packet.
+- I would standardize a checked-in gate wrapper that acquires the semaphore, records exit codes, and guarantees release.
+- I would keep the explicit no-promotion reminder because parallel-parent fan-in is easy to mishandle during a green streak.

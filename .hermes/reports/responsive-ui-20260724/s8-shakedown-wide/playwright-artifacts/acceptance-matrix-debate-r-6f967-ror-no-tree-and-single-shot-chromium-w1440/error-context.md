@@ -1,0 +1,293 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: acceptance-matrix.spec.ts >> debate route covers connecting, generating, completed, error, no-tree, and single-shot
+- Location: tests\s8-closure\acceptance-matrix.spec.ts:329:5
+
+# Error details
+
+```
+Error: expect(locator).toContainText(expected) failed
+
+Locator: locator('.screenInner')
+Expected pattern: /Connecting|Loading/
+Timeout: 10000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toContainText" with timeout 10000ms
+  - waiting for locator('.screenInner')
+
+```
+
+```yaml
+- banner:
+  - link "Dialectical Engine — home":
+    - /url: /
+    - text: Dialectical Engine dezbatere.ro
+  - text: Responsive evidence should remain readable across every supported viewport Complete
+  - group "View":
+    - button "Thread"
+    - button "Split"
+    - button "Tree" [pressed]
+    - button "Map"
+  - text: Scoring
+  - button "Open scoring diagnostics": i
+  - link "Library":
+    - /url: /
+  - button "Replay"
+  - button "Workspace"
+  - link "Export":
+    - /url: http://127.0.0.1:8118/api/debates/s8-delayed/export.md
+  - button "How it works": "?"
+  - link "Settings":
+    - /url: /settings
+    - text: ⚙
+- group: Scoring insights Real scores displayed Showing 1 persisted scored claim from the scoring response. Fresh scores - fixture/deterministic - Last checked 2026-07-26 17:01 UTC Model-assisted reasoning aid, not a truth verdict. Open
+- checkbox "Show set-aside paths" [checked]
+- text: Show set-aside paths Root claim Public decisions improve when communities examine reasons together. 4 claims / depth 3 ↑ Pro Structured debate helps people compare ordinary reasons without losing context.
+- button "⚐ Challenge"
+- button "Read ▼"
+- text: ↓ Con Careful dissent can expose hidden assumptions before a decision becomes costly.
+- button "⚐ Challenge"
+- button "Read ▼"
+- text: ◆ Evidence Concrete evidence improves collective decisions when reasons remain visible.
+- button "⚐ Challenge"
+- button "Read ▼"
+- text: ◆ Practical A second practical branch keeps comparison broad and tests responsive packing.
+- button "⚐ Challenge"
+- button "Read ▼"
+- group "Canvas zoom controls":
+  - button "Zoom in": +
+  - button "Zoom out": −
+  - button "Fit whole tree (overview)": Fit
+  - button "Reset zoom to 1:1": 1:1
+  - status: 100%
+- complementary "Synthesis":
+  - text: Synthesis The strongest case on each side, plus a verdict. ↑ Strongest Pro Visible reasons make tradeoffs easier to inspect. ↓ Strongest Con Structured formats can still omit important context. Verdict gpt-5 · Responsive fixture worker Use structured debate while preserving dissent and source context. Leans Even Agreements
+  - list:
+    - listitem: Reasons should stay visible.
+  - text: Tensions
+  - list:
+    - listitem: Structure can simplify context.
+  - text: Evidence Gaps
+  - list:
+    - listitem: Real-device gesture behavior remains a hardware gate.
+  - text: Key Takeaways
+  - list:
+    - listitem: Preserve context while comparing claims.
+- button "🔒 Unlock actions"
+- alert
+```
+
+# Test source
+
+```ts
+  233 |   });
+  234 | }
+  235 | 
+  236 | test("library route covers empty, populated, error, composer focus, and submit", async ({ page }) => {
+  237 |   await setLibraryState(page, "empty");
+  238 |   await clearToken(page);
+  239 |   await page.goto("/", { waitUntil: "domcontentloaded" });
+  240 |   await expect(page.locator(".emptyState")).toContainText("No debates yet");
+  241 |   await expectNoHorizontalOverflow(page);
+  242 | 
+  243 |   await setLibraryState(page, "populated");
+  244 |   await page.goto("/", { waitUntil: "domcontentloaded" });
+  245 |   await expect(page.locator(".debateCard")).toHaveCount(1);
+  246 |   await expect(page.locator(".debateCardClaim")).toContainText("Public decisions improve");
+  247 |   await expectNoHorizontalOverflow(page, ".screenInner");
+  248 | 
+  249 |   await setLibraryState(page, "error");
+  250 |   await page.goto("/", { waitUntil: "domcontentloaded" });
+  251 |   await expect(page.locator(".error")).toContainText("intentionally unreachable");
+  252 |   await expectNoHorizontalOverflow(page);
+  253 | 
+  254 |   await setLibraryState(page, "empty");
+  255 |   await page.goto("/", { waitUntil: "domcontentloaded" });
+  256 |   await page.waitForLoadState("networkidle");
+  257 |   const composer = page.getByLabel("Debate claim");
+  258 |   await composer.focus();
+  259 |   await expect(composer).toBeFocused();
+  260 |   await composer.fill("Ordinary reasons should stay visible during careful debate");
+  261 |   const start = page.getByRole("button", { name: /^Start/ });
+  262 |   await expect(start).toBeEnabled();
+  263 |   await start.click();
+  264 |   await expect(page).toHaveURL(/\/new\?topic=/);
+  265 |   await expect(page.getByLabel("User token")).toBeVisible();
+  266 |   await expectNoHorizontalOverflow(page);
+  267 | });
+  268 | 
+  269 | test("protected routes cover AuthGate and route lifecycle states", async ({ page }) => {
+  270 |   for (const route of protectedRoutes) {
+  271 |     await expectProtectedShellAuthStates(page, route.path, route.heading);
+  272 | 
+  273 |     if (route.path === "/new") {
+  274 |       await expect(page.getByLabel("Topic")).toBeVisible();
+  275 |       await page.getByRole("button", { name: /Options/ }).click();
+  276 |       await expect(page.locator(".optionsPanel")).toBeVisible();
+  277 |       await page.getByLabel("Topic").fill("A valid responsive debate topic");
+  278 |       await page.getByLabel("Role overrides JSON").fill("{invalid");
+  279 |       await page.getByRole("button", { name: /Start debate/ }).click();
+  280 |       await expect(page.locator(".error")).toBeVisible();
+  281 | 
+  282 |       await page.getByLabel("Role overrides JSON").fill("");
+  283 |       await page.route("**/api/debates", async (request) => {
+  284 |         if (request.request().method() !== "POST") {
+  285 |           await request.continue();
+  286 |           return;
+  287 |         }
+  288 |         await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+  289 |         await fulfillJson(request, { id: "s8-complete" }, 201);
+  290 |       });
+  291 |       await page.getByRole("button", { name: /Start debate/ }).click();
+  292 |       await expect(page.getByRole("button", { name: /Starting/ })).toBeDisabled();
+  293 |       await page.waitForURL(/\/debate\/s8-complete/);
+  294 |       await page.unroute("**/api/debates");
+  295 |     } else if (route.path === "/settings") {
+  296 |       await expect(page.locator(".modelRow")).toHaveCount(2);
+  297 |       const cap = page.getByLabel("gpt-5 monthly cap USD");
+  298 |       await cap.fill("42");
+  299 |       await expect(cap).toHaveValue("42");
+  300 |       const toggle = page.getByRole("switch", { name: "Toggle gpt-5" });
+  301 |       const before = await toggle.getAttribute("aria-checked");
+  302 |       await toggle.click();
+  303 |       expect(await toggle.getAttribute("aria-checked")).not.toBe(before);
+  304 |       await page.getByRole("button", { name: "Edit routing JSON" }).click();
+  305 |       await page.getByLabel("Role routing JSON").fill("{invalid");
+  306 |       await page.getByRole("button", { name: "Save changes" }).click();
+  307 |       await expect(page.locator(".error")).toBeVisible();
+  308 |     } else {
+  309 |       await expect(page.locator(".workerMetrics .miniCard")).toHaveCount(5);
+  310 |       await expect(page.locator(".debateCard")).toHaveCount(1);
+  311 | 
+  312 |       await page.route("**/api/backends/status", (request) => fulfillJson(request, { workers: [] }));
+  313 |       await page.reload({ waitUntil: "domcontentloaded" });
+  314 |       await expect(page.locator(".emptyState")).toContainText("No workers registered");
+  315 |       await page.unroute("**/api/backends/status");
+  316 | 
+  317 |       await page.route("**/api/backends/status", (request) =>
+  318 |         fulfillJson(request, { detail: "worker fixture error" }, 503)
+  319 |       );
+  320 |       await page.reload({ waitUntil: "domcontentloaded" });
+  321 |       await expect(page.locator(".error")).toBeVisible();
+  322 |       await page.unroute("**/api/backends/status");
+  323 |     }
+  324 | 
+  325 |     await expectNoHorizontalOverflow(page);
+  326 |   }
+  327 | });
+  328 | 
+  329 | test("debate route covers connecting, generating, completed, error, no-tree, and single-shot", async ({
+  330 |   page
+  331 | }) => {
+  332 |   await page.goto("/debate/s8-delayed", { waitUntil: "domcontentloaded" });
+> 333 |   await expect(page.locator(".screenInner")).toContainText(/Connecting|Loading/);
+      |                                              ^ Error: expect(locator).toContainText(expected) failed
+  334 |   await expect(page.locator(".debateTopBar")).toBeVisible();
+  335 | 
+  336 |   await page.goto("/debate/s8-generating", { waitUntil: "domcontentloaded" });
+  337 |   await expect(page.getByLabel("Scoring visibility state")).toBeVisible();
+  338 |   expect(await page.locator(".node").count()).toBeGreaterThanOrEqual(4);
+  339 | 
+  340 |   await openCompleteDebate(page);
+  341 |   await expect(page.getByRole("button", { name: "Open synthesis and verdict" })).toBeVisible();
+  342 | 
+  343 |   await page.goto("/debate/s8-banner-error", { waitUntil: "domcontentloaded" });
+  344 |   await expect(page.locator(".debateError .error")).toContainText("Claim generation failed");
+  345 | 
+  346 |   await page.goto("/debate/s8-no-tree", { waitUntil: "domcontentloaded" });
+  347 |   await expect(page.locator(".canvasEmpty")).toContainText("No argument tree was produced");
+  348 | 
+  349 |   await page.goto("/debate/s8-single-shot", { waitUntil: "domcontentloaded" });
+  350 |   await expect(page.locator(".debateMain")).toContainText(
+  351 |     "Use single-shot mode only when rapid orientation matters"
+  352 |   );
+  353 |   await expectNoHorizontalOverflow(page);
+  354 | });
+  355 | 
+  356 | test("debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands", async ({ page }) => {
+  357 |   await openCompleteDebate(page);
+  358 | 
+  359 |   const views = [
+  360 |     { name: "Thread", selector: ".thread" },
+  361 |     { name: "Split", selector: ".split" },
+  362 |     { name: "Tree", selector: ".canvas" },
+  363 |     { name: "Map", selector: ".map" }
+  364 |   ] as const;
+  365 |   for (const view of views) {
+  366 |     const button = page.getByRole("button", { name: view.name, exact: true });
+  367 |     await expectFullyInsideViewport(button, page);
+  368 |     await button.click();
+  369 |     await expect(button).toHaveAttribute("aria-pressed", "true");
+  370 |     await expect(page.locator(view.selector)).toBeVisible();
+  371 |     await expectNoHorizontalOverflow(page);
+  372 |   }
+  373 | 
+  374 |   const scoring = page.locator("details.scoringInsightsPanel");
+  375 |   await expect(scoring).toBeVisible();
+  376 |   await scoring.locator("summary").click();
+  377 |   await expect(scoring).toHaveAttribute("open", "");
+  378 |   await scoring.locator("summary").click();
+  379 |   await expect(scoring).not.toHaveAttribute("open", "");
+  380 | 
+  381 |   await page.getByRole("button", { name: "Tree", exact: true }).click();
+  382 |   const canvas = page.locator(".canvas");
+  383 |   await expect(canvas).toHaveAttribute("data-fit-policy", "column-auto");
+  384 |   const columnFit = Number(await canvas.getAttribute("data-zoom"));
+  385 |   expect(columnFit).toBeGreaterThanOrEqual(0.5);
+  386 |   expect(columnFit).toBeLessThanOrEqual(1);
+  387 | 
+  388 |   await page.getByRole("button", { name: "Reset zoom to 1:1" }).click();
+  389 |   await expect(canvas).toHaveAttribute("data-zoom", "1.0000");
+  390 | 
+  391 |   await page.getByRole("button", { name: "Fit whole tree (overview)" }).click();
+  392 |   await expect(canvas).toHaveAttribute("data-fit-policy", "overview-auto");
+  393 |   const overviewFit = Number(await canvas.getAttribute("data-zoom"));
+  394 |   expect(overviewFit).toBeGreaterThanOrEqual(0.1);
+  395 |   expect(overviewFit).toBeLessThanOrEqual(1);
+  396 | 
+  397 |   await page.getByRole("button", { name: "Reset zoom to 1:1" }).click();
+  398 |   for (let index = 0; index < 12; index += 1) {
+  399 |     await page.getByRole("button", { name: "Zoom out" }).click();
+  400 |   }
+  401 |   await expect(canvas).toHaveAttribute("data-zoom", "0.1000");
+  402 |   await expect(page.locator(".canvasInner")).toHaveAttribute("data-zoom-band", "overview");
+  403 | 
+  404 |   for (let index = 0; index < 24; index += 1) {
+  405 |     await page.getByRole("button", { name: "Zoom in" }).click();
+  406 |   }
+  407 |   await expect(canvas).toHaveAttribute("data-zoom", "2.0000");
+  408 | 
+  409 |   await page.getByRole("button", { name: "Fit whole tree (overview)" }).click();
+  410 |   const card = page.locator('.nodeWrap[data-node-id="node-1"] .node');
+  411 |   await card.click();
+  412 |   await expect(canvas).toHaveAttribute("data-zoom", "1.0000");
+  413 |   await expect(page.getByRole("dialog")).toHaveCount(0);
+  414 | });
+  415 | 
+  416 | test("overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock", async ({
+  417 |   page
+  418 | }, testInfo) => {
+  419 |   await openCompleteDebate(page);
+  420 |   await page.getByRole("button", { name: "Reset zoom to 1:1" }).click();
+  421 | 
+  422 |   const collapsed = await visibleRects(page);
+  423 |   expect(collapsed.dock).not.toBeNull();
+  424 |   expect(collapsed.zoom).not.toBeNull();
+  425 |   expect(collapsed.synthesis).not.toBeNull();
+  426 |   expect.soft(intersects(collapsed.dock!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);
+  427 |   expect.soft(intersects(collapsed.synthesis!, collapsed.dock!), JSON.stringify(collapsed)).toBe(false);
+  428 |   expect.soft(intersects(collapsed.synthesis!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);
+  429 | 
+  430 |   const node = page.locator('.nodeWrap[data-node-id="node-1"] .node');
+  431 |   await node.click();
+  432 |   const argumentDetail = page.getByRole("dialog", { name: "Argument detail" });
+  433 |   await expect(argumentDetail).toBeVisible();
+```

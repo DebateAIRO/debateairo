@@ -1,7 +1,7 @@
 ---
 name: debateai-graph-spine
 title: DebateAI Graph Spine v2
-version: 3.0.0
+version: 3.2.0
 supersedes: debateai-heartbeat-protocol (pre-3.0.0), heartbeat-protocol-lite, debateai-kanban-heartbeat-review-loop
 ---
 
@@ -750,7 +750,10 @@ Applicability by transport: compaction checkpoints apply to **PTY transports onl
 (long-lived terminal agent sessions that accumulate context). They are **N/A for
 SDK-subagent transports**, whose context is bounded per invocation and does not
 accumulate across the mission. An SDK-subagent node never blocks on a
-`COMPACTION CHECKPOINT`.
+`COMPACTION CHECKPOINT`. **Non-interactive exec invocations (`codex exec` /
+`codex exec resume`, `grok -p`/`--prompt-file`, `hermes -z`) are bounded-per-
+invocation transports under this clause and are likewise exempt** (Hermes
+transport ruling, 2026-07-26, S3 gate of responsive-ui-20260724: EXEC-EXEMPT).
 
 ## Binding Hermes numbered-stage review gates
 
@@ -1194,9 +1197,18 @@ Spine-level invariant: **no cycle without a bound; no wait without an owner, a
 deadline, and an escalation edge.** These laws (introduced in Phase 1) are carried
 forward unchanged:
 
-1. **Rework cap.** `rework_round` increments on every CHANGES REQUESTED of any kind
-   (peer, Hermes, stage, human). At `rework_round = 3` the loop freezes and emits
-   `V STEERING REQUIRED` into the V DECISIONS PACKET. No unbounded revise→re-review.
+1. **Rework cap — STAGNATION BREAKER (V amendment, 2026-07-24, live-ruled during
+   responsive-ui-20260724).** `rework_round` increments on every CHANGES REQUESTED
+   of any kind (peer, Hermes, stage, human). The freeze fires only on STAGNATION:
+   three consecutive rounds with NO material change (findings not shrinking, the
+   same findings recurring). A converging loop — shrinking or newly-surfaced
+   findings each round — continues past 3. On stagnation the loop freezes and emits
+   `V STEERING REQUIRED` into the V DECISIONS PACKET. No unbounded revise→re-review;
+   material change is judged by the Router mechanically (finding counts/identities),
+   never by the worker. Additionally (V law, 2026-07-26): a GLOBAL dead-air watchdog
+   — 20 minutes with zero observable change across all logs, worktrees, and agent
+   CPU — stops ALL agents, writes a stop-report, and halts the orchestrator loop
+   itself pending the human.
 2. **Unblock reset ceiling.** `unblock` / counter-reset may occur at most **twice
    per ticket**; the third occurrence freezes and escalates.
 3. **Chatter breaker.** Any two-party exchange (Hermes↔worker, Hermes↔watcher)

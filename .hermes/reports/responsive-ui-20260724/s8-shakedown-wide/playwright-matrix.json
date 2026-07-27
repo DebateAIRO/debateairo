@@ -1,0 +1,948 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "tests\\s8-closure\\playwright.config.ts",
+      "--project",
+      "chromium-w1440"
+    ],
+    "configFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\playwright.config.ts",
+    "rootDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w320",
+        "name": "chromium-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w375",
+        "name": "chromium-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w768",
+        "name": "chromium-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1024",
+        "name": "chromium-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1440",
+        "name": "chromium-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w2560",
+        "name": "chromium-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-844x390",
+        "name": "chromium-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-568x320",
+        "name": "chromium-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-507x1024",
+        "name": "chromium-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w320",
+        "name": "firefox-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w375",
+        "name": "firefox-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w768",
+        "name": "firefox-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1024",
+        "name": "firefox-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1440",
+        "name": "firefox-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w2560",
+        "name": "firefox-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-844x390",
+        "name": "firefox-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-568x320",
+        "name": "firefox-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-507x1024",
+        "name": "firefox-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w320",
+        "name": "webkit-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w375",
+        "name": "webkit-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w768",
+        "name": "webkit-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1024",
+        "name": "webkit-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1440",
+        "name": "webkit-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w2560",
+        "name": "webkit-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-844x390",
+        "name": "webkit-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-568x320",
+        "name": "webkit-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-507x1024",
+        "name": "webkit-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-custom-320x568-chromium",
+        "name": "profile-custom-320x568-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-iphone-12-webkit",
+        "name": "profile-iphone-12-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-pixel-7-chromium",
+        "name": "profile-pixel-7-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-ipad-webkit",
+        "name": "profile-ipad-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-shakedown-wide/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-desktop-chromium",
+        "name": "profile-desktop-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-matrix.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "acceptance-matrix.spec.ts",
+      "file": "acceptance-matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "library route covers empty, populated, error, composer focus, and submit",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6012,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:46:04.282Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-3e0e9cca58954aae5b5b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 236,
+          "column": 5
+        },
+        {
+          "title": "protected routes cover AuthGate and route lifecycle states",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26969,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:46:10.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-0277973c5ed9694e4426",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 269,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 11379,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.screenInner')\nExpected pattern: \u001b[32m/Connecting|Loading/\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.screenInner')\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.screenInner')\nExpected pattern: \u001b[32m/Connecting|Loading/\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.screenInner')\u001b[22m\n\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:333:46",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 46,
+                      "line": 333
+                    },
+                    "snippet": "  331 | }) => {\n  332 |   await page.goto(\"/debate/s8-delayed\", { waitUntil: \"domcontentloaded\" });\n> 333 |   await expect(page.locator(\".screenInner\")).toContainText(/Connecting|Loading/);\n      |                                              ^\n  334 |   await expect(page.locator(\".debateTopBar\")).toBeVisible();\n  335 |\n  336 |   await page.goto(\"/debate/s8-generating\", { waitUntil: \"domcontentloaded\" });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 46,
+                        "line": 333
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.screenInner')\nExpected pattern: \u001b[32m/Connecting|Loading/\u001b[39m\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.screenInner')\u001b[22m\n\n\n  331 | }) => {\n  332 |   await page.goto(\"/debate/s8-delayed\", { waitUntil: \"domcontentloaded\" });\n> 333 |   await expect(page.locator(\".screenInner\")).toContainText(/Connecting|Loading/);\n      |                                              ^\n  334 |   await expect(page.locator(\".debateTopBar\")).toBeVisible();\n  335 |\n  336 |   await page.goto(\"/debate/s8-generating\", { waitUntil: \"domcontentloaded\" });\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:333:46"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:46:37.416Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-debate-r-6f967-ror-no-tree-and-single-shot-chromium-w1440\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-debate-r-6f967-ror-no-tree-and-single-shot-chromium-w1440\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 46,
+                    "line": 333
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-36f092b566263da13e1b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 329,
+          "column": 5
+        },
+        {
+          "title": "debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 18025,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.canvas')\nExpected: \u001b[32m\"1.0000\"\u001b[39m\nReceived: \u001b[31m\"0.6667\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.canvas')\u001b[22m\n\u001b[2m    23 × locator resolved to <div data-zoom=\"0.6667\" class=\"canvas scroll\" data-gesture-owner=\"none\" data-viewport-ready=\"true\" data-fit-policy=\"overview-auto\">…</div>\u001b[22m\n\u001b[2m       - unexpected value \"0.6667\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.canvas')\nExpected: \u001b[32m\"1.0000\"\u001b[39m\nReceived: \u001b[31m\"0.6667\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.canvas')\u001b[22m\n\u001b[2m    23 × locator resolved to <div data-zoom=\"0.6667\" class=\"canvas scroll\" data-gesture-owner=\"none\" data-viewport-ready=\"true\" data-fit-policy=\"overview-auto\">…</div>\u001b[22m\n\u001b[2m       - unexpected value \"0.6667\"\u001b[22m\n\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:412:24",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 24,
+                      "line": 412
+                    },
+                    "snippet": "  410 |   const card = page.locator('.nodeWrap[data-node-id=\"node-1\"] .node');\n  411 |   await card.click();\n> 412 |   await expect(canvas).toHaveAttribute(\"data-zoom\", \"1.0000\");\n      |                        ^\n  413 |   await expect(page.getByRole(\"dialog\")).toHaveCount(0);\n  414 | });\n  415 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 24,
+                        "line": 412
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.canvas')\nExpected: \u001b[32m\"1.0000\"\u001b[39m\nReceived: \u001b[31m\"0.6667\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('.canvas')\u001b[22m\n\u001b[2m    23 × locator resolved to <div data-zoom=\"0.6667\" class=\"canvas scroll\" data-gesture-owner=\"none\" data-viewport-ready=\"true\" data-fit-policy=\"overview-auto\">…</div>\u001b[22m\n\u001b[2m       - unexpected value \"0.6667\"\u001b[22m\n\n\n  410 |   const card = page.locator('.nodeWrap[data-node-id=\"node-1\"] .node');\n  411 |   await card.click();\n> 412 |   await expect(canvas).toHaveAttribute(\"data-zoom\", \"1.0000\");\n      |                        ^\n  413 |   await expect(page.getByRole(\"dialog\")).toHaveCount(0);\n  414 | });\n  415 |\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:412:24"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:46:49.591Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-chromium-w1440\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-chromium-w1440\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 24,
+                    "line": 412
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-c97a0d470520219635af",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 356,
+          "column": 5
+        },
+        {
+          "title": "overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 1621,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:425:35",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 35,
+                      "line": 425
+                    },
+                    "snippet": "  423 |   expect(collapsed.dock).not.toBeNull();\n  424 |   expect(collapsed.zoom).not.toBeNull();\n> 425 |   expect(collapsed.synthesis).not.toBeNull();\n      |                                   ^\n  426 |   expect.soft(intersects(collapsed.dock!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);\n  427 |   expect.soft(intersects(collapsed.synthesis!, collapsed.dock!), JSON.stringify(collapsed)).toBe(false);\n  428 |   expect.soft(intersects(collapsed.synthesis!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 35,
+                        "line": 425
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m\n\n  423 |   expect(collapsed.dock).not.toBeNull();\n  424 |   expect(collapsed.zoom).not.toBeNull();\n> 425 |   expect(collapsed.synthesis).not.toBeNull();\n      |                                   ^\n  426 |   expect.soft(intersects(collapsed.dock!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);\n  427 |   expect.soft(intersects(collapsed.synthesis!, collapsed.dock!), JSON.stringify(collapsed)).toBe(false);\n  428 |   expect.soft(intersects(collapsed.synthesis!, collapsed.zoom!), JSON.stringify(collapsed)).toBe(false);\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:425:35"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:47:09.419Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-w1440\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-shakedown-wide\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-w1440\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 35,
+                    "line": 425
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-54b9a7b86144cfde3f03",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 416,
+          "column": 5
+        },
+        {
+          "title": "safe-area support is structurally wired without claiming non-zero emulated insets",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 674,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:47:11.726Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-8018b161e09c47a3f1e1",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 494,
+          "column": 5
+        },
+        {
+          "title": "320/375-class cells have no ordinary-English mid-word breaks across library and debate views",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "mid-word detector applies only at 320/375; project=chromium-w1440",
+                  "location": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "line": 518,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 87,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T19:47:12.514Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "mid-word detector applies only at 320/375; project=chromium-w1440",
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "line": 518,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-1956d2ee83fa95298457",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 514,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-26T19:45:57.383Z",
+    "duration": 75836.103,
+    "expected": 3,
+    "skipped": 1,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

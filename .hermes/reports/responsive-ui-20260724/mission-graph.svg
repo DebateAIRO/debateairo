@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1170" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrGold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#eab308"/>
+    </marker>
+  </defs>
+
+  <rect width="1500" height="1170" fill="#0e1726"/>
+
+  <!-- Header -->
+  <text x="40" y="46" fill="#f1f5f9" font-size="26" font-weight="bold">Mission implementation graph — responsive-ui-20260724</text>
+  <text x="40" y="72" fill="#94a3b8" font-size="14">All devices · all screens (320px–4K) · evergreen browsers · app-native tree zoom (pinch = HARD requirement, V ruling)</text>
+  <rect x="1130" y="28" width="330" height="52" rx="8" fill="#052e16" stroke="#16a34a"/>
+  <text x="1150" y="50" fill="#4ade80" font-size="14" font-weight="bold">PLANNING DIAMOND: PASSED</text>
+  <text x="1150" y="69" fill="#86efac" font-size="12">4 rounds · H2 Hermes + G3 Grok · 25 findings closed</text>
+
+  <!-- Seats row -->
+  <rect x="40" y="100" width="200" height="64" rx="8" fill="#1e293b" stroke="#64748b"/>
+  <text x="60" y="126" fill="#f1f5f9" font-size="15" font-weight="bold">V (human)</text>
+  <text x="60" y="146" fill="#94a3b8" font-size="12">one prompt · rulings · acceptance</text>
+
+  <rect x="330" y="100" width="280" height="64" rx="8" fill="#1e3a5f" stroke="#3b82f6"/>
+  <text x="350" y="126" fill="#93c5fd" font-size="15" font-weight="bold">Claude-Router (Fable)</text>
+  <text x="350" y="146" fill="#94a3b8" font-size="12">Main Orchestrator — dispatch only, no verdicts</text>
+
+  <rect x="700" y="100" width="300" height="64" rx="8" fill="#3b1e5f" stroke="#a855f7"/>
+  <text x="720" y="126" fill="#d8b4fe" font-size="15" font-weight="bold">Hermes-Verifier (gpt-5.6-sol)</text>
+  <text x="720" y="146" fill="#94a3b8" font-size="12">verdicts · Kanban custody: debateai-responsive-ui · Manual QA</text>
+
+  <rect x="1090" y="100" width="370" height="64" rx="8" fill="#1e293b" stroke="#64748b"/>
+  <text x="1110" y="126" fill="#f1f5f9" font-size="15" font-weight="bold">Codex (gpt-5.6-sol) — sole coder</text>
+  <text x="1110" y="146" fill="#94a3b8" font-size="12">9 lanes · isolated worktrees · same-subagent rework law</text>
+
+  <line x1="240" y1="132" x2="330" y2="132" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="610" y1="132" x2="700" y2="132" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1000" y1="132" x2="1090" y2="132" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ===== DAG ===== -->
+  <text x="40" y="215" fill="#64748b" font-size="13" font-weight="bold" letter-spacing="2">IMPLEMENTATION WAVE (A7) — TICKETS ON BOARD debateai-responsive-ui</text>
+
+  <!-- S1a -->
+  <rect x="40" y="470" width="210" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+  <text x="56" y="496" fill="#f1f5f9" font-size="15" font-weight="bold">S1a · CSS partition</text>
+  <text x="56" y="515" fill="#94a3b8" font-size="12">pure move + test loader</text>
+  <text x="56" y="536" fill="#cbd5e1" font-size="12">t_242b42cc · lane/resp-s1a</text>
+  <rect x="56" y="546" width="46" height="20" rx="10" fill="#10b981"/><text x="64" y="561" fill="#062c22" font-size="12" font-weight="bold">low</text>
+  <text x="110" y="561" fill="#64748b" font-size="11">gate: Hermes diff</text>
+  <rect x="56" y="571" width="120" height="14" rx="7" fill="#166534"/><text x="62" y="582" fill="#bbf7d0" font-size="10" font-weight="bold">READY — first lane</text>
+
+  <!-- S2 -->
+  <rect x="310" y="470" width="210" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+  <text x="326" y="496" fill="#f1f5f9" font-size="15" font-weight="bold">S2 · Test harness</text>
+  <text x="326" y="515" fill="#94a3b8" font-size="12">vitest + Playwright, green only</text>
+  <text x="326" y="536" fill="#cbd5e1" font-size="12">t_7e4eff60 · lane/resp-s2</text>
+  <rect x="326" y="546" width="46" height="20" rx="10" fill="#10b981"/><text x="334" y="561" fill="#062c22" font-size="12" font-weight="bold">low</text>
+  <text x="380" y="561" fill="#64748b" font-size="11">gate: Hermes diff</text>
+
+  <!-- S1b -->
+  <rect x="580" y="470" width="210" height="120" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <text x="596" y="496" fill="#f1f5f9" font-size="15" font-weight="bold">S1b · Foundation</text>
+  <text x="596" y="515" fill="#94a3b8" font-size="12">viewport/dvh/safe-area/tokens</text>
+  <text x="596" y="536" fill="#cbd5e1" font-size="12">t_4f837665 · lane/resp-s1b</text>
+  <rect x="596" y="546" width="66" height="20" rx="10" fill="#f59e0b"/><text x="604" y="561" fill="#3d2800" font-size="12" font-weight="bold">medium</text>
+  <text x="670" y="561" fill="#64748b" font-size="11">gate: 1 reviewer + Hermes</text>
+
+  <!-- Parallel block frame -->
+  <rect x="850" y="240" width="250" height="680" rx="14" fill="none" stroke="#334155" stroke-dasharray="6 5"/>
+  <text x="860" y="262" fill="#64748b" font-size="12" font-weight="bold">PARALLEL — file-disjoint by contract</text>
+
+  <!-- S3 -->
+  <rect x="870" y="280" width="210" height="112" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <text x="886" y="306" fill="#f1f5f9" font-size="15" font-weight="bold">S3 · Debate chrome</text>
+  <text x="886" y="325" fill="#94a3b8" font-size="12">two-row header, overflow</text>
+  <text x="886" y="346" fill="#cbd5e1" font-size="12">t_befaed4f · lane/resp-s3</text>
+  <rect x="886" y="356" width="66" height="20" rx="10" fill="#f59e0b"/><text x="894" y="371" fill="#3d2800" font-size="12" font-weight="bold">medium</text>
+
+  <!-- S4 -->
+  <rect x="870" y="408" width="210" height="112" rx="10" fill="#2b1620" stroke="#ef4444" stroke-width="3"/>
+  <text x="886" y="434" fill="#f1f5f9" font-size="15" font-weight="bold">S4 · Canvas zoom</text>
+  <text x="886" y="453" fill="#fca5a5" font-size="12">CanvasViewport · HARD pinch</text>
+  <text x="886" y="474" fill="#cbd5e1" font-size="12">t_df57cd49 · lane/resp-s4</text>
+  <rect x="886" y="484" width="50" height="20" rx="10" fill="#ef4444"/><text x="894" y="499" fill="#3b0708" font-size="12" font-weight="bold">high</text>
+  <text x="944" y="499" fill="#f87171" font-size="11">diamond + product-truth + V</text>
+
+  <!-- S5 -->
+  <rect x="870" y="536" width="210" height="112" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <text x="886" y="562" fill="#f1f5f9" font-size="15" font-weight="bold">S5 · Reading views</text>
+  <text x="886" y="581" fill="#94a3b8" font-size="12">thread/split/map + synth sheet</text>
+  <text x="886" y="602" fill="#cbd5e1" font-size="12">t_0f877f41 · lane/resp-s5</text>
+  <rect x="886" y="612" width="66" height="20" rx="10" fill="#f59e0b"/><text x="894" y="627" fill="#3d2800" font-size="12" font-weight="bold">medium</text>
+
+  <!-- S6 -->
+  <rect x="870" y="664" width="210" height="112" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <text x="886" y="690" fill="#f1f5f9" font-size="15" font-weight="bold">S6 · Library &amp; forms</text>
+  <text x="886" y="709" fill="#94a3b8" font-size="12">4 routes unsqueezed</text>
+  <text x="886" y="730" fill="#cbd5e1" font-size="12">t_e6d36779 · lane/resp-s6</text>
+  <rect x="886" y="740" width="66" height="20" rx="10" fill="#f59e0b"/><text x="894" y="755" fill="#3d2800" font-size="12" font-weight="bold">medium</text>
+
+  <!-- S7 -->
+  <rect x="870" y="792" width="210" height="112" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <text x="886" y="818" fill="#f1f5f9" font-size="15" font-weight="bold">S7 · Overlays</text>
+  <text x="886" y="837" fill="#94a3b8" font-size="12">drawers/toast/dock clamp</text>
+  <text x="886" y="858" fill="#cbd5e1" font-size="12">t_2007a124 · lane/resp-s7</text>
+  <rect x="886" y="868" width="66" height="20" rx="10" fill="#f59e0b"/><text x="894" y="883" fill="#3d2800" font-size="12" font-weight="bold">medium</text>
+
+  <!-- S8 -->
+  <rect x="1180" y="470" width="230" height="130" rx="10" fill="#2b1620" stroke="#ef4444" stroke-width="3"/>
+  <text x="1196" y="496" fill="#f1f5f9" font-size="15" font-weight="bold">S8 · Evidence closure</text>
+  <text x="1196" y="515" fill="#fca5a5" font-size="12">full matrix + real-device pinch</text>
+  <text x="1196" y="536" fill="#cbd5e1" font-size="12">t_3ac92e37 · lane/resp-s8</text>
+  <rect x="1196" y="546" width="50" height="20" rx="10" fill="#ef4444"/><text x="1204" y="561" fill="#3b0708" font-size="12" font-weight="bold">high</text>
+  <text x="1196" y="586" fill="#f87171" font-size="11">pinch fail = BLOCKER → V (no residual)</text>
+
+  <!-- serial arrows -->
+  <line x1="250" y1="530" x2="310" y2="530" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="520" y1="530" x2="580" y2="530" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- S1b fan-out -->
+  <line x1="790" y1="500" x2="870" y2="336" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="790" y1="515" x2="870" y2="464" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="790" y1="530" x2="870" y2="592" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="790" y1="545" x2="870" y2="720" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="790" y1="560" x2="870" y2="848" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <!-- fan-in to S8 -->
+  <line x1="1080" y1="336" x2="1180" y2="500" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1080" y1="464" x2="1180" y2="520" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1080" y1="592" x2="1180" y2="540" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1080" y1="720" x2="1180" y2="560" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1080" y1="848" x2="1180" y2="580" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Closure flow -->
+  <line x1="1295" y1="600" x2="1295" y2="650" stroke="#eab308" stroke-width="2" marker-end="url(#arrGold)"/>
+  <rect x="1150" y="650" width="290" height="86" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+  <text x="1166" y="676" fill="#fde047" font-size="14" font-weight="bold">C8 · Integration + closure QA</text>
+  <text x="1166" y="695" fill="#94a3b8" font-size="12">merge lanes → integrate/responsive-ui-20260724</text>
+  <text x="1166" y="713" fill="#94a3b8" font-size="12">git worktree list receipt · REQ ∧ ARCH SATISFIED</text>
+
+  <line x1="1295" y1="736" x2="1295" y2="786" stroke="#eab308" stroke-width="2" marker-end="url(#arrGold)"/>
+  <rect x="1150" y="786" width="290" height="64" rx="10" fill="#052e16" stroke="#16a34a" stroke-width="2"/>
+  <text x="1166" y="812" fill="#4ade80" font-size="14" font-weight="bold">H9 · V final acceptance</text>
+  <text x="1166" y="831" fill="#86efac" font-size="12">your verdict on the live product + report</text>
+
+  <!-- Worktree / merge strip -->
+  <rect x="40" y="950" width="1060" height="170" rx="10" fill="#111c2e" stroke="#334155"/>
+  <text x="60" y="978" fill="#f1f5f9" font-size="14" font-weight="bold">Worktree lane plan (what your single YES authorizes)</text>
+  <text x="60" y="1002" fill="#cbd5e1" font-size="12.5">.worktrees/resp-s1a … resp-s8 — nine isolated worktrees, one per lane, branches lane/resp-*</text>
+  <text x="60" y="1024" fill="#cbd5e1" font-size="12.5">Merge order: s1a → s2 → s1b → {s3,s4,s5,s6,s7 any order, all five required} → s8, each only after its Hermes gate</text>
+  <text x="60" y="1046" fill="#cbd5e1" font-size="12.5">Closure target: integrate/responsive-ui-20260724 (cut from tip of lane/roadmap-p0-p3 at approval) — Hermes/V gate only</text>
+  <text x="60" y="1068" fill="#cbd5e1" font-size="12.5">Destructive git ops in plan: NONE (any future one is individually V-gated) · No worker merge/push/Done authority</text>
+  <text x="60" y="1090" fill="#94a3b8" font-size="12">Every ticket carries: TDD RED-first · same-terminal rework (incl. Codex subagents) · no fake data · comment-scan law</text>
+
+  <!-- Legend -->
+  <rect x="1130" y="950" width="330" height="170" rx="10" fill="#111c2e" stroke="#334155"/>
+  <text x="1150" y="978" fill="#f1f5f9" font-size="14" font-weight="bold">Legend</text>
+  <rect x="1150" y="992" width="46" height="18" rx="9" fill="#10b981"/><text x="1206" y="1006" fill="#cbd5e1" font-size="12">low — direct Hermes diff review</text>
+  <rect x="1150" y="1017" width="46" height="18" rx="9" fill="#f59e0b"/><text x="1206" y="1031" fill="#cbd5e1" font-size="12">medium — 1 independent reviewer + Hermes</text>
+  <rect x="1150" y="1042" width="46" height="18" rx="9" fill="#ef4444"/><text x="1206" y="1056" fill="#cbd5e1" font-size="12">high — review diamond + product-truth + V</text>
+  <line x1="1150" y1="1076" x2="1196" y2="1076" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/><text x="1206" y="1081" fill="#cbd5e1" font-size="12">dependency edge (board-enforced)</text>
+  <line x1="1150" y1="1100" x2="1196" y2="1100" stroke="#eab308" stroke-width="2" marker-end="url(#arrGold)"/><text x="1206" y="1105" fill="#cbd5e1" font-size="12">closure flow (Hermes/V authority)</text>
+</svg>

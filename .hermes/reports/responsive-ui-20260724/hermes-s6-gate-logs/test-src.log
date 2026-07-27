@@ -1,0 +1,188 @@
+$ node --test "**/*.test.mjs" "**/*.source-test.mjs"
+✔ logs upstream non-2xx responses without consuming the response body (4736.1018ms)
+✔ logs thrown upstream fetch errors and rethrows them (5077.335ms)
+✔ does not let proxy fetch logging failures mask the original exception (4394.7202ms)
+✔ generates a request id for upstream fetch errors when no request id is provided (5223.9232ms)
+✔ logs upstream 5xx non-2xx responses at error level (4885.8477ms)
+✔ logs suspicious successful debate scoring responses without consuming the response body (3673.1378ms)
+✔ does not log successful non-scoring proxy responses (3375.4113ms)
+✔ api proxy strips expect before forwarding requests through undici (1.5518ms)
+✔ cached real scoring responses display metadata and claim badges through the debate page path (11.6412ms)
+✔ scoring provider/API failures and per-node scoring errors surface non-crashing UI (9.0482ms)
+✔ DebatePageClient loads scoring by default without normal toggle or refresh controls (5.3782ms)
+✔ default scoring states render from real response state without an action-token gate (5.9119ms)
+✔ SSE failure handlers render stable public copy without worker payload text (2.804ms)
+✔ a transient (pending) SSR failure renders a loading state, never the fatal gate (3.1528ms)
+✔ refresh() success and stream onopen clear stale error state (self-heal) (1.0511ms)
+✔ debate header keeps default scoring status and view controls in the top toolbar (3.2944ms)
+✔ scoring status text shrinks instead of pushing toolbar controls away (0.85ms)
+✔ DebatePageClient wires score-aware navigation from real scoring payloads (6.2689ms)
+✔ scoring insights are contained before the debate tree shell (1.9608ms)
+✔ scoring insights body is bounded so the tree remains visible (1.0252ms)
+✔ score chips open the same tree node details path as node cards (2.0699ms)
+✔ recommendation Open target keeps the user in Tree context (1.1776ms)
+✔ scored claim badges expose a keyboard-operable details control (1.5846ms)
+✔ DebateCanvas.tsx imports isLowStrengthNode from the shared debateTreeUtils module (no local duplicate) (3.6205ms)
+✔ DebateCanvas.tsx declares the same NEXT_PUBLIC_VERDICT_FIRST_UI flag constant as DebateTree.tsx (6.8388ms)
+✔ cardStyle.opacity composes the new low-strength dim onto the existing scoreFilterMatch/abandoned expression (1.1406ms)
+✔ low-strength dim factor is flag-gated and honors the honesty contract via isLowStrengthNode (2.1641ms)
+✔ data-low-strength attribute is present on the dimmed card and gated identically to the dim factor (0.7687ms)
+✔ nodes remain fully rendered and clickable -- no conditional return/filter introduced for low-strength (0.7352ms)
+✔ score badges wrap inside narrow argument card headers (2.6076ms)
+✔ scored cards derive compact chips from real high-priority scoring issues (1.5218ms)
+✔ DebateOutline accepts optional scoring metadata without requiring page wiring (3.7847ms)
+✔ debateTreeUtils exports isLowStrengthNode with an honest missing-score contract (2.2569ms)
+✔ DebateTree.tsx imports isLowStrengthNode alongside the existing isAbandonedArgumentStatus (2.9332ms)
+✔ DebateTree.tsx threads an optional scoringByNodeId prop in the DebateOutline-established style (0.917ms)
+✔ low-strength dimming is additive, flag-gated, and does not alter existing abandoned handling (2.016ms)
+✔ node remains fully clickable/inspectable -- no conditional return or filter introduced (1.8423ms)
+✔ DebateNode consumes the served path lifecycle fields (2.3956ms)
+✔ the drawer explains a lifecycle-set-aside path with its real nonblank reason (1.8934ms)
+✔ the canvas defaults set-aside paths to visible and offers a real hide/show filter (3.2334ms)
+✔ runtime set-aside copy never labels paths as low value or irrelevant (2.161ms)
+✔ RecommendedInvestigations is a presentational real-recommendation list (3.8884ms)
+✔ RecommendedInvestigations contains additional items behind a compact disclosure (5.3907ms)
+✔ VerdictBanner exports the expected component signature (6.007ms)
+✔ VerdictBanner renders null on missing/undefined verdict (honest absence) (1.0455ms)
+✔ VerdictBanner exposes a qualitative band badge with a CSS/testing hook (0.9741ms)
+✔ VerdictBanner renders claimLanguage as the leading plain-language sentence (0.6879ms)
+✔ VerdictBanner confines the real dialectical strength number to a <details> element (1.027ms)
+✔ VerdictBanner never silently omits null basis values (0.6002ms)
+✔ web/lib/types.ts defines VerdictBand and VerdictSummary matching the coordinator wire shape exactly (1.0962ms)
+✔ DebatePageClient mounts VerdictBanner behind the NEXT_PUBLIC_VERDICT_FIRST_UI flag only (1.0584ms)
+✔ the additive web contract accepts suppressed verdicts and optional evidence-gate fields (2.533ms)
+✔ VerdictBanner renders the exact withheld body and unlock hint for suppressed empirical verdicts (0.682ms)
+✔ VerdictBanner renders the exact honest caveat lines (0.421ms)
+✔ SynthesisPanel withholds only its endorsed verdict body from the threaded synthesis gate (1.0083ms)
+✔ analysis-map views remain independent of verdict state (0.6521ms)
+✔ every rendered QBAF value carries its semantics label through the sanctioned formatter (0.4647ms)
+✔ components\manualInvestigationDisabled.source-test.mjs (131.9086ms)
+✔ components\scoringDiagnostics.source-test.mjs (150.3353ms)
+✔ scoring UI has a local class error boundary around scoring surfaces (9.7878ms)
+✔ NodeDetailDrawer renders user feedback controls without model confidence wording (7.7864ms)
+✔ NodeDetailDrawer exposes persisted current vote and aggregate counts (0.6258ms)
+✔ DebatePageClient submits scoring feedback through the API and updates from response (0.6833ms)
+✔ DebatePageClient surfaces feedback API failure without applying fake success (0.642ms)
+✔ score chips render STR/UNC/IMP from the real node scoring payload (4.9338ms)
+✔ drawer renders rationale, holes, fatal flags, and recommendations from scoring state (1.5372ms)
+✔ recommended investigations component stays presentational over real recommendations (0.8281ms)
+✔ lib\adaptiveDepthDryRun.source-test.mjs (146.6798ms)
+✔ api helper does not expose normal scoring refresh or polling helpers (4382.3717ms)
+✔ submitScoringFeedback posts up and changed down votes with user bearer token (4381.4338ms)
+✔ frontend status presentation uses one shared abandoned-status normalizer (5.8014ms)
+✔ drawer and tree share model presentation helpers (3.7977ms)
+✔ findNodeById returns the matching node or null (4204.9884ms)
+✔ findNodePathById returns ancestors from root to selected node or an empty array (4332.1166ms)
+✔ partitionArgumentChildren returns direct PRO and CON children in original relative order (4001.1427ms)
+✔ perspectiveChildren returns direct perspective children in original relative order (4392.0856ms)
+✔ initialFocusedNodeId starts at the root so all perspectives remain navigable (3472.7369ms)
+✔ nearestExistingNodeId keeps a valid selected id or falls back to initial focus (3486.7368ms)
+✔ frontend correctness helpers keep local labels, SSR token storage, and scoring-by-default wiring safe (2.9075ms)
+✔ perspectiveChildren returns every lens branch for a non-four, arbitrary-node_type debate (4383.9018ms)
+✔ isLensNodeType accepts arbitrary lens types and rejects structural/argument types (4585.3158ms)
+✔ roleOf maps any non-argument node_type to the generic pov role (3975.8028ms)
+✔ lensLabelFromNodeType derives readable labels for arbitrary lenses and keeps legacy labels (4766.4679ms)
+✔ roleLabel and branchLabelOf are data-driven: prefer backend label/lens, else derive (4061.9096ms)
+✔ lib\newDebateDepthMode.source-test.mjs (126.196ms)
+✔ suspicious logger method records an ordered warning severity (4286.4187ms)
+✔ ordinary warning events are not suspicious category events (4052.9343ms)
+✔ redactForLog redacts api key values embedded in strings (4096.0783ms)
+✔ developer logger writes required JSONL shape when explicitly enabled (4316.3625ms)
+✔ redactForLog redacts sensitive nested keys and truncates oversized payloads (4357.8613ms)
+✔ redactForLog redacts sensitive error messages and stacks (3859.3539ms)
+✔ developer logger stays disabled when DEV_OBSERVABILITY is false (4068.7881ms)
+✔ developer logger never throws when the configured sink path is invalid (3783.5358ms)
+✔ lib\recommendation.source-test.mjs (125.3337ms)
+✔ score badges use theme score band tokens instead of one-off colors (6.3496ms)
+✔ score band text tokens keep tiny score badges readable (2.7323ms)
+✔ formatScorePercent scales normalized backend scores to out-of-100 display values (4087.6664ms)
+✔ formatScorePercent clamps unexpected values before display (3893.8457ms)
+✔ formatScoreBadgeLabel returns readable labels for score badges (3254.1399ms)
+✔ DebatePageClient derives debate-level holes summary from real scoring payload (1.7692ms)
+✔ debate-level holes panel surfaces unavailable and empty states without fake holes (0.5259ms)
+✔ indexScoringResponse keeps partial node errors separate from successful scores (5140.3993ms)
+✔ indexScoringResponse keeps pending nodes separate from scores and unavailable errors (5081.327ms)
+✔ indexScoringResponse indexes feedback summary and current user votes by node (3986.3629ms)
+✔ indexScoringResponse returns empty maps for absent scoring data (3949.5826ms)
+✔ formatScoringVisibilityState names off, provider required, unavailable, refreshing, and scored states (3382.2378ms)
+✔ formatScoringVisibilityState treats missing judge output as a pending default scoring state (2850.4416ms)
+✔ formatScoringVisibilityState reports refreshes as in progress without implying failure (2145.729ms)
+✔ formatScoringVisibilityState treats active backend scoring jobs as in progress (1914.0549ms)
+✔ formatScoringVisibilityState reports partial scoring counts (1267.7408ms)
+✔ summarizeScoringHoles aggregates only real payload holes with node context (1112.2698ms)
+✔ summarizeScoringFatalFlags aggregates only real payload fatal flags with node context (1110.4292ms)
+✔ selectStrongestUnresolvedScoringIssue picks the highest-priority real issue deterministically (1073.0655ms)
+✔ selectStrongestUnresolvedScoringIssue uses scored claim priority as a deterministic tie-break (970.2624ms)
+✔ selectStrongestUnresolvedScoringIssue ranks severity ahead of issue kind and scores (997.2073ms)
+✔ selectStrongestUnresolvedScoringIssue uses payload order after equal ranking fields (998.7692ms)
+✔ recordSuspiciousScoringResponse does not emit events for null response (954.4088ms)
+✔ recordSuspiciousScoringResponse does not emit events for unavailable status (1197.1909ms)
+✔ recordSuspiciousScoringResponse does not emit events for unrecognised non-success status (1040.5247ms)
+✔ recordSuspiciousScoringResponse emits empty-output event for partial status with no items (946.7607ms)
+✔ recordSuspiciousScoringResponse missing fields payload contains field names not raw response data (977.6686ms)
+✔ selectStrongestUnresolvedScoringIssue returns null when no real issue is present (956.0561ms)
+✔ recordSuspiciousScoringResponse logs successful empty scoring output once (1079.3019ms)
+✔ recordSuspiciousScoringResponse logs successful missing artifact chain once (994.5793ms)
+✔ recordSuspiciousScoringResponse logs success with missing required fields once (970.0199ms)
+✔ recordSuspiciousScoringResponse does not propagate synchronous logger exceptions (934.0578ms)
+✔ recordSuspiciousScoringResponse does not propagate async logger rejections (939.0132ms)
+✔ recordSuspiciousScoringResponse does not log complete normal scoring output (1031.5092ms)
+✔ formatScoringStatusCopy names unchecked, checking, checked, partial, failed, and cached states (3933.7583ms)
+✔ formatScoringStatusCopy appends last checked timestamp when real metadata provides one (3500.4954ms)
+✔ formatScoringStatusCopy appends compact provider and model label without leaking secret-looking metadata (3799.6914ms)
+✔ formatScoringStatusCopy marks real cache metadata as fresh or cached (3095.7686ms)
+✔ formatScoringStatusCopy warns when explicit stale score metadata is present (2799.7796ms)
+✔ formatScoringConfidenceCopy frames scores as reasoning aids instead of truth verdicts (2814.9273ms)
+✔ scoring response specification flags empty successful output (4392.1188ms)
+✔ scoring response specification flags missing required fields (4576.4088ms)
+✔ scoring response specification flags missing artifact-chain metadata (3407.4028ms)
+✔ scoring response specification does not flag normal valid output (3408.8761ms)
+✖ observability serializes suspicious scoring specification findings (3101.7095ms)
+✔ observability serializes missing required fields with DDD diagnostic paths (2458.8192ms)
+✔ observability serializes top-level missing required fields with DDD diagnostic paths (2011.6373ms)
+✔ observability payloads do not expose legacy node keys at the top level (1826.9071ms)
+✔ getDebateServer classifies a coordinator timeout as a transient pending result instead of throwing (3781.0249ms)
+✔ getDebateServer classifies a definitive 404 as a not_found result (3417.0712ms)
+✔ getDebateServer returns an ok result carrying the debate payload on success (2742.212ms)
+✔ a non-404 coordinator HTTP failure is treated as transient (pending), not fatal (2507.4805ms)
+ℹ tests 146
+ℹ suites 0
+ℹ pass 145
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59049.052
+
+✖ failing tests:
+
+test at lib\scoring\scoringResponseSpecification.test.mjs:146:1
+✖ observability serializes suspicious scoring specification findings (3101.7095ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      {
+        event: 'scoring.empty_output',
+        payload: {
+          argumentClaimIds: [
+            'node-a'
+          ],
+  +       category: 'suspicious',
+          claimCount: 1,
+          debateId: 'debate-1',
+          errorCount: 0,
+          message: 'Successful scoring response contained no scored items.',
+          operation: 'refresh-scoring',
+  
+      at TestContext.<anonymous> (file:///C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s6/apps/dialectical-engine/web/lib/scoring/scoringResponseSpecification.test.mjs:157:10)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { event: 'scoring.empty_output', payload: [Object] } ],
+    expected: [ { event: 'scoring.empty_output', payload: [Object] } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+[ELIFECYCLE] Command failed with exit code 1.

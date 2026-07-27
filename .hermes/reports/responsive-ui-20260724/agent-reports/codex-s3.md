@@ -1,0 +1,20 @@
+# S3 Worker Self-Report
+- Went well: the approved slice deck gave me a precise file contract and kept the header rewrite bounded.
+- Went well: I stopped on the unexplained v3 test residue instead of adopting or destroying another worker's files.
+- Went well: the orchestrator's explicit residue archive authorization restored a clean, auditable RED-first starting point.
+- Went well: the rewritten source contract failed for the intended missing two-row, overflow, scoring-status, and tap-target behavior.
+- Went well: real Playwright checks at 320, 375, 768, and 1440 caught accessibility and action-parity defects during implementation.
+- Went well: the shared heavy-command semaphore prevented this lane's broad gates from colliding with sibling lanes.
+- Went well: ticket comments preserved exact RED, GREEN, baseline-failure, scope, and commit evidence through lease reclamations.
+- What fought me: the killed v3 fan-out left plausible S3 files with no trustworthy continuity or ownership record.
+- What fought me: DebatePageClient had many regex consumers, so even tightly scoped presentation work required deliberate contract auditing.
+- What fought me: the first lane pass satisfied the specified phone widths but missed the 568x320 short-landscape height constraint.
+- What fought me: header height, scoring-summary wrapping, and reserved dock clearance combined to collapse the selected view to 7–9px.
+- What fought me: 900-second claims expired during multi-engine and broad gate runs, adding avoidable reclaim bookkeeping.
+- What fought me: the compaction-law gate dispute temporarily rejected valid work because transport type had not been recorded up front.
+- The transport ruling was useful: it established that bounded Codex exec and headless Grok runs were non-PTY and checkpoints were inapplicable.
+- I would add a standard short-landscape viewport row to the responsive acceptance matrix before any lane begins.
+- I would centralize geometry assertions for visible interaction surfaces and pointer hit-testing instead of discovering them at S8.
+- I would record worker and reviewer transport classifications in the initial claim and review packet.
+- I would wrap heavy-lock acquisition, release, and evidence capture in one repository helper to reduce manual protocol risk.
+- Overall, the rework was appropriately small: one short-height CSS presentation rule plus regression coverage across all three engines.

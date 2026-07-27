@@ -1,7 +1,7 @@
 ---
 name: heartbeat-protocol
 description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine. All agent launches use /goal.
-version: 3.1.0
+version: 3.2.0
 spine_version: 3.0.0
 ---
 
@@ -101,3 +101,53 @@ contracts, or ignore ticket comments. If the orchestrator session is down, the
 Architecture-responsible agent relays directly to the humans (ruling R3) — the only
 sanctioned fallback, legal because ARCHITECTURE already holds design-question
 authority.
+
+## v3.2.0 amendments — V-ordered laws from the first live Tier-1 mission (responsive-ui-20260724, 2026-07-24..27)
+
+1. **Fleet building (V's name for the R7 election):** run it as an explicit per-loop
+   election at every intake — one question per loop, multi-select of roster agents.
+   Never compress into a preset.
+2. **Visible-launch law:** agent CLIs launch in real, visible PowerShell windows the
+   human can watch (title = stage + mission; `-NoExit`; Tee to a per-stage log under
+   `.hermes/planning/<mission>/logs/`). Hardened patterns (all were live failures):
+   pass prompts via file or stdin-pipe (never inline with unescaped quotes — PS 5.1
+   drops embedded `"` for native exes); `codex exec` needs stdin closed (`< /dev/null`)
+   or it hangs awaiting EOF; Tee-Object writes UTF-16 → log watchers strip NULs;
+   `codex exec` echoes its prompt → completion markers require occurrence-counting or
+   colon-suffixed forms; ticket bodies quote marker vocabulary → match `MARKER: <payload>`
+   not bare markers; NEVER sed/heredoc-generate launchers without reading them back;
+   verify every launch (log file exists or process alive within 2 minutes).
+   **Window hygiene:** close windows whose work finished clean; leave failed ones open
+   for the human to read.
+3. **Stagnation kill-law (global):** a watchdog fingerprints logs + agent CPU every
+   5 minutes; 20 minutes with zero change across everything → kill ALL agents, write
+   the stop-report, the orchestrator halts its own loop and prompts the human. Distinct
+   from the spine's per-loop stagnation breaker (which the rework cap became — see spine
+   §10 amendment): converging loops continue; only true dead air dies.
+4. **Same-terminal rework through the /goal chain:** rework returns to the exact
+   original terminal/session at every level — `hermes --resume`, `grok --resume`,
+   `codex exec resume <id>`, SendMessage to the same SDK agent — including agents'
+   own subagents (each fixes its own work). Session ids are recorded at WORKER CLAIM
+   and recovered from the BOARD, never from logs. Reproduce-first is mandatory on
+   every rework: the RED test demonstrates the exact reported defect against current
+   code before any fix.
+5. **Planning-graph gate:** planning ends with a saved mission-graph IMAGE
+   (nodes/edges/routers/lanes/tiers/worktrees/merge order) at
+   `.hermes/reports/<mission>/mission-graph.svg`, presented WITH the lane-plan packet
+   row; the human's yes on the image gates programming.
+6. **Reporting laws:** every run report carries PER-AGENT token usage (named
+   accounting basis per row; capture: SDK task results, `hermes insights`, grok
+   session `updates.jsonl`, codex session footers) and a cross-run ledger for trends;
+   EVERY agent files its own SELF-REPORT (10-20 honest lines: went well / fought me /
+   would change) to `.hermes/reports/<mission>/agent-reports/` before its final
+   handoff — the harness self-improves on both.
+7. **Conversation-mode recovery:** when an agent errs or stalls, converse turn-by-turn
+   with the same session (ask what it received, what it did, why) instead of re-firing
+   bigger packets; workers who can't find something ask why and work around. Tooling
+   friction escalates to the human after ONE failed workaround, with the exact error
+   and smallest fix.
+8. **Codex-on-this-machine notes:** multi-agent collab mode is unproven (3 failed
+   fan-outs; evidence package filed) — default to direct single-session lanes with
+   the orchestrator routing; sandbox helper resolution is broken (see evidence
+   package) so lanes run `-s danger-full-access` with the file contract, no-push law,
+   and independent review as containment until Codex fixes land.
