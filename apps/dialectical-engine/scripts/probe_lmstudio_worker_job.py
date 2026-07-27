@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from _common import connect_db
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = Path("~/.dialectical/db.sqlite3").expanduser()
@@ -206,7 +208,13 @@ def main() -> int:
         "lmstudio_url": args.lmstudio_url,
         "capability": args.capability,
     }
-    with sqlite3.connect(args.database) as db:
+    # This connection stays open across run_fallback_worker_once's
+    # subprocess.run and wait_for_probe_completion's ~60s poll loop. That is
+    # safe only while insert_probe_job commits before the waiting starts and
+    # everything in between stays read-only: one un-committed DML held here
+    # would pin SQLite's write lock across the whole wait and starve the
+    # coordinator.
+    with connect_db(args.database) as db:
         try:
             ids = insert_probe_job(db, args.capability, args.max_tokens)
             report["ids"] = ids

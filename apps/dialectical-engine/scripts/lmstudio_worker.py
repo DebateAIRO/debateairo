@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sqlite3
 import time
 import urllib.error
 import urllib.request
@@ -17,6 +16,8 @@ try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
+
+from _common import connect_db
 
 
 DEFAULT_COORDINATOR_URL = "http://127.0.0.1:8000"
@@ -60,7 +61,7 @@ def ensure_worker_row(
     capability: str,
     token_source_worker: str,
 ) -> None:
-    with sqlite3.connect(db_path) as db:
+    with connect_db(db_path) as db:
         token_hash_row = db.execute(
             "select token_hash from workers where name = ?",
             (token_source_worker,),

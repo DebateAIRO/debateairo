@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from _common import connect_db
+
 
 DEFAULT_DB = Path("~/.dialectical/db.sqlite3").expanduser()
 DEFAULT_REPORT = Path("/private/tmp/dialectical-local-single-machine-config.json")
@@ -108,7 +110,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    with sqlite3.connect(args.database) as db:
+    with connect_db(args.database) as db:
         before = load_runtime_settings(db)
         after = configured_runtime(args, before)
         if not args.dry_run:

@@ -22,6 +22,8 @@ sys.path.insert(0, str(WORKER_ROOT))
 
 from app.config import update_config_file  # noqa: E402
 
+from _common import connect_db  # noqa: E402
+
 
 DEFAULT_DB = Path("~/.dialectical/db.sqlite3").expanduser()
 DEFAULT_WORKER_CONFIG = Path("~/.dialectical-worker/config.toml").expanduser()
@@ -293,7 +295,7 @@ def main() -> int:
         [*main_worker_ready, LM_STUDIO_CAPABILITY] if lm_studio.get("ready") else main_worker_ready
     )
 
-    with sqlite3.connect(args.database) as db:
+    with connect_db(args.database) as db:
         runtime_before = load_runtime_settings(db)
         runtime_after = build_runtime(runtime_before, enabled_models)
         if not args.dry_run:
