@@ -1249,7 +1249,21 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
     if terminal_events:
         commit_write(db)
         _publish_events_sync(terminal_events)
-    flush_write(db)
+    # COMMIT, not flush (2026-07-27). This has to make the reroute/sweep
+    # mutations above visible to the SELECT below -- autoflush is off, so
+    # without it the candidate scan reads stale rows -- and a flush does that.
+    # But flush_write releases the RLock while KEEPING SQLite's RESERVED writer,
+    # and this session then holds RESERVED across the pending-jobs SELECT and
+    # the whole worker_can_claim_job scan with the lock free. That is a second
+    # lock-ordering inversion, RLock vs RESERVED rather than RLock vs pool:
+    # a concurrent heartbeat takes the RLock, emits its UPDATE from inside
+    # commit(), blocks on this RESERVED, and burns its full busy_timeout (30s)
+    # holding the lock -- which is also what stops THIS session committing and
+    # releasing RESERVED. The hold does not need to be long to hurt; any overlap
+    # costs the other writer 30s. Committing releases both together, so the scan
+    # runs holding neither. See tests/test_write_lock_reserved_holds.py for the
+    # live tracebacks this reproduces.
+    commit_write(db)
 
     jobs = list(
         db.scalars(

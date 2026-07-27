@@ -419,17 +419,24 @@ def wake_pending_internal_scoring_job(
     # trigger can never both observe the same pending job and double-run it.
     # The RLock is reentrant, so the nested commit_write/flush_write calls
     # inside this section are safe no-op re-entries.
+    # Establish a fresh read snapshot for everything below. A concurrent
+    # create+claim+commit (separate session) -- or a pass claimed since this
+    # session's transaction began -- must be visible to the find/active-job
+    # checks, otherwise a second create_if_missing caller (concurrent
+    # branch-completion trigger, or a trigger firing while an earlier pass is
+    # still in flight) would miss the already-claimed job and double-create.
+    # Safe: callers hold no uncommitted writes at wake entry.
+    #
+    # OUTSIDE the lock as of 2026-07-27 (Mandate D follow-up 2), and that is
+    # not a weakening. db.rollback() RETURNS the pooled connection, so doing it
+    # inside meant the next statement checked one out with the lock held -- the
+    # 2026-07-26 inversion, in the browser-poll hot path. It loses nothing
+    # because it is not what pins the snapshot: pysqlite emits BEGIN only ahead
+    # of DML, so neither the rollback nor hold_write_lock's connection warm
+    # opens a SQLite read transaction, and the first SELECT below takes its
+    # snapshot when it executes -- under the lock either way.
+    db.rollback()
     with hold_write_lock(db):
-        # Establish a fresh read snapshot now that we hold the write lock. A
-        # concurrent create+claim+commit (separate session) -- or a pass claimed
-        # since this session's transaction began -- must be visible to the
-        # find/active-job checks below, otherwise a second create_if_missing
-        # caller (concurrent branch-completion trigger, or a trigger firing
-        # while an earlier pass is still in flight) would miss the already-
-        # claimed job and double-create. Under SQLite WAL a reader keeps its
-        # pre-lock snapshot until its transaction ends, so drop it here. Safe:
-        # callers hold no uncommitted writes at wake entry.
-        db.rollback()
         stale_jobs = db.scalars(
             select(Job).where(
                 Job.debate_id == debate.id,
@@ -450,8 +457,17 @@ def wake_pending_internal_scoring_job(
             stale_job.status = "failed"
             stale_job.error = STALE_SCORING_JOB_ERROR
         if stale_jobs:
+            # LAST statement of this critical section, deliberately: it returns
+            # the connection, so anything after it would re-check-out under the
+            # lock. The find/claim below re-enters hold_write_lock, whose warm
+            # runs OUTSIDE the lock. Splitting here is safe for W2 because the
+            # find-and-claim -- the part that must be atomic -- is entirely
+            # inside the second section, and the stale sweep only ever touches
+            # rows with deadline < now, which the find's deadline >= now filter
+            # excludes regardless.
             commit_write(db)
 
+    with hold_write_lock(db):
         job = db.scalars(
             select(Job)
             .where(
