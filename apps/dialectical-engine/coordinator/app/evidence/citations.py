@@ -245,25 +245,46 @@ async def check_citation_resolution(client: httpx.AsyncClient, url: str, quote: 
 
 
 async def _resolve_and_stamp_async(debate_id: str, node_ids: list[str], *, transport=None) -> None:
+    # 2026-07-26 pool-exhaustion fix: this used to hold ONE session open across
+    # every fetch. The session's first db.get checks a QueuePool connection out
+    # and keeps it until commit/rollback/close, so each citation thread pinned
+    # one of the pool's slots for its entire network run (fetches are bounded
+    # at CITATION_FETCH_TIMEOUT_SECONDS EACH, and the trigger spawns a thread
+    # per v2_evidence completion). Three phases instead: read the fetch targets
+    # in a short session, fetch with NO session at all, stamp in a second short
+    # session. Stamping re-reads evidence_metadata so a concurrent update
+    # landing mid-fetch (the entailment/verification stampers share this
+    # column) is merged onto, never clobbered by, the pre-fetch snapshot.
+    targets: list[tuple[str, str, str]] = []
+    with SessionLocal() as db:
+        for node_id in node_ids:
+            node = db.get(Node, node_id)
+            if node is None:
+                continue
+            metadata = node.evidence_metadata or {}
+            targets.append((node_id, str(metadata.get("url") or ""), str(metadata.get("quote") or "")))
+    if not targets:
+        return
     # follow_redirects=False: check_citation_resolution follows redirects itself
     # so the SSRF guard runs on every hop (httpx's own follower would not).
+    statuses: dict[str, str] = {}
     async with httpx.AsyncClient(
         transport=transport,
         timeout=CITATION_FETCH_TIMEOUT_SECONDS,
         follow_redirects=False,
     ) as client:
-        with SessionLocal() as db:
-            for node_id in node_ids:
-                node = db.get(Node, node_id)
-                if node is None:
-                    continue
-                metadata = dict(node.evidence_metadata or {})
-                url = str(metadata.get("url") or "")
-                quote = str(metadata.get("quote") or "")
-                metadata["resolution_status"] = await check_citation_resolution(client, url, quote)
-                node.evidence_metadata = metadata
-                db.add(node)
-            commit_write(db)
+        for node_id, url, quote in targets:
+            statuses[node_id] = await check_citation_resolution(client, url, quote)
+    with SessionLocal() as db:
+        for node_id, status in statuses.items():
+            node = db.get(Node, node_id)
+            if node is None:
+                continue
+            metadata = dict(node.evidence_metadata or {})
+            metadata["resolution_status"] = status
+            node.evidence_metadata = metadata
+            db.add(node)
+        commit_write(db)
 
 
 def resolve_and_stamp_citations(debate_id: str, node_ids: list[str], *, transport=None) -> None:

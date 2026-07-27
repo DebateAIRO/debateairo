@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 import app.evidence.citations as citations
+from app.core.db import engine
 from app.evidence.citations import (
     RESOLVED_QUOTE_FOUND,
     RESOLVED_QUOTE_MISSING,
@@ -346,21 +347,17 @@ def test_resolve_and_stamp_marks_found_missing_and_unreachable(db) -> None:
 def test_citation_fetches_run_without_holding_the_single_writer(
     db, independent_writer_can_commit
 ) -> None:
-    """Seam contract (2026-07-26 sweep): _resolve_and_stamp_async holds ONE
-    session open across every node's network fetch -- 46 evidence nodes at up
-    to CITATION_FETCH_TIMEOUT_SECONDS each is minutes -- and stamps them all in
-    a single terminal commit_write.
+    """Seam contract (2026-07-26 sweep): no citation fetch may run while the
+    resolution pass holds SQLite's single RESERVED writer -- 46 evidence nodes
+    at up to CITATION_FETCH_TIMEOUT_SECONDS each is minutes, and a held writer
+    starves every other coordinator writer into "database is locked" for that
+    whole window.
 
-    That is only safe because nothing in the loop emits DML: SessionLocal is
-    built with autoflush=False, so `db.get` never flushes the pending
-    `evidence_metadata` assignments, and the pysqlite driver does not BEGIN
-    until a DML statement runs. SQLite's single RESERVED writer is therefore
-    taken only by the final commit, never held across a fetch.
-
-    This test pins that property rather than the code shape: turning autoflush
-    on, or adding a flush_write inside the loop, would silently start holding
-    the writer for the whole fetch run and starve every other coordinator
-    writer into "database is locked" -- and would fail here.
+    Since the pool-exhaustion fix the pass fetches with NO session at all
+    (read targets in a short session, fetch, stamp in a second short session),
+    which satisfies this trivially. The test still pins the property rather
+    than the code shape: any regression that moves a flushed write back across
+    the fetch loop -- whatever the session arrangement -- fails here.
     """
     d1, _ = _evidence_node(
         db, node_id="ev-writer-1", url="https://example.org/a", quote="first quote"
@@ -386,6 +383,86 @@ def test_citation_fetches_run_without_holding_the_single_writer(
         "writer; every other coordinator writer blocks on busy_timeout and "
         "then fails with 'database is locked' for the whole fetch run "
         f"(observed independent-writer-can-commit={observed})"
+    )
+
+
+def test_citation_fetches_hold_no_pool_connection(db) -> None:
+    """Regression for the 2026-07-26 QueuePool exhaustion: the writer seam above
+    is necessary but not sufficient. The resolution pass used to wrap the WHOLE
+    fetch loop in one session -- db.get(Node) checked a QueuePool connection out
+    at the first read and held it until the terminal commit, so each citation
+    thread pinned one of the pool's 15 slots for its entire multi-minute network
+    run (fetches are bounded at CITATION_FETCH_TIMEOUT_SECONDS=15s EACH), and
+    the trigger spawns one such thread per v2_evidence completion.
+
+    The contract: no pooled connection is checked out while a citation fetch is
+    in flight -- reads happen in a short session released before the network
+    phase, stamping in a second short session after it."""
+    d1, _ = _evidence_node(
+        db, node_id="ev-pool-1", url="https://example.org/a", quote="first quote"
+    )
+    _evidence_node(db, node_id="ev-pool-2", url="https://example.org/b", quote="second quote")
+    debate_id = d1.id
+    # Release the fixture session's own read transaction (opened by the d1.id
+    # refresh above) so the probe counts ONLY the citation pass's checkouts.
+    db.rollback()
+    observed: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(engine.pool.checkedout())
+        return httpx.Response(200, text="page body containing the first quote and more")
+
+    resolve_and_stamp_citations(
+        debate_id,
+        ["ev-pool-1", "ev-pool-2"],
+        transport=httpx.MockTransport(handler),
+    )
+
+    db.expire_all()
+    assert db.get(Node, "ev-pool-1").evidence_metadata["resolution_status"] == RESOLVED_QUOTE_FOUND
+    assert db.get(Node, "ev-pool-2").evidence_metadata["resolution_status"] == RESOLVED_QUOTE_MISSING
+    assert observed == [0, 0], (
+        "a citation fetch ran while the resolution pass held a pooled "
+        "connection: every citation thread pins a QueuePool slot for its "
+        f"whole network run (observed checkedout counts={observed})"
+    )
+
+
+def test_resolve_and_stamp_reads_fresh_metadata_at_stamp_time(db) -> None:
+    """The two-session shape must MERGE onto metadata as it stands at stamp
+    time, not write back the copy read before the fetches: a concurrent
+    evidence_metadata update landing mid-fetch (the entailment/verification
+    stampers share this column) would otherwise be silently clobbered by the
+    pre-fetch snapshot."""
+    d1, _ = _evidence_node(
+        db, node_id="ev-fresh", url="https://example.org/a", quote="first quote"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Simulate a concurrent writer updating the node's metadata while the
+        # fetch is in flight.
+        from app.core.db import SessionLocal
+        from app.core.write_lock import commit_write
+
+        with SessionLocal() as other:
+            node = other.get(Node, "ev-fresh")
+            node.evidence_metadata = {**node.evidence_metadata, "entailment": "SUPPORTS"}
+            other.add(node)
+            commit_write(other)
+        return httpx.Response(200, text="page body containing the first quote and more")
+
+    resolve_and_stamp_citations(
+        d1.id,
+        ["ev-fresh"],
+        transport=httpx.MockTransport(handler),
+    )
+
+    db.expire_all()
+    metadata = db.get(Node, "ev-fresh").evidence_metadata
+    assert metadata["resolution_status"] == RESOLVED_QUOTE_FOUND
+    assert metadata["entailment"] == "SUPPORTS", (
+        "stamping wrote back the pre-fetch metadata snapshot and clobbered a "
+        f"concurrent update (metadata={metadata})"
     )
 
 

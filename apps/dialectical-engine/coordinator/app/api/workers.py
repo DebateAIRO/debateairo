@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,7 +15,7 @@ from app.core.auth import AuthContext, hash_token, require_user_token, require_w
 from app.core.config import load_settings, new_secret_token
 from app.core.db import get_db
 from app.core.write_lock import commit_write
-from app.models.entities import Worker, now_utc
+from app.models.entities import Job, Worker, now_utc
 from app.services.dialectical_v2 import v2_generation_readiness
 from app.services.orchestrator import (
     _publish_events_sync,
@@ -153,18 +154,44 @@ def heartbeat(
     return {"status": worker.status}
 
 
+def _claim_pending_job_warm(db: Session, worker: Worker) -> Job | None:
+    """claim_pending_job, plus touching every Job field publish_job_started
+    reads. The claim commits (expiring the ORM instance), so the first
+    attribute access afterwards issues a refresh SELECT -- touching them here
+    keeps that query on this worker thread instead of the event loop."""
+    job = claim_pending_job(db, worker)
+    if job is not None:
+        _ = (job.id, job.debate_id, job.node_id, job.job_type, job.required_model, job.worker_id)
+    return job
+
+
+def _finish_empty_poll(db: Session, worker: Worker) -> None:
+    mark_worker_seen(worker, now_utc())
+    commit_write(db)
+
+
 @router.post("/workers/{worker_id}/poll")
 async def poll(worker: Annotated[Worker, Depends(require_worker)], db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    # 2026-07-26 pool-exhaustion fix (path 6): this endpoint is async so the 1s
+    # long-poll cadence sleeps on the event loop without pinning a threadpool
+    # thread -- but that also means any DB call made directly here runs ON the
+    # loop. claim_pending_job can block for up to pool_timeout=30s waiting for
+    # a QueuePool slot on a saturated pool, and one such block froze the whole
+    # coordinator: no other request progressed, so every in-flight request held
+    # its own connection longer, amplifying a transient hold into full pool
+    # exhaustion. Every blocking DB call is therefore pushed to the threadpool;
+    # the calls are strictly sequential, so sharing the request session across
+    # them is safe. publish_job_started stays on the loop -- it is genuinely
+    # async and only reads fields _claim_pending_job_warm already loaded.
     settings = load_settings()
     deadline = asyncio.get_running_loop().time() + settings.worker_poll_seconds
     while True:
-        job = claim_pending_job(db, worker)
+        job = await run_in_threadpool(_claim_pending_job_warm, db, worker)
         if job:
             await publish_job_started(db, job)
-            return {"job": render_job_payload(db, job)}
+            return {"job": await run_in_threadpool(render_job_payload, db, job)}
         if asyncio.get_running_loop().time() >= deadline:
-            mark_worker_seen(worker, now_utc())
-            commit_write(db)
+            await run_in_threadpool(_finish_empty_poll, db, worker)
             return {"job": None}
         await asyncio.sleep(1)
 

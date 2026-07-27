@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.core.config import ensure_home, load_settings
+from app.core.config import ensure_home, int_env, load_settings
 
 
 class Base(DeclarativeBase):
@@ -21,13 +21,45 @@ _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
 
 
+def _is_memory_sqlite(url: str) -> bool:
+    """Memory SQLite engines get SingletonThreadPool/StaticPool, which reject
+    QueuePool sizing kwargs -- everything else (file SQLite, postgres, ...)
+    pools with QueuePool and takes them."""
+    if not url.startswith("sqlite"):
+        return False
+    return ":memory:" in url or "mode=memory" in url or url in ("sqlite://", "sqlite:///")
+
+
+def _pool_kwargs(url: str) -> dict[str, int]:
+    # 2026-07-26 incident: the engine used SQLAlchemy's implicit QueuePool
+    # sizing (5 + 10 overflow) and production exhausted all 15 slots. Explicit
+    # and env-tunable now. Connections to a WAL-mode SQLite file are cheap
+    # (a file handle + page cache each; readers never block); the single-
+    # WRITER constraint is serialized at the app layer by app.core.write_lock,
+    # not by keeping the pool small. The real fix for exhaustion was removing
+    # long holds (pre-CLI/network session release, bounded scoring fan-out,
+    # threadpooled poll endpoint) -- this sizing is headroom, not the cure.
+    if _is_memory_sqlite(url):
+        return {}
+    return {
+        "pool_size": int_env("DIALECTICAL_DB_POOL_SIZE", 10, 1, 100),
+        "max_overflow": int_env("DIALECTICAL_DB_MAX_OVERFLOW", 20, 0, 200),
+        "pool_timeout": int_env("DIALECTICAL_DB_POOL_TIMEOUT_S", 30, 1, 300),
+    }
+
+
 def get_engine() -> Engine:
     global _engine, _session_factory, _settings
     if _engine is None:
         _settings = load_settings()
         ensure_home(_settings)
         connect_args = {"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {}
-        _engine = create_engine(_settings.database_url, connect_args=connect_args, future=True)
+        _engine = create_engine(
+            _settings.database_url,
+            connect_args=connect_args,
+            future=True,
+            **_pool_kwargs(_settings.database_url),
+        )
         _session_factory = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
     return _engine
 

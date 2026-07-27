@@ -1382,6 +1382,12 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
     debate = db.get(Debate, job.debate_id)
     if not debate:
         raise ValueError("Debate not found")
+    # 2026-07-26 pool-exhaustion sweep (path 5): debate_to_dict is ~14
+    # debate-wide SELECTs holding a pool connection for its whole 1-2s run on a
+    # large debate. When a branch below already serialized the committed state
+    # for an SSE payload (decompose's tree_ready), it stashes the dict here and
+    # the terminal return reuses it instead of running a second identical pass.
+    serialized_debate: dict[str, Any] | None = None
     worker = db.get(Worker, job.worker_id) if job.worker_id else None
     if worker:
         worker.current_job_id = None
@@ -1446,7 +1452,8 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         # commit comment in score_node_with_provider.
         ensure_default_scoring_for_completed_generation(db, debate, node)
         commit_write(db)
-        await event_bus.publish(job.debate_id, "tree_ready", {"tree": debate_to_dict(db, debate)})
+        serialized_debate = debate_to_dict(db, debate)
+        await event_bus.publish(job.debate_id, "tree_ready", {"tree": serialized_debate})
         await event_bus.publish(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": node.active_generation_id})
 
     elif job.job_type == "argue":
@@ -1513,6 +1520,10 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
     else:
         raise ValueError(f"Unsupported job type {job.job_type}")
 
+    if serialized_debate is not None:
+        # Built after the branch's terminal commit, so it is exactly what a
+        # fresh pass here would rebuild -- minus the second 14-SELECT hold.
+        return serialized_debate
     db.refresh(debate)
     return debate_to_dict(db, debate)
 
