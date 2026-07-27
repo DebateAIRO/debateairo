@@ -169,3 +169,23 @@ def test_terminal_adaptive_stop_cannot_reopen_completed_debate(db):
     assert job.status == "failed"
     assert debate.status == "complete"
     assert any(event == "adaptive_expansion_cancelled" for _, event, _ in events)
+
+
+def test_terminal_adaptive_stop_rejects_pending_expansion_before_claim(db):
+    from app.exploration.expansion_dispatch import STOPPED_WALL_CLOCK, record_adaptive_stop
+    from app.services.orchestrator import claim_pending_job
+
+    codex = worker(db, "codex-terminal-frontier", ["gpt-5.6sol-medium"])
+    debate, job = make_debate_with_job(db, "gpt-5.6sol-medium")
+    job.job_type = "v2_expand"
+    debate.status = "complete"
+    debate.synthesis_id = "existing-synthesis"
+    debate.completed_at = debate.created_at
+    record_adaptive_stop(db, debate, STOPPED_WALL_CLOCK)
+    db.commit()
+
+    assert claim_pending_job(db, codex) is None
+    db.refresh(job)
+    db.refresh(debate)
+    assert job.status == "failed"
+    assert debate.status == "complete"

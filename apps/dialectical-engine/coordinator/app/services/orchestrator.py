@@ -1359,6 +1359,24 @@ def claim_pending_job(
             .order_by(Job.created_at.asc())
         ).all()
     )
+    lifecycle_compatible_jobs: list[Job] = []
+    for candidate in jobs:
+        debate = db.get(Debate, candidate.debate_id)
+        if _is_obsolete_adaptive_expansion(debate, candidate):
+            terminal_events.extend(
+                terminalize_job_failure(
+                    db,
+                    candidate,
+                    "Adaptive frontier already reached a terminal stop before claim",
+                )
+            )
+        else:
+            lifecycle_compatible_jobs.append(candidate)
+    jobs = lifecycle_compatible_jobs
+    if terminal_events:
+        commit_write(db)
+        _publish_events_sync(terminal_events)
+        terminal_events = []
     circuit_compatible_jobs: list[Job] = []
     for candidate in jobs:
         signature = _open_failure_circuit_reason(worker, candidate)
