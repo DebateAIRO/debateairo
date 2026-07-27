@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.config import bool_env
 from app.core.db import SessionLocal
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write, hold_write_lock
+from app.core.write_lock import commit_write, flush_write, hold_write_lock
 from app.exploration.expansion_dispatch import adaptive_expansion_enabled, expansion_dispatch
 from app.exploration.scoring_completion_lifecycle import reevaluate_lifecycle_after_scoring_completion
 from app.models.entities import AnalyzerRun, Debate, DebateBranch, Job, JudgeOutputArtifact, next_analyzer_run_seq, now_utc
@@ -108,7 +108,7 @@ def current_scoring_branch(db: Session, debate: Debate) -> DebateBranch:
         return branch
     branch = DebateBranch(debate_id=debate.id, root_node_id=debate.root_node_id, status="active")
     db.add(branch)
-    db.flush()
+    flush_write(db)
     return branch
 
 
