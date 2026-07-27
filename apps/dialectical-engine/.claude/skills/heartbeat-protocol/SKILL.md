@@ -1,7 +1,7 @@
 ---
 name: heartbeat-protocol
 description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine. All agent launches use /goal.
-version: 3.2.0
+version: 3.3.0
 spine_version: 3.0.0
 ---
 
@@ -151,3 +151,21 @@ authority.
    the orchestrator routing; sandbox helper resolution is broken (see evidence
    package) so lanes run `-s danger-full-access` with the file contract, no-push law,
    and independent review as containment until Codex fixes land.
+
+9. **Hermes board polling — the QA/SCRUM/PROGRAMMING loop surface (V amendment,
+   2026-07-27).** Hermes runs its OWN Kanban board and serves it on
+   **port 9119** (`hermes dashboard`, default port; `--port`/`--host` to
+   override). The Main Orchestrator **polls that board** as the coordination
+   surface for the QA SCRUM PROGRAMMING LOOP — lane status, review state,
+   blockers, and successor routing are read from Hermes's board, not inferred
+   from agent stdout.
+   - Poll surface: `http://localhost:9119` (the board Hermes serves).
+   - If the dashboard is not up, the orchestrator asks Hermes to start it
+     (`hermes dashboard`) rather than substituting its own tracker; the
+     `hermes kanban --board <slug>` CLI reads the same durable store and
+     remains the scriptable fallback for reads and comment writes.
+   - Board custody stays Hermes's (spine §5.2): the orchestrator READS the
+     board and routes from it; it never mutates review state.
+   - The board — not any log, live file, or host task list — is the source of
+     truth for loop state (spine: live files and host task lists are
+     read-only projections).
