@@ -303,13 +303,17 @@ def test_decompose_completion_serializes_the_debate_once(db, monkeypatch) -> Non
     monkeypatch.setattr(orchestrator_module, "debate_to_dict", counting_serialize)
 
     published: list[tuple[str, dict]] = []
-    real_publish = event_bus.publish
+    real_publish = event_bus._publish
 
-    async def recording_publish(debate_id, event, payload):
+    def recording_publish(debate_id, event, payload):
         published.append((event, payload))
-        return await real_publish(debate_id, event, payload)
+        return real_publish(debate_id, event, payload)
 
-    monkeypatch.setattr(event_bus, "publish", recording_publish)
+    # Capture at _publish, the funnel BOTH bus channels share: complete_job's
+    # core is sync (it runs in the threadpool off the /complete endpoint) and
+    # publishes via publish_from_sync, so the async publish method is no
+    # longer on this code path.
+    monkeypatch.setattr(event_bus, "_publish", recording_publish)
 
     result = asyncio.run(
         complete_job(

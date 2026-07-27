@@ -374,10 +374,14 @@ def test_retryable_v2_failure_publishes_node_retrying_not_debate_failed(db, monk
 
     published: list[tuple[str, str, dict]] = []
 
-    async def capture(debate_id, event, payload):
+    def capture(debate_id, event, payload):
         published.append((debate_id, event, payload))
 
-    monkeypatch.setattr(orch.event_bus, "publish", capture)
+    # Capture at _publish, the funnel BOTH bus channels share: fail_job's core
+    # is sync (it runs in the threadpool off the /fail endpoint) and publishes
+    # via publish_from_sync, so the async publish method is no longer on this
+    # code path.
+    monkeypatch.setattr(orch.event_bus, "_publish", capture)
     w = worker(db, "claude-loop", ["claude-sonnet-5-high-loop"])
     _, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
     claim_pending_job(db, w)

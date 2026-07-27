@@ -1341,7 +1341,15 @@ async def publish_job_started(db: Session, job: Job) -> None:
     )
 
 
-async def append_stream_delta(db: Session, job: Job, delta: str, offset: int | None = None) -> None:
+def append_stream_delta_sync(db: Session, job: Job, delta: str, offset: int | None = None) -> None:
+    """Blocking core of /stream: claim check, buffer write, commit.
+
+    The API endpoint runs this via run_in_threadpool so no pool wait or query
+    ever executes on the event loop (2026-07-26 pool-exhaustion follow-up to
+    the workers.poll fix -- see api/jobs.py). The token SSE goes through
+    event_bus.publish_from_sync: loop-agnostic, thread-safe, and delivered
+    before this returns, exactly like the awaited publish it replaces.
+    """
     if not delta:
         return
     ensure_mutable_claim(db, job)
@@ -1365,18 +1373,34 @@ async def append_stream_delta(db: Session, job: Job, delta: str, offset: int | N
     job.deadline = make_deadline(job.job_type)
     commit_write(db)
     if job.job_type in {"synthesize", "v2_synthesize"}:
-        await event_bus.publish(job.debate_id, "synthesis_token", {"debate_id": job.debate_id, "delta": delta})
+        event_bus.publish_from_sync(job.debate_id, "synthesis_token", {"debate_id": job.debate_id, "delta": delta})
     elif job.job_type.startswith("v2_"):
-        await event_bus.publish(
+        event_bus.publish_from_sync(
             job.debate_id,
             "artifact_token",
             {"debate_id": job.debate_id, "job_id": job.id, "job_type": job.job_type, "delta": delta},
         )
     else:
-        await event_bus.publish(job.debate_id, "node_token", {"node_id": job.node_id, "delta": delta})
+        event_bus.publish_from_sync(job.debate_id, "node_token", {"node_id": job.node_id, "delta": delta})
 
 
-async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+async def append_stream_delta(db: Session, job: Job, delta: str, offset: int | None = None) -> None:
+    """Awaitable form for async callers; the API endpoint uses the sync core
+    via run_in_threadpool instead of awaiting this on the loop."""
+    append_stream_delta_sync(db, job, delta, offset=offset)
+
+
+def complete_job_sync(db: Session, job: Job, result: Any, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Blocking core of /complete: the whole completion transaction plus
+    debate_to_dict (~14 debate-wide SELECTs, 1.3-2.1s on a 91-node debate).
+
+    The API endpoint runs this via run_in_threadpool so no pool wait, commit,
+    or serialization ever executes on the event loop (2026-07-26
+    pool-exhaustion follow-up to the workers.poll fix -- see api/jobs.py).
+    The mid-function publish points keep their exact position relative to the
+    commits around them: event_bus.publish_from_sync is loop-agnostic and
+    thread-safe, so no event collection/deferral is needed.
+    """
     metadata = metadata or {}
     ensure_mutable_claim(db, job)
     debate = db.get(Debate, job.debate_id)
@@ -1453,8 +1477,8 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         ensure_default_scoring_for_completed_generation(db, debate, node)
         commit_write(db)
         serialized_debate = debate_to_dict(db, debate)
-        await event_bus.publish(job.debate_id, "tree_ready", {"tree": serialized_debate})
-        await event_bus.publish(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": node.active_generation_id})
+        event_bus.publish_from_sync(job.debate_id, "tree_ready", {"tree": serialized_debate})
+        event_bus.publish_from_sync(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": node.active_generation_id})
 
     elif job.job_type == "argue":
         node = db.get(Node, job.node_id)
@@ -1488,12 +1512,12 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         maybe_queue_synthesis(db, debate)
         commit_write(db)
         if lifecycle_persistence.persistence_result == "created":
-            await event_bus.publish(
+            event_bus.publish_from_sync(
                 job.debate_id,
                 "dialectical_exploration",
                 _lifecycle_event_payload(lifecycle_persistence),
             )
-        await event_bus.publish(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": generation.id})
+        event_bus.publish_from_sync(job.debate_id, "node_complete", {"node_id": node.id, "generation_id": generation.id})
 
     elif job.job_type == "synthesize":
         payload = extract_jsonish(result)
@@ -1511,12 +1535,12 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         debate.status = "complete"
         debate.completed_at = now_utc()
         commit_write(db)
-        await event_bus.publish(job.debate_id, "synthesis_complete", {"synthesis": payload})
-        await event_bus.publish(job.debate_id, "debate_complete", {"debate_id": debate.id})
+        event_bus.publish_from_sync(job.debate_id, "synthesis_complete", {"synthesis": payload})
+        event_bus.publish_from_sync(job.debate_id, "debate_complete", {"debate_id": debate.id})
     elif job.job_type.startswith("v2_"):
         from app.services.dialectical_v2 import complete_v2_worker_job
 
-        await complete_v2_worker_job(db, job, extract_jsonish(result), metadata)
+        complete_v2_worker_job(db, job, extract_jsonish(result), metadata)
     else:
         raise ValueError(f"Unsupported job type {job.job_type}")
 
@@ -1526,6 +1550,12 @@ async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, A
         return serialized_debate
     db.refresh(debate)
     return debate_to_dict(db, debate)
+
+
+async def complete_job(db: Session, job: Job, result: Any, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Awaitable form for async callers; the API endpoint uses the sync core
+    via run_in_threadpool instead of awaiting this on the loop."""
+    return complete_job_sync(db, job, result, metadata)
 
 
 def _log_event_publish_exception(task: asyncio.Task[None]) -> None:
@@ -1853,7 +1883,15 @@ def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> 
     return []
 
 
-async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
+def fail_job_sync(db: Session, job: Job, reason: str, retryable: bool) -> None:
+    """Blocking core of /fail: claim check, requeue-or-terminalize, commit.
+
+    The API endpoint runs this via run_in_threadpool so no pool wait or
+    commit ever executes on the event loop (2026-07-26 pool-exhaustion
+    follow-up to the workers.poll fix -- see api/jobs.py). Publishes stay in
+    their commit-then-publish position via the loop-agnostic, thread-safe
+    event_bus.publish_from_sync.
+    """
     ensure_mutable_claim(db, job)
     job.error = sanitize_text(reason, 2_000)
     if job.worker_id:
@@ -1880,7 +1918,7 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
                 node.status = "pending"
         commit_write(db)
         if job.node_id and not job.job_type.startswith("v2_"):
-            await event_bus.publish(
+            event_bus.publish_from_sync(
                 job.debate_id,
                 "node_failed",
                 {
@@ -1891,7 +1929,7 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
                 },
             )
         else:
-            await event_bus.publish(
+            event_bus.publish_from_sync(
                 job.debate_id,
                 "node_retrying",
                 {
@@ -1907,12 +1945,18 @@ async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
     if failover_events:
         commit_write(db)
         for debate_id, event, payload in failover_events:
-            await event_bus.publish(debate_id, event, payload)
+            event_bus.publish_from_sync(debate_id, event, payload)
         return
     events = terminalize_job_failure(db, job, job.error or "Job failed")
     commit_write(db)
     for debate_id, event, payload in events:
-        await event_bus.publish(debate_id, event, payload)
+        event_bus.publish_from_sync(debate_id, event, payload)
+
+
+async def fail_job(db: Session, job: Job, reason: str, retryable: bool) -> None:
+    """Awaitable form for async callers; the API endpoint uses the sync core
+    via run_in_threadpool instead of awaiting this on the loop."""
+    fail_job_sync(db, job, reason, retryable)
 
 
 def debate_uses_v2_pipeline(db: Session, debate_id: str) -> bool:

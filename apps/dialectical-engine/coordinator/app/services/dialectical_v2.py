@@ -3048,7 +3048,11 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
     return system, user
 
 
-async def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: dict[str, Any]) -> None:
+def complete_v2_worker_job(db: Session, job: Job, result: Any, metadata: dict[str, Any]) -> None:
+    # Deliberately sync (it was `async def` with zero awaits): it runs inside
+    # complete_job_sync on a threadpool thread, off the event loop (2026-07-26
+    # pool-exhaustion follow-up -- see api/jobs.py). Its publishes already go
+    # through publish_event, which is loop-agnostic.
     debate = db.get(Debate, job.debate_id)
     if not debate:
         raise ValueError("Debate not found")
