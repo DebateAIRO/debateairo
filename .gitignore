@@ -16,6 +16,7 @@ apps/dialectical-engine/web/.next/
 apps/dialectical-engine/web/.next-dev*/
 apps/dialectical-engine/web/node_modules/
 apps/dialectical-engine/web/out/
+apps/dialectical-engine/web/logs/
 
 # TypeScript incremental build cache
 **/*.tsbuildinfo

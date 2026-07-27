@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from app.config import WorkerConfig, save_config
+from app.config import MissingCredentialsError, WorkerConfig, ensure_identity_persisted, save_config
 
 MAX_FAILURE_REASON_CHARS = 2_000
 
@@ -50,9 +50,25 @@ class CoordinatorClient:
         rotate_token: bool = False,
     ) -> None:
         if self.config.worker_id and self.config.worker_token and not rotate_token:
+            # Already registered, but the file may have lost the identity (the
+            # 2026-07-26/27 outage shape: memory had it, disk did not, and a
+            # restart became a one-way door). Re-persist before returning.
+            # Best-effort: a disk error must not kill a worker whose in-memory
+            # identity still works against the coordinator.
+            if persist:
+                try:
+                    ensure_identity_persisted(self.config, save_path)
+                except Exception as exc:  # noqa: BLE001 - durability is best-effort at runtime.
+                    print(
+                        f"WARNING: could not persist worker identity: {exc!r}. "
+                        "The next restart may require DIALECTICAL_USER_TOKEN.",
+                        flush=True,
+                    )
             return
         if not self.config.user_token:
-            raise RuntimeError("Set user_token in worker config or DIALECTICAL_USER_TOKEN to register")
+            raise MissingCredentialsError(
+                "Set user_token in worker config or DIALECTICAL_USER_TOKEN to register"
+            )
         payload: dict[str, object] = {
             "name": self.config.name,
             "capabilities": capabilities,

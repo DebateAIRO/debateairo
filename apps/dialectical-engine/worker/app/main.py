@@ -5,6 +5,7 @@ import asyncio
 import json
 import math
 import signal
+import sys
 import time
 from typing import Any
 
@@ -12,7 +13,58 @@ import httpx
 
 from app.capabilities import detect_adapters
 from app.client import CoordinatorClient
-from app.config import load_config, save_config
+from app.config import (
+    MissingCredentialsError,
+    WorkerConfig,
+    ensure_identity_persisted,
+    identity_snapshot_path,
+    load_config,
+    resolve_user_token,
+    resolved_config_path,
+    save_config,
+    snapshot_identity,
+)
+
+# sysexits.h EX_CONFIG: shows up in `launchctl list` as status 78, so an
+# unconfigured worker is distinguishable from any other crash (status 1).
+EX_CONFIG = 78
+
+
+def startup_credentials_check(config: WorkerConfig) -> None:
+    """Fail loudly, and distinguishably from other crashes, when the worker
+    can neither authenticate (stored worker_id/worker_token) nor register
+    (user token from config, env, or keychain).
+
+    Without this, a worker whose config file lost its identity crash-loops
+    under launchd KeepAlive on a generic RuntimeError raised deep inside
+    registration -- the 2026-07-26/27 outage shape.
+    """
+    if config.worker_id and config.worker_token:
+        return
+    if config.user_token:
+        return
+    config_path = resolved_config_path(None)
+    snapshot_path = identity_snapshot_path(None)
+    lines = [
+        "Worker cannot start: no stored identity and no registration credential.",
+        f"  config file: {config_path}",
+        f"  worker_id: {'present' if config.worker_id else 'MISSING'}, "
+        f"worker_token: {'present' if config.worker_token else 'MISSING'}",
+        "  user_token: not set (config user_token / DIALECTICAL_USER_TOKEN env)",
+        f"  Keychain: no token obtained (service {config.keychain_service!r}, account "
+        f"{config.keychain_account!r}) -- item missing, keychain locked, or lookup failed",
+        "Fix one of:",
+        f"  - restore worker_id and worker_token in {config_path}",
+        "  - store the operator token once in the macOS Keychain so launchd restarts recover unattended:",
+        f"      security add-generic-password -s {config.keychain_service} -a {config.keychain_account} -w",
+        "  - run one registration with DIALECTICAL_USER_TOKEN set; the worker persists the identity for later restarts",
+    ]
+    if snapshot_path.exists():
+        lines.insert(
+            1,
+            f"  An identity snapshot exists at {snapshot_path} -- restore worker_id/worker_token from it.",
+        )
+    raise MissingCredentialsError("\n".join(lines))
 
 
 class StructuredOutputError(ValueError):
@@ -317,6 +369,18 @@ async def handle_identity_desync(
     recovery_attempts += 1
     if client.config.worker_id and client.config.worker_token:
         client.last_known_identity = (client.config.worker_id, client.config.worker_token)
+        # A desync detection can be wrong (coordinator restoring from backup,
+        # transient auth misconfiguration). Snapshot the identity to disk
+        # before wiping so the operator can restore it; best-effort only.
+        try:
+            snapshot_path = snapshot_identity(
+                client.config,
+                reason=f"identity desync (attempt {recovery_attempts}/{RECOVERY_ATTEMPT_CAP})",
+            )
+            if snapshot_path is not None:
+                print(f"Saved pre-wipe identity snapshot to {snapshot_path}.", flush=True)
+        except Exception as exc:  # noqa: BLE001 - recovery must not die on snapshot IO.
+            print(f"WARNING: could not snapshot worker identity before wipe: {exc!r}.", flush=True)
     if recovery_attempts >= RECOVERY_ATTEMPT_CAP:
         identity = (client.config.worker_id, client.config.worker_token)
         if not all(identity):
@@ -329,10 +393,15 @@ async def handle_identity_desync(
                 await client.heartbeat(capabilities, status="blocked_auth")
             except Exception:  # noqa: BLE001 - best-effort truthful state report.
                 pass
+        snapshot_hint = ""
+        snapshot_path = identity_snapshot_path(None)
+        if snapshot_path.exists():
+            snapshot_hint = f" A pre-wipe identity snapshot exists at {snapshot_path}."
         raise RuntimeError(
             "Worker blocked_auth: identity recovery failed "
             f"{recovery_attempts} consecutive times. Fix DIALECTICAL_USER_TOKEN "
             "or the worker registration on the coordinator, then restart the worker."
+            + snapshot_hint
         )
     print(
         f"Worker identity desync (attempt {recovery_attempts}/{RECOVERY_ATTEMPT_CAP}); "
@@ -363,7 +432,36 @@ async def handle_identity_desync(
 
 
 async def worker_loop(run_once: bool = False) -> None:
-    config = load_config()
+    try:
+        config = load_config()
+    except (ValueError, OSError) as exc:
+        # tomllib.TOMLDecodeError subclasses ValueError, so this catches a
+        # torn/corrupt config file (and unreadable-file OSErrors) and routes
+        # them onto the same loud, exit-78 path as missing credentials
+        # instead of a generic crash-loop that KeepAlive cannot escape.
+        config_path = resolved_config_path(None)
+        snapshot_path = identity_snapshot_path(None)
+        lines = [
+            f"Worker config file is unreadable or corrupt: {config_path}",
+            f"  read/parse error: {exc!r}",
+            "  Fix or restore the file; the worker will not guess at a broken identity.",
+        ]
+        if snapshot_path.exists():
+            lines.append(
+                f"  An identity snapshot exists at {snapshot_path} -- "
+                "worker_id/worker_token can be restored from it."
+            )
+        raise MissingCredentialsError("\n".join(lines)) from exc
+    # Resolved eagerly at startup (not lazily inside registration) so a
+    # mid-run identity desync still holds a credential without re-entering
+    # the keychain; a token added while the worker is running is picked up
+    # on the next KeepAlive restart (the exit-78 path).
+    if resolve_user_token(config):
+        print(
+            f"Using registration credential from the macOS Keychain (service {config.keychain_service!r}).",
+            flush=True,
+        )
+    startup_credentials_check(config)
     client = CoordinatorClient(config)
     stop = asyncio.Event()
 
@@ -417,6 +515,21 @@ async def worker_loop(run_once: bool = False) -> None:
             # Funnel startup desync into the capped recovery path; the poll
             # loop below re-attempts and re-enters recovery if still broken.
             recovery_attempts = await handle_identity_desync(client, capabilities, stop, recovery_attempts)
+        # Durability invariant: whatever identity this process will poll with
+        # must be on disk BEFORE the poll loop starts, or the next restart
+        # needs a user token nobody supplies (the 2026-07-27 outage).
+        # register() persists fresh registrations itself; this covers the
+        # short-circuit/heartbeat paths where memory has an identity the
+        # file lost. Best-effort: a full disk must not kill a live worker.
+        try:
+            if ensure_identity_persisted(config):
+                print("Persisted worker identity to the config file for restart durability.", flush=True)
+        except Exception as exc:  # noqa: BLE001 - durability is best-effort at runtime.
+            print(
+                f"WARNING: could not persist worker identity: {exc!r}. "
+                "The next restart may require DIALECTICAL_USER_TOKEN.",
+                flush=True,
+            )
         try:
             # A restarted process cannot still be running whatever job it
             # held before. register() short-circuits without a network call
@@ -460,7 +573,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run a Dialectical Engine worker")
     parser.add_argument("--once", action="store_true", help="Poll and handle at most one job")
     args = parser.parse_args()
-    asyncio.run(worker_loop(run_once=args.once))
+    try:
+        asyncio.run(worker_loop(run_once=args.once))
+    except MissingCredentialsError as exc:
+        print(f"FATAL: {exc}", file=sys.stderr, flush=True)
+        raise SystemExit(EX_CONFIG) from exc
 
 
 if __name__ == "__main__":

@@ -6,6 +6,12 @@
   <string>com.dialectical.worker</string>
   <key>WorkingDirectory</key>
   <string>__ROOT__/worker</string>
+  <!-- Registration credential: do NOT put DIALECTICAL_USER_TOKEN here (this
+       template is committed, and the watchdog reverts live-plist edits).
+       For unattended KeepAlive recovery the worker reads the token from the
+       macOS Keychain when config.toml has no identity:
+         security add-generic-password -s dialectical-worker -a user-token -w
+       See docs/worker-identity-durability.md. -->
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
