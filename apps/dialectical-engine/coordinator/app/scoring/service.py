@@ -765,7 +765,7 @@ def score_node_with_provider(
                 result=payload,
                 contract=cache_contract,
             )
-            db.flush()
+            flush_write(db)
         return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
     # Task 6 (cross-family judge panel, docs/improvement-plan-2026-07-22.md
     # §P2.2): only runs after the primary judge above has produced a real,
@@ -828,7 +828,7 @@ def score_node_with_provider(
             result=payload,
             contract=cache_contract,
         )
-        db.flush()
+        flush_write(db)
     return _with_cache_metadata(payload, hit=False, stale=stale_cache_metadata)
 
 
@@ -1099,7 +1099,7 @@ def _relink_cached_node_artifacts_to_current_job(
         artifact.analyzer_run_id = None
         relinked = True
     if relinked:
-        db.flush()
+        flush_write(db)
 
 
 def _persist_judge_output_artifact(
@@ -1161,7 +1161,7 @@ def _persist_judge_output_artifact(
     artifact.provider_metadata = _private_provider_metadata(result.metadata)
     artifact.latency_ms = _public_latency_ms(result.latency_ms)
     artifact.checked_at = _artifact_checked_at(result.checked_at)
-    db.flush()
+    flush_write(db)
     return artifact
 
 
@@ -1217,7 +1217,7 @@ def _run_judge_panel(
         # F1 (2026-07-24 incident): release SQLite's single writer BEFORE this
         # member's up-to-120s judge CLI subprocess. By this point the primary
         # judge's JudgeOutputArtifact is flushed-but-uncommitted (the caller's
-        # _persist_judge_output_artifact -> db.flush()), and so is each prior
+        # _persist_judge_output_artifact -> flush_write), and so is each prior
         # panel member's -- that open write transaction holds the one writer
         # across the CLI call, starving every other writer (worker
         # heartbeats/leases, generation completion) into
