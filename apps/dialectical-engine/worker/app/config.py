@@ -98,6 +98,7 @@ class WorkerConfig:
     last_capabilities: list[str] | None = None
     heartbeat_seconds: int = 30
     request_timeout_seconds: int = 60
+    generation_timeout_seconds: int = 540
     keychain_service: str = "dialectical-worker"
     keychain_account: str = "user-token"
 
@@ -121,6 +122,9 @@ def load_config(path: Path | None = None) -> WorkerConfig:
         last_capabilities=parse_model_list(data.get("last_capabilities")),
         heartbeat_seconds=int(data.get("heartbeat_seconds", 30)),
         request_timeout_seconds=int(data.get("request_timeout_seconds", 60)),
+        generation_timeout_seconds=int(
+            os.getenv("DIALECTICAL_GENERATION_TIMEOUT_SECONDS", data.get("generation_timeout_seconds", 540))
+        ),
         keychain_service=os.getenv("DIALECTICAL_KEYCHAIN_SERVICE", data.get("keychain_service", "dialectical-worker")),
         keychain_account=os.getenv("DIALECTICAL_KEYCHAIN_ACCOUNT", data.get("keychain_account", "user-token")),
     )
@@ -141,6 +145,7 @@ def save_config(config: WorkerConfig, path: Path | None = None) -> None:
         "last_capabilities": config.last_capabilities,
         "heartbeat_seconds": config.heartbeat_seconds,
         "request_timeout_seconds": config.request_timeout_seconds,
+        "generation_timeout_seconds": config.generation_timeout_seconds,
         "keychain_service": config.keychain_service,
         "keychain_account": config.keychain_account,
     }
@@ -182,6 +187,7 @@ def load_file_config(path: Path | None = None) -> WorkerConfig:
         last_capabilities=parse_model_list(data.get("last_capabilities")),
         heartbeat_seconds=int(data.get("heartbeat_seconds", 30)),
         request_timeout_seconds=int(data.get("request_timeout_seconds", 60)),
+        generation_timeout_seconds=int(data.get("generation_timeout_seconds", 540)),
         keychain_service=data.get("keychain_service", "dialectical-worker"),
         keychain_account=data.get("keychain_account", "user-token"),
     )

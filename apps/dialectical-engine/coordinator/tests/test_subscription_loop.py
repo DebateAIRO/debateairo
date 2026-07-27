@@ -781,14 +781,15 @@ def _drive_once(module, monkeypatch, tmp_path, *, provider: str, prompt_user: st
     return asyncio.run(entrypoint(args)), fail_calls, commands
 
 
-def test_gemini_once_reports_a_retryable_failure_instead_of_crashing_on_an_oversized_prompt(
+def test_gemini_once_reports_a_permanent_failure_instead_of_crashing_on_an_oversized_prompt(
     tmp_path, monkeypatch
 ) -> None:
     """The live pathology: the loop process died (OSError E2BIG) after claiming
     the job, so the coordinator only ever saw a silent 10-minute deadline
     requeue -- four times over. The loop must instead survive and tell the
-    coordinator why, which burns full-weight attempts and reaches the failover
-    ladder."""
+    coordinator why. Transport incompatibility is permanent for this provider,
+    so the coordinator must enter the failover ladder immediately rather than
+    retrying the same impossible argv transport."""
     module = load_module()
 
     exit_code, fail_calls, _ = _drive_once(
@@ -799,7 +800,7 @@ def test_gemini_once_reports_a_retryable_failure_instead_of_crashing_on_an_overs
     assert len(fail_calls) == 1
     job_id, reason, retryable = fail_calls[0]
     assert job_id == "job-gemini-1"
-    assert retryable is True
+    assert retryable is False
     assert "agy" in reason
     assert len(reason) <= 2000
 

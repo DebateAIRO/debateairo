@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 import re
-from datetime import timedelta, timezone
+import threading
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -77,6 +78,10 @@ FAILOVER_JOB_TYPES = {"v2_pov", "v2_expand", "v2_synthesize", "argue", "synthesi
 # a web-search CLI call has the same slow-latency profile as generation.
 GENERATION_JOB_TYPES = {"argue", "synthesize", "v2_pov", "v2_expand", "v2_synthesize", "v2_evidence"}
 LOGGER = logging.getLogger(__name__)
+FAILURE_CIRCUIT_THRESHOLD = 2
+FAILURE_CIRCUIT_COOLDOWN_SECONDS = 15 * 60
+_FAILURE_CIRCUIT_LOCK = threading.Lock()
+_FAILURE_CIRCUITS: dict[tuple[str, str, str, str], tuple[int, datetime]] = {}
 
 
 class StaleJobMutationError(ValueError):
@@ -85,6 +90,48 @@ class StaleJobMutationError(ValueError):
 
 class StreamOffsetError(ValueError):
     pass
+
+
+def _failure_signature(reason: str) -> str:
+    compact = re.sub(r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b", "<id>", reason.lower())
+    compact = re.sub(r"\b\d+\b", "<n>", compact)
+    return re.sub(r"\s+", " ", compact).strip()[:240]
+
+
+def _record_permanent_failure_circuit(job: Job, reason: str) -> None:
+    if not job.worker_id:
+        return
+    key = (job.worker_id, job.required_model, job.job_type, _failure_signature(reason))
+    now = now_utc()
+    with _FAILURE_CIRCUIT_LOCK:
+        count, opened_until = _FAILURE_CIRCUITS.get(key, (0, now))
+        if opened_until <= now:
+            count = 0
+        count += 1
+        _FAILURE_CIRCUITS[key] = (
+            count,
+            now + timedelta(seconds=FAILURE_CIRCUIT_COOLDOWN_SECONDS),
+        )
+
+
+def _open_failure_circuit_reason(worker: Worker, job: Job) -> str | None:
+    now = now_utc()
+    with _FAILURE_CIRCUIT_LOCK:
+        for (worker_id, model, job_type, signature), (count, opened_until) in list(
+            _FAILURE_CIRCUITS.items()
+        ):
+            if opened_until <= now:
+                if count >= FAILURE_CIRCUIT_THRESHOLD:
+                    _FAILURE_CIRCUITS.pop((worker_id, model, job_type, signature), None)
+                continue
+            if (
+                worker_id == worker.id
+                and model == job.required_model
+                and job_type == job.job_type
+                and count >= FAILURE_CIRCUIT_THRESHOLD
+            ):
+                return signature
+    return None
 
 
 def merged_debate_config(config: dict[str, Any] | None) -> dict[str, Any]:
@@ -964,12 +1011,27 @@ def release_held_job_for_restart(db: Session, worker: Worker) -> list[tuple[str,
 
 def reset_job_target_for_retry(db: Session, job: Job) -> None:
     debate = db.get(Debate, job.debate_id)
+    if debate and _is_obsolete_adaptive_expansion(debate, job):
+        return
     if debate and debate.status not in {"archived", "failed"}:
         debate.status = "generating"
     if job.node_id:
         node = db.get(Node, job.node_id)
         if node and node.status != "stale":
             node.status = "pending"
+
+
+def _is_obsolete_adaptive_expansion(debate: Debate | None, job: Job) -> bool:
+    if (
+        debate is None
+        or job.job_type != "v2_expand"
+        or not debate.synthesis_id
+        or not debate.completed_at
+    ):
+        return False
+    from app.exploration.expansion_dispatch import adaptive_stop_is_terminal
+
+    return adaptive_stop_is_terminal(debate)
 
 
 def model_failover_enabled() -> bool:
@@ -1007,6 +1069,9 @@ def try_failover_job(
     """Re-queue the SAME job under the next untried online pool model with a
     fresh budget. Terminal failure is reserved for 'every capable model
     tried' -- one flaky provider must not kill a branch."""
+    debate = db.get(Debate, job.debate_id)
+    if _is_obsolete_adaptive_expansion(debate, job):
+        return []
     if job.job_type not in FAILOVER_JOB_TYPES or not model_failover_enabled():
         return []
     candidate = next_failover_model(db, job, candidate_models)
@@ -1192,7 +1257,9 @@ def ensure_mutable_claim(db: Session, job: Job) -> None:
         raise StaleJobMutationError(f"Job is {job.status} and cannot be mutated")
 
 
-def claim_pending_job(db: Session, worker: Worker) -> Job | None:
+def claim_pending_job(
+    db: Session, worker: Worker, *, max_prompt_bytes: int | None = None
+) -> Job | None:
     refresh_worker_job_leases(db, worker)
     # Collected up front (not published) so every terminal event -- orphan
     # release included -- goes out only after the commit that persists it,
@@ -1292,6 +1359,52 @@ def claim_pending_job(db: Session, worker: Worker) -> Job | None:
             .order_by(Job.created_at.asc())
         ).all()
     )
+    circuit_compatible_jobs: list[Job] = []
+    for candidate in jobs:
+        signature = _open_failure_circuit_reason(worker, candidate)
+        if signature is None:
+            circuit_compatible_jobs.append(candidate)
+            continue
+        reason = (
+            f"Provider circuit open for worker={worker.id} model={candidate.required_model} "
+            f"job_type={candidate.job_type}: {signature}"
+        )
+        rerouted = try_failover_job(db, candidate, reason)
+        if rerouted:
+            terminal_events.extend(rerouted)
+        else:
+            terminal_events.extend(terminalize_job_failure(db, candidate, reason))
+    jobs = circuit_compatible_jobs
+    if terminal_events:
+        commit_write(db)
+        _publish_events_sync(terminal_events)
+        terminal_events = []
+    if max_prompt_bytes is not None:
+        compatible_jobs: list[Job] = []
+        for candidate in jobs:
+            payload = render_job_payload(db, candidate)
+            prompt = payload["prompt"]
+            rendered_bytes = len(
+                (str(prompt.get("system") or "") + str(prompt.get("user") or "")).encode(
+                    "utf-8"
+                )
+            )
+            if rendered_bytes <= max_prompt_bytes:
+                compatible_jobs.append(candidate)
+                continue
+            reason = (
+                f"Prompt transport incompatibility: {rendered_bytes} bytes exceeds "
+                f"worker limit {max_prompt_bytes} bytes"
+            )
+            rerouted = try_failover_job(db, candidate, reason)
+            if rerouted:
+                terminal_events.extend(rerouted)
+            else:
+                terminal_events.extend(terminalize_job_failure(db, candidate, reason))
+        jobs = compatible_jobs
+        if terminal_events:
+            commit_write(db)
+            _publish_events_sync(terminal_events)
     job = next((candidate for candidate in jobs if worker_can_claim_job(db, worker, candidate, now)), None)
     if not job:
         mark_worker_seen(worker, now)
@@ -1778,6 +1891,25 @@ def terminalize_job_failure(db: Session, job: Job, reason: str) -> list[tuple[st
     debate = db.get(Debate, job.debate_id)
     node = db.get(Node, job.node_id) if job.node_id else None
     events: list[tuple[str, str, dict[str, Any]]] = []
+    if _is_obsolete_adaptive_expansion(debate, job):
+        if node is not None and node.status in {"pending", "generating", "failed"}:
+            node.status = "stale"
+        if debate is not None and debate.status != "archived":
+            debate.status = "complete"
+        events.append(
+            (
+                job.debate_id,
+                "adaptive_expansion_cancelled",
+                {
+                    "node_id": job.node_id,
+                    "job_id": job.id,
+                    "job_type": job.job_type,
+                    "reason": "Adaptive frontier already reached a terminal stop",
+                    "terminal": True,
+                },
+            )
+        )
+        return events
     if job.job_type in AUXILIARY_JOB_TYPES:
         # Task 10 (P1.1): AUXILIARY terminal failure never damages the debate.
         # The ledger entry above already records the terminal transition; we add
@@ -1889,6 +2021,9 @@ def requeue_or_terminalize_timed_out_job(db: Session, job: Job, reason: str) -> 
     remains, otherwise applies the shared terminal handling. Returns events
     to publish (empty when requeued).
     """
+    debate = db.get(Debate, job.debate_id)
+    if _is_obsolete_adaptive_expansion(debate, job):
+        return terminalize_job_failure(db, job, f"{reason}; adaptive frontier already stopped")
     previous_job_status = job.status
     job.timeout_attempts = (job.timeout_attempts or 0) + 1
     if job_attempts_exhausted(job):
@@ -1924,6 +2059,8 @@ def fail_job_sync(db: Session, job: Job, reason: str, retryable: bool) -> None:
     """
     ensure_mutable_claim(db, job)
     job.error = sanitize_text(reason, 2_000)
+    if not retryable:
+        _record_permanent_failure_circuit(job, job.error or "Job failed")
     if job.worker_id:
         worker = db.get(Worker, job.worker_id)
         if worker:

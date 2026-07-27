@@ -37,7 +37,8 @@ from sqlalchemy.orm import Session
 from app.core.config import bool_env, float_env, int_env
 from app.core.oplog import log_event
 from app.core.write_lock import commit_write
-from app.models.entities import Debate, Generation, Job, LifecycleDecisionRecord, Node
+from app.models.entities import Debate, Generation, Job, LifecycleDecisionRecord, Node, Worker
+from app.services.job_ledger import record_job_transition
 
 LOGGER = logging.getLogger(__name__)
 
@@ -196,6 +197,26 @@ STOPPED_WALL_CLOCK = "wall_clock"
 # above says this pairing exists to prevent, and an all-depth-rail pass is
 # EXPECTED late in a 12-round run against a depth-10 rail.
 STOPPED_DEPTH_LIMIT = "depth_limit"
+
+# These reasons are final for the automatic frontier. Once a debate already
+# has a synthesis, no pending/running adaptive expansion may survive one of
+# these stops and later reopen the debate. ``deferred_no_capacity`` and
+# ``wave_full`` are deliberately excluded: both describe a temporary pass,
+# not the end of the automatic frontier.
+TERMINAL_ADAPTIVE_STOP_REASONS: frozenset[str] = frozenset(
+    {
+        STOPPED_BUDGET_EXHAUSTED,
+        STOPPED_ROUNDS_EXHAUSTED,
+        STOPPED_NODE_BUDGET_EXHAUSTED,
+        STOPPED_NO_CATEGORICAL_SIGNALS,
+        STOPPED_QUIESCENT_NO_DECISIONS,
+        STOPPED_GENERATION_EXHAUSTED,
+        STOPPED_BELOW_PRIORITY_FLOOR,
+        STOPPED_CONVERGED,
+        STOPPED_WALL_CLOCK,
+        STOPPED_DEPTH_LIMIT,
+    }
+)
 
 # P1 Task 7: stop conditions beyond budget exhaustion. smoke4's post-scoring
 # protocol run recorded converged=false, maxDelta=0.226 against epsilon=0.05 --
@@ -590,14 +611,20 @@ def rounds_completed(debate: Debate) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
-def record_adaptive_stop(db: Session, debate: Debate, reason: str, *, overwrite: bool = True) -> None:
+def record_adaptive_stop(
+    db: Session, debate: Debate, reason: str, *, overwrite: bool = True
+) -> int:
     """Record why growth stopped on debate.config (additive; no commit --
-    the write joins the caller's transaction). Callers gate on the flag."""
+    the write joins the caller's transaction). Terminal automatic stops also
+    cancel obsolete expansion jobs in that transaction. Returns their count."""
     state = adaptive_expansion_state(debate)
     if not overwrite and str(state.get(STOPPED_BECAUSE_KEY) or "").strip():
-        return
+        return 0
     state[STOPPED_BECAUSE_KEY] = reason
     _write_adaptive_expansion_state(debate, state)
+    if reason in TERMINAL_ADAPTIVE_STOP_REASONS:
+        return _cancel_obsolete_expand_jobs(db, debate, reason)
+    return 0
 
 
 def clear_adaptive_stop(debate: Debate) -> None:
@@ -633,6 +660,50 @@ def stopped_because_of(debate: Debate) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
     return None
+
+
+def adaptive_stop_is_terminal(debate: Debate) -> bool:
+    return stopped_because_of(debate) in TERMINAL_ADAPTIVE_STOP_REASONS
+
+
+def _cancel_obsolete_expand_jobs(db: Session, debate: Debate, reason: str) -> int:
+    """Terminalize expansion work made obsolete by a whole-frontier stop.
+
+    This joins the stop annotation's transaction. Placeholder nodes are made
+    stale and workers are released, but the already synthesized debate stays
+    complete. Late worker mutations are rejected because the job no longer
+    has a mutable status.
+    """
+    if not debate.synthesis_id or not debate.completed_at:
+        return 0
+    jobs = db.scalars(
+        select(Job).where(
+            Job.debate_id == debate.id,
+            Job.job_type == "v2_expand",
+            Job.status.in_(["pending", "claimed", "running"]),
+        )
+    ).all()
+    for job in jobs:
+        previous_status = job.status
+        job.status = "failed"
+        job.error = f"Adaptive expansion stopped: {reason}"
+        record_job_transition(
+            db,
+            job,
+            from_status=previous_status,
+            to_status="failed",
+            channel="adaptive_stop",
+            reason=job.error,
+        )
+        if job.node_id:
+            node = db.get(Node, job.node_id)
+            if node is not None and node.status in {"pending", "generating"}:
+                node.status = "stale"
+        if job.worker_id:
+            worker = db.get(Worker, job.worker_id)
+            if worker is not None and worker.current_job_id == job.id:
+                worker.current_job_id = None
+    return len(jobs)
 
 
 def debate_wall_clock_seconds() -> int:
@@ -924,7 +995,7 @@ def _annotate_and_stop(
         if record.dispatch_outcome is None:
             record.dispatch_outcome = outcome
             refused += 1
-    record_adaptive_stop(db, debate, reason)
+    cancelled_jobs = record_adaptive_stop(db, debate, reason)
     try:
         commit_write(db)
     except Exception:
@@ -945,17 +1016,19 @@ def _annotate_and_stop(
         reason=reason,
         outcome=outcome,
         records_refused=refused,
+        jobs_cancelled=cancelled_jobs,
         growth_elapsed_s=elapsed,
         rounds_completed=rounds,
     )
     LOGGER.warning(
         "adaptive expansion STOPPED for debate=%s reason=%s records_refused=%d "
-        "growth_elapsed_s=%s rounds_completed=%d",
+        "growth_elapsed_s=%s rounds_completed=%d jobs_cancelled=%d",
         debate.id,
         reason,
         refused,
         elapsed,
         rounds,
+        cancelled_jobs,
     )
 
 

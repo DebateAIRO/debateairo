@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -18,6 +20,20 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
 from _common import connect_db
+
+ROOT = Path(__file__).resolve().parents[1]
+WORKER_ROOT = ROOT / "worker"
+_CONTRACT_SPEC = importlib.util.spec_from_file_location(
+    "dialectical_worker_result_contracts",
+    WORKER_ROOT / "app" / "result_contracts.py",
+)
+if _CONTRACT_SPEC is None or _CONTRACT_SPEC.loader is None:  # pragma: no cover
+    raise RuntimeError("Unable to load the worker result contract")
+_CONTRACTS = importlib.util.module_from_spec(_CONTRACT_SPEC)
+_CONTRACT_SPEC.loader.exec_module(_CONTRACTS)
+enrich_v2_result = _CONTRACTS.enrich_v2_result
+failure_is_permanent = _CONTRACTS.failure_is_permanent
+parse_model_result = _CONTRACTS.parse_model_result
 
 
 DEFAULT_COORDINATOR_URL = "http://127.0.0.1:8000"
@@ -144,62 +160,61 @@ def lmstudio_chat(base_url: str, model: str, system: str, user: str, max_tokens:
     return str(content).strip(), metadata
 
 
-def structured_result(job: dict[str, Any], text: str) -> Any:
-    job_type = job.get("job_type")
-    if job_type == "argue":
-        return text
-    if job_type == "decompose":
-        return {
-            "root_claim": text.splitlines()[0][:300] if text else "Debate topic",
-            "argument": text or "Debate decomposed into initial pro and con claims.",
-            "children": [
-                {"type": "PRO", "claim": "There is a strong supporting case to consider."},
-                {"type": "CON", "claim": "There is a strong opposing case to consider."},
-            ],
-        }
-    if job_type == "synthesize":
-        return {
-            "strongest_pro": text,
-            "strongest_con": "The opposing side raises material concerns that should be weighed carefully.",
-            "verdict": text,
-        }
-    return text
+def structured_result(job: dict[str, Any], text: str, worker_id: str | None = None) -> Any:
+    return enrich_v2_result(job, parse_model_result(job, text), worker_id)
 
 
 def process_job(args: argparse.Namespace, token: str, worker_id: str, job: dict[str, Any]) -> None:
-    prompt = job["prompt"]
-    model_name = args.model
-    text, metadata = lmstudio_chat(
-        args.lmstudio_url,
-        model_name,
-        str(prompt.get("system", "")),
-        str(prompt.get("user", "")),
-        int(prompt.get("max_tokens") or args.max_tokens),
-    )
     job_id = job["id"]
-    if text:
+    try:
+        prompt = job["prompt"]
+        model_name = args.model
+        text, metadata = lmstudio_chat(
+            args.lmstudio_url,
+            model_name,
+            str(prompt.get("system", "")),
+            str(prompt.get("user", "")),
+            int(prompt.get("max_tokens") or args.max_tokens),
+        )
+        if text:
+            request_json(
+                "POST",
+                f"{args.coordinator_url.rstrip('/')}/api/jobs/{job_id}/stream",
+                token=token,
+                worker_id=worker_id,
+                payload={"delta": text},
+                timeout=30,
+            )
+        result = structured_result(job, text, worker_id)
         request_json(
             "POST",
-            f"{args.coordinator_url.rstrip('/')}/api/jobs/{job_id}/stream",
+            f"{args.coordinator_url.rstrip('/')}/api/jobs/{job_id}/complete",
             token=token,
             worker_id=worker_id,
-            payload={"delta": text},
-            timeout=30,
+            payload={
+                "result": result,
+                "tokens_in": metadata.get("tokens_in"),
+                "tokens_out": metadata.get("tokens_out"),
+                "latency_ms": metadata.get("latency_ms"),
+            },
+            timeout=60,
         )
-    result = structured_result(job, text)
-    request_json(
-        "POST",
-        f"{args.coordinator_url.rstrip('/')}/api/jobs/{job_id}/complete",
-        token=token,
-        worker_id=worker_id,
-        payload={
-            "result": result,
-            "tokens_in": metadata.get("tokens_in"),
-            "tokens_out": metadata.get("tokens_out"),
-            "latency_ms": metadata.get("latency_ms"),
-        },
-        timeout=60,
-    )
+    except Exception as exc:
+        try:
+            request_json(
+                "POST",
+                f"{args.coordinator_url.rstrip('/')}/api/jobs/{job_id}/fail",
+                token=token,
+                worker_id=worker_id,
+                payload={
+                    "reason": str(exc).strip() or f"worker error: {type(exc).__name__}",
+                    "retryable": not failure_is_permanent(exc),
+                },
+                timeout=30,
+            )
+        except Exception as fail_exc:
+            print(f"Failed to report LM Studio job failure {job_id}: {fail_exc!r}", flush=True)
+        raise
 
 
 def heartbeat(args: argparse.Namespace, token: str, worker_id: str, capability: str) -> None:

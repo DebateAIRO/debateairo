@@ -24,6 +24,13 @@ from app.config import (
     save_config,
     snapshot_identity,
 )
+from app.result_contracts import (
+    StructuredOutputError,
+    enrich_v2_result,
+    extract_json_object,
+    failure_is_permanent,
+    parse_model_result,
+)
 
 # sysexits.h EX_CONFIG: shows up in `launchctl list` as status 78, so an
 # unconfigured worker is distinguishable from any other crash (status 1).
@@ -67,75 +74,8 @@ def startup_credentials_check(config: WorkerConfig) -> None:
     raise MissingCredentialsError("\n".join(lines))
 
 
-class StructuredOutputError(ValueError):
-    pass
-
-
-def extract_json_object(text: str) -> dict[str, Any]:
-    decoder = json.JSONDecoder()
-    for index, char in enumerate(text):
-        if char != "{":
-            continue
-        try:
-            payload, _ = decoder.raw_decode(text[index:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(payload, dict):
-            return payload
-    raise StructuredOutputError("Model output did not contain a valid JSON object")
-
-
 def parse_result(job: dict[str, Any], text: str) -> Any:
-    # KEEP IN SYNC with scripts/subscription_loop.py parse_model_response --
-    # the loop workers carry a twin of this set. v2_evidence drifted out of
-    # this copy when T10 added it to the loop's: Worker A then wrapped
-    # evidence output as {"argument": prose} and the coordinator's
-    # validate_evidence_contract correctly 400'd every completion (observed
-    # live 2026-07-26, 5 of 6 evidence jobs failed on debate 0f688d87).
-    if job["job_type"] in {
-        "decompose",
-        "synthesize",
-        "v2_skill_create",
-        "v2_agent_create",
-        "v2_agent_argument",
-        "v2_plan",
-        "v2_pov",
-        "v2_expand",
-        "v2_agent_run",
-        "v2_synthesize",
-        "v2_evidence",
-    }:
-        return extract_json_object(text)
-    return {"argument": text.strip()}
-
-
-def enrich_v2_result(job: dict[str, Any], result: Any, worker_id: str | None) -> Any:
-    if not isinstance(result, dict):
-        return result
-    job_type = str(job.get("job_type") or "")
-    if not job_type.startswith("v2_"):
-        return result
-    enriched = dict(result)
-    job_id = str(job.get("id") or "")
-    model_id = str(job.get("required_model") or "")
-    worker = str(worker_id or "")
-    if job_type in {"v2_skill_create", "v2_agent_create"}:
-        enriched["provenance"] = {
-            **(enriched.get("provenance") if isinstance(enriched.get("provenance"), dict) else {}),
-            "created_by_model": model_id,
-            "created_by_worker_id": worker,
-            "creation_prompt_id": f"prompt-{job_id}",
-            "job_id": job_id,
-        }
-    else:
-        enriched["provenance"] = {
-            **(enriched.get("provenance") if isinstance(enriched.get("provenance"), dict) else {}),
-            "model_id": model_id,
-            "worker_id": worker,
-            "prompt_id": f"prompt-{job_id}",
-            "job_id": job_id,
-        }
-    return enriched
+    return parse_model_result(job, text)
 
 
 def estimate_tokens(*parts: str) -> int:
@@ -309,7 +249,18 @@ async def handle_job_with_heartbeats(
                 output.append(delta)
                 yield delta
 
-        await client.stream_chunks(job["id"], chunks())
+        timeout_seconds = max(
+            1,
+            int(getattr(getattr(client, "config", None), "generation_timeout_seconds", 540)),
+        )
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                await client.stream_chunks(job["id"], chunks())
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"{job['required_model']} generation exceeded the worker deadline "
+                f"of {timeout_seconds}s"
+            ) from exc
         text = "".join(output)
         result = parse_result(job, text)
         client_config = getattr(client, "config", None)
@@ -325,7 +276,7 @@ async def handle_job_with_heartbeats(
             await client.fail(
                 job["id"],
                 failure_reason_for(exc),
-                retryable=not isinstance(exc, StructuredOutputError)
+                retryable=not failure_is_permanent(exc)
                 and not nonretryable_coordinator_completion_error(exc),
             )
         except Exception as fail_exc:
