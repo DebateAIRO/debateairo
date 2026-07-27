@@ -133,6 +133,13 @@ class Worker(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     status: Mapped[str] = mapped_column(String(24), default="online", index=True)
     current_job_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    # Work-loop liveness, stamped ONLY by poll/claim-path contact
+    # (orchestrator.mark_worker_seen) -- never by heartbeats, which run on an
+    # independent thread in loop workers and stayed green for 18 h while the
+    # 2026-07-26 wedged worker did nothing. `last_seen` answers "is the
+    # process alive?"; this column answers "is the work loop alive?" (the
+    # pending watchdog's question). Nullable: legacy rows have no poll history.
+    last_poll_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

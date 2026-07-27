@@ -851,7 +851,12 @@ def worker_can_claim_job(db: Session, worker: Worker, job: Job, now: Any) -> boo
 
 
 def mark_worker_seen(worker: Worker, now: Any) -> None:
+    # Every caller is on the poll/claim path, so this doubles as the ONLY
+    # writer of work-loop liveness. Heartbeats bump last_seen directly (api/
+    # workers.py) and must never reach this function: a wedged worker's
+    # heartbeat thread beats independently of its dead job loop (2026-07-26).
     worker.last_seen = now
+    worker.last_poll_at = now
     if worker.status != "degraded":
         worker.status = "online"
 
@@ -971,11 +976,17 @@ def model_failover_enabled() -> bool:
     return bool_env("DIALECTICAL_MODEL_FAILOVER", True)
 
 
-def next_failover_model(db: Session, job: Job) -> str | None:
+def next_failover_model(
+    db: Session, job: Job, candidate_models: set[str] | None = None
+) -> str | None:
     from app.services.dialectical_v2 import evidence_search_models, v2_generation_model_pool
 
     tried = set((job.payload or {}).get("tried_models") or []) | {job.required_model}
-    online = online_capabilities(db)
+    # `candidate_models` narrows eligibility beyond heartbeat-based
+    # online_capabilities -- the pending watchdog passes the models served by
+    # workers whose WORK LOOP shows life, because online_capabilities counted
+    # the 2026-07-26 wedged worker as a valid failover target for 18 h.
+    online = online_capabilities(db) if candidate_models is None else candidate_models
     # Task 10 (P1.1): an evidence job's failover pool is the search-capable list
     # ONLY -- a retrieval job must never be reassigned to a non-search model
     # (it could not do the web search the contract demands). Every other
@@ -987,13 +998,18 @@ def next_failover_model(db: Session, job: Job) -> str | None:
     return None
 
 
-def try_failover_job(db: Session, job: Job, reason: str) -> list[tuple[str, str, dict[str, Any]]]:
+def try_failover_job(
+    db: Session,
+    job: Job,
+    reason: str,
+    candidate_models: set[str] | None = None,
+) -> list[tuple[str, str, dict[str, Any]]]:
     """Re-queue the SAME job under the next untried online pool model with a
     fresh budget. Terminal failure is reserved for 'every capable model
     tried' -- one flaky provider must not kill a branch."""
     if job.job_type not in FAILOVER_JOB_TYPES or not model_failover_enabled():
         return []
-    candidate = next_failover_model(db, job)
+    candidate = next_failover_model(db, job, candidate_models)
     if candidate is None:
         return []
     payload = dict(job.payload or {})

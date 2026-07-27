@@ -18,6 +18,7 @@ from app.core.db import SessionLocal, get_engine, init_db
 from app.core.instance_lock import acquire_single_instance_lock, release_single_instance_lock
 from app.core.log_config import configure_app_logging
 from app.scoring.jobs import recover_orphaned_scoring_jobs_at_startup
+from app.services.pending_watchdog import pending_watchdog_loop
 from app.services.reaper import reaper_loop
 
 # Import-time, and therefore BEFORE configure_app_logging() runs in
@@ -49,15 +50,23 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     # database BEFORE touching the schema. Raising here fails startup fast
     # with the lock error (override: DIALECTICAL_ALLOW_MULTI_INSTANCE=1).
     instance_lock_key = acquire_single_instance_lock(str(get_engine().url))
-    reaper_stop = asyncio.Event()
+    sweep_stop = asyncio.Event()
     reaper_task: asyncio.Task[None] | None = None
+    watchdog_task: asyncio.Task[None] | None = None
     recovery_task: asyncio.Task[list[str]] | None = None
     try:
         run_startup_tasks()
         # W5b reaper: with zero polling workers an expired claim would sit
         # forever (the claim-path reaper only runs when a worker polls).
-        reaper_task = asyncio.create_task(reaper_loop(reaper_stop), name="dialectical-reaper")
+        reaper_task = asyncio.create_task(reaper_loop(sweep_stop), name="dialectical-reaper")
         app_.state.reaper_task = reaper_task
+        # C-1 pending watchdog: the reaper's output is `pending`, and a
+        # pending job with no live capable worker is otherwise invisible
+        # forever (the 2026-07-26 14-18 h silent stall).
+        watchdog_task = asyncio.create_task(
+            pending_watchdog_loop(sweep_stop), name="dialectical-pending-watchdog"
+        )
+        app_.state.pending_watchdog_task = watchdog_task
         # F2: recover score_debate jobs orphaned by a prior coordinator
         # restart (the reaper deliberately excludes score_debate, so nothing
         # else does). One-shot, off the event loop so its blocking DB work and
@@ -69,14 +78,16 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
         app_.state.scoring_recovery_task = recovery_task
         yield
     finally:
-        reaper_stop.set()
-        if reaper_task is not None:
+        sweep_stop.set()
+        for sweep_task in (reaper_task, watchdog_task):
+            if sweep_task is None:
+                continue
             try:
-                await asyncio.wait_for(reaper_task, timeout=5)
+                await asyncio.wait_for(sweep_task, timeout=5)
             except (asyncio.TimeoutError, TimeoutError):  # pragma: no cover - hung sweep
-                reaper_task.cancel()
+                sweep_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
-                    await reaper_task
+                    await sweep_task
         if recovery_task is not None and not recovery_task.done():  # pragma: no cover - fast shutdown
             recovery_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
