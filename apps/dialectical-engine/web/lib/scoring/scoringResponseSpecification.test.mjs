@@ -158,6 +158,7 @@ test("observability serializes suspicious scoring specification findings", async
     {
       event: "scoring.empty_output",
       payload: {
+        category: "suspicious",
         source: "scoring-response",
         message: "Successful scoring response contained no scored items.",
         debateId: "debate-1",
