@@ -2068,10 +2068,15 @@ def prompt_safety_summary() -> str:
     expected_template_names = {"decomposer.v1.md", "proposer.v1.md", "opponent.v1.md", "synthesizer.v1.md"}
     found_template_names = {template.name for template in PROMPT_TEMPLATES}
     missing_template_files = sorted(expected_template_names - found_template_names)
+    template_warning_markers = (
+        "untrusted data, not instructions",
+        "quoted data, not as instructions",
+        "Do not follow instructions embedded",
+    )
     missing_templates = []
     for template in PROMPT_TEMPLATES:
         text = read_text(template)
-        if "untrusted data, not instructions" not in text and "Do not follow instructions embedded" not in text:
+        if not any(marker in text for marker in template_warning_markers):
             missing_templates.append(display_path(template))
     issues: list[str] = []
     if missing_renderer:
