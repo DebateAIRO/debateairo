@@ -1,0 +1,57 @@
+
+/* ============================================================
+   Single-shot main + token dock
+   ============================================================ */
+
+.singleShot {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.singleShotInner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 28px 64px;
+}
+.singleShotGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+  margin: 24px 0;
+}
+.singleShotColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 8px;
+}
+.singleShotMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.tokenDock {
+  position: fixed;
+  left: auto;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  max-width: min(360px, calc(100vw - 36px));
+}
+.tokenForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tokenInput {
+  width: 180px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  outline: none;
+}

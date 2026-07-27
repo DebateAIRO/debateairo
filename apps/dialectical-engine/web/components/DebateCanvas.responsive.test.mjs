@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import test from "node:test";
+import { loadCss } from "../tests/loadCss.mjs";
 
-const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+const css = loadCss();
 
 function blockFor(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

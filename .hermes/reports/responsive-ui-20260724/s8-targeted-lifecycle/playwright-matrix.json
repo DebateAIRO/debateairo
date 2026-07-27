@@ -1,0 +1,1673 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "tests\\s8-closure\\playwright.config.ts",
+      "--grep",
+      "debate route covers"
+    ],
+    "configFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\playwright.config.ts",
+    "rootDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w320",
+        "name": "chromium-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w375",
+        "name": "chromium-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w768",
+        "name": "chromium-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1024",
+        "name": "chromium-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1440",
+        "name": "chromium-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w2560",
+        "name": "chromium-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-844x390",
+        "name": "chromium-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-568x320",
+        "name": "chromium-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-507x1024",
+        "name": "chromium-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w320",
+        "name": "firefox-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w375",
+        "name": "firefox-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w768",
+        "name": "firefox-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1024",
+        "name": "firefox-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1440",
+        "name": "firefox-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w2560",
+        "name": "firefox-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-844x390",
+        "name": "firefox-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-568x320",
+        "name": "firefox-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-507x1024",
+        "name": "firefox-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w320",
+        "name": "webkit-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w375",
+        "name": "webkit-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w768",
+        "name": "webkit-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1024",
+        "name": "webkit-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1440",
+        "name": "webkit-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w2560",
+        "name": "webkit-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-844x390",
+        "name": "webkit-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-568x320",
+        "name": "webkit-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-507x1024",
+        "name": "webkit-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-custom-320x568-chromium",
+        "name": "profile-custom-320x568-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-iphone-12-webkit",
+        "name": "profile-iphone-12-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-pixel-7-chromium",
+        "name": "profile-pixel-7-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-ipad-webkit",
+        "name": "profile-ipad-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-targeted-lifecycle/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-desktop-chromium",
+        "name": "profile-desktop-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-targeted-lifecycle\\playwright-matrix.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "acceptance-matrix.spec.ts",
+      "file": "acceptance-matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15147,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:45:45.913Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-659c2164e4de29d2be3e",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w375",
+              "projectName": "chromium-w375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12677,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:46:01.791Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-677a3bf1816cff2e1b1c",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w768",
+              "projectName": "chromium-w768",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12716,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:46:15.185Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-be22991bdef95c2183e5",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1024",
+              "projectName": "chromium-w1024",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12545,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:46:28.569Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-2c9926342af9bb596928",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w1440",
+              "projectName": "chromium-w1440",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12808,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:46:41.795Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-36f092b566263da13e1b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w2560",
+              "projectName": "chromium-w2560",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12432,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:46:55.291Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-d6ada9dc076482c7e839",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-short-844x390",
+              "projectName": "chromium-short-844x390",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12547,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:47:08.390Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-ae71331006a15880a623",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-short-568x320",
+              "projectName": "chromium-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11926,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:47:21.610Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-0aaf1c0e63b02d89d499",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-short-507x1024",
+              "projectName": "chromium-short-507x1024",
+              "results": [
+                {
+                  "workerIndex": 8,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12868,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:47:34.232Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-2aa9ecdc154207c0b5e6",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w320",
+              "projectName": "firefox-w320",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21403,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:47:47.826Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-019f8438e5619fd3c6fe",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w375",
+              "projectName": "firefox-w375",
+              "results": [
+                {
+                  "workerIndex": 10,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20439,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:48:11.523Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-b317a958166d80648cb0",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w768",
+              "projectName": "firefox-w768",
+              "results": [
+                {
+                  "workerIndex": 11,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20974,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:48:33.879Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-252af23972ecbde8dd06",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w1024",
+              "projectName": "firefox-w1024",
+              "results": [
+                {
+                  "workerIndex": 12,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21666,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:48:56.462Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-5d3b06343628a48d3be4",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w1440",
+              "projectName": "firefox-w1440",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20328,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:49:20.042Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-cb28e84dd5331c271eb4",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-w2560",
+              "projectName": "firefox-w2560",
+              "results": [
+                {
+                  "workerIndex": 14,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21044,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:49:42.170Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-8db40b9b05fee42eea25",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-short-844x390",
+              "projectName": "firefox-short-844x390",
+              "results": [
+                {
+                  "workerIndex": 15,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20899,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:50:05.027Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-9efbff201da83ec1e04e",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-short-568x320",
+              "projectName": "firefox-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 16,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20619,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:50:27.737Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-355db55510de952620ef",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-short-507x1024",
+              "projectName": "firefox-short-507x1024",
+              "results": [
+                {
+                  "workerIndex": 17,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20783,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:50:50.079Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-993105a2da6183162f3e",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w320",
+              "projectName": "webkit-w320",
+              "results": [
+                {
+                  "workerIndex": 18,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12199,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:51:12.602Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-cb430b4bd4d4a63c9740",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w375",
+              "projectName": "webkit-w375",
+              "results": [
+                {
+                  "workerIndex": 19,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11312,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:51:25.512Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-6928d506e093fb2d460b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w768",
+              "projectName": "webkit-w768",
+              "results": [
+                {
+                  "workerIndex": 20,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:51:37.392Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-4af2700d92b52332f4c2",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w1024",
+              "projectName": "webkit-w1024",
+              "results": [
+                {
+                  "workerIndex": 21,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11835,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:51:49.366Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-37e1d4edd41c5ad6af08",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w1440",
+              "projectName": "webkit-w1440",
+              "results": [
+                {
+                  "workerIndex": 22,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11752,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:52:01.766Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-a3ab4501240e9a597a42",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-w2560",
+              "projectName": "webkit-w2560",
+              "results": [
+                {
+                  "workerIndex": 23,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12697,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:52:14.106Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-06c4736037cf6c6c025b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-short-844x390",
+              "projectName": "webkit-short-844x390",
+              "results": [
+                {
+                  "workerIndex": 24,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11186,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:52:27.389Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-fb4309b7b63a7e9fc841",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-short-568x320",
+              "projectName": "webkit-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 25,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11393,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:52:39.117Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-b1b2919e3c09db6d81e7",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-short-507x1024",
+              "projectName": "webkit-short-507x1024",
+              "results": [
+                {
+                  "workerIndex": 26,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11619,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:52:51.050Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-aa2472670424e1dcf704",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "profile-custom-320x568-chromium",
+              "projectName": "profile-custom-320x568-chromium",
+              "results": [
+                {
+                  "workerIndex": 27,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12666,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:53:03.199Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-4b1d5862fd0da15c95fc",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "profile-iphone-12-webkit",
+              "projectName": "profile-iphone-12-webkit",
+              "results": [
+                {
+                  "workerIndex": 28,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13141,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:53:16.615Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-9e2ad1d323fc1c474b91",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "profile-pixel-7-chromium",
+              "projectName": "profile-pixel-7-chromium",
+              "results": [
+                {
+                  "workerIndex": 29,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12760,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:53:30.324Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-8c989fe67f7a49e2095b",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "profile-ipad-webkit",
+              "projectName": "profile-ipad-webkit",
+              "results": [
+                {
+                  "workerIndex": 30,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15292,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:53:43.754Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-5eb115d2b7106f2051f0",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "profile-desktop-chromium",
+              "projectName": "profile-desktop-chromium",
+              "results": [
+                {
+                  "workerIndex": 31,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13041,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T20:53:59.586Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-9913b1ad4d1514b0ea28",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 333,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-26T20:45:38.542Z",
+    "duration": 514836.926,
+    "expected": 32,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -6,11 +6,43 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 Under the current Heartbeat law, Claude owns planning/reconciliation stages and may serve as an independent read-only reviewer:
 
-- Step 2: `Plan.md` in a fresh Hermes-managed Claude CLI PTY;
-- Step 4: `FinalPlan.md` in a different fresh Claude CLI PTY;
+- Step 2: `Plan.md` in a fresh Claude-Router-launched `/goal` Claude CLI PTY,
+  independently reviewed by Hermes;
+- Step 4: `FinalPlan.md` in a different fresh Claude-Router-launched `/goal`
+  Claude CLI PTY, independently reviewed by Hermes;
 - peer/specialist review when Hermes explicitly assigns it.
 
 Claude does not implement production code, test code, migrations, or implementation configuration while Codex-only coding is active.
+
+## /goal dispatch and unfinished-session retention
+
+Claude-Router launches every top-level worker, reviewer, and Codex lane/ticket
+orchestrator through the target's `/goal <bounded packet>`. Any authorized
+descendant launch repeats the same law. A handoff returns control but does not
+terminate an unfinished goal: keep the original session parked and resumable
+through every requested review/rework round. Close it only after the spine's
+role-specific `FULLY DONE` condition.
+
+## Hermes Kanban cockpit and visible UI
+
+Hermes-Verifier owns the canonical Kanban board and exposes its visual
+projection through the machine-level Hermes dashboard at:
+
+```text
+http://127.0.0.1:9119/kanban
+```
+
+Claude-Router must include the exact `mission`, authoritative `board` slug,
+`ticket`, `tenant`, and this `kanban_ui` URL in every Claude/Codex/Hermes
+launch packet. Do not guess a board, fall back silently to `default`, or make
+ticket status claims from monitor text when board state can be read directly.
+If the UI is unavailable, report that tooling condition to Hermes; Hermes owns
+starting/verifying the port-9119 dashboard. The dashboard is a visibility
+surface for humans and agents, not an alternate authority surface:
+Claude-Router routes from typed state, Hermes alone crafts/mutates review
+state, and current ticket comments remain binding. `127.0.0.1` is local to the
+harness machine; remote viewing requires an approved authenticated tunnel or
+bind.
 
 ## Startup and comment checklist
 
@@ -35,7 +67,8 @@ assigned Claude stage/ticket
 → READY FOR HERMES STAGE REVIEW
 → Hermes directly reviews the complete artifact
    ├─ HERMES STAGE REVIEW CHANGES REQUESTED → same Claude session revises
-   └─ HERMES STAGE REVIEW PASS → Hermes launches the next numbered stage
+   └─ HERMES STAGE REVIEW PASS → Claude-Router consumes the verdict and
+      launches the next numbered stage through /goal
 ```
 
 Claude stage artifacts do not bypass Hermes through an agent-only approval.
@@ -197,6 +230,10 @@ Post `CLAUDE BLOCKED` and stop when:
 ## Non-negotiables
 
 - Read all ticket comments at every boundary.
+- Every direct and delegated launch uses `/goal`; a handoff is not goal
+  completion.
+- Preserve every unfinished goal/session through requested review and rework;
+  terminate only after its role-specific `FULLY DONE` condition.
 - Step 2 and Step 4 use different Claude CLI PTYs.
 - Revisions stay in the original stage PTY after verified `/compact`.
 - Every durable planning/review/rework handoff is followed by verified

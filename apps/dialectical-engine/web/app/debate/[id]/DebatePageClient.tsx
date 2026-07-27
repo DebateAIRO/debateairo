@@ -1015,12 +1015,8 @@ export default function DebatePageClient({
     >
       {/* ---- top bar ---- */}
       <header className="debateTopBar">
-        <BrandMark />
-        <div className="debateTopCenter">
-          <span className="topBarDivider" aria-hidden />
-          <Link className="btnGhost" href="/">
-            ← Library
-          </Link>
+        <div className="debateTopIdentityRow">
+          <BrandMark />
           <div className="debateTopClaim">
             <span className="debateTopTitle">{debate.topic}</span>
             <span className={`pill ${statusKind}`}>
@@ -1034,12 +1030,26 @@ export default function DebatePageClient({
             ) : null}
           </div>
         </div>
-        <div className="debateTopActions">
+        <div className="debateTopControlRow">
+          {hasTree ? (
+            <div className="segment" role="group" aria-label="View">
+              <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+                Thread
+              </button>
+              <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+                Split
+              </button>
+              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+                Tree
+              </button>
+              <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+                Map
+              </button>
+            </div>
+          ) : null}
           <ScoringErrorBoundary>
             <div className="topSwitch">
               <span>Scoring</span>
-              {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
-              {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
               <button
                 type="button"
                 className="iconBtn"
@@ -1051,41 +1061,109 @@ export default function DebatePageClient({
               </button>
             </div>
           </ScoringErrorBoundary>
-          {hasTree ? (
-            <>
-              <div className="segment" role="group" aria-label="View">
-                <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
-                  Thread
-                </button>
-                <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
-                  Split
-                </button>
-                <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                  Tree
-                </button>
-                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
-                  Map
-                </button>
-              </div>
-              <button type="button" className="btn" onClick={replayGeneration} title="Replay generation">
-                ↻ Replay
+          <div className="debateInlineActions">
+            <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
+              <span aria-hidden>←</span>
+              <span className="debateActionLabel">Library</span>
+            </Link>
+            {hasTree ? (
+              <button
+                type="button"
+                className="btn debateOverflowAction"
+                onClick={replayGeneration}
+                title="Replay generation"
+                aria-label="Replay"
+              >
+                <span aria-hidden>↻</span>
+                <span className="debateActionLabel">Replay</span>
               </button>
-            </>
-          ) : null}
-          {hasArtifacts ? (
-            <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
-              ◫ Workspace
+            ) : null}
+            {hasArtifacts ? (
+              <button
+                type="button"
+                className="btn debateOverflowAction"
+                onClick={() => setWorkspaceOpen(true)}
+                aria-label="Workspace"
+              >
+                <span aria-hidden>◫</span>
+                <span className="debateActionLabel">Workspace</span>
+              </button>
+            ) : null}
+            <a
+              className="btn debateOverflowAction"
+              href={exportUrl}
+              onClick={() => showToast("Exported debate.md")}
+              aria-label="Export"
+            >
+              <span aria-hidden>↓</span>
+              <span className="debateActionLabel">Export</span>
+            </a>
+            <button
+              type="button"
+              className="iconBtn debateOverflowAction"
+              aria-label="How it works"
+              onClick={() => setGuideOpen(true)}
+            >
+              ?
             </button>
-          ) : null}
-          <a className="btn" href={exportUrl} onClick={() => showToast("Exported debate.md")}>
-            ↓ Export
-          </a>
-          <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
-            ?
-          </button>
-          <Link className="iconBtn" href="/settings" aria-label="Settings">
-            ⚙
-          </Link>
+            <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">
+              ⚙
+            </Link>
+          </div>
+          <details className="debateOverflow">
+            <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
+              <span aria-hidden>⋯</span>
+            </summary>
+            <div className="debateOverflowMenu">
+              <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
+                <span aria-hidden>←</span>
+                <span className="debateActionLabel">Library</span>
+              </Link>
+              {hasTree ? (
+                <button
+                  type="button"
+                  className="btn debateOverflowAction"
+                  onClick={replayGeneration}
+                  title="Replay generation"
+                  aria-label="Replay"
+                >
+                  <span aria-hidden>↻</span>
+                  <span className="debateActionLabel">Replay</span>
+                </button>
+              ) : null}
+              {hasArtifacts ? (
+                <button
+                  type="button"
+                  className="btn debateOverflowAction"
+                  onClick={() => setWorkspaceOpen(true)}
+                  aria-label="Workspace"
+                >
+                  <span aria-hidden>◫</span>
+                  <span className="debateActionLabel">Workspace</span>
+                </button>
+              ) : null}
+              <a
+                className="btn debateOverflowAction"
+                href={exportUrl}
+                onClick={() => showToast("Exported debate.md")}
+                aria-label="Export"
+              >
+                <span aria-hidden>↓</span>
+                <span className="debateActionLabel">Export</span>
+              </a>
+              <button
+                type="button"
+                className="iconBtn debateOverflowAction"
+                aria-label="How it works"
+                onClick={() => setGuideOpen(true)}
+              >
+                ?
+              </button>
+              <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">
+                ⚙
+              </Link>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -1099,6 +1177,12 @@ export default function DebatePageClient({
               <span className="progressLabel">Scoring insights</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+              {scoringStatusText || scoringConfidenceText ? (
+                <span className="scoringInsightsStatus" data-mobile-scoring-status="true">
+                  {scoringStatusText ? <span>{scoringStatusText}</span> : null}
+                  {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
+                </span>
+              ) : null}
             </summary>
             <div className="scoringInsightsBody scroll">
               <ScoringVisibilityPanel state={scoringVisibility} />
@@ -1143,6 +1227,12 @@ export default function DebatePageClient({
               <span className="progressLabel">Scoring insights</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+              {scoringStatusText || scoringConfidenceText ? (
+                <span className="scoringInsightsStatus" data-mobile-scoring-status="true">
+                  {scoringStatusText ? <span>{scoringStatusText}</span> : null}
+                  {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
+                </span>
+              ) : null}
             </div>
           </section>
         )}
@@ -1331,7 +1421,7 @@ export default function DebatePageClient({
 
       {toast ? <Toast message={toast} /> : null}
 
-      {/* ---- action token (subtle, bottom-left) ---- */}
+      {/* ---- action token (subtle, bottom-right) ---- */}
       <div className="tokenDock">
         {actionToken ? (
           <button type="button" className="btn" onClick={lockActions}>

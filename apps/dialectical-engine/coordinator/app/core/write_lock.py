@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 _write_lock = RLock()
 
 
-def _check_out_connection_first(db: Session) -> None:
+def _check_out_connection_first(db: Session, *, unconditional: bool) -> None:
     """Take this session's pooled connection BEFORE the write lock, never inside.
 
     THE RULE: acquire the connection first, the write lock second. Both of the
@@ -57,30 +57,56 @@ def _check_out_connection_first(db: Session) -> None:
     guarantees is that they wait WITHOUT the write lock, so a RESERVED holder
     can always still commit and no writer is ever starved into busy_timeout.
 
-    GATED ON in_transaction(), deliberately. A session that has done nothing at
-    all has no connection AND nothing to write -- SQLAlchemy 2.0 autobegins on
-    the first add()/execute(), so in_transaction() is False only in that case.
-    Warming unconditionally would give such a session a pointless checkout, and
-    on a saturated pool would turn a genuinely empty commit_write into a 30s
-    block and then a TimeoutError it never used to be able to raise. When there
-    IS pending work the flag is already True (add() autobegins), which is
-    exactly the victim path -- claim_pending_job's `UPDATE workers SET
+    `unconditional` IS THE WHOLE DESIGN, and it is stated per call site rather
+    than defaulted, because getting it wrong is silent (corrected 2026-07-27,
+    Mandate D follow-up 1 -- the first shipped version gated every primitive and
+    the gate turned hold_write_lock back into a no-op at the incident site).
+
+    unconditional=False -- flush_write / commit_write. A session with genuinely
+    nothing pending has no connection and nothing to write, and warming it would
+    give it a pointless checkout plus, on a saturated pool, a 30s block and a
+    TimeoutError those two functions could never raise before. Their gate is
+    sound because pending work ALWAYS shows as in_transaction() == True:
+    SQLAlchemy 2.0 autobegins on the first add()/execute(), and even setting an
+    attribute on an expired instance triggers a load that autobegins and checks
+    out. That is the victim path -- claim_pending_job's `UPDATE workers SET
     last_seen` reaching commit_write with rows pending and no connection yet.
-    When the session already holds its connection this is a cheap no-op.
+
+    unconditional=True -- hold_write_lock. Its callers by construction intend to
+    touch the database inside the critical section (that is what a read-then-
+    write critical section IS), so there is no "nothing to do" case for a gate
+    to protect, and the empty-commit rationale above simply does not apply.
+
+    WHAT in_transaction() DOES AND DOES NOT MEAN (corrected 2026-07-27). The
+    original text here claimed it is False "only" for a session that has done
+    nothing at all. That was WRONG, and the error was load-bearing: it is also
+    False after any commit() or rollback(), both of which close the
+    SessionTransaction and RETURN the pooled connection (probed: checkedout()
+    drops to 0 after either). That is precisely the incident state --
+    evaluate_evidence_verdict commits before the judge CLI
+    (verification_evaluator.py:610) and rolls back after it (:620), then enters
+    hold_write_lock(db) at :417 owning no connection with the flag False. Under
+    the old gate the warm was skipped and _first_branch(db, debate.id) at :464
+    -- the exact frame in the incident's TimeoutError traceback -- checked out
+    INSIDE the lock. Pinned red-first by
+    test_hold_write_lock_never_queues_for_a_connection_inside_the_lock.
+
+    When the session already holds its connection this is a cheap no-op either
+    way.
     """
 
-    if db.in_transaction():
+    if unconditional or db.in_transaction():
         db.connection()
 
 
 def flush_write(db: Session) -> None:
-    _check_out_connection_first(db)
+    _check_out_connection_first(db, unconditional=False)
     with _write_lock:
         db.flush()
 
 
 def commit_write(db: Session) -> None:
-    _check_out_connection_first(db)
+    _check_out_connection_first(db, unconditional=False)
     with _write_lock:
         db.commit()
 
@@ -101,13 +127,32 @@ def hold_write_lock(db: Session) -> Iterator[None]:
     insufficient).
 
     `db` is REQUIRED, not optional, and that is the point: its connection is
-    checked out before the lock is taken, so the body can never be the thing
-    that queues for a connection while holding the lock. An optional parameter
-    would let a call site silently reintroduce the 2026-07-26 inversion --
-    which is exactly how it got in, at verification_evaluator.py:464, where the
-    FIRST statement inside the lock was the one that needed a connection. See
-    _check_out_connection_first for the full mechanism.
+    checked out before the lock is taken. An optional parameter would let a
+    call site silently reintroduce the 2026-07-26 inversion -- which is exactly
+    how it got in, at verification_evaluator.py:464, where the FIRST statement
+    inside the lock was the one that needed a connection. The warm here is
+    UNCONDITIONAL, unlike flush_write/commit_write's; see
+    _check_out_connection_first for why the gate is right there and wrong here.
+
+    WHAT THIS DOES NOT GUARANTEE (corrected 2026-07-27). The original text here
+    claimed "the body can never be the thing that queues for a connection while
+    holding the lock". That is FALSE and reads as a proof of an invariant this
+    code does not have. The warm covers the connection the body starts with; it
+    cannot cover one the body throws away. Any db.commit() / db.rollback() /
+    commit_write(db) inside the block returns the pooled connection, and the
+    next statement checks a new one out UNDER the lock -- the inversion again,
+    and now with a queued writer already pinning a slot (every RLock waiter
+    holds one since da3a566), a closed wait-for cycle that only pool_timeout
+    breaks. Reproduced by
+    test_a_writer_queueing_on_the_lock_cannot_wedge_the_lock_holder.
+
+    So the invariant is a CONVENTION on the bodies, not a property of this
+    contextmanager, and it is enforced where conventions can be:
+    tests/test_write_lock_conventions.py scans every hold_write_lock block
+    (following module-local helper calls) and fails on a release followed by
+    further database work. app/scoring/jobs.py's waker had exactly that shape
+    and was restructured so each of its critical sections ends at its commit.
     """
-    _check_out_connection_first(db)
+    _check_out_connection_first(db, unconditional=True)
     with _write_lock:
         yield

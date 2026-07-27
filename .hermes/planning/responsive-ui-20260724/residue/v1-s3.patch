@@ -1,0 +1,638 @@
+diff --git a/apps/dialectical-engine/web/app/debate/[id]/DebatePageClient.tsx b/apps/dialectical-engine/web/app/debate/[id]/DebatePageClient.tsx
+index 54e4d9e..91e47e3 100644
+--- a/apps/dialectical-engine/web/app/debate/[id]/DebatePageClient.tsx
++++ b/apps/dialectical-engine/web/app/debate/[id]/DebatePageClient.tsx
+@@ -960,10 +960,9 @@ export default function DebatePageClient({
+     >
+       {/* ---- top bar ---- */}
+       <header className="debateTopBar">
+-        <BrandMark />
+-        <div className="debateTopCenter">
+-          <span className="topBarDivider" aria-hidden />
+-          <Link className="btnGhost" href="/">
++        <div className="debateTopIdentity">
++          <BrandMark />
++          <Link className="btnGhost debateLibraryLink" href="/">
+             ← Library
+           </Link>
+           <div className="debateTopClaim">
+@@ -974,58 +973,115 @@ export default function DebatePageClient({
+             </span>
+           </div>
+         </div>
+-        <div className="debateTopActions">
+-          <ScoringErrorBoundary>
+-            <div className="topSwitch">
+-              <span>Scoring</span>
+-              {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
+-              {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
++        <div className="debateTopControls">
++          {hasTree ? (
++            <div className="segment" role="group" aria-label="View">
++              <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
++                Thread
++              </button>
++              <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
++                Split
++              </button>
++              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
++                Tree
++              </button>
++              <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
++                Map
++              </button>
++            </div>
++          ) : (
++            <div className="debateViewPlaceholder" aria-hidden />
++          )}
++          <div className="debatePrimaryActions">
++            <ScoringErrorBoundary>
++              <div className="topSwitch">
++                <span>Scoring</span>
++                {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
++                {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
++                <button
++                  type="button"
++                  className="iconBtn"
++                  aria-label="Open scoring diagnostics"
++                  title="Scoring diagnostics"
++                  onClick={() => setScoringDiagnosticsOpen(true)}
++                >
++                  i
++                </button>
++              </div>
++            </ScoringErrorBoundary>
++            {hasTree ? (
+               <button
+                 type="button"
+-                className="iconBtn"
+-                aria-label="Open scoring diagnostics"
+-                title="Scoring diagnostics"
+-                onClick={() => setScoringDiagnosticsOpen(true)}
++                className="btn debateReplayAction"
++                aria-label="Replay generation"
++                onClick={replayGeneration}
++                title="Replay generation"
+               >
+-                i
++                ↻ <span className="debateActionLabel">Replay</span>
+               </button>
+-            </div>
+-          </ScoringErrorBoundary>
+-          {hasTree ? (
+-            <>
+-              <div className="segment" role="group" aria-label="View">
+-                <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+-                  Thread
+-                </button>
+-                <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+-                  Split
+-                </button>
+-                <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+-                  Tree
++            ) : null}
++          </div>
++          <div className="debateSecondaryActions">
++            {hasArtifacts ? (
++              <button type="button" className="btn" aria-label="Workspace" onClick={() => setWorkspaceOpen(true)}>
++                ◫ <span className="debateActionLabel">Workspace</span>
++              </button>
++            ) : null}
++            <a
++              className="btn"
++              href={exportUrl}
++              aria-label="Export debate"
++              onClick={() => showToast("Exported debate.md")}
++            >
++              ↓ <span className="debateActionLabel">Export</span>
++            </a>
++            <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
++              ?
++            </button>
++            <Link className="iconBtn" href="/settings" aria-label="Settings">
++              ⚙
++            </Link>
++          </div>
++          <details className="debateOverflowMenu">
++            <summary
++              className="iconBtn debateOverflowTrigger"
++              aria-label="More debate actions"
++              title="More debate actions"
++            >
++              ⋯
++            </summary>
++            <div className="debateOverflowPanel">
++              {hasTree ? (
++                <button
++                  type="button"
++                  className="btn debateOverflowReplayAction"
++                  aria-label="Replay generation"
++                  onClick={replayGeneration}
++                >
++                  ↻ Replay
+                 </button>
+-                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+-                  Map
++              ) : null}
++              {hasArtifacts ? (
++                <button type="button" className="btn" aria-label="Workspace" onClick={() => setWorkspaceOpen(true)}>
++                  ◫ <span className="debateActionLabel">Workspace</span>
+                 </button>
+-              </div>
+-              <button type="button" className="btn" onClick={replayGeneration} title="Replay generation">
+-                ↻ Replay
++              ) : null}
++              <a
++                className="btn"
++                href={exportUrl}
++                aria-label="Export debate"
++                onClick={() => showToast("Exported debate.md")}
++              >
++                ↓ <span className="debateActionLabel">Export</span>
++              </a>
++              <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
++                ?
+               </button>
+-            </>
+-          ) : null}
+-          {hasArtifacts ? (
+-            <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
+-              ◫ Workspace
+-            </button>
+-          ) : null}
+-          <a className="btn" href={exportUrl} onClick={() => showToast("Exported debate.md")}>
+-            ↓ Export
+-          </a>
+-          <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
+-            ?
+-          </button>
+-          <Link className="iconBtn" href="/settings" aria-label="Settings">
+-            ⚙
+-          </Link>
++              <Link className="iconBtn" href="/settings" aria-label="Settings">
++                ⚙
++              </Link>
++            </div>
++          </details>
+         </div>
+       </header>
+ 
+@@ -1039,6 +1095,10 @@ export default function DebatePageClient({
+               <span className="progressLabel">Scoring insights</span>
+               <span className="progressCount">{scoringVisibility.title}</span>
+               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
++              <span className="scoringInsightsPhoneStatus" aria-live="polite">
++                {scoringStatusText ? <span>{scoringStatusText}</span> : null}
++                {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
++              </span>
+             </summary>
+             <div className="scoringInsightsBody scroll">
+               <ScoringVisibilityPanel state={scoringVisibility} />
+@@ -1083,6 +1143,10 @@ export default function DebatePageClient({
+               <span className="progressLabel">Scoring insights</span>
+               <span className="progressCount">{scoringVisibility.title}</span>
+               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
++              <span className="scoringInsightsPhoneStatus" aria-live="polite">
++                {scoringStatusText ? <span>{scoringStatusText}</span> : null}
++                {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
++              </span>
+             </div>
+           </section>
+         )}
+@@ -1270,7 +1334,7 @@ export default function DebatePageClient({
+ 
+       {toast ? <Toast message={toast} /> : null}
+ 
+-      {/* ---- action token (subtle, bottom-left) ---- */}
++      {/* ---- action token (safe-area-aware bottom dock) ---- */}
+       <div className="tokenDock">
+         {actionToken ? (
+           <button type="button" className="btn" onClick={lockActions}>
+diff --git a/apps/dialectical-engine/web/app/debate/headerToolbarResilience.source-test.mjs b/apps/dialectical-engine/web/app/debate/headerToolbarResilience.source-test.mjs
+index 4436317..0f18468 100644
+--- a/apps/dialectical-engine/web/app/debate/headerToolbarResilience.source-test.mjs
++++ b/apps/dialectical-engine/web/app/debate/headerToolbarResilience.source-test.mjs
+@@ -1,16 +1,28 @@
+ import assert from "node:assert/strict";
+ import { readFileSync } from "node:fs";
+ import test from "node:test";
+-import { loadCss } from "../../tests/loadCss.mjs";
+ 
+ const pageSource = readFileSync("app/debate/[id]/DebatePageClient.tsx", "utf8");
+-const globalsSource = loadCss();
++const debateChromeSource = readFileSync("styles/debate-chrome.css", "utf8");
++const headerSource = pageSource.match(/<header className="debateTopBar">[\s\S]*?<\/header>/)?.[0] ?? "";
++const overflowSource = headerSource.match(/<details className="debateOverflowMenu">[\s\S]*?<\/details>/)?.[0] ?? "";
+ 
+-test("debate header keeps default scoring status and view controls in the top toolbar", () => {
++test("debate header exposes the two-row identity and control contract", () => {
++  assert.ok(headerSource, "The debate page should render its contextual header");
+   assert.match(
+-    pageSource,
+-    /<div className="debateTopActions">[\s\S]*?<div className="topSwitch">[\s\S]*?<span>Scoring<\/span>[\s\S]*?className="topSwitchStatus"[\s\S]*?aria-label="Open scoring diagnostics"[\s\S]*?<\/div>[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*?aria-pressed=\{view === "thread"\}[\s\S]*?Thread[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "split"\}[\s\S]*?Split[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "tree"\}[\s\S]*?Tree[\s\S]*?<\/button>[\s\S]*?aria-pressed=\{view === "map"\}[\s\S]*?Map[\s\S]*?<\/button>[\s\S]*?<\/div>[\s\S]*?<\/header>/s,
+-    "Default scoring status, diagnostics, and Thread/Split/Tree/Map view controls should remain in the same toolbar action cluster"
++    headerSource,
++    /<div className="debateTopIdentity">[\s\S]*?<BrandMark \/>[\s\S]*?<div className="debateTopClaim">[\s\S]*?className="debateTopTitle"[\s\S]*?className=\{\x60pill \$\{statusKind\}\x60\}[\s\S]*?<\/div>[\s\S]*?<\/div>/,
++    "Row one should keep brand, ellipsized title, and debate status together"
++  );
++  assert.match(
++    headerSource,
++    /<div className="debateTopControls">[\s\S]*?<div className="segment" role="group" aria-label="View">[\s\S]*?aria-pressed=\{view === "thread"\}[\s\S]*?Thread[\s\S]*?aria-pressed=\{view === "split"\}[\s\S]*?Split[\s\S]*?aria-pressed=\{view === "tree"\}[\s\S]*?Tree[\s\S]*?aria-pressed=\{view === "map"\}[\s\S]*?Map[\s\S]*?<div className="debatePrimaryActions">[\s\S]*?aria-label="Open scoring diagnostics"[\s\S]*?className="btn debateReplayAction"[\s\S]*?<details className="debateOverflowMenu">/,
++    "Row two should keep all four view choices before the primary and overflow actions"
++  );
++  assert.doesNotMatch(
++    headerSource,
++    /className="debateTopActions"/,
++    "The retired one-row debateTopActions cluster must not survive the responsive rewrite"
+   );
+   assert.doesNotMatch(
+     pageSource,
+@@ -19,30 +31,63 @@ test("debate header keeps default scoring status and view controls in the top to
+   );
+ });
+ 
+-test("scoring status text shrinks instead of pushing toolbar controls away", () => {
++test("secondary actions move into the phone overflow menu", () => {
++  assert.match(
++    headerSource,
++    /<details className="debateOverflowMenu">[\s\S]*?<summary[\s\S]*?className="iconBtn debateOverflowTrigger"[\s\S]*?aria-label="More debate actions"[\s\S]*?>[\s\S]*?⋯[\s\S]*?<\/summary>[\s\S]*?<div className="debateOverflowPanel">/,
++    "The responsive toolbar should expose an accessible ellipsis menu"
++  );
++  for (const requiredAction of ["Workspace", "Export", "How it works", "Settings"]) {
++    assert.match(
++      overflowSource,
++      new RegExp('(?:aria-label="' + requiredAction + '"|>' + requiredAction + '<|' + requiredAction + ')'),
++      requiredAction + " should remain available inside the overflow action panel"
++    );
++  }
++});
++
++test("phone scoring status has an explicit JSX home in both insights summaries", () => {
++  assert.equal(
++    pageSource.match(/className="scoringInsightsPhoneStatus"/g)?.length,
++    2,
++    "Expandable and compact scoring insight summaries should each render the phone status container"
++  );
+   assert.match(
+-    globalsSource,
+-    /\.debateTopBar\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?\}/,
+-    "Top bar should allow child flex items to shrink"
++    pageSource,
++    /<summary className="scoringInsightsSummary">[\s\S]*?className="scoringInsightsPhoneStatus"[\s\S]*?\{scoringStatusText \? <span>\{scoringStatusText\}<\/span> : null\}[\s\S]*?\{scoringConfidenceText \? <span>\{scoringConfidenceText\}<\/span> : null\}[\s\S]*?<\/summary>/,
++    "Expandable insights should own the phone scoring-status JSX"
+   );
+   assert.match(
+-    globalsSource,
+-    /\.debateTopActions\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?\}/,
+-    "Toolbar actions should shrink as a group instead of forcing overflow"
++    pageSource,
++    /data-scoring-insights-compact="true"[\s\S]*?className="scoringInsightsSummary"[\s\S]*?className="scoringInsightsPhoneStatus"[\s\S]*?\{scoringStatusText \? <span>\{scoringStatusText\}<\/span> : null\}/,
++    "Compact insights should own the phone scoring-status JSX"
+   );
++});
++
++test("responsive CSS pins two rows, phone overflow, and 44px targets", () => {
+   assert.match(
+-    globalsSource,
+-    /\.topSwitch\s*\{[\s\S]*?flex:\s*0 1 min\(52vw,\s*680px\);[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*min\(52vw,\s*680px\);[\s\S]*?\}/,
+-    "The scoring control cluster should have a bounded responsive width"
++    debateChromeSource,
++    /@media \(max-width: 920px\)\s*\{[\s\S]*?\.debateTopBar\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?height:\s*auto;[\s\S]*?\}/,
++    "The tablet breakpoint should turn the debate header into an explicit two-row grid"
+   );
+   assert.match(
+-    globalsSource,
+-    /\.topSwitch > span:first-child,[\s\S]*?\.topSwitch \.iconBtn\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?\}/,
+-    "Scoring label and diagnostics controls should not collapse away"
++    debateChromeSource,
++    /\.debateTopBar :is\([\s\S]*?\.segment button[\s\S]*?\.debateOverflowTrigger[\s\S]*?\)\s*\{[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;[\s\S]*?\}/,
++    "Every interactive header control should meet the 44 by 44 pixel target floor"
+   );
+   assert.match(
+-    globalsSource,
+-    /\.topSwitchStatus\s*\{[\s\S]*?flex:\s*1 1 88px;[\s\S]*?min-width:\s*0;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?\}/,
+-    "Scoring status copy should truncate inside the scoring cluster"
++    debateChromeSource,
++    /@media \(max-width: 640px\)\s*\{[\s\S]*?\.debateTopControls\s*\{[\s\S]*?grid-template-columns:\s*minmax\(184px,\s*1fr\) 44px 44px;[\s\S]*?\}[\s\S]*?\.debateTopBar \.brandText,[\s\S]*?\.topSwitch > span\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}[\s\S]*?\.debateOverflowMenu > \.debateOverflowTrigger\s*\{[\s\S]*?display:\s*inline-flex;/,
++    "The phone breakpoint should reserve room for View + diagnostics + overflow while collapsing labels"
+   );
++  assert.match(
++    debateChromeSource,
++    /\.scoringInsightsPhoneStatus\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}[\s\S]*?@media \(max-width: 640px\)\s*\{[\s\S]*?\.scoringInsightsPhoneStatus\s*\{[\s\S]*?display:\s*flex;/,
++    "Phone scoring copy should appear from its insights-strip JSX home"
++  );
++});
++
++test("token dock comment no longer promises a stale bottom-left position", () => {
++  assert.match(pageSource, /action token \(safe-area-aware bottom dock\)/);
++  assert.doesNotMatch(pageSource, /action token \(subtle, bottom-left\)/);
+ });
+diff --git a/apps/dialectical-engine/web/styles/debate-chrome.css b/apps/dialectical-engine/web/styles/debate-chrome.css
+index 7c8f127..ed1e426 100644
+--- a/apps/dialectical-engine/web/styles/debate-chrome.css
++++ b/apps/dialectical-engine/web/styles/debate-chrome.css
+@@ -18,7 +18,7 @@
+ .debateTopBar {
+   display: flex;
+   align-items: center;
+-  gap: 18px;
++  gap: 14px;
+   height: 60px;
+   flex: 0 0 60px;
+   min-width: 0;
+@@ -28,16 +28,16 @@
+   z-index: 30;
+ }
+ 
+-.debateTopCenter {
++.debateTopIdentity {
+   display: flex;
+   align-items: center;
+-  gap: 14px;
+-  flex: 1;
++  gap: 12px;
++  flex: 1 1 auto;
+   min-width: 0;
+ }
+ 
+ .debateTopClaim {
+-  flex: 1;
++  flex: 1 1 auto;
+   min-width: 0;
+   display: flex;
+   align-items: center;
+@@ -46,33 +46,71 @@
+ }
+ 
+ .debateTopTitle {
++  flex: 1 1 auto;
++  min-width: 0;
++  max-width: 520px;
++  overflow: hidden;
++  color: var(--text-strong);
+   font-family: var(--font-serif);
+   font-size: 14.5px;
+   font-weight: 600;
+-  color: var(--text-strong);
+-  white-space: nowrap;
+-  overflow: hidden;
+   text-overflow: ellipsis;
+-  max-width: 520px;
++  white-space: nowrap;
++}
++
++.debateTopClaim .pill {
++  flex: 0 0 auto;
+ }
+ 
+-.debateTopActions {
++.debateTopControls,
++.debatePrimaryActions,
++.debateSecondaryActions,
++.debateOverflowPanel {
+   display: flex;
+   align-items: center;
+   gap: 8px;
++}
++
++.debateTopControls {
+   flex: 0 1 auto;
+   min-width: 0;
+ }
+ 
++.debatePrimaryActions {
++  flex: 0 0 auto;
++}
++
++.debateViewPlaceholder {
++  flex: 1 1 auto;
++}
++
++.debateTopBar :is(
++  .brand,
++  .btn,
++  .btnGhost,
++  .iconBtn,
++  .segment button,
++  .debateOverflowTrigger
++) {
++  min-width: 44px;
++  min-height: 44px;
++  box-sizing: border-box;
++}
++
++.debateTopBar .btn,
++.debateTopBar .btnGhost {
++  justify-content: center;
++}
++
+ .topSwitch {
+   display: inline-flex;
+   align-items: center;
+   gap: 8px;
+-  flex: 0 1 min(52vw, 680px);
+-  min-width: 0;
+-  max-width: min(52vw, 680px);
+-  min-height: 34px;
+-  padding: 0 8px;
++  flex: 0 1 min(38vw, 420px);
++  min-width: 44px;
++  max-width: min(38vw, 420px);
++  min-height: 44px;
++  padding: 0;
+   color: var(--muted);
+   font-family: var(--font-mono);
+   font-size: 10.5px;
+@@ -97,16 +135,192 @@
+   color: oklch(0.48 0.04 70);
+   text-transform: none;
+ }
++
+ [data-scoring-state="loading"] .topSwitchStatus {
+   color: var(--muted);
+ }
++
+ [data-scoring-state="error"] .topSwitchStatus {
+   color: oklch(0.52 0.14 28);
+ }
++
+ [data-scoring-state="unavailable"] .topSwitchStatus {
+   color: oklch(0.48 0.08 70);
+ }
+ 
++.debateOverflowMenu {
++  position: relative;
++  display: none;
++  flex: 0 0 auto;
++}
++
++.debateOverflowTrigger {
++  display: none;
++  list-style: none;
++}
++
++.debateOverflowTrigger::-webkit-details-marker {
++  display: none;
++}
++
++.debateOverflowMenu > .debateOverflowPanel {
++  display: flex;
++}
++
++.debateOverflowReplayAction {
++  display: none;
++}
++
++.scoringInsightsPhoneStatus {
++  display: none;
++  min-width: 0;
++  color: oklch(0.48 0.04 70);
++  font-family: var(--font-sans);
++  font-size: 12px;
++  line-height: 1.3;
++}
++
++@media (max-width: 920px) {
++  .debateTopBar {
++    display: grid;
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: minmax(44px, auto) minmax(44px, auto);
++    gap: 6px;
++    height: auto;
++    min-height: 108px;
++    flex: 0 0 auto;
++    padding: 7px 14px;
++  }
++
++  .debateTopIdentity,
++  .debateTopControls {
++    width: 100%;
++    min-width: 0;
++  }
++
++  .debateTopClaim {
++    justify-content: flex-start;
++  }
++
++  .debateTopTitle {
++    max-width: none;
++  }
++
++  .debateLibraryLink,
++  .topSwitch > span {
++    display: none;
++  }
++
++  .topSwitch {
++    flex: 0 0 44px;
++    width: 44px;
++    max-width: 44px;
++  }
++
++  .scoringInsightsPhoneStatus {
++    display: flex;
++    flex-direction: column;
++    gap: 2px;
++  }
++}
++
++@media (max-width: 720px) {
++  .debateTopBar .debateActionLabel {
++    display: none;
++  }
++}
++
++@media (max-width: 640px) {
++  .debateTopBar {
++    gap: 4px;
++    min-height: 104px;
++    padding: 6px 8px;
++  }
++
++  .debateTopControls {
++    display: grid;
++    grid-template-columns: minmax(184px, 1fr) 44px 44px;
++    gap: 4px;
++  }
++
++  .debateTopBar .brandText,
++  .debateTopBar .debateLibraryLink,
++  .debateTopBar .topSwitch > span {
++    display: none;
++  }
++
++  .debateTopIdentity > .brand {
++    width: 44px;
++    height: 44px;
++    justify-content: center;
++  }
++
++  .debateTopClaim {
++    gap: 8px;
++  }
++
++  .debateTopControls > .segment {
++    width: 100%;
++    min-width: 184px;
++    box-sizing: border-box;
++  }
++
++  .debateTopControls > .segment button {
++    flex: 1 1 44px;
++    min-width: 44px;
++    padding-inline: 2px;
++  }
++
++  .debatePrimaryActions {
++    width: 44px;
++  }
++
++  .debateReplayAction,
++  .debateSecondaryActions {
++    display: none;
++  }
++
++  .debateOverflowMenu {
++    display: block;
++  }
++
++  .debateOverflowMenu > .debateOverflowTrigger {
++    display: inline-flex;
++  }
++
++  .debateOverflowMenu:not([open]) > .debateOverflowPanel {
++    display: none;
++  }
++
++  .debateOverflowMenu[open] > .debateOverflowPanel {
++    position: absolute;
++    top: calc(100% + 6px);
++    right: 0;
++    z-index: 40;
++    display: grid;
++    min-width: 208px;
++    padding: 8px;
++    border: 1px solid var(--line-2);
++    border-radius: var(--r-panel);
++    background: var(--surface);
++    box-shadow: 0 12px 30px oklch(0.3 0.02 70 / 0.2);
++  }
++
++  .debateOverflowPanel > .btn,
++  .debateOverflowPanel > .iconBtn {
++    width: 100%;
++  }
++
++  .debateOverflowReplayAction {
++    display: inline-flex;
++  }
++
++  .scoringInsightsPhoneStatus {
++    display: flex;
++    width: calc(100% - 64px);
++  }
++}
++
+ .scoringInsightsPanel {
+   flex: 0 0 auto;
+   border-bottom: 1px solid oklch(0.91 0.02 75);

@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.10 C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s6/apps/dialectical-engine/web
+
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+   Start at  16:18:12
+   Duration  2.10s (transform 73ms, setup 762ms, import 27ms, tests 44ms, environment 1.36s)
+

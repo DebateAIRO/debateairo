@@ -103,10 +103,14 @@ docs/agent-protocols/claude-heartbeat-adapter.md
 docs/agent-protocols/grok-heartbeat-adapter.md
 ```
 
-Vendor skills are thin adapters:
+Vendor skills are thin node contracts that load the Graph Spine v2. As of
+spine 3.0.0 they are REAL in-repo files (the `.codex` and `.agents` skill
+directories were symlinks into an out-of-repo `.zenith` snapshot and were
+materialized in place — no directory here is a symlink):
 
 ```text
 .codex/skills/heartbeat-protocol/SKILL.md
+.agents/skills/heartbeat-protocol/SKILL.md
 .claude/skills/heartbeat-protocol/SKILL.md
 .grok/skills/heartbeat-protocol/SKILL.md
 ```

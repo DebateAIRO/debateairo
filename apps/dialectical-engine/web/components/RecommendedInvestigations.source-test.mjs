@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { loadCss } from "../tests/loadCss.mjs";
 
 const root = process.cwd();
 const componentPath = join(root, "components", "RecommendedInvestigations.tsx");
-const globalsPath = join(root, "app", "globals.css");
 
 test("RecommendedInvestigations is a presentational real-recommendation list", () => {
   assert.equal(existsSync(componentPath), true, "components/RecommendedInvestigations.tsx should exist");
@@ -50,7 +50,7 @@ test("RecommendedInvestigations is a presentational real-recommendation list", (
 
 test("RecommendedInvestigations contains additional items behind a compact disclosure", () => {
   const source = readFileSync(componentPath, "utf8");
-  const globals = readFileSync(globalsPath, "utf8");
+  const globals = loadCss();
 
   assert.match(
     source,

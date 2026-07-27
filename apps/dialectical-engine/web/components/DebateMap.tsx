@@ -62,6 +62,7 @@ function fillFor(node: DebateNode, depth: number): string {
 
 export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const maxDepth = Math.max(1, treeDepth(root));
   const ringW = (MAX_R - HUB_R - GAP - RING_GAP * (maxDepth - 1)) / maxDepth;
@@ -92,7 +93,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
   };
   place(root, 0, START, START + Math.PI * 2);
 
-  const readoutNode = hoverId ? arcs.find((a) => a.id === hoverId)?.node ?? root : root;
+  const inspectId = hoverId ?? selectedId;
+  const readoutNode = inspectId ? arcs.find((a) => a.id === inspectId)?.node ?? root : root;
   const readoutRole = roleOf(readoutNode);
   const readoutPal = readoutRole === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[readoutRole];
   const readoutModel = readoutNode.active_generation ? modelMeta(readoutNode.active_generation.model_id) : null;
@@ -121,10 +123,20 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
                 fill={arc.fill}
                 stroke="oklch(0.99 0.004 85)"
                 strokeWidth={2}
-                opacity={hoverId && hoverId !== arc.id ? 0.55 : 1}
+                opacity={inspectId && inspectId !== arc.id ? 0.55 : 1}
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
-                onClick={() => onOpenSplit(arc.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Inspect ${arc.node.claim}`}
+                onClick={() => setSelectedId(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
+                onFocus={() => setSelectedId(arc.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedId(arc.id);
+                  }
+                }}
               >
                 <title>{arc.node.claim}</title>
               </path>
@@ -137,9 +149,23 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
               stroke="oklch(0.22 0.012 70)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Inspect ${root.claim}`}
               onClick={() => {
                 setHoverId(null);
-                onOpenSplit(root.id);
+                setSelectedId(null);
+              }}
+              onFocus={() => {
+                setHoverId(null);
+                setSelectedId(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setHoverId(null);
+                  setSelectedId(null);
+                }
               }}
             >
               <title>{root.claim}</title>
@@ -151,6 +177,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
 
         <div
           className="mapReadout"
+          data-testid="map-readout"
           style={{ borderColor: readoutPal.border, borderLeftColor: readoutPal.text }}
         >
           <div className="mapReadoutHead">
@@ -172,7 +199,9 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             </button>
           </div>
           <div className="mapReadoutClaim">{readoutNode.claim}</div>
-          <div className="mapReadoutHint">Hover a wedge to inspect · click to focus · center resets to root</div>
+          <div className="mapReadoutHint">
+            Hover or tap a wedge to inspect · use Open in Split to navigate · center resets to root
+          </div>
         </div>
       </div>
     </div>

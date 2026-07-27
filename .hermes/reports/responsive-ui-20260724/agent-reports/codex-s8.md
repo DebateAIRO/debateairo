@@ -1,0 +1,19 @@
+# Codex S8 self-report
+- Ticket: `t_3ac92e37`; worker session: `codex-s8-evidence-20260726`.
+- Tested branch `lane/resp-s8` at integrated commit `646d6562ff33366100b51b927a4b95319619b4e3`.
+- Added only `apps/dialectical-engine/web/tests/s8-closure/**` test harness files.
+- Wrote evidence only under `.hermes/reports/responsive-ui-20260724/**`.
+- Reconciled automated result: 184 passed / 199 applicable cells; 15 failed; 25 intentionally inapplicable skips.
+- Covered 32 Chromium/Firefox/WebKit width, short-height, and device-profile projects.
+- Covered all five routes, shared AuthGate states, debate lifecycle, views, zoom, scoring, overlays, collision union, text breaks, and safe-area structure.
+- Retained 31 primary and 5 targeted short-height screenshots plus failure traces.
+- Confirmed synthetic S4 handler contracts: Vitest 27/27 and Playwright 7/7.
+- Routed 320 px TopBar overflow to S6.
+- Routed 568×320 debate/scoring collapse to S3.
+- Routed Firefox 844×390 zoom-to-card interception to S4.
+- Routed WebKit 568×320 synthesis/zoom collision to S5 with S4 coordination.
+- Marked every real pinch row, real Safari/iOS/Android row, and agent-browser acquisition as BLOCKED-ESCALATED.
+- Released every heavy lock, stopped all started servers, made no product fix, push, commit, or Done transition.
+- Final-gate update: verified the gated integration tip `c49b3a6533f6f263f58b107ec284dbb72b2614e2` and the complete rerun chain.
+- Final-gate result: automated acceptance reconciles to 199/199 applicable cells with 25 intentional N/A cells; mandatory hardware/product-truth rows remain BLOCKED-ESCALATED to V.
+- Final-gate scope: all 19 cited evidence paths exist, and S8's lane diff contains no product-code edits.

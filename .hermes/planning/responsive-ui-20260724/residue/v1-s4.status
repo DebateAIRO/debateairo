@@ -1,0 +1,5 @@
+ M apps/dialectical-engine/web/components/DebateCanvas.tsx
+ M apps/dialectical-engine/web/styles/canvas.css
+?? apps/dialectical-engine/web/components/CanvasViewport.tsx
+?? apps/dialectical-engine/web/lib/canvasViewport.ts
+?? apps/dialectical-engine/web/tests/s4-canvas/

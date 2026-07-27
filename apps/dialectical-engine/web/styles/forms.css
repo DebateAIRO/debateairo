@@ -1,0 +1,338 @@
+
+/* ============================================================
+   Buttons, inputs, pills
+   ============================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+.btn:hover {
+  background: oklch(0.96 0.005 80);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnDark {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: oklch(0.97 0.005 85);
+}
+.btnDark:hover {
+  background: var(--ink-hover);
+}
+
+.btnGhost {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  padding: 6px 8px;
+}
+.btnGhost:hover {
+  background: oklch(0.95 0.005 80);
+}
+
+.btnChallenge {
+  color: var(--con-text);
+  background: oklch(0.97 0.03 60);
+  border-color: oklch(0.88 0.05 55);
+}
+.btnChallenge:hover {
+  background: oklch(0.95 0.04 60);
+}
+
+.iconBtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  border-radius: var(--r-btn);
+  font-size: 15px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.iconBtn:hover {
+  background: oklch(0.96 0.005 80);
+}
+
+.btn:focus-visible,
+.iconBtn:focus-visible,
+.input:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.input {
+  width: 100%;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--text);
+  padding: 14px 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.18s;
+}
+.input:focus {
+  border-color: var(--focus);
+}
+
+/* segmented toggle (Tree / Outline) */
+.segment {
+  display: flex;
+  background: oklch(0.95 0.005 80);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  padding: 2px;
+}
+.segment button {
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+}
+.segment button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px oklch(0.4 0.02 70 / 0.18);
+}
+
+/* pills + badges */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+.pill.pillOk {
+  background: var(--ok-bg);
+  border-color: var(--ok-border);
+  color: var(--ok-text);
+}
+.pill.pillOk .dot {
+  background: var(--ok-dot);
+}
+.pill.pillGen {
+  background: var(--gen-bg);
+  border-color: var(--gen-border);
+  color: var(--gen-text);
+}
+.pill.pillGen .dot {
+  background: var(--gen-dot);
+}
+.pill.pillBad {
+  background: oklch(0.96 0.03 40);
+  border-color: var(--con-border);
+  color: oklch(0.5 0.12 38);
+}
+.pill.pillBad .dot {
+  background: oklch(0.6 0.14 38);
+}
+
+.workerMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.metaLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.modelDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot, var(--m-default));
+  flex: 0 0 auto;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  border: 1px solid var(--con-border);
+  border-radius: var(--r-btn);
+  background: oklch(0.97 0.03 40);
+  color: oklch(0.45 0.12 35);
+  padding: 10px 13px;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   Centered scrolling screen (library / new / settings)
+   ============================================================ */
+
+.screen {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.screenInner {
+  margin: 0 auto;
+  padding: 52px 28px 72px;
+}
+.screenInner.narrow {
+  max-width: 680px;
+}
+.screenInner.wide {
+  max-width: 880px;
+}
+.screenInner.medium {
+  max-width: 760px;
+}
+
+.display {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: var(--text-strong);
+  margin: 0;
+}
+.display.lg {
+  font-size: clamp(30px, 1.25rem + 2vw, 34px);
+}
+.display.md {
+  font-size: clamp(27px, 1.35rem + 1vw, 30px);
+}
+.display.sm {
+  font-size: clamp(24px, 1.25rem + 0.75vw, 26px);
+}
+
+.lede {
+  font-family: var(--font-serif);
+  font-size: clamp(15px, 0.875rem + 0.25vw, 16px);
+  line-height: 1.5;
+  color: var(--text-2);
+  margin: 12px 0 0;
+  max-width: 600px;
+}
+
+@media (max-width: 640px) {
+  .screenInner {
+    padding: 32px 16px;
+  }
+
+  /* These selectors intentionally outrank the later route-specific source files. */
+  .screenInner .optionRow,
+  .modelTable .modelRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .screenInner .optionControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .screenInner .optionControl input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  .modelTable .modelName {
+    flex-basis: auto;
+  }
+
+  .modelTable .roleChips {
+    flex: none;
+  }
+
+  .modelTable .capInput {
+    width: 100%;
+  }
+
+  .modelTable .modelSpend {
+    width: auto;
+    text-align: left;
+  }
+
+  .modelTable .switch {
+    align-self: flex-start;
+  }
+
+  .workerMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workerMetrics .miniCard {
+    min-width: 0;
+  }
+}

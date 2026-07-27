@@ -1,0 +1,976 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "tests\\s8-closure\\playwright.config.ts",
+      "--project",
+      "chromium-w320"
+    ],
+    "configFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\playwright.config.ts",
+    "rootDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w320",
+        "name": "chromium-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w375",
+        "name": "chromium-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w768",
+        "name": "chromium-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1024",
+        "name": "chromium-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1440",
+        "name": "chromium-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w2560",
+        "name": "chromium-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-844x390",
+        "name": "chromium-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-568x320",
+        "name": "chromium-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-507x1024",
+        "name": "chromium-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w320",
+        "name": "firefox-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w375",
+        "name": "firefox-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w768",
+        "name": "firefox-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1024",
+        "name": "firefox-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1440",
+        "name": "firefox-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w2560",
+        "name": "firefox-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-844x390",
+        "name": "firefox-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-568x320",
+        "name": "firefox-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-507x1024",
+        "name": "firefox-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w320",
+        "name": "webkit-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w375",
+        "name": "webkit-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w768",
+        "name": "webkit-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1024",
+        "name": "webkit-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1440",
+        "name": "webkit-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w2560",
+        "name": "webkit-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-844x390",
+        "name": "webkit-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-568x320",
+        "name": "webkit-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-507x1024",
+        "name": "webkit-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-custom-320x568-chromium",
+        "name": "profile-custom-320x568-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-iphone-12-webkit",
+        "name": "profile-iphone-12-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-pixel-7-chromium",
+        "name": "profile-pixel-7-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-ipad-webkit",
+        "name": "profile-ipad-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-debug/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-desktop-chromium",
+        "name": "profile-desktop-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-matrix.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "acceptance-matrix.spec.ts",
+      "file": "acceptance-matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "library route covers empty, populated, error, composer focus, and submit",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6391,
+                  "error": {
+                    "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m",
+                    "stack": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:239:3",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 5,
+                      "line": 117
+                    },
+                    "snippet": "  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:239:3"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:250:3"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:264:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:57:11.234Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-library--54652-r-composer-focus-and-submit-chromium-w320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-library--54652-r-composer-focus-and-submit-chromium-w320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 5,
+                    "line": 117
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-2bb4c214ea8e6c1b5992",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 234,
+          "column": 5
+        },
+        {
+          "title": "protected routes cover AuthGate and route lifecycle states",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 29427,
+                  "error": {
+                    "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m",
+                    "stack": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at expectProtectedShellAuthStates (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:141:3)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:269:5",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 5,
+                      "line": 117
+                    },
+                    "snippet": "  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at expectProtectedShellAuthStates (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:141:3)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:269:5"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at expectProtectedShellAuthStates (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:141:3)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:269:5"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:323:5"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at expectProtectedShellAuthStates (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:141:3)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:269:5"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 5,
+                        "line": 117
+                      },
+                      "message": "Error: html overflowed horizontally: {\"clientWidth\":320,\"scrollWidth\":339,\"offenders\":[{\"tag\":\"DIV\",\"className\":\"topBarActions\",\"left\":200.96875,\"right\":339.359375,\"width\":138.390625},{\"tag\":\"A\",\"className\":\"iconBtn\",\"left\":307.359375,\"right\":339.359375,\"width\":32}]}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m321\u001b[39m\nReceived:    \u001b[31m339\u001b[39m\n\n  115 |     geometry.scrollWidth,\n  116 |     `${selector} overflowed horizontally: ${JSON.stringify(geometry)}`\n> 117 |   ).toBeLessThanOrEqual(geometry.clientWidth + 1);\n      |     ^\n  118 | }\n  119 |\n  120 | async function expectFullyInsideViewport(locator: Locator, page: Page) {\n    at expectNoHorizontalOverflow (C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:117:5)\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:323:5"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:57:18.658Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-protecte-84293--and-route-lifecycle-states-chromium-w320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-protecte-84293--and-route-lifecycle-states-chromium-w320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 5,
+                    "line": 117
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-72125c94a4ddd8582db5",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 267,
+          "column": 5
+        },
+        {
+          "title": "debate route covers connecting, generating, completed, error, no-tree, and single-shot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7242,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:57:49.387Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-659c2164e4de29d2be3e",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 327,
+          "column": 5
+        },
+        {
+          "title": "debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6867,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:57:56.755Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-ecc8950ffda5be245497",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 354,
+          "column": 5
+        },
+        {
+          "title": "overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6557,
+                  "error": {
+                    "message": "Error: {\"dock\":{\"left\":41.09375,\"right\":302,\"top\":848,\"bottom\":882},\"zoom\":{\"left\":256,\"right\":308,\"top\":432,\"bottom\":660},\"toast\":{\"left\":80,\"right\":240,\"top\":104,\"bottom\":158},\"synthesis\":{\"left\":14,\"right\":122,\"top\":846,\"bottom\":882}}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m{\"bottom\": 882, \"left\": 14, \"right\": 122, \"top\": 846}\u001b[39m",
+                    "stack": "Error: {\"dock\":{\"left\":41.09375,\"right\":302,\"top\":848,\"bottom\":882},\"zoom\":{\"left\":256,\"right\":308,\"top\":432,\"bottom\":660},\"toast\":{\"left\":80,\"right\":240,\"top\":104,\"bottom\":158},\"synthesis\":{\"left\":14,\"right\":122,\"top\":846,\"bottom\":882}}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m{\"bottom\": 882, \"left\": 14, \"right\": 122, \"top\": 846}\u001b[39m\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:476:61",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 61,
+                      "line": 476
+                    },
+                    "snippet": "  474 |   expect(expanded.zoom).not.toBeNull();\n  475 |   expect(expanded.toast).not.toBeNull();\n> 476 |   expect.soft(expanded.synthesis, JSON.stringify(expanded)).toBeNull();\n      |                                                             ^\n  477 |   expect.soft(intersects(expanded.dock!, expanded.zoom!), JSON.stringify(expanded)).toBe(false);\n  478 |   expect.soft(intersects(expanded.toast!, expanded.dock!), JSON.stringify(expanded)).toBe(false);\n  479 |   expect.soft(intersects(expanded.toast!, expanded.zoom!), JSON.stringify(expanded)).toBe(false);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 61,
+                        "line": 476
+                      },
+                      "message": "Error: {\"dock\":{\"left\":41.09375,\"right\":302,\"top\":848,\"bottom\":882},\"zoom\":{\"left\":256,\"right\":308,\"top\":432,\"bottom\":660},\"toast\":{\"left\":80,\"right\":240,\"top\":104,\"bottom\":158},\"synthesis\":{\"left\":14,\"right\":122,\"top\":846,\"bottom\":882}}\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m{\"bottom\": 882, \"left\": 14, \"right\": 122, \"top\": 846}\u001b[39m\n\n  474 |   expect(expanded.zoom).not.toBeNull();\n  475 |   expect(expanded.toast).not.toBeNull();\n> 476 |   expect.soft(expanded.synthesis, JSON.stringify(expanded)).toBeNull();\n      |                                                             ^\n  477 |   expect.soft(intersects(expanded.dock!, expanded.zoom!), JSON.stringify(expanded)).toBe(false);\n  478 |   expect.soft(intersects(expanded.toast!, expanded.dock!), JSON.stringify(expanded)).toBe(false);\n  479 |   expect.soft(intersects(expanded.toast!, expanded.zoom!), JSON.stringify(expanded)).toBe(false);\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:476:61"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:58:03.645Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-w320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-debug\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-w320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 61,
+                    "line": 476
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-b5da9529490e1eca66dd",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 411,
+          "column": 5
+        },
+        {
+          "title": "safe-area support is structurally wired without claiming non-zero emulated insets",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 691,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:58:11.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-d56bdfb3386f1867007e",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 489,
+          "column": 5
+        },
+        {
+          "title": "320/375-class cells have no ordinary-English mid-word breaks across library and debate views",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-w320",
+              "projectName": "chromium-w320",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2982,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T18:58:12.207Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-950bf6f0e921abd650f4",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 509,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-26T18:57:06.067Z",
+    "duration": 69791.764,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

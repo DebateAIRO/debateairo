@@ -6,12 +6,16 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 Under the current Heartbeat law, Grok owns research/review/slicing stages and may serve as an independent read-only reviewer:
 
-- Step 1: `Research.md` in a fresh Hermes-managed Grok CLI PTY;
-- Step 3: `PlanReview.md` in a different fresh Grok CLI PTY;
-- Step 5: `VerticalSlices.md` in a third fresh Grok CLI PTY;
+- Step 1: `Research.md` in a fresh Claude-Router-launched `/goal` Grok CLI PTY;
+- Step 3: `PlanReview.md` in a different Claude-Router-launched `/goal` Grok CLI PTY;
+- Step 5: `VerticalSlices.md` in a third Claude-Router-launched `/goal` Grok CLI PTY;
 - peer/specialist review when Hermes explicitly assigns it.
 
 Grok does not implement production code, test code, migrations, or implementation configuration while Codex-only coding is active.
+
+Every Grok launch uses `/goal`. A handoff parks an unfinished goal/session for
+possible review/rework; it does not terminate it. Claude-Router closes the
+session only after its role-specific `FULLY DONE` condition from the spine.
 
 ## Startup and comment checklist
 
@@ -40,7 +44,8 @@ Step 3 or Step 5 Grok terminal
 → READY FOR HERMES STAGE REVIEW
 → Hermes directly reviews the complete artifact
    ├─ HERMES STAGE REVIEW CHANGES REQUESTED → same Grok session revises
-   └─ HERMES STAGE REVIEW PASS → Hermes launches the next numbered stage
+   └─ HERMES STAGE REVIEW PASS → Claude-Router consumes the verdict and
+      launches the next numbered stage through /goal
 ```
 
 Step 1 is the only substantive Hermes-review exemption. Hermes still verifies

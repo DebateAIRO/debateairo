@@ -33,24 +33,58 @@ export function TopBar() {
   const title = SCREEN_TITLES[pathname ?? "/"] ?? "";
 
   return (
-    <header className="topBar">
-      <BrandMark />
-      {title ? (
-        <div className="topBarContext">
-          <span className="topBarDivider" aria-hidden />
-          <span className="topBarTitle">{title}</span>
+    <>
+      <header className="topBar">
+        <BrandMark />
+        {title ? (
+          <div className="topBarContext">
+            <span className="topBarDivider" aria-hidden />
+            <span className="topBarTitle">{title}</span>
+          </div>
+        ) : (
+          <div className="topBarContext" />
+        )}
+        <div className="topBarActions">
+          <Link className="btn btnDark" href="/new">
+            + New debate
+          </Link>
+          <Link className="iconBtn" href="/settings" aria-label="Settings" title="Settings">
+            ⚙
+          </Link>
         </div>
-      ) : (
-        <div className="topBarContext" />
-      )}
-      <div className="topBarActions">
-        <Link className="btn btnDark" href="/new">
-          + New debate
-        </Link>
-        <Link className="iconBtn" href="/settings" aria-label="Settings" title="Settings">
-          ⚙
-        </Link>
-      </div>
-    </header>
+      </header>
+      <style>{`
+        @media (max-width: 480px) {
+          .topBar {
+            flex: 0 0 auto;
+            flex-wrap: wrap;
+            height: auto;
+            min-height: 60px;
+            row-gap: 8px;
+            padding-block: 8px;
+          }
+
+          .topBarContext {
+            flex: 1 1 0;
+          }
+
+          .topBarDivider {
+            flex: 0 0 1px;
+          }
+
+          .topBarTitle {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .topBarActions {
+            flex: 1 0 100%;
+            justify-content: flex-end;
+          }
+        }
+      `}</style>
+    </>
   );
 }
