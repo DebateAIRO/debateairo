@@ -43,6 +43,11 @@ test("phone geometry contract reserves visible 44px controls at 320 and 375", ()
     /@media \(max-width:\s*640px\) and \(max-height:\s*400px\)\s*\{[\s\S]*?\.debateView \.scoringInsightsSummary\s*\{[\s\S]*?height:\s*44px;[\s\S]*?flex-direction:\s*row;[\s\S]*?\}/,
     "Short landscape phones should compact the insights summary to one 44px row instead of collapsing the selected view"
   );
+  assert.match(
+    globalsSource,
+    /@media \(min-width:\s*480px\) and \(max-width:\s*640px\) and \(max-height:\s*400px\)\s*\{[\s\S]*?\.debateTopBar\s*\{[\s\S]*?height:\s*60px;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\) 286px;[\s\S]*?grid-template-rows:\s*44px;[\s\S]*?\}[\s\S]*?\.debateTopControlRow\s*\{[\s\S]*?grid-template-columns:\s*minmax\(182px,\s*1fr\) 44px 44px;/,
+    "Short landscape phones should compact identity and primary controls into one 60px row so canvas controls fit below"
+  );
 });
 
 test("scoring status is structurally moved to both insights summaries", () => {
