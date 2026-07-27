@@ -12,11 +12,13 @@ class ClaudeCliAdapter(SubprocessStreamingAdapter):
     executable = "claude"
 
     def command(self, system: str, user: str, max_tokens: int) -> list[str]:
-        prompt = f"{system}\n\n{user}"
+        # The prompt deliberately stays OFF argv: `claude -p` with no prompt
+        # argument reads it from stdin ("useful for pipes", verified end to end
+        # 2026-07-26), so big debate trees can never blow the execve ARG_MAX
+        # budget the way an argv-borne prompt does. See stdin_text below.
         return [
             "claude",
             "-p",
-            prompt,
             "--model",
             self.cli_model,
             "--effort",
@@ -25,6 +27,9 @@ class ClaudeCliAdapter(SubprocessStreamingAdapter):
             "stream-json",
             "--verbose",
         ]
+
+    def stdin_text(self, system: str, user: str, max_tokens: int) -> str:
+        return f"{system}\n\n{user}"
 
     def new_line_parser(self) -> Callable[[str], str]:
         # Fresh stateful parser per stream() so the assistant/result de-dup flag

@@ -1441,6 +1441,7 @@ def test_gemini_api_summary_reports_api_adapter_detection_and_preflight(
                     '"Respond with exactly OK.",',
                     '"--effort",',
                     '"high",',
+                "ensure_argv_fits(",
                 "await asyncio.wait_for(process.communicate(), timeout=30)",
                 "return process.returncode == 0 and bool(stdout.strip())",
             ]
@@ -1584,8 +1585,9 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
                         "class ClaudeCliAdapter(SubprocessStreamingAdapter):",
                         'model_id = "claude-sonnet-5-high-loop"',
                         'cli_model = "claude-sonnet-5"',
-                        'return ["claude", "-p", prompt, "--model", self.cli_model, "--effort", "high", "--output-format", "stream-json", "--verbose"]',
-                    "claude_stream_json_delta",
+                        'return ["claude", "-p", "--model", self.cli_model, "--effort", "high", "--output-format", "stream-json", "--verbose"]',
+                    "def stdin_text(self, system: str, user: str, max_tokens: int) -> str:",
+                    "return ClaudeStreamJsonParser()",
                 ]
         ),
         encoding="utf-8",
@@ -1615,7 +1617,7 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
                 "asyncio.create_subprocess_exec(",
                 '"--help",',
                 "PROMPT_FLAG_PATTERN.search(help_text)",
-                    'return ["grok", "-p", prompt, "--model", self.cli_model, "--reasoning-effort",',
+                    'return ["grok", "--prompt-file", str(prompt_path), "--model", self.cli_model, "--reasoning-effort",',
                     '"high",]',
             ]
         ),
@@ -1643,8 +1645,10 @@ def test_real_adapters_summary_reports_cli_ollama_and_detection_contracts(
                 "asyncio.create_subprocess_exec(",
                 "stderr = await process.stderr.read()",
                 "raise RuntimeError(stderr.decode",
+                "def ensure_argv_fits(",
+                "class ClaudeStreamJsonParser:",
                 "def claude_stream_json_delta(line: str) -> str:",
-                'payload.get("type") == "content_block_delta"',
+                'payload_type == "content_block_delta"',
             ]
         ),
         encoding="utf-8",

@@ -45,6 +45,18 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 CLAUDE_STREAM_JSON_FIXTURE = FIXTURES / "claude_stream_json_2026-07.jsonl"
 
+# Twice macOS ARG_MAX (1 048 576, argv + env charged together) -- the size
+# class that killed the gemini subscription loop live on 2026-07-26 with
+# OSError: [Errno 7] Argument list too long: 'agy'. Any adapter that puts the
+# rendered prompt on argv dies on this input before ever reaching the model.
+TWO_MEBIBYTE_PROMPT = "x" * (2 * 1024 * 1024)
+
+
+def total_argv_bytes(command: list[str]) -> int:
+    """Independent measure of a command's execve argv footprint (element bytes
+    plus NUL terminators), deliberately not reusing the production helper."""
+    return sum(len(str(part).encode("utf-8")) + 1 for part in command)
+
 
 @pytest.mark.asyncio
 async def test_mock_adapter_generates_structured_decomposition() -> None:
@@ -272,13 +284,13 @@ def test_enrich_v2_result_stamps_planner_first_provenance_generically(job_type: 
     }
 
 
-def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("CODEX_COMMAND", "codex")
 
-    assert ClaudeCliAdapter().command("sys", "user", 10) == [
+    claude = ClaudeCliAdapter()
+    assert claude.command("sys", "user", 10) == [
         "claude",
         "-p",
-        "sys\n\nuser",
         "--model",
         "claude-sonnet-5",
         "--effort",
@@ -287,6 +299,7 @@ def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch) -> None:
         "stream-json",
         "--verbose",
     ]
+    assert claude.stdin_text("sys", "user", 10) == "sys\n\nuser"
     codex_command = CodexCliAdapter().command("sys", "user", 10)
     assert codex_command[:5] == ["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write"]
     assert "--output-schema" not in codex_command
@@ -306,12 +319,169 @@ def test_cli_adapter_commands(monkeypatch: pytest.MonkeyPatch) -> None:
         "--effort",
         "high",
     ]
-    assert GrokCliAdapter().command("sys", "user", 10)[-4:] == [
+    monkeypatch.setattr(grok_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    grok = GrokCliAdapter()
+    grok_command = grok.command("sys", "user", 10)
+    assert grok_command[:2] == ["grok", "--prompt-file"]
+    assert Path(grok_command[2]).read_text(encoding="utf-8") == "sys\n\nuser\n\nMaximum tokens: 10"
+    assert grok_command[3:5] == ["--model", "grok-4.5"]
+    assert grok_command[-4:] == [
         "--reasoning-effort",
         "high",
         "--output-format",
         "plain",
     ]
+    grok.cleanup()
+    assert not Path(grok_command[2]).exists()
+
+
+def test_claude_command_keeps_two_mebibyte_prompt_off_argv() -> None:
+    # The prompt must ride stdin (claude -p with no prompt argument reads it
+    # from stdin), never argv, or execve fails with E2BIG on big debate trees.
+    adapter = ClaudeCliAdapter()
+
+    command = adapter.command("sys", TWO_MEBIBYTE_PROMPT, 10)
+
+    assert total_argv_bytes(command) < 4096
+    assert adapter.stdin_text("sys", TWO_MEBIBYTE_PROMPT, 10) == f"sys\n\n{TWO_MEBIBYTE_PROMPT}"
+
+
+@pytest.mark.asyncio
+async def test_claude_stream_delivers_two_mebibyte_prompt_via_stdin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del stdout, stderr, env
+        captured["command"] = list(command)
+        captured["stdin"] = stdin
+        process = FakeStreamingProcess(stdout=b'{"type":"result","result":"OK"}\n', returncode=0)
+        captured["process"] = process
+        return process
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    chunks = [chunk async for chunk in ClaudeCliAdapter().stream("sys", TWO_MEBIBYTE_PROMPT, 100)]
+
+    assert "".join(chunks) == "OK"
+    assert total_argv_bytes(captured["command"]) < 4096
+    assert captured["stdin"] == asyncio.subprocess.PIPE
+    piped = getattr(captured["process"].stdin, "payload", b"")
+    assert piped.decode() == f"sys\n\n{TWO_MEBIBYTE_PROMPT}"
+
+
+def test_grok_command_stages_two_mebibyte_prompt_in_prompt_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # grok documents --prompt-file <PATH> ("Single-turn prompt from a file");
+    # the prompt goes to disk and only the path rides argv.
+    monkeypatch.setattr(grok_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    adapter = GrokCliAdapter()
+
+    command = adapter.command("sys", TWO_MEBIBYTE_PROMPT, 10)
+
+    assert total_argv_bytes(command) < 4096
+    prompt_path = Path(command[command.index("--prompt-file") + 1])
+    assert prompt_path.read_text(encoding="utf-8") == f"sys\n\n{TWO_MEBIBYTE_PROMPT}\n\nMaximum tokens: 10"
+    adapter.cleanup()
+    assert not prompt_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_grok_stream_removes_prompt_file_after_success(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(grok_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    staged: list[Path] = []
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del stdin, stdout, stderr, env
+        prompt_path = Path(command[command.index("--prompt-file") + 1])
+        staged.append(prompt_path)
+        # The file must still exist at exec time -- the process reads it.
+        assert prompt_path.read_text(encoding="utf-8") == f"sys\n\n{TWO_MEBIBYTE_PROMPT}\n\nMaximum tokens: 100"
+        return FakeStreamingProcess(stdout=b"answer\n", returncode=0)
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    chunks = [chunk async for chunk in GrokCliAdapter().stream("sys", TWO_MEBIBYTE_PROMPT, 100)]
+
+    assert "".join(chunks) == "answer\n"
+    assert staged and not staged[0].exists()
+
+
+@pytest.mark.asyncio
+async def test_grok_stream_removes_prompt_file_when_process_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(grok_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    staged: list[Path] = []
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del stdin, stdout, stderr, env
+        staged.append(Path(command[command.index("--prompt-file") + 1]))
+        return FakeStreamingProcess(stdout=b"", stderr=b"grok exploded", returncode=1)
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    with pytest.raises(RuntimeError, match="grok exploded"):
+        [chunk async for chunk in GrokCliAdapter().stream("sys", "user", 100)]
+
+    assert staged and not staged[0].exists()
+
+
+@pytest.mark.asyncio
+async def test_grok_concurrent_streams_use_per_call_prompt_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # Adapters are built once and shared across jobs (see detect_adapters), so
+    # two in-flight stream() calls must stage and clean up SEPARATE prompt
+    # files -- one job's cleanup must never delete the other's prompt.
+    monkeypatch.setattr(grok_module.tempfile, "gettempdir", lambda: str(tmp_path))
+    barrier = asyncio.Event()
+    staged: list[Path] = []
+
+    async def fake_exec(*command: str, stdin, stdout, stderr, env=None) -> FakeStreamingProcess:
+        del stdin, stdout, stderr, env
+        staged.append(Path(command[command.index("--prompt-file") + 1]))
+        if len(staged) == 2:
+            barrier.set()
+        return BarrierStreamingProcess(barrier, stdout=b"done\n", returncode=0)
+
+    async def collect(chunks) -> str:
+        return "".join([chunk async for chunk in chunks])
+
+    monkeypatch.setattr(subprocess_base.asyncio, "create_subprocess_exec", fake_exec)
+
+    adapter = GrokCliAdapter()
+    results = await asyncio.gather(
+        collect(adapter.stream("sys", "first", 100)),
+        collect(adapter.stream("sys", "second", 100)),
+    )
+
+    assert results == ["done\n", "done\n"]
+    assert len(staged) == 2 and staged[0] != staged[1]
+    assert all(not path.exists() for path in staged)
+
+
+def test_gemini_command_refuses_prompt_past_exec_budget() -> None:
+    # agy has no stdin or prompt-file channel (verified against the installed
+    # binary 2026-07-26), so an oversized prompt must be refused with a typed
+    # error BEFORE exec -- never the raw OSError E2BIG that killed the loop.
+    with pytest.raises(subprocess_base.PromptTooLargeForCli, match="exec budget"):
+        GeminiCliAdapter().command("sys", TWO_MEBIBYTE_PROMPT, 10)
+
+
+def test_prompt_too_large_is_a_runtime_error() -> None:
+    # Worker job handling fails jobs on RuntimeError; the typed refusal must
+    # stay inside that contract so the job is reported failed, not crash the
+    # worker loop.
+    assert issubclass(subprocess_base.PromptTooLargeForCli, RuntimeError)
 
 
 def test_codex_v2_planner_command_uses_strict_output_schema() -> None:

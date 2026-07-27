@@ -2144,7 +2144,8 @@ def real_adapters_summary() -> str:
         '"--effort",',
         '"--output-format",',
         '"--verbose"',
-        "claude_stream_json_delta",
+        "def stdin_text(self, system: str, user: str, max_tokens: int) -> str:",
+        "return ClaudeStreamJsonParser()",
     ]
     codex_markers = [
         "class CodexCliAdapter(SubprocessStreamingAdapter):",
@@ -2166,6 +2167,7 @@ def real_adapters_summary() -> str:
         "asyncio.create_subprocess_exec(",
         '"--help",',
         "PROMPT_FLAG_PATTERN.search(help_text)",
+        '"--prompt-file",',
         '"--reasoning-effort",',
         '"high",',
     ]
@@ -2182,8 +2184,10 @@ def real_adapters_summary() -> str:
         "asyncio.create_subprocess_exec(",
         "stderr = await process.stderr.read()",
         "raise RuntimeError(stderr.decode",
+        "def ensure_argv_fits(",
+        "class ClaudeStreamJsonParser:",
         "def claude_stream_json_delta(line: str) -> str:",
-        'payload.get("type") == "content_block_delta"',
+        'payload_type == "content_block_delta"',
     ]
     capability_markers = [
         "ClaudeCliAdapter,",
@@ -2255,6 +2259,7 @@ def gemini_api_summary() -> str:
         '"Respond with exactly OK.",',
         '"--effort",',
         '"high",',
+        "ensure_argv_fits(",
         "await asyncio.wait_for(process.communicate(), timeout=30)",
         "return process.returncode == 0 and bool(stdout.strip())",
     ]

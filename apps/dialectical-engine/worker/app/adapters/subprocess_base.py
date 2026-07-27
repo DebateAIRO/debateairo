@@ -4,7 +4,59 @@ import asyncio
 import json
 import os
 import shutil
+import sys
 from collections.abc import AsyncIterator, Callable
+
+# --- CLI prompt transport ----------------------------------------------------
+# execve() charges argv AND envp against one kernel limit. On macOS/BSD that is
+# ARG_MAX (1 048 576 here, `getconf ARG_MAX`); Linux adds a hard 128 KiB cap on
+# any SINGLE argument (MAX_ARG_STRLEN). Passing a rendered debate prompt as one
+# argv element therefore fails with
+#   OSError: [Errno 7] Argument list too long
+# once the tree is big enough -- which is exactly what took the gemini
+# subscription loop down live on 2026-07-26 (debate 0f688d87 at 91 nodes).
+# Mirrors scripts/subscription_loop.py, the reference implementation whose
+# transports were verified against the installed CLIs that day.
+ARGV_HEADROOM_BYTES = 64 * 1024
+LINUX_MAX_SINGLE_ARG_BYTES = 128 * 1024  # MAX_ARG_STRLEN
+
+
+class PromptTooLargeForCli(RuntimeError):
+    """The prompt cannot be exec'd as an argv element and this CLI offers no
+    off-argv channel for it. Raised instead of letting execve fail with E2BIG,
+    so the worker reports a failed job rather than crashing mid-claim."""
+
+
+def argv_bytes(command: list[str]) -> int:
+    """Exec footprint of an argv list: each element plus its NUL terminator."""
+    return sum(len(str(part).encode("utf-8")) + 1 for part in command)
+
+
+def argv_capacity_bytes(extra_env: dict[str, str] | None = None) -> int:
+    """How many argv bytes this machine can actually exec, after charging the
+    environment (execve counts argv + envp together) and keeping headroom for
+    the pointer array and the kernel's own bookkeeping."""
+    try:
+        limit = int(os.sysconf("SC_ARG_MAX"))
+    except (ValueError, OSError, AttributeError):  # pragma: no cover - platform fallback
+        limit = 256 * 1024
+    merged = {**os.environ, **(extra_env or {})}
+    env_bytes = sum(len(f"{key}={value}".encode()) + 1 for key, value in merged.items())
+    capacity = limit - env_bytes - ARGV_HEADROOM_BYTES
+    if sys.platform.startswith("linux"):
+        capacity = min(capacity, LINUX_MAX_SINGLE_ARG_BYTES - 4096)
+    return max(0, capacity)
+
+
+def ensure_argv_fits(command: list[str], env: dict[str, str] | None = None, *, detail: str = "") -> None:
+    size = argv_bytes(command)
+    capacity = argv_capacity_bytes(env)
+    if size > capacity:
+        executable = command[0] if command else "command"
+        raise PromptTooLargeForCli(
+            f"{executable} argv is {size} bytes, past this machine's {capacity}-byte "
+            f"exec budget (ARG_MAX covers argv and env together).{detail}"
+        )
 
 
 class SubprocessStreamingAdapter:
@@ -24,44 +76,53 @@ class SubprocessStreamingAdapter:
     def env(self) -> dict[str, str] | None:
         return None
 
+    def cleanup(self) -> None:
+        """Per-stream() cleanup hook, called from stream()'s finally once the
+        run is over (success, process failure, or spawn error). Adapters that
+        stage the prompt on disk (grok) override this to remove the file; the
+        default no-op keeps every other adapter unchanged."""
+
     async def health_check(self) -> bool:
         return shutil.which(self.executable) is not None or os.path.isfile(self.executable)
 
     async def stream(self, system: str, user: str, max_tokens: int) -> AsyncIterator[str]:
-        stdin_text = self.stdin_text(system, user, max_tokens)
-        process = await asyncio.create_subprocess_exec(
-            *self.command(system, user, max_tokens),
-            stdin=asyncio.subprocess.PIPE if stdin_text is not None else None,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, **extra_env} if (extra_env := self.env()) else None,
-        )
-        if stdin_text is not None:
-            assert process.stdin is not None
-            process.stdin.write(stdin_text.encode())
-            await process.stdin.drain()
-            process.stdin.close()
-        assert process.stdout is not None
-        parse_line = self.new_line_parser()
-        emitted_output = False
-        async for raw_line in process.stdout:
-            text = parse_line(raw_line.decode(errors="replace"))
-            if text:
-                emitted_output = True
-                yield text
-        stderr = await process.stderr.read() if process.stderr else b""
-        code = await process.wait()
-        if code != 0:
-            raise RuntimeError(stderr.decode(errors="replace") or f"{self.executable} exited with {code}")
-        if not emitted_output:
-            final_text = self.final_output_text()
-            if final_text:
-                yield final_text
-                return
-            stderr_text = stderr.decode(errors="replace").strip()
-            if stderr_text:
-                raise RuntimeError(stderr_text)
-            raise RuntimeError(f"{self.executable} produced no output")
+        try:
+            stdin_text = self.stdin_text(system, user, max_tokens)
+            process = await asyncio.create_subprocess_exec(
+                *self.command(system, user, max_tokens),
+                stdin=asyncio.subprocess.PIPE if stdin_text is not None else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, **extra_env} if (extra_env := self.env()) else None,
+            )
+            if stdin_text is not None:
+                assert process.stdin is not None
+                process.stdin.write(stdin_text.encode())
+                await process.stdin.drain()
+                process.stdin.close()
+            assert process.stdout is not None
+            parse_line = self.new_line_parser()
+            emitted_output = False
+            async for raw_line in process.stdout:
+                text = parse_line(raw_line.decode(errors="replace"))
+                if text:
+                    emitted_output = True
+                    yield text
+            stderr = await process.stderr.read() if process.stderr else b""
+            code = await process.wait()
+            if code != 0:
+                raise RuntimeError(stderr.decode(errors="replace") or f"{self.executable} exited with {code}")
+            if not emitted_output:
+                final_text = self.final_output_text()
+                if final_text:
+                    yield final_text
+                    return
+                stderr_text = stderr.decode(errors="replace").strip()
+                if stderr_text:
+                    raise RuntimeError(stderr_text)
+                raise RuntimeError(f"{self.executable} produced no output")
+        finally:
+            self.cleanup()
 
     def parse_stdout_line(self, line: str) -> str:
         return line
