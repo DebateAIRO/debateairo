@@ -82,6 +82,14 @@ FAILURE_CIRCUIT_THRESHOLD = 2
 FAILURE_CIRCUIT_COOLDOWN_SECONDS = 15 * 60
 _FAILURE_CIRCUIT_LOCK = threading.Lock()
 _FAILURE_CIRCUITS: dict[tuple[str, str, str, str], tuple[int, datetime]] = {}
+# Provider-facing CLI model names occasionally survive in persisted jobs even
+# after the routing layer moves to a stable capability ID.  Treat those names
+# as aliases at the scheduler boundary so an upgrade cannot strand old work.
+# The worker still receives the canonical ID, which is the key its adapter map
+# exposes when configured with the current routing model.
+MODEL_ID_CANONICAL_ALIASES = {
+    "gpt-5.6-sol": "gpt-5.6sol-medium",
+}
 
 
 class StaleJobMutationError(ValueError):
@@ -240,6 +248,22 @@ def worker_capability_set(worker: Worker) -> set[str]:
     return {str(capability).strip() for capability in worker.capabilities or [] if str(capability).strip()}
 
 
+def canonical_model_id(model_id: str) -> str:
+    cleaned = str(model_id).strip()
+    return MODEL_ID_CANONICAL_ALIASES.get(cleaned, cleaned)
+
+
+def equivalent_model_ids(model_ids: set[str]) -> set[str]:
+    canonical = {canonical_model_id(model_id) for model_id in model_ids}
+    equivalent = set(canonical)
+    equivalent.update(
+        alias
+        for alias, target in MODEL_ID_CANONICAL_ALIASES.items()
+        if target in canonical
+    )
+    return equivalent
+
+
 def online_capabilities(db: Session) -> set[str]:
     settings = load_settings()
     allowed = routing_allowed_models(db)
@@ -248,9 +272,10 @@ def online_capabilities(db: Session) -> set[str]:
     caps: set[str] = set()
     for worker in workers:
         caps.update(worker_capability_set(worker))
+    caps = {canonical_model_id(capability) for capability in caps}
     if allowed is not None:
-        caps &= allowed
-    return caps
+        caps &= {canonical_model_id(model_id) for model_id in allowed}
+    return equivalent_model_ids(caps)
 
 
 def role_for_node(node_type: str) -> str:
@@ -815,12 +840,20 @@ def pending_or_running_jobs(db: Session, debate_id: str) -> list[Job]:
 
 def capable_online_workers(db: Session, model_id: str) -> list[Worker]:
     allowed = routing_allowed_models(db)
-    if allowed is not None and model_id not in allowed:
+    canonical_model = canonical_model_id(model_id)
+    if allowed is not None and canonical_model not in {
+        canonical_model_id(allowed_model) for allowed_model in allowed
+    }:
         return []
     settings = load_settings()
     cutoff = now_utc() - timedelta(seconds=settings.worker_offline_seconds)
     workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status == "online")).all()
-    return [worker for worker in workers if model_id in worker_capability_set(worker)]
+    return [
+        worker
+        for worker in workers
+        if canonical_model
+        in {canonical_model_id(capability) for capability in worker_capability_set(worker)}
+    ]
 
 
 def worker_debate_loads(db: Session, debate_id: str, workers: list[Worker]) -> dict[str, int]:
@@ -1293,10 +1326,15 @@ def claim_pending_job(
             _publish_events_sync(terminal_events)
         return None
 
-    capabilities = worker_capability_set(worker)
+    canonical_capabilities = {
+        canonical_model_id(capability) for capability in worker_capability_set(worker)
+    }
     allowed_models = routing_allowed_models(db)
     if allowed_models is not None:
-        capabilities &= allowed_models
+        canonical_capabilities &= {
+            canonical_model_id(model_id) for model_id in allowed_models
+        }
+    capabilities = equivalent_model_ids(canonical_capabilities)
     now = now_utc()
     reroute_unavailable_pending_jobs(db, now)
     # score_debate is excluded: scoring runs in a coordinator background
@@ -1359,6 +1397,19 @@ def claim_pending_job(
             .order_by(Job.created_at.asc())
         ).all()
     )
+    for candidate in jobs:
+        canonical_required_model = canonical_model_id(candidate.required_model)
+        if (
+            canonical_required_model != candidate.required_model
+            and canonical_required_model in canonical_capabilities
+        ):
+            LOGGER.info(
+                "Normalizing persisted job model alias job=%s from=%s to=%s",
+                candidate.id,
+                candidate.required_model,
+                canonical_required_model,
+            )
+            candidate.required_model = canonical_required_model
     lifecycle_compatible_jobs: list[Job] = []
     for candidate in jobs:
         debate = db.get(Debate, candidate.debate_id)

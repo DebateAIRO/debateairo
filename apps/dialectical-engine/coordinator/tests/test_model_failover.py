@@ -116,6 +116,23 @@ def test_transport_incompatible_prompt_reroutes_before_claim(db, monkeypatch):
     assert (job.payload or {})["tried_models"] == ["gemini-3.5-flash-loop"]
 
 
+def test_worker_claim_normalizes_persisted_codex_cli_alias(db):
+    from app.services.orchestrator import capable_online_workers, claim_pending_job, online_capabilities
+
+    codex = worker(db, "codex-current-model", ["gpt-5.6sol-medium"])
+    _, job = make_debate_with_job(db, "gpt-5.6-sol")
+
+    assert codex in capable_online_workers(db, "gpt-5.6-sol")
+    assert "gpt-5.6-sol" in online_capabilities(db)
+
+    claimed = claim_pending_job(db, codex)
+
+    assert claimed is not None
+    assert claimed.id == job.id
+    assert claimed.required_model == "gpt-5.6sol-medium"
+    assert claimed.worker_id == codex.id
+
+
 def test_repeated_permanent_signature_opens_provider_circuit(db, monkeypatch):
     from app.services import orchestrator
 
