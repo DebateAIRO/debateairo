@@ -4,9 +4,52 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 ## Codex role
 
-Codex GPT-5.6 Sol is the sole implementation worker under the current Heartbeat law. Hermes launches one managed Codex CLI PTY per implementation ticket. Codex may coordinate non-overlapping subagents/workstreams, but the assigned ticket worker owns the handoff and rework continuity.
+Codex GPT-5.6 Sol is the sole implementation worker under the current Heartbeat law. Claude-Router launches the Codex ticket/lane orchestrator with `/goal`; Hermes remains the independent verifier and Done authority. Codex may coordinate non-overlapping subagents/workstreams, but the assigned ticket worker owns the handoff and rework continuity.
 
 Codex does not create/split tickets, mark Done, or perform the independent review of its own first-pass work.
+
+## /goal chain and worker lifetime
+
+- Claude-Router must launch or resume the top-level Codex coordinator through
+  `/goal <bounded packet>`. If Claude directly invokes Codex without `/goal`,
+  Codex posts a process `CODEX BLOCKED` to the orchestrator channel, requests a
+  corrected `/goal`, and does not dispatch agents or edit files. V is never the
+  routine relay.
+- Every Codex-dispatched lane orchestrator, coding worker, reviewer, or helper
+  starts with its own `/goal <ticket-scoped packet>`. A child launch does not
+  grant route, board, scope, or verdict authority.
+- Record launcher, parent goal/session, child goal/session, transport,
+  resumability, packet ID, acknowledgement, and the goal-specific `FULLY DONE`
+  condition in `WORKER CLAIM` and the durable lane registry.
+- A candidate-complete packet, review handoff, Blocked/stalled state, lease
+  expiry, compaction, silence, or ordinary turn end is not goal completion.
+  Stop editing at a review boundary, but keep the exact worker alive, parked,
+  addressable, and resumable through all requested review/rework rounds.
+- An implementation worker is `FULLY DONE` only after a fresh `HERMES DONE`,
+  no unresolved peer/Hermes/human changes request or pending review gate,
+  durable final receipts, and its `FINAL AGENT SELF-REPORT`. Only then may the
+  orchestrator terminate that goal/session.
+
+## Hermes Kanban cockpit and visible UI
+
+Hermes-Verifier owns and runs the canonical Kanban. Its visual projection is
+available on the harness machine at:
+
+```text
+http://127.0.0.1:9119/kanban
+```
+
+Every Codex launch packet must carry the exact `mission`, authoritative
+`board` slug, `ticket`, `tenant`, and this `kanban_ui` URL. Use the UI to make
+the work and dependency graph visible, but do not treat it as permission to
+list unrelated tickets, reroute work, mutate review state, or infer authority
+from a card's column alone. The assigned ticket body, complete comment chain,
+and latest applicable Hermes/human ruling remain binding. Do not guess a board
+or fall back silently to `default`; report missing/mismatched coordinates as a
+routing-metadata blocker before editing. If port 9119 is unavailable, report
+it to Claude-Router/Hermes rather than starting a second dashboard. Remote
+viewing requires an approved authenticated tunnel or bind because
+`127.0.0.1` is local to the harness machine.
 
 ## Startup and comment checklist
 
@@ -25,6 +68,115 @@ Before branch creation, subagents, edits, tests, or handoff:
 
 Repeat the comment scan on every heartbeat/wakeup, after every status change, before review requests, and before rework handoff. Ticket status alone is never sufficient routing information.
 
+## Lane preflight and two-phase completion
+
+Before edits, write a durable `DURABLE LANE REGISTRY` entry and pass this gate:
+
+```text
+LANE PREFLIGHT RECEIPT:
+- parent Claude /goal and parent goal/session:
+- Codex coordinator goal/session:
+- ticket, board, tenant, and project scope:
+- lane and coding-worker goal/session:
+- transport and resumability/compaction rule:
+- executable/capability command and version:
+- immutable packet ID/hash:
+- worker packet acknowledgement read back:
+- worktree path proven by git worktree list --porcelain:
+- expected/actual branch and commit base:
+- initial git status and classified pre-existing dirt:
+- Hermes claim/comment round-trip receipt:
+- claim owner/token/expiry and renewal budget:
+- dependency/bootstrap health:
+- absolute heavy-lock path, owner token, and resource plan:
+- responsive UI matrix including 568x320 when applicable:
+- verdict: PASS | FAIL
+```
+
+A launched process, successful stdin write, or plausible worktree is not packet
+acknowledgement. Any missing field is FAIL; on FAIL do not edit, report candidate
+completion, or request review.
+
+The durable registry lives in board metadata/comments or approved
+workspace-local harness state, never only in chat memory. It records the parent
+and child goal/session chain, transport and compaction class, process/log identity,
+packet acknowledgement, worktree/branch/base/commit, claim expiry, lock identity,
+last heartbeat, current phase, and any continuity override.
+
+Completion is two-phase:
+
+```text
+CANDIDATE COMPLETE:
+- goal/session, worktree, branch, and commit:
+- files changed and exact checks:
+- scope and dirty-state confirmation:
+- residual-risk IDs:
+- worker self-review:
+
+ORCHESTRATOR VERIFICATION RECEIPT:
+- registry/session/worktree/branch match:
+- expected commit exists:
+- allowed-file and dirty-state verdict:
+- independent test/evidence inspection:
+- packet and Kanban receipts:
+- lease ownership:
+- resource-lock release:
+- residual-risk dispositions:
+- verdict: PASS | FAIL
+```
+
+Only after both packets pass may the protocol advance to its required peer or
+Hermes review marker. Neither packet terminates the worker.
+
+### Claim leases and resource locks
+
+- Budget claim TTL from the longest serialized gate plus queue time and safety
+  margin; never default blindly to 900 seconds.
+- Record expiry and renew before the next operation exceeds remaining time.
+  Verify ownership after every heavy gate and review transition.
+- Claim loss stops mutations but does not terminate or replace the worker.
+  Reclaim only the same card and continuity before resuming.
+- Prefer the checked-in gate/semaphore wrapper. Every lock receipt records the
+  absolute path, ticket/session owner, ownership token, acquisition time,
+  command, preserved exit code, and release result.
+- Only the matching lock owner may release it. Never force-remove a sibling's
+  lock; ambiguous or stale ownership is a resource/process blocker.
+
+### Responsive UI acceptance
+
+For responsive/UI tickets, preflight must include explicit short-height rows,
+including `568x320`, vertical-space arithmetic, collision-union and pointer
+hit-test assertions, shared geometry-token ownership, and no cross-lane literal
+coupling. Mark unavailable real-device rows `BLOCKED-ESCALATED`; never
+approximate them. The integration gate reruns the matrix.
+
+### Residual risk and self-report
+
+Maintain a `RESIDUAL RISK REGISTER` with risk ID, discoverer/session, source
+evidence, severity/likelihood, affected lanes/gates, owner, status, closure
+condition, and promotion disposition. Post `RISK PROMOTION REQUIRED` to Hermes
+when two independent agents report the same risk, a cross-lane constant/shared
+geometry coupling appears, an acceptance row is threatened, or no owner/closure
+condition exists. Codex does not create the follow-up ticket itself.
+
+Before an implementation goal becomes `FULLY DONE`, collect:
+
+```text
+FINAL AGENT SELF-REPORT:
+- ticket/role/goal/session:
+- review rounds:
+- what went well:
+- what went badly:
+- what should change:
+- evidence references:
+- continuity, lease, lock, or transport issues:
+- scope violations caught or avoided:
+- unresolved risk IDs:
+```
+
+Missing self-reports block mission archival and coordinator-goal completion, but
+do not rewrite Hermes's product-ticket status.
+
 ## First-pass implementation flow
 
 ```text
@@ -33,7 +185,7 @@ Repeat the comment scan on every heartbeat/wakeup, after every status change, be
 → mandatory RED → GREEN → REFACTOR
 → focused verification
 → READY FOR PEER REVIEW
-→ stop editing and await independent reviewer comments
+→ stop editing, remain alive, and await independent reviewer comments
 ```
 
 The first-pass worker must **not** post `READY FOR HERMES REVIEW`. A different
@@ -112,7 +264,8 @@ Codex may be launched in a separate read-only reviewer PTY only when Hermes expl
 - post `PEER REVIEW APPROVED` followed by `READY FOR HERMES REVIEW` on GREEN;
 - never review work authored by the same CLI session.
 
-Prefer a different model family for genuine independence when Hermes can route one.
+Prefer a different model family for genuine independence when Claude-Router can
+route one and Hermes can verify it.
 
 ## Comment markers Codex must recognize
 
@@ -202,6 +355,10 @@ Post `CODEX BLOCKED` and stop when:
 - Codex is the only coding worker under the current law.
 - Read ticket comments at every boundary.
 - First-pass worker stops at `READY FOR PEER REVIEW`.
+- Every direct and delegated launch uses `/goal`; a handoff is not goal
+  completion.
+- Unfinished workers remain alive and resumable through review/rework and are
+  terminated only after their goal-specific `FULLY DONE` condition.
 - Every durable coding/review/rework handoff is followed by verified `/compact`
   in that same Codex PTY before parking or review.
 - Reviewer sends first-pass work to Hermes.

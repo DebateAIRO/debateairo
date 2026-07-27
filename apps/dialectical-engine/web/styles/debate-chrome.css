@@ -1,0 +1,573 @@
+
+/* ============================================================
+   Debate view shell
+   ============================================================ */
+
+.debateView {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* safe-area env() requires the viewportFit: "cover" export in app/layout.tsx */
+  padding-bottom: calc(var(--token-dock-clearance) + env(safe-area-inset-bottom, 0px));
+}
+
+.debateTopBar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 60px;
+  flex: 0 0 60px;
+  min-width: 0;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  z-index: 30;
+}
+
+.debateTopIdentityRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.debateTopClaim {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.debateTopTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.debateTopControlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.debateTopBar :where(a, button, summary) {
+  min-height: 44px;
+}
+
+.debateTopBar .iconBtn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+
+.debateTopBar .segment {
+  flex: 0 0 auto;
+}
+
+.debateTopBar .segment button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 5px 10px;
+}
+
+.topSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 44px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.topSwitch > span:first-child {
+  flex: 0 0 auto;
+}
+
+.topSwitchStatus {
+  flex: 1 1 88px;
+  min-width: 0;
+  max-width: clamp(88px, 12vw, 180px);
+  overflow: hidden;
+  /* Explicit (not inherited from .topSwitch): this class is also used
+     outside .topSwitch, e.g. the W5a completion.humanReason line in the
+     debate top bar, which has no ancestor establishing nowrap. */
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: oklch(0.48 0.04 70);
+  text-transform: none;
+}
+
+[data-scoring-state="loading"] .topSwitchStatus {
+  color: var(--muted);
+}
+
+[data-scoring-state="error"] .topSwitchStatus {
+  color: oklch(0.52 0.14 28);
+}
+
+[data-scoring-state="unavailable"] .topSwitchStatus {
+  color: oklch(0.48 0.08 70);
+}
+
+.debateInlineActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debateOverflow {
+  display: none;
+}
+
+.debateOverflowMenu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debateOverflowAction {
+  flex: 0 0 auto;
+}
+
+.scoringInsightsStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(40vw, 360px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: oklch(0.48 0.04 70);
+  font-size: 12px;
+}
+
+.scoringInsightsStatus > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-scoring-state="loading"] .scoringInsightsStatus {
+  color: var(--muted);
+}
+
+[data-scoring-state="error"] .scoringInsightsStatus {
+  color: oklch(0.52 0.14 28);
+}
+
+[data-scoring-state="unavailable"] .scoringInsightsStatus {
+  color: oklch(0.48 0.08 70);
+}
+
+.scoringInsightsPanel {
+  flex: 0 0 auto;
+  border-bottom: 1px solid oklch(0.91 0.02 75);
+  background: oklch(0.97 0.01 75);
+}
+
+.scoringInsightsSummary {
+  position: relative;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.scoringInsightsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.scoringInsightsSummary::after {
+  content: "Open";
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.scoringInsightsPanel[open] .scoringInsightsSummary::after {
+  content: "Close";
+}
+
+.scoringInsightsPanelCompact .scoringInsightsSummary {
+  cursor: default;
+}
+
+.scoringInsightsPanelCompact .scoringInsightsSummary::after {
+  content: "";
+}
+
+.scoringInsightsDetail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scoringInsightsBody {
+  max-height: min(36vh, 360px);
+  overflow: auto;
+  border-top: 1px solid oklch(0.91 0.02 75);
+  background: var(--surface);
+}
+
+.scoringInsightsBody .progressStrip,
+.scoringInsightsBody .recommendationsPanel {
+  border-bottom: 1px solid oklch(0.91 0.02 75);
+}
+
+.scoringInsightsBody > :last-child {
+  border-bottom: 0;
+}
+
+/* progress strip */
+.progressStrip {
+  flex: 0 0 auto;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  background: oklch(0.97 0.01 75);
+  border-bottom: 1px solid oklch(0.91 0.02 75);
+}
+.progressLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: oklch(0.5 0.04 60);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.progressTrack {
+  flex: 1;
+  height: 4px;
+  background: oklch(0.92 0.01 75);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, oklch(0.62 0.09 165), oklch(0.66 0.1 75));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.progressCount {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: oklch(0.5 0.04 60);
+}
+
+.scoringIssueStrip,
+.adaptiveDepthStrip {
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 58px;
+  height: auto;
+  padding-top: 9px;
+  padding-bottom: 10px;
+}
+
+.scoringIssueIntro {
+  flex: 0 0 210px;
+  min-width: 0;
+}
+
+.scoringIssueSubcopy {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scoringIssuePills,
+.adaptiveDepthChips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scoringIssuePill {
+  max-width: min(100%, 420px);
+  min-height: 24px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.scoringIssuePill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adaptiveDepthActions {
+  display: grid;
+  gap: 5px;
+  margin-left: auto;
+  min-width: 210px;
+  max-width: 280px;
+}
+
+.adaptiveDepthActionMessage {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.debateError {
+  padding: 10px 22px 0;
+}
+
+.debateMain {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+@media (max-width: 920px) {
+  .debateTopBar {
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    height: auto;
+    min-height: 104px;
+    flex: 0 0 auto;
+    padding: 6px 14px 8px;
+  }
+
+  .debateTopIdentityRow,
+  .debateTopControlRow {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .debateTopIdentityRow {
+    gap: 12px;
+  }
+
+  .debateTopClaim {
+    justify-content: flex-start;
+  }
+
+  .debateTopIdentityRow .debateTopTitle {
+    flex: 1 1 auto;
+    max-width: none;
+    text-overflow: ellipsis;
+  }
+
+  .debateTopControlRow {
+    gap: 8px;
+  }
+
+  .debateActionLabel {
+    display: none;
+  }
+
+  .debateOverflowMenu {
+    gap: 8px;
+  }
+
+  .debateInlineActions :where(.btn, .btnGhost) {
+    width: 44px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .debateTopBar {
+    padding-inline: 8px;
+  }
+
+  .debateTopIdentityRow {
+    gap: 8px;
+  }
+
+  .debateTopIdentityRow .brand {
+    width: 44px;
+    justify-content: center;
+  }
+
+  .debateTopIdentityRow .brandText {
+    display: none;
+  }
+
+  .debateTopControlRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+    gap: 8px;
+  }
+
+  .debateInlineActions {
+    display: none;
+  }
+
+  .debateTopControlRow .segment {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .debateTopControlRow .segment button {
+    flex: 1 1 0;
+    min-width: 44px;
+    padding-inline: 0;
+  }
+
+  .topSwitch {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .topSwitch > span:first-child {
+    display: none;
+  }
+
+  .debateOverflow {
+    position: relative;
+    display: block;
+    width: 44px;
+  }
+
+  .debateOverflow > summary {
+    display: inline-flex;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .debateOverflow > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .debateOverflow:not([open]) .debateOverflowMenu {
+    display: none;
+  }
+
+  .debateOverflowMenu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 35;
+    width: min(240px, calc(100vw - 16px));
+    max-height: min(60dvh, 360px);
+    overflow: auto;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-panel);
+    background: var(--surface);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .debateOverflowMenu .debateOverflowAction {
+    width: 100%;
+    min-width: 44px;
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  .debateOverflowMenu .debateActionLabel {
+    display: inline;
+  }
+
+  .scoringInsightsStatus {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) and (max-height: 400px) {
+  .debateView .scoringInsightsSummary {
+    height: 44px;
+    min-height: 44px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    overflow: hidden;
+  }
+
+  .debateView .scoringInsightsSummary .progressCount,
+  .debateView .scoringInsightsDetail {
+    display: none;
+  }
+
+  .debateView .scoringInsightsStatus {
+    width: auto;
+    max-width: none;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .debateView .scoringInsightsStatus > span {
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+  .debateView .scoringInsightsSummary::after {
+    position: static;
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 640px) and (max-height: 400px) {
+  .debateTopBar {
+    height: 60px;
+    min-height: 60px;
+    grid-template-columns: minmax(0, 1fr) 286px;
+    grid-template-rows: 44px;
+    gap: 8px;
+    padding-block: 7px 8px;
+  }
+
+  .debateTopIdentityRow {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .debateTopClaim {
+    gap: 6px;
+  }
+
+  .debateTopControlRow {
+    width: 286px;
+    grid-template-columns: minmax(182px, 1fr) 44px 44px;
+  }
+}

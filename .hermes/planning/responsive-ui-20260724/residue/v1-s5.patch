@@ -1,0 +1,620 @@
+diff --git a/apps/dialectical-engine/web/components/DebateMap.tsx b/apps/dialectical-engine/web/components/DebateMap.tsx
+index 9a773ba..6fd9926 100644
+--- a/apps/dialectical-engine/web/components/DebateMap.tsx
++++ b/apps/dialectical-engine/web/components/DebateMap.tsx
+@@ -61,6 +61,7 @@ function fillFor(node: DebateNode, depth: number): string {
+ }
+ 
+ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
++  const [selectedId, setSelectedId] = useState(root.id);
+   const [hoverId, setHoverId] = useState<string | null>(null);
+ 
+   const maxDepth = Math.max(1, treeDepth(root));
+@@ -92,7 +93,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
+   };
+   place(root, 0, START, START + Math.PI * 2);
+ 
+-  const readoutNode = hoverId ? arcs.find((a) => a.id === hoverId)?.node ?? root : root;
++  const activeId = hoverId ?? selectedId;
++  const readoutNode = activeId === root.id ? root : arcs.find((a) => a.id === activeId)?.node ?? root;
+   const readoutRole = roleOf(readoutNode);
+   const readoutPal = readoutRole === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[readoutRole];
+   const readoutModel = readoutNode.active_generation ? modelMeta(readoutNode.active_generation.model_id) : null;
+@@ -121,10 +123,22 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
+                 fill={arc.fill}
+                 stroke="oklch(0.99 0.004 85)"
+                 strokeWidth={2}
+-                opacity={hoverId && hoverId !== arc.id ? 0.55 : 1}
++                opacity={activeId !== root.id && activeId !== arc.id ? 0.55 : 1}
+                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+-                onClick={() => onOpenSplit(arc.id)}
++                role="button"
++                tabIndex={0}
++                aria-label={`Inspect ${arc.node.claim}`}
++                aria-pressed={selectedId === arc.id}
++                onClick={() => setSelectedId(arc.id)}
++                onKeyDown={(event) => {
++                  if (event.key === "Enter" || event.key === " ") {
++                    event.preventDefault();
++                    setSelectedId(arc.id);
++                  }
++                }}
+                 onMouseEnter={() => setHoverId(arc.id)}
++                onFocus={() => setHoverId(arc.id)}
++                onBlur={() => setHoverId(null)}
+               >
+                 <title>{arc.node.claim}</title>
+               </path>
+@@ -137,9 +151,20 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
+               stroke="oklch(0.22 0.012 70)"
+               strokeWidth={2.5}
+               style={{ cursor: "pointer" }}
++              role="button"
++              tabIndex={0}
++              aria-label={`Inspect root claim: ${root.claim}`}
++              aria-pressed={selectedId === root.id}
+               onClick={() => {
+                 setHoverId(null);
+-                onOpenSplit(root.id);
++                setSelectedId(root.id);
++              }}
++              onKeyDown={(event) => {
++                if (event.key === "Enter" || event.key === " ") {
++                  event.preventDefault();
++                  setHoverId(null);
++                  setSelectedId(root.id);
++                }
+               }}
+             >
+               <title>{root.claim}</title>
+@@ -172,7 +197,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
+             </button>
+           </div>
+           <div className="mapReadoutClaim">{readoutNode.claim}</div>
+-          <div className="mapReadoutHint">Hover a wedge to inspect · click to focus · center resets to root</div>
++          <div className="mapReadoutHint">Tap or hover a wedge to inspect · use Open in Split to navigate · center selects root</div>
+         </div>
+       </div>
+     </div>
+diff --git a/apps/dialectical-engine/web/components/DebateSplit.tsx b/apps/dialectical-engine/web/components/DebateSplit.tsx
+index 6801926..1a8bbcc 100644
+--- a/apps/dialectical-engine/web/components/DebateSplit.tsx
++++ b/apps/dialectical-engine/web/components/DebateSplit.tsx
+@@ -81,7 +81,11 @@ export function DebateSplit({
+               const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
+               const isLeaf = index === path.length - 1;
+               return (
+-                <div key={node.id} className="splitChip" style={{ marginLeft: index * 16 }}>
++                <div
++                  key={node.id}
++                  className="splitChip"
++                  style={{ "--split-chip-indent": `${index * 16}px` } as CSSProperties}
++                >
+                   <span className="splitChipArrow" aria-hidden>
+                     ↳
+                   </span>
+diff --git a/apps/dialectical-engine/web/components/SynthesisPanel.tsx b/apps/dialectical-engine/web/components/SynthesisPanel.tsx
+index bd4ca3e..121610b 100644
+--- a/apps/dialectical-engine/web/components/SynthesisPanel.tsx
++++ b/apps/dialectical-engine/web/components/SynthesisPanel.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+ 
++import { useId, useState } from "react";
+ import type { Synthesis } from "@/lib/types";
+ 
+ export type SynthesisView = {
+@@ -22,80 +23,119 @@ export function SynthesisPanel(view: SynthesisView) {
+     view.verdictGate?.state === "suppressed_no_evidence"
+       ? "Endorsed verdict withheld — no evidence in this run."
+       : view.verdict || "Pending";
++  const [sheetOpen, setSheetOpen] = useState(false);
++  const sheetId = useId();
++  const closeSheet = () => setSheetOpen(false);
+ 
+   return (
+-    <aside className="synthPanel scroll" aria-label="Synthesis">
+-      <div className="synthInner">
+-        <div className="synthTitle">
+-          <span className="synthDiamond" aria-hidden />
+-          <span>Synthesis</span>
++    <>
++      <button
++        type="button"
++        className="synthSheetTab"
++        aria-controls={sheetId}
++        aria-expanded={sheetOpen}
++        onClick={() => setSheetOpen(true)}
++      >
++        <span className="synthSheetTabIcon" aria-hidden>
++          ◆
++        </span>
++        <span>Synthesis</span>
++      </button>
++      <button
++        type="button"
++        className={`synthSheetScrim${sheetOpen ? " synthSheetScrimOpen" : ""}`}
++        aria-label="Close synthesis"
++        tabIndex={sheetOpen ? 0 : -1}
++        onClick={closeSheet}
++      />
++      <aside
++        id={sheetId}
++        className={`synthPanel synthSheet scroll${sheetOpen ? " synthPanelOpen" : ""}`}
++        aria-label="Synthesis"
++        role={sheetOpen ? "dialog" : undefined}
++        aria-modal={sheetOpen ? true : undefined}
++        onKeyDown={(event) => {
++          if (event.key === "Escape") closeSheet();
++        }}
++      >
++        <div className="synthSheetBar">
++          <span>Synthesis and verdict</span>
++          <button type="button" className="synthSheetClose" onClick={closeSheet}>
++            Close
++          </button>
+         </div>
+-        <div className="synthSubtitle">The strongest case on each side, plus a verdict.</div>
+-
+-        {view.pending && !view.streaming ? (
+-          <div className="synthSkeletons">
+-            <div className="skel" style={{ height: 96, borderRadius: 12 }} />
+-            <div className="skel" style={{ height: 96, borderRadius: 12 }} />
+-            <div className="skel" style={{ height: 120, borderRadius: 12 }} />
+-            <div className="synthPendingNote">Synthesis runs once the tree completes…</div>
++        <div className="synthInner">
++          <div className="synthTitle">
++            <span className="synthDiamond" aria-hidden />
++            <span>Synthesis</span>
+           </div>
+-        ) : (
+-          <div className="synthCards">
+-            {view.structured ? null : (
+-              <>
+-                <section className="synthCard synthPro">
+-                  <div className="synthCardHead">
+-                    <span className="synthCardLabel pro">↑ Strongest Pro</span>
+-                  </div>
+-                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.proClaim || "Pending"}</div>
+-                </section>
++          <div className="synthSubtitle">The strongest case on each side, plus a verdict.</div>
++
++          {view.pending && !view.streaming ? (
++            <div className="synthSkeletons">
++              <div className="skel" style={{ height: 96, borderRadius: 12 }} />
++              <div className="skel" style={{ height: 96, borderRadius: 12 }} />
++              <div className="skel" style={{ height: 120, borderRadius: 12 }} />
++              <div className="synthPendingNote">Synthesis runs once the tree completes…</div>
++            </div>
++          ) : (
++            <div className="synthCards">
++              {view.structured ? null : (
++                <>
++                  <section className="synthCard synthPro">
++                    <div className="synthCardHead">
++                      <span className="synthCardLabel pro">↑ Strongest Pro</span>
++                    </div>
++                    <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.proClaim || "Pending"}</div>
++                  </section>
++
++                  <section className="synthCard synthCon">
++                    <div className="synthCardHead">
++                      <span className="synthCardLabel con">↓ Strongest Con</span>
++                    </div>
++                    <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.conClaim || "Pending"}</div>
++                  </section>
++                </>
++              )}
+ 
+-                <section className="synthCard synthCon">
+-                  <div className="synthCardHead">
+-                    <span className="synthCardLabel con">↓ Strongest Con</span>
++              <section className="synthCard synthVerdict">
++                <div className="synthCardHead">
++                  <span className="synthCardLabel verdict">Verdict</span>
++                  {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
++                </div>
++                <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
++                {view.lean ? (
++                  <div className="synthLean">
++                    <span className="synthLeanLabel">Leans</span>
++                    <div
++                      className="synthLeanBar"
++                      style={{
++                        background: `linear-gradient(90deg, oklch(0.6 0.08 165) 0%, oklch(0.6 0.08 165) ${view.lean.pct}%, oklch(0.5 0.01 70) ${view.lean.pct}%, oklch(0.65 0.1 50) 100%)`
++                      }}
++                    />
++                    <span className="synthLeanValue">{view.lean.label}</span>
+                   </div>
+-                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.conClaim || "Pending"}</div>
+-                </section>
+-              </>
+-            )}
++                ) : null}
++              </section>
+ 
+-            <section className="synthCard synthVerdict">
+-              <div className="synthCardHead">
+-                <span className="synthCardLabel verdict">Verdict</span>
+-                {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
+-              </div>
+-              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
+-              {view.lean ? (
+-                <div className="synthLean">
+-                  <span className="synthLeanLabel">Leans</span>
+-                  <div
+-                    className="synthLeanBar"
+-                    style={{
+-                      background: `linear-gradient(90deg, oklch(0.6 0.08 165) 0%, oklch(0.6 0.08 165) ${view.lean.pct}%, oklch(0.5 0.01 70) ${view.lean.pct}%, oklch(0.65 0.1 50) 100%)`
+-                    }}
+-                  />
+-                  <span className="synthLeanValue">{view.lean.label}</span>
++              {view.sections && view.sections.length > 0 ? (
++                <div className="synthSections">
++                  {view.sections.map((section) => (
++                    <section key={section.title} className="synthSection">
++                      <div className="synthSectionTitle">{section.title}</div>
++                      <ul className="synthSectionList">
++                        {section.items.map((item) => (
++                          <li key={item}>{item}</li>
++                        ))}
++                      </ul>
++                    </section>
++                  ))}
+                 </div>
+               ) : null}
+-            </section>
+-
+-            {view.sections && view.sections.length > 0 ? (
+-              <div className="synthSections">
+-                {view.sections.map((section) => (
+-                  <section key={section.title} className="synthSection">
+-                    <div className="synthSectionTitle">{section.title}</div>
+-                    <ul className="synthSectionList">
+-                      {section.items.map((item) => (
+-                        <li key={item}>{item}</li>
+-                      ))}
+-                    </ul>
+-                  </section>
+-                ))}
+-              </div>
+-            ) : null}
+-          </div>
+-        )}
+-      </div>
+-    </aside>
++            </div>
++          )}
++        </div>
++      </aside>
++    </>
+   );
+ }
+diff --git a/apps/dialectical-engine/web/styles/map.css b/apps/dialectical-engine/web/styles/map.css
+index 3151c04..a2bf3d2 100644
+--- a/apps/dialectical-engine/web/styles/map.css
++++ b/apps/dialectical-engine/web/styles/map.css
+@@ -77,18 +77,20 @@
+   margin-top: 9px;
+ }
+ 
+-@media (max-width: 760px) {
+-  .splitColumns {
+-    flex-direction: column;
++@media (max-width: 480px) {
++  .mapInner {
++    padding: 16px 12px 80px;
+   }
+-  .splitColumn.pro,
+-  .splitColumn.con {
+-    padding: 0;
++  .mapLegend {
++    gap: 8px 12px;
+   }
+-  .splitBattleLine {
+-    display: none;
++  .mapReadout {
++    padding: 12px;
+   }
+-  .splitPerspectives {
+-    grid-template-columns: 1fr;
++  .mapReadoutHead {
++    flex-wrap: wrap;
++  }
++  .mapReadoutHead .nodeCtrl.link {
++    margin-left: auto;
+   }
+ }
+diff --git a/apps/dialectical-engine/web/styles/split.css b/apps/dialectical-engine/web/styles/split.css
+index d44eb16..66d5a08 100644
+--- a/apps/dialectical-engine/web/styles/split.css
++++ b/apps/dialectical-engine/web/styles/split.css
+@@ -38,6 +38,9 @@
+ }
+ .splitChip {
+   display: flex;
++  min-width: 0;
++  max-width: 100%;
++  margin-left: var(--split-chip-indent, 0px);
+   align-items: center;
+   gap: 7px;
+   margin-bottom: 5px;
+@@ -148,7 +151,8 @@
+   margin: 18px auto 4px;
+ }
+ .splitMeterSide {
+-  flex: 0 0 130px;
++  flex: 0 1 auto;
++  min-width: 64px;
+ }
+ .splitMeterSide.right {
+   text-align: right;
+@@ -177,6 +181,7 @@
+ }
+ .splitMeterBar {
+   flex: 1;
++  min-width: 40px;
+   height: 7px;
+   border-radius: 4px;
+   box-shadow: inset 0 0 0 1px oklch(0.85 0.01 80 / 0.5);
+@@ -406,3 +411,39 @@
+ .nodeCtrl.link:hover {
+   background: oklch(0.95 0.03 250);
+ }
++
++@media (max-width: 768px) {
++  .splitInner {
++    padding: 20px 12px 90px;
++  }
++  .splitChip {
++    margin-left: min(var(--split-chip-indent, 0px), 36px);
++  }
++  .splitChipBtn {
++    width: 100%;
++    max-width: 100%;
++    flex-wrap: wrap;
++  }
++  .splitChipClaim {
++    flex-basis: 100%;
++    white-space: normal;
++    overflow-wrap: anywhere;
++  }
++  .splitMeter {
++    gap: 10px;
++  }
++  .splitColumns {
++    flex-direction: column;
++  }
++  .splitColumn.pro,
++  .splitColumn.con {
++    width: 100%;
++    padding: 0;
++  }
++  .splitBattleLine {
++    display: none;
++  }
++  .splitPerspectives {
++    grid-template-columns: 1fr;
++  }
++}
+diff --git a/apps/dialectical-engine/web/styles/synth.css b/apps/dialectical-engine/web/styles/synth.css
+index 0db2d43..7cf9215 100644
+--- a/apps/dialectical-engine/web/styles/synth.css
++++ b/apps/dialectical-engine/web/styles/synth.css
+@@ -187,3 +187,131 @@
+   background: currentColor;
+   animation: de-blink 1s step-end infinite;
+ }
++
++.synthSheetTab,
++.synthSheetScrim,
++.synthSheetBar {
++  display: none;
++}
++
++@media (max-width: 920px) {
++  .synthSheetTab {
++    position: fixed;
++    left: 18px;
++    bottom: var(--dock-offset-b);
++    z-index: var(--z-sheet);
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    gap: 6px;
++    width: min(164px, calc(100vw - var(--dock-collapsed-w) - 54px));
++    height: 44px;
++    padding: 0 10px;
++    border: 1px solid var(--line-strong);
++    border-radius: var(--r-btn);
++    background: var(--surface);
++    box-shadow: var(--shadow-pop);
++    color: var(--text-strong);
++    cursor: pointer;
++    font-family: var(--font-mono);
++    font-size: 11px;
++    font-weight: 700;
++    letter-spacing: 0.04em;
++    text-transform: uppercase;
++    white-space: nowrap;
++    overflow: hidden;
++  }
++  .synthSheetTabIcon {
++    color: oklch(0.52 0.04 75);
++  }
++  .synthSheetScrim {
++    position: fixed;
++    inset: 0;
++    z-index: var(--z-sheet);
++    display: block;
++    border: 0;
++    padding: 0;
++    background: oklch(0.18 0.01 70 / 0.42);
++    opacity: 0;
++    visibility: hidden;
++    pointer-events: none;
++    transition: opacity 0.2s ease, visibility 0.2s ease;
++  }
++  .synthSheetScrimOpen {
++    opacity: 1;
++    visibility: visible;
++    pointer-events: auto;
++  }
++  .synthPanel.synthSheet {
++    display: block;
++    position: fixed;
++    left: 0;
++    right: 0;
++    bottom: 0;
++    z-index: calc(var(--z-sheet) + 1);
++    flex: none;
++    width: 100%;
++    max-height: 70dvh;
++    padding-bottom: var(--safe-b);
++    border-top: 1px solid var(--line-strong);
++    border-left: 0;
++    border-radius: var(--r-card) var(--r-card) 0 0;
++    box-shadow: 0 -18px 48px -24px oklch(0.18 0.02 70 / 0.55);
++    overflow: auto;
++    overscroll-behavior: contain;
++    transform: translateY(100%);
++    visibility: hidden;
++    pointer-events: none;
++    transition: transform 0.22s ease, visibility 0.22s ease;
++  }
++  .synthPanel.synthSheet.synthPanelOpen {
++    transform: translateY(0);
++    visibility: visible;
++    pointer-events: auto;
++  }
++  .synthSheetBar {
++    position: sticky;
++    top: 0;
++    z-index: 1;
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 12px;
++    padding: 10px 14px;
++    border-bottom: 1px solid var(--line);
++    background: var(--surface-1);
++    color: var(--text-2);
++    font-family: var(--font-mono);
++    font-size: 10px;
++    font-weight: 700;
++    letter-spacing: 0.05em;
++    text-transform: uppercase;
++  }
++  .synthSheetClose {
++    min-height: 32px;
++    padding: 4px 10px;
++    border: 1px solid var(--line);
++    border-radius: var(--r-btn);
++    background: var(--surface-2);
++    color: var(--text-2);
++    cursor: pointer;
++    font-family: var(--font-mono);
++  }
++  .synthPanel.synthSheet .synthInner {
++    padding: 14px 14px 24px;
++  }
++  .debateView:has(.tokenForm) .synthSheetTab {
++    display: none;
++  }
++  .debateView:has(.tokenForm) .synthSheetScrim,
++  .debateView:has(.tokenForm) .synthPanel.synthSheet {
++    visibility: hidden;
++    pointer-events: none;
++  }
++}
++
++@media (max-width: 340px) {
++  .synthSheetTabIcon {
++    display: none;
++  }
++}
+diff --git a/apps/dialectical-engine/web/styles/thread.css b/apps/dialectical-engine/web/styles/thread.css
+index 73bcff0..7ca0208 100644
+--- a/apps/dialectical-engine/web/styles/thread.css
++++ b/apps/dialectical-engine/web/styles/thread.css
+@@ -4,6 +4,7 @@
+    ============================================================ */
+ 
+ .thread {
++  --thread-lane: 30px;
+   flex: 1;
+   min-width: 0;
+   overflow: auto;
+@@ -34,7 +35,7 @@
+ .threadStub {
+   position: relative;
+   height: 14px;
+-  margin-left: 14px;
++  margin-left: calc(var(--thread-lane) / 2 - 1px);
+ }
+ .threadStub::before {
+   content: "";
+@@ -52,28 +53,28 @@
+   position: relative;
+ }
+ .threadLane {
+-  flex: 0 0 30px;
+-  width: 30px;
++  flex: 0 0 var(--thread-lane);
++  width: var(--thread-lane);
+   position: relative;
+ }
+ .threadLaneLine {
+   position: absolute;
+-  left: 14px;
++  left: calc(var(--thread-lane) / 2 - 1px);
+   top: -14px;
+   bottom: 0;
+   width: 2px;
+   background: oklch(0.88 0.006 80);
+ }
+ .threadElbow {
+-  flex: 0 0 30px;
+-  width: 30px;
++  flex: 0 0 var(--thread-lane);
++  width: var(--thread-lane);
+   position: relative;
+ }
+ .threadElbowShape {
+   position: absolute;
+-  left: 14px;
++  left: calc(var(--thread-lane) / 2 - 1px);
+   top: -14px;
+-  width: 15px;
++  width: calc(var(--thread-lane) / 2);
+   height: 42px;
+   border-left: 2px solid;
+   border-bottom: 2px solid;
+@@ -81,7 +82,7 @@
+ }
+ .threadElbowContinue {
+   position: absolute;
+-  left: 14px;
++  left: calc(var(--thread-lane) / 2 - 1px);
+   top: 28px;
+   bottom: 0;
+   width: 2px;
+@@ -151,3 +152,18 @@
+   font-size: 12px;
+   line-height: 1;
+ }
++
++@media (max-width: 480px) {
++  .thread {
++    --thread-lane: 14px;
++  }
++  .threadInner {
++    padding: 20px 12px 80px;
++  }
++  .threadLane:nth-of-type(n + 5) {
++    display: none;
++  }
++  .threadCard {
++    padding-inline: 12px;
++  }
++}

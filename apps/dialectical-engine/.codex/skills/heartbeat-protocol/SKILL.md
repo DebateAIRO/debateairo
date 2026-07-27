@@ -1,8 +1,6 @@
 ---
 name: heartbeat-protocol
-description: Codex adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Codex requests independent peer review; Hermes performs its own review and runs verified same-terminal /compact after every durable coding/review/rework sequence.
-version: 3.0.0
-spine_version: 3.0.0
+description: Codex adapter for DebateAI's comment-driven Kanban Heartbeat protocol. Claude-Router and every descendant launch Codex agents through /goal; unfinished workers remain resumable through review and rework until FULLY DONE.
 ---
 
 # Codex Heartbeat Protocol
@@ -25,7 +23,29 @@ Hermes              = non-delegable evidence reviewer, cockpit, human-review rou
 V                    = human product/acceptance reviewer
 ```
 
-Hermes launches one managed Codex CLI PTY per implementation ticket. New ticket means new terminal. Rework means resume the same original ticket/session.
+Claude-Router must launch this Codex coordinator with
+`/goal <bounded ticket/lane packet>`. New ticket means a new goal/session.
+Rework means resume the same original goal/session.
+
+## /goal chain and worker lifetime
+
+- If Claude directly launches Codex without `/goal`, request a corrected
+  `/goal` from Claude-Router before dispatching agents or editing files. Record
+  the process blocker through the orchestrator channel; never ask V to relay it.
+- Every downstream agent launch starts with
+  `/goal <ticket-scoped objective>`, including lane orchestrators, coding
+  workers, reviewers, and helpers.
+- Record parent/child goal and session IDs, transport, resumability, packet
+  acknowledgement, worktree/branch, claim expiry, and lock identity in the
+  durable lane registry.
+- `READY FOR PEER REVIEW`, `READY FOR HERMES REVIEW`, Blocked, stalled,
+  compaction, claim expiry, or waiting for review does not complete a goal.
+  Stop editing at the required boundary, but keep the exact worker alive and
+  resumable for review requests.
+- An implementation goal is `FULLY DONE` only after fresh `HERMES DONE`, no
+  unresolved review/rework request or pending gate, final evidence receipts,
+  and the same worker's final self-report. Do not terminate an unfinished
+  worker or replace it merely to save time.
 
 ## On launch or wakeup
 
@@ -44,10 +64,16 @@ WORKER CLAIM
 → RED → GREEN → REFACTOR
 → exact focused checks
 → READY FOR PEER REVIEW
-→ stop editing
+→ stop editing but remain alive and resumable
 ```
 
-The first-pass Codex worker does **not** post `READY FOR HERMES REVIEW`. Hermes launches a separate reviewer. On reviewer RED, the same Codex worker fixes and requests peer re-review. On reviewer GREEN, the reviewer posts `READY FOR HERMES REVIEW`; Hermes itself then reads the full comment chain, diff, tests, and product evidence. Reviewer GREEN never substitutes for Hermes's own review.
+The first-pass Codex worker does **not** post `READY FOR HERMES REVIEW`.
+Claude-Router launches a separate reviewer through `/goal`; Hermes independently
+verifies the resulting verdict. On reviewer RED, the same Codex worker fixes and
+requests peer re-review. On reviewer GREEN, the reviewer posts
+`READY FOR HERMES REVIEW`; Hermes itself then reads the full comment chain, diff,
+tests, and product evidence. Reviewer GREEN never substitutes for Hermes's own
+review.
 
 ## Post-dialogue checkpoint compaction
 
@@ -136,3 +162,7 @@ Every outgoing marker includes the latest `comments read through` cursor.
 - Hermes's own review remains mandatory after reviewer GREEN.
 - Every durable coding/review/rework handoff is followed by verified
   same-terminal `/compact` before parking or review.
+- Every direct or delegated launch uses `/goal`; a handoff is never
+  implementation-goal completion.
+- Do not terminate an implementation worker until its `FULLY DONE` condition
+  is verified.

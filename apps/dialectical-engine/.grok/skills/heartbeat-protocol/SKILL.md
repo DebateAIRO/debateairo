@@ -1,8 +1,6 @@
 ---
 name: heartbeat-protocol
-description: Grok node contract for DebateAI Graph Spine v2. Research / plan-review / vertical-slices artifact worker and independent read-only reviewer; thin loader over the repo spine.
-version: 3.0.0
-spine_version: 3.0.0
+description: Grok node contract for DebateAI Graph Spine v2. Research, plan-review, vertical-slices, and read-only review goals launch through /goal and remain resumable through requested review/rework until FULLY DONE.
 ---
 
 # Grok Node Contract
@@ -30,6 +28,19 @@ Grok does NOT implement production/test/migration/configuration code while the
 Codex-only law is active; its role is research, plan-review, slicing, and
 read-only review.
 
+## /goal chain and worker lifetime
+
+Claude-Router launches every Grok artifact or review worker with
+`/goal <bounded stage/ticket packet>`. If an authorized Grok goal launches a
+helper, launch that child with its own `/goal <bounded packet>` and record the
+parent/child goal and session chain in durable state.
+
+A handoff, review wait, Blocked/stalled state, or compaction does not finish an
+unresolved goal. Stop editing at the required boundary, but keep the exact
+worker alive, parked, addressable, and resumable for every requested
+review/rework round. Terminate it only after its role-specific `FULLY DONE`
+condition in the spine is durable and no requested re-review remains.
+
 ## State reads/writes (spine §3)
 
 Reads its stage/ticket state, `risk_tier`, and declared upstream artifact paths.
@@ -43,9 +54,10 @@ Author only the assigned artifact -> `READY FOR HERMES STAGE REVIEW` (G1/G5), or
 record a G3/review verdict through markers (`READY FOR PEER REVIEW` /
 `PEER REVIEW APPROVED` / `PEER REVIEW CHANGES REQUESTED`). In a diamond, never read
 another reviewer's verdict (G3 never reads H2's; spine §7). Stop editing after
-handoff; Hermes-Verifier (spine §5.2) gates. Rework stays in the same stage session
-(preserved law 4); on a lost session post `GROK BLOCKED` with `session_continuity`
-and require `WORKER CONTINUITY OVERRIDE`.
+handoff but remain alive and resumable; Hermes-Verifier (spine §5.2) gates.
+Rework stays in the same stage session (preserved law 4); on a lost session post
+`GROK BLOCKED` with `session_continuity` and require
+`WORKER CONTINUITY OVERRIDE`.
 
 ## Worktree (read-only)
 

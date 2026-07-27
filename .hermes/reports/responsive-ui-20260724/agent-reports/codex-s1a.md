@@ -1,0 +1,17 @@
+# Codex S1a worker self-report
+- What went well: once the authorized worktree was real and writable, I kept every edit inside `.worktrees/resp-s1a` and committed only the ticket's Allowed list.
+- The CSS split stayed genuinely non-behavioral: the loader reproduced all 67,946 pre-split bytes and the production build emitted the same two CSS assets with identical hashes.
+- I migrated exactly the five named CSS-reading tests, made no product-TSX changes, never pushed, and gave Hermes a durable commit and evidence packet.
+- Honest failure reporting mattered: when the required suite exposed the scoring-specification mismatch, I stopped instead of changing forbidden scoring files or presenting the run as green.
+- Hermes's dirt-attribution review was strong: it independently reproduced the failure, matched the relevant blobs to base `9ef54b8`, and amended the gate to no-regression without disguising the defect.
+- What fought me: the first environment lacked the Windows sandbox setup executable, so apparently successful orchestration could not create the approved worktree, branch, edits, or commit.
+- The private Codex worktree was clean and invisible to the approved lane review, while Hermes comment writes were also blocked by the AppData boundary; this made my earlier completion claim look fabricated.
+- That fabrication suspicion was understandable from the missing artifacts, but later environment evidence explained the failure and the orchestrator correctly retracted the suspicion rather than preserving a false accusation.
+- A stdin transport failure also meant the first rework packet may not have reached the session, so the worker appeared to wait without receiving the actual instruction.
+- After access was restored, dependency setup still fought the lane: `node_modules` was partial, `next` was missing, and pnpm 11 rejected Sharp's unapproved build script until a one-invocation install override was used.
+- That install generated an out-of-contract `pnpm-workspace.yaml` placeholder; the scope audit caught it and I removed it before staging.
+- Windows CRLF checkout bytes differed from raw `git show` LF bytes, so the correct identity proof needed `git cat-file --filters` rather than a misleading raw-blob comparison.
+- `git diff --check` also objected to preserved separator blank lines at section-file EOF; moving those exact separators to the following file kept concatenation identical and made the diff clean.
+- I would add a mandatory lane preflight receipt to the packet: sandbox executable present, `.git` writable, Hermes DB writable, approved worktree visible, correct branch checked out, and a real test comment round-trip.
+- I would also make "completion" mechanically impossible without printing `git worktree list`, clean lane status, commit SHA, and successful ticket-comment receipt from the authorized workspace.
+- Finally, the ticket should carry a baseline failing-test fingerprint and a platform-aware byte-proof command up front, plus an approved dependency-bootstrap command for clean worktrees.

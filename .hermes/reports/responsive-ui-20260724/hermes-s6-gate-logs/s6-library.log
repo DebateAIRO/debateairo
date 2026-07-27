@@ -1,0 +1,42 @@
+
+[WebServer] (node:14044) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer]  ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+[WebServer]  We detected multiple lockfiles and selected the directory of C:\Users\vladm\pnpm-lock.yaml as the root directory.
+[WebServer]  To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+[WebServer]    See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+[WebServer]  Detected additional lockfiles: 
+[WebServer]    * C:\Users\vladm\Desktop\debate\DebateV2\.worktrees\resp-s6\apps\dialectical-engine\web\pnpm-lock.yaml
+[WebServer] 
+
+[WebServer] (node:20368) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 16 tests using 1 worker
+
+
+(node:18552) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:59:5 › library cards preserve a 12ch ordinary-English claim column without mid-word breaks
+[2/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:139:5 › settings model controls stay fully inside the model table and rows stack
+[3/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:177:5 › new-debate option rows put labels above controls
+[4/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:200:5 › small screens use the 32px by 16px screen padding tier
+[5/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:215:5 › admin metrics remain inside their grid at phone widths
+[6/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:243:7 › /new exercises checking, locked, invalid-token, and submitting AuthGate states
+[7/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:243:7 › /settings exercises checking, locked, invalid-token, and submitting AuthGate states
+[8/16] [chromium-320] › tests\s6-library\responsive-library.spec.ts:243:7 › /admin/workers exercises checking, locked, invalid-token, and submitting AuthGate states
+
+(node:4164) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[9/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:59:5 › library cards preserve a 12ch ordinary-English claim column without mid-word breaks
+[10/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:139:5 › settings model controls stay fully inside the model table and rows stack
+[11/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:177:5 › new-debate option rows put labels above controls
+[12/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:200:5 › small screens use the 32px by 16px screen padding tier
+[13/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:215:5 › admin metrics remain inside their grid at phone widths
+[14/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:243:7 › /new exercises checking, locked, invalid-token, and submitting AuthGate states
+[15/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:243:7 › /settings exercises checking, locked, invalid-token, and submitting AuthGate states
+[16/16] [chromium-375] › tests\s6-library\responsive-library.spec.ts:243:7 › /admin/workers exercises checking, locked, invalid-token, and submitting AuthGate states
+  16 passed (39.4s)

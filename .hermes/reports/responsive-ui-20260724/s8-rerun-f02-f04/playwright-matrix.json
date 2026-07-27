@@ -1,0 +1,981 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "tests\\s8-closure\\playwright.config.ts",
+      "--project",
+      "chromium-short-568x320",
+      "--project",
+      "firefox-short-568x320",
+      "--project",
+      "webkit-short-568x320",
+      "--grep",
+      "debate views cover|overlays and collision union"
+    ],
+    "configFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\playwright.config.ts",
+    "rootDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w320",
+        "name": "chromium-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w375",
+        "name": "chromium-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w768",
+        "name": "chromium-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1024",
+        "name": "chromium-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w1440",
+        "name": "chromium-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w2560",
+        "name": "chromium-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-844x390",
+        "name": "chromium-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-568x320",
+        "name": "chromium-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-short-507x1024",
+        "name": "chromium-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w320",
+        "name": "firefox-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w375",
+        "name": "firefox-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w768",
+        "name": "firefox-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1024",
+        "name": "firefox-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w1440",
+        "name": "firefox-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-w2560",
+        "name": "firefox-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-844x390",
+        "name": "firefox-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-568x320",
+        "name": "firefox-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-short-507x1024",
+        "name": "firefox-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w320",
+        "name": "webkit-w320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w375",
+        "name": "webkit-w375",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w768",
+        "name": "webkit-w768",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1024",
+        "name": "webkit-w1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w1440",
+        "name": "webkit-w1440",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-w2560",
+        "name": "webkit-w2560",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-844x390",
+        "name": "webkit-short-844x390",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-568x320",
+        "name": "webkit-short-568x320",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-short-507x1024",
+        "name": "webkit-short-507x1024",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-custom-320x568-chromium",
+        "name": "profile-custom-320x568-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-iphone-12-webkit",
+        "name": "profile-iphone-12-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-pixel-7-chromium",
+        "name": "profile-pixel-7-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-ipad-webkit",
+        "name": "profile-ipad-webkit",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/vladm/Desktop/debate/DebateV2/.hermes/reports/responsive-ui-20260724/s8-rerun-f02-f04/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "profile-desktop-chromium",
+        "name": "profile-desktop-chromium",
+        "testDir": "C:/Users/vladm/Desktop/debate/DebateV2/.worktrees/resp-s8/apps/dialectical-engine/web/tests/s8-closure",
+        "testIgnore": [],
+        "testMatch": [
+          "acceptance-matrix.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-matrix.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "acceptance-matrix.spec.ts",
+      "file": "acceptance-matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-short-568x320",
+              "projectName": "chromium-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 120321,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 396
+                      },
+                      "message": "Error: locator.click: Test timeout of 120000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is not stable\u001b[22m\n\u001b[2m  216 × retrying click action\u001b[22m\n\u001b[2m        - waiting 500ms\u001b[22m\n\u001b[2m        - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m        - element is visible, enabled and stable\u001b[22m\n\u001b[2m        - scrolling into view if needed\u001b[22m\n\u001b[2m        - done scrolling\u001b[22m\n\u001b[2m        - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\n\n  394 |   expect(columnFit).toBeLessThanOrEqual(1);\n  395 |\n> 396 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click();\n      |                                                                 ^\n  397 |   await expect(canvas).toHaveAttribute(\"data-zoom\", \"1.0000\");\n  398 |\n  399 |   await page.getByRole(\"button\", { name: \"Fit whole tree (overview)\" }).click();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:396:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:27:00.678Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-chromium-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-chromium-short-568x320\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-c28c4345ebc915d65fc6",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 364,
+          "column": 5
+        },
+        {
+          "title": "overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium-short-568x320",
+              "projectName": "chromium-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6374,
+                  "error": {
+                    "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n",
+                    "stack": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 65,
+                      "line": 432
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 430 |\u001b[39m }\u001b[33m,\u001b[39m testInfo) \u001b[33m=>\u001b[39m {\n \u001b[90m 431 |\u001b[39m   \u001b[36mawait\u001b[39m openCompleteDebate(page)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 432 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Reset zoom to 1:1\"\u001b[39m })\u001b[33m.\u001b[39mclick({ timeout\u001b[33m:\u001b[39m \u001b[35m5\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 433 |\u001b[39m\n \u001b[90m 434 |\u001b[39m   \u001b[36mconst\u001b[39m collapsed \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m visibleRects(page)\u001b[33m;\u001b[39m\n \u001b[90m 435 |\u001b[39m   expect(collapsed\u001b[33m.\u001b[39mdock)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoBeNull()\u001b[33m;\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 432
+                      },
+                      "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n\n  430 | }, testInfo) => {\n  431 |   await openCompleteDebate(page);\n> 432 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click({ timeout: 5_000 });\n      |                                                                 ^\n  433 |\n  434 |   const collapsed = await visibleRects(page);\n  435 |   expect(collapsed.dock).not.toBeNull();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:29:01.851Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-chromium-short-568x320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 65,
+                    "line": 432
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-c10090432ac6216feba6",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 428,
+          "column": 5
+        },
+        {
+          "title": "debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-short-568x320",
+              "projectName": "firefox-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 124400,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 396
+                      },
+                      "message": "Error: locator.click: Test timeout of 120000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    218 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m        - element is visible, enabled and stable\u001b[22m\n\u001b[2m        - scrolling into view if needed\u001b[22m\n\u001b[2m        - done scrolling\u001b[22m\n\u001b[2m        - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m      - retrying click action\u001b[22m\n\u001b[2m        - waiting 500ms\u001b[22m\n\n\n  394 |   expect(columnFit).toBeLessThanOrEqual(1);\n  395 |\n> 396 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click();\n      |                                                                 ^\n  397 |   await expect(canvas).toHaveAttribute(\"data-zoom\", \"1.0000\");\n  398 |\n  399 |   await page.getByRole(\"button\", { name: \"Fit whole tree (overview)\" }).click();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:396:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:29:08.894Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-firefox-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-firefox-short-568x320\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-567e43eb8a1a2c34e2e2",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 364,
+          "column": 5
+        },
+        {
+          "title": "overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox-short-568x320",
+              "projectName": "firefox-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 9161,
+                  "error": {
+                    "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n",
+                    "stack": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 65,
+                      "line": 432
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 430 |\u001b[39m }\u001b[33m,\u001b[39m testInfo) \u001b[33m=>\u001b[39m {\n \u001b[90m 431 |\u001b[39m   \u001b[36mawait\u001b[39m openCompleteDebate(page)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 432 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Reset zoom to 1:1\"\u001b[39m })\u001b[33m.\u001b[39mclick({ timeout\u001b[33m:\u001b[39m \u001b[35m5\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 433 |\u001b[39m\n \u001b[90m 434 |\u001b[39m   \u001b[36mconst\u001b[39m collapsed \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m visibleRects(page)\u001b[33m;\u001b[39m\n \u001b[90m 435 |\u001b[39m   expect(collapsed\u001b[33m.\u001b[39mdock)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoBeNull()\u001b[33m;\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 432
+                      },
+                      "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    9 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n\n  430 | }, testInfo) => {\n  431 |   await openCompleteDebate(page);\n> 432 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click({ timeout: 5_000 });\n      |                                                                 ^\n  433 |\n  434 |   const collapsed = await visibleRects(page);\n  435 |   expect(collapsed.dock).not.toBeNull();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:31:18.331Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-firefox-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-firefox-short-568x320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 65,
+                    "line": 432
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-77109dab05d8f38d65f5",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 428,
+          "column": 5
+        },
+        {
+          "title": "debate views cover Thread, Split, Tree, Map, scoring states, and all zoom bands",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-short-568x320",
+              "projectName": "webkit-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 120244,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 396
+                      },
+                      "message": "Error: locator.click: Test timeout of 120000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not stable\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    182 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m        - element is visible, enabled and stable\u001b[22m\n\u001b[2m        - scrolling into view if needed\u001b[22m\n\u001b[2m        - done scrolling\u001b[22m\n\u001b[2m        - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m      - retrying click action\u001b[22m\n\u001b[2m        - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  394 |   expect(columnFit).toBeLessThanOrEqual(1);\n  395 |\n> 396 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click();\n      |                                                                 ^\n  397 |   await expect(canvas).toHaveAttribute(\"data-zoom\", \"1.0000\");\n  398 |\n  399 |   await page.getByRole(\"button\", { name: \"Fit whole tree (overview)\" }).click();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:396:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:31:29.272Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-webkit-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-debate-v-0187e-g-states-and-all-zoom-bands-webkit-short-568x320\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-5a0d963dd4471c20f2bb",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 364,
+          "column": 5
+        },
+        {
+          "title": "overlays and collision union cover dock, zoom, toast, synthesis, and expanded dock",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-short-568x320",
+              "projectName": "webkit-short-568x320",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 6465,
+                  "error": {
+                    "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n",
+                    "stack": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65",
+                    "location": {
+                      "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                      "column": 65,
+                      "line": 432
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 430 |\u001b[39m }\u001b[33m,\u001b[39m testInfo) \u001b[33m=>\u001b[39m {\n \u001b[90m 431 |\u001b[39m   \u001b[36mawait\u001b[39m openCompleteDebate(page)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 432 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Reset zoom to 1:1\"\u001b[39m })\u001b[33m.\u001b[39mclick({ timeout\u001b[33m:\u001b[39m \u001b[35m5\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 433 |\u001b[39m\n \u001b[90m 434 |\u001b[39m   \u001b[36mconst\u001b[39m collapsed \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m visibleRects(page)\u001b[33m;\u001b[39m\n \u001b[90m 435 |\u001b[39m   expect(collapsed\u001b[33m.\u001b[39mdock)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoBeNull()\u001b[33m;\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                        "column": 65,
+                        "line": 432
+                      },
+                      "message": "TimeoutError: locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Reset zoom to 1:1' })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" aria-label=\"Reset zoom to 1:1\" class=\"canvasZoomButton canvasZoomOne\">1:1</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" class=\"synthTab\" data-synth-tab=\"true\" aria-expanded=\"false\" aria-controls=\"_R_4qatpesnelb_\" aria-label=\"Open synthesis and verdict\">…</button> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n\n  430 | }, testInfo) => {\n  431 |   await openCompleteDebate(page);\n> 432 |   await page.getByRole(\"button\", { name: \"Reset zoom to 1:1\" }).click({ timeout: 5_000 });\n      |                                                                 ^\n  433 |\n  434 |   const collapsed = await visibleRects(page);\n  435 |   expect(collapsed.dock).not.toBeNull();\n    at C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts:432:65"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-26T22:33:30.249Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-webkit-short-568x320\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.hermes\\reports\\responsive-ui-20260724\\s8-rerun-f02-f04\\playwright-artifacts\\acceptance-matrix-overlays-dadbc-synthesis-and-expanded-dock-webkit-short-568x320\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\vladm\\Desktop\\debate\\DebateV2\\.worktrees\\resp-s8\\apps\\dialectical-engine\\web\\tests\\s8-closure\\acceptance-matrix.spec.ts",
+                    "column": 65,
+                    "line": 432
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e4d6056cd15b41a2d1d4-6138eee16b72f1a3e139",
+          "file": "acceptance-matrix.spec.ts",
+          "line": 428,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-26T22:26:55.671Z",
+    "duration": 401913.994,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 0
+  }
+}
