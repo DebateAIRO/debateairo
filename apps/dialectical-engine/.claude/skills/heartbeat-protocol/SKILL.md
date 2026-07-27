@@ -1,8 +1,6 @@
 ---
 name: heartbeat-protocol
 description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine. All agent launches use /goal.
-version: 3.3.0
-spine_version: 3.0.0
 ---
 
 # Claude Node Contract (Main Orchestrator)
@@ -57,10 +55,11 @@ patterns available:
 1. **The Main Orchestrator launches every worker, reviewer, and loop owner with
    `/goal <bounded goal packet>`.** The packet carries the ticket contract
    (spine §4 launch-packet bounds apply) and ends with the return rule:
-   *"Do not come back to the Orchestrator unless you need its review — work the
-   goal to a spine handoff (READY FOR PEER REVIEW / READY FOR HERMES [STAGE]
-   REVIEW), a genuine blocker, or an IMPORTANT OPERATION. Silence is normal;
-   unchanged state needs no message."*
+   *"Return control at a spine handoff (READY FOR PEER REVIEW / READY FOR HERMES
+   [STAGE] REVIEW), a genuine blocker, or an IMPORTANT OPERATION, but keep the
+   unfinished goal/session alive and resumable. Silence is normal; unchanged
+   state needs no message. Termination requires the spine's goal-specific
+   FULLY DONE condition."*
 2. **Chained calls inherit the law:** when any model calls another model (Codex
    dispatching a lane subagent, Grok launching a checker, a reviewer spawning a
    verifier), it also calls it with that agent's `/goal` command and the same
@@ -70,6 +69,10 @@ patterns available:
    (review handoffs, blockers, V DECISIONS PACKET rows). A `/goal` never grants
    question authority — a launched agent that needs a design decision routes it
    up the lattice, never to V.
+4. **Codex orchestration is explicit:** Claude-Router launches each top-level
+   Codex lane/ticket orchestrator with `/goal`. That Codex orchestrator may
+   launch only its authorized descendants, and each descendant also starts with
+   `/goal`. A handoff parks an unfinished worker; it does not terminate it.
 
 ## Claude worker instances (spawned, not the orchestrator)
 
@@ -117,13 +120,16 @@ authority.
    colon-suffixed forms; ticket bodies quote marker vocabulary → match `MARKER: <payload>`
    not bare markers; NEVER sed/heredoc-generate launchers without reading them back;
    verify every launch (log file exists or process alive within 2 minutes).
-   **Window hygiene:** close windows whose work finished clean; leave failed ones open
-   for the human to read.
-3. **Stagnation kill-law (global):** a watchdog fingerprints logs + agent CPU every
-   5 minutes; 20 minutes with zero change across everything → kill ALL agents, write
-   the stop-report, the orchestrator halts its own loop and prompts the human. Distinct
-   from the spine's per-loop stagnation breaker (which the rework cap became — see spine
-   §10 amendment): converging loops continue; only true dead air dies.
+   **Window hygiene:** close a window only after that goal reaches its
+   spine-defined `FULLY DONE` condition; keep unfinished review/rework sessions
+   parked and resumable, and leave failed ones open for the human to read.
+3. **Stagnation liveness-law (global):** a watchdog fingerprints logs + agent CPU
+   every 5 minutes; 20 minutes with zero change across everything → freeze new
+   dispatch, preserve and park every unfinished goal/session, write the liveness
+   report, and halt the orchestrator loop pending the human. Distinct from the
+   spine's per-loop stagnation breaker (which the rework cap became — see spine
+   §10 amendment): converging loops continue; true dead air pauses the machine
+   but does not terminate unfinished agents.
 4. **Same-terminal rework through the /goal chain:** rework returns to the exact
    original terminal/session at every level — `hermes --resume`, `grok --resume`,
    `codex exec resume <id>`, SendMessage to the same SDK agent — including agents'

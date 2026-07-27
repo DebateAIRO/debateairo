@@ -1,7 +1,7 @@
 ---
 name: debateai-graph-spine
 title: DebateAI Graph Spine v2
-version: 3.2.0
+version: 3.3.0
 supersedes: debateai-heartbeat-protocol (pre-3.0.0), heartbeat-protocol-lite, debateai-kanban-heartbeat-review-loop
 ---
 
@@ -264,6 +264,41 @@ Explicitly forbidden in a launch packet:
 Route topology lives ONLY in Kanban and in Claude-Router (§5). A node never
 receives, and never needs, the shape of the graph beyond its own ticket and its
 declared upstream artifacts.
+
+### /goal launch and unfinished-worker retention
+
+Every agent launch uses the target agent's own `/goal <bounded goal packet>`
+command. Goals flow down the authority chain:
+
+- Claude-Router launches the Codex coordinator and every directly owned worker,
+  reviewer, or loop owner with `/goal`.
+- Codex, while acting as an orchestrator, launches every lane orchestrator,
+  coding worker, reviewer, and helper with `/goal`.
+- Any launched agent that launches another agent repeats this law. Plain prompt
+  dispatch is not an equivalent transport.
+- If Claude is the direct parent and launches Codex without `/goal`, Codex
+  requests a corrected `/goal` launch from Claude-Router before dispatching
+  agents or editing files. Codex records a process blocker in the normal
+  orchestrator channel and never asks V to relay the packet.
+
+Every goal packet records a goal ID, parent goal ID, agent/session identity,
+transport classification, resumability mechanism, ticket or artifact contract,
+the required handoff, and the goal-specific `FULLY DONE` condition.
+
+A review handoff returns control upward but does not complete or terminate an
+unfinished implementation goal. `READY FOR PEER REVIEW`,
+`READY FOR HERMES REVIEW`, Blocked, stalled, waiting for review, compaction,
+claim expiry, or an ordinary turn boundary all leave the original worker
+addressable and resumable. Review and rework return to that same goal/session.
+
+For an implementation worker, `FULLY DONE` requires a fresh authoritative
+`HERMES DONE`, no unresolved peer/Hermes/human changes request or pending review
+gate, durable final evidence, and the required final self-report. A reviewer is
+`FULLY DONE` only after its assigned verdict/handoff is durable and no requested
+re-review remains. The mission orchestrator is `FULLY DONE` only after every
+scoped goal and integration gate satisfies its own terminal condition and
+report coverage is complete. Agents may be parked while waiting, but unfinished
+agents are not terminated or replaced merely to save time.
 
 ## 5. Routers: Claude-Router and Hermes-Verifier
 
@@ -661,11 +696,11 @@ the product-truth and final-acceptance gates) closes the Grand Loop.
 
 ```text
 H0 Hermes intake
-G1 Grok Research.md        — fresh Hermes-managed Grok CLI PTY
-C2 Claude Plan.md          — fresh Hermes-managed Claude CLI PTY
-G3 Grok PlanReview.md      — different fresh Grok CLI PTY
-C4 Claude FinalPlan.md     — different fresh Claude CLI PTY
-G5 Grok VerticalSlices.md  — third fresh Grok CLI PTY
+G1 Grok Research.md        — fresh Claude-Router-launched /goal Grok CLI PTY; Hermes-reviewed
+C2 Claude Plan.md          — fresh Claude-Router-launched /goal Claude CLI PTY; Hermes-reviewed
+G3 Grok PlanReview.md      — different fresh Claude-Router-launched /goal Grok CLI PTY
+C4 Claude FinalPlan.md     — different fresh Claude-Router-launched /goal Claude CLI PTY
+G5 Grok VerticalSlices.md  — third fresh Claude-Router-launched /goal Grok CLI PTY
 H6 Hermes Kanban routing
 Implementation             — coding_agents from the model-law roster (below); fresh CLI PTY per ticket
 ```
@@ -1205,10 +1240,12 @@ forward unchanged:
    findings each round — continues past 3. On stagnation the loop freezes and emits
    `V STEERING REQUIRED` into the V DECISIONS PACKET. No unbounded revise→re-review;
    material change is judged by the Router mechanically (finding counts/identities),
-   never by the worker. Additionally (V law, 2026-07-26): a GLOBAL dead-air watchdog
-   — 20 minutes with zero observable change across all logs, worktrees, and agent
-   CPU — stops ALL agents, writes a stop-report, and halts the orchestrator loop
-   itself pending the human.
+   never by the worker. Additionally (V law, 2026-07-26, amended 2026-07-27): a
+   GLOBAL dead-air watchdog — 20 minutes with zero observable change across all
+   logs, worktrees, and agent CPU — halts new dispatch, parks and preserves every
+   unfinished goal/session, writes a stop-report, and halts the orchestrator loop
+   itself pending the human. It does not terminate unfinished agents; termination
+   still requires the `/goal` law's goal-specific `FULLY DONE` condition.
 2. **Unblock reset ceiling.** `unblock` / counter-reset may occur at most **twice
    per ticket**; the third occurrence freezes and escalates.
 3. **Chatter breaker.** Any two-party exchange (Hermes↔worker, Hermes↔watcher)
