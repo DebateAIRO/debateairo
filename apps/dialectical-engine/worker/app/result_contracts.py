@@ -42,6 +42,16 @@ _PERMANENT_FAILURE_MARKERS = (
     "prompt transport incompatibility",
     "argument list too long",
     "result contract",
+    # Account-level caps with a long reset horizon cannot become healthy by
+    # retrying this job seconds later. Mark the provider attempt permanent so
+    # the coordinator advances its failover ladder immediately. Deliberately
+    # exclude generic "rate limit"/429: those short throttles are transient.
+    "weekly limit",
+    "monthly limit",
+    "usage limit",
+    "quota exceeded",
+    "insufficient credits",
+    "credit balance",
 )
 
 
