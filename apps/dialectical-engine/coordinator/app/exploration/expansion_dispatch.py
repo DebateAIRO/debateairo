@@ -1698,19 +1698,32 @@ def maybe_queue_rescore_after_expansion(
     # without this lock each used to create its own full judge-panel pass.
     db.rollback()
     with hold_write_lock(db):
-        active = db.scalars(
-            select(Job)
-            .where(
-                Job.debate_id == debate_id,
-                Job.job_type == "score_debate",
-                Job.status.in_(["pending", "claimed", "running"]),
+        active_jobs = list(
+            db.scalars(
+                select(Job)
+                .where(
+                    Job.debate_id == debate_id,
+                    Job.job_type == "score_debate",
+                    Job.status.in_(["pending", "claimed", "running"]),
+                )
+                .order_by(Job.created_at.desc(), Job.id.desc())
             )
-            .order_by(Job.created_at.desc(), Job.id.desc())
-            .limit(1)
-        ).first()
-        if active is not None:
-            # A pending job just needs the wake; an in-flight one needs nothing.
-            return active if active.status == "pending" else None
+            .all()
+        )
+        queued = next(
+            (candidate for candidate in active_jobs if candidate.status in {"pending", "claimed"}),
+            None,
+        )
+        if queued is not None:
+            # Pending work needs the wake. Claimed work already has a runner
+            # queued behind the scoring semaphore and will snapshot the tree
+            # after the current pass exits.
+            return queued if queued.status == "pending" else None
+        # A RUNNING pass has already snapshotted its node ids. This expansion
+        # completed after that snapshot, so it needs one coalesced follow-up
+        # pass. Concurrent expansion completions are serialized by this
+        # critical section; the first creates a pending row and every later
+        # caller finds/reuses it through the branch above.
         registry = (registry_factory or ProviderRegistry)()
         scoring_config = detect_scoring_provider_config(
             registry.agents, role="judge", providers=registry.providers

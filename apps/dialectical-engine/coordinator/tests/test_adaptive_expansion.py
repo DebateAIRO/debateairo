@@ -575,11 +575,24 @@ def test_maybe_queue_rescore_reuses_active_scoring_jobs(db) -> None:
     assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry) is pending
     assert len(score_jobs(db, debate.id)) == 1
 
-    # An in-flight job needs nothing.
+    # A running pass has already snapshotted its node ids, so one pending
+    # follow-up is queued for the expansion that completed after that snapshot.
     pending.status = "running"
     db.commit()
+    follow_up = maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry)
+    assert follow_up is not None and follow_up.status == "pending"
+    assert len(score_jobs(db, debate.id)) == 2
+
+    # Further completions coalesce into the same pending follow-up.
+    assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry).id == follow_up.id
+    assert len(score_jobs(db, debate.id)) == 2
+
+    # Once a runner has claimed it, it is already queued behind the scoring
+    # semaphore and still coalesces later completions without a third row.
+    follow_up.status = "claimed"
+    db.commit()
     assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry) is None
-    assert len(score_jobs(db, debate.id)) == 1
+    assert len(score_jobs(db, debate.id)) == 2
 
 
 def test_concurrent_quiescent_expansions_queue_one_rescore(db) -> None:
