@@ -111,7 +111,13 @@ _scoring_pass_gate_size: int | None = None
 
 
 def scoring_pass_concurrency() -> int:
-    return int_env(SCORING_MAX_CONCURRENT_PASSES_ENV, 2, 1, 16)
+    # SQLite has one writer. Two scoring sessions can each flush an artifact
+    # before their per-node commit; if the second waits on SQLite while holding
+    # the process write lock, the first cannot acquire that lock to commit and
+    # release its RESERVED writer. Serializing scoring passes removes that
+    # lock-order cycle while the gate still permits all provider calls and
+    # queues later passes without a checked-out DB connection.
+    return int_env(SCORING_MAX_CONCURRENT_PASSES_ENV, 1, 1, 16)
 
 
 def scoring_pass_gate() -> threading.BoundedSemaphore:
