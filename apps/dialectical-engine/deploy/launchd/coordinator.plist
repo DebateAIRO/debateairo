@@ -94,6 +94,11 @@
          and the spawned_pro/spawned_con ratio in `expansion.census`. -->
     <key>DIALECTICAL_ADAPTIVE_EXPANSION</key>
     <string>1</string>
+    <!-- Hard structural rail, not a target: frontier priority, evidence
+         sufficiency, and two-wave convergence may stop each branch earlier.
+         Kept explicit so watchdog reinstalls preserve the production ceiling. -->
+    <key>DIALECTICAL_MAX_EXPANSION_DEPTH</key>
+    <string>10</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
