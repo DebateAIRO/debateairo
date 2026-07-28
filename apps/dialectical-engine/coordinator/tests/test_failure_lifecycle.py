@@ -449,11 +449,24 @@ def test_v2_all_lenses_failed_is_honest_terminal_failed(db) -> None:
     debate = create_dialectical_debate(db, "Should cities ban cars downtown?", {})
     for _ in range(4):
         job = claim_pending_job(db, worker)
-        assert job is not None and job.job_type == "v2_pov"
+        # After two identical permanent failures, the provider circuit
+        # terminalizes the remaining matching jobs without handing the same
+        # known-bad contract back to the worker.
+        if job is None:
+            break
+        assert job.job_type == "v2_pov"
         asyncio.run(fail_job(db, job, "Poisoned lens payload", retryable=False))
         _reset_online(db, worker)
 
     db.refresh(debate)
+    failed_povs = db.scalars(
+        select(Job).where(
+            Job.debate_id == debate.id,
+            Job.job_type == "v2_pov",
+            Job.status == "failed",
+        )
+    ).all()
+    assert len(failed_povs) == 4
     synthesis_job = db.scalar(select(Job).where(Job.debate_id == debate.id, Job.job_type == "v2_synthesize"))
     assert synthesis_job is None, "no surviving branches -> never synthesize over nothing"
     assert effective_debate_status(db, debate) == "failed"

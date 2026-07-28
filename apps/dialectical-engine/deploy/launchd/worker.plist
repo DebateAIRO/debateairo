@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.dialectical.worker</string>
+  <string>__SERVICE_LABEL__</string>
   <key>WorkingDirectory</key>
   <string>__ROOT__/worker</string>
   <!-- Registration credential: do NOT put DIALECTICAL_USER_TOKEN here (this
@@ -18,6 +18,8 @@
     <string>__PATH__</string>
     <key>DYLD_LIBRARY_PATH</key>
     <string>__PYTHON_DYLD_LIBRARY_PATH__</string>
+    <key>DIALECTICAL_WORKER_CONFIG</key>
+    <string>__WORKER_CONFIG__</string>
 __ADAPTER_API_ENV__
   </dict>
   <key>ProgramArguments</key>
@@ -33,8 +35,8 @@ __ADAPTER_API_ENV__
   <key>MaterializeDatalessFiles</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/dialectical-worker.out.log</string>
+  <string>/tmp/__LOG_BASENAME__.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/dialectical-worker.err.log</string>
+  <string>/tmp/__LOG_BASENAME__.err.log</string>
 </dict>
 </plist>

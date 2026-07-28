@@ -3,16 +3,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import threading
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
 from app.core.config import bool_env, float_env
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write, flush_write
+from app.core.write_lock import commit_write, execute_write, flush_write, hold_write_lock
 from app.models.entities import (
     AnalyzerRun,
     Debate,
@@ -78,6 +79,17 @@ SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES: int | None = None
 SCORING_PROVIDER_MAX_ATTEMPTS = 2
+PANEL_QUOTA_CIRCUIT_SECONDS = 15 * 60
+_PANEL_QUOTA_CIRCUIT_LOCK = threading.Lock()
+_PANEL_QUOTA_CIRCUITS: dict[str, float] = {}
+_LONG_HORIZON_QUOTA_MARKERS = (
+    "weekly limit",
+    "monthly limit",
+    "usage limit",
+    "quota exceeded",
+    "insufficient credits",
+    "credit balance",
+)
 # Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
 # §P2.3): bound applied to each PRO/CON child's argument excerpt included in
 # the judge payload -- long enough to give the judge real signal on the
@@ -1115,6 +1127,55 @@ def _persist_judge_output_artifact(
     parse_error: str | None,
     assessment: dict | None,
 ) -> JudgeOutputArtifact:
+    # Acquire SQLite write intent BEFORE the cache-identity SELECT below.
+    # Acquiring only when flush_write emits the INSERT is too late under WAL:
+    # another writer can commit between SELECT and INSERT, and SQLite then
+    # rejects this transaction's stale read-snapshot upgrade immediately with
+    # SQLITE_BUSY_SNAPSHOT ("database is locked"). This shared wrapper covers
+    # the primary judge and every panel member.
+    with hold_write_lock(db):
+        return _persist_judge_output_artifact_locked(
+            db,
+            debate_id=debate_id,
+            node_id=node_id,
+            input_hash=input_hash,
+            judge_role=judge_role,
+            request=request,
+            result=result,
+            parse_status=parse_status,
+            parse_error=parse_error,
+            assessment=assessment,
+        )
+
+
+def _persist_judge_output_artifact_locked(
+    db: Session,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+    judge_role: str,
+    request: ScoringProviderRequest,
+    result: ScoringProviderResult,
+    parse_status: str,
+    parse_error: str | None,
+    assessment: dict | None,
+) -> JudgeOutputArtifact:
+    # Take a REAL SQLite RESERVED write lock before the cache-identity SELECT.
+    # The process writer gate in hold_write_lock serializes coordinator
+    # threads, but workers are separate processes and cannot see that Python
+    # lock. Without a DML write-intent fence, a worker can commit after this
+    # SELECT establishes a WAL snapshot and before flush_write emits INSERT;
+    # SQLite then rejects the read->write upgrade immediately with
+    # SQLITE_BUSY_SNAPSHOT ("database is locked"). A zero-row UPDATE is still
+    # DML, so pysqlite begins the write transaction and external writers wait
+    # normally instead of invalidating our snapshot. It changes no data.
+    execute_write(
+        db,
+        update(JudgeOutputArtifact)
+        .where(JudgeOutputArtifact.id == "__dialectical_write_intent__")
+        .values(id=JudgeOutputArtifact.id),
+    )
     raw_output_sha256 = hashlib.sha256(result.raw_output.encode("utf-8")).hexdigest()
     artifact = db.scalar(
         select(JudgeOutputArtifact).where(
@@ -1214,6 +1275,21 @@ def _run_judge_panel(
         ]
     notes = list(notes)
     for member in members:
+        with _PANEL_QUOTA_CIRCUIT_LOCK:
+            blocked_until = _PANEL_QUOTA_CIRCUITS.get(member.model_id, 0.0)
+            if blocked_until <= time.monotonic():
+                _PANEL_QUOTA_CIRCUITS.pop(member.model_id, None)
+                blocked_until = 0.0
+        if blocked_until:
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "quota_circuit_open",
+                    "reason": "Panel judge has a long-horizon provider quota circuit open.",
+                }
+            )
+            continue
         # F1 (2026-07-24 incident): release SQLite's single writer BEFORE this
         # member's up-to-120s judge CLI subprocess. By this point the primary
         # judge's JudgeOutputArtifact is flushed-but-uncommitted (the caller's
@@ -1276,6 +1352,11 @@ def _run_judge_panel(
             continue
         except ProviderError as exc:
             LOGGER.warning("judge panel member provider error for %s: %s", member.model_id, exc)
+            if any(marker in str(exc).lower() for marker in _LONG_HORIZON_QUOTA_MARKERS):
+                with _PANEL_QUOTA_CIRCUIT_LOCK:
+                    _PANEL_QUOTA_CIRCUITS[member.model_id] = (
+                        time.monotonic() + PANEL_QUOTA_CIRCUIT_SECONDS
+                    )
             notes.append(
                 {
                     "model_id": member.model_id,

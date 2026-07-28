@@ -90,3 +90,217 @@ def test_failed_over_job_refuses_readoption_by_the_old_worker(db, monkeypatch):
     db.refresh(job)
     assert job.status == "pending"
     assert job.required_model == "gpt-5.6sol-medium"
+
+
+def test_transport_incompatible_prompt_reroutes_before_claim(db, monkeypatch):
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    worker(db, "codex", ["gpt-5.6sol-medium"])
+    gemini = worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    _, job = make_debate_with_job(db, "gemini-3.5-flash-loop")
+    monkeypatch.setattr(
+        orchestrator,
+        "render_job_payload",
+        lambda _db, candidate: {
+            "id": candidate.id,
+            "prompt": {"system": "x" * 100, "user": "y" * 100},
+        },
+    )
+
+    assert orchestrator.claim_pending_job(db, gemini, max_prompt_bytes=50) is None
+    db.refresh(job)
+    assert job.status == "pending"
+    assert job.required_model == "gpt-5.6sol-medium"
+    assert job.worker_id is None
+    assert (job.payload or {})["tried_models"] == ["gemini-3.5-flash-loop"]
+
+
+def test_worker_claim_normalizes_persisted_codex_cli_alias(db):
+    from app.services.orchestrator import capable_online_workers, claim_pending_job, online_capabilities
+
+    codex = worker(db, "codex-current-model", ["gpt-5.6sol-medium"])
+    _, job = make_debate_with_job(db, "gpt-5.6-sol")
+
+    assert codex in capable_online_workers(db, "gpt-5.6-sol")
+    assert "gpt-5.6-sol" in online_capabilities(db)
+
+    claimed = claim_pending_job(db, codex)
+
+    assert claimed is not None
+    assert claimed.id == job.id
+    assert claimed.required_model == "gpt-5.6sol-medium"
+    assert claimed.worker_id == codex.id
+
+
+def test_repeated_permanent_signature_opens_provider_circuit(db, monkeypatch):
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    worker(db, "codex", ["gpt-5.6sol-medium"])
+    gemini = worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    _, failed = make_debate_with_job(db, "gemini-3.5-flash-loop")
+    failed.worker_id = gemini.id
+    db.commit()
+    reason = "422 Unprocessable result contract for job 12345"
+    orchestrator._record_permanent_failure_circuit(failed, reason)
+    orchestrator._record_permanent_failure_circuit(failed, reason)
+    failed.status = "failed"
+    db.commit()
+
+    _, next_job = make_debate_with_job(db, "gemini-3.5-flash-loop")
+    assert orchestrator.claim_pending_job(db, gemini) is None
+    db.refresh(next_job)
+    assert next_job.required_model == "gpt-5.6sol-medium"
+    assert "Provider circuit open" in (next_job.error or "")
+    orchestrator._FAILURE_CIRCUITS.clear()
+
+
+def test_long_horizon_quota_opens_model_capacity_circuit_immediately(db, monkeypatch):
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    worker(db, "codex", ["gpt-5.6sol-medium"])
+    claude = worker(db, "claude-loop", ["claude-sonnet-5-high-loop"])
+    _, failed = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    failed.worker_id = claude.id
+    db.commit()
+
+    orchestrator._record_permanent_failure_circuit(
+        failed,
+        "You've hit your weekly limit; resets tomorrow",
+    )
+
+    assert "claude-sonnet-5-high-loop" not in orchestrator.online_capabilities(db)
+    _, next_job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    assert orchestrator.claim_pending_job(db, claude) is None
+    db.refresh(next_job)
+    assert next_job.required_model == "gpt-5.6sol-medium"
+    assert "Provider circuit open" in (next_job.error or "")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
+def test_non_capacity_permanent_error_does_not_remove_online_model(db):
+    from app.services import orchestrator
+
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    gemini = worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    _, failed = make_debate_with_job(db, "gemini-3.5-flash-loop")
+    failed.worker_id = gemini.id
+    db.commit()
+
+    orchestrator._record_permanent_failure_circuit(
+        failed,
+        "422 Unprocessable result contract",
+    )
+
+    assert "gemini-3.5-flash-loop" in orchestrator.online_capabilities(db)
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
+def test_adversarial_failover_preserves_cross_family_attacker(db, monkeypatch):
+    from app.models.entities import Generation, Job, Node
+    from app.scoring.lineage import lineage_family
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    gpt_worker = worker(db, "codex", ["gpt-5.6sol-medium"])
+    worker(db, "claude", ["claude-sonnet-5-high-loop"])
+    worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    worker(db, "grok", ["grok-4.5-high-loop"])
+    debate, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    parent = db.get(Node, job.node_id)
+    parent.status = "complete"
+    author = Generation(
+        node_id=parent.id,
+        model_id="gpt-5.6sol-medium",
+        role="proposer",
+        argument="A claim authored by GPT.",
+        is_active=True,
+        worker_id=gpt_worker.id,
+    )
+    db.add(author)
+    db.flush()
+    parent.active_generation_id = author.id
+    child = Node(
+        debate_id=debate.id,
+        parent_id=parent.id,
+        node_type="CON",
+        depth=2,
+        position=1,
+        claim="Pending independent attack",
+        status="pending",
+        materialized_path="0.1",
+    )
+    db.add(child)
+    db.flush()
+    job.node_id = child.id
+    job.job_type = "v2_expand"
+    job.payload = {"adversarial_pov": True}
+    db.commit()
+
+    candidate = orchestrator.next_failover_model(db, job)
+
+    assert candidate is not None
+    assert lineage_family(candidate) != "gpt"
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
+def test_terminal_adaptive_stop_cannot_reopen_completed_debate(db):
+    from app.exploration.expansion_dispatch import (
+        STOPPED_WALL_CLOCK,
+        record_adaptive_stop,
+    )
+    from app.services.orchestrator import (
+        requeue_or_terminalize_timed_out_job,
+        reset_job_target_for_retry,
+    )
+
+    debate, job = make_debate_with_job(db, "gpt-5.6sol-medium")
+    job.job_type = "v2_expand"
+    debate.status = "complete"
+    debate.synthesis_id = "existing-synthesis"
+    debate.completed_at = debate.created_at
+    record_adaptive_stop(db, debate, STOPPED_WALL_CLOCK)
+    db.commit()
+
+    reset_job_target_for_retry(db, job)
+    db.commit()
+    assert debate.status == "complete"
+
+    events = requeue_or_terminalize_timed_out_job(db, job, "deadline")
+    db.commit()
+    db.refresh(job)
+    db.refresh(debate)
+    assert job.status == "failed"
+    assert debate.status == "complete"
+    assert any(event == "adaptive_expansion_cancelled" for _, event, _ in events)
+
+
+def test_terminal_adaptive_stop_rejects_pending_expansion_before_claim(db):
+    from app.exploration.expansion_dispatch import STOPPED_WALL_CLOCK, record_adaptive_stop
+    from app.services.orchestrator import claim_pending_job
+
+    codex = worker(db, "codex-terminal-frontier", ["gpt-5.6sol-medium"])
+    debate, job = make_debate_with_job(db, "gpt-5.6sol-medium")
+    job.job_type = "v2_expand"
+    debate.status = "complete"
+    debate.synthesis_id = "existing-synthesis"
+    debate.completed_at = debate.created_at
+    record_adaptive_stop(db, debate, STOPPED_WALL_CLOCK)
+    db.commit()
+
+    assert claim_pending_job(db, codex) is None
+    db.refresh(job)
+    db.refresh(debate)
+    assert job.status == "failed"
+    assert debate.status == "complete"

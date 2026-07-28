@@ -114,8 +114,13 @@ class CoordinatorClient:
         )
         response.raise_for_status()
 
-    async def poll(self) -> dict[str, Any] | None:
-        response = await self.client.post(f"/api/workers/{self.config.worker_id}/poll", headers=self.worker_headers)
+    async def poll(self, *, max_prompt_bytes: int | None = None) -> dict[str, Any] | None:
+        payload = {"max_prompt_bytes": max_prompt_bytes} if max_prompt_bytes is not None else None
+        response = await self.client.post(
+            f"/api/workers/{self.config.worker_id}/poll",
+            headers=self.worker_headers,
+            json=payload,
+        )
         response.raise_for_status()
         return response.json().get("job")
 

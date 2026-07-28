@@ -37,6 +37,7 @@ from app.models.entities import (
     Debate,
     Job,
     JudgeOutputArtifact,
+    Node,
     next_analyzer_run_seq,
     now_utc,
 )
@@ -719,6 +720,31 @@ def test_a_stop_never_overwrites_an_outcome_a_pass_already_earned(
     db.expire_all()
     assert stopped_because_of(debate) == STOPPED_WALL_CLOCK
     assert records[0].dispatch_outcome == OUTCOME_SPAWNED
+
+
+def test_terminal_wall_clock_stop_cancels_prior_expansion_placeholders(
+    db, monkeypatch, categorical_decisions_factory
+):
+    monkeypatch.setenv("DIALECTICAL_ADAPTIVE_EXPANSION", "1")
+    from app.exploration.expansion_dispatch import expansion_dispatch
+
+    debate, _, run_id = categorical_decisions_factory(db, priorities=[0.9])
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    job = expand_jobs(db, debate.id)[0]
+    placeholder_id = job.node_id
+
+    debate.status = "complete"
+    debate.synthesis_id = "existing-synthesis"
+    debate.completed_at = now_utc()
+    db.commit()
+    monkeypatch.setenv("DIALECTICAL_DEBATE_WALL_CLOCK_SECONDS", "1")
+    _age_growth_clock(db, debate, days=365)
+
+    expansion_dispatch(db, debate_id=debate.id, analyzer_run_id=run_id)
+    db.expire_all()
+    assert db.get(Job, job.id).status == "failed"
+    assert db.get(Node, placeholder_id).status == "stale"
+    assert db.get(Debate, debate.id).status == "complete"
 
 
 def test_the_created_at_fallback_reads_the_naive_utc_timestamp_sqlite_hands_back(db):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 
@@ -753,7 +754,12 @@ def _drive_once(module, monkeypatch, tmp_path, *, provider: str, prompt_user: st
 
     async def fake_run_cli(config, command, **kwargs):
         commands.append(command)
-        return subprocess.CompletedProcess(args=command, returncode=0, stdout="answer", stderr="")
+        stdout = (
+            '{"title":"Repaired title","content":"Repaired content"}'
+            if provider == "gemini" and len(commands) == 2
+            else "answer"
+        )
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout=stdout, stderr="")
 
     async def fake_complete(args):
         return 0
@@ -781,14 +787,15 @@ def _drive_once(module, monkeypatch, tmp_path, *, provider: str, prompt_user: st
     return asyncio.run(entrypoint(args)), fail_calls, commands
 
 
-def test_gemini_once_reports_a_retryable_failure_instead_of_crashing_on_an_oversized_prompt(
+def test_gemini_once_reports_a_permanent_failure_instead_of_crashing_on_an_oversized_prompt(
     tmp_path, monkeypatch
 ) -> None:
     """The live pathology: the loop process died (OSError E2BIG) after claiming
     the job, so the coordinator only ever saw a silent 10-minute deadline
     requeue -- four times over. The loop must instead survive and tell the
-    coordinator why, which burns full-weight attempts and reaches the failover
-    ladder."""
+    coordinator why. Transport incompatibility is permanent for this provider,
+    so the coordinator must enter the failover ladder immediately rather than
+    retrying the same impossible argv transport."""
     module = load_module()
 
     exit_code, fail_calls, _ = _drive_once(
@@ -799,9 +806,56 @@ def test_gemini_once_reports_a_retryable_failure_instead_of_crashing_on_an_overs
     assert len(fail_calls) == 1
     job_id, reason, retryable = fail_calls[0]
     assert job_id == "job-gemini-1"
-    assert retryable is True
+    assert retryable is False
     assert "agy" in reason
     assert len(reason) <= 2000
+
+
+def test_gemini_once_repairs_malformed_structured_output_once(tmp_path, monkeypatch) -> None:
+    module = load_module()
+
+    exit_code, fail_calls, commands = _drive_once(
+        module,
+        monkeypatch,
+        tmp_path,
+        provider="gemini",
+        prompt_user="Give a concise objection.",
+    )
+
+    assert exit_code == 0
+    assert fail_calls == []
+    assert len(commands) == 2
+    assert "PREVIOUS_INVALID_RESPONSE" in commands[1][2]
+    assert '{"title":"...","content":"..."}' in commands[1][2]
+
+
+def test_gemini_command_uses_native_schema_for_known_structured_job() -> None:
+    module = load_module()
+    invocation = module.build_gemini_command(
+        "gemini-3.5-flash-high",
+        "Prompt text",
+        job_type="v2_expand",
+    )
+
+    assert invocation.command[invocation.command.index("--output-format") + 1] == "json"
+    schema = json.loads(invocation.command[invocation.command.index("--json-schema") + 1])
+    assert schema["required"] == ["title", "content"]
+
+
+def test_gemini_response_prefers_native_structured_output() -> None:
+    module = load_module()
+    stdout = json.dumps(
+        {
+            "status": "SUCCESS",
+            "response": "surrounding prose",
+            "structured_output": {"title": "Native", "content": "Valid"},
+        }
+    )
+
+    assert json.loads(module.gemini_response_text(stdout)) == {
+        "title": "Native",
+        "content": "Valid",
+    }
 
 
 def test_claude_and_grok_once_run_a_frontier_scale_prompt_without_touching_argv(tmp_path, monkeypatch) -> None:

@@ -46,6 +46,13 @@ class HeartbeatRequest(BaseModel):
     fresh_start: bool = False
 
 
+class PollRequest(BaseModel):
+    # Optional because stdin/file-based providers have no argv-sized prompt
+    # ceiling. CLI providers that do advertise their transport limit before
+    # claim, allowing deterministic incompatibility to reroute immediately.
+    max_prompt_bytes: int | None = Field(default=None, ge=1, le=64 * 1024 * 1024)
+
+
 def clean_worker_name(value: str) -> str:
     cleaned = value.strip()
     if not cleaned:
@@ -154,12 +161,18 @@ def heartbeat(
     return {"status": worker.status}
 
 
-def _claim_pending_job_warm(db: Session, worker: Worker) -> Job | None:
+def _claim_pending_job_warm(
+    db: Session, worker: Worker, max_prompt_bytes: int | None = None
+) -> Job | None:
     """claim_pending_job, plus touching every Job field publish_job_started
     reads. The claim commits (expiring the ORM instance), so the first
     attribute access afterwards issues a refresh SELECT -- touching them here
     keeps that query on this worker thread instead of the event loop."""
-    job = claim_pending_job(db, worker)
+    job = (
+        claim_pending_job(db, worker)
+        if max_prompt_bytes is None
+        else claim_pending_job(db, worker, max_prompt_bytes=max_prompt_bytes)
+    )
     if job is not None:
         _ = (job.id, job.debate_id, job.node_id, job.job_type, job.required_model, job.worker_id)
     return job
@@ -171,7 +184,11 @@ def _finish_empty_poll(db: Session, worker: Worker) -> None:
 
 
 @router.post("/workers/{worker_id}/poll")
-async def poll(worker: Annotated[Worker, Depends(require_worker)], db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+async def poll(
+    worker: Annotated[Worker, Depends(require_worker)],
+    db: Annotated[Session, Depends(get_db)],
+    payload: PollRequest | None = None,
+) -> dict[str, object]:
     # 2026-07-26 pool-exhaustion fix (path 6): this endpoint is async so the 1s
     # long-poll cadence sleeps on the event loop without pinning a threadpool
     # thread -- but that also means any DB call made directly here runs ON the
@@ -186,7 +203,12 @@ async def poll(worker: Annotated[Worker, Depends(require_worker)], db: Annotated
     settings = load_settings()
     deadline = asyncio.get_running_loop().time() + settings.worker_poll_seconds
     while True:
-        job = await run_in_threadpool(_claim_pending_job_warm, db, worker)
+        job = await run_in_threadpool(
+            _claim_pending_job_warm,
+            db,
+            worker,
+            payload.max_prompt_bytes if payload is not None else None,
+        )
         if job:
             await publish_job_started(db, job)
             return {"job": await run_in_threadpool(render_job_payload, db, job)}

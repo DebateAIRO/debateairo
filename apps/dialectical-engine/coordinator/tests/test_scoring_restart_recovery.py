@@ -7,10 +7,11 @@ resurrect scoring and flip complete debates), so nothing else recovers it. In
 prod one such job sat "running" 9h after a restart with 0 nodes scored, and
 the _active_scoring_job_exists guard then blocked any replacement.
 
-recover_orphaned_scoring_jobs is a startup-only sweep, gated on a PAST
-deadline (a genuinely live in-process job holds a future deadline), that
-fails the orphan to a non-active terminal state and re-drives scoring once
-for any affected debate that still needs it.
+recover_orphaned_scoring_jobs is a startup-only sweep run after the new
+coordinator owns the exclusive database instance lock. Therefore every
+claimed/running scoring row belongs to the dead prior process, regardless of
+deadline. The sweep fails each orphan to a non-active terminal state and
+re-drives scoring once for any affected debate that still needs it.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, Work
 from app.providers import AgentConfig, ProviderRegistry
 from app.scoring import ScoringProviderResult, queue_scoring_job
 from app.scoring.jobs import (
+    SCORING_PHASE_SETTLED_KEY,
     drive_internal_scoring_for_debate,
     recover_orphaned_scoring_jobs,
     recover_orphaned_scoring_jobs_at_startup,
@@ -61,7 +63,12 @@ def _judge_registry() -> ProviderRegistry:
 
 def _debate_with_live_node(db, *, suffix: str) -> tuple[Debate, Node]:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
-    worker = Worker(id=f"worker-{suffix}", name="Worker", token_hash="hash", capabilities=["debate"])
+    worker = Worker(
+        id=f"worker-{suffix}",
+        name=f"Worker {suffix}",
+        token_hash="hash",
+        capabilities=["debate"],
+    )
     root = Node(
         id=f"root-{suffix}",
         debate=debate,
@@ -145,22 +152,38 @@ def test_recovery_fails_orphaned_running_job_and_rescores_unscored_debate(db) ->
     assert all_live_argument_nodes_scored(db, db.get(Debate, debate.id))
 
 
-def test_recovery_leaves_live_running_job_with_future_deadline_untouched(db) -> None:
-    debate, _root = _debate_with_live_node(db, suffix="live-future")
+def test_startup_recovery_reclaims_future_deadline_from_prior_process(db) -> None:
+    debate, _root = _debate_with_live_node(db, suffix="orphan-future")
     job = queue_scoring_job(db, debate, model_id="codex-test-model")
     job.status = "running"
-    # A genuinely live in-process job refreshes its deadline into the future.
+    # Size-aware panel deadlines can be hours in the future, but at startup
+    # the prior process (and its in-process scoring thread) is already dead.
     job.deadline = now_utc() + timedelta(minutes=25)
     db.commit()
 
     calls: list[str] = []
-    rescored = recover_orphaned_scoring_jobs(db, rescore=lambda debate_id: calls.append(debate_id))
+
+    def observe_recovery(debate_id: str) -> None:
+        calls.append(debate_id)
+        active = db.scalar(
+            select(Job.id).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(("pending", "claimed", "running")),
+            )
+        )
+        assert active is not None, (
+            "restart recovery exposed a no-active-scoring window before "
+            "redrive; synthesis could be claimed against an unscored tree"
+        )
+
+    rescored = recover_orphaned_scoring_jobs(db, rescore=observe_recovery)
 
     db.expire_all()
-    # Critical: recovery must never kill a healthy in-flight pass.
-    assert db.get(Job, job.id).status == "running"
-    assert calls == []
-    assert rescored == []
+    assert db.get(Job, job.id).status == "failed"
+    assert "orphan" in (db.get(Job, job.id).error or "").lower()
+    assert calls == [debate.id]
+    assert rescored == [debate.id]
 
 
 def test_recovery_fails_orphaned_job_but_skips_rescore_when_already_scored(db) -> None:
@@ -193,6 +216,48 @@ def test_recovery_fails_orphaned_job_but_skips_rescore_when_already_scored(db) -
     assert len(_node_scoring_runs(db, debate.id)) == runs_before
 
 
+def test_restart_recovery_redrives_completed_but_unsettled_scoring_phase(db) -> None:
+    debate, _root = _debate_with_live_node(db, suffix="unsettled-complete")
+
+    # Establish complete scoring truth first. Recovery must still replay the
+    # post-score lifecycle/protocol/adaptive tail when its durable marker says
+    # that tail never settled before the coordinator restarted.
+    prep_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(prep_job.id, debate.id, registry_factory=_judge_registry)
+    db.expire_all()
+    assert all_live_argument_nodes_scored(db, db.get(Debate, debate.id))
+
+    interrupted = queue_scoring_job(db, debate, model_id="codex-test-model")
+    interrupted.status = "complete"
+    interrupted.payload = {SCORING_PHASE_SETTLED_KEY: False}
+    db.commit()
+
+    calls: list[str] = []
+
+    def observe_recovery(debate_id: str) -> None:
+        calls.append(debate_id)
+        replacement = db.scalar(
+            select(Job.id).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(("pending", "claimed", "running")),
+            )
+        )
+        assert replacement is not None
+        db.expire(interrupted)
+        assert interrupted.payload[SCORING_PHASE_SETTLED_KEY] is True
+
+    rescored = recover_orphaned_scoring_jobs(db, rescore=observe_recovery)
+
+    db.expire_all()
+    recovered = db.get(Job, interrupted.id)
+    assert recovered.status == "complete"
+    assert recovered.payload[SCORING_PHASE_SETTLED_KEY] is True
+    assert calls == [debate.id]
+    assert rescored == [debate.id]
+
+
 def test_startup_entrypoint_recovers_orphan_on_its_own_session(db) -> None:
     # The production entrypoint opens its own session (lifespan runs it off
     # the event loop). Use a node-less debate so "still needs scoring" is
@@ -213,3 +278,26 @@ def test_startup_entrypoint_recovers_orphan_on_its_own_session(db) -> None:
     refreshed = db.get(Job, job.id)
     assert refreshed.status == "failed"
     assert "orphan" in (refreshed.error or "").lower()
+
+
+def test_startup_entrypoint_enqueues_every_affected_debate(db, monkeypatch) -> None:
+    from app.scoring import jobs as scoring_jobs
+
+    debate_a, _ = _debate_with_live_node(db, suffix="startup-many-a")
+    debate_b, _ = _debate_with_live_node(db, suffix="startup-many-b")
+    for debate in (debate_a, debate_b):
+        job = queue_scoring_job(db, debate, model_id="codex-test-model")
+        job.status = "claimed"
+    db.commit()
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        scoring_jobs,
+        "_trigger_restart_rescore",
+        lambda debate_id: calls.append(debate_id),
+    )
+
+    recovered = recover_orphaned_scoring_jobs_at_startup()
+
+    assert set(calls) == {debate_a.id, debate_b.id}
+    assert set(recovered) == {debate_a.id, debate_b.id}

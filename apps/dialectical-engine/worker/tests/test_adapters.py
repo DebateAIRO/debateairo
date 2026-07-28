@@ -174,6 +174,7 @@ def test_enrich_v2_result_stamps_runtime_provenance_for_v2_expand() -> None:
 
     enriched = enrich_v2_result(job, result, "worker-1")
 
+    assert enriched["result_contract_version"] == "dialectical-result-v2"
     assert enriched["provenance"] == {
         "model_id": "gpt-5.6sol-medium",
         "worker_id": "worker-1",
@@ -1516,6 +1517,19 @@ class InvalidJsonAdapter:
         yield "This is not JSON."
 
 
+class HangingAdapter:
+    def __init__(self) -> None:
+        self.cancelled = False
+
+    async def stream(self, system: str, user: str, max_tokens: int):
+        del system, user, max_tokens
+        try:
+            await asyncio.sleep(60)
+            yield "too late"
+        finally:
+            self.cancelled = True
+
+
 def test_stale_job_error_classification_does_not_mask_auth_failures() -> None:
     assert stale_job_coordinator_error(coordinator_http_error(404, "Job not found"))
     assert stale_job_coordinator_error(coordinator_http_error(409, "Job is complete and cannot be mutated"))
@@ -1596,6 +1610,30 @@ async def test_handle_job_marks_malformed_structured_output_nonretryable() -> No
     assert client.failure["job_id"] == "job-1"
     assert client.failure["retryable"] is False
     assert "valid JSON object" in str(client.failure["reason"])
+
+
+@pytest.mark.asyncio
+async def test_handle_job_enforces_generation_deadline_and_cancels_adapter() -> None:
+    client = RecordingFailureClient()
+    client.config = type(
+        "Config",
+        (),
+        {"generation_timeout_seconds": 1, "worker_id": "worker-1"},
+    )()
+    adapter = HangingAdapter()
+    job = {
+        "id": "job-timeout",
+        "job_type": "argue",
+        "required_model": "hanging",
+        "prompt": {"system": "system", "user": "user", "max_tokens": 20},
+    }
+
+    await handle_job(client, {"hanging": adapter}, job)
+
+    assert adapter.cancelled
+    assert client.failure is not None
+    assert "generation exceeded the worker deadline" in str(client.failure["reason"])
+    assert client.failure["retryable"] is True
 
 
 @pytest.mark.asyncio

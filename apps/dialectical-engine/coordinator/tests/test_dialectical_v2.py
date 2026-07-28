@@ -1371,6 +1371,52 @@ def test_completion_tail_survives_scoring_bootstrap_failure(db, monkeypatch) -> 
     assert triggered == [debate.id]
 
 
+def test_fully_prescored_synthesis_does_not_queue_redundant_scoring(db, monkeypatch) -> None:
+    service = v2_service()
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, "Should cities ban cars downtown?", {})
+    for _ in range(4):
+        job = claim_for_worker(db, worker)
+        assert job.job_type == "v2_pov"
+        asyncio.run(
+            complete_job(
+                db,
+                job,
+                worker_pov_output(worker, job.id, job.required_role),
+                {"latency_ms": 12},
+            )
+        )
+    synthesis_job = claim_for_worker(db, worker)
+    assert synthesis_job.job_type == "v2_synthesize"
+
+    monkeypatch.setattr(service, "score_before_synthesis_enabled", lambda: True)
+    monkeypatch.setattr(service, "all_live_argument_nodes_scored", lambda db, debate: True)
+    bootstrapped: list[str] = []
+    triggered: list[str] = []
+    monkeypatch.setattr(
+        service,
+        "ensure_default_scoring_for_completed_v2_node",
+        lambda db, debate, node: bootstrapped.append(node.id),
+    )
+    monkeypatch.setattr(
+        service,
+        "trigger_internal_scoring_after_completion",
+        lambda debate_id: triggered.append(debate_id),
+    )
+
+    asyncio.run(
+        complete_job(
+            db,
+            synthesis_job,
+            worker_non_adjudicating_synthesis(worker, synthesis_job.id),
+            {"latency_ms": 12},
+        )
+    )
+
+    assert bootstrapped == []
+    assert triggered == []
+
+
 def test_scoring_job_queueing_ignores_worker_routing_allowlist(db) -> None:
     """score_debate jobs are internal bookkeeping for in-process judge runs --
     workers never claim them (claim/reaper/serialization all exclude them), so

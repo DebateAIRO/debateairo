@@ -358,3 +358,37 @@ def test_the_scoring_waker_never_checks_out_a_connection_under_the_write_lock(db
         "a new slot with the lock held -- on a saturated pool that is a 30s "
         "RESERVED hold and 'database is locked' for every concurrent short writer"
     )
+
+
+def test_session_execute_dml_uses_execute_write() -> None:
+    """A Core/ORM DML execute must take the gate before SQLite sees it.
+
+    A later ``commit_write`` is too late: ``Session.execute(update(...))``
+    already acquired SQLite's writer at the execute call.  This scan pins the
+    production convention that direct Session DML is routed through
+    ``execute_write``.
+    """
+    violations: list[str] = []
+    for path in sorted(APP_ROOT.rglob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr != "execute" or not isinstance(node.func.value, ast.Name):
+                continue
+            if node.func.value.id not in SESSION_NAMES or not node.args:
+                continue
+            statement = node.args[0]
+            if not isinstance(statement, ast.Call):
+                continue
+            statement_name = (
+                statement.func.id
+                if isinstance(statement.func, ast.Name)
+                else getattr(statement.func, "attr", None)
+            )
+            if statement_name in {"update", "insert", "delete"}:
+                violations.append(f"{path.relative_to(APP_ROOT)}:{node.lineno}")
+    assert not violations, (
+        "Session.execute emitted DML outside execute_write at: "
+        + ", ".join(violations)
+    )

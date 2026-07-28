@@ -64,7 +64,7 @@ from app.protocol.cross_exam import _OPPOSING_NODE_TYPES
 from app.protocol.runner import PROTOCOL_ANALYSIS_TYPE, run_protocol_analysis
 from app.protocol.state import advance_phase, initialize_protocol_state, protocol_state_of
 from app.providers import ProviderRegistry
-from app.scoring.jobs import trigger_internal_scoring_after_completion
+from app.scoring.jobs import scoring_phase_unsettled, trigger_internal_scoring_after_completion
 from app.scoring.service import debate_scoring_payload, ensure_node_scoring_on_completion
 
 
@@ -1248,9 +1248,13 @@ def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
 
     Returns False (claimable) for any non-synthesize job, when the
     score-before-synthesis flag is off, once every live argument node is
-    scored, or once the job has been pending past the wait budget -- so the
-    deferral is always bounded and can never wedge a debate. Skipping a job
-    here burns no attempt (see orchestrator.worker_can_claim_job)."""
+    scored. While a score_debate job is actively pending, claimed, or running,
+    synthesis remains blocked regardless of the ordinary wait budget: queued
+    scoring behind the global pass semaphore is healthy work, not an outage.
+    The bounded wait applies only when no active scoring job exists, so a
+    genuinely unavailable scoring subsystem cannot wedge the debate forever.
+    Skipping a job here burns no attempt (see
+    orchestrator.worker_can_claim_job)."""
     if job.job_type != "v2_synthesize":
         return False
     if not score_before_synthesis_enabled():
@@ -1258,6 +1262,20 @@ def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
     debate = db.get(Debate, job.debate_id)
     if debate is None:
         return False
+    scoring_jobs = db.scalars(
+        select(Job)
+        .where(
+            Job.debate_id == debate.id,
+            Job.job_type == "score_debate",
+            Job.status.in_(("pending", "claimed", "running", "complete")),
+        )
+    ).all()
+    if any(
+        scoring_job.status in {"pending", "claimed", "running"}
+        or scoring_phase_unsettled(scoring_job)
+        for scoring_job in scoring_jobs
+    ):
+        return True
     if all_live_argument_nodes_scored(db, debate):
         return False
     comparable_now = now.replace(tzinfo=None) if job.created_at.tzinfo is None else now
@@ -2612,8 +2630,12 @@ def persist_v2_synthesis(
         # marker-update try/except above (Phase 5a style).
         print(f"[dialectical_v2] protocol analysis failed (non-fatal): {exc!r}")
     record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
+    completion_scoring_needed = (
+        not score_before_synthesis_enabled()
+        or not all_live_argument_nodes_scored(db, debate)
+    )
     scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
-    if scoring_node is not None:
+    if scoring_node is not None and completion_scoring_needed:
         try:
             ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
         except Exception as exc:
@@ -2640,11 +2662,13 @@ def persist_v2_synthesis(
     publish_event(debate.id, "debate_complete", {"debate_id": debate.id})
     try:
         # W2 (B6): the coordinator itself initiates scoring at completion --
-        # no browser poll needed. Fire-and-forget after the commit above;
-        # must never fail or delay synthesis persistence (the trigger is
-        # non-raising; this guard is defense-in-depth, matching the
-        # best-effort style of the protocol-analysis guard above).
-        trigger_internal_scoring_after_completion(debate.id)
+        # no browser poll needed when score-before-synthesis is disabled or
+        # the bounded fallback synthesized an incompletely scored tree.
+        # A fully pre-scored tree must not enqueue a redundant post-synthesis
+        # pass: synthesis adds no argument nodes and cannot invalidate a node
+        # scoring input hash.
+        if completion_scoring_needed:
+            trigger_internal_scoring_after_completion(debate.id)
     except Exception as exc:
         print(f"[dialectical_v2] internal scoring trigger failed (non-fatal): {exc!r}")
 
@@ -2682,7 +2706,26 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
         raise ValueError("Debate not found")
     branch = first_branch(db, debate.id)
     classification = classify_question(debate.topic)
-    analyzers = [run.output for run in analyzer_runs_for_debate(db, debate.id)]
+    # Derived lifecycle analyzers can be enormous: a node_scoring run embeds
+    # one record per node (360-470 KiB in the live incidents), and protocol
+    # analysis can add another ~60 KiB. POV, expansion, evidence, and synthesis
+    # already receive their purpose-built context below; copying every derived
+    # analyzer into `base_context` both duplicates that data and turns a
+    # one-parent expansion into a full-debate prompt. Besides wasting tokens,
+    # this exceeded Gemini's argv transport and pushed Codex past its 540s
+    # worker deadline. Keep analyzer outputs only for the artifact/agent jobs
+    # whose explicit input contract calls for them.
+    analyzer_free_job_types = {
+        "v2_pov",
+        "v2_expand",
+        "v2_evidence",
+        "v2_synthesize",
+    }
+    analyzers = (
+        []
+        if job.job_type in analyzer_free_job_types
+        else [run.output for run in analyzer_runs_for_debate(db, debate.id)]
+    )
     skill = first_skill_match(db, debate.id)
     agent = first_agent_match(db, debate.id)
     base_context = {

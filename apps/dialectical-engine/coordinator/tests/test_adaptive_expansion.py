@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from datetime import timedelta
 from types import SimpleNamespace
 
 from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 
 from app.exploration import scoring_completion_lifecycle
 from app.exploration.decision_repository import (
@@ -573,11 +575,63 @@ def test_maybe_queue_rescore_reuses_active_scoring_jobs(db) -> None:
     assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry) is pending
     assert len(score_jobs(db, debate.id)) == 1
 
-    # An in-flight job needs nothing.
+    # A running pass has already snapshotted its node ids, so one pending
+    # follow-up is queued for the expansion that completed after that snapshot.
     pending.status = "running"
     db.commit()
+    follow_up = maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry)
+    assert follow_up is not None and follow_up.status == "pending"
+    assert len(score_jobs(db, debate.id)) == 2
+
+    # Further completions coalesce into the same pending follow-up.
+    assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry).id == follow_up.id
+    assert len(score_jobs(db, debate.id)) == 2
+
+    # Once a runner has claimed it, it is already queued behind the scoring
+    # semaphore and still coalesces later completions without a third row.
+    follow_up.status = "claimed"
+    db.commit()
     assert maybe_queue_rescore_after_expansion(db, debate, registry_factory=_judge_registry) is None
-    assert len(score_jobs(db, debate.id)) == 1
+    assert len(score_jobs(db, debate.id)) == 2
+
+
+def test_concurrent_quiescent_expansions_queue_one_rescore(db) -> None:
+    debate = Debate(topic="Concurrent adaptive rescore", status="generating")
+    db.add(debate)
+    db.commit()
+    debate_id = debate.id
+    session_factory = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
+    barrier = threading.Barrier(2)
+    results: list[str | None] = []
+    errors: list[BaseException] = []
+
+    def queue_from_completion() -> None:
+        try:
+            with session_factory() as thread_db:
+                thread_debate = thread_db.get(Debate, debate_id)
+                assert thread_debate is not None
+                barrier.wait()
+                job = maybe_queue_rescore_after_expansion(
+                    thread_db,
+                    thread_debate,
+                    registry_factory=_judge_registry,
+                )
+                results.append(job.id if job is not None else None)
+        except BaseException as exc:  # surfaced below with its original traceback text
+            errors.append(exc)
+
+    threads = [threading.Thread(target=queue_from_completion, daemon=True) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+        assert not thread.is_alive()
+
+    assert errors == []
+    db.expire_all()
+    jobs = score_jobs(db, debate_id)
+    assert len(jobs) == 1
+    assert results.count(jobs[0].id) == 2
 
 
 # ---------------------------------------------------------------------------

@@ -94,6 +94,16 @@
          and the spawned_pro/spawned_con ratio in `expansion.census`. -->
     <key>DIALECTICAL_ADAPTIVE_EXPANSION</key>
     <string>1</string>
+    <!-- Hard structural rail, not a target: frontier priority, evidence
+         sufficiency, and two-wave convergence may stop each branch earlier.
+         Kept explicit so watchdog reinstalls preserve the production ceiling. -->
+    <key>DIALECTICAL_MAX_EXPANSION_DEPTH</key>
+    <string>10</string>
+    <!-- SQLite permits one writer. Keep judge-panel scoring passes serialized;
+         later passes wait before opening a Session or checking out a DB
+         connection, eliminating cross-pass RESERVED-writer deadlocks. -->
+    <key>DIALECTICAL_SCORING_MAX_CONCURRENT_PASSES</key>
+    <string>1</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
