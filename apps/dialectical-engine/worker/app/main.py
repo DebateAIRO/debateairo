@@ -135,14 +135,22 @@ def nonretryable_coordinator_completion_error(exc: Exception) -> bool:
     return exc.response.status_code == 400 and "/complete" in str(exc.request.url)
 
 
-# Transient network errors that warrant a bounded retry of /complete before we
-# give up and fall back to fail(). These typically come from the coordinator
-# dropping in-flight connections (e.g. an uvicorn --reload restart), not from a
-# genuine job problem, so retrying recovers the completion instead of wastefully
-# failing (and re-generating) the job.
-TRANSIENT_NETWORK_ERRORS = (httpx.ReadError, httpx.ConnectError, httpx.RemoteProtocolError)
+# Transient network errors that warrant a bounded retry of /complete. These
+# typically mean the acknowledgement was lost—not that the completion itself
+# failed—so exhausting the retries produces CompletionDeliveryUncertain and
+# must never be converted into /fail.
+TRANSIENT_NETWORK_ERRORS = (
+    httpx.TimeoutException,
+    httpx.ReadError,
+    httpx.ConnectError,
+    httpx.RemoteProtocolError,
+)
 COMPLETE_RETRY_ATTEMPTS = 3
 COMPLETE_RETRY_BACKOFF_SECONDS = 0.5
+
+
+class CompletionDeliveryUncertain(RuntimeError):
+    """The coordinator may have committed /complete before the reply was lost."""
 
 
 def failure_reason_for(exc: Exception) -> str:
@@ -167,14 +175,17 @@ async def complete_with_retry(
     tokens_out: int,
 ) -> None:
     """Call client.complete, retrying transient network errors a bounded number
-    of times with a short backoff before letting the last error propagate."""
+    of times before surfacing an explicitly ambiguous delivery outcome."""
     for attempt in range(1, COMPLETE_RETRY_ATTEMPTS + 1):
         try:
             await client.complete(job_id, result, started_at, tokens_in, tokens_out)
             return
         except TRANSIENT_NETWORK_ERRORS as exc:
             if attempt >= COMPLETE_RETRY_ATTEMPTS:
-                raise
+                raise CompletionDeliveryUncertain(
+                    f"Completion acknowledgement remained unavailable after "
+                    f"{COMPLETE_RETRY_ATTEMPTS} attempts"
+                ) from exc
             print(
                 f"Transient network error completing job {job_id} "
                 f"(attempt {attempt}/{COMPLETE_RETRY_ATTEMPTS}): {exc!r}. Retrying.",
@@ -269,6 +280,19 @@ async def handle_job_with_heartbeats(
             print(f"V2 result for {job['id']}: {json.dumps(result, default=str)[:2000]}", flush=True)
         await complete_with_retry(client, job["id"], result, started_at, tokens_in, estimate_tokens(text))
     except Exception as exc:
+        if isinstance(exc, CompletionDeliveryUncertain):
+            # Never turn an ambiguous /complete acknowledgement into /fail.
+            # The coordinator may already have durably completed the job while
+            # its response was delayed or lost. A false /fail races that
+            # transaction and can reopen/requeue successful work. If none of
+            # the completion attempts arrived, the coordinator's lease expiry
+            # safely requeues the still-running job instead.
+            print(
+                f"Completion delivery uncertain for job {job['id']}; "
+                "leaving coordinator state authoritative.",
+                flush=True,
+            )
+            return
         if stale_job_coordinator_error(exc):
             print(f"Coordinator no longer accepts job {job['id']}: {exc}", flush=True)
             return

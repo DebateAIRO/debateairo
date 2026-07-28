@@ -1,12 +1,52 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from threading import RLock
+from threading import Lock, RLock
 from typing import Iterator
 
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 _write_lock = RLock()
+_sqlite_writer_gate = Lock()
+_WRITER_GATE_INFO_KEY = "_dialectical_sqlite_writer_gate"
+
+
+def _uses_sqlite(db: Session) -> bool:
+    bind = db.get_bind()
+    return bind.dialect.name == "sqlite"
+
+
+def _acquire_writer_gate(db: Session) -> None:
+    """Own SQLite's single-writer gate until the outer transaction ends.
+
+    A flush starts (and retains) SQLite's RESERVED write transaction. Releasing
+    only the short-lived RLock after that flush allowed another thread to take
+    the RLock and block inside SQLite, while the RESERVED holder simultaneously
+    needed the RLock to commit: RLock -> RESERVED versus RESERVED -> RLock.
+    Holding this transaction-scoped gate closes that inversion by ensuring no
+    second in-process writer can enter SQLite until the first transaction has
+    committed or rolled back.
+    """
+    if not _uses_sqlite(db) or db.info.get(_WRITER_GATE_INFO_KEY):
+        return
+    _sqlite_writer_gate.acquire()
+    db.info[_WRITER_GATE_INFO_KEY] = True
+
+
+def _release_writer_gate(db: Session) -> None:
+    if db.info.pop(_WRITER_GATE_INFO_KEY, False):
+        _sqlite_writer_gate.release()
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _release_writer_gate_after_transaction(
+    session: Session, transaction: object
+) -> None:
+    # A flush creates an internal/nested SessionTransaction. Only the end of
+    # the outer transaction releases SQLite's writer ownership.
+    if getattr(transaction, "parent", None) is None:
+        _release_writer_gate(session)
 
 
 def _check_out_connection_first(db: Session, *, unconditional: bool) -> None:
@@ -101,12 +141,22 @@ def _check_out_connection_first(db: Session, *, unconditional: bool) -> None:
 
 def flush_write(db: Session) -> None:
     _check_out_connection_first(db, unconditional=False)
-    with _write_lock:
-        db.flush()
+    _acquire_writer_gate(db)
+    try:
+        with _write_lock:
+            db.flush()
+    except BaseException:
+        # A failed flush leaves the Session unusable until rollback. Roll back
+        # here so the transaction-scoped writer gate can never leak if a
+        # caller propagates the exception without cleaning the Session first.
+        db.rollback()
+        raise
 
 
 def commit_write(db: Session) -> None:
     _check_out_connection_first(db, unconditional=False)
+    if db.info.get(_WRITER_GATE_INFO_KEY) or db.new or db.dirty or db.deleted:
+        _acquire_writer_gate(db)
     with _write_lock:
         db.commit()
 
@@ -154,5 +204,6 @@ def hold_write_lock(db: Session) -> Iterator[None]:
     and was restructured so each of its critical sections ends at its commit.
     """
     _check_out_connection_first(db, unconditional=True)
+    _acquire_writer_gate(db)
     with _write_lock:
         yield

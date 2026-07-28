@@ -167,17 +167,17 @@ class AlwaysTransientCompleteClient(RecordingClient):
 
 
 @pytest.mark.asyncio
-async def test_complete_exhausts_retries_then_fails_with_nonempty_reason(monkeypatch) -> None:
+async def test_complete_exhausts_retries_without_racing_with_fail(monkeypatch) -> None:
     monkeypatch.setattr(main, "COMPLETE_RETRY_BACKOFF_SECONDS", 0)
     client = AlwaysTransientCompleteClient()
 
     await handle_job(client, {"tiny": TinyAdapter()}, _argue_job())
 
     assert client.complete_attempts == main.COMPLETE_RETRY_ATTEMPTS
-    assert client.failure is not None
-    assert str(client.failure["reason"]).strip() != ""
-    # A transient network error is retryable so the coordinator can re-queue.
-    assert client.failure["retryable"] is True
+    # The coordinator may have committed the completion before its response
+    # was lost. Sending /fail here could requeue successful work; if no
+    # completion arrived, lease expiry remains the authoritative retry path.
+    assert client.failure is None
 
 
 # ---------------------------------------------------------------------------
