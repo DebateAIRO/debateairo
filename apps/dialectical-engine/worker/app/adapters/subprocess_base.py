@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import signal
 import shutil
 import sys
 from collections.abc import AsyncIterator, Callable
@@ -86,15 +87,35 @@ class SubprocessStreamingAdapter:
         return shutil.which(self.executable) is not None or os.path.isfile(self.executable)
 
     async def stream(self, system: str, user: str, max_tokens: int) -> AsyncIterator[str]:
+        process: asyncio.subprocess.Process | None = None
         try:
             stdin_text = self.stdin_text(system, user, max_tokens)
-            process = await asyncio.create_subprocess_exec(
-                *self.command(system, user, max_tokens),
-                stdin=asyncio.subprocess.PIPE if stdin_text is not None else None,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env={**os.environ, **extra_env} if (extra_env := self.env()) else None,
-            )
+            command = self.command(system, user, max_tokens)
+            spawn_kwargs: dict[str, object] = {
+                "stdin": asyncio.subprocess.PIPE if stdin_text is not None else None,
+                "stdout": asyncio.subprocess.PIPE,
+                "stderr": asyncio.subprocess.PIPE,
+                "env": {**os.environ, **extra_env} if (extra_env := self.env()) else None,
+            }
+            if os.name != "nt":
+                spawn_kwargs["start_new_session"] = True
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    **spawn_kwargs,
+                )
+            except TypeError as exc:
+                # Several adapter tests (and some third-party event-loop
+                # shims) provide the older create_subprocess_exec signature.
+                # Real CPython supports start_new_session; only retry when
+                # that exact compatibility keyword was rejected.
+                if "start_new_session" not in str(exc):
+                    raise
+                spawn_kwargs.pop("start_new_session", None)
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    **spawn_kwargs,
+                )
             if stdin_text is not None:
                 assert process.stdin is not None
                 process.stdin.write(stdin_text.encode())
@@ -122,6 +143,23 @@ class SubprocessStreamingAdapter:
                     raise RuntimeError(stderr_text)
                 raise RuntimeError(f"{self.executable} produced no output")
         finally:
+            if process is not None and process.returncode is None:
+                try:
+                    if os.name != "nt":
+                        os.killpg(process.pid, signal.SIGTERM)
+                    else:  # pragma: no cover - exercised by Windows CI.
+                        process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=5)
+                except (ProcessLookupError, asyncio.TimeoutError):
+                    if process.returncode is None:
+                        try:
+                            if os.name != "nt":
+                                os.killpg(process.pid, signal.SIGKILL)
+                            else:  # pragma: no cover - exercised by Windows CI.
+                                process.kill()
+                            await process.wait()
+                        except ProcessLookupError:
+                            pass
             self.cleanup()
 
     def parse_stdout_line(self, line: str) -> str:

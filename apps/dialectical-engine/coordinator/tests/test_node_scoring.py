@@ -4154,6 +4154,63 @@ def test_score_node_with_provider_panel_member_timeout_degrades_to_remaining_jud
     assert notes[0]["status"] == "timeout"
 
 
+def test_panel_long_horizon_quota_opens_cross_node_circuit(db, monkeypatch) -> None:
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "quota-panel-model")
+    scoring_service._PANEL_QUOTA_CIRCUITS.clear()
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(node_id=request.claim.node_id).model_dump(mode="json")
+                ),
+            )
+
+    class QuotaPanelProvider:
+        calls = 0
+
+        def judge_node(self, request):
+            self.calls += 1
+            raise ProviderError("You've hit your weekly limit; resets tomorrow")
+
+    panel_provider = QuotaPanelProvider()
+    member = JudgePanelMember(
+        family="quota-family",
+        model_id="quota-panel-model",
+        judge_role=judge_panel_role("quota-family"),
+        provider=panel_provider,
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([member], []))
+    debate, node, _generation = _lineage_guard_debate_and_node(
+        db, arguer_model_id="model-a"
+    )
+
+    try:
+        first = score_node_with_provider(
+            db, debate, node.id, PrimaryProvider(), force_refresh=True
+        )
+        second = score_node_with_provider(
+            db, debate, node.id, PrimaryProvider(), force_refresh=True
+        )
+    finally:
+        scoring_service._PANEL_QUOTA_CIRCUITS.clear()
+
+    assert panel_provider.calls == 1
+    assert first["items"][0]["score_provenance"]["judge_panel_notes"][0][
+        "status"
+    ] == "provider_error"
+    assert second["items"][0]["score_provenance"]["judge_panel_notes"][0][
+        "status"
+    ] == "quota_circuit_open"
+
+
 def test_score_node_with_provider_panel_member_persist_exception_leaves_primary_artifact_intact(
     db, monkeypatch
 ) -> None:
@@ -5651,6 +5708,88 @@ def test_background_scoring_job_persists_judge_artifacts_before_public_analyzer_
     assert artifact.job_id == job.id
     assert artifact.analyzer_run_id == analyzer_run.id
     _assert_public_payload_has_no_private_judge_output(analyzer_run.output, "RJ01-BACKGROUND-RAW-1")
+
+
+def test_scoring_job_stays_running_through_lifecycle_and_adaptive_dispatch(db, monkeypatch) -> None:
+    import app.scoring.jobs as scoring_jobs
+
+    class BarrierProbeProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=1,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={},
+            )
+
+    debate = Debate(topic="Phase barriers must be honest.", status="complete")
+    root = Node(
+        id="barrier-root",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Synthesis must wait for adaptive dispatch.",
+        status="complete",
+        materialized_path="/",
+    )
+    debate.root_node_id = root.id
+    db.add_all([debate, root])
+    db.flush()
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": BarrierProbeProvider()},
+    )
+    observed: list[tuple[str, str, bool | None]] = []
+
+    def observe_lifecycle(session, *, job_id, **_kwargs):
+        observed_job = session.get(Job, job_id)
+        observed.append(
+            (
+                "lifecycle",
+                observed_job.status,
+                observed_job.payload.get("scoring_phase_settled"),
+            )
+        )
+
+    def observe_dispatch(session, *, debate_id, analyzer_run_id):
+        complete_job = session.scalar(
+            select(Job).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status == "complete",
+            )
+        )
+        observed.append(
+            (
+                "dispatch",
+                complete_job.status if complete_job is not None else "missing",
+                complete_job.payload.get("scoring_phase_settled") if complete_job is not None else None,
+            )
+        )
+
+    monkeypatch.setattr(scoring_jobs, "reevaluate_lifecycle_after_scoring_completion", observe_lifecycle)
+    monkeypatch.setattr(scoring_jobs, "run_protocol_analysis", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(scoring_jobs, "adaptive_expansion_enabled", lambda: True)
+    monkeypatch.setattr(scoring_jobs, "expansion_dispatch", observe_dispatch)
+
+    scoring_jobs.run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    assert observed == [
+        ("lifecycle", "complete", False),
+        ("dispatch", "complete", False),
+    ]
+    settled_job = db.get(Job, job.id)
+    assert settled_job.status == "complete"
+    assert settled_job.payload["scoring_phase_settled"] is True
 
 
 def test_analyzer_run_links_only_artifacts_from_its_own_job(db) -> None:
@@ -10540,6 +10679,96 @@ def test_primary_judge_cli_runs_outside_any_open_transaction(db) -> None:
         "duration and starves every other writer into busy_timeout expiry "
         f"(observed in_transaction={observed})"
     )
+
+
+def test_judge_artifact_takes_cross_process_write_intent_before_identity_read(
+    db, independent_writer_can_commit, monkeypatch
+) -> None:
+    """A worker commit between artifact SELECT and INSERT must not invalidate
+    the scorer's WAL snapshot with SQLITE_BUSY_SNAPSHOT.
+
+    hold_write_lock only coordinates threads in the coordinator process. This
+    after-SELECT probe acts as a separate worker process: before the write-intent
+    fence it can commit, and the following artifact flush fails "database is
+    locked"; with the fence it briefly waits/fails while artifact persistence
+    completes, which is the required SQLite single-writer ordering.
+    """
+    monkeypatch.delenv("DIALECTICAL_JUDGE_PANEL_MODELS", raising=False)
+
+    class Provider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(node_id=request.claim.node_id).model_dump(mode="json")
+                ),
+                latency_ms=15,
+                checked_at="2026-07-28T11:48:45+00:00",
+            )
+
+    debate = Debate(topic="Can a WAL snapshot be upgraded safely?", status="complete")
+    worker = Worker(
+        id="worker-artifact-intent",
+        name="Worker Artifact Intent",
+        token_hash="hash",
+        capabilities=["debate"],
+    )
+    node = Node(
+        id="node-artifact-intent",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Artifact identity reads must happen after real SQLite write intent.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-artifact-intent",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="A separate process can otherwise invalidate the WAL snapshot.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.commit()
+
+    observed: list[bool] = []
+    engine = db.get_bind()
+
+    def probe_after_identity_select(conn, cursor, statement, parameters, context, executemany):
+        normalized = " ".join(statement.lower().split())
+        if (
+            not observed
+            and normalized.startswith("select")
+            and "from judge_output_artifacts" in normalized
+            and "raw_output_sha256" in normalized
+        ):
+            observed.append(independent_writer_can_commit())
+
+    event.listen(engine, "after_cursor_execute", probe_after_identity_select)
+    try:
+        payload = score_node_with_provider(
+            db, debate, node.id, Provider(), judge_role="judge", force_refresh=True
+        )
+    finally:
+        event.remove(engine, "after_cursor_execute", probe_after_identity_select)
+
+    assert payload["status"] == "available"
+    assert observed == [False], (
+        "a separate-process writer committed after the artifact identity SELECT; "
+        "the scorer had no real SQLite write intent and its INSERT is vulnerable "
+        "to SQLITE_BUSY_SNAPSHOT"
+    )
+    assert _single_judge_output_artifact(
+        db, debate_id=debate.id, node_id=node.id
+    ).parse_status == "available"
 
 
 def test_generation_completion_queues_scoring_instead_of_judging_inline(db, monkeypatch) -> None:

@@ -30,6 +30,7 @@ from app.protocol.runner import run_protocol_analysis
 from app.providers import AgentConfig, ProviderRegistry
 from app.scoring import ScoringProviderResult, queue_scoring_job
 from app.scoring.jobs import (
+    SCORING_PHASE_SETTLED_KEY,
     drive_internal_scoring_for_debate,
     run_scoring_job_background,
     wake_pending_internal_scoring_job,
@@ -308,6 +309,57 @@ def test_synthesis_claimable_after_budget_expiry_with_partial_scores(db, monkeyp
 
     # No scoring at all (fully partial), but the wait budget is exhausted, so
     # synthesis proceeds rather than wedging.
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_active_scoring_blocks_synthesis_even_after_wait_budget_expires(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "0")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    scoring_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+
+    # A claimed pass can legitimately wait behind the global scoring semaphore
+    # for much longer than the synthesis fallback budget. It remains a hard
+    # blocker because allowing synthesis here produces an unscored result.
+    scoring_job.status = "claimed"
+    db.commit()
+    assert claim_pending_job(db, worker) is None
+    assert _pending_synthesize_job(db, debate) is not None
+
+    # The bounded no-scoring fallback still works once the internal pass is
+    # genuinely terminal rather than merely queued.
+    scoring_job.status = "failed"
+    scoring_job.error = "judge subsystem unavailable"
+    db.commit()
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_completed_unsettled_scoring_phase_blocks_fully_scored_synthesis(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "0")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    _seed_tree_scoring(db, debate)
+    assert service.all_live_argument_nodes_scored(db, debate)
+
+    scoring_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    scoring_job.status = "complete"
+    scoring_job.payload = {SCORING_PHASE_SETTLED_KEY: False}
+    db.commit()
+
+    # Scoring output alone is insufficient: lifecycle, protocol analysis, and
+    # adaptive dispatch must settle before synthesis can observe the phase.
+    assert claim_pending_job(db, worker) is None
+    assert _pending_synthesize_job(db, debate) is not None
+
+    scoring_job.payload = {SCORING_PHASE_SETTLED_KEY: True}
+    db.commit()
     claimed = claim_pending_job(db, worker)
     assert claimed is not None and claimed.job_type == "v2_synthesize"
 
@@ -879,6 +931,32 @@ def test_synthesize_prompt_includes_measured_standing_and_keeps_no_winner(db) ->
     assert "Ground the synthesis in the measured_standing" in user
     for key in ("measured_standing", "node_scores", "verification_statuses", "unresolved_attacks", "failure_manifest"):
         assert key in user
+
+
+def test_synthesize_prompt_does_not_duplicate_node_scoring_analyzer(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    _seed_tree_scoring(db, debate)
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={"raw": "DUPLICATED_SCORING_SENTINEL_" + ("x" * 300_000)},
+            status="complete",
+            provenance={},
+        )
+    )
+    db.commit()
+
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    _system, user = service.render_v2_job_prompt(db, synth)
+
+    assert "DUPLICATED_SCORING_SENTINEL" not in user
+    assert "measured_standing" in user
 
 
 # ---------------------------------------------------------------------------

@@ -19,7 +19,14 @@ ADAPTER_CLI_ENV = {"GOOGLE_GENAI_USE_GCA": "true"}
 from app.adapters.credentials import configured_api_key
 from app.capabilities import detect_adapters
 from app.client import CoordinatorClient
-from app.config import WorkerConfig, load_file_config, parse_model_list, save_config
+from app.config import (
+    DEFAULT_CONFIG_PATH,
+    WorkerConfig,
+    keychain_user_token,
+    load_file_config,
+    parse_model_list,
+    save_config,
+)
 
 HOSTNAME_RE = re.compile(
     r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
@@ -37,8 +44,14 @@ def default_python_dyld_library_path() -> str:
     return str(expat) if expat.exists() else ""
 
 
-def user_token() -> str:
+def user_token(config: WorkerConfig | None = None) -> str:
     token = os.getenv("DIALECTICAL_USER_TOKEN") or os.getenv("USER_TOKEN")
+    if token:
+        return token
+    credential_config = config or WorkerConfig()
+    token = keychain_user_token(
+        credential_config.keychain_service, credential_config.keychain_account
+    )
     if token:
         return token
     if not sys.stdin.isatty():
@@ -105,7 +118,13 @@ def launchd_environment_xml(values: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def render_launchd_service(python_path: str, adapter_api_env: dict[str, str] | None = None) -> str:
+def render_launchd_service(
+    python_path: str,
+    adapter_api_env: dict[str, str] | None = None,
+    *,
+    service_label: str = "com.dialectical.worker",
+    config_path: Path = DEFAULT_CONFIG_PATH,
+) -> str:
     template = ROOT / "deploy" / "launchd" / "worker.plist"
     adapter_env = {
         **ADAPTER_CLI_ENV,
@@ -119,13 +138,26 @@ def render_launchd_service(python_path: str, adapter_api_env: dict[str, str] | N
         .replace("__PATH__", default_launchd_path())
         .replace("__PYTHON_DYLD_LIBRARY_PATH__", default_python_dyld_library_path())
         .replace("__ADAPTER_API_ENV__", adapter_env_xml)
+        .replace("__SERVICE_LABEL__", service_label)
+        .replace("__WORKER_CONFIG__", str(config_path.expanduser()))
+        .replace("__LOG_BASENAME__", service_label)
     )
 
 
-def install_launchd_service(python_path: str) -> None:
-    destination = Path.home() / "Library" / "LaunchAgents" / "com.dialectical.worker.plist"
+def install_launchd_service(
+    python_path: str, *, service_label: str, config_path: Path
+) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", service_label):
+        raise ValueError("service label may contain only letters, numbers, dots, and hyphens")
+    destination = Path.home() / "Library" / "LaunchAgents" / f"{service_label}.plist"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(render_launchd_service(python_path))
+    destination.write_text(
+        render_launchd_service(
+            python_path,
+            service_label=service_label,
+            config_path=config_path,
+        )
+    )
     subprocess.run(["launchctl", "unload", str(destination)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["launchctl", "load", str(destination)], check=True)
     print(f"Installed and started launchd service: {destination}")
@@ -135,9 +167,11 @@ def same_origin(left: str, right: str) -> bool:
     return left.strip().rstrip("/") == right.strip().rstrip("/")
 
 
-def existing_registration_for(coordinator_url: str, name: str) -> WorkerConfig | None:
+def existing_registration_for(
+    coordinator_url: str, name: str, config_path: Path | None = None
+) -> WorkerConfig | None:
     try:
-        config = load_file_config()
+        config = load_file_config() if config_path is None else load_file_config(config_path)
     except Exception:
         return None
     if not config.worker_id or not config.worker_token:
@@ -151,8 +185,15 @@ def existing_registration_for(coordinator_url: str, name: str) -> WorkerConfig |
 
 async def run(args: argparse.Namespace) -> None:
     require_named_coordinator_url(args)
+    config_arg = getattr(args, "config", None)
+    config_path = Path(config_arg or DEFAULT_CONFIG_PATH).expanduser()
+    custom_config_path = config_path if config_arg is not None else None
     rotate_token = getattr(args, "rotate_token", False)
-    existing = None if rotate_token else existing_registration_for(args.coordinator_url, args.name)
+    existing = (
+        None
+        if rotate_token
+        else existing_registration_for(args.coordinator_url, args.name, custom_config_path)
+    )
     allowed_models = parse_model_list(args.allowed_models)
     if args.allowed_models is None and existing is not None:
         allowed_models = existing.allowed_models
@@ -178,14 +219,29 @@ async def run(args: argparse.Namespace) -> None:
         else:
             await client.register(capabilities, persist=False)
         await client.heartbeat(capabilities)
-        save_config(config)
+        if custom_config_path is None:
+            save_config(config)
+        else:
+            save_config(config, custom_config_path)
         print(f"Worker config saved for {config.name}.")
         if rotate_token:
             print("Worker token rotated; restart or reload any already-running worker process with the saved config.")
     finally:
         await client.aclose()
     if args.install_service:
-        install_launchd_service(args.python)
+        service_label = getattr(args, "service_label", "com.dialectical.worker")
+        if service_label == "com.dialectical.worker" and custom_config_path is None:
+            install_launchd_service(
+                args.python,
+                service_label=service_label,
+                config_path=DEFAULT_CONFIG_PATH,
+            )
+        else:
+            install_launchd_service(
+                args.python,
+                service_label=service_label,
+                config_path=config_path,
+            )
     else:
         print(f"Start manually from {ROOT / 'worker'} with: {args.python} -m app.main")
 
@@ -195,6 +251,8 @@ def main() -> None:
     parser.add_argument("--coordinator-url", required=True)
     parser.add_argument("--name", required=True)
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
+    parser.add_argument("--service-label", default="com.dialectical.worker")
     parser.add_argument("--install-service", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--enable-mock", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(

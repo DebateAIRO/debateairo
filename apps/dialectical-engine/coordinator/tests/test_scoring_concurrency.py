@@ -163,6 +163,14 @@ def test_concurrent_scoring_passes_are_bounded(db, monkeypatch) -> None:
     assert db.get(Job, job_b_id).status == "complete"
 
 
+def test_scoring_pass_concurrency_defaults_to_one_for_sqlite(monkeypatch) -> None:
+    from app.scoring.jobs import SCORING_MAX_CONCURRENT_PASSES_ENV, scoring_pass_concurrency
+
+    monkeypatch.delenv(SCORING_MAX_CONCURRENT_PASSES_ENV, raising=False)
+
+    assert scoring_pass_concurrency() == 1
+
+
 def test_force_refresh_inline_pass_waits_for_the_gate_without_a_connection(db, monkeypatch) -> None:
     """GET /{debate_id}/scoring?force_refresh=true runs a full pass inline on
     the request session. It must (1) count against the same process-wide pass

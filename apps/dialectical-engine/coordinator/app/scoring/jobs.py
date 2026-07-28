@@ -49,12 +49,11 @@ SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
 # clock it actually needs.
 #
 # Trade-off (noted per the brief): F2 startup recovery of a restart-orphaned
-# score_debate job is deadline-gated (recover_orphaned_scoring_jobs only resets
-# rows whose deadline is already PAST), and the reaper deliberately excludes
-# score_debate. So a larger panel deadline lengthens the window before a
-# restart-orphaned panel job is recovered. This is the accepted cost of not
-# prematurely expiring a legitimately long panel pass; single-judge (the common
-# case) keeps the original 30-min window exactly.
+# score_debate is recovered by a startup-only sweep. Because the coordinator
+# holds a single-instance database lock before that sweep starts, every
+# claimed/running scoring row belongs to the previous process and is orphaned
+# regardless of its deadline. A larger panel deadline therefore never delays
+# restart recovery.
 SCORING_PANEL_PER_NODE_JUDGE_DEADLINE_SECONDS = 120
 
 
@@ -111,7 +110,13 @@ _scoring_pass_gate_size: int | None = None
 
 
 def scoring_pass_concurrency() -> int:
-    return int_env(SCORING_MAX_CONCURRENT_PASSES_ENV, 2, 1, 16)
+    # SQLite has one writer. Two scoring sessions can each flush an artifact
+    # before their per-node commit; if the second waits on SQLite while holding
+    # the process write lock, the first cannot acquire that lock to commit and
+    # release its RESERVED writer. Serializing scoring passes removes that
+    # lock-order cycle while the gate still permits all provider calls and
+    # queues later passes without a checked-out DB connection.
+    return int_env(SCORING_MAX_CONCURRENT_PASSES_ENV, 1, 1, 16)
 
 
 def scoring_pass_gate() -> threading.BoundedSemaphore:
@@ -134,12 +139,28 @@ SCORING_JOB_COMPLETION_PERSISTENCE_ERROR = (
 )
 SCORING_JOB_MISSING_ARTIFACTS_ERROR = "No durable judge output artifacts were persisted for this scoring job."
 SCORING_JOB_MISSING_NODE_ARTIFACTS_ERROR = "Missing durable judge output artifacts for scoring job nodes."
+SCORING_PHASE_SETTLED_KEY = "scoring_phase_settled"
 # F2 (2026-07-24 incident): terminal error stamped on a score_debate job that a
 # coordinator restart orphaned in claimed/running -- see
 # recover_orphaned_scoring_jobs.
 SCORING_JOB_ORPHANED_BY_RESTART_ERROR = "orphaned by coordinator restart"
 RegistryFactory = Callable[[], ProviderRegistry]
 ScoringRunner = Callable[..., dict]
+
+
+def scoring_phase_unsettled(job: Job) -> bool:
+    """True only for a new-style completed score whose post-score tail is open.
+
+    Legacy completed jobs have no marker and are therefore settled.  The
+    explicit ``False`` value is written atomically with scoring completion,
+    then flipped to ``True`` only after lifecycle, protocol, and adaptive
+    dispatch finish.
+    """
+    return (
+        job.status == "complete"
+        and isinstance(job.payload, dict)
+        and job.payload.get(SCORING_PHASE_SETTLED_KEY) is False
+    )
 
 
 def current_scoring_branch(db: Session, debate: Debate) -> DebateBranch:
@@ -245,21 +266,19 @@ def _run_scoring_job_pass(
             )
             job.status = "complete"
             job.error = None
+            job.payload = {
+                **(job.payload if isinstance(job.payload, dict) else {}),
+                SCORING_PHASE_SETTLED_KEY: False,
+            }
             try:
+                # Scoring truth must be durably COMPLETE before lifecycle
+                # authentication consumes it.  The explicit unsettled marker
+                # keeps synthesis blocked until the post-score phase finishes.
                 commit_write(db)
             except Exception:
                 db.rollback()
                 _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
                 return
-            log_event(
-                LOGGER,
-                "scoring.run",
-                debate_id=debate_id,
-                job_id=job_id,
-                job_type="score_debate",
-                outcome="complete",
-                duration_ms=int((time.monotonic() - run_started) * 1000),
-            )
         except Exception as exc:
             db.rollback()
             record_job_transition(
@@ -292,6 +311,7 @@ def _run_scoring_job_pass(
                 # must leave lifecycle inputs unavailable rather than inventing
                 # a verdict or retroactively failing the scoring operation.
                 pass
+        lifecycle_error: Exception | None = None
         try:
             reevaluate_lifecycle_after_scoring_completion(
                 db,
@@ -300,6 +320,13 @@ def _run_scoring_job_pass(
                 analyzer_run_id=new_run.id,
                 **lifecycle_kwargs,
             )
+        except Exception as exc:
+            # Preserve the historical best-effort lifecycle semantics: scores
+            # stay durable and the scoring job still reaches complete, but the
+            # background task may surface the tail error after the phase gate
+            # has been closed cleanly below.
+            db.rollback()
+            lifecycle_error = exc
         finally:
             # W2: judge scores are durable (committed above) -- re-run
             # protocol analysis so the next verdict read consumes real taus
@@ -348,6 +375,34 @@ def _run_scoring_job_pass(
                         outcome="completed",
                         duration_ms=int((time.monotonic() - dispatch_started) * 1000),
                     )
+        # Release the phase barrier only after every post-score consumer has
+        # finished and adaptive dispatch has either queued its next wave or
+        # recorded a terminal stop.  Job status remains complete throughout so
+        # lifecycle provenance stays authenticated.
+        job = db.get(Job, job_id)
+        if job is None or job.status != "complete":
+            return
+        job.payload = {
+            **(job.payload if isinstance(job.payload, dict) else {}),
+            SCORING_PHASE_SETTLED_KEY: True,
+        }
+        try:
+            commit_write(db)
+        except Exception:
+            db.rollback()
+            _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
+            return
+        log_event(
+            LOGGER,
+            "scoring.run",
+            debate_id=debate_id,
+            job_id=job_id,
+            job_type="score_debate",
+            outcome="complete",
+            duration_ms=int((time.monotonic() - run_started) * 1000),
+        )
+        if lifecycle_error is not None:
+            raise lifecycle_error
 
 
 def _mark_scoring_job_failed(job_id: str, error: str) -> None:
@@ -614,29 +669,37 @@ def recover_orphaned_scoring_jobs(
     recovers it. In prod one such job sat "running" 9h after a restart with 0
     nodes scored, and _active_scoring_job_exists then blocked any replacement.
 
-    Startup-only sweep, gated on a PAST deadline: a genuinely live in-process
-    job holds a FUTURE deadline (run start refreshes it to now +
-    SCORING_BACKGROUND_JOB_DEADLINE_SECONDS), so only truly orphaned rows are
-    reset -- a healthy in-flight pass is never killed. Each orphan is failed
-    to a non-active terminal state so _active_scoring_job_exists no longer
-    counts it and a fresh pass can be created; then, for each affected debate
-    that still needs scoring (not archived, not already fully scored --
-    honoring the reaper's do-not-flip-complete-debates warning), scoring is
-    re-driven once.
+    Startup-only sweep. The coordinator acquires the database's exclusive
+    single-instance lock before launching this function, so no scoring thread
+    from the previous process can still be alive. Every claimed/running row is
+    therefore orphaned even when its size-aware deadline is hours in the
+    future. A completed row whose explicit phase marker remains unsettled also
+    proves the process died between durable scoring completion and the end of
+    lifecycle/protocol/adaptive dispatch. Each active orphan is failed to a
+    non-active terminal state so
+    _active_scoring_job_exists no longer counts it and a fresh pass can be
+    created. For each debate that still needs scoring, or whose completed phase
+    was explicitly unsettled, a replacement is made visible atomically with
+    settling the old marker and scoring is re-driven once.
 
     Best-effort and bounded: each job and each re-drive is wrapped so one
     failure never aborts the rest, and this never raises (startup must not be
     blocked or crashed by recovery). Returns the debate ids re-driven.
     """
     now = now_utc()
-    orphaned = db.scalars(
+    candidates = db.scalars(
         select(Job).where(
             Job.job_type == "score_debate",
-            Job.status.in_(("claimed", "running")),
-            Job.deadline < now,
+            Job.status.in_(("claimed", "running", "complete")),
         )
     ).all()
+    orphaned = [job for job in candidates if job.status in {"claimed", "running"}]
+    unsettled = [job for job in candidates if scoring_phase_unsettled(job)]
+    unsettled_by_debate: dict[str, list[Job]] = {}
+    for job in unsettled:
+        unsettled_by_debate.setdefault(job.debate_id, []).append(job)
     affected_debate_ids: list[str] = []
+    replacement_models: dict[str, str] = {}
     for job in orphaned:
         try:
             record_job_transition(
@@ -657,21 +720,63 @@ def recover_orphaned_scoring_jobs(
             continue
         if job.debate_id not in affected_debate_ids:
             affected_debate_ids.append(job.debate_id)
+            replacement_models[job.debate_id] = job.required_model
+    for job in unsettled:
+        if job.debate_id not in affected_debate_ids:
+            affected_debate_ids.append(job.debate_id)
+            replacement_models[job.debate_id] = job.required_model
     rescored: list[str] = []
     for debate_id in affected_debate_ids:
         try:
-            if not _debate_still_needs_scoring(db, debate_id):
+            settling_jobs = unsettled_by_debate.get(debate_id, [])
+            if not settling_jobs and not _debate_still_needs_scoring(db, debate_id):
                 continue
+            # Make the replacement ACTIVE before yielding to any daemon
+            # thread. A pending v2_synthesize job checks for active scoring;
+            # failing the orphan and only later creating its replacement left
+            # a claim window in which synthesis ran against an unscored tree.
+            # The pending row closes that window durably, while `rescore`
+            # below merely claims/runs it.
+            debate = db.get(Debate, debate_id)
+            if debate is None:
+                continue
+            active_status_job = db.scalar(
+                select(Job.id)
+                .where(
+                    Job.debate_id == debate_id,
+                    Job.job_type == "score_debate",
+                    Job.status.in_(("pending", "claimed", "running")),
+                )
+                .limit(1)
+            )
+            if active_status_job is None:
+                queue_scoring_job(
+                    db,
+                    debate,
+                    model_id=replacement_models.get(debate_id, ""),
+                    judge_role="judge",
+                )
+            # Atomic handoff: the old completed scoring truth stops blocking
+            # synthesis only in the same commit that makes its replacement
+            # pass visible as pending.
+            for settling_job in settling_jobs:
+                settling_job.payload = {
+                    **(settling_job.payload if isinstance(settling_job.payload, dict) else {}),
+                    SCORING_PHASE_SETTLED_KEY: True,
+                }
+            commit_write(db)
             rescore(debate_id)
             rescored.append(debate_id)
         except Exception:  # noqa: BLE001 -- one debate's re-drive failure must not abort the rest
             LOGGER.exception("restart scoring recovery re-drive failed for debate %s", debate_id)
+            db.rollback()
             continue
-    if orphaned:
+    if orphaned or unsettled:
         log_event(
             LOGGER,
             "scoring.restart_recovery",
             orphaned_job_count=len(orphaned),
+            unsettled_job_count=len(unsettled),
             rescored_debate_count=len(rescored),
         )
     return rescored
@@ -692,6 +797,27 @@ def _debate_still_needs_scoring(db: Session, debate_id: str) -> bool:
     return not all_live_argument_nodes_scored(db, debate)
 
 
+def _trigger_restart_rescore(debate_id: str) -> threading.Thread:
+    """Enqueue one restart recovery without blocking the rest of the sweep.
+
+    drive_internal_scoring_for_debate runs its collected background task
+    synchronously. Calling it directly from the recovery loop therefore made
+    the first affected debate occupy the global scoring semaphore for hours
+    before the second debate even received a replacement job. Claim every
+    affected debate from its own daemon thread instead; the existing scoring
+    pass gate still serializes execution, while every replacement becomes
+    durable immediately.
+    """
+    thread = threading.Thread(
+        target=drive_internal_scoring_for_debate,
+        args=(debate_id,),
+        name=f"scoring-restart-{debate_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
 def recover_orphaned_scoring_jobs_at_startup() -> list[str]:
     """Startup entrypoint for F2 recovery: open a session and sweep.
 
@@ -702,7 +828,9 @@ def recover_orphaned_scoring_jobs_at_startup() -> list[str]:
     may re-drive a full scoring pass)."""
     try:
         with SessionLocal() as db:
-            return recover_orphaned_scoring_jobs(db)
+            return recover_orphaned_scoring_jobs(
+                db, rescore=_trigger_restart_rescore
+            )
     except Exception:
         LOGGER.exception("restart scoring recovery sweep failed (non-fatal)")
         return []
@@ -780,20 +908,20 @@ def _latest_retryable_stale_scoring_job(db: Session, debate_id: str) -> Job | No
 
 
 def _active_scoring_job_exists(db: Session, debate_id: str) -> bool:
-    """True when a score_debate job for this debate is pending, claimed, or
-    running -- i.e. a scoring pass is already queued or in flight. Used to keep
-    cold-start (create_if_missing) from spinning up a duplicate concurrent pass;
-    must be read on a fresh snapshot under the write lock (see
-    wake_pending_internal_scoring_job)."""
-    return (
-        db.scalar(
-            select(Job.id)
-            .where(
-                Job.debate_id == debate_id,
-                Job.job_type == "score_debate",
-                Job.status.in_(("pending", "claimed", "running")),
-            )
-            .limit(1)
+    """True for a queued/in-flight pass or a completed-unsettled score phase.
+
+    Used to keep cold-start (create_if_missing) from spinning up a duplicate
+    concurrent pass, including while lifecycle/protocol/adaptive dispatch is
+    still consuming durable scoring truth. Must be read on a fresh snapshot
+    under the write lock (see wake_pending_internal_scoring_job)."""
+    jobs = db.scalars(
+        select(Job).where(
+            Job.debate_id == debate_id,
+            Job.job_type == "score_debate",
+            Job.status.in_(("pending", "claimed", "running", "complete")),
         )
-        is not None
+    ).all()
+    return any(
+        job.status in {"pending", "claimed", "running"} or scoring_phase_unsettled(job)
+        for job in jobs
     )

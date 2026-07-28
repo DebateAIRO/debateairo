@@ -118,6 +118,47 @@ def test_mock_orchestration_completes_and_exports(db) -> None:
     assert "Cleaner transport." in exported
 
 
+def test_successful_completion_clears_prior_failover_error(db) -> None:
+    worker = Worker(
+        name="failover-success-worker",
+        token_hash=hash_token("worker-token"),
+        capabilities=["mock-local"],
+        last_seen=now_utc(),
+        status="online",
+    )
+    db.add(worker)
+    debate = create_debate(
+        db,
+        "Should successful failover retain an error?",
+        {"max_depth": 1, "branching": 2},
+    )
+    job = claim_pending_job(db, worker)
+    assert job is not None and job.job_type == "decompose"
+    job.error = "Primary provider quota exhausted; reassigned to fallback."
+    db.commit()
+
+    asyncio.run(
+        complete_job(
+            db,
+            job,
+            {
+                "root_claim": debate.topic,
+                "argument": "The fallback completed successfully.",
+                "children": [
+                    {"node_type": "PRO", "claim": "Successful completion is terminal truth."},
+                    {"node_type": "CON", "claim": "Failover history remains in the ledger."},
+                ],
+            },
+            {"latency_ms": 12},
+        )
+    )
+
+    db.expire_all()
+    completed = db.get(Job, job.id)
+    assert completed.status == "complete"
+    assert completed.error is None
+
+
 def test_classic_argue_completion_queues_default_scoring_state(db) -> None:
     worker = Worker(
         name="mac-mini",

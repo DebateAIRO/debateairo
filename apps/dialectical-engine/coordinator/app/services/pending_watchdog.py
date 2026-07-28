@@ -64,7 +64,7 @@ from sqlalchemy.orm import Session
 from app.core.config import bool_env, float_env, load_settings
 from app.core.db import SessionLocal
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, execute_write
 from app.models.entities import Job, Worker, now_utc
 from app.services.events import event_bus
 from app.services.orchestrator import try_failover_job, worker_capability_set
@@ -213,7 +213,8 @@ def _stake_pending_job(db: Session, job: Job) -> bool:
     stake pattern): the conditional UPDATE misses if a worker claimed the job
     (status/deadline changed) between this sweep's read and its write, and
     the job is skipped this round -- a live claim is never clobbered."""
-    result = db.execute(
+    result = execute_write(
+        db,
         update(Job)
         .where(Job.id == job.id, Job.status == "pending", Job.deadline == job.deadline)
         .values(deadline=job.deadline)

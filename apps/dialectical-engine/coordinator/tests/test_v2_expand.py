@@ -22,7 +22,7 @@ import pytest
 from sqlalchemy import select
 
 from app.main import app  # noqa: F401 - warm up the import graph (import-cycle guard)
-from app.models.entities import Debate, Generation, Job, Node, Worker, now_utc
+from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, Worker, now_utc
 from app.services import dialectical_v2 as service
 from app.services.dialectical_v2 import (
     pending_generation_nodes,
@@ -399,6 +399,32 @@ def test_v2_expand_travels_real_worker_path_and_adds_exactly_one_child(db, monke
     # The expansion was the last outstanding generation: synthesis now queues.
     queued_synthesis = synthesize_jobs(db, debate.id)
     assert len(queued_synthesis) == 1 and queued_synthesis[0].status == "pending"
+
+
+def test_v2_expand_prompt_does_not_copy_full_tree_scoring_analyzer(db) -> None:
+    worker = codex_worker(db)
+    debate = make_v2_debate(db, worker, complete_povs=3)
+    parent = first_pov_pro(db, debate)
+    job = queue_v2_expand_job(db, debate, parent, "CON", "Measured disagreement remains high.")
+    branch = service.first_branch(db, debate.id)
+    sentinel = "FULL_TREE_SCORING_SENTINEL_" + ("x" * 300_000)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={"items": [{"raw": sentinel}]},
+            status="complete",
+            provenance={},
+        )
+    )
+    db.commit()
+
+    _system, user_prompt = render_v2_job_prompt(db, job)
+
+    assert "FULL_TREE_SCORING_SENTINEL" not in user_prompt
+    assert "Measured disagreement remains high." in user_prompt
+    assert len(user_prompt.encode("utf-8")) < 50_000
 
 
 def test_replayed_expand_completion_cannot_mint_a_second_child(db) -> None:

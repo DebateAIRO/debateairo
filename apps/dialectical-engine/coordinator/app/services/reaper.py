@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import float_env
 from app.core.db import SessionLocal
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, execute_write
 from app.models.entities import Job, now_utc
 from app.services.events import event_bus
 from app.services.orchestrator import job_stuck_seconds, requeue_or_terminalize_timed_out_job
@@ -64,7 +64,8 @@ def _stake_expired_job(db: Session, job: Job, now: Any) -> bool:
     concurrent requeue (status pending), or second-instance sweep (deadline
     already restaked) makes it miss, and the job is skipped this round.
     """
-    result = db.execute(
+    result = execute_write(
+        db,
         update(Job)
         .where(Job.id == job.id, Job.status == job.status, Job.deadline == job.deadline)
         .values(deadline=now)
