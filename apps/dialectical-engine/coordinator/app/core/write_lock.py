@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from threading import Lock, RLock
-from typing import Iterator
+from typing import Any, Iterator
 
 from sqlalchemy import event
 from sqlalchemy.orm import Session
@@ -149,6 +149,25 @@ def flush_write(db: Session) -> None:
         # A failed flush leaves the Session unusable until rollback. Roll back
         # here so the transaction-scoped writer gate can never leak if a
         # caller propagates the exception without cleaning the Session first.
+        db.rollback()
+        raise
+
+
+def execute_write(db: Session, statement: Any) -> Any:
+    """Execute SQLAlchemy Core/ORM DML under the transaction writer gate.
+
+    ``Session.execute(update(...))`` emits SQLite DML immediately, before a
+    later ``commit_write`` can serialize it.  Such call sites therefore bypass
+    both the process RLock and the transaction-scoped writer gate unless the
+    execute itself is covered.  Keep the gate until the surrounding outer
+    transaction commits or rolls back, exactly like ``flush_write``.
+    """
+    _check_out_connection_first(db, unconditional=True)
+    _acquire_writer_gate(db)
+    try:
+        with _write_lock:
+            return db.execute(statement)
+    except BaseException:
         db.rollback()
         raise
 

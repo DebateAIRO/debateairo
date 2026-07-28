@@ -12,7 +12,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import RUNTIME_SETTINGS_KEY, bool_env, int_env, load_settings
-from app.core.write_lock import commit_write, flush_write
+from app.core.write_lock import commit_write, execute_write, flush_write
 
 from app.models.entities import Debate, Generation, Job, Node, Setting, Synthesis, Worker, now_utc, uuid_str
 from app.services.events import event_bus
@@ -475,8 +475,11 @@ def create_generation(
     prompt_rendered: str,
     metadata: dict[str, Any],
 ) -> Generation:
-    db.query(Generation).filter(Generation.node_id == node.id, Generation.is_active.is_(True)).update(
-        {"is_active": False}
+    execute_write(
+        db,
+        update(Generation)
+        .where(Generation.node_id == node.id, Generation.is_active.is_(True))
+        .values(is_active=False),
     )
     generation = Generation(
         node_id=node.id,
@@ -1008,7 +1011,8 @@ def readopt_job_claim(db: Session, job: Job, worker: Worker) -> bool:
         return False
     now = now_utc()
     deadline = make_deadline(job.job_type)
-    result = db.execute(
+    result = execute_write(
+        db,
         update(Job)
         .where(Job.id == job.id, Job.status == "pending", Job.last_worker_id == worker.id)
         .values(
@@ -1304,7 +1308,8 @@ def maybe_queue_synthesis(db: Session, debate: Debate) -> Job | None:
 
 def try_claim_pending_job(db: Session, job: Job, worker: Worker, now: Any) -> bool:
     deadline = make_deadline(job.job_type)
-    result = db.execute(
+    result = execute_write(
+        db,
         update(Job)
         .where(Job.id == job.id, Job.status == "pending")
         .values(
