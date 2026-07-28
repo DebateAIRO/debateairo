@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import bool_env, float_env, int_env
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write
+from app.core.write_lock import commit_write, hold_write_lock
 from app.models.entities import Debate, Generation, Job, LifecycleDecisionRecord, Node, Worker
 from app.services.job_ledger import record_job_transition
 
@@ -1690,25 +1690,35 @@ def maybe_queue_rescore_after_expansion(
     from app.providers import ProviderRegistry, detect_scoring_provider_config
     from app.scoring.service import queue_scoring_job
 
-    active = db.scalars(
-        select(Job)
-        .where(
-            Job.debate_id == debate.id,
-            Job.job_type == "score_debate",
-            Job.status.in_(["pending", "claimed", "running"]),
+    debate_id = debate.id
+    # This function is reached after the expansion completion transaction has
+    # committed. Refresh the snapshot, then make active-check + create + commit
+    # one process-wide critical section. Two final expansion completions can
+    # both observe a quiescent tree and arrive here in the same millisecond;
+    # without this lock each used to create its own full judge-panel pass.
+    db.rollback()
+    with hold_write_lock(db):
+        active = db.scalars(
+            select(Job)
+            .where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(["pending", "claimed", "running"]),
+            )
+            .order_by(Job.created_at.desc(), Job.id.desc())
+            .limit(1)
+        ).first()
+        if active is not None:
+            # A pending job just needs the wake; an in-flight one needs nothing.
+            return active if active.status == "pending" else None
+        registry = (registry_factory or ProviderRegistry)()
+        scoring_config = detect_scoring_provider_config(
+            registry.agents, role="judge", providers=registry.providers
         )
-        .order_by(Job.created_at.desc(), Job.id.desc())
-        .limit(1)
-    ).first()
-    if active is not None:
-        # A pending job just needs the wake; an in-flight one needs nothing.
-        return active if active.status == "pending" else None
-    registry = (registry_factory or ProviderRegistry)()
-    scoring_config = detect_scoring_provider_config(
-        registry.agents, role="judge", providers=registry.providers
-    )
-    if not scoring_config.available:
-        return None
-    job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
-    commit_write(db)
+        if not scoring_config.available:
+            return None
+        job = queue_scoring_job(db, debate, model_id=scoring_config.model or "", judge_role="judge")
+        # Last DB operation in the critical section: commit returns the pooled
+        # connection, so no later query may occur until after the lock exits.
+        commit_write(db)
     return job
