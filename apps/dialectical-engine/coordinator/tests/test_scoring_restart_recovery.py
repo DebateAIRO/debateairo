@@ -161,7 +161,22 @@ def test_startup_recovery_reclaims_future_deadline_from_prior_process(db) -> Non
     db.commit()
 
     calls: list[str] = []
-    rescored = recover_orphaned_scoring_jobs(db, rescore=lambda debate_id: calls.append(debate_id))
+
+    def observe_recovery(debate_id: str) -> None:
+        calls.append(debate_id)
+        active = db.scalar(
+            select(Job.id).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(("pending", "claimed", "running")),
+            )
+        )
+        assert active is not None, (
+            "restart recovery exposed a no-active-scoring window before "
+            "redrive; synthesis could be claimed against an unscored tree"
+        )
+
+    rescored = recover_orphaned_scoring_jobs(db, rescore=observe_recovery)
 
     db.expire_all()
     assert db.get(Job, job.id).status == "failed"

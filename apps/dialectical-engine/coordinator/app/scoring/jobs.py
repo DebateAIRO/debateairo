@@ -641,6 +641,7 @@ def recover_orphaned_scoring_jobs(
         )
     ).all()
     affected_debate_ids: list[str] = []
+    replacement_models: dict[str, str] = {}
     for job in orphaned:
         try:
             record_job_transition(
@@ -661,11 +662,29 @@ def recover_orphaned_scoring_jobs(
             continue
         if job.debate_id not in affected_debate_ids:
             affected_debate_ids.append(job.debate_id)
+            replacement_models[job.debate_id] = job.required_model
     rescored: list[str] = []
     for debate_id in affected_debate_ids:
         try:
             if not _debate_still_needs_scoring(db, debate_id):
                 continue
+            # Make the replacement ACTIVE before yielding to any daemon
+            # thread. A pending v2_synthesize job checks for active scoring;
+            # failing the orphan and only later creating its replacement left
+            # a claim window in which synthesis ran against an unscored tree.
+            # The pending row closes that window durably, while `rescore`
+            # below merely claims/runs it.
+            debate = db.get(Debate, debate_id)
+            if debate is None:
+                continue
+            if not _active_scoring_job_exists(db, debate_id):
+                queue_scoring_job(
+                    db,
+                    debate,
+                    model_id=replacement_models.get(debate_id, ""),
+                    judge_role="judge",
+                )
+                commit_write(db)
             rescore(debate_id)
             rescored.append(debate_id)
         except Exception:  # noqa: BLE001 -- one debate's re-drive failure must not abort the rest
