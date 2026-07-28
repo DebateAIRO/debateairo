@@ -49,12 +49,11 @@ SCORING_BACKGROUND_JOB_DEADLINE_SECONDS = 30 * 60
 # clock it actually needs.
 #
 # Trade-off (noted per the brief): F2 startup recovery of a restart-orphaned
-# score_debate job is deadline-gated (recover_orphaned_scoring_jobs only resets
-# rows whose deadline is already PAST), and the reaper deliberately excludes
-# score_debate. So a larger panel deadline lengthens the window before a
-# restart-orphaned panel job is recovered. This is the accepted cost of not
-# prematurely expiring a legitimately long panel pass; single-judge (the common
-# case) keeps the original 30-min window exactly.
+# score_debate is recovered by a startup-only sweep. Because the coordinator
+# holds a single-instance database lock before that sweep starts, every
+# claimed/running scoring row belongs to the previous process and is orphaned
+# regardless of its deadline. A larger panel deadline therefore never delays
+# restart recovery.
 SCORING_PANEL_PER_NODE_JUDGE_DEADLINE_SECONDS = 120
 
 
@@ -620,15 +619,15 @@ def recover_orphaned_scoring_jobs(
     recovers it. In prod one such job sat "running" 9h after a restart with 0
     nodes scored, and _active_scoring_job_exists then blocked any replacement.
 
-    Startup-only sweep, gated on a PAST deadline: a genuinely live in-process
-    job holds a FUTURE deadline (run start refreshes it to now +
-    SCORING_BACKGROUND_JOB_DEADLINE_SECONDS), so only truly orphaned rows are
-    reset -- a healthy in-flight pass is never killed. Each orphan is failed
-    to a non-active terminal state so _active_scoring_job_exists no longer
-    counts it and a fresh pass can be created; then, for each affected debate
-    that still needs scoring (not archived, not already fully scored --
-    honoring the reaper's do-not-flip-complete-debates warning), scoring is
-    re-driven once.
+    Startup-only sweep. The coordinator acquires the database's exclusive
+    single-instance lock before launching this function, so no scoring thread
+    from the previous process can still be alive. Every claimed/running row is
+    therefore orphaned even when its size-aware deadline is hours in the
+    future. Each orphan is failed to a non-active terminal state so
+    _active_scoring_job_exists no longer counts it and a fresh pass can be
+    created; then, for each affected debate that still needs scoring (not
+    archived, not already fully scored -- honoring the reaper's
+    do-not-flip-complete-debates warning), scoring is re-driven once.
 
     Best-effort and bounded: each job and each re-drive is wrapped so one
     failure never aborts the rest, and this never raises (startup must not be
@@ -639,7 +638,6 @@ def recover_orphaned_scoring_jobs(
         select(Job).where(
             Job.job_type == "score_debate",
             Job.status.in_(("claimed", "running")),
-            Job.deadline < now,
         )
     ).all()
     affected_debate_ids: list[str] = []

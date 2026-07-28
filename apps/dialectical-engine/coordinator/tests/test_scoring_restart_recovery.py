@@ -7,10 +7,11 @@ resurrect scoring and flip complete debates), so nothing else recovers it. In
 prod one such job sat "running" 9h after a restart with 0 nodes scored, and
 the _active_scoring_job_exists guard then blocked any replacement.
 
-recover_orphaned_scoring_jobs is a startup-only sweep, gated on a PAST
-deadline (a genuinely live in-process job holds a future deadline), that
-fails the orphan to a non-active terminal state and re-drives scoring once
-for any affected debate that still needs it.
+recover_orphaned_scoring_jobs is a startup-only sweep run after the new
+coordinator owns the exclusive database instance lock. Therefore every
+claimed/running scoring row belongs to the dead prior process, regardless of
+deadline. The sweep fails each orphan to a non-active terminal state and
+re-drives scoring once for any affected debate that still needs it.
 """
 from __future__ import annotations
 
@@ -145,11 +146,12 @@ def test_recovery_fails_orphaned_running_job_and_rescores_unscored_debate(db) ->
     assert all_live_argument_nodes_scored(db, db.get(Debate, debate.id))
 
 
-def test_recovery_leaves_live_running_job_with_future_deadline_untouched(db) -> None:
-    debate, _root = _debate_with_live_node(db, suffix="live-future")
+def test_startup_recovery_reclaims_future_deadline_from_prior_process(db) -> None:
+    debate, _root = _debate_with_live_node(db, suffix="orphan-future")
     job = queue_scoring_job(db, debate, model_id="codex-test-model")
     job.status = "running"
-    # A genuinely live in-process job refreshes its deadline into the future.
+    # Size-aware panel deadlines can be hours in the future, but at startup
+    # the prior process (and its in-process scoring thread) is already dead.
     job.deadline = now_utc() + timedelta(minutes=25)
     db.commit()
 
@@ -157,10 +159,10 @@ def test_recovery_leaves_live_running_job_with_future_deadline_untouched(db) -> 
     rescored = recover_orphaned_scoring_jobs(db, rescore=lambda debate_id: calls.append(debate_id))
 
     db.expire_all()
-    # Critical: recovery must never kill a healthy in-flight pass.
-    assert db.get(Job, job.id).status == "running"
-    assert calls == []
-    assert rescored == []
+    assert db.get(Job, job.id).status == "failed"
+    assert "orphan" in (db.get(Job, job.id).error or "").lower()
+    assert calls == [debate.id]
+    assert rescored == [debate.id]
 
 
 def test_recovery_fails_orphaned_job_but_skips_rescore_when_already_scored(db) -> None:
