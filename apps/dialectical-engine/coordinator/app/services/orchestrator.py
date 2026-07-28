@@ -1689,6 +1689,10 @@ def complete_job_sync(db: Session, job: Job, result: Any, metadata: dict[str, An
         worker.status = "online"
     previous_job_status = job.status
     job.status = "complete"
+    # A pending/running job may retain the diagnostic that caused a successful
+    # failover or retry. The transition ledger preserves that history; a
+    # terminally successful row must not simultaneously advertise an error.
+    job.error = None
     record_job_transition(
         db, job, from_status=previous_job_status, to_status="complete", channel="complete"
     )
