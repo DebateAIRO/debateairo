@@ -312,6 +312,32 @@ def test_synthesis_claimable_after_budget_expiry_with_partial_scores(db, monkeyp
     assert claimed is not None and claimed.job_type == "v2_synthesize"
 
 
+def test_active_scoring_blocks_synthesis_even_after_wait_budget_expires(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "0")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    scoring_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+
+    # A claimed pass can legitimately wait behind the global scoring semaphore
+    # for much longer than the synthesis fallback budget. It remains a hard
+    # blocker because allowing synthesis here produces an unscored result.
+    scoring_job.status = "claimed"
+    db.commit()
+    assert claim_pending_job(db, worker) is None
+    assert _pending_synthesize_job(db, debate) is not None
+
+    # The bounded no-scoring fallback still works once the internal pass is
+    # genuinely terminal rather than merely queued.
+    scoring_job.status = "failed"
+    scoring_job.error = "judge subsystem unavailable"
+    db.commit()
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
 def test_synthesis_immediately_claimable_when_flag_off(db, monkeypatch) -> None:
     monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "false")
     worker = real_codex_worker(db)

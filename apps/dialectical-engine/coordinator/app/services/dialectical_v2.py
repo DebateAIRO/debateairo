@@ -1248,9 +1248,13 @@ def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
 
     Returns False (claimable) for any non-synthesize job, when the
     score-before-synthesis flag is off, once every live argument node is
-    scored, or once the job has been pending past the wait budget -- so the
-    deferral is always bounded and can never wedge a debate. Skipping a job
-    here burns no attempt (see orchestrator.worker_can_claim_job)."""
+    scored. While a score_debate job is actively pending, claimed, or running,
+    synthesis remains blocked regardless of the ordinary wait budget: queued
+    scoring behind the global pass semaphore is healthy work, not an outage.
+    The bounded wait applies only when no active scoring job exists, so a
+    genuinely unavailable scoring subsystem cannot wedge the debate forever.
+    Skipping a job here burns no attempt (see
+    orchestrator.worker_can_claim_job)."""
     if job.job_type != "v2_synthesize":
         return False
     if not score_before_synthesis_enabled():
@@ -1260,6 +1264,17 @@ def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
         return False
     if all_live_argument_nodes_scored(db, debate):
         return False
+    active_scoring = db.scalar(
+        select(Job.id)
+        .where(
+            Job.debate_id == debate.id,
+            Job.job_type == "score_debate",
+            Job.status.in_(("pending", "claimed", "running")),
+        )
+        .limit(1)
+    )
+    if active_scoring is not None:
+        return True
     comparable_now = now.replace(tzinfo=None) if job.created_at.tzinfo is None else now
     waited = comparable_now - job.created_at
     return waited < timedelta(seconds=synthesis_score_wait_seconds())
