@@ -7,13 +7,13 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session, attributes
 from pydantic import ValidationError
 
 from app.core.config import bool_env, float_env
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write, flush_write, hold_write_lock
+from app.core.write_lock import commit_write, execute_write, flush_write, hold_write_lock
 from app.models.entities import (
     AnalyzerRun,
     Debate,
@@ -1161,6 +1161,21 @@ def _persist_judge_output_artifact_locked(
     parse_error: str | None,
     assessment: dict | None,
 ) -> JudgeOutputArtifact:
+    # Take a REAL SQLite RESERVED write lock before the cache-identity SELECT.
+    # The process writer gate in hold_write_lock serializes coordinator
+    # threads, but workers are separate processes and cannot see that Python
+    # lock. Without a DML write-intent fence, a worker can commit after this
+    # SELECT establishes a WAL snapshot and before flush_write emits INSERT;
+    # SQLite then rejects the read->write upgrade immediately with
+    # SQLITE_BUSY_SNAPSHOT ("database is locked"). A zero-row UPDATE is still
+    # DML, so pysqlite begins the write transaction and external writers wait
+    # normally instead of invalidating our snapshot. It changes no data.
+    execute_write(
+        db,
+        update(JudgeOutputArtifact)
+        .where(JudgeOutputArtifact.id == "__dialectical_write_intent__")
+        .values(id=JudgeOutputArtifact.id),
+    )
     raw_output_sha256 = hashlib.sha256(result.raw_output.encode("utf-8")).hexdigest()
     artifact = db.scalar(
         select(JudgeOutputArtifact).where(

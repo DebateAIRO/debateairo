@@ -10681,6 +10681,96 @@ def test_primary_judge_cli_runs_outside_any_open_transaction(db) -> None:
     )
 
 
+def test_judge_artifact_takes_cross_process_write_intent_before_identity_read(
+    db, independent_writer_can_commit, monkeypatch
+) -> None:
+    """A worker commit between artifact SELECT and INSERT must not invalidate
+    the scorer's WAL snapshot with SQLITE_BUSY_SNAPSHOT.
+
+    hold_write_lock only coordinates threads in the coordinator process. This
+    after-SELECT probe acts as a separate worker process: before the write-intent
+    fence it can commit, and the following artifact flush fails "database is
+    locked"; with the fence it briefly waits/fails while artifact persistence
+    completes, which is the required SQLite single-writer ordering.
+    """
+    monkeypatch.delenv("DIALECTICAL_JUDGE_PANEL_MODELS", raising=False)
+
+    class Provider:
+        provider = "test-provider"
+        model = "test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(node_id=request.claim.node_id).model_dump(mode="json")
+                ),
+                latency_ms=15,
+                checked_at="2026-07-28T11:48:45+00:00",
+            )
+
+    debate = Debate(topic="Can a WAL snapshot be upgraded safely?", status="complete")
+    worker = Worker(
+        id="worker-artifact-intent",
+        name="Worker Artifact Intent",
+        token_hash="hash",
+        capabilities=["debate"],
+    )
+    node = Node(
+        id="node-artifact-intent",
+        debate=debate,
+        node_type="root",
+        depth=0,
+        position=0,
+        claim="Artifact identity reads must happen after real SQLite write intent.",
+        status="complete",
+        materialized_path="/",
+    )
+    generation = Generation(
+        id="generation-artifact-intent",
+        node=node,
+        model_id="model-a",
+        role="pro",
+        argument="A separate process can otherwise invalidate the WAL snapshot.",
+        worker_id=worker.id,
+    )
+    node.active_generation_id = generation.id
+    db.add_all([debate, worker, node, generation])
+    db.commit()
+
+    observed: list[bool] = []
+    engine = db.get_bind()
+
+    def probe_after_identity_select(conn, cursor, statement, parameters, context, executemany):
+        normalized = " ".join(statement.lower().split())
+        if (
+            not observed
+            and normalized.startswith("select")
+            and "from judge_output_artifacts" in normalized
+            and "raw_output_sha256" in normalized
+        ):
+            observed.append(independent_writer_can_commit())
+
+    event.listen(engine, "after_cursor_execute", probe_after_identity_select)
+    try:
+        payload = score_node_with_provider(
+            db, debate, node.id, Provider(), judge_role="judge", force_refresh=True
+        )
+    finally:
+        event.remove(engine, "after_cursor_execute", probe_after_identity_select)
+
+    assert payload["status"] == "available"
+    assert observed == [False], (
+        "a separate-process writer committed after the artifact identity SELECT; "
+        "the scorer had no real SQLite write intent and its INSERT is vulnerable "
+        "to SQLITE_BUSY_SNAPSHOT"
+    )
+    assert _single_judge_output_artifact(
+        db, debate_id=debate.id, node_id=node.id
+    ).parse_status == "available"
+
+
 def test_generation_completion_queues_scoring_instead_of_judging_inline(db, monkeypatch) -> None:
     """FW3 (I-2): job completion is NOT split into two transactions.
 
