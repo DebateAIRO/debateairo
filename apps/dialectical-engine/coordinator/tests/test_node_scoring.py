@@ -5747,20 +5747,33 @@ def test_scoring_job_stays_running_through_lifecycle_and_adaptive_dispatch(db, m
         agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
         providers={"codex": BarrierProbeProvider()},
     )
-    observed: list[tuple[str, str]] = []
+    observed: list[tuple[str, str, bool | None]] = []
 
     def observe_lifecycle(session, *, job_id, **_kwargs):
-        observed.append(("lifecycle", session.get(Job, job_id).status))
+        observed_job = session.get(Job, job_id)
+        observed.append(
+            (
+                "lifecycle",
+                observed_job.status,
+                observed_job.payload.get("scoring_phase_settled"),
+            )
+        )
 
     def observe_dispatch(session, *, debate_id, analyzer_run_id):
-        active = session.scalar(
+        complete_job = session.scalar(
             select(Job).where(
                 Job.debate_id == debate_id,
                 Job.job_type == "score_debate",
-                Job.status == "running",
+                Job.status == "complete",
             )
         )
-        observed.append(("dispatch", active.status if active is not None else "missing"))
+        observed.append(
+            (
+                "dispatch",
+                complete_job.status if complete_job is not None else "missing",
+                complete_job.payload.get("scoring_phase_settled") if complete_job is not None else None,
+            )
+        )
 
     monkeypatch.setattr(scoring_jobs, "reevaluate_lifecycle_after_scoring_completion", observe_lifecycle)
     monkeypatch.setattr(scoring_jobs, "run_protocol_analysis", lambda *_args, **_kwargs: None)
@@ -5770,8 +5783,13 @@ def test_scoring_job_stays_running_through_lifecycle_and_adaptive_dispatch(db, m
     scoring_jobs.run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
 
     db.expire_all()
-    assert observed == [("lifecycle", "running"), ("dispatch", "running")]
-    assert db.get(Job, job.id).status == "complete"
+    assert observed == [
+        ("lifecycle", "complete", False),
+        ("dispatch", "complete", False),
+    ]
+    settled_job = db.get(Job, job.id)
+    assert settled_job.status == "complete"
+    assert settled_job.payload["scoring_phase_settled"] is True
 
 
 def test_analyzer_run_links_only_artifacts_from_its_own_job(db) -> None:

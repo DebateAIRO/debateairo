@@ -24,6 +24,7 @@ from app.models.entities import AnalyzerRun, Debate, Generation, Job, Node, Work
 from app.providers import AgentConfig, ProviderRegistry
 from app.scoring import ScoringProviderResult, queue_scoring_job
 from app.scoring.jobs import (
+    SCORING_PHASE_SETTLED_KEY,
     drive_internal_scoring_for_debate,
     recover_orphaned_scoring_jobs,
     recover_orphaned_scoring_jobs_at_startup,
@@ -213,6 +214,48 @@ def test_recovery_fails_orphaned_job_but_skips_rescore_when_already_scored(db) -
     assert calls == []
     assert rescored == []
     assert len(_node_scoring_runs(db, debate.id)) == runs_before
+
+
+def test_restart_recovery_redrives_completed_but_unsettled_scoring_phase(db) -> None:
+    debate, _root = _debate_with_live_node(db, suffix="unsettled-complete")
+
+    # Establish complete scoring truth first. Recovery must still replay the
+    # post-score lifecycle/protocol/adaptive tail when its durable marker says
+    # that tail never settled before the coordinator restarted.
+    prep_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    run_scoring_job_background(prep_job.id, debate.id, registry_factory=_judge_registry)
+    db.expire_all()
+    assert all_live_argument_nodes_scored(db, db.get(Debate, debate.id))
+
+    interrupted = queue_scoring_job(db, debate, model_id="codex-test-model")
+    interrupted.status = "complete"
+    interrupted.payload = {SCORING_PHASE_SETTLED_KEY: False}
+    db.commit()
+
+    calls: list[str] = []
+
+    def observe_recovery(debate_id: str) -> None:
+        calls.append(debate_id)
+        replacement = db.scalar(
+            select(Job.id).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status.in_(("pending", "claimed", "running")),
+            )
+        )
+        assert replacement is not None
+        db.expire(interrupted)
+        assert interrupted.payload[SCORING_PHASE_SETTLED_KEY] is True
+
+    rescored = recover_orphaned_scoring_jobs(db, rescore=observe_recovery)
+
+    db.expire_all()
+    recovered = db.get(Job, interrupted.id)
+    assert recovered.status == "complete"
+    assert recovered.payload[SCORING_PHASE_SETTLED_KEY] is True
+    assert calls == [debate.id]
+    assert rescored == [debate.id]
 
 
 def test_startup_entrypoint_recovers_orphan_on_its_own_session(db) -> None:

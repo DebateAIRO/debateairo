@@ -30,6 +30,7 @@ from app.protocol.runner import run_protocol_analysis
 from app.providers import AgentConfig, ProviderRegistry
 from app.scoring import ScoringProviderResult, queue_scoring_job
 from app.scoring.jobs import (
+    SCORING_PHASE_SETTLED_KEY,
     drive_internal_scoring_for_debate,
     run_scoring_job_background,
     wake_pending_internal_scoring_job,
@@ -333,6 +334,31 @@ def test_active_scoring_blocks_synthesis_even_after_wait_budget_expires(db, monk
     # genuinely terminal rather than merely queued.
     scoring_job.status = "failed"
     scoring_job.error = "judge subsystem unavailable"
+    db.commit()
+    claimed = claim_pending_job(db, worker)
+    assert claimed is not None and claimed.job_type == "v2_synthesize"
+
+
+def test_completed_unsettled_scoring_phase_blocks_fully_scored_synthesis(db, monkeypatch) -> None:
+    monkeypatch.setenv("DIALECTICAL_SCORE_BEFORE_SYNTHESIS", "true")
+    monkeypatch.setenv("DIALECTICAL_SYNTHESIS_SCORE_WAIT_SECONDS", "0")
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    _seed_tree_scoring(db, debate)
+    assert service.all_live_argument_nodes_scored(db, debate)
+
+    scoring_job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    scoring_job.status = "complete"
+    scoring_job.payload = {SCORING_PHASE_SETTLED_KEY: False}
+    db.commit()
+
+    # Scoring output alone is insufficient: lifecycle, protocol analysis, and
+    # adaptive dispatch must settle before synthesis can observe the phase.
+    assert claim_pending_job(db, worker) is None
+    assert _pending_synthesize_job(db, debate) is not None
+
+    scoring_job.payload = {SCORING_PHASE_SETTLED_KEY: True}
     db.commit()
     claimed = claim_pending_job(db, worker)
     assert claimed is not None and claimed.job_type == "v2_synthesize"

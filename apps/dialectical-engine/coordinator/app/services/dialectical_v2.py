@@ -64,7 +64,7 @@ from app.protocol.cross_exam import _OPPOSING_NODE_TYPES
 from app.protocol.runner import PROTOCOL_ANALYSIS_TYPE, run_protocol_analysis
 from app.protocol.state import advance_phase, initialize_protocol_state, protocol_state_of
 from app.providers import ProviderRegistry
-from app.scoring.jobs import trigger_internal_scoring_after_completion
+from app.scoring.jobs import scoring_phase_unsettled, trigger_internal_scoring_after_completion
 from app.scoring.service import debate_scoring_payload, ensure_node_scoring_on_completion
 
 
@@ -1262,19 +1262,22 @@ def v2_synthesis_claim_blocked(db: Session, job: Job, now: Any) -> bool:
     debate = db.get(Debate, job.debate_id)
     if debate is None:
         return False
-    if all_live_argument_nodes_scored(db, debate):
-        return False
-    active_scoring = db.scalar(
-        select(Job.id)
+    scoring_jobs = db.scalars(
+        select(Job)
         .where(
             Job.debate_id == debate.id,
             Job.job_type == "score_debate",
-            Job.status.in_(("pending", "claimed", "running")),
+            Job.status.in_(("pending", "claimed", "running", "complete")),
         )
-        .limit(1)
-    )
-    if active_scoring is not None:
+    ).all()
+    if any(
+        scoring_job.status in {"pending", "claimed", "running"}
+        or scoring_phase_unsettled(scoring_job)
+        for scoring_job in scoring_jobs
+    ):
         return True
+    if all_live_argument_nodes_scored(db, debate):
+        return False
     comparable_now = now.replace(tzinfo=None) if job.created_at.tzinfo is None else now
     waited = comparable_now - job.created_at
     return waited < timedelta(seconds=synthesis_score_wait_seconds())
