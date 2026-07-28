@@ -881,6 +881,32 @@ def test_synthesize_prompt_includes_measured_standing_and_keeps_no_winner(db) ->
         assert key in user
 
 
+def test_synthesize_prompt_does_not_duplicate_node_scoring_analyzer(db) -> None:
+    worker = real_codex_worker(db)
+    debate = service.create_dialectical_debate(db, TOPIC, {})
+    _complete_all_povs(db, debate, worker)
+    _seed_tree_scoring(db, debate)
+    branch = service.first_branch(db, debate.id)
+    db.add(
+        AnalyzerRun(
+            debate_id=debate.id,
+            branch_id=branch.id,
+            analyzer_type="node_scoring",
+            output={"raw": "DUPLICATED_SCORING_SENTINEL_" + ("x" * 300_000)},
+            status="complete",
+            provenance={},
+        )
+    )
+    db.commit()
+
+    synth = _pending_synthesize_job(db, debate)
+    assert synth is not None
+    _system, user = service.render_v2_job_prompt(db, synth)
+
+    assert "DUPLICATED_SCORING_SENTINEL" not in user
+    assert "measured_standing" in user
+
+
 # ---------------------------------------------------------------------------
 # Synthesizer rotation
 # ---------------------------------------------------------------------------

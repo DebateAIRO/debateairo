@@ -2682,7 +2682,26 @@ def render_v2_job_prompt(db: Session, job: Job) -> tuple[str, str]:
         raise ValueError("Debate not found")
     branch = first_branch(db, debate.id)
     classification = classify_question(debate.topic)
-    analyzers = [run.output for run in analyzer_runs_for_debate(db, debate.id)]
+    # Derived lifecycle analyzers can be enormous: a node_scoring run embeds
+    # one record per node (360-470 KiB in the live incidents), and protocol
+    # analysis can add another ~60 KiB. POV, expansion, evidence, and synthesis
+    # already receive their purpose-built context below; copying every derived
+    # analyzer into `base_context` both duplicates that data and turns a
+    # one-parent expansion into a full-debate prompt. Besides wasting tokens,
+    # this exceeded Gemini's argv transport and pushed Codex past its 540s
+    # worker deadline. Keep analyzer outputs only for the artifact/agent jobs
+    # whose explicit input contract calls for them.
+    analyzer_free_job_types = {
+        "v2_pov",
+        "v2_expand",
+        "v2_evidence",
+        "v2_synthesize",
+    }
+    analyzers = (
+        []
+        if job.job_type in analyzer_free_job_types
+        else [run.output for run in analyzer_runs_for_debate(db, debate.id)]
+    )
     skill = first_skill_match(db, debate.id)
     agent = first_agent_match(db, debate.id)
     base_context = {
