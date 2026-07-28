@@ -157,6 +157,53 @@ def test_repeated_permanent_signature_opens_provider_circuit(db, monkeypatch):
     orchestrator._FAILURE_CIRCUITS.clear()
 
 
+def test_long_horizon_quota_opens_model_capacity_circuit_immediately(db, monkeypatch):
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    worker(db, "codex", ["gpt-5.6sol-medium"])
+    claude = worker(db, "claude-loop", ["claude-sonnet-5-high-loop"])
+    _, failed = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    failed.worker_id = claude.id
+    db.commit()
+
+    orchestrator._record_permanent_failure_circuit(
+        failed,
+        "You've hit your weekly limit; resets tomorrow",
+    )
+
+    assert "claude-sonnet-5-high-loop" not in orchestrator.online_capabilities(db)
+    _, next_job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    assert orchestrator.claim_pending_job(db, claude) is None
+    db.refresh(next_job)
+    assert next_job.required_model == "gpt-5.6sol-medium"
+    assert "Provider circuit open" in (next_job.error or "")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
+def test_non_capacity_permanent_error_does_not_remove_online_model(db):
+    from app.services import orchestrator
+
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    gemini = worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    _, failed = make_debate_with_job(db, "gemini-3.5-flash-loop")
+    failed.worker_id = gemini.id
+    db.commit()
+
+    orchestrator._record_permanent_failure_circuit(
+        failed,
+        "422 Unprocessable result contract",
+    )
+
+    assert "gemini-3.5-flash-loop" in orchestrator.online_capabilities(db)
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
 def test_terminal_adaptive_stop_cannot_reopen_completed_debate(db):
     from app.exploration.expansion_dispatch import (
         STOPPED_WALL_CLOCK,

@@ -82,6 +82,15 @@ FAILURE_CIRCUIT_THRESHOLD = 2
 FAILURE_CIRCUIT_COOLDOWN_SECONDS = 15 * 60
 _FAILURE_CIRCUIT_LOCK = threading.Lock()
 _FAILURE_CIRCUITS: dict[tuple[str, str, str, str], tuple[int, datetime]] = {}
+_PROVIDER_CAPACITY_CIRCUITS: dict[tuple[str, str], tuple[datetime, str]] = {}
+_LONG_HORIZON_CAPACITY_MARKERS = (
+    "weekly limit",
+    "monthly limit",
+    "usage limit",
+    "quota exceeded",
+    "insufficient credits",
+    "credit balance",
+)
 # Provider-facing CLI model names occasionally survive in persisted jobs even
 # after the routing layer moves to a stable capability ID.  Treat those names
 # as aliases at the scheduler boundary so an upgrade cannot strand old work.
@@ -112,6 +121,12 @@ def _record_permanent_failure_circuit(job: Job, reason: str) -> None:
     key = (job.worker_id, job.required_model, job.job_type, _failure_signature(reason))
     now = now_utc()
     with _FAILURE_CIRCUIT_LOCK:
+        lowered = reason.lower()
+        if any(marker in lowered for marker in _LONG_HORIZON_CAPACITY_MARKERS):
+            _PROVIDER_CAPACITY_CIRCUITS[(job.worker_id, canonical_model_id(job.required_model))] = (
+                now + timedelta(seconds=FAILURE_CIRCUIT_COOLDOWN_SECONDS),
+                _failure_signature(reason),
+            )
         count, opened_until = _FAILURE_CIRCUITS.get(key, (0, now))
         if opened_until <= now:
             count = 0
@@ -125,6 +140,13 @@ def _record_permanent_failure_circuit(job: Job, reason: str) -> None:
 def _open_failure_circuit_reason(worker: Worker, job: Job) -> str | None:
     now = now_utc()
     with _FAILURE_CIRCUIT_LOCK:
+        capacity_key = (worker.id, canonical_model_id(job.required_model))
+        capacity = _PROVIDER_CAPACITY_CIRCUITS.get(capacity_key)
+        if capacity is not None:
+            opened_until, signature = capacity
+            if opened_until > now:
+                return signature
+            _PROVIDER_CAPACITY_CIRCUITS.pop(capacity_key, None)
         for (worker_id, model, job_type, signature), (count, opened_until) in list(
             _FAILURE_CIRCUITS.items()
         ):
@@ -271,7 +293,15 @@ def online_capabilities(db: Session) -> set[str]:
     workers = db.scalars(select(Worker).where(Worker.last_seen >= cutoff, Worker.status == "online")).all()
     caps: set[str] = set()
     for worker in workers:
-        caps.update(worker_capability_set(worker))
+        for capability in worker_capability_set(worker):
+            canonical = canonical_model_id(capability)
+            with _FAILURE_CIRCUIT_LOCK:
+                capacity = _PROVIDER_CAPACITY_CIRCUITS.get((worker.id, canonical))
+                if capacity is not None and capacity[0] <= now_utc():
+                    _PROVIDER_CAPACITY_CIRCUITS.pop((worker.id, canonical), None)
+                    capacity = None
+            if capacity is None:
+                caps.add(capability)
     caps = {canonical_model_id(capability) for capability in caps}
     if allowed is not None:
         caps &= {canonical_model_id(model_id) for model_id in allowed}
@@ -1081,7 +1111,8 @@ def next_failover_model(
     # online_capabilities -- the pending watchdog passes the models served by
     # workers whose WORK LOOP shows life, because online_capabilities counted
     # the 2026-07-26 wedged worker as a valid failover target for 18 h.
-    online = online_capabilities(db) if candidate_models is None else candidate_models
+    healthy_online = online_capabilities(db)
+    online = healthy_online if candidate_models is None else candidate_models & healthy_online
     # Task 10 (P1.1): an evidence job's failover pool is the search-capable list
     # ONLY -- a retrieval job must never be reassigned to a non-search model
     # (it could not do the web search the contract demands). Every other
