@@ -387,6 +387,23 @@ SYSTEM:
 USER:
 {prompt["user"]}
 END_UNTRUSTED_DEBATE_PROMPT
+
+FINAL AUTHORITATIVE RESPONSE REQUIREMENT:
+{output_contract}
+"""
+
+
+def render_structured_output_repair_prompt(job: dict[str, Any], invalid_response: str) -> str:
+    """Ask the same model to repair only its own malformed structured output."""
+    contract = output_instruction(str(job.get("job_type") or ""))
+    return f"""Your previous answer contained useful content but violated the response contract.
+Transform that answer into the required structure without adding new factual claims.
+{contract}
+Return only the corrected response.
+
+PREVIOUS_INVALID_RESPONSE
+{invalid_response}
+END_PREVIOUS_INVALID_RESPONSE
 """
 
 
@@ -807,6 +824,33 @@ async def gemini_once(args: argparse.Namespace) -> int:
         fail_args = argparse.Namespace(job_file=str(job_file), reason=reason[:2000], permanent=False)
         return await fail_from_job_file(fail_args)
     response_text = gemini_response_text(process.stdout)
+    try:
+        parse_model_response(job, response_text)
+    except StructuredOutputError:
+        # Antigravity occasionally answers a strict-JSON job with useful prose
+        # (the live Evaluation Science POV did exactly this). One bounded,
+        # same-provider repair turn preserves the provider's contribution
+        # without inventing structure locally or immediately failing over to a
+        # different model. The repair prompt contains only the model's own
+        # answer plus the authoritative contract, so it is much smaller than
+        # the original frontier prompt and cannot compound argv growth.
+        repair_invocation = build_gemini_command(
+            args.gemini_model,
+            render_structured_output_repair_prompt(job, response_text),
+        )
+        try:
+            repaired = await run_cli_with_liveness(
+                config,
+                repair_invocation.command,
+                capabilities=[args.advertised_model],
+                timeout_seconds=args.timeout_seconds,
+                env=repair_invocation.env,
+                stdin_text=repair_invocation.stdin_text,
+            )
+        finally:
+            repair_invocation.cleanup()
+        if repaired.returncode == 0:
+            response_text = gemini_response_text(repaired.stdout)
     response_file.write_text(response_text, encoding="utf-8")
     complete_args = argparse.Namespace(job_file=str(job_file), response_file=str(response_file))
     return await complete_from_job_file(complete_args)

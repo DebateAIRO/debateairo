@@ -58,7 +58,28 @@ def job_requires_json(job_type: str) -> bool:
 
 def output_instruction(job_type: str) -> str:
     if job_requires_json(job_type):
-        return "Output exactly one strict JSON object and no Markdown fences or surrounding commentary."
+        shapes = {
+            "v2_pov": (
+                '{"title":"...","content":"...","strongest_pro":{"title":"...",'
+                '"content":"...","pro":{"title":"...","content":"..."}}}'
+            ),
+            "v2_expand": '{"title":"...","content":"..."}',
+            "v2_evidence": (
+                '{"sources":[{"url":"https://...","quote":"...","publisher":"...",'
+                '"date":"YYYY-MM-DD or null","retrieval_query":"...",'
+                '"stance":"supports|refutes|mixed"}]}'
+            ),
+            "v2_synthesize": (
+                '{"strongest_pro":"...","strongest_con":"...","verdict":"...",'
+                '"confidence":0.0}'
+            ),
+        }
+        shape = shapes.get(job_type)
+        suffix = f" Required JSON shape: {shape}" if shape else ""
+        return (
+            "Output exactly one strict JSON object and no Markdown fences or "
+            f"surrounding commentary.{suffix}"
+        )
     return "Output only the argument text, with no Markdown fence and no commentary about this protocol."
 
 

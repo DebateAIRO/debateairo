@@ -753,7 +753,12 @@ def _drive_once(module, monkeypatch, tmp_path, *, provider: str, prompt_user: st
 
     async def fake_run_cli(config, command, **kwargs):
         commands.append(command)
-        return subprocess.CompletedProcess(args=command, returncode=0, stdout="answer", stderr="")
+        stdout = (
+            '{"title":"Repaired title","content":"Repaired content"}'
+            if provider == "gemini" and len(commands) == 2
+            else "answer"
+        )
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout=stdout, stderr="")
 
     async def fake_complete(args):
         return 0
@@ -803,6 +808,24 @@ def test_gemini_once_reports_a_permanent_failure_instead_of_crashing_on_an_overs
     assert retryable is False
     assert "agy" in reason
     assert len(reason) <= 2000
+
+
+def test_gemini_once_repairs_malformed_structured_output_once(tmp_path, monkeypatch) -> None:
+    module = load_module()
+
+    exit_code, fail_calls, commands = _drive_once(
+        module,
+        monkeypatch,
+        tmp_path,
+        provider="gemini",
+        prompt_user="Give a concise objection.",
+    )
+
+    assert exit_code == 0
+    assert fail_calls == []
+    assert len(commands) == 2
+    assert "PREVIOUS_INVALID_RESPONSE" in commands[1][2]
+    assert '{"title":"...","content":"..."}' in commands[1][2]
 
 
 def test_claude_and_grok_once_run_a_frontier_scale_prompt_without_touching_argv(tmp_path, monkeypatch) -> None:
