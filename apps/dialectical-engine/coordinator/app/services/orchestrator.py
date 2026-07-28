@@ -1118,9 +1118,31 @@ def next_failover_model(
     # (it could not do the web search the contract demands). Every other
     # failover family uses the general v2 generation pool.
     pool = evidence_search_models() if job.job_type in AUXILIARY_JOB_TYPES else v2_generation_model_pool(db)
-    for model in pool:
-        if model not in tried and model in online:
-            return model
+    candidates = [model for model in pool if model not in tried and model in online]
+    payload = job.payload if isinstance(job.payload, dict) else {}
+    if job.job_type == "v2_expand" and payload.get("adversarial_pov") and job.node_id:
+        # P3.1's initial assignment selects an attacker from a different model
+        # family. Preserve that epistemic constraint through failover: otherwise
+        # a Claude outage can silently turn a GPT-authored claim's independent
+        # attack into GPT self-critique even while Gemini/Grok/LM Studio are
+        # healthy. Fall back to the ordered candidates only when no genuinely
+        # different family remains online.
+        from app.scoring.lineage import lineage_family
+
+        child = db.get(Node, job.node_id)
+        parent = db.get(Node, child.parent_id) if child and child.parent_id else None
+        author = (
+            db.get(Generation, parent.active_generation_id)
+            if parent is not None and parent.active_generation_id
+            else None
+        )
+        author_family = lineage_family(author.model_id) if author is not None else None
+        if author_family is not None:
+            for model in candidates:
+                if lineage_family(model) != author_family:
+                    return model
+    if candidates:
+        return candidates[0]
     return None
 
 

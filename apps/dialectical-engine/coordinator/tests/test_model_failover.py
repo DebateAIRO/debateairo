@@ -204,6 +204,57 @@ def test_non_capacity_permanent_error_does_not_remove_online_model(db):
     orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
 
 
+def test_adversarial_failover_preserves_cross_family_attacker(db, monkeypatch):
+    from app.models.entities import Generation, Job, Node
+    from app.scoring.lineage import lineage_family
+    from app.services import orchestrator
+
+    monkeypatch.setenv("DIALECTICAL_MULTI_MODEL_GENERATION", "true")
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+    gpt_worker = worker(db, "codex", ["gpt-5.6sol-medium"])
+    worker(db, "claude", ["claude-sonnet-5-high-loop"])
+    worker(db, "gemini", ["gemini-3.5-flash-loop"])
+    worker(db, "grok", ["grok-4.5-high-loop"])
+    debate, job = make_debate_with_job(db, "claude-sonnet-5-high-loop")
+    parent = db.get(Node, job.node_id)
+    parent.status = "complete"
+    author = Generation(
+        node_id=parent.id,
+        model_id="gpt-5.6sol-medium",
+        role="proposer",
+        argument="A claim authored by GPT.",
+        is_active=True,
+        worker_id=gpt_worker.id,
+    )
+    db.add(author)
+    db.flush()
+    parent.active_generation_id = author.id
+    child = Node(
+        debate_id=debate.id,
+        parent_id=parent.id,
+        node_type="CON",
+        depth=2,
+        position=1,
+        claim="Pending independent attack",
+        status="pending",
+        materialized_path="0.1",
+    )
+    db.add(child)
+    db.flush()
+    job.node_id = child.id
+    job.job_type = "v2_expand"
+    job.payload = {"adversarial_pov": True}
+    db.commit()
+
+    candidate = orchestrator.next_failover_model(db, job)
+
+    assert candidate is not None
+    assert lineage_family(candidate) != "gpt"
+    orchestrator._FAILURE_CIRCUITS.clear()
+    orchestrator._PROVIDER_CAPACITY_CIRCUITS.clear()
+
+
 def test_terminal_adaptive_stop_cannot_reopen_completed_debate(db):
     from app.exploration.expansion_dispatch import (
         STOPPED_WALL_CLOCK,
