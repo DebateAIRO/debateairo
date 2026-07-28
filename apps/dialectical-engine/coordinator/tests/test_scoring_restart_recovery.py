@@ -62,7 +62,12 @@ def _judge_registry() -> ProviderRegistry:
 
 def _debate_with_live_node(db, *, suffix: str) -> tuple[Debate, Node]:
     debate = Debate(topic="Should companies adopt remote work?", status="complete")
-    worker = Worker(id=f"worker-{suffix}", name="Worker", token_hash="hash", capabilities=["debate"])
+    worker = Worker(
+        id=f"worker-{suffix}",
+        name=f"Worker {suffix}",
+        token_hash="hash",
+        capabilities=["debate"],
+    )
     root = Node(
         id=f"root-{suffix}",
         debate=debate,
@@ -215,3 +220,26 @@ def test_startup_entrypoint_recovers_orphan_on_its_own_session(db) -> None:
     refreshed = db.get(Job, job.id)
     assert refreshed.status == "failed"
     assert "orphan" in (refreshed.error or "").lower()
+
+
+def test_startup_entrypoint_enqueues_every_affected_debate(db, monkeypatch) -> None:
+    from app.scoring import jobs as scoring_jobs
+
+    debate_a, _ = _debate_with_live_node(db, suffix="startup-many-a")
+    debate_b, _ = _debate_with_live_node(db, suffix="startup-many-b")
+    for debate in (debate_a, debate_b):
+        job = queue_scoring_job(db, debate, model_id="codex-test-model")
+        job.status = "claimed"
+    db.commit()
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        scoring_jobs,
+        "_trigger_restart_rescore",
+        lambda debate_id: calls.append(debate_id),
+    )
+
+    recovered = recover_orphaned_scoring_jobs_at_startup()
+
+    assert set(calls) == {debate_a.id, debate_b.id}
+    assert set(recovered) == {debate_a.id, debate_b.id}

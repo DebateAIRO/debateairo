@@ -696,6 +696,27 @@ def _debate_still_needs_scoring(db: Session, debate_id: str) -> bool:
     return not all_live_argument_nodes_scored(db, debate)
 
 
+def _trigger_restart_rescore(debate_id: str) -> threading.Thread:
+    """Enqueue one restart recovery without blocking the rest of the sweep.
+
+    drive_internal_scoring_for_debate runs its collected background task
+    synchronously. Calling it directly from the recovery loop therefore made
+    the first affected debate occupy the global scoring semaphore for hours
+    before the second debate even received a replacement job. Claim every
+    affected debate from its own daemon thread instead; the existing scoring
+    pass gate still serializes execution, while every replacement becomes
+    durable immediately.
+    """
+    thread = threading.Thread(
+        target=drive_internal_scoring_for_debate,
+        args=(debate_id,),
+        name=f"scoring-restart-{debate_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
 def recover_orphaned_scoring_jobs_at_startup() -> list[str]:
     """Startup entrypoint for F2 recovery: open a session and sweep.
 
@@ -706,7 +727,9 @@ def recover_orphaned_scoring_jobs_at_startup() -> list[str]:
     may re-drive a full scoring pass)."""
     try:
         with SessionLocal() as db:
-            return recover_orphaned_scoring_jobs(db)
+            return recover_orphaned_scoring_jobs(
+                db, rescore=_trigger_restart_rescore
+            )
     except Exception:
         LOGGER.exception("restart scoring recovery sweep failed (non-fatal)")
         return []
