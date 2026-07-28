@@ -5710,6 +5710,70 @@ def test_background_scoring_job_persists_judge_artifacts_before_public_analyzer_
     _assert_public_payload_has_no_private_judge_output(analyzer_run.output, "RJ01-BACKGROUND-RAW-1")
 
 
+def test_scoring_job_stays_running_through_lifecycle_and_adaptive_dispatch(db, monkeypatch) -> None:
+    import app.scoring.jobs as scoring_jobs
+
+    class BarrierProbeProvider:
+        provider = "test-real-judge"
+        model = "codex-test-model"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(base_assessment(node_id=request.claim.node_id).model_dump(mode="json")),
+                latency_ms=1,
+                checked_at="2026-06-18T10:15:30+00:00",
+                metadata={},
+            )
+
+    debate = Debate(topic="Phase barriers must be honest.", status="complete")
+    root = Node(
+        id="barrier-root",
+        debate=debate,
+        node_type="ROOT_CLAIM",
+        depth=0,
+        position=0,
+        claim="Synthesis must wait for adaptive dispatch.",
+        status="complete",
+        materialized_path="/",
+    )
+    debate.root_node_id = root.id
+    db.add_all([debate, root])
+    db.flush()
+    job = queue_scoring_job(db, debate, model_id="codex-test-model")
+    db.commit()
+    registry = ProviderRegistry(
+        agents={"judge": AgentConfig(provider="codex", model="codex-test-model", temperature=0.0)},
+        providers={"codex": BarrierProbeProvider()},
+    )
+    observed: list[tuple[str, str]] = []
+
+    def observe_lifecycle(session, *, job_id, **_kwargs):
+        observed.append(("lifecycle", session.get(Job, job_id).status))
+
+    def observe_dispatch(session, *, debate_id, analyzer_run_id):
+        active = session.scalar(
+            select(Job).where(
+                Job.debate_id == debate_id,
+                Job.job_type == "score_debate",
+                Job.status == "running",
+            )
+        )
+        observed.append(("dispatch", active.status if active is not None else "missing"))
+
+    monkeypatch.setattr(scoring_jobs, "reevaluate_lifecycle_after_scoring_completion", observe_lifecycle)
+    monkeypatch.setattr(scoring_jobs, "run_protocol_analysis", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(scoring_jobs, "adaptive_expansion_enabled", lambda: True)
+    monkeypatch.setattr(scoring_jobs, "expansion_dispatch", observe_dispatch)
+
+    scoring_jobs.run_scoring_job_background(job.id, debate.id, registry_factory=lambda: registry)
+
+    db.expire_all()
+    assert observed == [("lifecycle", "running"), ("dispatch", "running")]
+    assert db.get(Job, job.id).status == "complete"
+
+
 def test_analyzer_run_links_only_artifacts_from_its_own_job(db) -> None:
     """Provenance precision: a node_scoring analyzer run must never absorb
     unlinked judge artifacts produced by a different (e.g. interrupted) job."""

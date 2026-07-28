@@ -2627,8 +2627,12 @@ def persist_v2_synthesis(
         # marker-update try/except above (Phase 5a style).
         print(f"[dialectical_v2] protocol analysis failed (non-fatal): {exc!r}")
     record_provenance(db, debate.id, branch.id, "synthesis", synthesis.id, payload["provenance"])
+    completion_scoring_needed = (
+        not score_before_synthesis_enabled()
+        or not all_live_argument_nodes_scored(db, debate)
+    )
     scoring_node = db.get(Node, debate.root_node_id) if debate.root_node_id else None
-    if scoring_node is not None:
+    if scoring_node is not None and completion_scoring_needed:
         try:
             ensure_default_scoring_for_completed_v2_node(db, debate, scoring_node)
         except Exception as exc:
@@ -2655,11 +2659,13 @@ def persist_v2_synthesis(
     publish_event(debate.id, "debate_complete", {"debate_id": debate.id})
     try:
         # W2 (B6): the coordinator itself initiates scoring at completion --
-        # no browser poll needed. Fire-and-forget after the commit above;
-        # must never fail or delay synthesis persistence (the trigger is
-        # non-raising; this guard is defense-in-depth, matching the
-        # best-effort style of the protocol-analysis guard above).
-        trigger_internal_scoring_after_completion(debate.id)
+        # no browser poll needed when score-before-synthesis is disabled or
+        # the bounded fallback synthesized an incompletely scored tree.
+        # A fully pre-scored tree must not enqueue a redundant post-synthesis
+        # pass: synthesis adds no argument nodes and cannot invalidate a node
+        # scoring input hash.
+        if completion_scoring_needed:
+            trigger_internal_scoring_after_completion(debate.id)
     except Exception as exc:
         print(f"[dialectical_v2] internal scoring trigger failed (non-fatal): {exc!r}")
 

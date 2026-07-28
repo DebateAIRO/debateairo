@@ -245,26 +245,19 @@ def _run_scoring_job_pass(
             # db.flush()es as one lock-covered critical section (see
             # app.models.entities) -- do not db.add() this row separately.
             next_analyzer_run_seq(db, new_run)
-            record_job_transition(
-                db, job, from_status="running", to_status="complete", channel="scoring_complete"
-            )
-            job.status = "complete"
-            job.error = None
             try:
+                # Persist the scoring snapshot while the job deliberately
+                # remains RUNNING.  Lifecycle reevaluation, protocol analysis,
+                # and adaptive dispatch below consume this snapshot and may
+                # enqueue new generation work.  Marking the job complete here
+                # opened a claim race in which synthesis saw no active scoring
+                # job and ran against the tree before adaptive dispatch had
+                # settled it.
                 commit_write(db)
             except Exception:
                 db.rollback()
                 _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
                 return
-            log_event(
-                LOGGER,
-                "scoring.run",
-                debate_id=debate_id,
-                job_id=job_id,
-                job_type="score_debate",
-                outcome="complete",
-                duration_ms=int((time.monotonic() - run_started) * 1000),
-            )
         except Exception as exc:
             db.rollback()
             record_job_transition(
@@ -297,6 +290,7 @@ def _run_scoring_job_pass(
                 # must leave lifecycle inputs unavailable rather than inventing
                 # a verdict or retroactively failing the scoring operation.
                 pass
+        lifecycle_error: Exception | None = None
         try:
             reevaluate_lifecycle_after_scoring_completion(
                 db,
@@ -305,6 +299,13 @@ def _run_scoring_job_pass(
                 analyzer_run_id=new_run.id,
                 **lifecycle_kwargs,
             )
+        except Exception as exc:
+            # Preserve the historical best-effort lifecycle semantics: scores
+            # stay durable and the scoring job still reaches complete, but the
+            # background task may surface the tail error after the phase gate
+            # has been closed cleanly below.
+            db.rollback()
+            lifecycle_error = exc
         finally:
             # W2: judge scores are durable (committed above) -- re-run
             # protocol analysis so the next verdict read consumes real taus
@@ -353,6 +354,35 @@ def _run_scoring_job_pass(
                         outcome="completed",
                         duration_ms=int((time.monotonic() - dispatch_started) * 1000),
                     )
+        # The score job is the phase barrier, not merely the model-call
+        # carrier.  Release synthesis only after every post-score consumer has
+        # finished and adaptive dispatch has either queued its next wave or
+        # recorded a terminal stop.
+        job = db.get(Job, job_id)
+        if job is None or job.status != "running":
+            return
+        record_job_transition(
+            db, job, from_status="running", to_status="complete", channel="scoring_complete"
+        )
+        job.status = "complete"
+        job.error = None
+        try:
+            commit_write(db)
+        except Exception:
+            db.rollback()
+            _mark_scoring_job_failed(job_id, SCORING_JOB_COMPLETION_PERSISTENCE_ERROR)
+            return
+        log_event(
+            LOGGER,
+            "scoring.run",
+            debate_id=debate_id,
+            job_id=job_id,
+            job_type="score_debate",
+            outcome="complete",
+            duration_ms=int((time.monotonic() - run_started) * 1000),
+        )
+        if lifecycle_error is not None:
+            raise lifecycle_error
 
 
 def _mark_scoring_job_failed(job_id: str, error: str) -> None:
