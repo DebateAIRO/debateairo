@@ -4154,6 +4154,63 @@ def test_score_node_with_provider_panel_member_timeout_degrades_to_remaining_jud
     assert notes[0]["status"] == "timeout"
 
 
+def test_panel_long_horizon_quota_opens_cross_node_circuit(db, monkeypatch) -> None:
+    from app.scoring import service as scoring_service
+
+    monkeypatch.setenv("DIALECTICAL_JUDGE_PANEL_MODELS", "quota-panel-model")
+    scoring_service._PANEL_QUOTA_CIRCUITS.clear()
+
+    class PrimaryProvider:
+        provider = "codex"
+        model = "gpt-5.6sol-medium"
+
+        def judge_node(self, request):
+            return ScoringProviderResult(
+                provider=self.provider,
+                model=self.model,
+                raw_output=json.dumps(
+                    base_assessment(node_id=request.claim.node_id).model_dump(mode="json")
+                ),
+            )
+
+    class QuotaPanelProvider:
+        calls = 0
+
+        def judge_node(self, request):
+            self.calls += 1
+            raise ProviderError("You've hit your weekly limit; resets tomorrow")
+
+    panel_provider = QuotaPanelProvider()
+    member = JudgePanelMember(
+        family="quota-family",
+        model_id="quota-panel-model",
+        judge_role=judge_panel_role("quota-family"),
+        provider=panel_provider,
+    )
+    monkeypatch.setattr(scoring_service, "build_judge_panel_members", lambda: ([member], []))
+    debate, node, _generation = _lineage_guard_debate_and_node(
+        db, arguer_model_id="model-a"
+    )
+
+    try:
+        first = score_node_with_provider(
+            db, debate, node.id, PrimaryProvider(), force_refresh=True
+        )
+        second = score_node_with_provider(
+            db, debate, node.id, PrimaryProvider(), force_refresh=True
+        )
+    finally:
+        scoring_service._PANEL_QUOTA_CIRCUITS.clear()
+
+    assert panel_provider.calls == 1
+    assert first["items"][0]["score_provenance"]["judge_panel_notes"][0][
+        "status"
+    ] == "provider_error"
+    assert second["items"][0]["score_provenance"]["judge_panel_notes"][0][
+        "status"
+    ] == "quota_circuit_open"
+
+
 def test_score_node_with_provider_panel_member_persist_exception_leaves_primary_artifact_intact(
     db, monkeypatch
 ) -> None:

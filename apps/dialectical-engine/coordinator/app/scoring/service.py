@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -78,6 +79,17 @@ SCORING_JOB_TYPE = "score_debate"
 JUDGE_OUTPUT_SOURCE = "judge_outputs"
 DEFAULT_SCORING_MAX_NODES: int | None = None
 SCORING_PROVIDER_MAX_ATTEMPTS = 2
+PANEL_QUOTA_CIRCUIT_SECONDS = 15 * 60
+_PANEL_QUOTA_CIRCUIT_LOCK = threading.Lock()
+_PANEL_QUOTA_CIRCUITS: dict[str, float] = {}
+_LONG_HORIZON_QUOTA_MARKERS = (
+    "weekly limit",
+    "monthly limit",
+    "usage limit",
+    "quota exceeded",
+    "insufficient credits",
+    "credit balance",
+)
 # Task 3 (tree-aware judge payload, docs/improvement-plan-2026-07-22.md
 # §P2.3): bound applied to each PRO/CON child's argument excerpt included in
 # the judge payload -- long enough to give the judge real signal on the
@@ -1248,6 +1260,21 @@ def _run_judge_panel(
         ]
     notes = list(notes)
     for member in members:
+        with _PANEL_QUOTA_CIRCUIT_LOCK:
+            blocked_until = _PANEL_QUOTA_CIRCUITS.get(member.model_id, 0.0)
+            if blocked_until <= time.monotonic():
+                _PANEL_QUOTA_CIRCUITS.pop(member.model_id, None)
+                blocked_until = 0.0
+        if blocked_until:
+            notes.append(
+                {
+                    "model_id": member.model_id,
+                    "family": member.family,
+                    "status": "quota_circuit_open",
+                    "reason": "Panel judge has a long-horizon provider quota circuit open.",
+                }
+            )
+            continue
         # F1 (2026-07-24 incident): release SQLite's single writer BEFORE this
         # member's up-to-120s judge CLI subprocess. By this point the primary
         # judge's JudgeOutputArtifact is flushed-but-uncommitted (the caller's
@@ -1310,6 +1337,11 @@ def _run_judge_panel(
             continue
         except ProviderError as exc:
             LOGGER.warning("judge panel member provider error for %s: %s", member.model_id, exc)
+            if any(marker in str(exc).lower() for marker in _LONG_HORIZON_QUOTA_MARKERS):
+                with _PANEL_QUOTA_CIRCUIT_LOCK:
+                    _PANEL_QUOTA_CIRCUITS[member.model_id] = (
+                        time.monotonic() + PANEL_QUOTA_CIRCUIT_SECONDS
+                    )
             notes.append(
                 {
                     "model_id": member.model_id,
