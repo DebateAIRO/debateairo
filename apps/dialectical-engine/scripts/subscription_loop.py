@@ -35,6 +35,7 @@ StructuredOutputError = _CONTRACTS.StructuredOutputError
 enrich_v2_result = _CONTRACTS.enrich_v2_result
 failure_is_permanent = _CONTRACTS.failure_is_permanent
 output_instruction = _CONTRACTS.output_instruction
+output_json_schema = _CONTRACTS.output_json_schema
 parse_model_result = _CONTRACTS.parse_model_result
 
 
@@ -611,7 +612,7 @@ async def fail_from_job_file(args: argparse.Namespace) -> int:
     return 0
 
 
-def build_gemini_command(model: str, prompt: str) -> CliInvocation:
+def build_gemini_command(model: str, prompt: str, *, job_type: str = "") -> CliInvocation:
     """agy: argv, guarded.
 
     The Antigravity CLI has no off-argv prompt channel -- verified against the
@@ -627,6 +628,20 @@ def build_gemini_command(model: str, prompt: str) -> CliInvocation:
     that killed the loop process live.
     """
     command = ["agy", "--print", prompt, "--model", model, "--effort", "high"]
+    schema = output_json_schema(job_type)
+    if schema is not None:
+        # Antigravity returns a top-level `structured_output` object when given
+        # a JSON schema. This is a provider-enforced contract, not a second
+        # prompt-only request, and is substantially more reliable than asking
+        # the model to repair prose after the fact.
+        command.extend(
+            [
+                "--output-format",
+                "json",
+                "--json-schema",
+                json.dumps(schema, separators=(",", ":")),
+            ]
+        )
     ensure_argv_fits(
         command,
         detail=(
@@ -692,6 +707,9 @@ def gemini_response_text(stdout: str) -> str:
     if isinstance(payload, str):
         return payload.strip()
     if isinstance(payload, dict):
+        structured = payload.get("structured_output")
+        if isinstance(structured, dict):
+            return json.dumps(structured, separators=(",", ":"))
         for key in ("response", "text", "content", "output"):
             value = payload.get(key)
             if isinstance(value, str) and value.strip():
@@ -792,7 +810,11 @@ async def gemini_once(args: argparse.Namespace) -> int:
     )
     invocation: CliInvocation | None = None
     try:
-        invocation = build_gemini_command(args.gemini_model, render_model_prompt(job))
+        invocation = build_gemini_command(
+            args.gemini_model,
+            render_model_prompt(job),
+            job_type=str(job.get("job_type") or ""),
+        )
         process = await run_cli_with_liveness(
             config,
             invocation.command,
@@ -837,6 +859,7 @@ async def gemini_once(args: argparse.Namespace) -> int:
         repair_invocation = build_gemini_command(
             args.gemini_model,
             render_structured_output_repair_prompt(job, response_text),
+            job_type=str(job.get("job_type") or ""),
         )
         try:
             repaired = await run_cli_with_liveness(

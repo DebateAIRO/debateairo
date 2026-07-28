@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 
@@ -826,6 +827,35 @@ def test_gemini_once_repairs_malformed_structured_output_once(tmp_path, monkeypa
     assert len(commands) == 2
     assert "PREVIOUS_INVALID_RESPONSE" in commands[1][2]
     assert '{"title":"...","content":"..."}' in commands[1][2]
+
+
+def test_gemini_command_uses_native_schema_for_known_structured_job() -> None:
+    module = load_module()
+    invocation = module.build_gemini_command(
+        "gemini-3.5-flash-high",
+        "Prompt text",
+        job_type="v2_expand",
+    )
+
+    assert invocation.command[invocation.command.index("--output-format") + 1] == "json"
+    schema = json.loads(invocation.command[invocation.command.index("--json-schema") + 1])
+    assert schema["required"] == ["title", "content"]
+
+
+def test_gemini_response_prefers_native_structured_output() -> None:
+    module = load_module()
+    stdout = json.dumps(
+        {
+            "status": "SUCCESS",
+            "response": "surrounding prose",
+            "structured_output": {"title": "Native", "content": "Valid"},
+        }
+    )
+
+    assert json.loads(module.gemini_response_text(stdout)) == {
+        "title": "Native",
+        "content": "Valid",
+    }
 
 
 def test_claude_and_grok_once_run_a_frontier_scale_prompt_without_touching_argv(tmp_path, monkeypatch) -> None:

@@ -80,8 +80,9 @@ def output_instruction(job_type: str) -> str:
                 '"stance":"supports|refutes|mixed"}]}'
             ),
             "v2_synthesize": (
-                '{"strongest_pro":"...","strongest_con":"...","verdict":"...",'
-                '"confidence":0.0}'
+                '{"title":"Synthesis","content":"...","tensions":["..."],'
+                '"agreements":["..."],"evidence_gaps":["..."],'
+                '"key_takeaways":["..."]}'
             ),
         }
         shape = shapes.get(job_type)
@@ -91,6 +92,104 @@ def output_instruction(job_type: str) -> str:
             f"surrounding commentary.{suffix}"
         )
     return "Output only the argument text, with no Markdown fence and no commentary about this protocol."
+
+
+def output_json_schema(job_type: str) -> dict[str, Any] | None:
+    """Return the native provider schema for contracts whose full shape is known.
+
+    Prompt instructions remain the portable baseline for every provider. CLIs
+    with first-class structured output can additionally use these schemas so a
+    useful answer is not discarded merely because the model wrapped it in
+    prose. Keep these shapes aligned with the coordinator's materializers.
+    """
+
+    title_content = {
+        "type": "object",
+        "required": ["title", "content"],
+        "properties": {
+            "title": {"type": "string"},
+            "content": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+    if job_type == "v2_expand":
+        return title_content
+    if job_type == "v2_pov":
+        return {
+            "type": "object",
+            "required": ["title", "content", "strongest_pro"],
+            "properties": {
+                "title": {"type": "string"},
+                "content": {"type": "string"},
+                "strongest_pro": {
+                    "type": "object",
+                    "required": ["title", "content", "pro"],
+                    "properties": {
+                        "title": {"type": "string"},
+                        "content": {"type": "string"},
+                        "pro": title_content,
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        }
+    if job_type == "v2_evidence":
+        return {
+            "type": "object",
+            "required": ["sources"],
+            "properties": {
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "url",
+                            "quote",
+                            "publisher",
+                            "date",
+                            "retrieval_query",
+                            "stance",
+                        ],
+                        "properties": {
+                            "url": {"type": "string"},
+                            "quote": {"type": "string"},
+                            "publisher": {"type": "string"},
+                            "date": {"type": ["string", "null"]},
+                            "retrieval_query": {"type": "string"},
+                            "stance": {
+                                "type": "string",
+                                "enum": ["supports", "refutes", "mixed"],
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "additionalProperties": False,
+        }
+    if job_type == "v2_synthesize":
+        return {
+            "type": "object",
+            "required": [
+                "title",
+                "content",
+                "tensions",
+                "agreements",
+                "evidence_gaps",
+                "key_takeaways",
+            ],
+            "properties": {
+                "title": {"type": "string"},
+                "content": {"type": "string"},
+                "tensions": {"type": "array", "items": {"type": "string"}},
+                "agreements": {"type": "array", "items": {"type": "string"}},
+                "evidence_gaps": {"type": "array", "items": {"type": "string"}},
+                "key_takeaways": {"type": "array", "items": {"type": "string"}},
+            },
+            "additionalProperties": False,
+        }
+    return None
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
