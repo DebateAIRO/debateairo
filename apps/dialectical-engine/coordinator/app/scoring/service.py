@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from app.core.config import bool_env, float_env
 from app.core.oplog import log_event
-from app.core.write_lock import commit_write, flush_write
+from app.core.write_lock import commit_write, flush_write, hold_write_lock
 from app.models.entities import (
     AnalyzerRun,
     Debate,
@@ -1103,6 +1103,40 @@ def _relink_cached_node_artifacts_to_current_job(
 
 
 def _persist_judge_output_artifact(
+    db: Session,
+    *,
+    debate_id: str,
+    node_id: str,
+    input_hash: str,
+    judge_role: str,
+    request: ScoringProviderRequest,
+    result: ScoringProviderResult,
+    parse_status: str,
+    parse_error: str | None,
+    assessment: dict | None,
+) -> JudgeOutputArtifact:
+    # Acquire SQLite write intent BEFORE the cache-identity SELECT below.
+    # Acquiring only when flush_write emits the INSERT is too late under WAL:
+    # another writer can commit between SELECT and INSERT, and SQLite then
+    # rejects this transaction's stale read-snapshot upgrade immediately with
+    # SQLITE_BUSY_SNAPSHOT ("database is locked"). This shared wrapper covers
+    # the primary judge and every panel member.
+    with hold_write_lock(db):
+        return _persist_judge_output_artifact_locked(
+            db,
+            debate_id=debate_id,
+            node_id=node_id,
+            input_hash=input_hash,
+            judge_role=judge_role,
+            request=request,
+            result=result,
+            parse_status=parse_status,
+            parse_error=parse_error,
+            assessment=assessment,
+        )
+
+
+def _persist_judge_output_artifact_locked(
     db: Session,
     *,
     debate_id: str,
