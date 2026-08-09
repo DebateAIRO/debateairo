@@ -1,0 +1,1 @@
+{"name":"@debateai/contract","version":"0.1.0","private":true,"type":"module","exports":"./generated/client.ts","dependencies":{"@debateai/kernel":"workspace:*","zod":"4.4.3"}}

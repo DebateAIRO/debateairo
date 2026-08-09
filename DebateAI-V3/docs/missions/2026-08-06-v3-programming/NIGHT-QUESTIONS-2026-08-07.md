@@ -1,0 +1,18 @@
+# Night questions ledger — 2026-08-07 programming loop (DR-120 night mode)
+
+> **2026-08-08 morning: ALL ROWS ANSWERED at the day-mode sitting (DR-124).**
+> NQ-1 → **RATIFIED WHOLESALE** (DR-125). NQ-2 → answered by DR-121 (embedded
+> real PG standing). NQ-3 → **DEFERRED** (DR-126: live-model fixtures
+> accumulate in the environment tail, close in one acceptance pass when V
+> provides a runtime). NQ-4 → confirmed (no objection raised).
+
+Law: V answers tomorrow; the loop never stops for a question (DR-120 clause 1).
+Each row: the question, why it arose, the conservative path the loop is taking
+meanwhile. Questions from Codex handoffs are folded in here by the Orchestrator.
+
+| # | Question | Context | Interim path taken |
+|---|---|---|---|
+| NQ-1 | Does DR-119 ("Final decision: Modular Monolith") plus the DR-120 loop launch constitute **wholesale ratification of the pattern register P1..P18 + anti-patterns**, or do you still want your read-through with possible amendments? | You asked to read design-patterns.md before ruling ratification; you then ruled the P1 question directly (the debate) and launched coding. | The register is treated as **binding working law** for all reviews (it already bound Codex tickets under DR-102 "design patterns must be respected"); a later amendment from your read would be folded as a DR row and re-checked against landed code. |
+| NQ-2 | ~~Test-database provisioning deviation — ratify or reverse?~~ **ANSWERED BY V (DR-121, live during the night):** "for now we do not install anything from the Docker family. Just code." | Codex's first S00 run ended CODEX BLOCKED on exactly this; machine inventory confirmed it (node+npm+network only). | **The embedded-real-PostgreSQL path is the STANDING dev/test DB for the prototype phase** (V-endorsed); Testcontainers wiring stays authored-dormant per ADR-0012 for the later Docker phase; hatchet dev-compose authored-dormant; container-dependent fixtures DEFERRED BY RULING — reviews treat them as deferred, never failed. |
+| NQ-3 | **The real judge call still needs a model runtime — non-Docker options only (DR-121 struck the Docker route).** Remaining options when you're ready: (a) an ollama or LM Studio install with any real model, or (b) a hosted-provider API key for the Seam C adapter. DR-115 bars fabricating the call, so "one replayable served number" stays an ENVIRONMENT TAIL item until then. | No model runtime and no API key exist on the machine; orchestrator declined to install server binaries/models unilaterally. | Codex builds everything else TDD (provider adapter fully implemented + wire-shape-tested in the test layer); the fixtures requiring a LIVE model are enumerated in the S00 handoff as the tail. The loop advances through S01+ meanwhile — the prototype is code-complete-able without the live call; the trace lands the day you provide a runtime. |
+| NQ-4 | **Recorded environment acts by the orchestrator (confirm or object):** (1) `npm install -g pnpm` → pnpm **11.20.0** (userland, ~/.local) — this is the pnpmVersion pin resolving on-machine per DR-104; nodeRuntimeVersion pin = **v22.23.1** (found on machine). (2) vllmImageDigest resolved WITHOUT docker via registry API: tag `latest` as of 2026-08-07 → `sha256:ffb2d59b1c059a5bd8d781320c9f5189de8293693b7d95da54befddaa54abf52`. (3) Codex re-dispatched with sandbox network access ENABLED (`sandbox_workspace_write.network_access=true`) — needed for pnpm registry; sandbox still workspace-write for files. | Codex's DNS block was its sandbox, not the machine. | All three recorded; reversible; no admin/system change made. |

@@ -1,0 +1,10 @@
+GROK REVIEW: CHANGES REQUESTED
+SOLID: greenlight — pure evidence aggregate + repository write seams; kernel-minted closed vocabs; activation reducer pure
+DDD: greenlight — eight routes + five R6 reasons + VERIFIED-as-outcome; marks 23–24 dormant-by-absence (DR-110(1)); no OTHER
+TDD: greenlight* — independent 187/187 GREEN vs embedded PG 18.4; typecheck PASS; lint 27/0 + source 0 (*FX-LG-08 cannot-score unenforced — B1)
+Patterns (P9/P12/P17/P18 · DR-125): red on P17 — P12 ladder/order match citation-routes.md; P18 FX-DEF-01/02 NOT_SHIPPED; P9 shadow gate; **reject-before-score not SQL/repo law**
+DR-115: greenlight — no production fabrication; model-asserted leaf scores throw; probe needs real ledger+raw; budget-skip of citation compare throws; hard-kill absent
+1. BLOCKING — FX-LG-08 / DR-009 “wholly off-subject REJECTED before scoring”: `assessAdmissibility` returns `scoreAllowed: false`, but `EvidenceRepository.recordEvidenceItem` never consults it and will persist `admissibility='REJECTED'` with a non-null `base_score` when the caller supplies a pipeline score; `migrations/0008_s06.sql` has no CHECK coupling REJECTED → null score (only score↔producer and score∈[0,1] checks). Handoff claim that SQL enforces cannot-score is false. Fix: domain loud refusal + DDL CHECK + firing test.
+2. NON-BLOCKING — R6 five-reason domain is implemented in kernel/SQL/ladder, but unit `it.each` fires only one EXACT_COMPARE limb (`MEDIUM_UNSUPPORTED`); `NO_SPAN_CITED` / `COMPARE_NOT_EXECUTED` / `COMPARE_EXECUTION_NOT_OK` / `COMPARE_RESULT_MISSING` lack named firing demos.
+3. NON-BLOCKING — integration suite persists only R1 (`NO_SOURCE_FOUND`) through the repository; other seven route SQL pairing constraints are string-asserted in architecture tests, not exercised against real PG.
+4. NON-BLOCKING — S05 diamond carry-forwards remain: dead `answer.terminal` BLOCKED member + unreachable `OPERATOR` session branch (untouched, correctly out of S06 file scope); composition-budget unit still unruled (no invented value).

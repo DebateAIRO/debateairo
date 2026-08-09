@@ -1,0 +1,9 @@
+I'll act as the independent S07 rev 2 review lens: load the heartbeat protocol, then verify the audit-ledger rework only (not re-litigate the already-strong engine).Next I'll verify production reachability of the reclassified surfaces and confirm the scaffold/orphan-audit claims hold.GROK REVIEW (rev 2): APPROVED
+SOLID: greenlight — audit-ledger accuracy only; no engine/logic change; wait-drain / decision / DR-050 seams left untouched and still clean
+DDD: greenlight — attachment vocabulary matches S04/S05 law (composition-root reachability); test-only SPLIT write path no longer masquerades as production attachment
+TDD: greenlight — independent **207/207 GREEN** vs real embedded PostgreSQL; typecheck PASS; lint 27 edges / 0 violations / 0 source blockers; scaffold pins truthful UNATTACHED + neverCalled
+Patterns (FX-ORPH / honesty): greenlight — four false ATTACHED reclassified UNATTACHED + neverCalled; addEdge/spawnPendingChild mutual exclusion resolved (both neverCalled); genuine ATTACHED retained for SSE lifecycle + runner WAIT drain; truthful owner line present on all seven
+DR-115: greenlight — honesty fix only; no fabrication of served/judged data; fail-closed TERMINAL/WAIT paths unchanged
+1. BLOCKING — DR-050 / decide / recordDecision / spawnPendingChild falsely ATTACHED (and addEdge contradiction) — **FIXED** (UNATTACHED + neverCalled; scaffold asserts corrected state; readNodeLifecycleEvents + drainWaitsForCompletion stay ATTACHED)
+2. NON-BLOCKING — certifyDefeaterCompleteness / resolveRegeneration / selectRivalCarver missing honesty rows — **FIXED** (all three in neverCalled with later-runner-slice owner line)
+3. NON-BLOCKING — WAIT_RESOLUTION_INCOMPLETE and TERMINAL_ACTIVATION_EVALUATOR_UNRESOLVED loud-refusal fixtures still unfired (coded fail-closed only) — **ACKNOWLEDGED**, remains open carry-forward

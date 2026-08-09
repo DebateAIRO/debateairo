@@ -1,0 +1,11 @@
+I'll act as the independent S01 review lens: load the heartbeat protocol, read the handoff and law docs, then verify the implementation against code and gates.Next I'll inspect the S01 implementation and law citations, then run typecheck/lint/`test:s00` against the real Postgres path.Independent verification complete: typecheck, lint, and `pnpm test:s00` are green (15 files / 62 tests on embedded Postgres 18.4). Gate reworks (append-outcome, claim hermeticity) check out as law-preserving.GROK REVIEW: APPROVED
+- SOLID: greenlight — ledger owns reconstruction/completeness, serve owns eviction, replay is a frozen-records reader with injected Pool; boundaries hold
+- DDD: greenlight — ADR-0006/0012 terms (`JUDGEMENT_SCHEDULED`, hash triple, allocator order, ceremony limbs) match carriers; not a serve state
+- TDD: greenlight — RED at 2026-08-08T06:05:54Z is durable in `S01-progress.log`; fixtures fire both ways where law requires (01a/01b); DR-121/NQ-3 deferred not failed
+- Patterns: greenlight — P10 allocator+append-only+named hashes; P13 recorded structure consumed or loud refuse; P18 isolation proof + falsifiable operator attestation
+- DR-115: greenlight — four reconstruction paths fail typed (`RECONSTRUCTION_INPUT_MISSING` / `STORED_RESULT_MISSING` / `COMPLETENESS_GATE_FAILED` / partial inventory); ceremony/scheduler refuse unsupported shape; no runtime fixture fallback
+- Findings:
+  1. NON-BLOCKING — Environment Tail remains open for FX-LG-01b on foreign runs S01 did not produce (NQ-3 live-model prerequisite); code path and isolation pins are in place, real operator ceremony not executed here
+  2. NON-BLOCKING — Launch ceremony keeps `σ`/`product` live via `void [σ, product]` while single-node recompute only uses `agg`; multi-node correctly throws `REPLAY_SHAPE_NOT_IMPLEMENTED` (deferred, not masked)
+  3. NON-BLOCKING — Rework (a) outcome correction is append-under-later-sequence (UPDATE/DELETE only in negative fixtures; runtime mutates only `core.work_item`); rework (b) claimNext pollution fixed by test hermeticity (`createRun` does not enqueue), ADR-0017 oldest-READY/`SKIP LOCKED` law unchanged
+  4. NON-BLOCKING — Verified green: `pnpm run typecheck`, `pnpm run lint` (0 architecture/source violations), `pnpm run test:s00` → 15 files / 62 tests on embedded PostgreSQL 18.4

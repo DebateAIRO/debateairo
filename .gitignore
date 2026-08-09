@@ -31,3 +31,10 @@ dialectical-engine/**/.pytest_cache/
 dialectical-engine/web/.next/
 dialectical-engine/web/.next-dev*/
 dialectical-engine/web/node_modules/
+
+# V3 workspace (moved in 2026-08-09)
+DebateAI-V3/node_modules/
+DebateAI-V3/web/node_modules/
+DebateAI-V3/web/.next/
+DebateAI-V3/.DS_Store
+.DS_Store

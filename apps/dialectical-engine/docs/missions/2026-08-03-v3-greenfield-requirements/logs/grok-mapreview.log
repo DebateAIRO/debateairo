@@ -1,0 +1,13 @@
+I have enough to break the map on several fronts. Writing the single allowed review artifact.**Map-review complete.** Single artifact written:
+
+`docs/missions/2026-08-03-v3-greenfield-requirements/reviews/ReviewLens-Grok.md`
+
+| Field | Value |
+|---|---|
+| Lens | red-team (Grok) |
+| Verdict | **LENS CHANGES REQUESTED** |
+| Handoff | `REVIEW LENS HANDOFF COMPLETE` → `READY FOR HERMES STAGE REVIEW` |
+
+**Strongest breaks:** missing battery↔carryover composition decision; no authoritative activation-graph ticket; destination artifacts #1–#2 unowned; HumanPolicyState holes (citation, coverage upgrade, measurement quota, split caps); race/golden-vector layering and no-V2-mutation gates under-specified; blocking order lets dispositions/race run before policy sittings.
+
+No reviewed files were edited. Orchestrator (Fable) merges the three lenses.

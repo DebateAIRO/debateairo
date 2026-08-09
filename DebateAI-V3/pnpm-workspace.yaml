@@ -1,0 +1,20 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "packages/battery/*"
+  - "tools/*"
+  - "web"
+
+allowBuilds:
+  '@embedded-postgres/darwin-arm64': true
+  '@hatchet-dev/typescript-sdk': true
+  cpu-features: false
+  esbuild: true
+  protobufjs: false
+  sharp: true
+  ssh2: false
+
+minimumReleaseAgeExclude:
+  - '@types/node@26.2.0'
+  - '@types/pg@8.21.0'
+  - tsx@4.23.11

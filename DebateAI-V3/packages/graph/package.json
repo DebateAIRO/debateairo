@@ -1,0 +1,1 @@
+{"name":"@debateai/graph","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@debateai/kernel":"workspace:*","@debateai/db":"workspace:*","@debateai/ledger":"workspace:*","@debateai/register":"workspace:*"}}

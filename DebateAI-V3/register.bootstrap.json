@@ -1,0 +1,17 @@
+{
+  "registerVersion": 1,
+  "values": {
+    "nodeRuntimeVersion": "v22.23.1",
+    "pnpmVersion": "11.20.0",
+    "postgresMajorVersion": "18",
+    "typescriptVersion": "7.0.2",
+    "vllmImageDigest": "sha256:ffb2d59b1c059a5bd8d781320c9f5189de8293693b7d95da54befddaa54abf52"
+  },
+  "resolution": {
+    "nodeRuntimeVersion": "node --version on 2026-08-07",
+    "pnpmVersion": "pnpm --version on 2026-08-07",
+    "postgresMajorVersion": "embedded-postgres darwin-arm64 postgres --version on 2026-08-07",
+    "typescriptVersion": "pnpm exec tsc --version on 2026-08-07",
+    "vllmImageDigest": "Docker Hub registry API manifest HEAD for vllm/vllm-openai:latest on 2026-08-07"
+  }
+}

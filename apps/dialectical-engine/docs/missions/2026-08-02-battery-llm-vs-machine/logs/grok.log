@@ -1,0 +1,29 @@
+I'll inspect the upstream plan and any parallel research artifacts so the plan criteria match the packet's required outcomes.I have enough context to freeze the research-seat contract into the goal plan.DoneI'll seed the plan todos and read the upstream plan plus intake so the partition research is grounded.Continuing through the remaining stages and the appendix so the 62-question partition is complete.I have the full plan and appendix. Next I’ll write the independent Grok research artifact with all six required sections.Running the verification plan and saving proof to scratch.Running the verification plan and capturing proof in scratch.Fixing the coverage proof file with accurate section sizes, then marking the goal complete.**RESEARCH HANDOFF COMPLETE**
+
+Deliverable written only at:
+
+`research/Research-Grok.md`
+
+### Contents
+1. **62-question table** (appendix 1–62) with MACHINE | LLM | HYBRID, machine/LLM split, token-saving mechanism — grounded in Stages 1–11 / Parts 1–9  
+2. **9 human-set rules** (Part 4) with the same treatment  
+3. **Preflight T0–T11** order + typed state (`LockState` → `SettleState`)  
+4. **Top-10 token reductions** (retrieval logs, Stage 9 arithmetic, type activation, depth-0 skip, austere critic, …)  
+5. **V-only open decisions** (engine fate, freeze law, admissibility, abstention price, lineage, …)  
+6. **Implications** for human report vs AI companion  
+
+### Verification (scratch)
+- Sole seat write: `Research-Grok.md`  
+- Handoff marker + metadata OK  
+- 62/62 questions, 9/9 rules, sections 1–6 present  
+- Sample rows + top-10 cite plan stages/parts; verdicts only MACHINE | LLM | HYBRID  
+
+Stopped per packet: one round, one artifact.I'll adversarially verify the research deliverable against the goal packet, plan criteria, and cited sources—starting with the packet, plan, and `Research-Grok.md`.Continuing: reading the rest of the deliverable, upstream plan structure, and implementer verification captures.Fact-checking material claims against `upstream/human-plan.md`: appendix questions, Part 4 rules, and key figures.Verifying quantitative claims and appendix question mappings against the plan.Structural gates and plan-grounded claims check out. Writing the verdict and details.Not RefutedI'll adversarially verify the research deliverable against the goal packet, plan, and sources—starting by reading the contract artifacts and `Research-Grok.md`.I'll audit the research deliverable against the goal packet and plan, verifying claims against sources rather than trusting the implementer's summary.Continuing the deliverable and upstream plan, and checking implementer verification captures.Fact-checking material claims in the research against `upstream/human-plan.md`.Verifying appendix question mapping and key numerical claims against the plan.Next I'll finish reading sections 2–6 and cross-check the plan’s 62 questions, 9 rules, and cited stages for factual grounding.I'll verify the appendix's question numbering and a sample of material claims against `human-plan.md`.Structural gates and plan citations check out. Writing the verdict files.Not RefutedStructural and grounding checks hold; writing the Not Refuted verdict.Not Refuted**Delivered:** Grok’s LLM-vs-machine partition research for the Empirical Truth Battery — `research/Research-Grok.md` (62 questions, 9 rules, preflight sketch, top-10 savings, V-only opens, dual-doc notes).
+
+**How to use:**
+- Open `research/Research-Grok.md` under this mission directory
+- Use §1–2 for per-item MACHINE | LLM | HYBRID calls; §3–4 for preflight and cost cuts; §5–6 for human decisions and report/companion implications**Delivered:** Grok’s LLM-vs-machine partition research for the Empirical Truth Battery — `research/Research-Grok.md` (62 questions, 9 rules, preflight sketch, top-10 savings, V-only opens, dual-doc notes).
+
+**How to use:**
+- Open `research/Research-Grok.md` under this mission directory
+- Use §1–2 for per-item MACHINE | LLM | HYBRID calls; §3–4 for preflight and cost cuts; §5–6 for human decisions and report/companion implications

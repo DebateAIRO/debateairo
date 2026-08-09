@@ -1,0 +1,42 @@
+name: debateai-v3
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_MAJOR_VERSION:?generated from register.bootstrap.json by pnpm compose:env}
+    environment:
+      POSTGRES_USER: debateai
+      POSTGRES_PASSWORD: debateai-dev-only
+      POSTGRES_DB: debateai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-hatchet.sql:/docker-entrypoint-initdb.d/init-hatchet.sql:ro
+
+  hatchet-lite:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest@sha256:7198bda4d73021a9759d90c57f11f1dd2b32599b81f4c08a5a97ea4cf047c41a
+    depends_on:
+      - postgres
+    ports:
+      - "8888:8888"
+      - "7077:7077"
+    environment:
+      DATABASE_URL: postgresql://debateai:debateai-dev-only@postgres:5432/hatchet?sslmode=disable
+      SERVER_MSGQUEUE_KIND: postgres
+      SERVER_AUTH_COOKIE_DOMAIN: localhost
+      SERVER_AUTH_COOKIE_INSECURE: "true"
+      SERVER_GRPC_BIND_ADDRESS: 0.0.0.0
+      SERVER_GRPC_INSECURE: "true"
+      SERVER_GRPC_BROADCAST_ADDRESS: localhost:7077
+      SERVER_GRPC_PORT: "7077"
+      SERVER_URL: http://localhost:8888
+      SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS: localhost:7077
+
+  vllm:
+    image: vllm/vllm-openai:latest@sha256:ffb2d59b1c059a5bd8d781320c9f5189de8293693b7d95da54befddaa54abf52
+    ports:
+      - "8000:8000"
+    command:
+      - --model
+      - ${VLLM_MODEL:?VLLM_MODEL must name a real provisioned model}
+
+volumes:
+  postgres-data:
