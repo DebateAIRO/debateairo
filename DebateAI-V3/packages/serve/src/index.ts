@@ -748,7 +748,7 @@ export interface MemoryQuestionRegistration {
 }
 
 export interface ConditionMarkRecord {
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -857,7 +857,7 @@ export class ServeRepository {
       throw new TypedDomainError("INVALID_COMPOSITION_ATTEMPT", "A composition artifact requires a positive attempt number");
     }
     const conditionMarkRecords = input.conditionMarkRecords ?? [];
-    for (const mark of ["SKIPPED-BY-BUDGET", "ENVELOPE_EXHAUSTED"] as const) {
+    for (const mark of ["SKIPPED-BY-BUDGET", "ENVELOPE_EXHAUSTED", "OWED-CHECK-UNEXECUTED", "UNRESOLVED-TYPE-FALLBACK"] as const) {
       if (input.result.conditionMarks.includes(mark) && !conditionMarkRecords.some((record) => record.mark === mark)) {
         throw new TypedDomainError("CONDITION_MARK_RECORD_REQUIRED", `${mark} has no typed persistence record`);
       }
@@ -1167,6 +1167,21 @@ export class ServeRepository {
        ORDER BY at_seq`,
       [row.answer_id, row.answer_version]
     );
+    // DR-139(4): the served answer names each condition-mark record — the
+    // owed-but-unexecuted checks ride here, one typed record per battery row.
+    const conditionMarkRecords = await this.pool.query<{
+      mark: string;
+      scope: "answer" | "node";
+      subject_ref: string;
+      reason: string;
+      lift_path: string | null;
+    }>(
+      `SELECT mark, scope, subject_ref, reason, lift_path
+       FROM serve.condition_mark
+       WHERE answer_id = $1 AND answer_version = $2
+       ORDER BY at_seq`,
+      [row.answer_id, row.answer_version]
+    );
     const abstention = await this.pool.query<Answer["abstention"] extends infer T ? Exclude<T, null> : never>(
       `SELECT kind, question_class, risk_tier, price, register_row_key,
               register_version::integer, register_source_ref, unlock_condition, ledger_unknown_ref
@@ -1214,6 +1229,13 @@ export class ServeRepository {
       residual_objections: row.residual_objections,
       value_hinges: valueHinges.rows,
       condition_marks: conditionMarks,
+      condition_mark_records: conditionMarkRecords.rows.map((record) => ({
+        mark: ConditionMarkSchema.parse(record.mark),
+        scope: record.scope,
+        subject_ref: record.subject_ref,
+        reason: record.reason,
+        lift_path: record.lift_path
+      })),
       reversal_point: row.reversal_point,
       builds_on_previous: {
         value: memoryDisclosure?.matched === true,

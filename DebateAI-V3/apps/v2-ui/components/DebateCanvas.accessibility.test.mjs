@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
+
+const source = readFileSync(join(process.cwd(), "components", "DebateCanvas.tsx"), "utf8");
+
+test("scored claim badges expose a keyboard-operable details control", () => {
+  assert.match(source, /<button\s+type="button"\s+className="scoreBadgeButton"/);
+  assert.match(source, /aria-label=\{`Open scoring explanation for \$\{node\.claim\}`\}/);
+  assert.match(source, /event\.stopPropagation\(\);\s*openNodeDetails\(\);/s);
+  assert.doesNotMatch(
+    source,
+    /role=\{state === "done" \? "button" : undefined\}[\s\S]*<button\s+type="button"\s+className="scoreBadgeButton"/,
+    "Scored cards must not nest score buttons inside a card-level button role"
+  );
+});

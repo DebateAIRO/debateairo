@@ -387,7 +387,7 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   async *events(runId: string, session: Session): AsyncIterable<unknown> {
-    const result = await this.pool.query<{
+    const [result, failedWork] = await Promise.all([this.pool.query<{
       event_id: string;
       kind: string;
       at_seq: string;
@@ -396,10 +396,21 @@ export class PostgresAskApplication implements AskApplication {
       `SELECT event.event_id, event.kind, event.at_seq, event.value_json
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
-       WHERE event.run_id = $1 AND run.asker_id = $2 ORDER BY event.at_seq`,
+      WHERE event.run_id = $1 AND run.asker_id = $2 ORDER BY event.at_seq`,
       [runId, session.asker_id]
-    );
-    if (result.rows.length === 0) return;
+    ), this.pool.query<{
+      work_item_id: string;
+      created_at_seq: string;
+      terminal_reason: string;
+    }>(
+      `SELECT work.work_item_id, work.created_at_seq, work.terminal_reason
+       FROM core.work_item AS work
+       JOIN core.run AS run ON run.run_id = work.run_id
+       WHERE work.run_id = $1 AND run.asker_id = $2 AND work.state = 'FAILED'
+       ORDER BY work.created_at_seq`,
+      [runId, session.asker_id]
+    )]);
+    if (result.rows.length === 0 && failedWork.rows.length === 0) return;
     const projected = await this.#splitLifecycle.read(runId);
     const storedEvents = result.rows.flatMap((row) => {
       const direct = EventTypeSchema.safeParse(row.kind);
@@ -424,6 +435,13 @@ export class PostgresAskApplication implements AskApplication {
     });
     const events = [
       ...storedEvents,
+      ...failedWork.rows.map((work) => ({
+        event_id: work.work_item_id,
+        event_type: "run.terminal" as const,
+        run_ref: runId,
+        at_sequence: Number(work.created_at_seq),
+        payload: { state: "FAILED", reason: work.terminal_reason }
+      })),
       ...projected.map((event) => ({
         event_id: event.eventId,
         event_type: event.eventType,

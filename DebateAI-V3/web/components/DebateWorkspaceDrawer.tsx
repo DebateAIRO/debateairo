@@ -7,6 +7,12 @@ export function DebateWorkspaceDrawer({ answer }: { answer: AnswerSurfaceProject
     <p>Freshness: {answer.time.stalenessState} · relevant as of {answer.time.relevantAsOf}</p>
     <p>Conformance: {answer.conformanceOutcome}</p>
     {answer.conditionMarks.map((mark) => <div className="pill" key={mark}>{conditionMarkLabel(mark)}</div>)}
+    {answer.conditionMarkRecords.length > 0 ? <section aria-label="Condition mark records">
+      <h3>Named condition marks</h3>
+      {answer.conditionMarkRecords.map((record) => <p key={`${record.mark}:${record.subject_ref}`}>
+        {conditionMarkLabel(record.mark)} · {record.subject_ref} · {record.reason}
+      </p>)}
+    </section> : null}
     {answer.abstention ? <p><strong>Abstention:</strong> {abstentionKindLabel(answer.abstention.kind)} · cell {answer.abstention.question_class}/{answer.abstention.risk_tier} · {answer.abstention.unlock_condition}</p> : null}
     <h3>What would reverse this</h3><p>{answer.reversalPoint}</p>
     {answer.valueHinges.map((hinge) => <section key={hinge.value_hinge_ref}><h3>Value hinge</h3><p>{hinge.left_option_ref} ↔ {hinge.right_option_ref} · weights: {hinge.weight_source}{hinge.weight_owner ? ` by ${hinge.weight_owner}` : ""}</p><p>Rejected criteria: {hinge.rejected_criteria.length === 0 ? "None recorded" : hinge.rejected_criteria.join(", ")}</p></section>)}

@@ -99,6 +99,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       residual_objections: [],
       value_hinges: [],
       condition_marks: [],
+      condition_mark_records: [],
       reversal_point: "A contrary test-layer observation.",
       builds_on_previous: { value: false, answer_ref: null },
       memory_disclosure: null,

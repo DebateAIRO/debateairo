@@ -31,6 +31,14 @@ export interface JudgeInput {
   readonly subjectItemId: string;
   readonly callSiteKey: string;
   readonly questionLine: string;
+  /**
+   * FAIR-01 (DR-140(b)): the text the code-first claim classifier runs on when
+   * it differs from the prompt line. One debate has ONE claim frame — the
+   * counter-position judgement is classified on the debate's own question
+   * line, not on the wording of the position it embeds. Defaults to
+   * questionLine, which keeps the position-side behavior byte-identical.
+   */
+  readonly claimClassificationLine?: string;
   readonly providerRef: string;
   readonly contractHash: string;
   readonly bound: CallBound;
@@ -54,7 +62,8 @@ export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
   async judge(input: JudgeInput): Promise<JudgedNode> {
-    const codeClaim = classifyClaimText(input.questionLine);
+    const classificationLine = input.claimClassificationLine ?? input.questionLine;
+    const codeClaim = classifyClaimText(classificationLine);
     const response = await this.provider.call({
       runId: input.runId,
       subjectItemId: input.subjectItemId,
@@ -68,7 +77,22 @@ export class Judge {
         messages: [
           {
             role: "system",
-            content: `Return only the declared judge JSON object with steelman, critic, evidence, context, and fallacy sub-objects. Never invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. LOOKED_UP requires a resolving locator.${codeClaim.claimType === "unknown" ? " The code classifier returned unknown; propose claim_type from the declared closed vocabulary." : " Do not classify claim_type; the code-first classifier already resolved it."}`
+            content: `Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:
+{
+  "statement": non-empty string,
+  "way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING",
+  "locator": non-empty string | null,
+  "restatement_text": non-empty string,
+  "restatement_status": "PASS" | "FAIL" | "NOT_SAMPLED",
+  "value_laden": boolean,
+  optional "claim_type": "empirical" | "causal" | "normative" | "definitional" | "prediction" | "comparative" | "mixed" | "unknown",
+  "steelman": { "summary": non-empty string, "fidelity": number [0,1] },
+  "critic": { "summary": non-empty string, "counterargumentStrength": number [0,1], "basis": "REAL_ATTACK" | "PLAUSIBLE_COUNTER" },
+  "evidence": { "quality": number [0,1], "relevance": number [0,1] },
+  "context": { "fit": number [0,1], "ambiguityFlags": non-empty string[] },
+  "fallacy": { "severity": number [0,1], "fatalFlags": [{ "type": non-empty string, "severity": number [0,1], "description": non-empty string }] }
+}
+Never invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. LOOKED_UP requires a resolving locator.${codeClaim.claimType === "unknown" ? " The code classifier returned unknown; include claim_type from the declared closed vocabulary." : " Omit claim_type; the code-first classifier already resolved it."}`
           },
           { role: "user", content: input.questionLine }
         ]
@@ -88,7 +112,7 @@ export class Judge {
     let normalizedClaim: NormalizedClaim;
     try {
       normalizedClaim = await resolveClaimType({
-        text: input.questionLine,
+        text: classificationLine,
         classifyUnknown: async () => parsed.value.claim_type
       });
     } catch (error) {

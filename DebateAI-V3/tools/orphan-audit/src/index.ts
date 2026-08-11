@@ -102,6 +102,18 @@ async function sourceFiles(directory: string): Promise<string[]> {
   return output;
 }
 
+// UI-01 (DR-145): apps/v2-ui is V's restored V2 debate workspace — a Next.js
+// UI surface, the same class of code as the root-level web/ app, which these
+// engine sweeps have never covered (web/ sits outside packages/apps/tools by
+// placement). V placed the restored UI under apps/, so the exemption must be
+// explicit here: UI code lawfully reads NEXT_PUBLIC_* / framework env and is
+// not part of the engine's register/dependency-edge law. Engine rules keep
+// applying to every other apps/* directory.
+const uiSurfaceDirectory = join(root, "apps/v2-ui");
+function withoutUiSurface(paths: readonly string[]): string[] {
+  return paths.filter((path) => !path.startsWith(uiSurfaceDirectory));
+}
+
 export async function auditS14TypeGraph(): Promise<{
   readonly contractVersion: string;
   readonly servedWithoutConsumer: readonly string[];
@@ -293,10 +305,10 @@ export async function auditSurfaceReachability(): Promise<{
   readonly declarationsChecked: number;
   readonly blocking: readonly string[];
 }> {
-  const productionFiles = [
+  const productionFiles = withoutUiSurface([
     ...await sourceFiles(join(root, "packages")),
     ...await sourceFiles(join(root, "apps"))
-  ];
+  ]);
   const declarations = new Map<string, CallableDeclaration>();
   const byCallName = new Map<string, string[]>();
   for (const path of productionFiles) {
@@ -428,11 +440,11 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
 
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
-  const engineFiles = [
+  const engineFiles = withoutUiSurface([
     ...await sourceFiles(join(root, "packages")),
     ...await sourceFiles(join(root, "apps")),
     ...await sourceFiles(join(root, "tools"))
-  ];
+  ]);
   let gatewayDeclarations = 0;
   for (const path of engineFiles) {
     const source = await readFile(path, "utf8");
@@ -590,8 +602,6 @@ export async function auditOrphans(): Promise<{
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },
       { package: "packages/graph.constructEdge", reason: "S02 exposes the pure construction seam, but its current callers are test fixtures; the first production caller belongs to a later graph-construction slice" },
-      { package: "packages/graph.GraphWriter.addEdge", reason: "S02 exposes the transactional write seam, but its current callers are integration fixtures; the first production caller belongs to a later graph-construction slice" },
-      { package: "packages/register.resolveScoringOperator", reason: "S03 exposes the ruled P8 resolver, but Seam A still has no production attachment; deferred explicitly to the propagation shell rather than hidden in handoff prose" },
       { package: "packages/judgement.runJudgePanel", reason: "S04 proves the P15 panel bulkhead in the pure surface; the current production shell is honestly single-judge until panel routing is composed" },
       { package: "packages/judgement.measureDispersion", reason: "S04 proves typed dispersion at two judgements; the current single-judge production shell persists null" },
       { package: "packages/judgement.applyCorrelatedErrorDiscount", reason: "S04 proves first-appearance family discounting; production attachment waits for multi-member routing" },
@@ -610,12 +620,12 @@ export async function auditOrphans(): Promise<{
       { package: "apps/runner.WalkingSkeletonRunner.executeValueOverlay", reason: "the S10 value pipeline is staged behind this method, but no production task or route dispatches it; attachment belongs to the later value-serving composition." },
       { package: "packages/critique.planBlindVerification", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
       { package: "packages/critique.computeSymmetryDiff", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.buildBlindedCritiquePacket", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.computeIndependenceReceipt", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
+      { package: "packages/critique.buildBlindedCritiquePacket", reason: "callers are test fixtures; the FAIR-01 counter leg deliberately records no packet (DR-141(4): a run carrying critique packets refuses at terminal until the Q42 recording migration is ruled); production CROSS-loop attachment follows that ruling." },
+      { package: "packages/critique.computeIndependenceReceipt", reason: "callers are test fixtures; the FAIR-01 counter's independence is carried by recorded per-artifact maker lineage; the P18 receipt attaches with the ruled Q42 recording migration." },
       { package: "packages/critique.evaluateMakerAvailability", reason: "callers are test fixtures; production per-run maker reachability belongs to a later CROSS runner composition." },
       { package: "packages/critique.applyCriticUnavailableCap", reason: "callers are test fixtures; production DR-014 serving attachment belongs to a later CROSS runner composition." },
       { package: "packages/critique.deriveObjectionRecords", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.CritiqueRepository", reason: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
+      { package: "packages/critique.CritiqueRepository", reason: "callers are test fixtures; production CROSS-loop attachment follows the ruled Q42 recording migration (DR-141(4))." },
       { package: "packages/providers.selectProviderAdapter", reason: "callers are test fixtures; production configured-provider selection belongs to the provider composition slice." },
       { package: "packages/providers.VllmOpenAICompatibleProviderGateway", reason: "compiled adapter is present; production selection awaits the configured-provider register row." },
       { package: "apps/replay", reason: "S00 pins its isolated arithmetic surface; the launch ceremony closes in the deployment tail" },
@@ -663,12 +673,12 @@ export async function auditOrphans(): Promise<{
       { package: "packages/critique.readDeploymentMakerCapability", evidence: "API composition root validates the register-backed provider set at launch and reads it again on admission" },
       { package: "packages/critique.planBlindVerification", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
       { package: "packages/critique.computeSymmetryDiff", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.buildBlindedCritiquePacket", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.computeIndependenceReceipt", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
+      { package: "packages/critique.buildBlindedCritiquePacket", evidence: "callers are test fixtures; the FAIR-01 counter records no packet under DR-141(4)'s Q42 refusal law." },
+      { package: "packages/critique.computeIndependenceReceipt", evidence: "callers are test fixtures; FAIR-01 independence is carried by recorded per-artifact maker lineage." },
       { package: "packages/critique.evaluateMakerAvailability", evidence: "callers are test fixtures; production per-run reachability belongs to a later CROSS runner composition." },
       { package: "packages/critique.applyCriticUnavailableCap", evidence: "callers are test fixtures; production DR-014 serving attachment belongs to a later CROSS runner composition." },
       { package: "packages/critique.deriveObjectionRecords", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." },
-      { package: "packages/critique.CritiqueRepository", evidence: "callers are test fixtures; production CROSS-loop attachment belongs to a later runner composition." }
+      { package: "packages/critique.CritiqueRepository", evidence: "callers are test fixtures; production CROSS-loop attachment follows the ruled Q42 recording migration." }
     ], reachableCallables),
     s09Surface: deriveSurfaceRows([
       { package: "packages/budget.decideBudgetPressure", evidence: "WalkingSkeletonRunner evaluates the pinned run basis before and after the serve model calls" },

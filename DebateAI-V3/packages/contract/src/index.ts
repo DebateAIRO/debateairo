@@ -315,6 +315,16 @@ export const AnswerSchema = z.object({
   residual_objections: z.array(z.string()),
   value_hinges: z.array(ValueHingeProjectionSchema),
   condition_marks: z.array(ConditionMarkSchema),
+  // DR-139(4): typed loud condition-mark records on the served answer —
+  // each names its subject (an OWED-CHECK-UNEXECUTED record names the battery
+  // row whose owed check has no recorded execution at terminal).
+  condition_mark_records: z.array(z.object({
+    mark: ConditionMarkSchema,
+    scope: z.enum(["answer", "node"]),
+    subject_ref: z.string().min(1),
+    reason: z.string().min(1),
+    lift_path: z.string().nullable()
+  }).strict()),
   reversal_point: z.string().min(1),
   builds_on_previous: z.object({
     value: z.boolean(),

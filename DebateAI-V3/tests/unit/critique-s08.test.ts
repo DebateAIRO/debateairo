@@ -1,3 +1,4 @@
+import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import {
   applyCriticUnavailableCap,
@@ -7,7 +8,8 @@ import {
   computeSymmetryDiff,
   deriveObjectionRecords,
   evaluateMakerAvailability,
-  planBlindVerification
+  planBlindVerification,
+  readDeploymentMakerCapability
 } from "../../packages/critique/src/index.js";
 import {
   BUILT_IN_PROVIDER_ADAPTERS,
@@ -105,6 +107,40 @@ describe("S08 / FX-PRV-01a/01b/02 / FX-C52-04 — maker predicates", () => {
     standingMisconfigurationLimit: 3,
     registerRef: "configuredProviderSet@fixture"
   } as const;
+
+  const singleMakerRegisterPool = {
+    query: async () => ({ rows: [{
+      value_json: {
+        kind: "CONFIGURED_PROVIDER_SET",
+        requiredDistinctMakers: 1,
+        providers: [{
+          providerRef: "provider:mono",
+          adapterKind: "openai-compatible-http",
+          maker: "maker:a"
+        }]
+      },
+      source_ref: "acceptance:DR-137:V-approved"
+    }] })
+  } as unknown as Pool;
+
+  it("admits an honestly declared single-maker deployment at standard tier (DR-137)", async () => {
+    const availability = await readDeploymentMakerCapability(singleMakerRegisterPool, 1);
+
+    expect(availability).toEqual({
+      deploymentMakerCapability: true,
+      configuredMakers: ["maker:a"],
+      registerRef: "configuredProviderSet@1:acceptance:DR-137:V-approved"
+    });
+    expect(() => assertMakerAdmission("standard", availability)).not.toThrow();
+  });
+
+  it("retains the two-maker admission floor for high-stakes runs (DR-137)", () => {
+    expect(() => assertMakerAdmission("high-stakes", {
+      deploymentMakerCapability: true,
+      configuredMakers: ["maker:a"],
+      registerRef: "configuredProviderSet@1:acceptance:DR-137:V-approved"
+    })).toThrowError(expect.objectContaining({ code: "MAKER_INVENTORY_UNSATISFIED" }));
+  });
 
   it("refuses standard+ for standing one-maker capability failure", () => {
     const availability = evaluateMakerAvailability({

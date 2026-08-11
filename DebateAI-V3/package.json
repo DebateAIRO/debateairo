@@ -37,6 +37,7 @@
     "@debateai/budget": "workspace:*",
     "@debateai/api": "workspace:*",
     "@debateai/contract": "workspace:*",
+    "@debateai/critique": "workspace:*",
     "@debateai/db": "workspace:*",
     "@debateai/graph": "workspace:*",
     "@debateai/kernel": "workspace:*",

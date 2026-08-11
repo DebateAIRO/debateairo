@@ -88,7 +88,11 @@ export const CONDITION_MARKS = [
   "NOT_SAMPLED",
   "OFF-SUBJECT-DOWNGRADE",
   "AMENDED-SEARCH",
-  "MISSING-NUMBER"
+  "MISSING-NUMBER",
+  // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed
+  // check has no recorded execution — the run settles and the served answer
+  // names each such check loudly (one condition-mark record per row).
+  "OWED-CHECK-UNEXECUTED"
 ] as const;
 export type ConditionMark = typeof CONDITION_MARKS[number];
 

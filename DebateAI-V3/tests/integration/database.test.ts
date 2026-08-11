@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
-import { BATTERY_EXECUTION_CONTRACTS, createInitialBatteryRows, SplitStageRunner, WorkItemRepository } from "@debateai/battery";
+import {
+  BATTERY_EXECUTION_CONTRACTS,
+  createInitialBatteryRows,
+  readTerminalRecordedFacts,
+  SplitStageRunner,
+  WorkItemRepository
+} from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
 import { RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
@@ -1221,6 +1227,193 @@ describe("apps/runner — legal command lifecycle", () => {
         "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [work.workItemId]
       );
       expect(state.rows[0]).toEqual({ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" });
+    } finally { await provider.stop(); }
+  });
+});
+
+describe("TERM-01 micro-round — run-scoped instrument-certification facts (Grok advisory 1)", () => {
+  it("never attributes another run's instrument certifications to the completing run", async () => {
+    const targetRunId = await createRun("term01-instrument-scope-target");
+    const leakSourceRunId = await createRun("term01-instrument-scope-leak-source");
+    const ledger = new LedgerRepository(database.pool);
+    await ledger.appendRawArtifact({
+      artifactId: "00000000-0000-4000-8000-0000000000a1",
+      attemptId: "00000000-0000-4000-8000-0000000000a2",
+      runId: leakSourceRunId,
+      providerRef: "provider:test",
+      provider: "test-layer-http",
+      model: "fixture/model",
+      maker: "fixture",
+      modelVersion: "fixture-version",
+      rawText: "instrument fixture artifact",
+      metadata: {},
+      parseStatus: "UNPARSED",
+      inputHash: "1".repeat(64),
+      contractHash: "2".repeat(64),
+      contentHash: "3".repeat(64)
+    });
+    const nodeId = await new GraphRepository(database.pool).withGraphWrite(leakSourceRunId, (writer) => writer.addNode({
+      runId: leakSourceRunId,
+      statementText: "An instrumented statement",
+      claimType: "unknown",
+      parentNodeId: null,
+      childKind: null,
+      siblingOrdinal: 0,
+      generationStatus: "complete",
+      pathStatus: "active",
+      explorationDecision: "continue",
+      provenanceRef: "00000000-0000-4000-8000-0000000000a1",
+      wayOfKnowing: "RAN",
+      locator: null,
+      valueLaden: false
+    }));
+    const gateway = await ledger.append({
+      runId: leakSourceRunId,
+      attemptId: "00000000-0000-4000-8000-0000000000a3",
+      actionKind: "MODEL_CALL",
+      callSiteKey: "INSTRUMENT:fixture",
+      subjectItemId: nodeId,
+      stanceAtAction: "UNASSIGNED",
+      outcome: "OK",
+      actorRef: "test-layer:instrument",
+      inputHash: "4".repeat(64),
+      contractHash: "5".repeat(64),
+      rawArtifactRef: "00000000-0000-4000-8000-0000000000a1",
+      startedAt: new Date(),
+      finishedAt: new Date()
+    });
+    const probeIds = {
+      positive: "00000000-0000-4000-8000-0000000000b1",
+      negative: "00000000-0000-4000-8000-0000000000b2"
+    } as const;
+    for (const [polarity, observed, probeId] of [
+      ["POSITIVE", "POSITIVE", probeIds.positive],
+      ["NEGATIVE", "NEGATIVE", probeIds.negative]
+    ] as const) {
+      await database.pool.query(
+        `INSERT INTO evidence.probe_capture (
+           probe_capture_id, run_id, node_id, gateway_ledger_entry_ref, raw_artifact_ref,
+           instrument_ref, expected_polarity, observed_outcome, observation, at_seq
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb, ledger.allocate_sequence())`,
+        [
+          probeId, leakSourceRunId, nodeId, gateway.ledgerEntryId,
+          "00000000-0000-4000-8000-0000000000a1", "fixture:instrument",
+          polarity, observed, JSON.stringify({ fixture: true })
+        ]
+      );
+    }
+    await database.pool.query(
+      `INSERT INTO evidence.instrument_certification (
+         run_id, instrument_ref, positive_probe_capture_ref, negative_probe_capture_ref, outcome, at_seq
+       ) VALUES ($1,$2,$3,$4,'CERTIFIED', ledger.allocate_sequence())`,
+      [leakSourceRunId, "fixture:instrument", probeIds.positive, probeIds.negative]
+    );
+    const leakSourceFacts = await readTerminalRecordedFacts(database.pool, leakSourceRunId);
+    expect(leakSourceFacts.research.instrumentCertificationCount).toBe(1);
+    const targetFacts = await readTerminalRecordedFacts(database.pool, targetRunId);
+    expect(targetFacts.research.instrumentCertificationCount).toBe(0);
+  });
+});
+
+describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-answer segment contract", () => {
+  // The S04 judge-prompt defect class on the COMPOSER organ (live ceremony 4):
+  // the serve gate (packages/serve/src/index.ts:502) is byte-strict — a
+  // reasoning-only answer MUST arrive as segments[0]=hypothesis and
+  // segments[1]=research plan — but the composer system prompt never declared
+  // that contract, so the live model returned fewer segments. The double below
+  // behaves exactly like the live model: it returns the observed
+  // under-segmented shape UNLESS the system prompt declares the contract.
+  const reasoningContractFragments = [
+    "When the supplied nodes rest on reasoning alone",
+    "at least two segments",
+    "first segment states the provisional answer as a hypothesis",
+    "second segment states the research plan"
+  ] as const;
+
+  async function startContractAwareProviderDouble(): Promise<{
+    readonly endpoint: string;
+    composerSystemPrompt(): string;
+    stop(): Promise<void>;
+  }> {
+    let composerSystemPrompt = "";
+    const server: Server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+          messages: readonly { role: string; content: string }[];
+        };
+        const system = body.messages.find((message) => message.role === "system")?.content ?? "";
+        let content: string;
+        if (system.startsWith("Return only one JSON object")) {
+          content = JSON.stringify({
+            statement: "A reasoning-only provisional answer.", way_of_knowing: "REASONING",
+            locator: null, restatement_text: "A reasoning-only provisional answer.",
+            restatement_status: "PASS", value_laden: false,
+            steelman: { summary: "Strongest version.", fidelity: 0.72 },
+            critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+            evidence: { quality: 0.72, relevance: 0.72 },
+            context: { fit: 0.72, ambiguityFlags: [] },
+            fallacy: { severity: 0.28, fatalFlags: [] }
+          });
+        } else if (system.startsWith("Return only JSON with a segments array")) {
+          composerSystemPrompt = system;
+          const contractDeclared = reasoningContractFragments.every((fragment) => system.includes(fragment));
+          content = contractDeclared
+            ? JSON.stringify({ segments: [
+                { segment_id: "segment:hypothesis", text: "Hypothesis: the reasoning answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+                { segment_id: "segment:research-plan", text: "Research plan: gather independent evidence that could lift or defeat the hypothesis.", node_refs: [], served_number_refs: [] }
+              ] })
+            // The live ceremony-4 observation: one verdict segment only.
+            : JSON.stringify({ segments: [
+                { segment_id: "segment:verdict", text: "A reasoning-only provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] }
+              ] });
+        } else if (system.includes("{conforms,findings}")) {
+          content = JSON.stringify({ conforms: true, findings: [] });
+        } else {
+          content = JSON.stringify({ pass: true });
+        }
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+          id: "composer-contract-double", model: "test-layer/model",
+          choices: [{ message: { content } }]
+        }));
+      });
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("TEST_PROVIDER_ADDRESS_FAILED");
+    return {
+      endpoint: `http://127.0.0.1:${address.port}`,
+      composerSystemPrompt: () => composerSystemPrompt,
+      async stop() {
+        server.close();
+        await once(server, "close");
+      }
+    };
+  }
+
+  it("declares the reasoning-only segment contract and settles the answer as hypothesis + research plan", async () => {
+    const provider = await startContractAwareProviderDouble();
+    try {
+      const work = await createRunnerWork("term01-composer-reasoning-contract");
+      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      expect(reasoningContractFragments.every((fragment) => provider.composerSystemPrompt().includes(fragment)))
+        .toBe(true);
+      const answer = await database.pool.query<{ terminal: string; answer_form: { kind: string; hypothesis: string; researchPlan: string } }>(
+        `SELECT answer.terminal, answer.answer_form
+         FROM serve.answer AS answer
+         JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
+         WHERE work.work_item_id = $1`,
+        [work.workItemId]
+      );
+      expect(answer.rows[0]?.terminal).toBe("DOWNGRADED");
+      expect(answer.rows[0]?.answer_form).toEqual({
+        kind: "HYPOTHESIS_WITH_RESEARCH_PLAN",
+        hypothesis: "Hypothesis: the reasoning answer holds provisionally.",
+        researchPlan: "Research plan: gather independent evidence that could lift or defeat the hypothesis."
+      });
     } finally { await provider.stop(); }
   });
 });

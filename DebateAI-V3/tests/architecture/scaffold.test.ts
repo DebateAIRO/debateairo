@@ -34,6 +34,12 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
       "apps/scheduler/src/cli.ts"
     ]));
     expect(reachability.reachableCallables).toContain("WalkingSkeletonRunner.executeWorkItem");
+    // FAIR-01 (DR-140(b)): the runner's counter leg attaches the S02 edge
+    // writer and the P8 operator resolver in production; the S08 packet
+    // organs stay unattached under DR-141(4)'s Q42 refusal law.
+    expect(reachability.reachableCallables).toContain("GraphWriter.addEdge");
+    expect(reachability.reachableCallables).toContain("resolveScoringOperator");
+    expect(reachability.reachableCallables).not.toContain("CritiqueRepository.recordCritiquePacket");
     expect(reachability.reachableCallables).not.toContain("WalkingSkeletonRunner.executeValueOverlay");
     expect(reachability.reachableCallables).not.toContain("buildValueOverlay");
     expect(reachability.reachableCallables).not.toContain("serveMixedAnswer");
@@ -90,8 +96,6 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
     expect(report.neverCalled).toEqual(expect.arrayContaining([
       expect.objectContaining({ package: "packages/kernel.exhaustive" }),
       expect.objectContaining({ package: "packages/graph.constructEdge" }),
-      expect.objectContaining({ package: "packages/graph.GraphWriter.addEdge" }),
-      expect.objectContaining({ package: "packages/register.resolveScoringOperator" }),
       expect.objectContaining({ package: "packages/judgement.runJudgePanel" }),
       expect.objectContaining({ package: "packages/judgement.measureDispersion" }),
       expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount" }),

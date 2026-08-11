@@ -454,3 +454,343 @@ supersedes | status`.
   V-gate on git, reachability-attachment + the 4 killed defect classes,
   gate-before-diamond, dual-greenlight). Day mode resumes only on V's word. |
   supersedes DR-124 while active | night ledger; morning report | — | ACTIVE
+
+- **DR-132** | 2026-08-09 | V-RULINGS (morning sitting, three of four NQ
+  answered; NQ-1 held open at V's word "wait a bit") | the morning ledger |
+  (1) **NQ-2 EXECUTED**: V moved the V3 workspace INTO the V2 repo
+  (DebateAIRO/DebateAI-V3) and authorized commit + push to origin/dev — the
+  V-gate lifted by V's explicit word for this act. Committed on `dev`: 513
+  files, ~158k lines (node_modules/.next ignored; the nested V3 .git
+  PRESERVED at ~/Documents/DebateAI-V3-history.git, founding commit e32de26
+  intact). Push pending V's GitHub credentials (none stored on machine;
+  orchestrator does not handle tokens). **PATH LAW: the workspace is now
+  /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3 — all loop tooling
+  paths update accordingly.** (2) **NQ-3**: the dev-runner ticket is NOT cut
+  now — V: "anything docker-dependent is not in scope... at a later date,
+  after we get a functional prototype." Orchestrator note for the acceptance
+  day: the DR-126 pass can drive the tested runner execute path via a
+  supervised one-shot ceremony script (an acceptance mechanism, not new
+  product scope) — to be confirmed with V then. (3) **NQ-4**: the Docker
+  phase runs AFTER the acceptance pass, as deploy-prep. (4) **NQ-1 model
+  runtime: OPEN** — V will decide; the acceptance pass waits on it. | binds
+  the endgame sequence: S14 visual gate → S15 → NQ-1 runtime → acceptance
+  pass → Docker phase | repo dev branch; night ledger | — | ACTIVE
+
+- **DR-133** | 2026-08-09 | V-RULING (acceptance sitting) | V approved the
+  ACCEPTANCE-REGISTER-DRAFT wholesale ("Approve draft as-is, build it") and
+  authorized the DR-126 acceptance harness | **THE ACCEPTANCE VALUE-SET IS
+  RULED** at register version 1, source_ref `acceptance:DR-133:V-approved`:
+  deployment risk tier = **standard**; claimTypeCompositionMap = the minimal
+  evidence-aware map (unknown→EVIDENCE_AWARE, steelman_fidelity coeff 1,
+  clarityDecay 0.1, ladder [PROVISIONAL]); wayOfKnowingCeiling = reasoning≥0.5
+  → CAPPED band (default FULL); runCostEnvelope (maxAttempts 3, tokenCeiling
+  2048, deadlineMs 60000 — generous for CLI latency); compositionBundleBudget
+  low/medium/high = 10k/20k/30k; convergenceEpsilon 0.001; convergenceStop
+  defaults minimal; livenessPolicy standard (review 7d/retire 180d); contract
+  hashes = real sha256 of each shipped organ contract. **These are ACCEPTANCE
+  values for the prototype demo — a full production value sitting may revise
+  them.** Plus the acceptance harness AUTHORIZED: a standing embedded-Postgres,
+  an acceptance API boot with a NO-OP Dispatcher (no Hatchet/Docker — DR-121
+  intact), a codex-CLI OpenAI-compatible shim (real GPT-5.6 Sol judge; lineage
+  = OpenAI never "shim"; DR-115-legal real artifact), and a one-shot ceremony
+  driving the tested WalkingSkeletonRunner.execute(). Not production product
+  code — an acceptance mechanism. | unblocks the UI + the first real debate |
+  acceptance/ folder | — | ACTIVE
+
+| DR-134 | 2026-08-09 | V (chat, "we are not on night mode no more") | **DAY
+  MODE RESTORED — supersedes DR-131 night mode #3.** Questions go DIRECT to V
+  in chat; every ticket event reported live in chat; the loop-protocol night
+  section is inactive (ledger wins). NIGHT-QUESTIONS files stay as records;
+  no new entries. DR-123 continuous flow and all coding laws unchanged. |
+  restores direct V contact for the ACC-01 cycle | mode only | — | ACTIVE
+
+| DR-135 | 2026-08-09 | V (chat, "we go for A since that evaluator only
+  breaks them") | **TERMINAL WAIT DRAIN — REFUSING EVALUATOR for the
+  acceptance pass.** ACC-01 ships an acceptance-only evaluator that resolves
+  NOTHING: zero outstanding WAIT rows → run settles honestly; ANY outstanding
+  WAIT row → typed loud failure, run stays unsettled, the row keeps its WAIT
+  state in the ledger untouched. Blanket-INACTIVE explicitly REJECTED (it
+  fabricates predicate outcomes — the DR-115 class). The REAL terminal
+  activation evaluator (checks each parked row's trigger against the run's
+  actual evidence at completion) is PRODUCT work — cut as follow-up ticket
+  TERM-01, entry after ACC-01 + a V design sitting. | unblocks the ACC-01
+  ceremony without touching production or fabricating | acceptance/ +
+  board TERM-01 | — | ACTIVE
+
+| DR-136 | 2026-08-09 | V (chat, "approved for now") | **convergenceStopDefaults
+  MEMBERS RULED (provisional).** Row value: { kind: CONVERGENCE_STOP_DEFAULTS,
+  members: { maxRounds: 3, stopWhenDeltaBelowEpsilon: true } }; source_ref
+  acceptance:DR-136:V-approved. Members are inert today (no shipped organ
+  reads them); the full DR-023 stop-parameter sitting REMAINS OPEN and may
+  revise this row at a later register_version. | seals the acceptance
+  register; unblocks ACC-01 seeding | register row only | — | ACTIVE
+
+| DR-137 | 2026-08-09 | V (chat, "questions should be able to run with a single
+  model as well... maybe people will want a mono-model run"; "approve both for
+  now") | **MONO-MODEL RUNS LAWFUL.** The deployment maker-capability register
+  row records the HONEST maker count (hardcoded capability literals banned);
+  single-maker admission passes for casual and standard tiers; the >=2-maker
+  anti-monoculture floor survives for high-stakes only. Answer lineage already
+  names the judging maker — a mono-model answer is visibly mono-model, never
+  hidden. Shipped admission (packages/critique) gets the narrowly authorized
+  tier-aware edit; diamond re-reviews the production diff. | legalizes the
+  single-maker acceptance pass + the mono-model product mode | critique
+  admission + capability row | — | ACTIVE
+
+| DR-138 | 2026-08-09 | V (chat, "approve both for now") | **RUN-LEVEL MODEL-
+  CALL TOTAL = 9** (provisional; DR-023/value sitting may revise). The enforced
+  run budget max_model_attempts is a RULED register value with TRUE provenance
+  acceptance:DR-138:V-approved — never a synthesized sum stamped with borrowed
+  provenance (the B3 class). | seals the enforced budget lawfully | register
+  row only | — | ACTIVE
+
+| DR-121-r | 2026-08-09 | V (chat, "just defer docker and hatchet for now and
+  lets see the thing working") | **DR-121 REAFFIRMED** — Docker/Hatchet stay
+  deferred through the acceptance pass; priority is the live debate rendering.
+  | keeps the env tail out of the critical path | — | — | ACTIVE
+
+| DR-139 | 2026-08-09 | V (chat, "okay" to the enumerated plan; "create those
+  nice tickets") | **TERM-01 DESIGN RULED (provisional, recommendations
+  adopted; V may reverse any of the four).** (1) The terminal evaluator
+  consults RECORDED run facts only (ledger + DB) — no model calls decide
+  activation. (2) A predicate input genuinely unavailable at terminal → typed
+  loud refusal; the run stays unsettled. (3) Behavior is risk-tier-invariant
+  for the prototype. (4) A predicate TRUE at terminal (check owed execution)
+  → the run SETTLES with typed loud condition marks naming every
+  owed-but-unexecuted check on the served answer (option ii); executing owed
+  checks at terminal is the production follow-up, out of TERM-01. |
+  unblocks the terminal evaluator build | TERM-01 | — | ACTIVE
+
+| DR-140 | 2026-08-09 | V (chat, "prompt claude to code it with Grok using
+  only the coding loop"; "I want the debate to have more than one node and
+  one model") | **ROSTER EDIT + FAIR-DEBATE REQUIREMENT.** (a) For the
+  fair-debate lane (TERM-01, FAIR-01, FAIR-02, POL-01): CLAUDE worker
+  instances CODE (spawned workers, never the orchestrator seat); GROK is the
+  review lens; the standing coding-loop mechanics (tickets, claims, TDD,
+  gates, review-before-done, git V-gated) bind unchanged. Supersedes the
+  DR-120 Codex+dual-lens pairing FOR THIS LANE ONLY. (b) REQUIREMENT: a real
+  acceptance debate must contain MORE THAN ONE NODE in its answer graph (a
+  genuine counter-position at minimum) and MORE THAN ONE MODEL MAKER with
+  honest lineage (second maker = Claude Code CLI relay, maker Anthropic,
+  per V's NQ-1 transport choice). | fairness of the first real debate |
+  roster + FAIR tickets | — | ACTIVE
+
+| DR-141 | 2026-08-09 | V (chat, "okay ratify all 6") | **TERM-01 SIX
+  RATIFICATIONS.** (1) Completion-declaration channel RATIFIED: the four
+  serve/settle-stage inputs (Q59/Q36/Q38/terminality) read the completing
+  runner's about-to-persist state — drain lawfully precedes persist because
+  the fail-closed trigger refuses TERMINAL over surviving WAIT. (2) Knob-10
+  fallback label RIDES the served answer whenever consulted (visible
+  honesty). (3) livenessPolicy canonical shape = the SHIPPED reader's
+  classes{}; acceptance seed aligns. (4) Q37/Q42 recording gaps stay parked:
+  runs needing them REFUSE until a ruled migration. (5) Q56: nonzero class
+  history with no ruled sufficiency threshold REFUSES until V rules the
+  threshold row. (6) Kernel mint OWED-CHECK-UNEXECUTED CONFIRMED (closed
+  vocabulary 22→23). | closes the TERM-01 sitting | evaluator + seed | — |
+  ACTIVE
+
+| DR-142 | 2026-08-09 | V (chat, "approve the normative") | **NORMATIVE
+  COMPOSITION ENTRY RULED.** claimTypeCompositionMap gains: "normative":
+  { branch EVIDENCE_AWARE, clarityDecayPerAmbiguity 0.1, terms
+  [steelman_fidelity coeff 1], caps [], uncertaintyLadder [atMost 1 →
+  PROVISIONAL] } — identical in shape and numbers to the V-approved unknown
+  entry; provenance acceptance:DR-142:V-approved. Provisional pending the
+  full 8-type map sitting. | unblocks composition for should-questions; last
+  value gap before first settled debate | register row | — | ACTIVE
+
+| DR-143 | 2026-08-10 | V (UI question card: logged in / keep 1 / CLI default
+  / acceptable) | **FAIR-02 CONFIRMATIONS.** (1) Deployment
+  requiredDistinctMakers STAYS 1 — DR-137 governs ADMISSION (mono-model
+  lawful casual/standard); DR-140(b)'s more-than-one-maker requirement is
+  RUN-LEVEL fair-debate law enforced by FAIR-01 on the real debate, not a
+  deployment floor (so one CLI being down never bricks every run).
+  (2) The Anthropic relay runs the claude CLI's CONFIGURED DEFAULT model (no
+  --model pin); lineage records whatever the CLI reports it actually ran.
+  (3) The one-call startup handshake (liveness + honest model id, loud refusal
+  on a dead/unauthenticated CLI) is RATIFIED at ceremony boot. V confirmed
+  claude CLI login for the live gate. | closes FAIR-02's sitting | relay +
+  register | — | ACTIVE
+
+| DR-144 | 2026-08-10 | V (UI question card: "accumulate") | **scoringOperator
+  (DR-074) RULED = `accumulate`** (provisional pending the DR-023 sitting).
+  Multiple attacks on one node compound; the worker proved both candidate
+  operators numerically identical for the current 2-node/1-edge shape, so the
+  choice only diverges on richer graphs. Seed with provenance
+  `acceptance:DR-144:V-approved`; fresh acceptance data directory required
+  (register content change → ACCEPTANCE_REGISTER_CONFLICT guard). | unblocks
+  strength propagation across the FAIR-01 attack edge | register row | — |
+  ACTIVE
+
+| DR-145 | 2026-08-10 | V (UI question card + "the same structure as V2
+  should've been kept, including the UI and its design") | **S14 HUMAN VISUAL
+  GATE: REJECTED.** V's verdict on the ten mockup reviews S14 requested: the
+  kept-surface requirement was NOT met — V2's debate workspace (canvas +
+  viewport, tree, thread, split, map, outline, focus view, synthesis panel,
+  challenge popover, investigation drawer, guide, toasts; 22 components /
+  4,260 lines) was replaced by a 5-component / 126-line reading surface, and
+  must be restored along with V2's design. FINDING OF FACT: those components
+  were never committed under DebateAI-V3/web (S14 replaced the copied folder
+  pre-commit); the pristine originals remain at
+  apps/dialectical-engine/web in this repo. SEQUENCE RULED BY V: V re-copies
+  the V2 UI folder into V3 personally; the loop then cuts a smaller ticket
+  that ports the placed components onto V3 contract types and wires them to
+  the V3 API. S14 stays in review until the restored surface passes V's eye.
+  | the UI restoration lane | web/ | — | ACTIVE
+
+| DR-146 | 2026-08-10 | V (UI question card, during the loop pause) | **UI-01
+  VISUAL-GATE RULINGS (3 of 3; the S14 disposition question was returned for
+  explanation).** (1) CANVAS: pull in the NEWER `CanvasViewport` +
+  `DebateCanvas` from apps/dialectical-engine/web — the repo's V2 supersedes
+  the older snapshot V copied; DR-145's "design authority" now means V2 AS IN
+  THIS REPO, and the 117-line DebateCanvas divergence is accepted. (2) TITLE
+  CRUSH: add a responsive OVERFLOW MENU collapsing less-used top-bar controls
+  below a width threshold so the question stays readable (the newer V2
+  behaviour). (3) DEAD ACTIONS: V2-only mutations (regenerate, scoring
+  feedback, settings write, adaptive-depth approval) stay VISIBLE but VISIBLY
+  DISABLED — greyed with a tooltip naming the missing V3 capability; no
+  refusal dialog, and never a fake success. Work is queued, NOT dispatched:
+  the loop is paused at V's word. | UI-01 rework scope on resume | v2-ui | — |
+  ACTIVE
+
+| DR-147 | 2026-08-10 | V (UI question card) | **S14 CLOSED AS SUPERSEDED; S15
+  UNBLOCKED.** S14's surface was rejected (DR-145) and replaced by UI-01; its
+  data layer (generated contract types replacing the 823-line hand-mirror,
+  single typed client + SSE front door, S05 asker-scoped reads, honesty
+  renderers) STANDS and carries everything built since. The ten mockup reviews
+  it requested are moot — V ruled on the restored surface instead. S15's
+  "S14 green" ENTRY CONDITION IS DISCHARGED; S15 is dispatchable at V's word.
+  | closes the last review-limbo ticket | board | — | ACTIVE
+
+| DR-148 | 2026-08-10 | V (UI card, during the pause: "no debate [depth work]
+  for now. I wanna know If judges get called, I wanna make the scoring visible
+  once again, the model tags visible once again, and I wanna see how each new
+  node is reviewed by yet another model") | **FOUR REQUIREMENTS RECORDED; NO
+  DISPATCH (pause holds).** (1) DEPTH: budget work DEFERRED by V — the
+  register still rules only {standard, depth 1, 9 calls}; the /new form's Tree
+  depth defaults to 3 and any depth != 1 is lawfully REFUSED
+  (RUN_COST_ENVELOPE unresolved member). The form default is therefore a known
+  trap — flag on resume. (2) JUDGES: ANSWERED FROM THE LEDGER for run
+  8d2b4e5a — 8 artifacts decode by contract_hash as JUDGE x2 (OpenAI on the
+  position, Anthropic on the counter), COMPOSER x2 (one recompose), CONFORMANCE
+  x4, all OpenAI. Judges ARE called, once per node, by different houses; NO
+  node is judged twice. (3) SCORING VISIBLE: the contract exposes per-node
+  base_score + final_strength, but apps/v2-ui/lib/v3/adapter.ts carries NEITHER
+  to the node cards — same defect class as the missing maker tags. Folded into
+  UI-02. (4) CROSS-MODEL NODE REVIEW: V wants each new node visibly reviewed by
+  a SECOND model. That capability does not exist — new ticket XREV-01 (engine +
+  UI), cut ready, NOT dispatched. | requirements record for resume | UI-02 +
+  XREV-01 | — | ACTIVE
+
+| DR-149 | 2026-08-11 | V (UI question card + follow-up: "The question stays
+  neutral. There should always be defenders giving 'Pro' arguments that find
+  good things about the question" / "each node needs its own Pro and Cons") |
+  **DEBATE SHAPE RULED; UI-02 SPLIT; PAUSE LIFTED FOR THIS LANE.**
+  (1) THE QUESTION CARD STAYS NEUTRAL — the root carries the question line and
+  takes NO stance badge. V explicitly REJECTED the offered projection fix
+  (labelling the opening position PRO relative to the question) and the
+  graph-shape fix (making the question a node with support edges).
+  (2) EVERY NODE GETS ITS OWN PRO AND CONS — PRO cards must come from REAL
+  defender nodes joined by real `support` edges, never from relabelling an
+  existing node. This is a new capability: a DEFENDER leg symmetric to
+  FAIR-01's critic leg, applied per node rather than once per run. Cut as
+  PRO-01 (engine + UI), NOT dispatched.
+  COST COLLISION FLAGGED AT CUT TIME: the register rules exactly one envelope,
+  {standard, depth 1, 9 attempts}, and the FAIR-01 run already consumed 8. One
+  defender per node cannot fit. Under AC-76/DR-039 the worker MUST stop loudly
+  and put the required number to V rather than pick one; PRO-01 is therefore
+  blocked on a V-ruled envelope row, not on code.
+  (3) UI-02 SPLIT ON A CONTRACT BOUNDARY. UI-02a (scores) is adapter-only —
+  NodeSchema already carries base_score + final_strength and the adapter
+  ignores both, plus the "Scoring unavailable" banner misstates V3's
+  capability. DISPATCHED at V's word ("Scores now"). UI-02b (maker
+  attribution) carries a CHANGE TO THE SERVED CONTRACT — NodeSchema is
+  `.strict()` with no maker/model field, and the maker exists only in
+  ledger.raw_artifact behind each node's provenance_ref — so it becomes its
+  own ticket, so that a served-contract edit gets its own review rather than
+  riding along inside UI work. This corrects DR-148(3), which folded both into
+  one ticket on the assumption that both were adapter-only.
+  | V's product ruling on what a debate must look like, plus an honest resize
+  of UI-02 once the contract was read | PRO-01 + UI-02a + UI-02b | — | ACTIVE
+
+| DR-150 | 2026-08-11 | V ("The question in its own should be debated by all
+  the models engaged in the conversation, and that's where we launch opinions.
+  does V3 do this? or did you skip when making the tickets?") | **REQUIREMENT
+  RECORDED + ORCHESTRATOR GAP ADMITTED. Answer: NO on both counts.**
+  (1) V3 DOES NOT DO THIS. apps/runner/src/index.ts calls ONE judge (line 347,
+  callSiteKey "JUDGE") plus FAIR-01's ONE critic (line 456, "JUDGE:critic").
+  One opinion, one counter — never a panel.
+  (2) THE ORCHESTRATOR DID SKIP IT. Neither PRO-01 (per-node pro/con), nor
+  XREV-01 (a second model reviewing a node), nor UI-02a/b (display) makes every
+  engaged maker weigh in on the QUESTION. New ticket PANEL-01, blocked.
+  (3) THE MACHINERY IS BUILT AND HONESTLY DECLARED DORMANT. runJudgePanel
+  (packages/judgement/src/s04.ts:224) is a real multi-member panel carrying the
+  FX-HR-H6 independence law PRODUCER_GRADING_FORBIDDEN — a maker may never
+  grade the artifact it produced. tools/orphan-audit REGISTERS it and three
+  siblings as intentional never-called surfaces awaiting "panel routing":
+  measureDispersion (production persists null), applyCorrelatedErrorDiscount
+  (awaits multi-member routing), applyDeclaredDisagreement (production records
+  truthful NOT_MEASURED). Nothing was faked — the audit names the gap in its
+  own words. One ticket lights up all four, and must refresh those audit rows.
+  (4) A DISTINCTION V MUST RULE, NOT THE WORKER: the shipped panel has N models
+  GRADE one artifact and measures where they diverge. V's sentence also reads
+  as each model LAUNCHING ITS OWN position on the question — N independent root
+  positions — which the panel's primary+members shape does not produce. Both
+  readings, with their real costs, go to V before either is built.
+  (5) BLOCKED on the same envelope ruling as PRO-01, and it COMPOUNDS with it:
+  every extra maker on the question is at least one more model call, multiplied
+  by per-node PRO+CON. | closes a real hole in the orchestrator's own ticket
+  set, found by V's question | PANEL-01 (+ compounds PRO-01) | — | ACTIVE
+
+| DR-151 | 2026-08-11 | V (UI question card) | **ALL EIGHT CLAIM TYPES NOW
+  CARRY A RATIFIED COMPOSITION.** A live run died with COMPOSITION_UNRESOLVED
+  ("No ratified composition for mixed") because claimTypeCompositionMap held
+  only 2 of the 8 CLAIM_TYPES, and the classifier picks the type PER RUN — the
+  same default question landed on `normative` in August 10's run and `mixed`
+  today, so a partially-filled map is a coin flip that halts the ceremony.
+  V ratified the six missing members — empirical, causal, definitional,
+  prediction, comparative, mixed — each with the SHAPE ALREADY RULED for
+  `normative` in DR-142: branch EVIDENCE_AWARE, clarityDecayPerAmbiguity 0.1,
+  terms [steelman_fidelity x 1], caps [], ladder [atMost 1 -> PROVISIONAL].
+  V RULED THIS KNOWING THE CONSEQUENCE, which is recorded here so nobody later
+  mistakes it for modelling: because all eight entries are IDENTICAL, claim
+  type has NO differential effect on scoring. This ENDS THE WALL; it does not
+  model the types. Real per-type compositions remain a future V sitting.
+  Guard added in the same pass: acceptance/seed-register.test.ts now asserts
+  the map is CLOSED over CLAIM_TYPES, so adding a claim type to the vocabulary
+  without a ruled composition fails loudly instead of at run time.
+  V also ruled the data-dir disposition: `acceptance/.pgdata` was BACKED UP to
+  `.pgdata-backup-2026-08-11` (68M) before the register change forced a fresh
+  seed, so the two superseded debates stay recoverable by swapping it back.
+  | a register gap that halts any run whose claim type was never ruled |
+  acceptance/seed-register.ts + its byte-faithful test | — | ACTIVE
+
+| DR-152 | 2026-08-11 | Orchestrator (ON PRECEDENT, PENDING V'S RATIFICATION) |
+  **THE ANTHROPIC MAKER NOW ASKS THE CLI FOR `opus`.** With V's login restored
+  the relay still refused: the CLI's DEFAULT model is Fable 5 and it returned
+  api_error 429 "You've reached your Fable 5 limit" — a quota wall, not a
+  defect. Opus 5 and Sonnet 5 were both verified live; `opus` was chosen on the
+  precedent of V's earlier WORKER CONTINUITY OVERRIDE for Fable exhaustion.
+  This is an ALIAS REQUEST, not a lineage claim — the recorded maker model is
+  still only ever the id the CLI reports back in `modelUsage` (DR-115), and
+  zero-or-several reported models remains a loud refusal. WHICH house model
+  plays the Anthropic maker is a roster value and therefore V's; recorded here
+  for ratification or reversal. | the ceremony cannot boot on an exhausted
+  default model | acceptance/claude-relay.ts | — | PENDING V
+
+| DR-153 | 2026-08-11 | V (/heartbeat-protocol /goal: "only the coding loop.
+  you orchestrate as Opus 5, use other Opus 5 subagents for reviews alongside
+  Grok Reviewers, Codex Codes. we need this fixed") | **ROSTER EDIT — THE
+  CODEX LANE IS BACK, WITH THE FULL DUAL DIAMOND.** Loop ownership for this
+  lane: PROGRAMMING ONLY (no requirements/architecture/QA loop is opened).
+  Seats: Fable/Opus 5 ORCHESTRATES (routing only — no verdicts, no board
+  review-state mutation, per spine §5.1); **CODEX IMPLEMENTS**; reviews are
+  the DUAL DIAMOND — an Opus 5 subagent lens AND a Grok reviewer, BOTH must
+  greenlight before done. This SUPERSEDES DR-140's per-lane arrangement
+  (Claude worker codes, Grok sole lens) for work dispatched from here on;
+  DR-140 governed the fair/UI lane and its completed tickets stand.
+  First dispatch under this roster: EXEC-01 (`t_6fae713b`, retitled to
+  `[Codex]` so the standing poll loop in CODING-LOOP-PROTOCOL.md §1 matches
+  it), launched in a visible Terminal window per the v3.2.0 visible-launch
+  law with the goal packet OFF argv at
+  `goal-packets/EXEC-01-codex-goal.md`. | V wants the debate-start blocker
+  fixed and named the seats | EXEC-01 and every ticket after it | — | ACTIVE

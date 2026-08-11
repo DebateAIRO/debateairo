@@ -1,0 +1,291 @@
+import {
+  ContractHttpError,
+  createContractClient,
+  type Answer,
+  type AskRequest,
+  type ContractClient
+} from "@debateai/contract";
+import type {
+  DebateAdaptiveDepthApprovalRequest,
+  DebateAdaptiveDepthApprovalResponse,
+  DebateAdaptiveDepthDryRunResponse,
+  DebateDetail,
+  DebateScoringResponse,
+  Generation,
+  ScoringFeedbackResponse,
+  ScoringFeedbackVote,
+  WorkerStatus
+} from "./types.js";
+import {
+  adaptiveDepthUnavailable,
+  debateDetailFromAnswer,
+  scoringUnavailable,
+  settingsViewFromDeployment,
+  runCostEnvelopeFromDeployment,
+  workersFromDeployment,
+  type RunCostEnvelopeView,
+  type SettingsView
+} from "./v3/adapter.js";
+
+/**
+ * UI-01 (DR-145): V2's browser data access, swapped onto V3's typed contract
+ * client. Same-origin by default — the browser only ever talks to this app's
+ * own /api proxy (ACC-01 rev-3 pattern); the acceptance upstream is a
+ * server-only concern. Cross-origin-capable bases are rejected loudly at
+ * import time.
+ */
+
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
+
+function normalizeSameOriginApiPath(apiBase: string): string {
+  const normalized = apiBase.trim().replace(/\/+$/, "");
+  // Rev-3 advisory A1: the WHATWG URL parser treats "\" as "/" for special
+  // schemes, so any backslash form ("/\evil.test") can escape the origin.
+  // Refuse every backslash outright, refuse ".." path escapes, then prove the
+  // survivor stays on a sentinel origin by round-tripping it.
+  if (normalized.length === 0 || normalized.includes("\\")) {
+    throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
+  }
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
+  }
+  if (normalized.split("/").some((segment) => segment === "..")) {
+    throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
+  }
+  let resolved: URL;
+  try {
+    resolved = new URL(`${normalized}/origin-probe`, "http://sentinel.invalid");
+  } catch {
+    throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
+  }
+  if (resolved.origin !== "http://sentinel.invalid") {
+    throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
+  }
+  return normalized;
+}
+
+/**
+ * Rewrites contract-client URLs onto the same-origin proxy path. Rev-3
+ * advisory A4: a Request input would silently drop method, headers, and body
+ * under rewriting, so it is refused loudly instead of forwarded wrong.
+ */
+export function createSameOriginFetch(
+  apiBase: string,
+  fetchImplementation: typeof fetch = fetch
+): typeof fetch {
+  const sameOriginApiPath = normalizeSameOriginApiPath(apiBase);
+  return ((input, init) => {
+    if (input instanceof Request) {
+      return Promise.reject(
+        new Error("PROXY_FETCH_REQUEST_INPUT_UNSUPPORTED: pass a URL plus init so method, headers, and body forward faithfully")
+      );
+    }
+    const contractUrl = new URL(String(input));
+    return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init);
+  }) as typeof fetch;
+}
+
+export function createBrowserContractClient(
+  fetchImplementation: typeof fetch = fetch,
+  apiBase: string = API_BASE
+): ContractClient {
+  const contractOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  return createContractClient(contractOrigin, createSameOriginFetch(apiBase, fetchImplementation));
+}
+
+export const contractClient: ContractClient = createBrowserContractClient();
+
+const TOKEN_KEY = "debateai:user-dev-token";
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TOKEN_KEY, token);
+  // Raw cookie name, encoded value — the exact S14 browser-proven pattern
+  // (web/lib/api.ts); the SSR pages read the same name via next/headers.
+  document.cookie = `${TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
+}
+
+export function clearStoredToken(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TOKEN_KEY);
+  document.cookie = `${TOKEN_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function requireToken(token?: string | null): string {
+  const resolved = token ?? getStoredToken();
+  if (resolved === null || resolved.length === 0) {
+    throw new ContractHttpError("SESSION_REQUIRED", 401, "Every V3 read is asker-scoped; unlock actions with your dev token first.");
+  }
+  return resolved;
+}
+
+export function isNotFound(failure: unknown): boolean {
+  return failure instanceof ContractHttpError && failure.code === "NOT_FOUND";
+}
+
+/** readSession proves the token names a real asker identity (S05). */
+export async function validateUserToken(token: string, client: ContractClient = contractClient): Promise<void> {
+  await client.readSession(token);
+}
+
+export type DebateBundle = { answer: Answer; detail: DebateDetail };
+
+/**
+ * Reads a debate by answer id, falling back to the run projection so both
+ * /debate/{answer_id} and /debate/{run_ref} routes resolve (S14 pattern).
+ */
+export async function getDebateBundle(
+  id: string,
+  token: string,
+  client: ContractClient = contractClient
+): Promise<DebateBundle> {
+  let answer: Answer;
+  try {
+    answer = await client.readAnswer(id, token);
+  } catch (failure) {
+    if (!isNotFound(failure)) throw failure;
+    answer = await client.readRunAnswer(id, token);
+  }
+  return { answer, detail: debateDetailFromAnswer(answer) };
+}
+
+export async function getDebate(id: string, client: ContractClient = contractClient): Promise<DebateDetail> {
+  const bundle = await getDebateBundle(id, requireToken(), client);
+  return bundle.detail;
+}
+
+/**
+ * DR-115 typed absence: V3 has no per-node scoring resource. The V2 scoring
+ * surfaces receive their own "unavailable" state with an honest reason —
+ * never a fabricated score payload, never a masked network call.
+ */
+export function getDebateScoring(id: string): Promise<DebateScoringResponse> {
+  return Promise.resolve(scoringUnavailable(id));
+}
+
+export function getDebateAdaptiveDepthDryRun(id: string): Promise<DebateAdaptiveDepthDryRunResponse> {
+  return Promise.resolve(adaptiveDepthUnavailable(id));
+}
+
+export function approveDebateAdaptiveDepthExpansion(
+  _id: string,
+  _payload: DebateAdaptiveDepthApprovalRequest,
+  _token: string
+): Promise<DebateAdaptiveDepthApprovalResponse> {
+  return Promise.reject(new Error("V3_HAS_NO_ADAPTIVE_DEPTH_APPROVALS: V3 exposes no adaptive-depth approval resource."));
+}
+
+export function submitScoringFeedback(
+  _debateId: string,
+  _nodeId: string,
+  _vote: ScoringFeedbackVote,
+  _token: string
+): Promise<ScoringFeedbackResponse> {
+  return Promise.reject(new Error("V3_HAS_NO_SCORING_FEEDBACK: V3 exposes no scoring-feedback resource."));
+}
+
+export function regenerateNode(_nodeId: string, _token: string, _modelId?: string): Promise<{ job_id: string }> {
+  return Promise.reject(new Error("V3_HAS_NO_NODE_REGENERATION: V3 exposes no node-regeneration resource."));
+}
+
+export function nodeGenerations(_nodeId: string, _token: string): Promise<Generation[]> {
+  return Promise.reject(new Error("V3_HAS_NO_GENERATION_HISTORY: V3 exposes no generation-history resource."));
+}
+
+export async function backendStatus(
+  token?: string | null,
+  client: ContractClient = contractClient
+): Promise<WorkerStatus[]> {
+  const deployment = await client.readDeployment(requireToken(token));
+  return workersFromDeployment(deployment);
+}
+
+export async function getSettingsView(
+  token: string,
+  client: ContractClient = contractClient
+): Promise<SettingsView> {
+  return settingsViewFromDeployment(await client.readDeployment(token));
+}
+
+export async function getRunCostEnvelope(
+  token: string,
+  client: ContractClient = contractClient
+): Promise<RunCostEnvelopeView> {
+  return runCostEnvelopeFromDeployment(await client.readDeployment(token));
+}
+
+export function saveSettings(): Promise<never> {
+  return Promise.reject(new Error("V3_HAS_NO_SETTINGS_WRITE: deployment configuration is register-governed, not UI-writable."));
+}
+
+type AskConfig = Record<string, unknown>;
+
+function requiredString(config: AskConfig, key: string): string {
+  const value = config[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`ASK_FIELD_REQUIRED: ${key} must be supplied explicitly; the UI invents no ask values.`);
+  }
+  return value.trim();
+}
+
+function requiredInteger(config: AskConfig, key: string, minimum: number): number {
+  const value = config[key];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < minimum) {
+    throw new Error(`ASK_FIELD_REQUIRED: ${key} must be an explicit whole number; the UI invents no ask values.`);
+  }
+  return value;
+}
+
+function optionalLines(config: AskConfig, key: string): string[] {
+  const value = config[key];
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value) && value.every((line): line is string => typeof line === "string")) {
+    return value.filter((line) => line.trim().length > 0);
+  }
+  throw new Error(`ASK_FIELD_REQUIRED: ${key} must be a list of lines when supplied.`);
+}
+
+const RISK_TIERS = new Set(["casual", "standard", "high-stakes"]);
+const BUDGET_TIERS = new Set(["low", "medium", "high"]);
+
+/**
+ * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
+ * contract value is explicit input — no hidden defaults, no invented
+ * numbers). Missing or malformed fields fail loudly before any network call.
+ */
+export async function createDebate(
+  topic: string,
+  config: AskConfig,
+  token: string,
+  client: ContractClient = contractClient
+): Promise<{ id: string }> {
+  const riskTier = requiredString(config, "risk_tier");
+  if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
+  const budgetTier = requiredString(config, "composition_budget_tier");
+  if (!BUDGET_TIERS.has(budgetTier)) throw new Error("ASK_FIELD_REQUIRED: composition_budget_tier must be low, medium, or high.");
+  const asOf = new Date(requiredString(config, "as_of"));
+  if (Number.isNaN(asOf.valueOf())) throw new Error("ASK_FIELD_REQUIRED: as_of must be an explicit date and time.");
+  const ask: AskRequest = {
+    question_line: topic,
+    risk_tier: riskTier as AskRequest["risk_tier"],
+    tier_source: "ASKER",
+    tier_provenance_ref: "asker:ui-selection",
+    composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
+    depth_params: { depth: requiredInteger(config, "depth", 0) },
+    agent_count: requiredInteger(config, "agent_count", 1),
+    decision_owner: requiredString(config, "decision_owner"),
+    action_owner: requiredString(config, "action_owner"),
+    decision_scope: requiredString(config, "decision_scope"),
+    caller_scope: "ASKER",
+    as_of: asOf.toISOString(),
+    steering_presets: optionalLines(config, "steering_presets"),
+    steering_annotations: optionalLines(config, "steering_annotations")
+  };
+  const accepted = await client.submitAsk(ask, token);
+  return { id: accepted.run_ref };
+}

@@ -27,6 +27,7 @@ export type AnswerSurfaceProjection = Readonly<{
   residualObjections: Answer["residual_objections"];
   valueHinges: Answer["value_hinges"];
   conditionMarks: Answer["condition_marks"];
+  conditionMarkRecords: Answer["condition_mark_records"];
   reversalPoint: string;
   buildsOnPrevious: Answer["builds_on_previous"];
   memoryDisclosure: Answer["memory_disclosure"];
@@ -64,6 +65,7 @@ export function projectAnswerSurface(answer: Answer): AnswerSurfaceProjection {
     residual_objections,
     value_hinges,
     condition_marks,
+    condition_mark_records,
     reversal_point,
     builds_on_previous,
     memory_disclosure,
@@ -97,6 +99,7 @@ export function projectAnswerSurface(answer: Answer): AnswerSurfaceProjection {
     residualObjections: residual_objections,
     valueHinges: value_hinges,
     conditionMarks: condition_marks,
+    conditionMarkRecords: condition_mark_records,
     reversalPoint: reversal_point,
     buildsOnPrevious: builds_on_previous,
     memoryDisclosure: memory_disclosure,
@@ -134,6 +137,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";
     case "AMENDED-SEARCH": return "Search amended during run";
     case "MISSING-NUMBER": return "Number removed after replay failure";
+    case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";
   }
 }
 
