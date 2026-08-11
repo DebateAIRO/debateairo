@@ -2,11 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "web",
-      "runtimeExecutable": "bash",
+      "name": "v3-ui",
+      "runtimeExecutable": "env",
       "runtimeArgs": [
-        "-c",
-        "cd '/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V4/apps/dialectical-engine/web' && exec pnpm dev"
+        "NEXT_DIST_DIR=.next-dev",
+        "pnpm",
+        "--dir",
+        "DebateAI-V3/apps/v2-ui",
+        "dev"
       ],
       "port": 3000
     }
