@@ -1,0 +1,449 @@
+import type {
+  CurrentUserFeedbackVote,
+  DebateScoringResponse,
+  EvidenceSignal,
+  ExpansionDecision,
+  InvestigationPathStatus,
+  NodeFeedbackSummary,
+  NodeScoringError,
+  NodeScoringPending,
+  NodeScoringPayload,
+  RecommendedInvestigation,
+  Severity,
+} from "./types";
+import {
+  recordSuspiciousScoringEvents,
+  type SuspiciousScoringContext,
+  type SuspiciousScoringLogger,
+} from "./observability/suspiciousScoring";
+import { toArgumentClaimStatus } from "./debateTreeUtils";
+import { v3ScoringStatusLabel } from "./v3/adapter";
+
+export type IndexedScoringResponse = {
+  scoringByNodeId: Map<string, NodeScoringPayload>;
+  scoringErrorsByNodeId: Map<string, NodeScoringError>;
+  scoringPendingByNodeId: Map<string, NodeScoringPending>;
+  feedbackSummaryByNodeId: Map<string, NodeFeedbackSummary>;
+  currentUserFeedbackByNodeId: Map<string, CurrentUserFeedbackVote>;
+};
+
+export type DebateScoringHoleSummaryItem = {
+  nodeId: string;
+  claim: string;
+  type: string;
+  severity: Severity;
+  description: string;
+  source: string;
+};
+
+export type DebateScoringHoleSummary = {
+  total: number;
+  bySeverity: Record<Severity, number>;
+  items: DebateScoringHoleSummaryItem[];
+};
+
+export type DebateScoringFatalFlagSummaryItem = {
+  nodeId: string;
+  claim: string;
+  type: string;
+  severity: Severity;
+  description: string;
+};
+
+export type DebateScoringFatalFlagSummary = {
+  total: number;
+  bySeverity: Record<Severity, number>;
+  items: DebateScoringFatalFlagSummaryItem[];
+};
+
+export type DebateScoringUnresolvedIssue =
+  | {
+      kind: "fatal_flag";
+      nodeId: string;
+      claim: string;
+      type: string;
+      severity: Severity;
+      description: string;
+    }
+  | {
+      kind: "hole";
+      nodeId: string;
+      claim: string;
+      type: string;
+      severity: Severity;
+      description: string;
+      source: string;
+    };
+
+export type ScoringVisibilityKind =
+  | "off"
+  | "empty"
+  | "provider_required"
+  | "unavailable"
+  | "refreshing"
+  | "scores";
+
+export type ScoringVisibilityState = {
+  kind: ScoringVisibilityKind;
+  title: string;
+  detail: string;
+};
+
+export type ScoringVisibilityInput = {
+  enabled: boolean;
+  hasActionToken: boolean;
+  scoringStatus: "idle" | "loading" | "loaded" | "unavailable" | "error";
+  refreshStatus: "idle" | "starting" | "error";
+  response: DebateScoringResponse | null;
+  error?: string | null;
+};
+
+const severityRank: Record<Severity, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+const issueKindRank: Record<DebateScoringUnresolvedIssue["kind"], number> = {
+  fatal_flag: 0,
+  hole: 1,
+};
+
+type RankedScoringIssue = {
+  issue: DebateScoringUnresolvedIssue;
+  nodeIndex: number;
+  issueIndex: number;
+  impact: number;
+  uncertainty: number;
+  strength: number;
+};
+
+function scoreValue(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function scoredClaimDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "No persisted scored claims are available.";
+  return `Showing ${pluralize(count, "persisted scored claim")} from the scoring response.`;
+}
+
+function retainedScoreDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "No persisted scored claims are available yet.";
+  return `Showing ${pluralize(count, "persisted scored claim")} while it completes.`;
+}
+
+function hasActiveScoringJob(response: DebateScoringResponse | null): boolean {
+  return response?.active_scoring_job_status === "queued" || response?.active_scoring_job_status === "running";
+}
+
+function activeScoringJobDetail(response: DebateScoringResponse | null): string {
+  const count = response?.scored_node_count ?? response?.items?.length ?? 0;
+  if (count <= 0) return "Judge outputs are being generated.";
+  return `Judge outputs are being generated. ${retainedScoreDetail(response)}`;
+}
+
+function unavailableClaimCount(response: DebateScoringResponse | null): number {
+  return response?.errors?.length ?? 0;
+}
+
+function partialScoreDetail(response: DebateScoringResponse | null): string {
+  const scoredCount = response?.scored_node_count ?? response?.items?.length ?? 0;
+  const unavailableCount = unavailableClaimCount(response);
+  const scoredDetail =
+    scoredCount > 0 ? `Showing ${pluralize(scoredCount, "persisted scored claim")}` : "No persisted scored claims";
+  return unavailableCount > 0
+    ? `${scoredDetail}; ${pluralize(unavailableCount, "unavailable claim")}.`
+    : `${scoredDetail}.`;
+}
+
+function isMissingJudgeOutputReason(reason?: string | null): boolean {
+  return (reason || "").trim().toLowerCase() === "no scoring judge outputs are available for this debate.";
+}
+
+function looksProviderOrTokenRequired(value: string | null | undefined): boolean {
+  const lower = (value || "").toLowerCase();
+  return (
+    lower.includes("provider") ||
+    lower.includes("model") ||
+    lower.includes("token") ||
+    lower.includes("credential") ||
+    lower.includes("auth") ||
+    lower.includes("api key")
+  );
+}
+
+function compareRankedIssues(left: RankedScoringIssue, right: RankedScoringIssue): number {
+  return (
+    severityRank[left.issue.severity] - severityRank[right.issue.severity] ||
+    issueKindRank[left.issue.kind] - issueKindRank[right.issue.kind] ||
+    right.impact - left.impact ||
+    right.uncertainty - left.uncertainty ||
+    left.strength - right.strength ||
+    left.nodeIndex - right.nodeIndex ||
+    left.issueIndex - right.issueIndex
+  );
+}
+
+export function indexScoringResponse(response: DebateScoringResponse | null): IndexedScoringResponse {
+  return {
+    scoringByNodeId: new Map<string, NodeScoringPayload>(
+      (response?.items ?? []).map((item) => [item.node_id, item])
+    ),
+    scoringErrorsByNodeId: new Map<string, NodeScoringError>(
+      (response?.errors ?? []).map((error) => [error.node_id, error])
+    ),
+    scoringPendingByNodeId: new Map<string, NodeScoringPending>(
+      (response?.pending ?? []).map((item) => [item.node_id, item])
+    ),
+    feedbackSummaryByNodeId: new Map<string, NodeFeedbackSummary>(
+      (response?.feedback_summary ?? []).map((summary) => [summary.node_id, summary])
+    ),
+    currentUserFeedbackByNodeId: new Map<string, CurrentUserFeedbackVote>(
+      (response?.current_user_votes ?? []).map((vote) => [vote.node_id, vote])
+    ),
+  };
+}
+
+export async function recordSuspiciousScoringResponse(
+  response: DebateScoringResponse | null,
+  context: SuspiciousScoringContext,
+  logger: SuspiciousScoringLogger
+): Promise<void> {
+  await recordSuspiciousScoringEvents(response, context, logger);
+}
+
+export function formatScoringVisibilityState(input: ScoringVisibilityInput): ScoringVisibilityState {
+  const reason = input.error || input.response?.reason || null;
+
+  if (!input.enabled) {
+    return {
+      kind: "off",
+      title: "Scoring off",
+      detail: "Scoring is disabled for this view; no score data is being shown.",
+    };
+  }
+
+  if (input.refreshStatus === "starting" || input.scoringStatus === "loading") {
+    const hasRetainedScores = (input.response?.scored_node_count ?? input.response?.items?.length ?? 0) > 0;
+    return {
+      kind: "refreshing",
+      title: input.scoringStatus === "loading" && input.refreshStatus === "idle" ? "Loading scoring" : "Scoring in progress",
+      detail:
+        input.refreshStatus === "idle"
+          ? "Reading persisted scoring state for this debate."
+          : hasRetainedScores
+            ? `Judge outputs are being generated. ${retainedScoreDetail(input.response)}`
+            : "Judge outputs are being generated.",
+    };
+  }
+
+  if (hasActiveScoringJob(input.response)) {
+    return {
+      kind: "refreshing",
+      title: "Scoring in progress",
+      detail: activeScoringJobDetail(input.response),
+    };
+  }
+
+  if (input.scoringStatus === "unavailable" && isMissingJudgeOutputReason(reason)) {
+    return {
+      kind: "empty",
+      title: "Scoring pending",
+      detail: "No persisted judge outputs are available yet.",
+    };
+  }
+
+  // UI-02a (DR-149(3)): V3's typed absence is about V2's per-node scoring
+  // ENDPOINT, not about scoring. V3 records a base score and a final strength
+  // for every node and the cards now show them, so titling this strip "Scoring
+  // unavailable" asserted something false. Narrow and additive — the V3 layer
+  // owns the judgement of whether the reason is its own, and every other
+  // unavailable reason keeps V2's original copy below.
+  const v3ScoringLabel = v3ScoringStatusLabel(reason);
+  if (input.scoringStatus === "unavailable" && v3ScoringLabel !== null) {
+    return {
+      kind: "unavailable",
+      title: v3ScoringLabel,
+      detail: reason ?? "",
+    };
+  }
+
+  if (reason && looksProviderOrTokenRequired(reason)) {
+    return {
+      kind: "provider_required",
+      title: "Scoring provider required",
+      detail: reason,
+    };
+  }
+
+  if (input.scoringStatus === "error" || input.scoringStatus === "unavailable") {
+    return {
+      kind: "unavailable",
+      title: "Scoring unavailable",
+      detail: reason || "No scoring payload is available.",
+    };
+  }
+
+  if (input.response?.status === "partial") {
+    return {
+      kind: "scores",
+      title: "Scores partially checked",
+      detail: partialScoreDetail(input.response),
+    };
+  }
+
+  return {
+    kind: "scores",
+    title: "Real scores displayed",
+    detail: scoredClaimDetail(input.response),
+  };
+}
+
+export function summarizeScoringHoles(response: DebateScoringResponse | null): DebateScoringHoleSummary {
+  const items = (response?.items ?? [])
+    .flatMap((node) =>
+      (node.holes ?? []).map((hole) => ({
+        nodeId: node.node_id,
+        claim: node.claim?.core_claim?.trim() || node.node_id,
+        type: hole.type,
+        severity: hole.severity,
+        description: hole.description.trim(),
+        source: hole.source,
+      }))
+    )
+    .filter((hole) => hole.description.length > 0)
+    .sort((left, right) => severityRank[left.severity] - severityRank[right.severity]);
+
+  return {
+    total: items.length,
+    bySeverity: {
+      high: items.filter((hole) => hole.severity === "high").length,
+      medium: items.filter((hole) => hole.severity === "medium").length,
+      low: items.filter((hole) => hole.severity === "low").length,
+    },
+    items,
+  };
+}
+
+export function summarizeScoringFatalFlags(response: DebateScoringResponse | null): DebateScoringFatalFlagSummary {
+  const items = (response?.items ?? [])
+    .flatMap((node) =>
+      (node.fatal_flags ?? []).map((flag) => ({
+        nodeId: node.node_id,
+        claim: node.claim?.core_claim?.trim() || node.node_id,
+        type: flag.type,
+        severity: flag.severity,
+        description: flag.description.trim(),
+      }))
+    )
+    .filter((flag) => flag.description.length > 0)
+    .sort((left, right) => severityRank[left.severity] - severityRank[right.severity]);
+
+  return {
+    total: items.length,
+    bySeverity: {
+      high: items.filter((flag) => flag.severity === "high").length,
+      medium: items.filter((flag) => flag.severity === "medium").length,
+      low: items.filter((flag) => flag.severity === "low").length,
+    },
+    items,
+  };
+}
+
+export function selectStrongestUnresolvedScoringIssue(
+  response: DebateScoringResponse | null
+): DebateScoringUnresolvedIssue | null {
+  const issues = (response?.items ?? []).flatMap((node, nodeIndex) => {
+    const claim = node.claim?.core_claim?.trim() || node.node_id;
+    const impact = scoreValue(node.scores?.impact);
+    const uncertainty = scoreValue(node.scores?.uncertainty);
+    const strength = scoreValue(node.scores?.strength);
+    const fatalFlags = (node.fatal_flags ?? []).map((flag, issueIndex): RankedScoringIssue => ({
+      issue: {
+        kind: "fatal_flag",
+        nodeId: node.node_id,
+        claim,
+        type: flag.type,
+        severity: flag.severity,
+        description: flag.description.trim(),
+      },
+      nodeIndex,
+      issueIndex,
+      impact,
+      uncertainty,
+      strength,
+    }));
+    const holes = (node.holes ?? []).map((hole, issueIndex): RankedScoringIssue => ({
+      issue: {
+        kind: "hole",
+        nodeId: node.node_id,
+        claim,
+        type: hole.type,
+        severity: hole.severity,
+        description: hole.description.trim(),
+        source: hole.source,
+      },
+      nodeIndex,
+      issueIndex,
+      impact,
+      uncertainty,
+      strength,
+    }));
+
+    return [...fatalFlags, ...holes];
+  });
+
+  return issues.filter((item) => item.issue.description.length > 0).sort(compareRankedIssues)[0]?.issue ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// DDD-10: Domain signal extractors
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract an EvidenceSignal from a NodeScoringPayload.
+ * Evidence correctness is separate from score values per DDD doctrine.
+ */
+export function extractEvidenceSignal(score: NodeScoringPayload): EvidenceSignal {
+  return {
+    argumentClaimId: score.node_id,
+    holes: score.holes ?? [],
+    fatalFlags: score.fatal_flags ?? [],
+    recommendations: score.recommended_investigations ?? [],
+    evidenceQuality:
+      typeof score.scores?.evidence_quality === "number" ? score.scores.evidence_quality : null,
+  };
+}
+
+/**
+ * Convert a RecommendedInvestigation to an ExpansionDecision.
+ * Deterministic policy wrapping — raw LLM output never directly sets this.
+ */
+export function toExpansionDecision(
+  recommendation: RecommendedInvestigation,
+  argumentClaimId: string
+): ExpansionDecision {
+  return {
+    argumentClaimId,
+    action: recommendation.action,
+    reason: recommendation.reason,
+    priority: recommendation.priority,
+    expansionHint: null,
+  };
+}
+
+/**
+ * Map a raw backend status string to InvestigationPathStatus.
+ * Mirrors toArgumentClaimStatus (DDD-06A) with added policy states.
+ */
+export function toInvestigationPathStatus(rawStatus: string | null | undefined): InvestigationPathStatus {
+  const s = (rawStatus ?? "").toLowerCase();
+  if (s === "challenged" || s === "challenge") return "challenged";
+  return toArgumentClaimStatus(s);
+}

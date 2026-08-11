@@ -74,6 +74,7 @@ function answer(overrides: Partial<Answer> = {}): Answer {
     residual_objections: [],
     value_hinges: [],
     condition_marks: [],
+    condition_mark_records: [],
     reversal_point: "A contrary observation would reverse it.",
     builds_on_previous: { value: false, answer_ref: null },
     memory_disclosure: null,
@@ -108,8 +109,9 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     }))).toMatchObject({ mode: "COMPONENTS_ONLY", text: [], defect: true });
   });
 
-  it("has a renderer for every one of spec section 12.3's 22 condition marks", () => {
-    expect(CONDITION_MARKS).toHaveLength(22);
+  it("has a renderer for every ruled condition mark — spec section 12.3's 22 plus DR-139(4)'s owed-check mark", () => {
+    expect(CONDITION_MARKS).toHaveLength(23);
+    expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS.map(conditionMarkLabel).every((label) => label.trim().length > 0)).toBe(true);
   });
 
@@ -193,6 +195,26 @@ describe("S14 / W6 / FX-LG-17 — live lifecycle and freshness", () => {
 });
 
 describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
+  it("prefixes browser contract requests with the same-origin /api route", async () => {
+    const { createBrowserContractClient } = await import("../../web/lib/api.js");
+    const calls: Array<{ input: string; headers: Headers }> = [];
+    const client = createBrowserContractClient(async (input, init) => {
+      calls.push({ input: String(input), headers: new Headers(init?.headers) });
+      return new Response(JSON.stringify({
+        asker_id: "asker:test",
+        session_id: "session:test",
+        caller_scope: "ASKER",
+        ownership_provenance: "user_dev_token",
+        provisional_identity_model: true
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }, "/api");
+
+    await expect(client.readSession("token:test")).resolves.toMatchObject({ session_id: "session:test" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.input).toBe("/api/v1/session");
+    expect(calls[0]?.headers.get("x-user-dev-token")).toBe("token:test");
+  });
+
   it("branches on typed 429 rather than response prose", async () => {
     const client = createContractClient("https://api.example.test", async () => new Response("arbitrary prose", { status: 429 }));
     const request = client.readAnswer("answer:test", "token:test");

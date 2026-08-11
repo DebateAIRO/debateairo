@@ -9,6 +9,17 @@ export {
   type SplitStageResult
 } from "./split.js";
 
+export {
+  createTerminalActivationEvaluator,
+  evaluateTerminalActivations,
+  readTerminalRecordedFacts,
+  SHIPPED_QUESTION_CLASS,
+  TERMINAL_EVALUATOR_REF,
+  type TerminalActivationResolution,
+  type TerminalCompletionDeclaration,
+  type TerminalRecordedFacts
+} from "./terminal.js";
+
 export const BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
   "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",
@@ -90,6 +101,21 @@ const predicateInputsByRow: Readonly<Partial<Record<BatteryRowId, readonly strin
   R5: ["nonterminal_researched_answer", "before_confident_serve"], R6: [], R7: ["Q7_terminality"],
   R8: ["AIM_entered", "before_source_plan_freeze"], R9: ["serve_candidate_ready"]
 });
+
+/** The declared predicate input names for a battery row — the ratified
+ * per-row contract field (docs/architecture/10-row-contracts.md §6). The
+ * terminal evaluator (TERM-01, DR-139) records values for exactly these
+ * names on every completion transition. */
+export function declaredPredicateInputNames(rowId: BatteryRowId): readonly string[] {
+  if (rowId === "Q1") return Object.freeze(["run_opened"]);
+  if (rowId === "Q51") return Object.freeze([]);
+  if (rowId === "Q62") return Object.freeze(["wrong_resolved_outcome"]);
+  const declared = predicateInputsByRow[rowId];
+  if (declared === undefined) {
+    throw new TypeError(`PREDICATE_INPUT_CONTRACT_MISSING:${rowId}`);
+  }
+  return declared;
+}
 
 function sectionFor(rowId: BatteryRowId): string {
   if (rowId.startsWith("R")) return "6.12";
@@ -359,6 +385,27 @@ export class WorkItemRepository {
         [input.workItemId, input.attemptId, input.artifactRef]
       );
       return result.rowCount === 1;
+    });
+  }
+
+  async recordTerminalFailure(input: {
+    readonly runId: string;
+    readonly workItemId: string;
+    readonly reason: string;
+  }): Promise<boolean> {
+    if (input.reason.trim().length === 0) {
+      throw new TypeError("Terminal failure reason must be a typed non-empty value");
+    }
+    return withWriteTransaction(this.pool, async (client) => {
+      const failed = await client.query(
+        `UPDATE core.work_item
+         SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL,
+             terminal_reason = $3
+         WHERE work_item_id = $1 AND run_id = $2
+           AND state <> 'DONE' AND settled_attempt_id IS NULL`,
+        [input.workItemId, input.runId, input.reason]
+      );
+      return failed.rowCount === 1;
     });
   }
 }

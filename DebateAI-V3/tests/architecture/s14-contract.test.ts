@@ -16,6 +16,20 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
     expect(types).not.toContain("ScoringRefreshState");
   });
 
+  it("routes browser contract traffic through the V3 same-origin API boundary", async () => {
+    const [browser, server, route, localEnv] = await Promise.all([
+      readFile(new URL("../../web/lib/api.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../web/lib/serverApi.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../web/app/api/[...path]/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../web/.env.local", import.meta.url), "utf8")
+    ]);
+    expect(browser).toContain('"/api"');
+    expect(server).toContain("DIALECTICAL_API_BASE");
+    expect(route).toContain("DIALECTICAL_API_BASE_REQUIRED");
+    expect(route).toContain("response.body");
+    expect(localEnv).toContain("NEXT_PUBLIC_API_BASE=/api");
+  });
+
   it("FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory", async () => {
     const report = await auditS14TypeGraph();
     expect(report.contractVersion).toBe("v1");

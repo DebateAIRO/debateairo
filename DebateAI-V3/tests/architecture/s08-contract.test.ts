@@ -35,6 +35,11 @@ describe("S08 / P12 / P17 / honesty — critique contract", () => {
       expect.objectContaining({ package: "packages/critique.assertMakerAdmission", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/critique.planBlindVerification", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/critique.computeSymmetryDiff", attachment: "UNATTACHED" }),
+      // FAIR-01: the counter leg deliberately records NO critique packet —
+      // DR-141(4) rules a packet-carrying run refuses at terminal (Q42) until
+      // the recording migration is ruled — so these stay honestly UNATTACHED.
+      expect.objectContaining({ package: "packages/critique.buildBlindedCritiquePacket", attachment: "UNATTACHED" }),
+      expect.objectContaining({ package: "packages/critique.computeIndependenceReceipt", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/critique.CritiqueRepository", attachment: "UNATTACHED" })
     ]));
     expect(report.neverCalled).toEqual(expect.arrayContaining([

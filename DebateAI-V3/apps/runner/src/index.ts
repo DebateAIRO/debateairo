@@ -6,7 +6,11 @@ import {
   assertNoOpenWriteTransaction,
   type CompletionActivationResolution
 } from "@debateai/db";
-import { WorkItemRepository, assertClaimCoversCall } from "@debateai/battery";
+import {
+  WorkItemRepository,
+  assertClaimCoversCall,
+  type TerminalCompletionDeclaration
+} from "@debateai/battery";
 import { GraphRepository } from "@debateai/graph";
 import {
   Judge,
@@ -18,6 +22,7 @@ import {
   type JudgementSelectionRule
 } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
+import { resolveScoringOperator } from "@debateai/register";
 import {
   BudgetRepository,
   BATTERY_BUDGET_CONTRACTS,
@@ -55,7 +60,7 @@ import {
   type ConditionMarkRecord,
   type FactBundle
 } from "@debateai/serve";
-import { TypedDomainError, type CompositionBudgetTier } from "@debateai/kernel";
+import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
@@ -69,6 +74,34 @@ const compositionSchema = z.object({
 }).strict();
 const conformanceSchema = z.object({ conforms: z.boolean(), findings: z.array(z.string()) }).strict();
 const r9Schema = z.object({ pass: z.boolean() }).strict();
+
+/**
+ * FAIR-01 (DR-140(b)): the SECOND real maker's leg. When configured, the
+ * critic maker judges the strongest genuine counter-position through the same
+ * ruled JUDGE organ, and the counter joins the answer graph as a first-class
+ * defeater node with an attack edge — a rival judgement whose independence is
+ * carried by recorded per-artifact maker lineage. Deliberately NOT the S08
+ * CROSS critique-packet instrument: DR-141(4) rules that a run carrying
+ * critique packets REFUSES at terminal (Q42 `critic_agrees` has no recorded
+ * shape) until V rules the recording migration. When absent, the runner stays
+ * honestly single-node (DR-137 mono-model runs remain lawful; DR-143 clause 1
+ * keeps the >1-maker law run-level, enforced on the acceptance debate).
+ */
+export interface RunnerCritiqueSettings {
+  readonly provider: ProviderGateway;
+  readonly providerRef: string;
+}
+
+/**
+ * P8/DR-074: the raw deployment `scoringOperator` register row, resolved
+ * through the SHIPPED chain (resolveScoringOperator) at the point of use. The
+ * VALUE is V's at DR-023 — a missing row is a typed loud stop, never a
+ * literal (AC-76/DR-039).
+ */
+export interface ScoringOperatorRegisterInput {
+  readonly deploymentRowValue: unknown;
+  readonly registerRef: string;
+}
 
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
@@ -101,10 +134,23 @@ export interface WalkingSkeletonSettings {
     readonly judgeWeightVersion: string;
     readonly reducerVersion: string;
   };
+  readonly critique?: RunnerCritiqueSettings;
+  readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly resolveTerminalActivations?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];
-  }) => Promise<readonly CompletionActivationResolution[]>;
+    /** The runner's own declaration of the terminal boundary being drained
+     * (TERM-01/DR-139): this completion persists an answer record in the same
+     * sequence. It is the same authority that supplies runId and waitingRows. */
+    readonly completion: TerminalCompletionDeclaration;
+  }) => Promise<readonly (CompletionActivationResolution & {
+    /** Recorded execution of the row's scoped check, when one exists.
+     * ACTIVE with no recorded execution is the DR-139(4) owed-check case. */
+    readonly executedCheckRef?: string | null;
+    /** DR-141(2): the row's evaluation consulted the DR-021 knob-10
+     * question-type fallback; the travelling label rides the answer. */
+    readonly typeFallbackConsulted?: boolean;
+  })[]>;
 }
 
 export interface ValueOverlayExecutionInput {
@@ -140,6 +186,7 @@ export class WalkingSkeletonRunner {
   readonly #serve: ServeRepository;
   readonly #valuation: ValuationRepository;
   readonly #memory: MemoryRepository;
+  readonly #criticJudge: Judge | null;
 
   constructor(
     pool: Pool,
@@ -156,6 +203,9 @@ export class WalkingSkeletonRunner {
     this.#serve = new ServeRepository(pool);
     this.#valuation = new ValuationRepository(pool);
     this.#memory = new MemoryRepository(pool);
+    // FAIR-01: the critic is the SAME shipped Judge organ over the second
+    // maker's gateway — genuinely independent lineage, no new organ minted.
+    this.#criticJudge = settings.critique === undefined ? null : new Judge(settings.critique.provider);
   }
 
   async executeNext(): Promise<RunnerExecutionResult> {
@@ -234,6 +284,17 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError(
         "SERVE_POLICY_UNRESOLVED",
         "S05 requires V-ratified composition-budget and band-ceiling register rows"
+      );
+    }
+    const critiqueSettings = this.settings.critique;
+    if (critiqueSettings !== undefined && this.settings.scoringOperator === undefined) {
+      // FAIR-01 × DR-074: the critique leg always yields an attack arrow, and
+      // an arrow-bearing graph cannot propagate without the mandatory
+      // deployment scoringOperator row. The value is V's at DR-023 — stop
+      // loudly BEFORE any claim or model call, never invent it (AC-76/DR-039).
+      throw new TypedDomainError(
+        "SCORING_OPERATOR_UNRESOLVED",
+        "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
       );
     }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
@@ -353,7 +414,173 @@ export class WalkingSkeletonRunner {
       disagreement: createUnmeasuredDisagreement()
     });
 
-    const snapshot = await this.#graph.materialiseSnapshot(run.runId);
+    // FAIR-01 (DR-140(b)): the SECOND maker's leg. The critic maker judges the
+    // strongest genuine counter-position through the SAME ruled JUDGE organ
+    // (same contract text, same ruled JUDGE cost bound), and the counter joins
+    // the graph as a first-class defeater node with a real attack edge — one
+    // maker per artifact, honest lineage, nothing fabricated (DR-115). The
+    // counter prompt carries only the position's STATEMENT TEXT — no maker,
+    // model or provider identity — so the rival judgement is blind to who
+    // produced the position. The S08 critique-packet instrument is
+    // deliberately NOT recorded here: DR-141(4) rules that a run carrying
+    // critique packets REFUSES at terminal (Q42 `critic_agrees`,
+    // packages/battery/src/terminal.ts Q42 evaluator) until V rules the
+    // agreement-verdict recording migration.
+    let counterLeg: {
+      readonly nodeId: string;
+      readonly provenanceRef: string;
+      readonly reducedJudgementId: string;
+      readonly wayOfKnowing: WayOfKnowing;
+    } | null = null;
+    const criticJudge = this.#criticJudge;
+    if (critiqueSettings !== undefined && criticJudge !== null) {
+      const counterQuestionLine = [
+        "A fair debate requires the strongest genuine counter-position, judged on its own merits.",
+        `Question under debate: ${run.questionLine}`,
+        `Position under critique: ${judged.statement}`,
+        "State and defend the strongest genuine counter-position to that position."
+      ].join("\n");
+      await this.#ledger.append({
+        runId: run.runId,
+        attemptId: runnerAttemptId,
+        actionKind: "JUDGEMENT_SCHEDULED",
+        subjectItemId: claimed.workItemId,
+        stanceAtAction: "UNASSIGNED",
+        outcome: "OK",
+        actorRef: this.settings.workerId,
+        inputHash: hash({ questionLine: counterQuestionLine, workItemId: claimed.workItemId }),
+        contractHash: this.settings.judgeContractHash,
+        startedAt: new Date(),
+        finishedAt: new Date()
+      });
+      const counterJudged = await criticJudge.judge({
+        runId: run.runId,
+        subjectItemId: claimed.workItemId,
+        callSiteKey: "JUDGE:critic",
+        questionLine: counterQuestionLine,
+        // One debate, one claim frame: the counter is classified on the
+        // debate's own question line, not on the position's wording.
+        claimClassificationLine: run.questionLine,
+        providerRef: critiqueSettings.providerRef,
+        contractHash: this.settings.judgeContractHash,
+        bound: this.settings.judgeBound
+      });
+      const counterReduced = reduceAssessment({
+        claimType: counterJudged.normalizedClaim.claimType,
+        assessment: counterJudged.assessment,
+        compositionRow,
+        reducerVersion: judgementPolicy.reducerVersion
+      });
+      if (counterReduced.kind !== "REDUCED") {
+        throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${counterReduced.claimType}`);
+      }
+      const counterSelection = selectReducedJudgement([{
+        judgementRef: counterJudged.provenanceRef,
+        tau: counterReduced.tau,
+        effectiveWeight: judgementPolicy.earnedWeight
+      }], judgementPolicy.selectionRule);
+      if (counterSelection.kind !== "SELECTED") {
+        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The critic produced no selectable judgement");
+      }
+      const counterNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
+        const created = await writer.addNode({
+          runId: run.runId,
+          statementText: counterJudged.statement,
+          claimType: counterJudged.normalizedClaim.claimType,
+          parentNodeId: nodeId,
+          childKind: "defeater",
+          siblingOrdinal: 1,
+          generationStatus: "complete",
+          pathStatus: "active",
+          explorationDecision: "challenge",
+          provenanceRef: counterJudged.provenanceRef,
+          wayOfKnowing: counterJudged.wayOfKnowing,
+          locator: counterJudged.locator,
+          valueLaden: counterJudged.valueLaden
+        });
+        await writer.addStrangerRestatement({
+          nodeId: created,
+          text: counterJudged.restatementText,
+          checkStatus: counterJudged.restatementStatus
+        });
+        // The S07 defeater edge shape: polarity attack, kind rebutting, and a
+        // magnitude honestly UNKNOWN — no evidence verifier measured this
+        // edge, so no number rides it (AC-76). Provenance = the critic's REAL
+        // artifact.
+        await writer.addEdge({
+          runId: run.runId,
+          sourceNodeId: created,
+          targetKind: "NODE",
+          targetNodeId: nodeId,
+          targetEdgeId: null,
+          targetEdgePolarity: null,
+          polarity: "attack",
+          kind: "rebutting",
+          strength: null,
+          magnitudeStatus: "UNKNOWN",
+          strengthSource: "EVIDENCE_VERIFIER",
+          provenanceRef: counterJudged.provenanceRef
+        });
+        return created;
+      });
+      const counterReducedJudgementId = await this.#judgements.recordReduced({
+        runId: run.runId,
+        nodeId: counterNodeId,
+        rawArtifactRef: counterJudged.provenanceRef,
+        tau: counterSelection.tau,
+        numberKind: this.settings.judgementNumberKind,
+        producer: this.settings.judgementProducer,
+        wayOfKnowing: counterJudged.wayOfKnowing,
+        uncertaintyLadderPosition: counterReduced.uncertaintyLadderPosition,
+        uncertaintyDrivers: counterReduced.drivers,
+        scoreCaps: counterReduced.caps,
+        holes: counterReduced.holes,
+        branchIdentifier: counterReduced.branch,
+        reducerVersion: counterReduced.reducerVersion,
+        judgeWeightVersion: judgementPolicy.judgeWeightVersion,
+        selectedJudgementRef: counterSelection.selectedJudgementRef,
+        dispersion: null,
+        panelContractHashes: [this.settings.judgeContractHash],
+        disagreement: createUnmeasuredDisagreement()
+      });
+      counterLeg = Object.freeze({
+        nodeId: counterNodeId,
+        provenanceRef: counterJudged.provenanceRef,
+        reducedJudgementId: counterReducedJudgementId,
+        wayOfKnowing: counterJudged.wayOfKnowing
+      });
+    }
+
+    const materialised = await this.#graph.materialiseSnapshot(run.runId);
+    // P8 × DR-074: an arrow-bearing graph propagates only under the ruled
+    // deployment scoringOperator row, resolved through the SHIPPED chain with
+    // the supplying level RECORDED on the receipt. Unruled ⇒ typed loud stop.
+    const arrowTargetNodeIds = [...new Set(materialised.arrows.flatMap((arrow) =>
+      arrow.targetKind === "NODE" && arrow.targetNodeId !== null ? [arrow.targetNodeId] : []
+    ))];
+    let snapshot: EvaluationSnapshot = materialised;
+    if (arrowTargetNodeIds.length > 0) {
+      const scoringRegisterRow = this.settings.scoringOperator;
+      if (scoringRegisterRow === undefined) {
+        throw new TypedDomainError(
+          "SCORING_OPERATOR_UNRESOLVED",
+          "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
+        );
+      }
+      const resolvedOperator = resolveScoringOperator({
+        parent: {},
+        run: {},
+        deployment: { scoringOperator: scoringRegisterRow.deploymentRowValue }
+      });
+      snapshot = Object.freeze({
+        ...materialised,
+        operatorResolutions: Object.freeze(arrowTargetNodeIds.map((parentNodeId) => Object.freeze({
+          parentNodeId,
+          operator: resolvedOperator.value,
+          suppliedBy: resolvedOperator.suppliedBy
+        })))
+      });
+    }
     const propagationStartedAt = new Date();
     const propagation = evaluate(snapshot);
     const replayHandle = `replay:${run.runId}:${nodeId}`;
@@ -373,15 +600,38 @@ export class WalkingSkeletonRunner {
         selectionScore: selection.selectionScore
       },
       sensitivityRecords: propagation.sensitivityRecords,
-      strengths: propagation.strengths.map((strength) => ({
-        ...strength,
-        reducedJudgementRef: strength.nodeId === nodeId ? reducedJudgementId : null,
-        numberKind: this.settings.propagationNumberKind,
-        sourceRef: judged.provenanceRef,
-        producer: this.settings.propagationProducer,
-        replayHandle,
-        wayOfKnowing: judged.wayOfKnowing
-      }))
+      // FAIR-01/DR-115: every strength record cites ITS OWN node's judgement,
+      // artifact and way of knowing — the position's lineage is never stamped
+      // onto the counter's number. An unmapped node is a typed loud stop.
+      strengths: propagation.strengths.map((strength) => {
+        const lineage = strength.nodeId === nodeId
+          ? {
+              reducedJudgementRef: reducedJudgementId,
+              sourceRef: judged.provenanceRef,
+              replayHandle,
+              wayOfKnowing: judged.wayOfKnowing
+            }
+          : counterLeg !== null && strength.nodeId === counterLeg.nodeId
+            ? {
+                reducedJudgementRef: counterLeg.reducedJudgementId,
+                sourceRef: counterLeg.provenanceRef,
+                replayHandle: `replay:${run.runId}:${counterLeg.nodeId}`,
+                wayOfKnowing: counterLeg.wayOfKnowing
+              }
+            : null;
+        if (lineage === null) {
+          throw new TypedDomainError("STRENGTH_LINEAGE_UNRESOLVED", strength.nodeId);
+        }
+        return {
+          ...strength,
+          reducedJudgementRef: lineage.reducedJudgementRef,
+          numberKind: this.settings.propagationNumberKind,
+          sourceRef: lineage.sourceRef,
+          producer: this.settings.propagationProducer,
+          replayHandle: lineage.replayHandle,
+          wayOfKnowing: lineage.wayOfKnowing
+        };
+      })
     });
     await this.#ledger.append({
       runId: run.runId,
@@ -502,7 +752,11 @@ export class WalkingSkeletonRunner {
           contractHash: this.settings.composerContractHash,
           providerRef: this.settings.providerRef,
           packet: { messages: [
-            { role: "system", content: "Return only JSON with a segments array of {segment_id,text,node_refs,served_number_refs}. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts." },
+            // TERM-01 rework 2 (S04 prompt class, composer organ): the system
+            // prompt must declare the ruled serve-gate segment contract —
+            // including the reasoning-only two-segment form — because the gate
+            // is byte-strict and repairs nothing.
+            { role: "system", content: "Return only JSON with a segments array of {segment_id,text,node_refs,served_number_refs}. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
             { role: "user", content: JSON.stringify({
               factBundle: facts,
               availableNodes: [{ ref: "primary", nodeId, fact: judged.statement }],
@@ -609,7 +863,9 @@ export class WalkingSkeletonRunner {
         }
       }
     }
-    const strength = propagation.strengths[0];
+    // The served number is the POSITION node's final strength — selected by
+    // node identity, never by array position (a multi-node graph reorders).
+    const strength = propagation.strengths.find((row) => row.nodeId === nodeId);
     if (strength === undefined) throw new TypedDomainError("EMPTY_PROPAGATION", run.runId);
     const terminalEvaluator = this.settings.resolveTerminalActivations;
     if (terminalEvaluator === undefined) {
@@ -621,9 +877,57 @@ export class WalkingSkeletonRunner {
     const current = await this.#runs.readCurrentState(run.runId);
     const resolutions = await terminalEvaluator({
       runId: run.runId,
-      waitingRows: current.activations.filter((row) => row.state === "WAIT").map((row) => row.batteryRowId)
+      waitingRows: current.activations.filter((row) => row.state === "WAIT").map((row) => row.batteryRowId),
+      completion: Object.freeze({
+        kind: "ANSWER_RECORD_PERSIST",
+        servedNodeIds: Object.freeze([nodeId]),
+        servedNumberPlanned: compositionEvidenceRequired(result)
+      })
     });
     await this.#runs.drainWaitsForCompletion(run.runId, resolutions);
+    // DR-139(4): every row ACTIVE at terminal whose owed check has no recorded
+    // execution rides the served answer as a typed loud condition mark naming
+    // that check. Executing owed checks at terminal is the ruled follow-up,
+    // out of TERM-01.
+    const owedChecks = resolutions.filter(
+      (resolution) => resolution.state === "ACTIVE" && (resolution.executedCheckRef ?? null) === null
+    );
+    if (owedChecks.length > 0) {
+      conditionMarkRecords = Object.freeze([
+        ...conditionMarkRecords,
+        ...owedChecks.map((resolution): ConditionMarkRecord => Object.freeze({
+          mark: "OWED-CHECK-UNEXECUTED",
+          scope: "answer",
+          subjectRef: resolution.batteryRowId,
+          reason: `DR-139(4): ${resolution.batteryRowId} is ACTIVE at run completion and its owed check has no recorded execution`,
+          liftPath: null,
+          affectedNodeIds: [nodeId]
+        }))
+      ]);
+      if (!result.conditionMarks.includes("OWED-CHECK-UNEXECUTED")) {
+        result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, "OWED-CHECK-UNEXECUTED"]) };
+      }
+    }
+    // DR-141(2): whenever the terminal evaluation consulted the DR-021
+    // knob-10 question-type fallback, its travelling label rides the served
+    // answer — one named record per consulting battery row.
+    const typeFallbackRows = resolutions.filter((resolution) => resolution.typeFallbackConsulted === true);
+    if (typeFallbackRows.length > 0) {
+      conditionMarkRecords = Object.freeze([
+        ...conditionMarkRecords,
+        ...typeFallbackRows.map((resolution): ConditionMarkRecord => Object.freeze({
+          mark: "UNRESOLVED-TYPE-FALLBACK",
+          scope: "answer",
+          subjectRef: resolution.batteryRowId,
+          reason: `DR-021 knob 10 · DR-141(2): ${resolution.batteryRowId} was evaluated through the factual question-type fallback because no recorded type resolution exists`,
+          liftPath: null,
+          affectedNodeIds: [nodeId]
+        }))
+      ]);
+      if (!result.conditionMarks.includes("UNRESOLVED-TYPE-FALLBACK")) {
+        result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, "UNRESOLVED-TYPE-FALLBACK"]) };
+      }
+    }
     const persisted = await this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,

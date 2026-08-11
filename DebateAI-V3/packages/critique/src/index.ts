@@ -264,7 +264,7 @@ export async function readDeploymentMakerCapability(
   const providers = candidate.providers;
   const requiredDistinctMakers = candidate.requiredDistinctMakers;
   if (candidate.kind !== "CONFIGURED_PROVIDER_SET" || !Array.isArray(providers)
-    || !Number.isInteger(requiredDistinctMakers) || (requiredDistinctMakers as number) < 2) {
+    || !Number.isInteger(requiredDistinctMakers) || (requiredDistinctMakers as number) < 1) {
     throw new TypedDomainError("CONFIGURED_PROVIDER_SET_INVALID", "Configured provider set violates its declared member type");
   }
   const typedProviders: { readonly providerRef: string; readonly adapterKind: string; readonly maker: string }[] = [];
@@ -294,8 +294,8 @@ export function evaluateMakerAvailability(input: {
   readonly standingMisconfigurationCount: number;
   readonly policy: MakerPolicy;
 }): MakerAvailability {
-  if (!Number.isInteger(input.policy.requiredDistinctMakers) || input.policy.requiredDistinctMakers < 2) {
-    throw new TypedDomainError("MAKER_POLICY_INVALID", "The maker floor must preserve the ruled multi-maker requirement");
+  if (!Number.isInteger(input.policy.requiredDistinctMakers) || input.policy.requiredDistinctMakers < 1) {
+    throw new TypedDomainError("MAKER_POLICY_INVALID", "The declared maker requirement must be a positive integer");
   }
   if (!Number.isInteger(input.policy.standingMisconfigurationLimit) || input.policy.standingMisconfigurationLimit < 1) {
     throw new TypedDomainError("MAKER_POLICY_INVALID", "The standing counter limit must be a positive register value");
@@ -323,12 +323,16 @@ export function evaluateMakerAvailability(input: {
 
 export function assertMakerAdmission(
   riskTier: RiskTier,
-  availability: Pick<MakerAvailability, "deploymentMakerCapability" | "registerRef">
+  availability: Pick<MakerAvailability, "deploymentMakerCapability" | "configuredMakers" | "registerRef">
 ): void {
-  if (riskTier !== "casual" && !availability.deploymentMakerCapability) {
+  // DR-137: mono-model deployments are lawful for casual/standard runs; the
+  // anti-monoculture floor remains an independent high-stakes admission rule.
+  const highStakesMakerFloorSatisfied = new Set(availability.configuredMakers).size >= 2;
+  if ((riskTier !== "casual" && !availability.deploymentMakerCapability)
+    || (riskTier === "high-stakes" && !highStakesMakerFloorSatisfied)) {
     throw new TypedDomainError(
       "MAKER_INVENTORY_UNSATISFIED",
-      `Standard-or-above admission requires deployment maker capability (${availability.registerRef})`
+      `Maker admission is unsatisfied for ${riskTier} (${availability.registerRef})`
     );
   }
 }
