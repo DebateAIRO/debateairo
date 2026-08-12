@@ -1,1 +1,0 @@
-/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres "-D" "/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/acceptance/.pgdata" "-p" "55432" "-c" "shared_memory_type=mmap" "-c" "dynamic_shared_memory_type=mmap"

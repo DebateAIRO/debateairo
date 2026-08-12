@@ -38,3 +38,18 @@ DebateAI-V3/web/node_modules/
 DebateAI-V3/web/.next/
 DebateAI-V3/.DS_Store
 .DS_Store
+
+# V3 apps/v2-ui — V2's UI copied in 2026-08-10. The rules above predate this
+# directory, so its build output was being tracked: 187 files / ~35 MB of
+# webpack cache turned up in an unpushed commit.
+DebateAI-V3/apps/**/node_modules/
+DebateAI-V3/apps/**/.next/
+DebateAI-V3/apps/**/.next-dev*/
+DebateAI-V3/apps/**/.next-build*/
+
+# Acceptance harness runtime state. `.pgdata` is a LIVE PostgreSQL data
+# directory and `.pgdata-backup-*` are local recovery copies taken before a
+# register reseed (DR-151). Both are machine-local runtime state, never source:
+# one backup put 1615 files / ~34 MB into an unpushed commit.
+DebateAI-V3/acceptance/.pgdata/
+DebateAI-V3/acceptance/.pgdata-backup-*/
