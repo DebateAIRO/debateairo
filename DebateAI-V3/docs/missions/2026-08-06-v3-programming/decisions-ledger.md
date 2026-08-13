@@ -1246,3 +1246,21 @@ supersedes | status`.
   at claim, `codex exec resume`, board as source of truth). The
   dependency-lanes half of DR-168 is unchanged. | V weighed both mechanisms
   and ruled for the simpler wire | next coding loop | — | ACTIVE
+
+| DR-172 | 2026-08-13 | V (ceiling card: "Set A — 3× headroom") | **THE
+  REVIEW-COVERAGE ENVELOPE IS RATIFIED — SET A.** runCostEnvelope members
+  become 60/108/204/396/780 max_model_attempts for depths 1..5 (standard
+  and high-stakes identically; casual stays unreachable per DR-159). Set A
+  sizes each ceiling at three times the healthy spend (~20/36/68/132/260) —
+  headroom for retries and judge slips, tighter runaway guard than set B's
+  full reservation. This UNLOCKS depth 3-5 debates under DR-165(3)'s
+  no-opinion-unjudged law: full cross-review coverage now fits inside the
+  ceiling, so the typed NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED refusal
+  (which correctly stopped V's own depth-5 ask 045beacd at zero spend) no
+  longer triggers for ratified depths. Seed source_ref advances to
+  acceptance:DR-172:V-approved; register hash changes, so the standing
+  stack requires V's ruled backup-then-reseed flow on next boot. Supersedes
+  DR-159's member VALUES; every other DR-159 clause (retry tolerance,
+  refuse-before-spend, per-call-site 3 attempts) stands. | V ruled the
+  waiting finishing-packet §2 table after hitting the refusal live | depth
+  3-5 unlock | — | ACTIVE
