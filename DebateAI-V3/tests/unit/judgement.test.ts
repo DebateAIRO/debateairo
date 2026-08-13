@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Judge } from "@debateai/judgement";
-import type { ProviderGateway } from "@debateai/providers";
+import { ProviderContentUnacceptedError, type ProviderGateway } from "@debateai/providers";
 
 describe("Organ 2 / P4 — one-node judge contract", () => {
   it("parses a provider artifact and relabels unpinned LOOKED_UP as REASONING", async () => {
@@ -139,6 +139,71 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       questionLine: "Test-layer question", providerRef: "provider:test",
       contractHash: "contract:test", bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE" });
+  });
+
+  it("BUG-01 T7/T10 declares the incident extra key and bogus claim_type as retryable schema failures", async () => {
+    const validArtifact = {
+      statement: "A test-layer judgement.", way_of_knowing: "REASONING", locator: null,
+      restatement_text: "A test-layer judgement.", restatement_status: "PASS", value_laden: false,
+      steelman: { summary: "Strongest version.", fidelity: 0.8 },
+      critic: { summary: "Plausible counter.", counterargumentStrength: 0.2, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.7, relevance: 0.9 }, context: { fit: 0.8, ambiguityFlags: [] },
+      fallacy: { severity: 0.1, fatalFlags: [] }
+    };
+    const classifications: unknown[] = [];
+    const provider: ProviderGateway = {
+      call: async (request) => {
+        classifications.push(request.classifyContent?.(JSON.stringify({
+          ...validArtifact, evidence: { ...validArtifact.evidence, notes_absent: true }
+        })));
+        classifications.push(request.classifyContent?.(JSON.stringify({ ...validArtifact, claim_type: "bogus" })));
+        throw new ProviderContentUnacceptedError(2, "SCHEMA_FAILED", "last schema error", "artifact:last", "ledger:last");
+      }
+    };
+    await expect(new Judge(provider).judge({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge",
+      questionLine: "Test-layer question", providerRef: "provider:test", contractHash: "contract:test",
+      bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }
+    })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE", message: "last schema error" });
+    expect(classifications).toEqual([
+      expect.objectContaining({ parseStatus: "SCHEMA_FAILED" }),
+      expect.objectContaining({ parseStatus: "SCHEMA_FAILED" })
+    ]);
+  });
+
+  it("BUG-01 T8 translates provider exhaustion to the unchanged judge code and exposes a machine-error-only repair packet", async () => {
+    let repairText = "";
+    const provider: ProviderGateway = {
+      call: async (request) => {
+        const repaired = request.buildRepairPacket?.({
+          rawText: "raw model content must not be interpolated", parseStatus: "SCHEMA_FAILED",
+          parseError: "machine schema error"
+        });
+        repairText = JSON.stringify(repaired);
+        throw new ProviderContentUnacceptedError(3, "SCHEMA_FAILED", "last schema error", "artifact:last", "ledger:last");
+      }
+    };
+    await expect(new Judge(provider).judge({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge",
+      questionLine: "Test-layer question", providerRef: "provider:test", contractHash: "contract:test",
+      bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 }
+    })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE", message: "last schema error" });
+    expect(repairText).toContain("machine schema error");
+    expect(repairText).not.toContain("raw model content must not be interpolated");
+  });
+
+  it("BUG-01 T9 translates review exhaustion to the unchanged node-review code", async () => {
+    const provider: ProviderGateway = {
+      call: async () => { throw new ProviderContentUnacceptedError(
+        3, "SCHEMA_FAILED", "last review schema error", "artifact:last", "ledger:last"
+      ); }
+    };
+    await expect(new Judge(provider).review({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture:review",
+      questionLine: "Test-layer question", statement: "Test-layer statement", authorMaker: "maker:a",
+      providerRef: "provider:test", contractHash: "contract:test",
+      bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 }
+    })).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE", message: "last review schema error" });
   });
 });
 

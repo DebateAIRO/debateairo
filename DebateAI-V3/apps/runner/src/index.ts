@@ -41,8 +41,11 @@ import {
 } from "@debateai/valuation";
 import {
   OpenAICompatibleProviderGateway,
+  ProviderContentUnacceptedError,
   type CallBound,
+  type ContentClassification,
   type OpenAICompatibleGatewayOptions,
+  type PromptPacket,
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderGateway
@@ -201,6 +204,43 @@ function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T
     return schema.parse(JSON.parse(content));
   } catch (error) {
     throw new TypedDomainError(code, error instanceof Error ? error.message : String(error));
+  }
+}
+
+function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): ContentClassification {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(content);
+  } catch (error) {
+    return { parseStatus: "PARSE_FAILED", parseError: error instanceof Error ? error.message : String(error) };
+  }
+  const parsed = schema.safeParse(decoded);
+  return parsed.success
+    ? { parseStatus: "PARSED", parseError: null }
+    : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
+}
+
+function buildSchemaRepairPacket(packet: PromptPacket, parseError: string): PromptPacket {
+  return {
+    messages: [...packet.messages, {
+      role: "user",
+      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}\nReturn a new response that follows the system schema exactly.`
+    }]
+  };
+}
+
+async function callWithContentContract(
+  provider: ProviderGateway,
+  request: ProviderCallRequest,
+  organFailureCode: string
+): Promise<ProviderCallResult> {
+  try {
+    return await provider.call(request);
+  } catch (error) {
+    if (error instanceof ProviderContentUnacceptedError) {
+      throw new TypedDomainError(organFailureCode, error.lastParseError);
+    }
+    throw error;
   }
 }
 
@@ -1132,7 +1172,19 @@ export class WalkingSkeletonRunner {
     }, {
       measureCompositionBundle: (facts) => Buffer.byteLength(JSON.stringify(facts), "utf8"),
       compose: async (facts, attempt) => {
-        const response = await this.provider.call({
+        const packet: PromptPacket = { messages: [
+          // TERM-01 rework 2 (S04 prompt class, composer organ): the system
+          // prompt must declare the ruled serve-gate segment contract —
+          // including the reasoning-only two-segment form — because the gate
+          // is byte-strict and repairs nothing.
+          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
+          { role: "user", content: JSON.stringify({
+            factBundle: facts,
+            availableNodes: servedNodes.map((node) => ({ ref: "primary", nodeId: node.nodeId, fact: node.text })),
+            availableServedNumberRefs: ["number:final-strength"]
+          }) }
+        ] };
+        const response = await callWithContentContract(this.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `COMPOSER:${attempt}`,
@@ -1141,19 +1193,10 @@ export class WalkingSkeletonRunner {
           bound: this.settings.composerBound,
           contractHash: this.settings.composerContractHash,
           providerRef: this.settings.providerRef,
-          packet: { messages: [
-            // TERM-01 rework 2 (S04 prompt class, composer organ): the system
-            // prompt must declare the ruled serve-gate segment contract —
-            // including the reasoning-only two-segment form — because the gate
-            // is byte-strict and repairs nothing.
-            { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
-            { role: "user", content: JSON.stringify({
-              factBundle: facts,
-              availableNodes: servedNodes.map((node) => ({ ref: "primary", nodeId: node.nodeId, fact: node.text })),
-              availableServedNumberRefs: ["number:final-strength"]
-            }) }
-          ] }
-        });
+          packet,
+          classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
+          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
+        }, "COMPOSITION_CONTRACT_ERROR");
         const parsed = parseComposerOutput(response.content);
         const composedSegments = parsed.segments.map((segment) => {
           if (segment.segment_id === "memory:disclosure") {
@@ -1188,7 +1231,11 @@ export class WalkingSkeletonRunner {
       },
       conform: async (segment, state) => {
         const segmentIndex = finalSegments.findIndex((candidate) => candidate.segmentId === segment.segmentId);
-        const response = await this.provider.call({
+        const packet: PromptPacket = { messages: [
+          { role: "system", content: "Return only JSON {conforms,findings}. Judge this segment against the frozen fact bundle." },
+          { role: "user", content: JSON.stringify({ factBundle, segment }) }
+        ] };
+        const response = await callWithContentContract(this.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `CONFORMANCE:${compositionAttempt}:${segmentIndex}`,
@@ -1197,17 +1244,20 @@ export class WalkingSkeletonRunner {
           bound: this.settings.conformanceBound,
           contractHash: this.settings.conformanceContractHash,
           providerRef: this.settings.providerRef,
-          packet: { messages: [
-            { role: "system", content: "Return only JSON {conforms,findings}. Judge this segment against the frozen fact bundle." },
-            { role: "user", content: JSON.stringify({ factBundle, segment }) }
-          ] }
-        });
+          packet,
+          classifyContent: (content) => classifyStructuredContent(content, conformanceSchema),
+          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
+        }, "CONFORMANCE_CONTRACT_ERROR");
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         const parsed = parseContent(response.content, conformanceSchema, "CONFORMANCE_CONTRACT_ERROR");
         return { segmentId: segment.segmentId, state, conforms: parsed.conforms };
       },
       postComposeR9: async (segments) => {
-        const response = await this.provider.call({
+        const packet: PromptPacket = { messages: [
+          { role: "system", content: "Return only JSON {pass}. Apply the R9 stranger-restatement check to the composed verdict." },
+          { role: "user", content: JSON.stringify({ question: run.questionLine, segments }) }
+        ] };
+        const response = await callWithContentContract(this.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `POST_COMPOSE_R9:${compositionAttempt}`,
@@ -1216,11 +1266,10 @@ export class WalkingSkeletonRunner {
           bound: this.settings.conformanceBound,
           contractHash: this.settings.conformanceContractHash,
           providerRef: this.settings.providerRef,
-          packet: { messages: [
-            { role: "system", content: "Return only JSON {pass}. Apply the R9 stranger-restatement check to the composed verdict." },
-            { role: "user", content: JSON.stringify({ question: run.questionLine, segments }) }
-          ] }
-        });
+          packet,
+          classifyContent: (content) => classifyStructuredContent(content, r9Schema),
+          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
+        }, "POST_COMPOSE_R9_CONTRACT_ERROR");
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         return parseContent(response.content, r9Schema, "POST_COMPOSE_R9_CONTRACT_ERROR").pass;
       },

@@ -12,9 +12,10 @@ afterEach(async () => {
 
 describe("FX-HR-H1 — one provider interface", () => {
   it("FX-LG-16 persists the contract classifier's parse-vs-schema outcome on the unconditional artifact", async () => {
+    let attempt = 0;
     const server = createServer((_request, response) => response.end(JSON.stringify({
       id: "fixture-classified", model: "fixture/model",
-      choices: [{ message: { content: "valid-json-wrong-schema" } }]
+      choices: [{ message: { content: ++attempt === 1 ? "valid-json-wrong-schema" : "accepted-json" } }]
     })));
     servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -26,15 +27,132 @@ describe("FX-HR-H1 — one provider interface", () => {
       persistRawArtifact: async (artifact) => { recorded.push(artifact); return "artifact:classified"; },
       appendLedgerEntry: async () => "ledger:classified", assertNoOpenWriteTransaction: () => undefined
     });
-    await gateway.call({
+    const result = await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
-      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
+      bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
       providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
-      classifyContent: () => ({ parseStatus: "SCHEMA_FAILED", parseError: "test-layer schema mismatch" })
+      classifyContent: (content) => content === "accepted-json"
+        ? { parseStatus: "PARSED", parseError: null }
+        : { parseStatus: "SCHEMA_FAILED", parseError: "test-layer schema mismatch" }
     });
-    expect(recorded).toEqual([expect.objectContaining({
-      parseStatus: "SCHEMA_FAILED", parseError: "test-layer schema mismatch"
-    })]);
+    expect(result.content).toBe("accepted-json");
+    expect(recorded).toEqual([
+      expect.objectContaining({ parseStatus: "SCHEMA_FAILED", parseError: "test-layer schema mismatch" }),
+      expect.objectContaining({ parseStatus: "PARSED", parseError: null })
+    ]);
+  });
+
+  it("BUG-01 T1/T2 retries declared schema rejection and ledgers FAILED before OK with artifact links", async () => {
+    let attempt = 0;
+    const server = createServer((_request, response) => response.end(JSON.stringify({
+      id: `fixture-${attempt + 1}`, model: "fixture/model",
+      choices: [{ message: { content: ++attempt === 1 ? "rejected" : "accepted" } }]
+    })));
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server did not bind");
+    const artifacts: Array<{ parseStatus: string; parseError?: string | null; artifactId: string }> = [];
+    const ledger: Array<{ outcome: string; rawArtifactRef: string | null }> = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
+      persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
+      appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    const result = await gateway.call({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
+      providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
+      classifyContent: (content) => content === "accepted"
+        ? { parseStatus: "PARSED", parseError: null }
+        : { parseStatus: "SCHEMA_FAILED", parseError: "first schema error" }
+    });
+    expect(result.content).toBe("accepted");
+    expect(artifacts.map(({ parseStatus, parseError }) => ({ parseStatus, parseError }))).toEqual([
+      { parseStatus: "SCHEMA_FAILED", parseError: "first schema error" },
+      { parseStatus: "PARSED", parseError: null }
+    ]);
+    expect(ledger).toEqual([
+      expect.objectContaining({ outcome: "FAILED", rawArtifactRef: artifacts[0]!.artifactId }),
+      expect.objectContaining({ outcome: "OK", rawArtifactRef: artifacts[1]!.artifactId })
+    ]);
+  });
+
+  it("BUG-01 T3 exhausts the declared content bound with the last structured parse error", async () => {
+    let attempt = 0;
+    const server = createServer((_request, response) => response.end(JSON.stringify({
+      id: `fixture-${attempt + 1}`, model: "fixture/model",
+      choices: [{ message: { content: `rejected-${++attempt}` } }]
+    })));
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server did not bind");
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
+      persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => `ledger:${entry.attemptId}`,
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    await expect(gateway.call({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:test",
+      providerRef: "provider:test", packet: { messages: [{ role: "user", content: "fixture" }] },
+      classifyContent: (content) => ({ parseStatus: "SCHEMA_FAILED", parseError: `error:${content}` })
+    })).rejects.toMatchObject({
+      code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2, lastParseStatus: "SCHEMA_FAILED",
+      lastParseError: "error:rejected-2"
+    });
+  });
+
+  it("BUG-01 T5/T6 hashes each repair packet but preserves contract identity and resends identically without a builder", async () => {
+    const runCase = async (withBuilder: boolean) => {
+      let attempt = 0;
+      const bodies: string[] = [];
+      const ledger: Array<{ inputHash: string; contractHash: string }> = [];
+      const server = createServer((request, response) => {
+        let body = "";
+        request.on("data", (chunk) => { body += String(chunk); });
+        request.on("end", () => {
+          bodies.push(body);
+          response.end(JSON.stringify({
+            id: `fixture-${attempt + 1}`, model: "fixture/model",
+            choices: [{ message: { content: ++attempt === 1 ? "rejected" : "accepted" } }]
+          }));
+        });
+      });
+      servers.push(server);
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("test server did not bind");
+      const gateway = new OpenAICompatibleProviderGateway({
+        endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
+        persistRawArtifact: async (artifact) => artifact.artifactId,
+        appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
+        assertNoOpenWriteTransaction: () => undefined
+      });
+      await gateway.call({
+        runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }, contractHash: "contract:fixed",
+        providerRef: "provider:test", packet: { messages: [{ role: "user", content: "base" }] },
+        classifyContent: (content) => content === "accepted"
+          ? { parseStatus: "PARSED", parseError: null }
+          : { parseStatus: "SCHEMA_FAILED", parseError: "machine-only-error" },
+        ...(withBuilder ? {
+          buildRepairPacket: ({ parseError }: { parseError: string }) => ({
+            messages: [{ role: "user" as const, content: `base\nSchema error: ${parseError}` }]
+          })
+        } : {})
+      });
+      return { bodies, ledger };
+    };
+    const repaired = await runCase(true);
+    expect(repaired.ledger[0]!.inputHash).not.toBe(repaired.ledger[1]!.inputHash);
+    expect(repaired.ledger.map((entry) => entry.contractHash)).toEqual(["contract:fixed", "contract:fixed"]);
+    const resent = await runCase(false);
+    expect(resent.bodies[1]).toBe(resent.bodies[0]);
+    expect(resent.ledger[1]!.inputHash).toBe(resent.ledger[0]!.inputHash);
   });
 
   it("persists the raw real HTTP response unconditionally before ledgering the attempt", async () => {
@@ -73,7 +191,7 @@ describe("FX-HR-H1 — one provider interface", () => {
       callSiteKey: "fixture:judge",
       role: "JUDGE",
       lane: "served",
-      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 },
+      bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
       contractHash: "contract:test",
       providerRef: "provider:test",
       packet: { messages: [{ role: "user", content: "test fixture only" }] }

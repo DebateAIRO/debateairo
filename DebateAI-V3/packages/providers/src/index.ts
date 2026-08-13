@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
+import { TypedDomainError } from "@debateai/kernel";
 
 export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE"] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
@@ -18,6 +19,16 @@ export interface PromptPacket {
   }[];
 }
 
+export type ContentClassification =
+  | { readonly parseStatus: "PARSED"; readonly parseError: null }
+  | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
+
+export interface RejectedProviderContent {
+  readonly rawText: string;
+  readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+  readonly parseError: string;
+}
+
 export interface ProviderCallRequest {
   readonly runId: string | null;
   readonly subjectItemId: string;
@@ -28,10 +39,34 @@ export interface ProviderCallRequest {
   readonly contractHash: string;
   readonly providerRef: string;
   readonly packet: PromptPacket;
-  readonly classifyContent?: (content: string) => {
-    readonly parseStatus: "PARSED" | "PARSE_FAILED" | "SCHEMA_FAILED";
-    readonly parseError: string | null;
-  };
+  readonly classifyContent?: (content: string) => ContentClassification;
+  readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
+}
+
+export class ProviderCallFailedError extends TypedDomainError {
+  override readonly code = "PROVIDER_CALL_FAILED";
+  override readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super("PROVIDER_CALL_FAILED", "PROVIDER_CALL_FAILED");
+    this.name = "ProviderCallFailedError";
+    this.cause = cause;
+  }
+}
+
+export class ProviderContentUnacceptedError extends TypedDomainError {
+  override readonly code = "PROVIDER_CONTENT_UNACCEPTED";
+
+  constructor(
+    readonly attempts: number,
+    readonly lastParseStatus: "PARSE_FAILED" | "SCHEMA_FAILED",
+    readonly lastParseError: string,
+    readonly lastRawArtifactRef: string,
+    readonly lastLedgerEntryRef: string
+  ) {
+    super("PROVIDER_CONTENT_UNACCEPTED", lastParseError);
+    this.name = "ProviderContentUnacceptedError";
+  }
 }
 
 export interface ProviderCallResult {
@@ -149,14 +184,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
-    const inputHash = digest(JSON.stringify(request.packet));
     const fetcher = this.#options.fetchImplementation ?? fetch;
     let lastError: unknown;
+    let attemptPacket = request.packet;
+    let lastContentRejection: {
+      attempts: number;
+      parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED";
+      parseError: string;
+      rawArtifactRef: string;
+      ledgerEntryRef: string;
+    } | null = null;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
+      let ledgerRecorded = false;
       try {
         const headers: Record<string, string> = { "content-type": "application/json" };
         if (this.#options.authorizationHeader !== undefined) {
@@ -169,7 +213,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           body: JSON.stringify({
             model: this.#options.model,
             max_tokens: request.bound.tokenCeiling,
-            messages: request.packet.messages
+            messages: attemptPacket.messages
           })
         });
         const rawText = await response.text();
@@ -182,9 +226,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const candidate = z.object({ id: z.string(), model: z.string() }).passthrough().safeParse(decoded);
         const strict = responseSchema.safeParse(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
-        let classifiedContent: {
-          parseStatus: "PARSED" | "UNPARSED" | "PARSE_FAILED" | "SCHEMA_FAILED";
-          parseError: string | null;
+        let classifiedContent: ContentClassification | {
+          readonly parseStatus: "UNPARSED";
+          readonly parseError: null;
         };
         try {
           classifiedContent = content === null
@@ -218,6 +262,43 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
         const responseJson = responseSchema.parse(decoded);
+        if (
+          request.classifyContent !== undefined
+          && (classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED")
+        ) {
+          const ledgerEntryRef = await this.#options.appendLedgerEntry({
+            attemptId,
+            runId: request.runId,
+            actionKind: "MODEL_CALL",
+            callSiteKey: request.callSiteKey,
+            subjectItemId: request.subjectItemId,
+            stanceAtAction: "UNASSIGNED",
+            outcome: "FAILED",
+            inputHash,
+            contractHash: request.contractHash,
+            actorRef: request.providerRef,
+            rawArtifactRef,
+            startedAt,
+            finishedAt: new Date()
+          });
+          ledgerRecorded = true;
+          lastContentRejection = {
+            attempts: attempt,
+            parseStatus: classifiedContent.parseStatus,
+            parseError: classifiedContent.parseError,
+            rawArtifactRef,
+            ledgerEntryRef
+          };
+          if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
+            attemptPacket = request.buildRepairPacket({
+              rawText: responseJson.choices[0]!.message.content,
+              parseStatus: classifiedContent.parseStatus,
+              parseError: classifiedContent.parseError
+            });
+          }
+          continue;
+        }
+        lastContentRejection = null;
         const ledgerEntryRef = await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
@@ -233,6 +314,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           startedAt,
           finishedAt: new Date()
         });
+        ledgerRecorded = true;
         return {
           rawArtifactRef,
           ledgerEntryRef,
@@ -243,8 +325,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           modelVersion: responseJson.model
         };
       } catch (error) {
+        lastContentRejection = null;
         lastError = error;
-        await this.#options.appendLedgerEntry({
+        if (!ledgerRecorded) await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
           actionKind: "MODEL_CALL",
@@ -261,7 +344,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         });
       }
     }
-    throw new Error("PROVIDER_CALL_FAILED", { cause: lastError });
+    if (lastContentRejection !== null) {
+      throw new ProviderContentUnacceptedError(
+        lastContentRejection.attempts,
+        lastContentRejection.parseStatus,
+        lastContentRejection.parseError,
+        lastContentRejection.rawArtifactRef,
+        lastContentRejection.ledgerEntryRef
+      );
+    }
+    throw new ProviderCallFailedError(lastError);
   }
 }
 

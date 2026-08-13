@@ -10,6 +10,7 @@ import {
   WorkItemRepository
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
+import { BudgetRepository } from "@debateai/budget";
 import { RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
@@ -189,6 +190,88 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await database?.stop();
+});
+
+describe("BUG-01 content-rejection retry accounting", () => {
+  it("T11/T13 charges every rejected attempt while terminal execution counts only the accepted attempt", async () => {
+    const question = `bug01-accounting-${randomUUID()}`;
+    const { runId, workItemId } = await createRunnerWork(question);
+    const provider = await startProviderDouble(["rejected-one", "rejected-two", "accepted-three"]);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      });
+      const result = await gateway.call({
+        runId, subjectItemId: workItemId, callSiteKey: "JUDGE", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
+        contractHash: "contract:bug01-accounting", providerRef: "provider:test-layer",
+        packet: { messages: [{ role: "user", content: "test-layer accounting fixture" }] },
+        classifyContent: (content) => content === "accepted-three"
+          ? { parseStatus: "PARSED", parseError: null }
+          : { parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` }
+      });
+      expect(result.content).toBe("accepted-three");
+      expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(3);
+      expect(await new LedgerRepository(database.pool).countModelAttempts({
+        runId, workItemId, contractHash: "contract:bug01-accounting", callSiteKey: "JUDGE"
+      })).toBe(3);
+      const facts = await readTerminalRecordedFacts(database.pool, runId);
+      expect(facts.ledger.judgeCallCount).toBe(1);
+      const outcomes = await database.pool.query<{ outcome: string; parse_status: string }>(
+        `SELECT entry.outcome, artifact.parse_status
+         FROM ledger.ledger_entry AS entry
+         JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref
+         WHERE entry.run_id = $1 AND entry.call_site_key = 'JUDGE'
+         ORDER BY entry.sequence`,
+        [runId]
+      );
+      expect(outcomes.rows).toEqual([
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "OK", parse_status: "PARSED" }
+      ]);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:BUG01_ACCOUNTING_COMPLETE"
+      });
+    }
+  });
+
+  it("T12 exposes the last rejected artifact to the redelivery exhaustion check", async () => {
+    const question = `bug01-exhaustion-${randomUUID()}`;
+    const { runId, workItemId } = await createRunnerWork(question);
+    const provider = await startProviderDouble(["rejected-one", "rejected-two", "rejected-three"]);
+    const ledger = new LedgerRepository(database.pool);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      });
+      await expect(gateway.call({
+        runId, subjectItemId: workItemId, callSiteKey: "JUDGE:retry", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
+        contractHash: "contract:bug01-exhaustion", providerRef: "provider:test-layer",
+        packet: { messages: [{ role: "user", content: "test-layer exhaustion fixture" }] },
+        classifyContent: (content) => ({ parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` })
+      })).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 3 });
+      const exhausted = await ledger.findExhaustedModelAttempt({
+        runId, workItemId, contractHash: "contract:bug01-exhaustion", maxAttempts: 3
+      });
+      expect(exhausted).toEqual(expect.objectContaining({ artifactRef: expect.any(String) }));
+      const last = await database.pool.query<{ raw_artifact_ref: string }>(
+        `SELECT raw_artifact_ref FROM ledger.ledger_entry
+         WHERE run_id = $1 AND subject_item_id = $2 AND call_site_key = 'JUDGE:retry'
+         ORDER BY sequence DESC LIMIT 1`,
+        [runId, workItemId]
+      );
+      expect(exhausted?.artifactRef).toBe(last.rows[0]!.raw_artifact_ref);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:BUG01_EXHAUSTION_COMPLETE"
+      });
+    }
+  });
 });
 
 describe("LOAD-01 run projection ownership boundary", () => {
@@ -1816,9 +1899,11 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
   async function startContractAwareProviderDouble(): Promise<{
     readonly endpoint: string;
     composerSystemPrompt(): string;
+    composerCalls(): number;
     stop(): Promise<void>;
   }> {
     let composerSystemPrompt = "";
+    let composerCalls = 0;
     const server: Server = createServer((request, response) => {
       const chunks: Buffer[] = [];
       request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -1842,7 +1927,10 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         } else if (system.startsWith("Return only JSON with a segments array")) {
           composerSystemPrompt = system;
           const contractDeclared = reasoningContractFragments.every((fragment) => system.includes(fragment));
-          content = contractDeclared
+          composerCalls += 1;
+          content = composerCalls === 1
+            ? JSON.stringify({ segments: "test-layer schema rejection" })
+            : contractDeclared
             ? JSON.stringify({ segments: [
                 { segment_id: "segment:hypothesis", text: "Hypothesis: the reasoning answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
                 { segment_id: "segment:research-plan", text: "Research plan: gather independent evidence that could lift or defeat the hypothesis.", node_refs: [], served_number_refs: [] }
@@ -1869,6 +1957,7 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     return {
       endpoint: `http://127.0.0.1:${address.port}`,
       composerSystemPrompt: () => composerSystemPrompt,
+      composerCalls: () => composerCalls,
       async stop() {
         server.close();
         await once(server, "close");
@@ -1880,8 +1969,13 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     const provider = await startContractAwareProviderDouble();
     try {
       const work = await createRunnerWork("term01-composer-reasoning-contract");
-      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
+      const settings = runnerSettings();
+      const result = await runnerWithEndpoint(provider.endpoint, {
+        ...settings,
+        composerBound: { ...settings.composerBound, maxAttempts: 2 }
+      }).executeWorkItem(work.workItemId);
       expect(result.kind).toBe("COMPLETED");
+      expect(provider.composerCalls()).toBe(2);
       expect(reasoningContractFragments.every((fragment) => provider.composerSystemPrompt().includes(fragment)))
         .toBe(true);
       const answer = await database.pool.query<{ terminal: string; answer_form: { kind: string; hypothesis: string; researchPlan: string } }>(
@@ -1897,6 +1991,18 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         hypothesis: "Hypothesis: the reasoning answer holds provisionally.",
         researchPlan: "Research plan: gather independent evidence that could lift or defeat the hypothesis."
       });
+      const composerAttempts = await database.pool.query<{ outcome: string; parse_status: string }>(
+        `SELECT entry.outcome, artifact.parse_status
+         FROM ledger.ledger_entry AS entry
+         JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref
+         WHERE entry.run_id = $1 AND entry.call_site_key LIKE 'COMPOSER:%'
+         ORDER BY entry.sequence`,
+        [work.runId]
+      );
+      expect(composerAttempts.rows).toEqual([
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "OK", parse_status: "PARSED" }
+      ]);
     } finally { await provider.stop(); }
   });
 });
