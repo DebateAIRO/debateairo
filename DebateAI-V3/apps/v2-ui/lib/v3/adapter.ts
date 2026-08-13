@@ -5,6 +5,7 @@ import type {
   Edge,
   Node as ContractNode
 } from "@debateai/contract";
+import type { RunProjection } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type {
   DebateAdaptiveDepthDryRunResponse,
@@ -134,7 +135,13 @@ function projectGraph(answer: Answer): GraphProjection {
       status: "complete",
       materialized_path: path,
       active_generation_id: null,
-      active_generation: null,
+      active_generation: contractNode.maker_lineage === null
+        ? null
+        : {
+            model_id: contractNode.maker_lineage.model_id,
+            maker: contractNode.maker_lineage.maker
+          },
+      maker: contractNode.maker_lineage?.maker ?? null,
       children: []
     };
     view.children = childIds.map((childId, index) => build(childId, nodeId, depth + 1, index, `${path}.${index}`));
@@ -294,24 +301,73 @@ export type V3ScorePresentation =
   | Readonly<{ status: "ABSENT"; badge: Readonly<{ pillText: string; title: string }> }>;
 
 /**
- * THE VALUE IS RENDERED VERBATIM. V2's own formatScorePercent clamps to [0,1]
- * and multiplies by 100; V3 rules no scale for these numbers, so rescaling or
- * rounding them here would publish a number the run never recorded
- * (AC-76/DR-039). A LabeledNumber is not a bare float either: its `kind`,
- * `producer`, `source` and `replay_handle` ride along in the title, which is
- * also the badge's accessible name.
+ * DR-154(4): restate the recorded probability as a percentage, rounded to the
+ * nearest 0.01 percentage point. Trailing zeroes are omitted. When rounding
+ * changes the represented value, the visible approximation mark and the
+ * detail's original probability make that loss explicit instead of implying
+ * precision the display does not carry.
+ *
+ * This is the one formatter shared by cards, drawers and tooltips. It never
+ * clamps or defaults a contract number (DR-115 / AC-76).
  */
+export function v3ScorePercentage(value: number): Readonly<{ text: string; detail: string }> {
+  const percentage = value * 100;
+  const rounded = Math.round(percentage * 100) / 100;
+  const decimal = rounded.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+  const exact = rounded / 100 === value;
+  return exact
+    ? { text: `${decimal}%`, detail: `${decimal}% (exact percentage restatement)` }
+    : {
+        text: `≈${decimal}%`,
+        detail: `≈${decimal}% (rounded to the nearest 0.01 percentage point from recorded probability ${value})`
+      };
+}
+
+export type V3NodeScoreDetail = Readonly<{
+  id: "base_score" | "final_strength";
+  label: string;
+  percentage: Readonly<{ text: string; detail: string }>;
+  producer: string;
+  source: string;
+  replay_handle: string;
+}>;
+
+export type V3NodeScoreDetails = readonly [V3NodeScoreDetail, V3NodeScoreDetail];
+
+/** The drawer-ready score records, kept executable so percentage drift is test-visible. */
+export function v3NodeScoreDetails(node: ContractNode): V3NodeScoreDetails {
+  return [
+    {
+      id: "base_score",
+      label: `base score (${node.base_score.kind})`,
+      percentage: v3ScorePercentage(node.base_score.value),
+      producer: node.base_score.producer,
+      source: node.base_score.source,
+      replay_handle: node.base_score.replay_handle
+    },
+    {
+      id: "final_strength",
+      label: `final strength (${node.final_strength.kind})`,
+      percentage: v3ScorePercentage(node.final_strength.value),
+      producer: node.final_strength.producer,
+      source: node.final_strength.source,
+      replay_handle: node.final_strength.replay_handle
+    }
+  ];
+}
+
 function labeledNumberBadge(
   id: V3ScoreBadge["id"],
   name: string,
   abbreviation: string,
   number: V3LabeledNumber
 ): V3ScoreBadge {
+  const percentage = v3ScorePercentage(number.value);
   return {
     id,
-    pillText: `${abbreviation} ${number.value}`,
+    pillText: `${abbreviation} ${percentage.text}`,
     title:
-      `${name} ${number.value} · ${number.kind} · produced by ${number.producer} · ` +
+      `${name} ${percentage.detail} · ${number.kind} · produced by ${number.producer} · ` +
       `source ${number.source} · replay ${number.replay_handle}`
   };
 }
@@ -364,7 +420,7 @@ export function liveDebateDetail(runId: string, tree: DebateNode): DebateDetail 
   return {
     id: runId,
     topic: tree.claim,
-    status: tree.status === "complete" ? "complete" : "generating",
+    status: tree.status === "complete" ? "complete" : tree.status === "failed" ? "failed" : "generating",
     config: {},
     direct_answer: null,
     root_node_id: tree.id,
@@ -388,6 +444,27 @@ export function liveDebateDetail(runId: string, tree: DebateNode): DebateDetail 
     models: [],
     node_count: liveNodeCount
   };
+}
+
+/** V2's generating card, backed only by the asker-owned typed run projection. */
+export function debateDetailFromRunProjection(run: RunProjection): DebateDetail {
+  const status = run.state === "FAILED" ? "failed" : "generating";
+  return { ...liveDebateDetail(run.run_ref, {
+    id: run.run_ref,
+    debate_id: run.run_ref,
+    parent_id: null,
+    node_type: "ROOT_CLAIM",
+    label: null,
+    lens: null,
+    depth: 0,
+    position: 0,
+    claim: run.question_line,
+    status,
+    materialized_path: "0",
+    active_generation_id: null,
+    active_generation: null,
+    children: []
+  }), run_state: run.state };
 }
 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
@@ -415,7 +492,7 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
  */
 export const SCORING_ABSENCE_REASON =
   "V3 scores every claim on the answer graph itself: each card carries its recorded base score and final " +
-  "strength, with the full labels and replay handles in the Honesty drawer. What V3 has no resource for is " +
+  "strength, with the full labels and replay handles in each badge tooltip and claim drawer. What V3 has no resource for is " +
   "V2's separate per-node scoring endpoint — so no scoring refresh, holes, fatal flags or score feedback " +
   "exist here.";
 
@@ -525,14 +602,13 @@ export function runCostEnvelopeFromDeployment(deployment: Deployment): RunCostEn
     );
   }
   const riskTierRow = deployment.register.rows.find((candidate) => candidate.row_key === "riskTier");
-  const deploymentRiskTier = riskTierRow?.value ?? null;
-  if (
-    deploymentRiskTier !== null &&
-    deploymentRiskTier !== "casual" &&
-    deploymentRiskTier !== "standard" &&
-    deploymentRiskTier !== "high-stakes"
-  ) {
-    throw new TypedDomainError("RISK_TIER_POLICY_INVALID", "Deployment register row riskTier is invalid.");
+  let deploymentRiskTier: RunCostEnvelopeMember["riskTier"] | null = null;
+  if (riskTierRow !== undefined) {
+    const candidate = riskTierRow.value;
+    if (candidate !== "casual" && candidate !== "standard" && candidate !== "high-stakes") {
+      throw new TypedDomainError("RISK_TIER_POLICY_INVALID", "Deployment register row riskTier is invalid.");
+    }
+    deploymentRiskTier = candidate;
   }
   return Object.freeze({
     registerVersion: deployment.register.register_version,
@@ -570,6 +646,16 @@ export type SettingsModelRow = {
   routing_decision_refs: string[];
 };
 
+type ModelLedgerIdentity = Pick<
+  Deployment["model_ledger"][number],
+  "model_id" | "model_version" | "provider"
+>;
+
+/** Collision-safe ledger identity; the source escape evaluates to the original NUL delimiter. */
+export function modelLedgerIdentityKey(entry: ModelLedgerIdentity): string {
+  return `${entry.model_id}\u0000${entry.model_version}\u0000${entry.provider}`;
+}
+
 export type SettingsView = {
   /** The register version this deployment projection was read at. */
   register_version: number;
@@ -592,7 +678,7 @@ export function settingsViewFromDeployment(deployment: Deployment): SettingsView
     if (!assigned.includes(entry.model_id)) assigned.push(entry.model_id);
     routing[entry.task_class] = assigned;
 
-    const key = `${entry.model_id} ${entry.model_version} ${entry.provider}`;
+    const key = modelLedgerIdentityKey(entry);
     const row = rowsByKey.get(key) ?? {
       model_id: entry.model_id,
       model_version: entry.model_version,

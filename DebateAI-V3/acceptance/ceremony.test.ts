@@ -59,24 +59,36 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
   };
 }
 
+function judgementDouble(statement: string): string {
+  return JSON.stringify({
+    statement,
+    way_of_knowing: "REASONING",
+    locator: null,
+    restatement_text: statement,
+    restatement_status: "PASS",
+    value_laden: false,
+    claim_type: "unknown",
+    steelman: { summary: statement, fidelity: 0.72 },
+    critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.72, relevance: 0.72 },
+    context: { fit: 0.72, ambiguityFlags: [] },
+    fallacy: { severity: 0.28, fatalFlags: [] }
+  });
+}
+
+function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
+  return JSON.stringify({ outcome, reasons: [reason] });
+}
+
 beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), "debateai-acc-01-"));
   database = await startStandingDatabase({ port: await reservePort(), dataDirectory });
   provider = await startProviderDouble([
-    JSON.stringify({
-      statement: "A provisional acceptance answer.",
-      way_of_knowing: "REASONING",
-      locator: null,
-      restatement_text: "A provisional acceptance answer.",
-      restatement_status: "PASS",
-      value_laden: false,
-      claim_type: "unknown",
-      steelman: { summary: "A provisional acceptance answer.", fidelity: 0.72 },
-      critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
-      evidence: { quality: 0.72, relevance: 0.72 },
-      context: { fit: 0.72, ambiguityFlags: [] },
-      fallacy: { severity: 0.28, fatalFlags: [] }
-    }),
+    judgementDouble("A provisional acceptance answer."),
+    judgementDouble("A primary-maker defence of the second root."),
+    judgementDouble("A primary-maker attack on the second root."),
+    judgementDouble("The primary maker directly defends its root and attacks the other root."),
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `OpenAI review ${index + 1}`)),
     JSON.stringify({ segments: [
       { segment_id: "segment:verdict", text: "A provisional acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:next", text: "Verify the proposal independently.", node_refs: [], served_number_refs: [] }
@@ -85,23 +97,14 @@ beforeAll(async () => {
     JSON.stringify({ conforms: true, findings: [] }),
     JSON.stringify({ pass: true })
   ]);
-  // FAIR-01 (DR-140(b)): the SECOND maker's transport double — one real-shaped
-  // judge artifact carrying the genuine counter-position.
+  // PANEL-01: the second maker independently authors a root, grows both
+  // primary-root children, and authors its ordered cross-root response.
   criticProvider = await startProviderDouble([
-    JSON.stringify({
-      statement: "The strongest genuine counter-position to the acceptance answer.",
-      way_of_knowing: "REASONING",
-      locator: null,
-      restatement_text: "The strongest genuine counter-position to the acceptance answer.",
-      restatement_status: "PASS",
-      value_laden: false,
-      claim_type: "unknown",
-      steelman: { summary: "Steelmanned counter-position.", fidelity: 0.7 },
-      critic: { summary: "Counter to the counter.", counterargumentStrength: 0.31, basis: "PLAUSIBLE_COUNTER" },
-      evidence: { quality: 0.6, relevance: 0.8 },
-      context: { fit: 0.7, ambiguityFlags: [] },
-      fallacy: { severity: 0.15, fatalFlags: [] }
-    })
+    judgementDouble("An independent Anthropic position on the question."),
+    judgementDouble("A genuine supporting case for the acceptance answer."),
+    judgementDouble("The strongest genuine counter-position to the acceptance answer."),
+    judgementDouble("The second maker directly defends its root and attacks the primary root."),
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`))
   ]);
 });
 
@@ -130,6 +133,7 @@ describe("ACC-01 dry-run ceremony", () => {
       composerBound: bound,
       conformanceBound: bound,
       providerRef: "acceptance:codex-cli",
+      maker: "OpenAI",
       judgeContractHash: "a".repeat(64),
       composerContractHash: "b".repeat(64),
       conformanceContractHash: "c".repeat(64),
@@ -177,7 +181,7 @@ describe("ACC-01 dry-run ceremony", () => {
         judgeWeightVersion: "acceptance:test-layer",
         reducerVersion: "acceptance:test-layer"
       },
-      critique: { provider: refusingProvider, providerRef: "acceptance:claude-cli" }
+      critique: { provider: refusingProvider, providerRef: "acceptance:claude-cli", maker: "Anthropic" }
       // scoringOperator deliberately omitted — the unruled composition.
     });
     await expect(runner.executeNext()).rejects.toMatchObject({ code: "SCORING_OPERATOR_UNRESOLVED" });
@@ -232,7 +236,7 @@ describe("ACC-01 dry-run ceremony", () => {
         tier_provenance_ref: "acceptance:test-layer:asker",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        agent_count: 1,
+        agent_count: 2,
         decision_owner: "acceptance-test-owner",
         action_owner: "acceptance-test-owner",
         decision_scope: "acceptance-test",
@@ -253,6 +257,7 @@ describe("ACC-01 dry-run ceremony", () => {
         [runId]
       );
       workState = work.rows[0];
+      if (workState?.state === "FAILED") throw new Error(`ACCEPTANCE_WORK_FAILED:${workState.terminal_reason}`);
       expect(workState?.state).toBe("DONE");
     });
     expect(workState).toEqual({ state: "DONE", terminal_reason: null });
@@ -294,8 +299,17 @@ describe("ACC-01 dry-run ceremony", () => {
     // DR-139(4): the served answer names each owed-but-unexecuted check.
     const answerPayload = owned.json() as {
       condition_marks: string[];
-      condition_mark_records: { mark: string; subject_ref: string }[];
+      condition_mark_records: {
+        mark: string;
+        subject_ref: string;
+        reason: string;
+        served_root_rule: string | null;
+      }[];
     };
+    // PANEL-01 rev2 / DR-161: removing the multi-maker mark (the exact []
+    // mutation that survived rev1) or its typed record must fail this ceremony.
+    expect(answerPayload.condition_marks).toContain("UNSERVED-MAKER-POSITION");
+    expect(answerPayload.condition_marks).not.toContain("UNCOVERED-SCOPE");
     expect(answerPayload.condition_marks).toContain("OWED-CHECK-UNEXECUTED");
     const owedRows = answerPayload.condition_mark_records
       .filter((record) => record.mark === "OWED-CHECK-UNEXECUTED")
@@ -318,9 +332,9 @@ describe("ACC-01 dry-run ceremony", () => {
       .sort();
     expect(typeFallbackRows).toEqual(["Q37", "Q50"]);
 
-    // FAIR-01 (DR-140(b)): the settled debate's answer graph carries MORE THAN
-    // ONE NODE — the position AND the genuine counter-position — joined by a
-    // real attack edge, each node with its own maker's artifact lineage.
+    // PRO-01 (DR-149/DR-159): depth 1 means one expansion round — the neutral
+    // question remains synthetic, while the graph carries a position plus a
+    // real PRO and a real CON child.
     const graphPayload = owned.json() as {
       nodes: {
         node_id: string;
@@ -329,26 +343,42 @@ describe("ACC-01 dry-run ceremony", () => {
         defeater_refs: string[];
         base_score: { value: number };
         final_strength: { value: number; source: string };
+        maker_lineage: { maker: string };
+        review: null | {
+          outcome: "agree" | "dispute" | "cannot-assess";
+          reasons: string[];
+          reviewer_lineage: { maker: string };
+        };
       }[];
       edges: { edge_id: string; from_node_ref: string; target_ref: string; relation: string; placeholder: boolean }[];
       number_slots: ({ status: "PRESENT"; number: { value: number } } | { status: string })[];
     };
-    expect(graphPayload.nodes).toHaveLength(2);
-    expect(graphPayload.edges).toHaveLength(1);
+    expect(graphPayload.nodes).toHaveLength(8);
+    expect(graphPayload.edges).toHaveLength(8);
     const positionNode = graphPayload.nodes[0]!;
-    const counterNode = graphPayload.nodes[1]!;
+    const secondRootNode = graphPayload.nodes[1]!;
+    const defenderNode = graphPayload.nodes[2]!;
+    const counterNode = graphPayload.nodes[3]!;
     expect(positionNode.claim).toBe("A provisional acceptance answer.");
+    expect(secondRootNode.claim).toBe("An independent Anthropic position on the question.");
+    expect(defenderNode.claim).toBe("A genuine supporting case for the acceptance answer.");
     expect(counterNode.claim).toBe("The strongest genuine counter-position to the acceptance answer.");
-    expect(graphPayload.edges[0]).toMatchObject({
+    expect(graphPayload.edges).toEqual(expect.arrayContaining([expect.objectContaining({
+      from_node_ref: defenderNode.node_id,
+      target_ref: positionNode.node_id,
+      relation: "support",
+      placeholder: true
+    }), expect.objectContaining({
       from_node_ref: counterNode.node_id,
       target_ref: positionNode.node_id,
       relation: "attack",
       placeholder: true
-    });
+    })]));
     expect(positionNode.defeater_refs).toEqual([counterNode.node_id]);
 
     // Honest per-node lineage: each node's provenance artifact carries its own
-    // maker; the debate persisted TWO distinct makers (DR-140(b), DR-115).
+    // maker; both children were actually authored by the configured secondary
+    // maker, never relabelled from the primary position (DR-149, DR-115).
     const nodeMakers = await database.pool.query<{ node_id: string; maker: string }>(
       `SELECT node.node_id, artifact.maker
        FROM core.node AS node
@@ -356,7 +386,31 @@ describe("ACC-01 dry-run ceremony", () => {
        WHERE node.run_id = $1 ORDER BY node.created_at_seq`,
       [runId]
     );
-    expect(nodeMakers.rows.map((row) => row.maker)).toEqual(["OpenAI", "Anthropic"]);
+    expect(nodeMakers.rows.map((row) => row.maker)).toEqual([
+      "OpenAI", "Anthropic", "Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "Anthropic"
+    ]);
+    expect(graphPayload.nodes.every((node) => node.review !== null)).toBe(true);
+    expect(graphPayload.nodes.every(
+      (node) => node.review!.reviewer_lineage.maker !== node.maker_lineage.maker
+    )).toBe(true);
+    expect(new Set(graphPayload.nodes.map((node) => node.review!.outcome))).toEqual(
+      new Set(["agree", "dispute"])
+    );
+    const unservedMakerRecord = answerPayload.condition_mark_records.find(
+      (record) => record.mark === "UNSERVED-MAKER-POSITION"
+    );
+    expect(unservedMakerRecord).toEqual(expect.objectContaining({
+      subject_ref: positionNode.node_id,
+      served_root_rule: "first-configured-provider"
+    }));
+    expect(unservedMakerRecord?.reason).toContain("OpenAI");
+    expect(unservedMakerRecord?.reason).toContain("Anthropic");
+    expect(unservedMakerRecord?.reason).toContain(positionNode.node_id);
+    expect(unservedMakerRecord?.reason).toContain(secondRootNode.node_id);
+    expect(unservedMakerRecord?.reason).not.toContain("first-configured-provider");
+    // The carried rule outcome must match served reality, not merely name a
+    // policy: the served number belongs to the record's subject root.
+    expect(unservedMakerRecord?.subject_ref).toBe(positionNode.node_id);
 
     // Honest per-node strength lineage: each recorded strength cites ITS node's
     // artifact, never the position's artifact stamped onto the counter.
@@ -369,7 +423,7 @@ describe("ACC-01 dry-run ceremony", () => {
        WHERE propagation.run_id = $1`,
       [runId]
     );
-    expect(strengthLineage.rows).toHaveLength(2);
+    expect(strengthLineage.rows).toHaveLength(8);
     for (const row of strengthLineage.rows) {
       expect(row.source_ref).toBe(row.provenance_ref);
     }
@@ -389,21 +443,29 @@ describe("ACC-01 dry-run ceremony", () => {
     );
     expect(packetCount.rows[0]?.count).toBe("0");
 
-    // The critic's model call is a recorded first-class MODEL_CALL at its own
-    // call site, budgeted within the DR-138 run total.
-    const criticCalls = await database.pool.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM ledger.ledger_entry
-       WHERE run_id = $1 AND action_kind = 'MODEL_CALL' AND call_site_key = 'JUDGE:critic'`,
+    // Both expansion legs are first-class model calls at distinct call sites.
+    const expansionCalls = await database.pool.query<{ call_site_key: string }>(
+      `SELECT call_site_key FROM ledger.ledger_entry
+       WHERE run_id = $1 AND action_kind = 'MODEL_CALL'
+         AND (call_site_key LIKE 'JUDGE:%:root%:r1:p%' OR call_site_key LIKE 'JUDGE:cross-root:%')
+       ORDER BY call_site_key`,
       [runId]
     );
-    expect(criticCalls.rows[0]?.count).toBe("1");
+    expect(expansionCalls.rows.map((row) => row.call_site_key)).toEqual([
+      "JUDGE:critic:root0:r1:p0",
+      "JUDGE:critic:root1:r1:p1",
+      "JUDGE:cross-root:0->1",
+      "JUDGE:cross-root:1->0",
+      "JUDGE:defender:root0:r1:p0",
+      "JUDGE:defender:root1:r1:p1"
+    ]);
 
     // The RUN-LEVEL fair-debate gate (DR-143 clause 1) passes on this run.
     await expect(assertFairDebate(database.pool, runId)).resolves.toEqual({
-      nodeCount: 2,
-      attackEdgeCount: 1,
+      nodeCount: 8,
+      attackEdgeCount: 4,
       distinctMakers: ["Anthropic", "OpenAI"],
-      independentAttackEdgeCount: 1
+      independentAttackEdgeCount: 4
     });
 
     const foreign = await runtime.api.inject({

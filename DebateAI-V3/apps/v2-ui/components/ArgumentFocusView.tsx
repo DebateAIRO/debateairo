@@ -9,9 +9,7 @@ type ArgumentFocusViewProps = {
   selectedNode: DebateNode;
   selectedPath: DebateNode[];
   token: string | null;
-  onQueued: () => void;
   onError: (message: string) => void;
-  onAuthRejected: () => void;
   onSelectNode: (nodeId: string) => void;
 };
 
@@ -20,9 +18,7 @@ export function ArgumentFocusView({
   selectedNode,
   selectedPath,
   token,
-  onQueued,
   onError,
-  onAuthRejected,
   onSelectNode,
 }: ArgumentFocusViewProps) {
   const parentNode = selectedPath.length > 1 ? selectedPath[selectedPath.length - 2] : null;
@@ -43,9 +39,7 @@ export function ArgumentFocusView({
             key={child.id}
             node={child}
             token={token}
-            onQueued={onQueued}
             onError={onError}
-            onAuthRejected={onAuthRejected}
             onSelectNode={onSelectNode}
             isSelected={child.id === selectedNode.id}
             selectionLabel={`Focus child argument: ${child.claim}`}
@@ -105,9 +99,7 @@ export function ArgumentFocusView({
         <ArgumentNodeCard
           node={selectedNode}
           token={token}
-          onQueued={onQueued}
           onError={onError}
-          onAuthRejected={onAuthRejected}
           onSelectNode={onSelectNode}
           isSelected
           selectionLabel={`Selected argument: ${selectedNode.claim}`}
@@ -132,9 +124,7 @@ export function ArgumentFocusView({
                   key={child.id}
                   node={child}
                   token={token}
-                  onQueued={onQueued}
                   onError={onError}
-                  onAuthRejected={onAuthRejected}
                   onSelectNode={onSelectNode}
                   selectionLabel={`Focus perspective: ${child.claim}`}
                 />

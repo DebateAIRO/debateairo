@@ -3,8 +3,9 @@
 import type { CSSProperties, MouseEvent } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { modelMeta } from "@/lib/models";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 export type ThreadCallbacks = {
   onOpenNode: (nodeId: string) => void;
@@ -123,7 +124,6 @@ function ThreadRowCard({
   const state = renderStateOf(node);
   const empty = state === "empty";
   const generation = node.active_generation;
-  const model = generation ? modelMeta(generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const hasContinue = trail.length > 0 ? !trail[trail.length - 1] : false;
   // ancestor lanes = every ancestor except the immediate parent
@@ -175,11 +175,8 @@ function ThreadRowCard({
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
               {pal.arrow} {roleLabel(node)}
             </span>
-            {model ? (
-              <span className="metaLine">
-                <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                {model.name}
-              </span>
+            {generation || node.maker !== undefined ? (
+              <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
             ) : null}
           </div>
 
@@ -222,18 +219,15 @@ function ThreadRowCard({
                 >
                   ⚐ Challenge
                 </button>
-                {onRegenNode ? (
-                  <button
-                    type="button"
-                    className="nodeCtrl"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRegenNode(node, event.currentTarget);
-                    }}
-                  >
-                    ↻ Regenerate
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="nodeCtrl"
+                  disabled
+                  aria-disabled="true"
+                  title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                >
+                  ↻ Regenerate
+                </button>
                 {generation?.argument ? (
                   <button
                     type="button"

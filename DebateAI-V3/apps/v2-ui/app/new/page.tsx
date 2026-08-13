@@ -1,12 +1,26 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createDebate, getRunCostEnvelope } from "@/lib/api";
-import type { RunCostEnvelopeView } from "@/lib/v3/adapter";
+import { createDebate, contractClient } from "@/lib/api";
+import { runCostEnvelopeFromDeployment, type RunCostEnvelopeView } from "@/lib/v3/adapter";
 import { selectRunCostEnvelopeMember, selectRunCostEnvelopeMembers } from "@/lib/runCostEnvelopeSelection";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
+import {
+  buildNewDebateAskConfig,
+  askDefaultFailureMessage,
+  DECISION_SCOPE_DEFAULT,
+  dateTimeLocalValue,
+  deriveAgentCountDefault,
+  deriveRiskTierDefault,
+  deriveSessionAskDefaults,
+  MachineDefaultHint,
+  MachineOwnedAskFields,
+  PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
+  type CompositionBudgetTier,
+  type RiskTier
+} from "./defaults";
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -30,6 +44,7 @@ function NewDebateForm({ token }: { token: string }) {
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
   const [depth, setDepth] = useState<number | null>(null);
@@ -39,28 +54,76 @@ function NewDebateForm({ token }: { token: string }) {
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
   const [roleOverrides, setRoleOverrides] = useState("");
-  // UI-01: the V3 run contract requires these explicitly from the asker
-  // (S14 precedent) — the UI supplies no hidden defaults for any of them.
   const [riskTier, setRiskTier] = useState("");
-  const [budgetTier, setBudgetTier] = useState("");
+  const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
+  const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [agentCount, setAgentCount] = useState("");
   const [decisionOwner, setDecisionOwner] = useState("");
   const [actionOwner, setActionOwner] = useState("");
-  const [decisionScope, setDecisionScope] = useState("");
-  const [asOf, setAsOf] = useState("");
+  const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
+  const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
+  const [asOfWasEdited, setAsOfWasEdited] = useState(false);
+  const asOfEditedRef = useRef(false);
+  const [agentCountDefault, setAgentCountDefault] = useState<ReturnType<typeof deriveAgentCountDefault> | null>(null);
+  const [riskTierDefault, setRiskTierDefault] = useState<ReturnType<typeof deriveRiskTierDefault> | null>(null);
+  const [sessionDefaultsProvenance, setSessionDefaultsProvenance] = useState<ReturnType<typeof deriveSessionAskDefaults> | null>(null);
+  const [agentCountDefaultError, setAgentCountDefaultError] = useState<string | null>(null);
+  const [riskTierDefaultError, setRiskTierDefaultError] = useState<string | null>(null);
+  const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void getRunCostEnvelope(token).then((envelope) => {
+    void contractClient.readDeployment(token).then((deployment) => {
       if (!active) return;
-      setRunCostEnvelope(envelope);
-      setEnvelopeError(null);
+      try {
+        setRunCostEnvelope(runCostEnvelopeFromDeployment(deployment));
+        setEnvelopeError(null);
+      } catch (failure) {
+        setRunCostEnvelope(null);
+        setEnvelopeError(failure instanceof Error ? failure.message : "RUN_COST_ENVELOPE_UNAVAILABLE");
+      }
+      try {
+        const defaults = deriveAgentCountDefault(deployment);
+        setAgentCountDefault(defaults);
+        setAgentCount((current) => current.trim().length > 0 ? current : defaults.agentCount);
+        setAgentCountDefaultError(null);
+      } catch (failure) {
+        setAgentCountDefault(null);
+        setAgentCountDefaultError(askDefaultFailureMessage(failure, "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE"));
+      }
+      try {
+        const defaults = deriveRiskTierDefault(deployment);
+        setRiskTierDefault(defaults);
+        setRiskTier((current) => current.length > 0 ? current : defaults.riskTier);
+        setRiskTierDefaultError(null);
+      } catch (failure) {
+        setRiskTierDefault(null);
+        setRiskTierDefaultError(askDefaultFailureMessage(failure, "ASK_RISK_TIER_DEFAULT_UNAVAILABLE"));
+      }
     }).catch((failure: unknown) => {
       if (!active) return;
       setRunCostEnvelope(null);
       setEnvelopeError(failure instanceof Error ? failure.message : "RUN_COST_ENVELOPE_UNAVAILABLE");
+      setAgentCountDefault(null);
+      setRiskTierDefault(null);
+      setAgentCountDefaultError(`ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Deployment read failed"}`);
+      setRiskTierDefaultError(`ASK_RISK_TIER_DEFAULT_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Deployment read failed"}`);
+    });
+    void contractClient.readSession(token).then((session) => {
+      if (!active) return;
+      const defaults = deriveSessionAskDefaults(session);
+      setSessionDefaultsProvenance(defaults);
+      setDecisionOwner((current) => current.trim().length > 0 ? current : defaults.decisionOwner);
+      setActionOwner((current) => current.trim().length > 0 ? current : defaults.actionOwner);
+      setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
+      setAsOf((current) => asOfEditedRef.current ? current : defaults.asOf);
+      setSessionDefaultsError(null);
+    }).catch((failure: unknown) => {
+      if (!active) return;
+      setSessionDefaultsProvenance(null);
+      setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
     });
     return () => { active = false; };
   }, [token]);
@@ -78,9 +141,8 @@ function NewDebateForm({ token }: { token: string }) {
     ? []
     : selectRunCostEnvelopeMembers(runCostEnvelope.members, riskTier, runCostEnvelope.deploymentRiskTier);
   const selectedEnvelopeMember = selectRunCostEnvelopeMember(allowedEnvelopeMembers, depth);
-  // The Start button may only look ready when the ask this form will build is
-  // actually complete: the V3 contract requires every one of these explicitly,
-  // and the UI supplies no hidden default for any of them (AC-76).
+  // The button becomes ready only for the complete ask that will be submitted.
+  // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
     selectedEnvelopeMember !== null &&
@@ -101,17 +163,20 @@ function NewDebateForm({ token }: { token: string }) {
     setSubmitting(true);
     setError(null);
     try {
-      const config: Record<string, unknown> = {
-        // V3 run contract (all explicit user input — no invented values):
-        risk_tier: riskTier,
-        composition_budget_tier: budgetTier,
+      const submitTime = new Date();
+      if (!asOfWasEdited) setAsOf(dateTimeLocalValue(submitTime));
+      const config = buildNewDebateAskConfig({
+        agentCount,
+        riskTier: riskTier as RiskTier,
+        budgetTier: budgetTier as CompositionBudgetTier,
+        decisionOwner,
+        actionOwner,
+        decisionScope,
+        asOf,
         depth: selectedEnvelopeMember!.depth,
-        agent_count: askAgentCount,
-        decision_owner: decisionOwner.trim(),
-        action_owner: actionOwner.trim(),
-        decision_scope: decisionScope.trim(),
-        as_of: askAsOf.toISOString()
-      };
+        asOfWasEdited,
+        riskTierWasEdited
+      }, submitTime);
       const debate = await createDebate(topic.trim(), config, token);
       router.push(`/debate/${encodeURIComponent(debate.id)}`);
     } catch (exc) {
@@ -144,14 +209,9 @@ function NewDebateForm({ token }: { token: string }) {
             required
           />
 
-          {/*
-            UI-01: the V3 run contract requires these seven from the asker. They
-            sit outside the collapsed Options panel because the run cannot be
-            asked without them — the UI fills none of them in.
-          */}
           <div className="optionsPanel" style={{ marginTop: 18 }}>
             <div className="optionHint" style={{ marginBottom: 4 }}>
-              The run contract — every value below is yours to state; nothing here is filled in for you.
+              Choose your risk tier, composition budget tier, and depth, then click Start. Machine-owned fields remain editable under Advanced.
             </div>
             <div className="optionRow">
               <div>
@@ -159,12 +219,16 @@ function NewDebateForm({ token }: { token: string }) {
                   Risk tier
                 </label>
                 <div className="optionHint">How much is riding on the answer</div>
+                {riskTierDefault ? <MachineDefaultHint>{riskTierDefault.riskTierProvenance}</MachineDefaultHint> : null}
               </div>
               <div className="optionControl">
                 <select
                   id="riskTier"
                   value={riskTier}
-                  onChange={(event) => setRiskTier(event.target.value)}
+                  onChange={(event) => {
+                    setRiskTier(event.target.value);
+                    setRiskTierWasEdited(true);
+                  }}
                   aria-label="Risk tier"
                 >
                   <option value="">Choose…</option>
@@ -180,12 +244,13 @@ function NewDebateForm({ token }: { token: string }) {
                   Composition budget tier
                 </label>
                 <div className="optionHint">How much work the composition may spend</div>
+                <div className="optionHint">Provisional default pending V ruling; editable user-owned value</div>
               </div>
               <div className="optionControl">
                 <select
                   id="budgetTier"
                   value={budgetTier}
-                  onChange={(event) => setBudgetTier(event.target.value)}
+                  onChange={(event) => setBudgetTier(event.target.value as CompositionBudgetTier)}
                   aria-label="Composition budget tier"
                 >
                   <option value="">Choose…</option>
@@ -197,84 +262,83 @@ function NewDebateForm({ token }: { token: string }) {
             </div>
             <div className="optionRow">
               <div>
-                <label className="optionLabel" htmlFor="agentCount">
-                  Agent count
-                </label>
-                <div className="optionHint">How many agents the run may enlist</div>
+                <label className="optionLabel" htmlFor="treeDepth">Tree depth</label>
+                <div className="optionHint">Allowed by the deployment run-cost envelope for the chosen risk tier</div>
               </div>
               <div className="optionControl">
-                <input
-                  id="agentCount"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={agentCount}
-                  onChange={(event) => setAgentCount(event.target.value)}
-                  aria-label="Agent count"
+                <select
+                  id="treeDepth"
+                  value={depth ?? ""}
+                  onChange={(event) => setDepth(Number(event.target.value))}
+                  aria-label="Tree depth"
+                  disabled={allowedEnvelopeMembers.length === 0}
+                >
+                  <option value="">Choose a ruled depth…</option>
+                  {allowedEnvelopeMembers.map((member) => (
+                    <option key={`${member.riskTier}:${member.depth}`} value={member.depth}>
+                      {member.depth} — up to {member.maxModelAttempts} model attempts
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="optionsToggle"
+              aria-expanded={advancedOpen}
+              aria-controls={advancedOpen ? "machineOwnedAskFields" : undefined}
+              onClick={() => setAdvancedOpen((value) => !value)}
+            >
+              Advanced <span style={{ fontSize: 9 }}>{advancedOpen ? "▲" : "▼"}</span>
+            </button>
+            {advancedOpen ? (
+              <div id="machineOwnedAskFields">
+                <MachineOwnedAskFields
+                  agentCount={agentCount}
+                  asOf={asOf}
+                  decisionOwner={decisionOwner}
+                  actionOwner={actionOwner}
+                  decisionScope={decisionScope}
+                  agentCountDefault={agentCountDefault}
+                  sessionDefaults={sessionDefaultsProvenance}
+                  onAgentCountChange={setAgentCount}
+                  onAsOfChange={(value) => {
+                    asOfEditedRef.current = true;
+                    setAsOf(value);
+                    setAsOfWasEdited(true);
+                  }}
+                  onDecisionOwnerChange={setDecisionOwner}
+                  onActionOwnerChange={setActionOwner}
+                  onDecisionScopeChange={setDecisionScope}
                 />
               </div>
-            </div>
-            <div className="optionRow">
-              <div>
-                <label className="optionLabel" htmlFor="asOf">
-                  As of
-                </label>
-                <div className="optionHint">The moment the answer should be true as of</div>
-              </div>
-              <div className="optionControl">
-                <input
-                  id="asOf"
-                  type="datetime-local"
-                  value={asOf}
-                  onChange={(event) => setAsOf(event.target.value)}
-                  aria-label="As of"
-                />
-              </div>
-            </div>
-            <div className="fieldGroup">
-              <label htmlFor="decisionOwner">Decision owner</label>
-              <input
-                id="decisionOwner"
-                value={decisionOwner}
-                onChange={(event) => setDecisionOwner(event.target.value)}
-                placeholder="Who owns the decision this answer feeds"
-              />
-            </div>
-            <div className="fieldGroup">
-              <label htmlFor="actionOwner">Action owner</label>
-              <input
-                id="actionOwner"
-                value={actionOwner}
-                onChange={(event) => setActionOwner(event.target.value)}
-                placeholder="Who will act on it"
-              />
-            </div>
-            <div className="fieldGroup">
-              <label htmlFor="decisionScope">Decision scope</label>
-              <input
-                id="decisionScope"
-                value={decisionScope}
-                onChange={(event) => setDecisionScope(event.target.value)}
-                placeholder="What the decision covers"
-              />
-            </div>
+            ) : null}
           </div>
 
-          <button type="button" className="optionsToggle" onClick={() => setOptionsOpen((value) => !value)}>
+          {agentCountDefaultError ? <div className="error" style={{ marginTop: 14 }}>{agentCountDefaultError}</div> : null}
+          {riskTierDefaultError ? <div className="error" style={{ marginTop: 14 }}>{riskTierDefaultError}</div> : null}
+          {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
+
+          <button
+            type="button"
+            className="optionsToggle"
+            aria-expanded={optionsOpen}
+            aria-controls={optionsOpen ? "additionalRunOptions" : undefined}
+            onClick={() => setOptionsOpen((value) => !value)}
+          >
             Options <span style={{ fontSize: 9 }}>{optionsOpen ? "▲" : "▼"}</span>
           </button>
 
-          {optionsOpen ? (
-            <div className="optionsPanel">
+              {optionsOpen ? (
+            <div id="additionalRunOptions" className="optionsPanel">
               {/*
-                DR-115 honesty: of the V2 knobs below, only Tree depth reaches
-                V3's ask (depth_params.depth). The rest are named as not
-                carried rather than quietly posted into a config the ask
-                builder drops.
+                DR-115 honesty: the ruled Tree depth control is on the default
+                surface. The legacy V2 knobs below are named as not carried
+                rather than quietly posted into a config the ask builder drops.
               */}
               <div className="optionHint" style={{ marginBottom: 4 }}>
-                Tree depth is carried into the V3 ask. Depth mode, depth of scrutiny, branching width, concurrency, max
-                tokens, and role overrides are V2 controls the V3 run contract has no slot for — they are not sent.
+                Depth mode, depth of scrutiny, branching width, concurrency, max tokens, and role overrides are V2
+                controls the V3 run contract has no slot for — they are not sent.
               </div>
               <div className="optionRow">
                 <div>
@@ -317,28 +381,6 @@ function NewDebateForm({ token }: { token: string }) {
                     {SCRUTINY_DEPTH_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="optionRow">
-                <div>
-                  <label className="optionLabel" htmlFor="treeDepth">Tree depth</label>
-                  <div className="optionHint">Allowed by the deployment run-cost envelope for the chosen risk tier</div>
-                </div>
-                <div className="optionControl">
-                  <select
-                    id="treeDepth"
-                    value={depth ?? ""}
-                    onChange={(event) => setDepth(Number(event.target.value))}
-                    aria-label="Tree depth"
-                    disabled={allowedEnvelopeMembers.length === 0}
-                  >
-                    <option value="">Choose a ruled depth…</option>
-                    {allowedEnvelopeMembers.map((member) => (
-                      <option key={`${member.riskTier}:${member.depth}`} value={member.depth}>
-                        {member.depth} — up to {member.maxModelAttempts} model attempts
                       </option>
                     ))}
                   </select>

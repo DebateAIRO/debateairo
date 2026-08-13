@@ -175,6 +175,17 @@ export const rawArtifact = ledger.table("raw_artifact", {
   atSeq: bigint("at_seq", { mode: "number" }).notNull()
 });
 
+export const nodeReview = ledger.table("node_review", {
+  nodeReviewId: uuid("node_review_id").primaryKey(),
+  runId: uuid("run_id").notNull(),
+  nodeId: uuid("node_id").notNull(),
+  authorRawArtifactRef: uuid("author_raw_artifact_ref").notNull(),
+  reviewRawArtifactRef: uuid("review_raw_artifact_ref").notNull(),
+  outcome: text("outcome").notNull(),
+  reasons: jsonb("reasons").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
 export const propagationRun = ledger.table("propagation_run", {
   propagationRunId: uuid("propagation_run_id").primaryKey(),
   runId: uuid("run_id").notNull(),

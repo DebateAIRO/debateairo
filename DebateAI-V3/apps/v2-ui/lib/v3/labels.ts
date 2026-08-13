@@ -1,10 +1,18 @@
-import type { AbstentionKind, ConditionMark, StalenessState } from "@debateai/contract";
+import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
+
+export function riskTierSourceLabel(source: Answer["tier_source"]): string {
+  switch (source) {
+    case "ASKER": return "chosen by the asker";
+    case "MACHINE_DEFAULT": return "machine default from the deployment floor";
+    case "DEPLOYMENT_POLICY": return "raised by deployment policy";
+  }
+}
 
 /**
  * UI-01: human labels for V3's closed honesty vocabularies, ported from the
  * S14 reading surface (web/lib/v3Presentation.ts) so no honesty surface is
  * lost in the restored V2 workspace. The switch is exhaustive over the
- * 23-mark kernel vocabulary — a new mark fails typecheck here, never silently
+ * kernel vocabulary — a new mark fails typecheck here, never silently
  * renders unnamed.
  */
 export function conditionMarkLabel(mark: ConditionMark): string {
@@ -26,6 +34,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "UNPRICED": return "Abstention cell unpriced";
     case "UNADJUDICATED": return "No adverse evidence found";
     case "UNCOVERED-SCOPE": return "Scope not fully covered";
+    case "UNSERVED-MAKER-POSITION": return "Another maker's position was not served";
     case "NON-COMPARABLE": return "Results are not compute-matched";
     case "NOT_SAMPLED": return "Not sampled";
     case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";

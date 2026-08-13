@@ -7,6 +7,8 @@ import {
   AnswerSchema,
   InspectionSchema,
   NumberSlotSchema,
+  RunProjectionSchema,
+  TierSourceSchema,
   contractInventory
 } from "@debateai/contract";
 
@@ -20,6 +22,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       "GET /v1/answers/{id}/inspection",
       "GET /v1/answers/{id}/nodes/{nodeId}",
       "GET /v1/runs/{id}/events"
+      ,"GET /v1/runs/{id}"
     ]));
     expect(AskRequestSchema.parse({
       question_line: "What follows from this evidence?",
@@ -37,6 +40,23 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       steering_presets: [],
       steering_annotations: []
     }).question_line).toContain("evidence");
+    expect(AskRequestSchema.parse({
+      question_line: "What follows from this evidence?",
+      risk_tier: "standard",
+      tier_source: "MACHINE_DEFAULT",
+      tier_provenance_ref: "machine:deployment-floor",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      agent_count: 2,
+      decision_owner: "asker:test",
+      action_owner: "asker:test",
+      decision_scope: "test-layer scope",
+      caller_scope: "ASKER",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    }).tier_source).toBe("MACHINE_DEFAULT");
+    expect(TierSourceSchema.options).toEqual(["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"]);
     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
   });
 
@@ -52,6 +72,87 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
     expect(NodeSchema).toBeDefined();
     expect(AnswerSchema).toBeDefined();
     expect(InspectionSchema).toBeDefined();
+  });
+
+  it("keeps loading and loud-stop run states typed on the wire", () => {
+    expect(RunProjectionSchema.parse({
+      run_ref: "run:queued",
+      question_line: "Messi or Ronaldo?",
+      state: "QUEUED",
+      terminal_reason: null
+    }).state).toBe("QUEUED");
+    expect(RunProjectionSchema.parse({
+      run_ref: "run:failed",
+      question_line: "Messi or Ronaldo?",
+      state: "FAILED",
+      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+    }).terminal_reason).toBe("TOTAL_REVIEW_COVERAGE_UNSATISFIED");
+    expect(() => RunProjectionSchema.parse({
+      run_ref: "run:failed",
+      question_line: "Messi or Ronaldo?",
+      state: "FAILED",
+      terminal_reason: null
+    })).toThrow();
+  });
+
+  it("admits recorded per-node maker lineage and requires typed null when it is absent", () => {
+    const node = {
+      node_id: "node:test-lineage",
+      claim: "A test-layer claim",
+      way_of_knowing: "REASONING",
+      base_score: {
+        value: 0.7, kind: "test-layer", source: "test-layer", producer: "test-layer",
+        provenance_ref: "number:test-base", replay_handle: "replay:test-base"
+      },
+      final_strength: {
+        value: 0.6, kind: "test-layer", source: "test-layer", producer: "test-layer",
+        provenance_ref: "number:test-final", replay_handle: "replay:test-final"
+      },
+      provenance_ref: "artifact:test-lineage",
+      maker_lineage: {
+        maker: "maker:test-layer",
+        model_id: "model:test-layer",
+        transport: "provider-kind:test-layer",
+        provider_ref: "provider:test-layer"
+      },
+      review: null,
+      locator: null,
+      stranger_restatement: { check_status: "PASS" },
+      defeater_refs: [],
+      defeater_exhaustion_marked: false,
+      disagreement: null,
+      condition_marks: [],
+      abstention: null,
+      staleness_state: "FRESH",
+      relevant_as_of: "2026-08-12T00:00:00.000Z"
+    };
+
+    expect(NodeSchema.parse(node).maker_lineage).toEqual(node.maker_lineage);
+    expect(NodeSchema.parse({ ...node, maker_lineage: null }).maker_lineage).toBeNull();
+    const { maker_lineage: _omitted, ...withoutTypedAbsence } = node;
+    expect(() => NodeSchema.parse(withoutTypedAbsence)).toThrow();
+    expect(() => NodeSchema.parse({ ...node, maker_lineage: { ...node.maker_lineage, maker: "" } })).toThrow();
+    expect(() => NodeSchema.parse({
+      ...node,
+      maker_lineage: { ...node.maker_lineage, provider: "misleading-legacy-name" }
+    })).toThrow();
+    expect(NodeSchema.parse({
+      ...node,
+      review: {
+        outcome: "agree",
+        reasons: ["The reasoning supports the conclusion."],
+        provenance_ref: "artifact:review",
+        reviewer_lineage: {
+          maker: "maker:reviewer",
+          model_id: "model:reviewer",
+          transport: "provider-kind:test-layer",
+          provider_ref: "provider:reviewer"
+        }
+      }
+    }).review).toMatchObject({ outcome: "agree" });
+    expect(() => NodeSchema.parse({ ...node, review: { outcome: "concurs" } })).toThrow();
+    const { review: _review, ...withoutReviewAbsence } = node;
+    expect(() => NodeSchema.parse(withoutReviewAbsence)).toThrow();
   });
 
   it("FX-SRV-14/15 makes typed segments and honesty projections non-optional", () => {

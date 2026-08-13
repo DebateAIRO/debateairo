@@ -1,5 +1,6 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { createPool } from "@debateai/db";
+import { WorkItemRepository } from "@debateai/battery";
 import {
   loadBootstrapRegister,
   loadRunnerEnvironment,
@@ -26,7 +27,8 @@ const runner = new WalkingSkeletonRunner(pool, provider, {
   judgeBound: { maxAttempts: environment.JUDGE_MAX_ATTEMPTS, tokenCeiling: environment.JUDGE_TOKEN_CEILING, deadlineMs: environment.JUDGE_DEADLINE_MS },
   composerBound: { maxAttempts: environment.COMPOSER_MAX_ATTEMPTS, tokenCeiling: environment.COMPOSER_TOKEN_CEILING, deadlineMs: environment.COMPOSER_DEADLINE_MS },
   conformanceBound: { maxAttempts: environment.CONFORMANCE_MAX_ATTEMPTS, tokenCeiling: environment.CONFORMANCE_TOKEN_CEILING, deadlineMs: environment.CONFORMANCE_DEADLINE_MS },
-  providerRef: environment.PROVIDER_REF, judgeContractHash: environment.JUDGE_CONTRACT_HASH,
+  providerRef: environment.PROVIDER_REF, maker: environment.VLLM_MAKER,
+  judgeContractHash: environment.JUDGE_CONTRACT_HASH,
   composerContractHash: environment.COMPOSER_CONTRACT_HASH, conformanceContractHash: environment.CONFORMANCE_CONTRACT_HASH,
   propagationContractHash: environment.PROPAGATION_CONTRACT_HASH, serveContractHash: environment.SERVE_CONTRACT_HASH,
   maxRecompose: environment.MAX_RECOMPOSE, factBundleVersion: environment.FACT_BUNDLE_VERSION,
@@ -36,6 +38,7 @@ const runner = new WalkingSkeletonRunner(pool, provider, {
   compositionRow
 });
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
+  failures: new WorkItemRepository(pool),
   workflowName: environment.HATCHET_WORKFLOW_NAME, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME);
 await worker.registerWorkflows([task]);

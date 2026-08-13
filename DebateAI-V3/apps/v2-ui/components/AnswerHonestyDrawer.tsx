@@ -4,7 +4,7 @@ import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
-import { abstentionKindLabel, conditionMarkLabel, summarizeFreshness } from "@/lib/v3/labels";
+import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
 
 /**
  * UI-01 honesty surface (additive, V2 drawer vocabulary). V2's workspace has
@@ -83,7 +83,7 @@ export function AnswerHonestyDrawer({
                   <span>conformance {answer.conformance_outcome}</span>
                 </div>
                 <div className="drawerFindingText">
-                  Risk tier {answer.risk_tier} · {answer.tier_source} · {answer.tier_provenance_ref}
+                  Risk tier {answer.risk_tier} · {riskTierSourceLabel(answer.tier_source)} · {answer.tier_provenance_ref}
                 </div>
                 <div className="drawerFindingText">
                   As of {answer.as_of} · freshness {answer.staleness_state} · relevant as of {answer.relevant_as_of}

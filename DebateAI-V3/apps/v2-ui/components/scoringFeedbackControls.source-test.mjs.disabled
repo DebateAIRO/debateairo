@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
+
+const root = process.cwd();
+const drawerSource = readFileSync(join(root, "components", "NodeDetailDrawer.tsx"), "utf8");
+const pageSource = readFileSync(join(root, "app", "debate", "[id]", "DebatePageClient.tsx"), "utf8");
+
+test("NodeDetailDrawer renders user feedback controls without model confidence wording", () => {
+  assert.match(drawerSource, /function ScoringFeedbackControls/);
+  assert.match(drawerSource, /data-scoring-feedback="user-feedback"/);
+  assert.match(drawerSource, /<div className="drawerSectionTitle">Your feedback<\/div>/);
+  assert.match(drawerSource, /Was this scoring explanation useful for reviewing the claim\?/);
+  assert.doesNotMatch(drawerSource, /feedback[\s\S]{0,160}(model confidence|truth verdict)/i);
+});
+
+test("NodeDetailDrawer exposes persisted current vote and aggregate counts", () => {
+  assert.match(drawerSource, /currentVote=\{currentUserFeedback\?\.vote\}/);
+  assert.match(drawerSource, /const upLabel = summary \? `UP \$\{summary\.up\}` : "UP";/);
+  assert.match(drawerSource, /const downLabel = summary \? `DOWN \$\{summary\.down\}` : "DOWN";/);
+  assert.match(drawerSource, /aria-pressed=\{currentVote === "up"\}/);
+  assert.match(drawerSource, /aria-pressed=\{currentVote === "down"\}/);
+});
+
+test("DR-146 keeps scoring feedback visible but disables its missing V3 mutation", () => {
+  assert.match(drawerSource, /V3_MISSING_CAPABILITIES\.scoringFeedback/);
+  assert.match(drawerSource, /aria-pressed=\{currentVote === "up"\}[\s\S]*?disabled[\s\S]*?title=\{V3_MISSING_CAPABILITIES\.scoringFeedback\}/);
+  assert.match(drawerSource, /aria-pressed=\{currentVote === "down"\}[\s\S]*?disabled[\s\S]*?title=\{V3_MISSING_CAPABILITIES\.scoringFeedback\}/);
+  assert.doesNotMatch(drawerSource, /onClick=\{\(\) => onSubmit\("(?:up|down)"\)\}/);
+});
+
+test("DebatePageClient has no feedback refusal or fake-success path", () => {
+  assert.doesNotMatch(pageSource, /submitScoringFeedback|submitNodeFeedback|Feedback saved:/);
+});

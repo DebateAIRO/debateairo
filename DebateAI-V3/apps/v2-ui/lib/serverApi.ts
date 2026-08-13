@@ -1,4 +1,4 @@
-import { ContractHttpError, createContractClient, type Answer, type ContractClient } from "@debateai/contract";
+import { ContractHttpError, createContractClient, type Answer, type ContractClient, type RunProjection } from "@debateai/contract";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
 
@@ -48,14 +48,16 @@ export async function listDebatesPageServer(
 
 export type GetDebateServerResult =
   | { ok: true; debate: DebateDetail; answer: Answer }
+  | { ok: false; kind: "loading"; run: RunProjection }
+  | { ok: false; kind: "failed"; run: RunProjection; reason: string }
+  | { ok: false; kind: "not_found" }
   | { ok: false; kind: "pending"; message: string; status?: number };
 
 /**
- * SSR read of a debate by answer id or run ref. EVERY failure is classified
- * "pending" — never a fatal dead-end at SSR time — because in V3 a 404 is
- * genuinely ambiguous between "run still open, nothing served yet" and "not
- * visible to this asker"; the client's event stream resolves the difference
- * (a stream that also 404s surfaces the terminal NOT_FOUND loudly).
+ * SSR read of a debate by answer id or run ref. An absent served answer is
+ * resolved against the typed, asker-owned run projection: live runs load,
+ * failed runs fail loudly, and only an absent run becomes an honest 404.
+ * Transport failures remain retryable pending states.
  */
 export async function getDebateServer(
   id: string,
@@ -71,10 +73,27 @@ export async function getDebateServer(
       answer = await client.readRunAnswer(id, token);
     }
   } catch (failure) {
-    if (failure instanceof ContractHttpError) {
-      return { ok: false, kind: "pending", message: failure.code, status: failure.status };
+    if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") {
+      if (failure instanceof ContractHttpError) {
+        return { ok: false, kind: "pending", message: failure.code, status: failure.status };
+      }
+      return { ok: false, kind: "pending", message: failure instanceof Error ? failure.message : "Unable to load debate" };
     }
-    return { ok: false, kind: "pending", message: failure instanceof Error ? failure.message : "Unable to load debate" };
+    try {
+      const run = await client.readRun(id, token);
+      if (run.state === "FAILED") {
+        return { ok: false, kind: "failed", run, reason: run.terminal_reason! };
+      }
+      return { ok: false, kind: "loading", run };
+    } catch (runFailure) {
+      if (runFailure instanceof ContractHttpError && runFailure.code === "NOT_FOUND") {
+        return { ok: false, kind: "not_found" };
+      }
+      if (runFailure instanceof ContractHttpError) {
+        return { ok: false, kind: "pending", message: runFailure.code, status: runFailure.status };
+      }
+      return { ok: false, kind: "pending", message: runFailure instanceof Error ? runFailure.message : "Unable to load run" };
+    }
   }
   return { ok: true, debate: debateDetailFromAnswer(answer), answer };
 }

@@ -17,7 +17,7 @@ import {
   projectAnswerSurface,
   summarizeFreshness
 } from "../../web/lib/v3Presentation.js";
-import { projectServeEdge } from "@debateai/serve";
+import { projectNodeMakerLineage, projectServeEdge } from "@debateai/serve";
 
 const labeledNumber = Object.freeze({
   value: 0.75,
@@ -59,6 +59,8 @@ function answer(overrides: Partial<Answer> = {}): Answer {
       base_score: labeledNumber,
       final_strength: labeledNumber,
       provenance_ref: "provenance:test",
+      maker_lineage: null,
+      review: null,
       locator: "https://example.test/source",
       stranger_restatement: { check_status: "PASS" },
       defeater_refs: [],
@@ -109,9 +111,11 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     }))).toMatchObject({ mode: "COMPONENTS_ONLY", text: [], defect: true });
   });
 
-  it("has a renderer for every ruled condition mark — spec section 12.3's 22 plus DR-139(4)'s owed-check mark", () => {
-    expect(CONDITION_MARKS).toHaveLength(23);
+  it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
+    expect(CONDITION_MARKS).toHaveLength(24);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
+    expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
+    expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");
     expect(CONDITION_MARKS.map(conditionMarkLabel).every((label) => label.trim().length > 0)).toBe(true);
   });
 
@@ -153,6 +157,28 @@ describe("S14 / W10 — first-class graph edges", () => {
     expect(projectServeEdge({ ...base, magnitudeStatus: "UNKNOWN", strength: null }).strength).toEqual({
       status: "UNKNOWN", reason: "NO_JUDGEMENT_OR_MAGNITUDE"
     });
+  });
+});
+
+describe("UI-02b — recorded per-node maker lineage", () => {
+  it("relays a complete ledger identity exactly and maps an unresolved join to typed absence", () => {
+    const recorded = {
+      maker: "maker:test-layer",
+      model_id: "model:test-layer",
+      model_version: null,
+      provider: "provider-kind:test-layer",
+      provider_ref: "provider:test-layer"
+    };
+    expect(projectNodeMakerLineage(recorded)).toEqual({
+      maker: "maker:test-layer",
+      model_id: "model:test-layer",
+      transport: "provider-kind:test-layer",
+      provider_ref: "provider:test-layer"
+    });
+    expect(projectNodeMakerLineage({ ...recorded, maker: null })).toBeNull();
+    expect(projectNodeMakerLineage({ ...recorded, model_id: null })).toBeNull();
+    expect(projectNodeMakerLineage({ ...recorded, provider: null })).toBeNull();
+    expect(projectNodeMakerLineage({ ...recorded, provider_ref: null })).toBeNull();
   });
 });
 

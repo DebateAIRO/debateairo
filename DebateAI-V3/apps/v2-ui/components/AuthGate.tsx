@@ -2,7 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { clearStoredToken, getStoredToken, setStoredToken, validateUserToken } from "@/lib/api";
-import { tokenUnlockFailureMessage } from "@/lib/v3/tokenUnlock";
+import {
+  shouldClearStoredTokenAfterUnlockFailure,
+  tokenUnlockFailureMessage
+} from "@/lib/v3/tokenUnlock";
 
 export function AuthGate({ children }: { children: (token: string) => React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -22,9 +25,9 @@ export function AuthGate({ children }: { children: (token: string) => React.Reac
       try {
         await validateUserToken(stored);
         if (active) setToken(stored);
-      } catch {
-        clearStoredToken();
-        if (active) setError("Saved token is no longer valid.");
+      } catch (error) {
+        if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
+        if (active) setError(tokenUnlockFailureMessage(error));
       } finally {
         if (active) setChecking(false);
       }
@@ -46,7 +49,7 @@ export function AuthGate({ children }: { children: (token: string) => React.Reac
       setStoredToken(value);
       setToken(value);
     } catch (error) {
-      clearStoredToken();
+      if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
       // DR-115: only say "rejected" when the coordinator actually rejected it.
       setError(tokenUnlockFailureMessage(error));
     } finally {

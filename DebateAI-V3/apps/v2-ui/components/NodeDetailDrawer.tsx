@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
-import { nodeGenerations, regenerateNode } from "@/lib/api";
+import { nodeGenerations } from "@/lib/api";
 import type {
   CurrentUserFeedbackVote,
   DebateNode,
@@ -10,8 +10,7 @@ import type {
   LifecycleDecision,
   NodeFeedbackSummary,
   NodeScoringError,
-  NodeScoringPayload,
-  ScoringFeedbackVote
+  NodeScoringPayload
 } from "@/lib/types";
 import { ROLE_PALETTES, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { isAbandonedArgumentStatus } from "@/lib/debateTreeUtils";
@@ -25,13 +24,9 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Node as ContractNode } from "@debateai/contract";
-import { wayOfKnowingLabel } from "@/lib/v3/adapter";
+import { v3NodeScoreDetails, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, conditionMarkLabel } from "@/lib/v3/labels";
-
-function looksAuthRelated(message: string): boolean {
-  const lower = message.toLowerCase();
-  return lower.includes("401") || lower.includes("403") || lower.includes("invalid user token");
-}
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -84,12 +79,10 @@ export function NodeDetailDrawer({
   scoringError,
   feedbackSummary,
   currentUserFeedback,
-  feedbackSubmitState,
   lifecycleDecision,
   token,
   onClose,
   onChallenge,
-  onSubmitFeedback,
   onFocusRecommendationNode,
   canFocusRecommendationNode,
   onQueued,
@@ -109,12 +102,10 @@ export function NodeDetailDrawer({
   scoringError?: NodeScoringError;
   feedbackSummary?: NodeFeedbackSummary;
   currentUserFeedback?: CurrentUserFeedbackVote;
-  feedbackSubmitState?: { status: "idle" | "submitting" | "error"; error: string | null };
   lifecycleDecision?: LifecycleDecision;
   token: string | null;
   onClose: () => void;
   onChallenge: (anchor: HTMLElement, text: string) => void;
-  onSubmitFeedback: (vote: ScoringFeedbackVote) => void;
   onFocusRecommendationNode: (targetClaimId: string) => boolean;
   canFocusRecommendationNode: (targetClaimId: string) => boolean;
   onQueued: () => void;
@@ -130,7 +121,6 @@ export function NodeDetailDrawer({
   const [history, setHistory] = useState<Generation[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(0);
   const [compareOn, setCompareOn] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [focusFailedTargetNodeId, setFocusFailedTargetNodeId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -154,22 +144,6 @@ export function NodeDetailDrawer({
   useEffect(() => {
     setFocusFailedTargetNodeId(null);
   }, [node.id, scoring]);
-
-  async function regenerate(modelId?: string) {
-    if (!token || busy) return;
-    setBusy(true);
-    try {
-      await regenerateNode(node.id, token, modelId);
-      onQueued();
-      onClose();
-    } catch (exc) {
-      const message = exc instanceof Error ? exc.message : "Unable to regenerate";
-      onError(message);
-      if (looksAuthRelated(message)) onAuthRejected();
-    } finally {
-      setBusy(false);
-    }
-  }
 
   function selectProse(event: MouseEvent) {
     const selection = window.getSelection();
@@ -224,7 +198,9 @@ export function NodeDetailDrawer({
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
               {pal.arrow} {roleLabel(node)}
             </span>
-            {generation ? <ModelMetaLine modelId={generation.model_id} /> : null}
+            {generation || node.maker !== undefined ? (
+              <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+            ) : null}
           </div>
           <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
             ×
@@ -268,9 +244,6 @@ export function NodeDetailDrawer({
               scoringError={scoringError}
               feedbackSummary={feedbackSummary}
               currentUserFeedback={currentUserFeedback}
-              feedbackSubmitState={feedbackSubmitState}
-              token={token}
-              onSubmitFeedback={onSubmitFeedback}
               recommendationTargetButton={recommendationTargetButton}
             />
           </ScoringErrorBoundary>
@@ -285,11 +258,17 @@ export function NodeDetailDrawer({
             >
               ⚐ Challenge
             </button>
-            <button type="button" className="btn" disabled={!token || busy} onClick={() => regenerate()}>
+            <button
+              type="button"
+              className="btn"
+              disabled
+              aria-disabled="true"
+              title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+            >
               ↻ Regenerate
             </button>
           </div>
-          {!token ? <div className="drawerHintMuted">Unlock actions to regenerate or challenge.</div> : null}
+          <div className="drawerHintMuted">{V3_MISSING_CAPABILITIES.nodeRegeneration}</div>
 
           <div className="drawerDivider" />
 
@@ -307,7 +286,9 @@ export function NodeDetailDrawer({
               <div className="compareCell current">
                 <div className="compareCellHead">
                   <span className="compareTag">Current</span>
-                  {generation ? <ModelMetaLine modelId={generation.model_id} /> : null}
+                  {generation || node.maker !== undefined ? (
+                    <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+                  ) : null}
                 </div>
                 <div className="compareClaim">{node.claim}</div>
               </div>
@@ -360,6 +341,7 @@ export function NodeDetailDrawer({
  * numbers, no defaults.
  */
 function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
+  const [baseScore, finalStrength] = v3NodeScoreDetails(v3);
   return (
     <section className="drawerScoringRationale" aria-label="V3 node honesty">
       <div className="drawerSectionTitle">V3 honesty</div>
@@ -378,21 +360,20 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
             here, where the drawer has room for the whole record. */}
         <li className="drawerFindingItem">
           <div className="drawerFindingMeta">
-            <span>base score ({v3.base_score.kind})</span>
-            <span>{v3.base_score.value}</span>
+            <span>{baseScore.label}</span>
+            <span title={baseScore.percentage.detail}>{baseScore.percentage.text}</span>
           </div>
           <div className="drawerFindingText">
-            produced by {v3.base_score.producer} · {v3.base_score.source} · replay {v3.base_score.replay_handle}
+            produced by {baseScore.producer} · {baseScore.source} · replay {baseScore.replay_handle}
           </div>
         </li>
         <li className="drawerFindingItem">
           <div className="drawerFindingMeta">
-            <span>final strength ({v3.final_strength.kind})</span>
-            <span>{v3.final_strength.value}</span>
+            <span>{finalStrength.label}</span>
+            <span title={finalStrength.percentage.detail}>{finalStrength.percentage.text}</span>
           </div>
           <div className="drawerFindingText">
-            produced by {v3.final_strength.producer} · {v3.final_strength.source} · replay{" "}
-            {v3.final_strength.replay_handle}
+            produced by {finalStrength.producer} · {finalStrength.source} · replay {finalStrength.replay_handle}
           </div>
         </li>
         <li className="drawerFindingItem">
@@ -421,6 +402,21 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
             {v3.disagreement === null ? "No disagreement record" : JSON.stringify(v3.disagreement)}
           </div>
         </li>
+        <li className="drawerFindingItem" data-node-review={v3.review?.outcome ?? "absent"}>
+          <div className="drawerFindingMeta">
+            <span>second-maker review</span>
+            <span>{v3.review?.outcome ?? "Review unavailable"}</span>
+          </div>
+          <ModelMetaLine
+            modelId={v3.review?.reviewer_lineage.model_id ?? null}
+            maker={v3.review?.reviewer_lineage.maker ?? null}
+          />
+          <div className="drawerFindingText">
+            {v3.review === null
+              ? "No completed second-maker review is recorded for this node."
+              : v3.review.reasons.join(" ")}
+          </div>
+        </li>
       </ul>
       {v3.condition_marks.length > 0 ? (
         <div className="roleChips" style={{ marginTop: 8 }}>
@@ -442,21 +438,13 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
 
 function ScoringFeedbackControls({
   summary,
-  currentVote,
-  submitState,
-  token,
-  onSubmit
+  currentVote
 }: {
   summary?: NodeFeedbackSummary;
-  currentVote?: ScoringFeedbackVote;
-  submitState: { status: "idle" | "submitting" | "error"; error: string | null };
-  token: string | null;
-  onSubmit: (vote: ScoringFeedbackVote) => void;
+  currentVote?: CurrentUserFeedbackVote["vote"];
 }) {
-  const busy = submitState.status === "submitting";
-  const upCount = summary?.up ?? 0;
-  const downCount = summary?.down ?? 0;
-  const locked = !token;
+  const upLabel = summary ? `UP ${summary.up}` : "UP";
+  const downLabel = summary ? `DOWN ${summary.down}` : "DOWN";
 
   return (
     <section
@@ -475,34 +463,27 @@ function ScoringFeedbackControls({
           type="button"
           className="nodeCtrl"
           aria-pressed={currentVote === "up"}
-          disabled={locked || busy}
-          onClick={() => onSubmit("up")}
+          disabled
+          aria-disabled="true"
+          title={V3_MISSING_CAPABILITIES.scoringFeedback}
         >
-          UP {upCount}
+          {upLabel}
         </button>
         <button
           type="button"
           className="nodeCtrl"
           aria-pressed={currentVote === "down"}
-          disabled={locked || busy}
-          onClick={() => onSubmit("down")}
+          disabled
+          aria-disabled="true"
+          title={V3_MISSING_CAPABILITIES.scoringFeedback}
         >
-          DOWN {downCount}
+          {downLabel}
         </button>
       </div>
-      {locked ? (
-        <div className="drawerHintMuted">Unlock actions to save feedback.</div>
-      ) : busy ? (
+      <div className="drawerHintMuted">{V3_MISSING_CAPABILITIES.scoringFeedback}</div>
+      {currentVote ? (
         <div className="drawerHintMuted" role="status">
-          Saving feedback...
-        </div>
-      ) : submitState.status === "error" && submitState.error ? (
-        <div className="drawerHintMuted" role="alert">
-          Feedback was not saved: {submitState.error}
-        </div>
-      ) : currentVote ? (
-        <div className="drawerHintMuted" role="status">
-          Current user feedback: {currentVote === "up" ? "useful" : "not useful"}.
+          Previously recorded user feedback: {currentVote === "up" ? "useful" : "not useful"}.
         </div>
       ) : null}
     </section>
@@ -514,18 +495,12 @@ function NodeScoringDetails({
   scoringError,
   feedbackSummary,
   currentUserFeedback,
-  feedbackSubmitState = { status: "idle", error: null },
-  token,
-  onSubmitFeedback,
   recommendationTargetButton
 }: {
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
   feedbackSummary?: NodeFeedbackSummary;
   currentUserFeedback?: CurrentUserFeedbackVote;
-  feedbackSubmitState?: { status: "idle" | "submitting" | "error"; error: string | null };
-  token: string | null;
-  onSubmitFeedback: (vote: ScoringFeedbackVote) => void;
   recommendationTargetButton: (
     recommendation: NodeScoringPayload["recommended_investigations"][number]
   ) => ReactNode;
@@ -574,15 +549,10 @@ function NodeScoringDetails({
         </section>
       ) : null}
 
-      {scoring ? (
-        <ScoringFeedbackControls
-          summary={feedbackSummary}
-          currentVote={currentUserFeedback?.vote}
-          submitState={feedbackSubmitState}
-          token={token}
-          onSubmit={onSubmitFeedback}
-        />
-      ) : null}
+      <ScoringFeedbackControls
+        summary={feedbackSummary}
+        currentVote={currentUserFeedback?.vote}
+      />
 
       {hasScoringFindings ? (
         <section className="drawerScoringFindings" aria-label="Scoring holes and fatal flags">

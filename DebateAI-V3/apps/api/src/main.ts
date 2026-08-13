@@ -1,14 +1,21 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { createPool } from "@debateai/db";
+import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   loadApiEnvironment,
+  readDeploymentRiskTier,
   readRunCostEnvelopePolicy,
   resolveEffectiveRiskTier,
   resolveRunCostEnvelopeBasis
 } from "@debateai/register";
-import { buildApi, HatchetDispatcher, PostgresAskApplication } from "./index.js";
+import {
+  buildApi,
+  HatchetDispatcher,
+  PostgresAskApplication,
+  preserveSubmittedTierSource
+} from "./index.js";
 
 const environment = loadApiEnvironment();
 const pool = createPool(environment.DATABASE_URL);
@@ -20,6 +27,7 @@ const hatchet = new Hatchet({
 const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
 await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
 const costEnvelopePolicy = await readRunCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
+const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
 const application = new PostgresAskApplication(pool, dispatcher, {
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
@@ -27,16 +35,17 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
   resolveDeploymentMakerAvailability: () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION),
   resolveEnvelopeBasis: async (input) => resolveRunCostEnvelopeBasis(costEnvelopePolicy, input),
-  resolveRisk(askerRiskTier: RiskTier, askerProvenanceRef: string) {
-    return resolveEffectiveRiskTier({
+  resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
+    const resolved = resolveEffectiveRiskTier({
       askerTier: askerRiskTier,
       askerProvenanceRef,
       policyLevels: {
         parent: {},
         run: {},
-        deployment: { riskTier: environment.DEPLOYMENT_RISK_TIER }
+        deployment: { riskTier: deploymentRiskTier.value }
       }
     });
+    return preserveSubmittedTierSource(resolved, askerTierSource);
   }
 });
 const api = buildApi({ application });

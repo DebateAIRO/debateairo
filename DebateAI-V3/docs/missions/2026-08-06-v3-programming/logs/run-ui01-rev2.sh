@@ -1,0 +1,12 @@
+#!/bin/zsh
+set -u
+MISSION_DIR="/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3"
+LOG="${MISSION_DIR}/docs/missions/2026-08-06-v3-programming/logs/UI-01-rework-codex.log"
+SESSION="019ff552-cb5b-7a00-bd59-1428e42c9d87"
+cd "${MISSION_DIR}" || exit 1
+if pgrep -f "codex exec" >/dev/null 2>&1; then print "REFUSING: codex alive" | tee -a "${LOG}"; exit 1; fi
+print "=== UI-01 rework rev2 resuming ${SESSION} $(date -u +%FT%TZ) ===" | tee -a "${LOG}"
+codex exec resume "${SESSION}" -c model='"gpt-5.6-sol"' -c sandbox_mode='"danger-full-access"' \
+  "/goal UI-01 rework rev1 diamond: Grok APPROVED, Opus 5 CHANGES REQUESTED with 3 blocking - and V has ALREADY RULED the third one, so rev2 closes all three. Read docs/missions/2026-08-06-v3-programming/reviews/UI-01-rework-rev2-directive.md in full INCLUDING ITS ADDENDUM, plus reviews/ui01-rework-opus-rev1.md and reviews/ui01-rework-grok-rev1.md. Your merge was verified RIGHT down to the rendered pixels - byte-identical viewport, newer base plus only the V3 additions, badges and maker tags rendering live - do not touch that. B1: the adaptive-depth approval panel is HIDDEN not disabled - its only mount sits in a branch unreachable in V3; mount it reachable, greyed, tooltip naming the real missing capability. B2: your enforced ratchets CANNOT FAIL - the disabled assertions live only in source-test.mjs files no gate runs, and the lens proved by three concrete mutations (delete the V3ScoreBadges JSX, re-enable Regenerate keeping the tooltip, delete the maker meta line) that the enforced suite stays green through all three; move load-bearing assertions into tests/unit/v2ui-pages.test.ts and make each one kill its named mutation - state which mutation each new assertion kills. B3 IS RULED (DR-160): the overflow menu is CONTENT-AWARE - it engages whenever the title lacks the room it needs at ANY width, not at a breakpoint; measure needed vs available (the canvas height measurement is the house pattern) and add an enforced test that fails when a crowded bar stops collapsing. Fold advisories A3-A6; A1/A2 are HYG-01's, record only. Correct the handoff AC table - the rows that claimed green falsely must say what was actually true. Re-run EVERY gate, paste real output, same session, back to review with 'REWORK READY FOR HERMES REVIEW - UI-01 rework rev2'." \
+  </dev/null 2>&1 | tee -a "${LOG}"
+print "=== UI-01 rework rev2 exited $(date -u +%FT%TZ) ===" | tee -a "${LOG}"

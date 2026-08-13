@@ -53,19 +53,30 @@ from a plain terminal (the claude CLI needs its own keychain login —
 ACCEPTANCE_DB_PORT=<port> ./node_modules/.bin/tsx acceptance/dual-maker-proof.ts
 ```
 
-**The fair debate (FAIR-01, DR-140(b), DR-143 clause 1).** The ceremony now
-starts the Anthropic relay beside the codex shim and the acceptance runner
-runs BOTH makers inside one debate: the OpenAI provider judges the position
-(and keeps the composer/conformance chain), and the Anthropic relay runs the
-critic leg — the SAME shipped Judge organ (same ruled contract text, same
-ruled JUDGE cost bound, call site `JUDGE:critic`) asked for the strongest
-genuine counter-position to the position's statement text (no maker/model
-identity travels in the prompt). The counter joins the answer graph as a
-first-class `defeater` child node with a real `attack`/`rebutting` edge
-(magnitude honestly `UNKNOWN` — no evidence verifier measured it), its own
-stranger restatement, reduced judgement, and per-node strength record citing
-ITS OWN artifact. Classification uses the debate's ONE claim frame (the run's
-question line), not the position's wording. The S08 critique-packet /
+**Multi-maker depth-driven debate (FAIR-01 + PRO-01 + PANEL-01, DR-140(b),
+DR-149, DR-154(2), DR-159).** The ceremony starts the Anthropic relay beside
+the codex shim and requires `agent_count: 2`, matching the two makers funded by
+DR-159; larger or mismatched counts refuse with a typed reason. Each maker
+independently authors a depth-0 position root. `depth_params.depth` counts
+expansion rounds below each root: every node authored in the previous round receives one real
+`support` child and one real `attack`/`rebutting` child through the same shipped
+Judge organ. Authorship alternates by level (OpenAI root, Anthropic round 1,
+OpenAI round 2, and so on); each artifact records the maker/model/provider that
+actually ran. Call sites name their leg, round, and parent index
+(`JUDGE:defender:root<root>:r<round>:p<index>` /
+`JUDGE:critic:root<root>:r<round>:p<index>`).
+The synthetic question remains neutral and outside the graph. Each maker also
+authors one cross-root response, represented by a support edge to its own root
+and an attack edge to the other root, with magnitude `UNKNOWN`. Serve remains
+the ruled single-primary-root B2-A shape. DR-161 makes that choice explicit as
+`first-configured-provider`: the selected root and rule travel on the required
+`UNSERVED-MAKER-POSITION` record, which names both makers and both root ids.
+The other root remains graph-visible but is not composed into the served
+answer. Every node is still judged, recorded, and propagated. Each child carries its own stranger restatement, reduced judgement,
+and per-node strength record citing its own artifact. Edge magnitude remains
+honestly `UNKNOWN` where no evidence verifier measured it. Classification uses
+the debate's one claim frame (the run question), not a child position's wording.
+The S08 critique-packet /
 independence-receipt instrument is deliberately NOT recorded: DR-141(4) rules
 that a run carrying critique packets REFUSES at terminal (Q42 `critic_agrees`
 has no recorded shape) until V rules the recording migration — independence
@@ -89,14 +100,43 @@ directory before the live gate.
 
 DR-137 makes the honest one-maker `configuredProviderSet` lawful for casual and
 standard runs; high-stakes admission still requires at least two distinct
-makers in the shipped critique rule. DR-138 supplies the shipped run-level
-`runCostEnvelope` member for the acceptance ask (`depth_params: {depth: 1}`,
-`risk_tier: standard`, `max_model_attempts: 9`) with provenance exactly
-`acceptance:DR-138:V-approved`. The earlier DR-133 per-organ attempt, token, and
+makers in the shipped critique rule. DR-159 supplies the shipped run-level
+`runCostEnvelope` members for depths 1–5 at both reachable tiers (`standard`
+and `high-stakes`) with the DR-159 retry-tolerant ceilings 42, 66, 114, 210,
+and 402 and provenance exactly `acceptance:DR-159:V-approved`. No `casual`
+member is seeded because the standard deployment floor makes it unreachable.
+The earlier DR-133 per-organ attempt, token, and
 deadline bounds remain byte-faithful in the acceptance-only
 `acceptanceOrganCostBounds` row. This split lets the live API exercise the
 shipped run-envelope reader without conflating its run-level schema with the
 acceptance runner's per-organ call bounds.
+
+PRO-01's one authorized live depth-2 proof is isolated from the sealed standing
+database and runs with:
+
+```text
+ACCEPTANCE_DB_PORT=<free port> \
+ACCEPTANCE_API_HOST=127.0.0.1 \
+ACCEPTANCE_API_PORT=<free port> \
+ACCEPTANCE_SHIM_PORT=<free port> \
+ACCEPTANCE_STRANGER_SAMPLE_RATE=1 \
+ACCEPTANCE_BATTERY_VERSION=acceptance-v1 \
+ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:pro01-depth2 \
+./node_modules/.bin/tsx acceptance/pro01-depth2-proof.ts
+```
+
+PANEL-01's one authorized live depth-1, M=2 proof is likewise isolated:
+
+```text
+ACCEPTANCE_DB_PORT=<free port> ACCEPTANCE_API_PORT=<free port> \
+ACCEPTANCE_SHIM_PORT=<free port> \
+./node_modules/.bin/tsx acceptance/panel01-depth1-proof.ts
+```
+
+The proof prints the run/answer IDs, total model attempts (including failed or
+timed-out attempts), and every node's persisted maker/model/provider lineage,
+then removes only its caller-owned temporary database. Depth 3 remains reserved
+for V's acceptance run.
 
 The runtime environment is strict and contains no Hatchet keys:
 

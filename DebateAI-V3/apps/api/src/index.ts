@@ -13,6 +13,7 @@ import {
   InvestigationRequestSchema,
   NodeSchema,
   RunEventSchema,
+  RunProjectionSchema,
   SessionSchema,
   type Answer,
   type AnswerIndex,
@@ -23,6 +24,7 @@ import {
   type Inspection,
   type InvestigationAccepted,
   type Node,
+  type RunProjection,
   type Session
 } from "@debateai/contract";
 import type { Pool } from "pg";
@@ -38,6 +40,7 @@ export interface AskApplication {
   submit(ask: AskRequest, session: Session): Promise<AskAccepted>;
   readAnswer(answerId: string, session: Session, version?: number): Promise<Answer | null>;
   readRunAnswer(runId: string, session: Session): Promise<Answer | null>;
+  readRun(runId: string, session: Session): Promise<RunProjection | null>;
   readAnswerIndex(session: Session, limit: number, offset: number): Promise<AnswerIndex>;
   readInspection(answerId: string, session: Session, version?: number): Promise<Inspection | null>;
   readLedgerDigest(answerId: string, session: Session): Promise<ExecutionLedgerDigest | null>;
@@ -50,6 +53,44 @@ export interface AskApplication {
 
 export interface ApiOptions {
   readonly application: AskApplication;
+}
+
+/**
+ * Marks a domain error that was observed while evaluating whether an ask may
+ * be admitted. Typed errors from deployment reads or persistence deliberately
+ * do not receive this marker and therefore remain internal failures.
+ */
+export class AskRefusal extends Error {
+  readonly code: string;
+
+  constructor(refusal: TypedDomainError) {
+    super(refusal.message);
+    this.name = "AskRefusal";
+    this.code = refusal.code;
+  }
+}
+
+class MalformedRequestError extends Error {
+  constructor(error: Error) {
+    super(error.message);
+    this.name = "MalformedRequestError";
+  }
+}
+
+function parseRequest<T>(schema: { parse(value: unknown): T }, value: unknown): T {
+  try {
+    return schema.parse(value);
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      throw new MalformedRequestError(error);
+    }
+    throw error;
+  }
+}
+
+function markAskRefusal(error: unknown): never {
+  if (error instanceof TypedDomainError) throw new AskRefusal(error);
+  throw error;
 }
 
 function resolveSession(token: unknown, scope: "ASKER" | "OPERATOR" = "ASKER"): Session | null {
@@ -67,14 +108,35 @@ function resolveSession(token: unknown, scope: "ASKER" | "OPERATOR" = "ASKER"): 
 export function buildApi(options: ApiOptions): FastifyInstance {
   const api = Fastify({ logger: false });
   api.setErrorHandler((error, _request, reply) => {
+    if (reply.sent || reply.raw.headersSent) {
+      // A streaming response has no lawful error envelope left to send. Abort
+      // the one connection instead of fabricating a terminal SSE event (DR-115)
+      // or letting Fastify attempt a second write and crash the process.
+      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
+        try {
+          reply.raw.destroy();
+        } catch {
+          try {
+            reply.raw.socket?.destroy();
+          } catch {
+            // The error handler must remain total even if the transport is
+            // already tearing itself down.
+          }
+        }
+      }
+      return;
+    }
     const knownError = error instanceof Error ? error : new Error(String(error));
-    const statusCode = knownError.name === "ZodError" || knownError instanceof SyntaxError
-      ? 400
-      : knownError instanceof TypedDomainError && knownError.code === "MAKER_INVENTORY_UNSATISFIED" ? 403 : 500;
-    void reply.status(statusCode).send({
-      error: statusCode === 400
+    const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
+    // Only an error marked at the ask-evaluation stage is a refusal. Register,
+    // memory, sequence-allocation and other persistence faults remain 5xx even
+    // when they happen behind POST /v1/asks (DR-115).
+    const askRefusal = knownError instanceof AskRefusal;
+    const statusCode = malformed ? 400 : askRefusal ? 422 : 500;
+    return reply.status(statusCode).send({
+      error: malformed
         ? "MALFORMED_REQUEST"
-        : statusCode === 403 ? "MAKER_INVENTORY_UNSATISFIED" : "INTERNAL_ERROR",
+        : askRefusal ? knownError.code : "INTERNAL_ERROR",
       message: knownError.message
     });
   });
@@ -94,7 +156,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks", async (request, reply) => {
     const session = resolveSession(request.headers["x-user-dev-token"]);
     if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
-    const ask = AskRequestSchema.parse(request.body);
+    const ask = parseRequest(AskRequestSchema, request.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(ask, session));
     return reply.status(202).send(accepted);
   });
@@ -153,7 +215,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", async (request, reply) => {
     const session = resolveSession(request.headers["x-user-dev-token"]);
     if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
-    const input = InvestigationRequestSchema.parse(request.body);
+    const input = parseRequest(InvestigationRequestSchema, request.body);
     const accepted = await options.application.recordInvestigation(request.params.id, request.params.gapRef, input.user_input, session);
     return accepted === null ? reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" }) : reply.status(202).send(InvestigationAcceptedSchema.parse(accepted));
   });
@@ -171,6 +233,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
     }
     reply.raw.end();
+  });
+  api.get<{ Params: { id: string } }>("/v1/runs/:id", async (request, reply) => {
+    const session = resolveSession(request.headers["x-user-dev-token"]);
+    if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const run = await options.application.readRun(request.params.id, session);
+    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(RunProjectionSchema.parse(run));
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", async (request, reply) => {
     const session = resolveSession(request.headers["x-user-dev-token"]);
@@ -223,11 +291,49 @@ export interface RunCreationSettings {
     readonly depthParams: Readonly<Record<string, unknown>>;
     readonly riskTier: RiskTier;
   }) => Promise<Readonly<Record<string, unknown>>>;
-  readonly resolveRisk: (askerRiskTier: RiskTier, provenanceRef: string) => {
+  readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
     readonly tierSource: TierSource;
     readonly tierProvenanceRef: string;
   };
+}
+
+export function preserveSubmittedTierSource<T extends { readonly tierSource: TierSource }>(
+  resolved: T,
+  submittedTierSource: AskRequest["tier_source"]
+): Omit<T, "tierSource"> & { readonly tierSource: TierSource } {
+  return {
+    ...resolved,
+    tierSource: resolved.tierSource === "DEPLOYMENT_POLICY"
+      ? "DEPLOYMENT_POLICY"
+      : submittedTierSource
+  };
+}
+
+export async function evaluateAskAdmission(
+  settings: RunCreationSettings,
+  ask: AskRequest
+): Promise<{
+  readonly risk: ReturnType<RunCreationSettings["resolveRisk"]>;
+  readonly envelopeBasis: Readonly<Record<string, unknown>>;
+}> {
+  const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
+  const makerAvailability = await settings.resolveDeploymentMakerAvailability();
+  try {
+    assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
+  } catch (error) {
+    markAskRefusal(error);
+  }
+  let envelopeBasis: Readonly<Record<string, unknown>>;
+  try {
+    envelopeBasis = await settings.resolveEnvelopeBasis({
+      depthParams: ask.depth_params,
+      riskTier: risk.effectiveRiskTier
+    });
+  } catch (error) {
+    markAskRefusal(error);
+  }
+  return { risk, envelopeBasis };
 }
 
 export class PostgresAskApplication implements AskApplication {
@@ -251,12 +357,7 @@ export class PostgresAskApplication implements AskApplication {
 
   async submit(ask: AskRequest, session: Session): Promise<AskAccepted> {
     await this.#liveness.recordQuery(ask.question_line, session.asker_id, new Date(ask.as_of));
-    const risk = this.settings.resolveRisk(ask.risk_tier, ask.tier_provenance_ref);
-    assertMakerAdmission(risk.effectiveRiskTier, await this.settings.resolveDeploymentMakerAvailability());
-    const envelopeBasis = await this.settings.resolveEnvelopeBasis({
-      depthParams: ask.depth_params,
-      riskTier: risk.effectiveRiskTier
-    });
+    const { risk, envelopeBasis } = await evaluateAskAdmission(this.settings, ask);
     const runId = await this.#runs.startRun({
       questionLine: ask.question_line,
       askerId: session.asker_id,
@@ -313,6 +414,16 @@ export class PostgresAskApplication implements AskApplication {
 
   readRunAnswer(runId: string, session: Session): Promise<Answer | null> {
     return this.#serve.readRunAnswerProjection(runId, session.asker_id);
+  }
+
+  async readRun(runId: string, session: Session): Promise<RunProjection | null> {
+    const run = await this.#runs.readLoadingProjection(runId, session.asker_id);
+    return run === null ? null : RunProjectionSchema.parse({
+      run_ref: run.runRef,
+      question_line: run.questionLine,
+      state: run.state,
+      terminal_reason: run.terminalReason
+    });
   }
 
   readAnswerIndex(session: Session, limit: number, offset: number): Promise<AnswerIndex> {

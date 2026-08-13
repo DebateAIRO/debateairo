@@ -266,6 +266,11 @@ export async function createDebate(
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
+  const tierSource = requiredString(config, "tier_source");
+  if (tierSource !== "ASKER" && tierSource !== "MACHINE_DEFAULT") {
+    throw new Error("ASK_FIELD_REQUIRED: tier_source must identify an asker choice or machine default.");
+  }
+  const tierProvenanceRef = requiredString(config, "tier_provenance_ref");
   const budgetTier = requiredString(config, "composition_budget_tier");
   if (!BUDGET_TIERS.has(budgetTier)) throw new Error("ASK_FIELD_REQUIRED: composition_budget_tier must be low, medium, or high.");
   const asOf = new Date(requiredString(config, "as_of"));
@@ -273,8 +278,8 @@ export async function createDebate(
   const ask: AskRequest = {
     question_line: topic,
     risk_tier: riskTier as AskRequest["risk_tier"],
-    tier_source: "ASKER",
-    tier_provenance_ref: "asker:ui-selection",
+    tier_source: tierSource,
+    tier_provenance_ref: tierProvenanceRef,
     composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
     depth_params: { depth: requiredInteger(config, "depth", 0) },
     agent_count: requiredInteger(config, "agent_count", 1),

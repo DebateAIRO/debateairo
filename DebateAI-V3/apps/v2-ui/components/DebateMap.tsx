@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { modelMeta } from "@/lib/models";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 
 type DebateMapProps = {
   root: DebateNode;
@@ -95,7 +95,6 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
   const readoutNode = hoverId ? arcs.find((a) => a.id === hoverId)?.node ?? root : root;
   const readoutRole = roleOf(readoutNode);
   const readoutPal = readoutRole === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[readoutRole];
-  const readoutModel = readoutNode.active_generation ? modelMeta(readoutNode.active_generation.model_id) : null;
 
   return (
     <div className="map scroll">
@@ -160,11 +159,11 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             >
               {readoutRole === "root" ? "● Root claim" : `${readoutPal.arrow} ${roleLabel(readoutNode)}`}
             </span>
-            {readoutModel ? (
-              <span className="metaLine">
-                <span className="modelDot" style={{ ["--dot" as string]: readoutModel.dot }} />
-                {readoutModel.name}
-              </span>
+            {readoutNode.active_generation || readoutNode.maker !== undefined ? (
+              <ModelMetaLine
+                modelId={readoutNode.active_generation?.model_id ?? null}
+                maker={readoutNode.maker}
+              />
             ) : null}
             <span style={{ flex: 1 }} />
             <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>

@@ -9,6 +9,14 @@ describe("S09 structural attachment and migration law", () => {
     expect(migration).not.toContain("'DERIVED'");
   });
 
+  it("PROV-01 extends the frozen run vocabulary for an honestly recorded machine default", async () => {
+    const migration = await readFile(new URL("../../migrations/0020_prov01_machine_default.sql", import.meta.url), "utf8");
+    expect(migration).toContain("DROP CONSTRAINT IF EXISTS run_tier_source_check");
+    expect(migration).toContain("tier_source IN ('ASKER', 'MACHINE_DEFAULT', 'DEPLOYMENT_POLICY')");
+    expect(migration).toContain("tier_source = 'DEPLOYMENT_POLICY' OR risk_tier = asker_risk_tier");
+    expect(migration).not.toContain("'DERIVED'");
+  });
+
   it("attaches the attempt-ledger-backed envelope to the runner and avoids source-literal tier arithmetic", async () => {
     const [runner, apiMain, budget] = await Promise.all([
       readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8"),
@@ -18,6 +26,7 @@ describe("S09 structural attachment and migration law", () => {
     expect(runner).toContain("BudgetRepository");
     expect(budget).toContain("countRunModelAttempts");
     expect(apiMain).toContain("resolveEffectiveRiskTier");
+    expect(apiMain).toContain("preserveSubmittedTierSource(resolved, askerTierSource)");
     expect(apiMain).not.toContain("RISK_TIERS.indexOf");
   });
 

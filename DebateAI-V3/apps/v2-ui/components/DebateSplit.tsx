@@ -4,7 +4,7 @@ import type { CSSProperties, MouseEvent } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { findNodePathById, partitionArgumentChildren, perspectiveChildren } from "@/lib/debateTreeUtils";
-import { modelMeta } from "@/lib/models";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 
 export type SplitCallbacks = {
@@ -64,7 +64,6 @@ export function DebateSplit({
 
   const focusRole = roleOf(focus);
   const focusPal = focusRole === "root" ? null : ROLE_PALETTES[focusRole];
-  const focusModel = focus.active_generation ? modelMeta(focus.active_generation.model_id) : null;
 
   return (
     <div className="split scroll">
@@ -123,11 +122,8 @@ export function DebateSplit({
               >
                 {focusPal?.arrow} {roleLabel(focus)}
               </span>
-              {focusModel ? (
-                <span className="metaLine">
-                  <span className="modelDot" style={{ ["--dot" as string]: focusModel.dot }} />
-                  {focusModel.name}
-                </span>
+              {focus.active_generation || focus.maker !== undefined ? (
+                <ModelMetaLine modelId={focus.active_generation?.model_id ?? null} maker={focus.maker} />
               ) : null}
             </div>
             <div className="splitFocusClaim">{focus.claim}</div>
@@ -279,7 +275,6 @@ function SplitCard({
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const state = renderStateOf(node);
   const empty = state === "empty";
-  const model = node.active_generation ? modelMeta(node.active_generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const rebuttals = node.children || [];
 
@@ -302,11 +297,8 @@ function SplitCard({
           <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
             {pal.arrow} {roleLabel(node)}
           </span>
-          {model ? (
-            <span className="metaLine">
-              <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-              {model.name}
-            </span>
+          {node.active_generation || node.maker !== undefined ? (
+            <ModelMetaLine modelId={node.active_generation?.model_id ?? null} maker={node.maker} />
           ) : null}
         </div>
         {empty ? (

@@ -58,7 +58,8 @@ import {
   type ComposedSegment,
   type CompositionBudgetResolution,
   type ConditionMarkRecord,
-  type FactBundle
+  type FactBundle,
+  type ServeNode
 } from "@debateai/serve";
 import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
@@ -70,7 +71,7 @@ const compositionSchema = z.object({
     text: z.string().trim().min(1),
     node_refs: z.array(z.string().trim().min(1)),
     served_number_refs: z.array(z.string().trim().min(1))
-  }).strict()).min(1)
+  }).strict()).min(1).max(2, "Composer output exceeds DR-159's ratified two-segment serve cap")
 }).strict();
 const conformanceSchema = z.object({ conforms: z.boolean(), findings: z.array(z.string()) }).strict();
 const r9Schema = z.object({ pass: z.boolean() }).strict();
@@ -90,6 +91,33 @@ const r9Schema = z.object({ pass: z.boolean() }).strict();
 export interface RunnerCritiqueSettings {
   readonly provider: ProviderGateway;
   readonly providerRef: string;
+  readonly maker: string;
+}
+
+export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
+  authorMaker: string,
+  configuredMakers: readonly T[]
+): T {
+  const reviewer = configuredMakers.find((candidate) => candidate.maker !== authorMaker);
+  if (reviewer === undefined) {
+    throw new TypedDomainError(
+      "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
+      `No configured maker differs from node author ${authorMaker}`
+    );
+  }
+  return reviewer;
+}
+
+export function assertReviewCoverageEnvelopeRatified(depth: number): void {
+  // DR-165(3) explicitly rules current total-review coverage for depths 1–2
+  // and says the 114-attempt depth-3 member cannot carry it. Larger members
+  // remain V's to ratify; the worker must not derive replacement ceilings.
+  if (depth > 2) {
+    throw new TypedDomainError(
+      "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED",
+      `DR-165(3): total cross-maker review coverage is not ratified at depth ${depth}`
+    );
+  }
 }
 
 /**
@@ -111,6 +139,7 @@ export interface WalkingSkeletonSettings {
   readonly composerBound: CallBound;
   readonly conformanceBound: CallBound;
   readonly providerRef: string;
+  readonly maker: string;
   readonly judgeContractHash: string;
   readonly composerContractHash: string;
   readonly conformanceContractHash: string;
@@ -173,6 +202,183 @@ function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T
   } catch (error) {
     throw new TypedDomainError(code, error instanceof Error ? error.message : String(error));
   }
+}
+
+export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
+  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+}
+
+export type DebateMakerRole = "primary" | "secondary";
+
+const DR159_RATIFIED_MAKER_COUNT = 2;
+
+/** PANEL-01/DR-159: the ratified envelope arithmetic is valid for at most M=2. */
+export function assertRatifiedMakerCount(effectiveMakerCount: number): void {
+  if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
+    throw new TypedDomainError("RUN_MAKER_COUNT_INVALID", "The effective maker count must be a positive integer");
+  }
+  if (effectiveMakerCount > DR159_RATIFIED_MAKER_COUNT) {
+    throw new TypedDomainError(
+      "RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE",
+      `DR-159 ratified the run-cost envelope for M=${DR159_RATIFIED_MAKER_COUNT}; received M=${effectiveMakerCount}`
+    );
+  }
+}
+
+export interface DebateExpansionLeg {
+  readonly round: number;
+  readonly parentIndex: number;
+  readonly childIndex: number;
+  readonly polarity: "support" | "attack";
+  readonly author: DebateMakerRole;
+}
+
+export interface MultiMakerExpansionLeg extends DebateExpansionLeg {
+  readonly rootIndex: number;
+}
+
+export interface CrossRootExchangeLeg {
+  readonly author: DebateMakerRole;
+  readonly authorRootIndex: number;
+  readonly targetRootIndex: number;
+}
+
+export const SERVED_ROOT_RULE = "first-configured-provider" as const;
+
+/** DR-161: B2-A serves the root authored by the first configured provider. */
+export function selectServedRoot<T>(configuredProviderRoots: readonly T[]): Readonly<{
+  rule: typeof SERVED_ROOT_RULE;
+  root: T;
+}> {
+  const root = configuredProviderRoots[0];
+  if (root === undefined) throw new TypedDomainError("SERVED_ROOT_UNRESOLVED", "No configured provider root exists");
+  return Object.freeze({ rule: SERVED_ROOT_RULE, root });
+}
+
+/** PANEL-01 rev3: budget records append without erasing prior honesty records. */
+export function preserveEnvelopeTerminalConditionMarkRecords(
+  existing: readonly ConditionMarkRecord[],
+  budgetRecords: readonly ConditionMarkRecord[]
+): readonly ConditionMarkRecord[] {
+  return Object.freeze([...existing, ...budgetRecords]);
+}
+
+export interface FixedRootServeCandidate {
+  readonly nodeId: string;
+  readonly statement: string;
+  readonly wayOfKnowing: WayOfKnowing;
+  readonly provenanceRef: string;
+  readonly locator: string | null;
+  readonly restatementStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
+}
+
+/** DR-159 B2-A: project exactly the selected root into the served-node set. */
+export function buildFixedSingleRootServeNodes(
+  authoredRoots: readonly FixedRootServeCandidate[],
+  servedRootNodeId: string
+): readonly ServeNode[] {
+  const selectedRoots = authoredRoots.filter((root) => root.nodeId === servedRootNodeId);
+  if (selectedRoots.length !== 1) {
+    throw new TypedDomainError(
+      "FIXED_SINGLE_ROOT_SERVE_VIOLATED",
+      "DR-159 B2-A requires exactly one served root"
+    );
+  }
+  return Object.freeze(selectedRoots.map((root) => Object.freeze({
+    nodeId: root.nodeId,
+    text: root.statement,
+    wayOfKnowing: root.wayOfKnowing,
+    provenanceRef: root.provenanceRef,
+    locator: root.locator,
+    restatementStatus: root.restatementStatus,
+    loadBearing: true
+  })));
+}
+
+/** DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds. */
+export function resolveExpansionDepth(depthParams: Readonly<Record<string, unknown>>): number {
+  const depth = depthParams.depth;
+  if (!Number.isInteger(depth) || typeof depth !== "number" || depth < 1 || depth > 5) {
+    throw new TypedDomainError(
+      "RUN_DEPTH_PARAMS_INVALID",
+      "DR-157/DR-159 require a pinned integer expansion depth from 1 through 5"
+    );
+  }
+  return depth;
+}
+
+/** PANEL-01: every independently authored root owns a complete B3-B subtree. */
+export function buildMultiMakerExpansionPlan(
+  depth: number,
+  effectiveMakerCount: number
+): readonly MultiMakerExpansionLeg[] {
+  const ruledDepth = resolveExpansionDepth({ depth });
+  assertRatifiedMakerCount(effectiveMakerCount);
+  if (effectiveMakerCount !== DR159_RATIFIED_MAKER_COUNT) {
+    throw new TypedDomainError(
+      "MULTI_MAKER_PLAN_REQUIRES_TWO_MAKERS",
+      "The PANEL-01 multi-maker planner requires exactly two configured makers"
+    );
+  }
+  const legs: MultiMakerExpansionLeg[] = [];
+  let nextNodeIndex = effectiveMakerCount;
+  for (let rootIndex = 0; rootIndex < effectiveMakerCount; rootIndex += 1) {
+    let frontier = [rootIndex];
+    for (let round = 1; round <= ruledDepth; round += 1) {
+      const rootAuthor: DebateMakerRole = rootIndex === 0 ? "primary" : "secondary";
+      const author: DebateMakerRole = round % 2 === 0
+        ? rootAuthor
+        : rootAuthor === "primary" ? "secondary" : "primary";
+      const nextFrontier: number[] = [];
+      for (const parentIndex of frontier) {
+        for (const polarity of ["support", "attack"] as const) {
+          const childIndex = nextNodeIndex++;
+          legs.push(Object.freeze({ round, rootIndex, parentIndex, childIndex, polarity, author }));
+          nextFrontier.push(childIndex);
+        }
+      }
+      frontier = nextFrontier;
+    }
+  }
+  return Object.freeze(legs);
+}
+
+/** One ordered response per maker: defend its own root and attack the other root. */
+export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
+  assertRatifiedMakerCount(effectiveMakerCount);
+  if (effectiveMakerCount === 1) return Object.freeze([]);
+  return Object.freeze([
+    Object.freeze({ author: "primary" as const, authorRootIndex: 0, targetRootIndex: 1 }),
+    Object.freeze({ author: "secondary" as const, authorRootIndex: 1, targetRootIndex: 0 })
+  ]);
+}
+
+/**
+ * DR-159 B2-A applies the two-segment cap to composer/conformance output.
+ * The memory disclosure is a separately validated typed-renderer projection:
+ * persist it for honesty, but never smuggle it into the conformance spend set.
+ */
+export function partitionServedSegments(
+  composedSegments: readonly ComposedSegment[],
+  renderedMemory: string | null
+): {
+  readonly conformanceSegments: readonly ComposedSegment[];
+  readonly persistedSegments: readonly ComposedSegment[];
+} {
+  const conformanceSegments = Object.freeze([...composedSegments]);
+  const persistedSegments = renderedMemory === null
+    ? conformanceSegments
+    : Object.freeze([
+        ...conformanceSegments,
+        Object.freeze({
+          segmentId: "memory:disclosure",
+          text: renderedMemory,
+          loadBearing: false,
+          assertedNodeRefs: Object.freeze([]),
+          servedNumberRefs: Object.freeze([])
+        })
+      ]);
+  return Object.freeze({ conformanceSegments, persistedSegments });
 }
 
 export class WalkingSkeletonRunner {
@@ -305,6 +511,18 @@ export class WalkingSkeletonRunner {
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const runnerAttemptId = randomUUID();
     const run = await this.#runs.readFrozenHead(claimed.runId);
+    const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
+    const expansionDepth = resolveExpansionDepth(envelopeBasis.derivedFrom.depthParams);
+    const criticJudge = this.#criticJudge;
+    const effectiveMakerCount = critiqueSettings !== undefined && criticJudge !== null ? 2 : 1;
+    assertRatifiedMakerCount(run.agentCount);
+    if (run.agentCount !== effectiveMakerCount) {
+      throw new TypedDomainError(
+        "RUN_MAKER_CONFIGURATION_MISMATCH",
+        `The run requests ${run.agentCount} maker(s), but exactly ${effectiveMakerCount} real maker gateway(s) are configured`
+      );
+    }
+    assertReviewCoverageEnvelopeRatified(expansionDepth);
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
       runId: run.runId,
@@ -414,142 +632,299 @@ export class WalkingSkeletonRunner {
       disagreement: createUnmeasuredDisagreement()
     });
 
-    // FAIR-01 (DR-140(b)): the SECOND maker's leg. The critic maker judges the
-    // strongest genuine counter-position through the SAME ruled JUDGE organ
-    // (same contract text, same ruled JUDGE cost bound), and the counter joins
-    // the graph as a first-class defeater node with a real attack edge — one
-    // maker per artifact, honest lineage, nothing fabricated (DR-115). The
-    // counter prompt carries only the position's STATEMENT TEXT — no maker,
-    // model or provider identity — so the rival judgement is blind to who
-    // produced the position. The S08 critique-packet instrument is
-    // deliberately NOT recorded here: DR-141(4) rules that a run carrying
-    // critique packets REFUSES at terminal (Q42 `critic_agrees`,
-    // packages/battery/src/terminal.ts Q42 evaluator) until V rules the
-    // agreement-verdict recording migration.
-    let counterLeg: {
+    interface AuthoredDebateNode {
       readonly nodeId: string;
+      readonly statement: string;
       readonly provenanceRef: string;
       readonly reducedJudgementId: string;
       readonly wayOfKnowing: WayOfKnowing;
-    } | null = null;
-    const criticJudge = this.#criticJudge;
-    if (critiqueSettings !== undefined && criticJudge !== null) {
-      const counterQuestionLine = [
-        "A fair debate requires the strongest genuine counter-position, judged on its own merits.",
-        `Question under debate: ${run.questionLine}`,
-        `Position under critique: ${judged.statement}`,
-        "State and defend the strongest genuine counter-position to that position."
-      ].join("\n");
-      await this.#ledger.append({
-        runId: run.runId,
-        attemptId: runnerAttemptId,
-        actionKind: "JUDGEMENT_SCHEDULED",
-        subjectItemId: claimed.workItemId,
-        stanceAtAction: "UNASSIGNED",
-        outcome: "OK",
-        actorRef: this.settings.workerId,
-        inputHash: hash({ questionLine: counterQuestionLine, workItemId: claimed.workItemId }),
-        contractHash: this.settings.judgeContractHash,
-        startedAt: new Date(),
-        finishedAt: new Date()
-      });
-      const counterJudged = await criticJudge.judge({
-        runId: run.runId,
-        subjectItemId: claimed.workItemId,
-        callSiteKey: "JUDGE:critic",
-        questionLine: counterQuestionLine,
-        // One debate, one claim frame: the counter is classified on the
-        // debate's own question line, not on the position's wording.
-        claimClassificationLine: run.questionLine,
-        providerRef: critiqueSettings.providerRef,
-        contractHash: this.settings.judgeContractHash,
-        bound: this.settings.judgeBound
-      });
-      const counterReduced = reduceAssessment({
-        claimType: counterJudged.normalizedClaim.claimType,
-        assessment: counterJudged.assessment,
-        compositionRow,
-        reducerVersion: judgementPolicy.reducerVersion
-      });
-      if (counterReduced.kind !== "REDUCED") {
-        throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${counterReduced.claimType}`);
-      }
-      const counterSelection = selectReducedJudgement([{
-        judgementRef: counterJudged.provenanceRef,
-        tau: counterReduced.tau,
-        effectiveWeight: judgementPolicy.earnedWeight
-      }], judgementPolicy.selectionRule);
-      if (counterSelection.kind !== "SELECTED") {
-        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The critic produced no selectable judgement");
-      }
-      const counterNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
-        const created = await writer.addNode({
+      readonly locator: string | null;
+      readonly restatementStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
+      readonly reversalPoint: string;
+      readonly author: DebateMakerRole;
+      readonly maker: string;
+    }
+    const authoredNodes: AuthoredDebateNode[] = [Object.freeze({
+      nodeId,
+      statement: judged.statement,
+      provenanceRef: judged.provenanceRef,
+      reducedJudgementId,
+      wayOfKnowing: judged.wayOfKnowing,
+      locator: judged.locator,
+      restatementStatus: judged.restatementStatus,
+      reversalPoint: judged.assessment.critic.summary,
+      author: "primary",
+      maker: this.settings.maker
+    })];
+
+    const authorPosition = async (input: {
+      readonly author: DebateMakerRole;
+      readonly questionLine: string;
+      readonly callSiteKey: string;
+      readonly role: string;
+      readonly parentNodeId: string | null;
+      readonly childKind: "support" | "defeater" | null;
+      readonly siblingOrdinal: number;
+      readonly explorationDecision: "continue" | "deepen" | "challenge";
+      readonly edges: readonly {
+        readonly targetNodeId: string;
+        readonly polarity: "support" | "attack";
+      }[];
+    }): Promise<AuthoredDebateNode> => {
+      const selectedMaker = input.author === "primary"
+        ? { judge: this.#judge, providerRef: this.settings.providerRef, maker: this.settings.maker }
+        : { judge: criticJudge!, providerRef: critiqueSettings!.providerRef, maker: critiqueSettings!.maker };
+        await this.#ledger.append({
           runId: run.runId,
-          statementText: counterJudged.statement,
-          claimType: counterJudged.normalizedClaim.claimType,
-          parentNodeId: nodeId,
-          childKind: "defeater",
-          siblingOrdinal: 1,
-          generationStatus: "complete",
-          pathStatus: "active",
-          explorationDecision: "challenge",
-          provenanceRef: counterJudged.provenanceRef,
-          wayOfKnowing: counterJudged.wayOfKnowing,
-          locator: counterJudged.locator,
-          valueLaden: counterJudged.valueLaden
+          attemptId: runnerAttemptId,
+          actionKind: "JUDGEMENT_SCHEDULED",
+          subjectItemId: claimed.workItemId,
+          stanceAtAction: "UNASSIGNED",
+          outcome: "OK",
+          actorRef: this.settings.workerId,
+          inputHash: hash({ questionLine: input.questionLine, workItemId: claimed.workItemId }),
+          contractHash: this.settings.judgeContractHash,
+          startedAt: new Date(),
+          finishedAt: new Date()
         });
-        await writer.addStrangerRestatement({
-          nodeId: created,
-          text: counterJudged.restatementText,
-          checkStatus: counterJudged.restatementStatus
-        });
-        // The S07 defeater edge shape: polarity attack, kind rebutting, and a
-        // magnitude honestly UNKNOWN — no evidence verifier measured this
-        // edge, so no number rides it (AC-76). Provenance = the critic's REAL
-        // artifact.
-        await writer.addEdge({
+      const childJudged = await selectedMaker.judge.judge({
           runId: run.runId,
-          sourceNodeId: created,
-          targetKind: "NODE",
-          targetNodeId: nodeId,
-          targetEdgeId: null,
-          targetEdgePolarity: null,
-          polarity: "attack",
-          kind: "rebutting",
-          strength: null,
-          magnitudeStatus: "UNKNOWN",
-          strengthSource: "EVIDENCE_VERIFIER",
-          provenanceRef: counterJudged.provenanceRef
+          subjectItemId: claimed.workItemId,
+          callSiteKey: input.callSiteKey,
+          questionLine: input.questionLine,
+          claimClassificationLine: run.questionLine,
+          providerRef: selectedMaker.providerRef,
+          contractHash: this.settings.judgeContractHash,
+          bound: this.settings.judgeBound
         });
-        return created;
-      });
-      const counterReducedJudgementId = await this.#judgements.recordReduced({
-        runId: run.runId,
-        nodeId: counterNodeId,
-        rawArtifactRef: counterJudged.provenanceRef,
-        tau: counterSelection.tau,
-        numberKind: this.settings.judgementNumberKind,
-        producer: this.settings.judgementProducer,
-        wayOfKnowing: counterJudged.wayOfKnowing,
-        uncertaintyLadderPosition: counterReduced.uncertaintyLadderPosition,
-        uncertaintyDrivers: counterReduced.drivers,
-        scoreCaps: counterReduced.caps,
-        holes: counterReduced.holes,
-        branchIdentifier: counterReduced.branch,
-        reducerVersion: counterReduced.reducerVersion,
-        judgeWeightVersion: judgementPolicy.judgeWeightVersion,
-        selectedJudgementRef: counterSelection.selectedJudgementRef,
-        dispersion: null,
-        panelContractHashes: [this.settings.judgeContractHash],
-        disagreement: createUnmeasuredDisagreement()
-      });
-      counterLeg = Object.freeze({
-        nodeId: counterNodeId,
-        provenanceRef: counterJudged.provenanceRef,
-        reducedJudgementId: counterReducedJudgementId,
-        wayOfKnowing: counterJudged.wayOfKnowing
+      const childReduced = reduceAssessment({
+          claimType: childJudged.normalizedClaim.claimType,
+          assessment: childJudged.assessment,
+          compositionRow,
+          reducerVersion: judgementPolicy.reducerVersion
+        });
+        if (childReduced.kind !== "REDUCED") {
+          throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
+        }
+        const childSelection = selectReducedJudgement([{
+          judgementRef: childJudged.provenanceRef,
+          tau: childReduced.tau,
+          effectiveWeight: judgementPolicy.earnedWeight
+        }], judgementPolicy.selectionRule);
+        if (childSelection.kind !== "SELECTED") {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", `The ${input.role} produced no selectable judgement`);
+        }
+        const childNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
+          const created = await writer.addNode({
+            runId: run.runId,
+            statementText: childJudged.statement,
+            claimType: childJudged.normalizedClaim.claimType,
+            parentNodeId: input.parentNodeId,
+            childKind: input.childKind,
+            siblingOrdinal: input.siblingOrdinal,
+            generationStatus: "complete",
+            pathStatus: "active",
+            explorationDecision: input.explorationDecision,
+            provenanceRef: childJudged.provenanceRef,
+            wayOfKnowing: childJudged.wayOfKnowing,
+            locator: childJudged.locator,
+            valueLaden: childJudged.valueLaden
+          });
+          await writer.addStrangerRestatement({
+            nodeId: created,
+            text: childJudged.restatementText,
+            checkStatus: childJudged.restatementStatus
+          });
+          for (const edge of input.edges) {
+            await writer.addEdge({
+              runId: run.runId,
+              sourceNodeId: created,
+              targetKind: "NODE",
+              targetNodeId: edge.targetNodeId,
+              targetEdgeId: null,
+              targetEdgePolarity: null,
+              polarity: edge.polarity,
+              kind: edge.polarity === "attack" ? "rebutting" : null,
+              strength: null,
+              magnitudeStatus: "UNKNOWN",
+              strengthSource: "EVIDENCE_VERIFIER",
+              provenanceRef: childJudged.provenanceRef
+            });
+          }
+          return created;
+        });
+        const childReducedJudgementId = await this.#judgements.recordReduced({
+          runId: run.runId,
+          nodeId: childNodeId,
+          rawArtifactRef: childJudged.provenanceRef,
+          tau: childSelection.tau,
+          numberKind: this.settings.judgementNumberKind,
+          producer: this.settings.judgementProducer,
+          wayOfKnowing: childJudged.wayOfKnowing,
+          uncertaintyLadderPosition: childReduced.uncertaintyLadderPosition,
+          uncertaintyDrivers: childReduced.drivers,
+          scoreCaps: childReduced.caps,
+          holes: childReduced.holes,
+          branchIdentifier: childReduced.branch,
+          reducerVersion: childReduced.reducerVersion,
+          judgeWeightVersion: judgementPolicy.judgeWeightVersion,
+          selectedJudgementRef: childSelection.selectedJudgementRef,
+          dispersion: null,
+          panelContractHashes: [this.settings.judgeContractHash],
+          disagreement: createUnmeasuredDisagreement()
+        });
+      return Object.freeze({
+          nodeId: childNodeId,
+          statement: childJudged.statement,
+          provenanceRef: childJudged.provenanceRef,
+          reducedJudgementId: childReducedJudgementId,
+          wayOfKnowing: childJudged.wayOfKnowing,
+          locator: childJudged.locator,
+          restatementStatus: childJudged.restatementStatus,
+          reversalPoint: childJudged.assessment.critic.summary,
+          author: input.author,
+          maker: selectedMaker.maker
+        });
+    };
+
+    if (effectiveMakerCount === 2) {
+      authoredNodes[1] = await authorPosition({
+        author: "secondary",
+        questionLine: [
+          "Independently author your own position on the question. Do not grade or imitate another maker.",
+          `Question under debate: ${run.questionLine}`
+        ].join("\n"),
+        callSiteKey: "JUDGE:root:secondary",
+        role: "secondary root author",
+        parentNodeId: null,
+        childKind: null,
+        siblingOrdinal: 0,
+        explorationDecision: "continue",
+        edges: []
       });
     }
+
+    // PRO-01 × PANEL-01: each independently authored root owns its own B3-B
+    // breadth-first pro/con tree, with real per-node maker lineage.
+    for (const leg of effectiveMakerCount === 2
+      ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount)
+      : []) {
+      const parent = authoredNodes[leg.parentIndex];
+      if (parent === undefined) {
+        throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
+      }
+      const role = leg.polarity === "support" ? "defender" : "critic";
+      const childQuestionLine = leg.polarity === "support"
+        ? [
+            "A fair debate requires a genuine supporting case for every position, judged on its own merits.",
+            `Question under debate: ${run.questionLine}`,
+            `Position to defend: ${parent.statement}`,
+            "State and defend the strongest genuine supporting reason for that position."
+          ].join("\n")
+        : [
+            "A fair debate requires the strongest genuine counter-position, judged on its own merits.",
+            `Question under debate: ${run.questionLine}`,
+            `Position under critique: ${parent.statement}`,
+            "State and defend the strongest genuine counter-position to that position."
+          ].join("\n");
+      authoredNodes[leg.childIndex] = await authorPosition({
+        author: leg.author,
+        questionLine: childQuestionLine,
+        callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+        role,
+        parentNodeId: parent.nodeId,
+        childKind: leg.polarity === "support" ? "support" : "defeater",
+        siblingOrdinal: leg.polarity === "support" ? 1 : 2,
+        explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
+        edges: [{ targetNodeId: parent.nodeId, polarity: leg.polarity }]
+      });
+    }
+
+    // DR-154(2): each maker authors one ordered cross-root response. The same
+    // real response node defends its own root and attacks the other root; both
+    // S07 edges carry UNKNOWN magnitude until independently judged.
+    for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
+      const authorRoot = authoredNodes[exchange.authorRootIndex];
+      const targetRoot = authoredNodes[exchange.targetRootIndex];
+      if (authorRoot === undefined || targetRoot === undefined) {
+        throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
+      }
+      authoredNodes.push(await authorPosition({
+        author: exchange.author,
+        questionLine: [
+          "Author one direct cross-root response: defend your own position and attack the other maker's position.",
+          `Question under debate: ${run.questionLine}`,
+          `Your position: ${authorRoot.statement}`,
+          `Other maker's position: ${targetRoot.statement}`
+        ].join("\n"),
+        callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`,
+        role: "cross-root response",
+        parentNodeId: authorRoot.nodeId,
+        childKind: "support",
+        siblingOrdinal: 3,
+        explorationDecision: "challenge",
+        edges: [
+          { targetNodeId: authorRoot.nodeId, polarity: "support" },
+          { targetNodeId: targetRoot.nodeId, polarity: "attack" }
+        ]
+      }));
+    }
+
+    // XREV-01 / DR-148(4): every authored node in a multi-maker run is
+    // reviewed by any configured maker other than its author. The selection
+    // rule is N-generic; today's M=2 roster is only configuration. A failed or
+    // invalid review call leaves the append-only review resource absent and
+    // makes the run unservable; envelope refusal is likewise never swallowed.
+    if (effectiveMakerCount > 1) {
+      const configuredReviewers = [
+        { judge: this.#judge, providerRef: this.settings.providerRef, maker: this.settings.maker },
+        { judge: criticJudge!, providerRef: critiqueSettings!.providerRef, maker: critiqueSettings!.maker }
+      ] as const;
+      for (const authoredNode of authoredNodes) {
+        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredReviewers);
+        try {
+          const review = await reviewer.judge.review({
+            runId: run.runId,
+            subjectItemId: claimed.workItemId,
+            callSiteKey: `JUDGE:review:${authoredNode.nodeId}`,
+            questionLine: run.questionLine,
+            statement: authoredNode.statement,
+            authorMaker: authoredNode.maker,
+            providerRef: reviewer.providerRef,
+            contractHash: this.settings.judgeContractHash,
+            bound: this.settings.judgeBound
+          });
+          await this.#judgements.recordNodeReview({
+            runId: run.runId,
+            nodeId: authoredNode.nodeId,
+            authorRawArtifactRef: authoredNode.provenanceRef,
+            reviewRawArtifactRef: review.provenanceRef,
+            outcome: review.outcome,
+            reasons: review.reasons
+          });
+        } catch (error) {
+          if (error instanceof TypedDomainError && [
+            "RUN_COST_ENVELOPE_EXHAUSTED",
+            "CALL_BUDGET_EXHAUSTED",
+            "PRODUCER_GRADING_FORBIDDEN"
+          ].includes(error.code)) throw error;
+          // DR-165(3): the record remains honestly absent, but the authored
+          // opinion is unservable. Never turn a failed call into cannot-assess.
+          throw new TypedDomainError(
+            "NODE_REVIEW_UNAVAILABLE",
+            `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
+          );
+        }
+      }
+    }
+
+    const servedRootSelection = selectServedRoot(authoredNodes.slice(0, effectiveMakerCount));
+    const servedRoot = servedRootSelection.root;
+    const unservedRoot = effectiveMakerCount === 2 ? authoredNodes[1] : undefined;
+    const servedNodes = buildFixedSingleRootServeNodes(
+      authoredNodes.slice(0, effectiveMakerCount),
+      servedRoot.nodeId
+    );
 
     const materialised = await this.#graph.materialiseSnapshot(run.runId);
     // P8 × DR-074: an arrow-bearing graph propagates only under the ruled
@@ -583,7 +958,7 @@ export class WalkingSkeletonRunner {
     }
     const propagationStartedAt = new Date();
     const propagation = evaluate(snapshot);
-    const replayHandle = `replay:${run.runId}:${nodeId}`;
+    const replayHandle = `replay:${run.runId}:${servedRoot.nodeId}`;
     const propagationRunId = await this.#ledger.recordPropagation({
       runId: run.runId,
       inputHash: hash(snapshot),
@@ -604,31 +979,17 @@ export class WalkingSkeletonRunner {
       // artifact and way of knowing — the position's lineage is never stamped
       // onto the counter's number. An unmapped node is a typed loud stop.
       strengths: propagation.strengths.map((strength) => {
-        const lineage = strength.nodeId === nodeId
-          ? {
-              reducedJudgementRef: reducedJudgementId,
-              sourceRef: judged.provenanceRef,
-              replayHandle,
-              wayOfKnowing: judged.wayOfKnowing
-            }
-          : counterLeg !== null && strength.nodeId === counterLeg.nodeId
-            ? {
-                reducedJudgementRef: counterLeg.reducedJudgementId,
-                sourceRef: counterLeg.provenanceRef,
-                replayHandle: `replay:${run.runId}:${counterLeg.nodeId}`,
-                wayOfKnowing: counterLeg.wayOfKnowing
-              }
-            : null;
-        if (lineage === null) {
+        const lineage = authoredNodes.find((candidate) => candidate.nodeId === strength.nodeId);
+        if (lineage === undefined) {
           throw new TypedDomainError("STRENGTH_LINEAGE_UNRESOLVED", strength.nodeId);
         }
         return {
           ...strength,
-          reducedJudgementRef: lineage.reducedJudgementRef,
+          reducedJudgementRef: lineage.reducedJudgementId,
           numberKind: this.settings.propagationNumberKind,
-          sourceRef: lineage.sourceRef,
+          sourceRef: lineage.provenanceRef,
           producer: this.settings.propagationProducer,
-          replayHandle: lineage.replayHandle,
+          replayHandle: `replay:${run.runId}:${lineage.nodeId}`,
           wayOfKnowing: lineage.wayOfKnowing
         };
       })
@@ -637,23 +998,28 @@ export class WalkingSkeletonRunner {
       runId: run.runId,
       attemptId: runnerAttemptId,
       actionKind: "PROPAGATION",
-      subjectItemId: nodeId,
+      subjectItemId: servedRoot.nodeId,
       stanceAtAction: "UNASSIGNED",
       outcome: "OK",
       actorRef: this.settings.propagationProducer,
       inputHash: hash(snapshot),
       contractHash: this.settings.propagationContractHash,
-      rawArtifactRef: judged.provenanceRef,
+      rawArtifactRef: servedRoot.provenanceRef,
       startedAt: propagationStartedAt,
       finishedAt: new Date()
     });
     const memoryDisclosure = await this.#memory.readDisclosure(run.runId);
+    const monoMakerConditionMarks = effectiveMakerCount === 1
+      ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
+      : [] as const;
     const factBundle: FactBundle = buildFactBundle({
-      facts: Object.freeze([judged.statement]),
+      facts: Object.freeze([servedRoot.statement]),
       residualObjections: Object.freeze([]),
       badges: Object.freeze([]),
-      conditionMarks: Object.freeze([]),
-      reversalPoint: judged.assessment.critic.summary,
+      conditionMarks: Object.freeze(effectiveMakerCount === 2
+        ? ["UNSERVED-MAKER-POSITION"]
+        : [...monoMakerConditionMarks]),
+      reversalPoint: servedRoot.reversalPoint,
       buildsOnPrevious: {
         value: memoryDisclosure?.matched === true,
         answerRef: memoryDisclosure?.prior?.answer_id ?? null
@@ -664,16 +1030,46 @@ export class WalkingSkeletonRunner {
     let compositionRawArtifactRef: string | null = null;
     let compositionAttempt = 0;
     const conformanceRawArtifactRefs: string[] = [];
-    let conditionMarkRecords: readonly ConditionMarkRecord[] = [];
+    let conditionMarkRecords: readonly ConditionMarkRecord[] = effectiveMakerCount === 1
+      ? [
+          Object.freeze({
+            mark: "SINGLE-LINEAGE",
+            scope: "answer",
+            subjectRef: servedRoot.nodeId,
+            reason: "MONO_MAKER_RUN",
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([servedRoot.nodeId])
+          }),
+          Object.freeze({
+            mark: "CRITIQUE-UNAVAILABLE",
+            scope: "answer",
+            subjectRef: servedRoot.nodeId,
+            reason: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
+            liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
+            servedRootRule: null,
+            affectedNodeIds: Object.freeze([servedRoot.nodeId])
+          })
+        ]
+      : unservedRoot === undefined
+        ? []
+      : [Object.freeze({
+          mark: "UNSERVED-MAKER-POSITION",
+          scope: "answer",
+          subjectRef: servedRoot.nodeId,
+          reason: `The first configured maker's root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedRoot.maker} position ${unservedRoot.nodeId} remains graph-visible but unserved`,
+          liftPath: "Serve the other maker root in a separately ruled answer",
+          servedRootRule: servedRootSelection.rule,
+          affectedNodeIds: Object.freeze([servedRoot.nodeId, unservedRoot.nodeId])
+        })];
     const serveStartedAt = new Date();
-    const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
     const evaluateEnvelope = (): Promise<BudgetPressureDecision> => this.#budget.evaluateRunPressure({
       runId: run.runId,
       basis: envelopeBasis,
       pendingRows: BATTERY_BUDGET_CONTRACTS
         .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
-        .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [nodeId] })),
-      verifiedNodeIds: [nodeId]
+        .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
+      verifiedNodeIds: [servedRoot.nodeId]
     });
     const recordEnvelope = (decision: BudgetPressureDecision): Promise<void> => this.#budget.recordDecision({
       runId: run.runId,
@@ -691,13 +1087,14 @@ export class WalkingSkeletonRunner {
       compositionRawArtifactRef = null;
       compositionAttempt = 0;
       conformanceRawArtifactRefs.length = 0;
-      conditionMarkRecords = Object.freeze([
+      conditionMarkRecords = preserveEnvelopeTerminalConditionMarkRecords(conditionMarkRecords, [
         ...decision.enrichmentSkips.map((row): ConditionMarkRecord => Object.freeze({
           mark: row.conditionMark,
           scope: "node",
           subjectRef: row.batteryRowId,
           reason: "ENRICHMENT_ROW_SKIPPED_BY_BUDGET",
           liftPath: null,
+          servedRootRule: null,
           affectedNodeIds: row.affectedNodeIds
         })),
         Object.freeze({
@@ -706,6 +1103,7 @@ export class WalkingSkeletonRunner {
           subjectRef: run.runId,
           reason: "RUN_COST_ENVELOPE_EXHAUSTED",
           liftPath: null,
+          servedRootRule: null,
           affectedNodeIds: decision.terminal.servedNodeIds
         })
       ]);
@@ -714,26 +1112,18 @@ export class WalkingSkeletonRunner {
         compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
         verifiedNodeIds: decision.terminal.servedNodeIds,
         skippedEnrichmentRows: decision.enrichmentSkips.map((row) => row.batteryRowId),
-        protectedCoreVerified: judged.restatementStatus === "PASS"
+        protectedCoreVerified: servedRoot.restatementStatus === "PASS"
       });
     };
     const initialEnvelopeDecision = await evaluateEnvelope();
     let result;
-    if (initialEnvelopeDecision.kind === "HARD_STOP" && judged.restatementStatus === "PASS") {
+    if (initialEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
       result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       try {
         result = await runServeGateChain({
-      nodes: [{
-        nodeId,
-        text: judged.statement,
-        wayOfKnowing: judged.wayOfKnowing,
-        provenanceRef: judged.provenanceRef,
-        locator: judged.locator,
-        restatementStatus: judged.restatementStatus,
-        loadBearing: true
-      }],
+      nodes: servedNodes,
       factBundle,
       maxRecompose: this.settings.maxRecompose,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
@@ -756,15 +1146,15 @@ export class WalkingSkeletonRunner {
             // prompt must declare the ruled serve-gate segment contract —
             // including the reasoning-only two-segment form — because the gate
             // is byte-strict and repairs nothing.
-            { role: "system", content: "Return only JSON with a segments array of {segment_id,text,node_refs,served_number_refs}. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
+            { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
             { role: "user", content: JSON.stringify({
               factBundle: facts,
-              availableNodes: [{ ref: "primary", nodeId, fact: judged.statement }],
+              availableNodes: servedNodes.map((node) => ({ ref: "primary", nodeId: node.nodeId, fact: node.text })),
               availableServedNumberRefs: ["number:final-strength"]
             }) }
           ] }
         });
-        const parsed = parseContent(response.content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+        const parsed = parseComposerOutput(response.content);
         const composedSegments = parsed.segments.map((segment) => {
           if (segment.segment_id === "memory:disclosure") {
             throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
@@ -777,26 +1167,18 @@ export class WalkingSkeletonRunner {
             if (ref !== "primary") {
               throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${ref}`);
             }
-            return nodeId;
+            return servedRoot.nodeId;
           })),
           servedNumberRefs: Object.freeze([...segment.served_number_refs])
           });
         });
         const renderedMemory = renderMemorySentence(facts.memoryDisclosure);
         validateMemorySentence(facts.memoryDisclosure, renderedMemory);
-        finalSegments = Object.freeze(renderedMemory === null ? composedSegments : [
-          ...composedSegments,
-          Object.freeze({
-            segmentId: "memory:disclosure",
-            text: renderedMemory,
-            loadBearing: false,
-            assertedNodeRefs: Object.freeze([]),
-            servedNumberRefs: Object.freeze([])
-          })
-        ]);
+        const partitioned = partitionServedSegments(composedSegments, renderedMemory);
+        finalSegments = partitioned.persistedSegments;
         compositionRawArtifactRef = response.rawArtifactRef;
         compositionAttempt = attempt;
-        return finalSegments;
+        return partitioned.conformanceSegments;
       },
       selectSample: (segment, sampleRate) => {
         if (sampleRate <= 0) return false;
@@ -851,12 +1233,12 @@ export class WalkingSkeletonRunner {
       } catch (error) {
         if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
         const exhausted = await evaluateEnvelope();
-        if (exhausted.kind !== "HARD_STOP" || judged.restatementStatus !== "PASS") throw error;
+        if (exhausted.kind !== "HARD_STOP" || servedRoot.restatementStatus !== "PASS") throw error;
         result = await makeEnvelopeTerminal(exhausted);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();
-        if (finalEnvelopeDecision.kind === "HARD_STOP" && judged.restatementStatus === "PASS") {
+        if (finalEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
           result = await makeEnvelopeTerminal(finalEnvelopeDecision);
         } else {
           await recordEnvelope(finalEnvelopeDecision);
@@ -865,7 +1247,7 @@ export class WalkingSkeletonRunner {
     }
     // The served number is the POSITION node's final strength — selected by
     // node identity, never by array position (a multi-node graph reorders).
-    const strength = propagation.strengths.find((row) => row.nodeId === nodeId);
+    const strength = propagation.strengths.find((row) => row.nodeId === servedRoot.nodeId);
     if (strength === undefined) throw new TypedDomainError("EMPTY_PROPAGATION", run.runId);
     const terminalEvaluator = this.settings.resolveTerminalActivations;
     if (terminalEvaluator === undefined) {
@@ -880,7 +1262,7 @@ export class WalkingSkeletonRunner {
       waitingRows: current.activations.filter((row) => row.state === "WAIT").map((row) => row.batteryRowId),
       completion: Object.freeze({
         kind: "ANSWER_RECORD_PERSIST",
-        servedNodeIds: Object.freeze([nodeId]),
+        servedNodeIds: Object.freeze([servedRoot.nodeId]),
         servedNumberPlanned: compositionEvidenceRequired(result)
       })
     });
@@ -901,7 +1283,8 @@ export class WalkingSkeletonRunner {
           subjectRef: resolution.batteryRowId,
           reason: `DR-139(4): ${resolution.batteryRowId} is ACTIVE at run completion and its owed check has no recorded execution`,
           liftPath: null,
-          affectedNodeIds: [nodeId]
+          servedRootRule: null,
+          affectedNodeIds: [servedRoot.nodeId]
         }))
       ]);
       if (!result.conditionMarks.includes("OWED-CHECK-UNEXECUTED")) {
@@ -921,7 +1304,8 @@ export class WalkingSkeletonRunner {
           subjectRef: resolution.batteryRowId,
           reason: `DR-021 knob 10 · DR-141(2): ${resolution.batteryRowId} was evaluated through the factual question-type fallback because no recorded type resolution exists`,
           liftPath: null,
-          affectedNodeIds: [nodeId]
+          servedRootRule: null,
+          affectedNodeIds: [servedRoot.nodeId]
         }))
       ]);
       if (!result.conditionMarks.includes("UNRESOLVED-TYPE-FALLBACK")) {
@@ -944,7 +1328,7 @@ export class WalkingSkeletonRunner {
         numberRef: "number:final-strength",
         value: strength.strength,
         numberKind: this.settings.propagationNumberKind,
-        sourceRef: judged.provenanceRef,
+        sourceRef: servedRoot.provenanceRef,
         producer: this.settings.propagationProducer,
         replayHandle,
         propagationRunId
@@ -983,9 +1367,24 @@ export type RunnerExecutionResult =
   | { readonly kind: "COMPLETED"; readonly answerId: string }
   | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null };
 
+export interface RunnerFailureRecorder {
+  recordTerminalFailure(input: {
+    readonly runId: string;
+    readonly workItemId: string;
+    readonly reason: string;
+  }): Promise<boolean>;
+}
+
+export function runnerTerminalFailureReason(error: unknown): string {
+  return error instanceof TypedDomainError
+    ? `RUNNER_EXECUTION_FAILED:${error.code}`
+    : "RUNNER_EXECUTION_FAILED:UNEXPECTED_ERROR";
+}
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
+  readonly failures: RunnerFailureRecorder;
   readonly workflowName: string;
   readonly engineRetries: number;
 }): TaskWorkflowDeclaration<{ runId: string; workItemId: string }, { kind: string; answerId?: string }> {
@@ -996,10 +1395,22 @@ export function declareHatchetWalkingSkeletonTask(input: {
     name: input.workflowName,
     retries: input.engineRetries,
     fn: async (dispatch: { runId: string; workItemId: string }) => {
-      const result = await input.runner.executeWorkItem(dispatch.workItemId);
-      return result.kind === "COMPLETED"
-        ? { kind: result.kind, answerId: result.answerId }
-        : { kind: result.kind };
+      try {
+        const result = await input.runner.executeWorkItem(dispatch.workItemId);
+        return result.kind === "COMPLETED"
+          ? { kind: result.kind, answerId: result.answerId }
+          : { kind: result.kind };
+      } catch (error) {
+        const recorded = await input.failures.recordTerminalFailure({
+          runId: dispatch.runId,
+          workItemId: dispatch.workItemId,
+          reason: runnerTerminalFailureReason(error)
+        });
+        if (!recorded) {
+          throw new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", dispatch.workItemId);
+        }
+        throw error;
+      }
     }
   });
 }

@@ -101,8 +101,8 @@ describe("S09 / DR-108 — the ratified 71-row budget split", () => {
 });
 
 describe("S09 / DR-094 — ruled tier authority", () => {
-  it("has only the two reachable tier suppliers", () => {
-    expect(TIER_SOURCES).toEqual(["ASKER", "DEPLOYMENT_POLICY"]);
+  it("names asker choice, machine prefill, and policy escalation as distinct tier suppliers", () => {
+    expect(TIER_SOURCES).toEqual(["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"]);
   });
 
   it("resolves policy parent -> run -> deployment, raises, and never lowers", () => {

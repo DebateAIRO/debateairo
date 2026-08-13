@@ -79,7 +79,7 @@ export function parseAcceptanceArguments(
     tier_provenance_ref: values.get("--tier-provenance-ref") ?? "acceptance:cli-default",
     composition_budget_tier: values.get("--composition-budget-tier") ?? "low",
     depth_params: parseJson(values.get("--depth-params") ?? '{"depth":1}', "--depth-params"),
-    agent_count: Number(values.get("--agent-count") ?? "1"),
+    agent_count: Number(values.get("--agent-count") ?? "2"),
     decision_owner: values.get("--decision-owner") ?? "acceptance-user",
     action_owner: values.get("--action-owner") ?? "acceptance-user",
     decision_scope: values.get("--decision-scope") ?? "prototype-acceptance",
@@ -97,7 +97,31 @@ export interface LiveAcceptanceCeremony {
   readonly uiUrl: string;
   /** FAIR-01: the RUN-LEVEL fair-debate report (DR-140(b), DR-143 clause 1). */
   readonly fairDebate: FairDebateReport;
+  /** Retry-tolerant run total: failed/timed-out attempts remain counted. */
+  readonly modelCallCount: number;
+  readonly nodeMakerLineage: readonly {
+    readonly nodeId: string;
+    readonly depth: number;
+    readonly childKind: string | null;
+    readonly maker: string;
+    readonly modelId: string;
+    readonly providerRef: string;
+  }[];
+  readonly nodeReviewLineage: readonly {
+    readonly nodeId: string;
+    readonly outcome: "agree" | "dispute" | "cannot-assess";
+    readonly authorMaker: string;
+    readonly reviewerMaker: string;
+    readonly reviewerModelId: string;
+    readonly reviewerProviderRef: string;
+    readonly reviewArtifactRef: string;
+  }[];
   close(): Promise<void>;
+}
+
+export interface AcceptanceCeremonyOptions {
+  /** Operator/test-owned isolated directory; omitted keeps the standing DB. */
+  readonly databaseDataDirectory?: string;
 }
 
 async function closeAll(
@@ -114,7 +138,8 @@ async function closeAll(
 
 export async function runAcceptanceCeremony(
   parsed: AcceptanceArguments,
-  source: NodeJS.ProcessEnv = process.env
+  source: NodeJS.ProcessEnv = process.env,
+  options: AcceptanceCeremonyOptions = {}
 ): Promise<LiveAcceptanceCeremony> {
   const ceremony = loadAcceptanceCeremonyEnvironment(source);
   let database: StandingDatabase | null = null;
@@ -122,7 +147,10 @@ export async function runAcceptanceCeremony(
   let relay: ClaudeRelayHandle | null = null;
   let api: Awaited<ReturnType<typeof createAcceptanceRuntime>>["api"] | null = null;
   try {
-    database = await startStandingDatabase({ port: ceremony.ACCEPTANCE_DB_PORT });
+    database = await startStandingDatabase({
+      port: ceremony.ACCEPTANCE_DB_PORT,
+      ...(options.databaseDataDirectory === undefined ? {} : { dataDirectory: options.databaseDataDirectory })
+    });
     await seedAcceptanceRegister(database.pool);
     const policy = await readAcceptanceRuntimePolicy(database.pool);
     shim = await startModelShim({
@@ -185,11 +213,78 @@ export async function runAcceptanceCeremony(
     // more than one node, more than one persisted maker, a real attack edge,
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
+    const [modelCalls, lineage, reviewLineage] = await Promise.all([
+      database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+        [accepted.run_ref]
+      ),
+      database.pool.query<{
+        node_id: string;
+        depth: number;
+        child_kind: string | null;
+        maker: string;
+        model_id: string;
+        provider_ref: string;
+      }>(
+        `SELECT node.node_id, node.depth, node.child_kind,
+                artifact.maker, artifact.model_id, artifact.provider_ref
+         FROM core.node AS node
+         JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id=node.provenance_ref
+         WHERE node.run_id=$1 ORDER BY node.created_at_seq`,
+        [accepted.run_ref]
+      ),
+      database.pool.query<{
+        node_id: string;
+        outcome: "agree" | "dispute" | "cannot-assess";
+        author_maker: string;
+        reviewer_maker: string;
+        reviewer_model_id: string;
+        reviewer_provider_ref: string;
+        review_artifact_ref: string;
+      }>(
+        `SELECT review.node_id, review.outcome,
+                author.maker AS author_maker,
+                reviewer.maker AS reviewer_maker,
+                reviewer.model_id AS reviewer_model_id,
+                reviewer.provider_ref AS reviewer_provider_ref,
+                review.review_raw_artifact_ref::text AS review_artifact_ref
+         FROM ledger.node_review AS review
+         JOIN ledger.raw_artifact AS author ON author.raw_artifact_id=review.author_raw_artifact_ref
+         JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id=review.review_raw_artifact_ref
+         WHERE review.run_id=$1 ORDER BY review.at_seq`,
+        [accepted.run_ref]
+      )
+    ]);
+    const modelCallCount = Number(modelCalls.rows[0]?.count ?? 0);
+    const nodeMakerLineage = Object.freeze(lineage.rows.map((row) => Object.freeze({
+      nodeId: row.node_id,
+      depth: Number(row.depth),
+      childKind: row.child_kind,
+      maker: row.maker,
+      modelId: row.model_id,
+      providerRef: row.provider_ref
+    })));
+    const nodeReviewLineage = Object.freeze(reviewLineage.rows.map((row) => Object.freeze({
+      nodeId: row.node_id,
+      outcome: row.outcome,
+      authorMaker: row.author_maker,
+      reviewerMaker: row.reviewer_maker,
+      reviewerModelId: row.reviewer_model_id,
+      reviewerProviderRef: row.reviewer_provider_ref,
+      reviewArtifactRef: row.review_artifact_ref
+    })));
     const uiUrl = `http://localhost:3000/debate/${accepted.run_ref}`;
     console.info(`ACC-01 run id: ${accepted.run_ref}`);
     console.info(`ACC-01 answer id: ${answer.answer_id}`);
     console.info(`FAIR-01 graph: ${fairDebate.nodeCount} nodes · ${fairDebate.attackEdgeCount} attack edge(s)`);
-    console.info(`FAIR-01 makers: ${fairDebate.distinctMakers.join(", ")} · independence: ${fairDebate.independenceStatus}`);
+    console.info(
+      `FAIR-01 makers: ${fairDebate.distinctMakers.join(", ")} · ` +
+      `independent attack edges: ${fairDebate.independentAttackEdgeCount}`
+    );
+    console.info(`PRO-01 model calls (all outcomes): ${modelCallCount}`);
+    console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
+    console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
     const liveDatabase = database;
     const liveShim = shim;
@@ -200,6 +295,9 @@ export async function runAcceptanceCeremony(
       answerId: answer.answer_id,
       uiUrl,
       fairDebate,
+      modelCallCount,
+      nodeMakerLineage,
+      nodeReviewLineage,
       close: () => closeAll(liveDatabase, liveShim, liveRelay, liveApi)
     });
   } catch (error) {

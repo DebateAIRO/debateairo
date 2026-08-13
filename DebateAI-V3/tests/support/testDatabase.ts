@@ -9,6 +9,7 @@ import { loadBootstrapRegister } from "@debateai/register";
 
 export interface TestDatabase {
   readonly pool: Pool;
+  readonly connectionString: string;
   readonly mechanism: "testcontainers" | "embedded-postgres";
   readonly testcontainersStatus: "ACTIVE" | "DEFERRED BY DR-121";
   readonly expectedPostgresMajor: string;
@@ -57,6 +58,7 @@ async function startWithTestcontainers(postgresMajor: string): Promise<TestDatab
   console.info("[S00 DB] Testcontainers ACTIVE: real PostgreSQL container started");
   return {
     pool,
+    connectionString,
     mechanism: "testcontainers",
     testcontainersStatus: "ACTIVE",
     expectedPostgresMajor: postgresMajor,
@@ -81,7 +83,11 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
       "--set=shared_memory_type=mmap",
       "--set=dynamic_shared_memory_type=mmap"
     ],
-    postgresFlags: ["-c", "shared_memory_type=mmap", "-c", "dynamic_shared_memory_type=mmap"],
+    postgresFlags: [
+      "-c", "shared_memory_type=mmap",
+      "-c", "dynamic_shared_memory_type=mmap",
+      "-c", "lc_messages=C"
+    ],
     onLog: (message) => console.info(`[S00 DB embedded] ${String(message)}`),
     onError: (message) => console.error(`[S00 DB embedded] ${String(message)}`)
   });
@@ -91,10 +97,12 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
     await embedded.initialise();
     await embedded.start();
     await embedded.createDatabase("debateai_s00");
-    const pool = createPool(`postgresql://debateai:debateai-test-only@127.0.0.1:${port}/debateai_s00`);
+    const connectionString = `postgresql://debateai:debateai-test-only@127.0.0.1:${port}/debateai_s00`;
+    const pool = createPool(connectionString);
     await pool.query("SELECT 1");
     return {
       pool,
+      connectionString,
       mechanism: "embedded-postgres",
       testcontainersStatus: policy.testcontainersStatus,
       expectedPostgresMajor: postgresMajor,

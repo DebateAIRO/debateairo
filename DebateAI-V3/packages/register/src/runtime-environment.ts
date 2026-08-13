@@ -36,7 +36,7 @@ export function loadApiEnvironment() {
     DATABASE_URL: z.string().url(), API_HOST: z.string().min(1), API_PORT: positiveInteger,
     STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: positiveInteger,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
-    DEPLOYMENT_RISK_TIER: z.enum(["casual", "standard", "high-stakes"]), ...hatchetShape
+    ...hatchetShape
   });
 }
 

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { CONDITION_MARKS } from "@debateai/kernel";
 import { ContractHttpError, type ContractClient, type Deployment, type Session } from "@debateai/contract";
-import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import {
+  buildFairShapedAnswer,
+  buildSameModelDifferentMakerAnswer
+} from "../support/v2uiFixtures.js";
+import { makerIdentityLabel } from "../../apps/v2-ui/lib/makerIdentity.js";
 import { classifyTokenUnlockFailure, tokenUnlockFailureMessage } from "../../apps/v2-ui/lib/v3/tokenUnlock.js";
 import {
   createBrowserContractClient,
@@ -24,18 +28,23 @@ import {
   V3_SCORING_STATUS_LABEL,
   contractNodesById,
   debateDetailFromAnswer,
+  debateDetailFromRunProjection,
   debateStatusFromTerminal,
   debateSummariesFromIndex,
+  modelLedgerIdentityKey,
   scoringUnavailable,
   unrepresentedEdges,
   v3NodeScoreState,
+  v3NodeScoreDetails,
+  v3ScorePercentage,
   v3ScoreAbsenceCopy,
   v3ScorePresentation,
   v3ScoringStatusLabel,
   wayOfKnowingLabel,
   runCostEnvelopeFromDeployment
 } from "../../apps/v2-ui/lib/v3/adapter.js";
-import { abstentionKindLabel, conditionMarkLabel } from "../../apps/v2-ui/lib/v3/labels.js";
+import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel } from "../../apps/v2-ui/lib/v3/labels.js";
+import { getDebateServer } from "../../apps/v2-ui/lib/serverApi.js";
 import {
   selectRunCostEnvelopeMember,
   selectRunCostEnvelopeMembers
@@ -124,7 +133,35 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     expect(defeater.claim).toBe("The defeater claim attacking the position.");
   });
 
-  it("renders typed absence instead of fabricated values (DR-115)", () => {
+  it("projects a real support edge as a PRO child without relabelling the neutral position", () => {
+    const base = buildFairShapedAnswer();
+    const defender = {
+      ...base.nodes[1]!,
+      node_id: "node:defender",
+      claim: "The defender claim supporting the position.",
+      provenance_ref: "prov:node:defender",
+      condition_marks: []
+    };
+    const answer = buildFairShapedAnswer({
+      nodes: [...base.nodes, defender],
+      edges: [...base.edges, {
+        ...base.edges[0]!,
+        edge_id: "edge:support:1",
+        from_node_ref: defender.node_id,
+        relation: "support",
+        provenance_ref: "prov:edge:support:1"
+      }]
+    });
+
+    const position = debateDetailFromAnswer(answer).tree!.children[0]!;
+    expect(position.node_type).toBe("CLAIM");
+    expect(position.children.map((child) => [child.claim, child.node_type])).toEqual([
+      ["The defeater claim attacking the position.", "CON"],
+      ["The defender claim supporting the position.", "PRO"]
+    ]);
+  });
+
+  it("projects only recorded maker model ids and preserves typed absence (DR-115)", () => {
     const detail = debateDetailFromAnswer(buildFairShapedAnswer());
     expect(detail.created_at).toBe("");
     expect(detail.completed_at).toBeNull();
@@ -133,11 +170,36 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     expect(detail.models).toEqual([]);
     expect(detail.analyzer_runs).toEqual([]);
     expect(detail.agent_runs).toEqual([]);
-    const walkGenerations = (node: NonNullable<typeof detail.tree>): void => {
-      expect(node.active_generation).toBeNull();
-      node.children.forEach(walkGenerations);
-    };
-    walkGenerations(detail.tree!);
+    expect(detail.tree!.active_generation).toBeNull();
+    const position = detail.tree!.children[0]!;
+    const defeater = position.children[0]!;
+    expect(position.active_generation).toEqual({ model_id: "gpt-5", maker: "OpenAI" });
+    expect(position.maker).toBe("OpenAI");
+    expect(position.active_generation_id).toBeNull();
+    expect(defeater.active_generation).toBeNull();
+    expect(defeater.maker).toBeNull();
+  });
+
+  it("keeps two houses visible when they report the same model id (UI-02c B1)", () => {
+    const answer = buildSameModelDifferentMakerAnswer();
+    const lineages = answer.nodes.map((node) => node.maker_lineage!);
+    expect(new Set(lineages.map((lineage) => lineage.model_id))).toEqual(new Set(["test-layer/model"]));
+
+    const labels = lineages.map((lineage) => makerIdentityLabel({
+      maker: lineage.maker,
+      modelId: lineage.model_id
+    }));
+    expect(labels[0]!.text).toContain("OpenAI");
+    expect(labels[1]!.text).toContain("Anthropic");
+    expect(labels[0]!.text).not.toBe(labels[1]!.text);
+    expect(labels.every((label) => !label.absence)).toBe(true);
+  });
+
+  it("labels a missing recorded house as typed absence", () => {
+    expect(makerIdentityLabel({ maker: null, modelId: null })).toEqual({
+      text: "House unavailable",
+      absence: true
+    });
   });
 
   it("maps every terminal outcome onto an honest V2 status", () => {
@@ -217,10 +279,7 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     expect(state.final_strength).toEqual(answer.nodes[0]!.final_strength);
   });
 
-  it("prints the recorded value verbatim — never rescaled, rounded or clamped", () => {
-    // V2's own formatScorePercent assumes a 0..1 scale and multiplies by 100.
-    // V3 rules NO scale for base_score/final_strength, so any transform here
-    // would publish a number the run never recorded (AC-76/DR-039).
+  it("restates probabilities as percentages without leaking floating-point noise (DR-154(4))", () => {
     const scored = buildFairShapedAnswer({
       nodes: answer.nodes.map((node, index) =>
         index === 0
@@ -233,8 +292,25 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     );
     expect(presentation.status).toBe("PRESENT");
     if (presentation.status !== "PRESENT") return;
-    expect(presentation.badges[0]!.pillText).toBe("BASE 0.41000000000000003");
-    expect(presentation.badges[0]!.pillText).not.toContain("41 ");
+    expect(presentation.badges[0]!.pillText).toBe("BASE ≈41%");
+    expect(presentation.badges[0]!.pillText).not.toContain("0.41000000000000003");
+    expect(presentation.badges[0]!.title).toContain("rounded to the nearest 0.01 percentage point");
+    expect(presentation.badges[0]!.title).toContain("recorded probability 0.41000000000000003");
+  });
+
+  it("marks rounded percentages as approximate and keeps close distinctions in the detail", () => {
+    expect(v3ScorePercentage(0.98)).toEqual({
+      text: "98%",
+      detail: "98% (exact percentage restatement)"
+    });
+
+    const first = v3ScorePercentage(0.410001);
+    const second = v3ScorePercentage(0.410002);
+    expect(first.text).toBe("≈41%");
+    expect(second.text).toBe("≈41%");
+    expect(first.detail).toContain("recorded probability 0.410001");
+    expect(second.detail).toContain("recorded probability 0.410002");
+    expect(first.detail).not.toBe(second.detail);
   });
 
   it("carries each number's label and provenance with it, never a bare float", () => {
@@ -244,16 +320,46 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     const [base, final] = presentation.badges;
     expect(base!.id).toBe("base_score");
     expect(final!.id).toBe("final_strength");
-    expect(base!.pillText).toBe("BASE 0.62");
-    expect(final!.pillText).toBe("FINAL 0.41");
+    expect(base!.pillText).toBe("BASE 62%");
+    expect(final!.pillText).toBe("FINAL 41%");
     for (const badge of presentation.badges) {
       const number = badge.id === "base_score" ? answer.nodes[0]!.base_score : answer.nodes[0]!.final_strength;
       expect(badge.title).toContain(number.kind);
       expect(badge.title).toContain(number.producer);
       expect(badge.title).toContain(number.source);
       expect(badge.title).toContain(number.replay_handle);
-      expect(badge.title).toContain(String(number.value));
+      expect(badge.title).toContain(v3ScorePercentage(number.value).text);
     }
+  });
+
+  it("projects the drawer's visible values through the executable percentage rule", () => {
+    const scored = buildFairShapedAnswer({
+      nodes: answer.nodes.map((node, index) =>
+        index === 0
+          ? { ...node, base_score: { ...node.base_score, value: 0.41000000000000003 } }
+          : node
+      )
+    });
+    const node = scored.nodes[0]!;
+    expect(v3NodeScoreDetails(node)).toEqual([
+      {
+        id: "base_score",
+        label: `base score (${node.base_score.kind})`,
+        percentage: v3ScorePercentage(node.base_score.value),
+        producer: node.base_score.producer,
+        source: node.base_score.source,
+        replay_handle: node.base_score.replay_handle
+      },
+      {
+        id: "final_strength",
+        label: `final strength (${node.final_strength.kind})`,
+        percentage: v3ScorePercentage(node.final_strength.value),
+        producer: node.final_strength.producer,
+        source: node.final_strength.source,
+        replay_handle: node.final_strength.replay_handle
+      }
+    ]);
+    expect(v3NodeScoreDetails(node)[0]!.percentage.text).toBe("≈41%");
   });
 
   it("shows typed absence for every card that genuinely has no recorded number", () => {
@@ -300,6 +406,12 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
 });
 
 describe("v2-ui honesty labels cover the full closed vocabulary", () => {
+  it("renders every tier supplier in plain words", () => {
+    expect(riskTierSourceLabel("ASKER")).toBe("chosen by the asker");
+    expect(riskTierSourceLabel("MACHINE_DEFAULT")).toBe("machine default from the deployment floor");
+    expect(riskTierSourceLabel("DEPLOYMENT_POLICY")).toBe("raised by deployment policy");
+  });
+
   it("names all condition marks, including DR-139(4) and DR-141(2)", () => {
     const labels = CONDITION_MARKS.map((mark) => conditionMarkLabel(mark));
     expect(new Set(labels).size).toBe(CONDITION_MARKS.length);
@@ -318,6 +430,60 @@ describe("v2-ui honesty labels cover the full closed vocabulary", () => {
 });
 
 describe("v2-ui data access over the V3 contract client", () => {
+  it("renders V's exact queued run flow from the typed run projection, not a 404", async () => {
+    const client = {
+      readAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); },
+      readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED"); },
+      readRun: async () => ({
+        run_ref: "run:queued",
+        question_line: "Messi or Ronaldo?",
+        state: "QUEUED" as const,
+        terminal_reason: null
+      })
+    } as unknown as ContractClient;
+    const result = await getDebateServer("run:queued", "token:test", client);
+    expect(result).toMatchObject({ ok: false, kind: "loading" });
+    if (result.ok || result.kind !== "loading") throw new Error("expected typed loading state");
+    expect(result.run.question_line).toBe("Messi or Ronaldo?");
+    expect(result.run.state).toBe("QUEUED");
+    const loading = debateDetailFromRunProjection(result.run);
+    expect(loading.topic).toBe("Messi or Ronaldo?");
+    expect(loading.status).toBe("generating");
+    expect(loading.tree).toMatchObject({ claim: "Messi or Ronaldo?", status: "generating", children: [] });
+  });
+
+  it("surfaces a typed failed run and keeps a truly missing id not-found", async () => {
+    const answerMissing = async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); };
+    const failedClient = {
+      readAnswer: answerMissing,
+      readRunAnswer: answerMissing,
+      readRun: async () => ({
+        run_ref: "run:failed",
+        question_line: "Messi or Ronaldo?",
+        state: "FAILED" as const,
+        terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+      })
+    } as unknown as ContractClient;
+    const failed = await getDebateServer("run:failed", "token:test", failedClient);
+    expect(failed).toMatchObject({ ok: false, kind: "failed", reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED" });
+    if (failed.ok || failed.kind !== "failed") throw new Error("expected typed failed state");
+    expect(debateDetailFromRunProjection(failed.run)).toMatchObject({
+      topic: "Messi or Ronaldo?",
+      status: "failed",
+      tree: { claim: "Messi or Ronaldo?", status: "failed" }
+    });
+
+    const missingClient = {
+      readAnswer: answerMissing,
+      readRunAnswer: answerMissing,
+      readRun: async () => { throw new ContractHttpError("NOT_FOUND", 404, "RUN_NOT_FOUND"); }
+    } as unknown as ContractClient;
+    await expect(getDebateServer("run:missing", "token:test", missingClient)).resolves.toMatchObject({
+      ok: false,
+      kind: "not_found"
+    });
+  });
+
   it("falls back from answer id to run ref when reading a debate", async () => {
     const answer = buildFairShapedAnswer();
     const client = {
@@ -349,6 +515,9 @@ describe("v2-ui data access over the V3 contract client", () => {
     expect(absent.reason).toMatch(/base score/i);
     expect(absent.reason).toMatch(/final strength/i);
     expect(absent.reason).toMatch(/V2's separate per-node scoring endpoint/);
+    expect(absent.reason).toMatch(/badge tooltip/i);
+    expect(absent.reason).toMatch(/claim drawer/i);
+    expect(absent.reason).not.toMatch(/Honesty drawer/i);
     // Reasons that are NOT V3's absence fall through to V2's own copy.
     expect(v3ScoringStatusLabel("Model unavailable")).toBeNull();
     expect(v3ScoringStatusLabel(null)).toBeNull();
@@ -399,6 +568,8 @@ describe("v2-ui data access over the V3 contract client", () => {
       "Question?",
       {
         risk_tier: "casual",
+        tier_source: "MACHINE_DEFAULT",
+        tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
         depth: 1,
         agent_count: 2,
@@ -414,7 +585,8 @@ describe("v2-ui data access over the V3 contract client", () => {
     expect(submitted[0]).toMatchObject({
       question_line: "Question?",
       risk_tier: "casual",
-      tier_source: "ASKER",
+      tier_source: "MACHINE_DEFAULT",
+      tier_provenance_ref: "machine:deployment-floor",
       caller_scope: "ASKER",
       agent_count: 2,
       depth_params: { depth: 1 }
@@ -605,6 +777,17 @@ describe("v2-ui data access over the V3 contract client", () => {
     expect(view.models.map((row) => row.model_version)).toEqual(["2026-05", "2026-07"]);
     expect(view.configured_models).toEqual(["gpt-5"]);
   });
+
+  it("keeps the model-ledger identity key byte-identical while using an unambiguous NUL delimiter", () => {
+    const key = modelLedgerIdentityKey({ model_id: "a", model_version: "b", provider: "c" });
+    expect(Buffer.from(key).toString("hex")).toBe("6100620063");
+    expect(key).toBe(`a\u0000b\u0000c`);
+    expect(
+      modelLedgerIdentityKey({ model_id: "a b", model_version: "c", provider: "d" })
+    ).not.toBe(
+      modelLedgerIdentityKey({ model_id: "a", model_version: "b c", provider: "d" })
+    );
+  });
 });
 
 describe("token unlock failures never assert a verdict the coordinator did not give", () => {
@@ -643,7 +826,7 @@ describe("token unlock failures never assert a verdict the coordinator did not g
   it("classifies every ContractErrorCode — no code falls through unnamed", () => {
     const codes = [
       "SESSION_REQUIRED", "RATE_LIMITED", "NOT_FOUND", "MALFORMED_REQUEST",
-      "FORBIDDEN", "SERVER_FAILURE", "NETWORK_FAILURE", "INVALID_RESPONSE"
+      "UNPROCESSABLE", "FORBIDDEN", "SERVER_FAILURE", "NETWORK_FAILURE", "INVALID_RESPONSE"
     ] as const;
     for (const code of codes) {
       const message = tokenUnlockFailureMessage(new ContractHttpError(code, 500, "x"));

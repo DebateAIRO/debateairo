@@ -77,6 +77,17 @@
   --font-sans: var(--font-sans), "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
+  /* Newer V2 canvas collision map (apps/dialectical-engine/web/styles/base.css). */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --dock-w: min(360px, calc(100vw - 36px));
+  --dock-max-h: 96px;
+  --dock-offset-b: calc(18px + var(--safe-b));
+  --zoom-cluster-w: 52px;
+  --zoom-cluster-offset-b: calc(var(--dock-offset-b) + var(--dock-max-h) + 12px);
+  --token-dock-clearance: calc(18px + var(--dock-max-h));
+  --z-canvas-sticky: 4;
+  --z-zoom-cluster: 5;
+
   /* radii + shadow */
   --r-card: 13px;
   --r-panel: 12px;
@@ -888,6 +899,12 @@ a:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+.nodeReviewBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
 .modelSpend {
   flex: 0 0 auto;
   font-family: var(--font-mono);
@@ -990,10 +1007,11 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  padding-bottom: 58px;
+  padding-bottom: calc(var(--token-dock-clearance) + env(safe-area-inset-bottom, 0px));
 }
 
 .debateTopBar {
@@ -1009,10 +1027,10 @@ a:focus-visible {
   z-index: 30;
 }
 
-.debateTopCenter {
+.debateTopIdentityRow {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   flex: 1;
   min-width: 0;
 }
@@ -1027,6 +1045,8 @@ a:focus-visible {
 }
 
 .debateTopTitle {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--font-serif);
   font-size: 14.5px;
   font-weight: 600;
@@ -1037,7 +1057,16 @@ a:focus-visible {
   max-width: 520px;
 }
 
-.debateTopActions {
+.debateTopTitleMeasure {
+  position: absolute;
+  width: max-content;
+  max-width: none;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.debateTopControlRow {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1045,21 +1074,128 @@ a:focus-visible {
   min-width: 0;
 }
 
+.debateTopBar :where(a, button, summary) {
+  min-height: 44px;
+}
+
+.debateTopBar .iconBtn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+
+.debateTopBar .segment {
+  flex: 0 0 auto;
+}
+
+.debateTopBar .segment button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 5px 10px;
+}
+
 .topSwitch {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex: 0 1 min(52vw, 680px);
+  flex: 0 0 auto;
   min-width: 0;
-  max-width: min(52vw, 680px);
-  min-height: 34px;
-  padding: 0 8px;
+  min-height: 44px;
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0;
   white-space: nowrap;
+}
+
+.debateInlineActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debateOverflow {
+  display: none;
+}
+
+.debateView[data-actions-collapsed="true"] .debateInlineActions {
+  position: absolute;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.debateView[data-actions-collapsed="true"] .debateOverflow {
+  position: relative;
+  display: block;
+  width: 44px;
+}
+
+.debateOverflow > summary {
+  display: inline-flex;
+  list-style: none;
+  cursor: pointer;
+}
+
+.debateOverflow > summary::-webkit-details-marker {
+  display: none;
+}
+
+.debateOverflow:not([open]) .debateOverflowMenu {
+  display: none;
+}
+
+.debateOverflowMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 35;
+  width: min(240px, calc(100vw - 16px));
+  max-height: min(60dvh, 360px);
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.debateOverflowMenu .debateOverflowAction {
+  width: 100%;
+  min-width: 44px;
+  justify-content: flex-start;
+  padding-inline: 12px;
+}
+
+.debateOverflowMenu .debateActionLabel {
+  display: inline;
+}
+
+.debateOverflowAction {
+  flex: 0 0 auto;
+}
+
+.scoringInsightsStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(40vw, 360px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: oklch(0.48 0.04 70);
+  font-size: 12px;
+}
+
+.scoringInsightsStatus > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topSwitch > span:first-child,
@@ -1268,19 +1404,109 @@ a:focus-visible {
    Tree canvas
    ============================================================ */
 
+.canvasViewport {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
 .canvas {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
   overflow: auto;
+  touch-action: none;
+  overscroll-behavior: contain;
   background:
     radial-gradient(oklch(0.94 0.005 80) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+.canvasStickyToggle {
+  position: sticky;
+  top: 12px;
+  left: 12px;
+  z-index: var(--z-canvas-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  box-shadow: var(--shadow-card);
+}
+.canvasSizer {
+  position: relative;
+  flex: 0 0 auto;
+}
 .canvasInner {
   position: relative;
-  min-width: 100%;
-  min-height: 100%;
+  transform-origin: 0 0;
+  transition: transform 0.18s ease;
+}
+.canvasZoomCluster {
+  position: absolute;
+  right: 12px;
+  bottom: var(--zoom-cluster-offset-b);
+  z-index: var(--z-zoom-cluster);
+  width: var(--zoom-cluster-w);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--surface) 94%, transparent);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+}
+.canvasZoomButton {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.canvasZoomButton:hover { background: var(--surface-sunken); }
+.canvasZoomButton:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.canvasZoomButton[aria-pressed="true"] { border-color: var(--focus); background: var(--surface-sunken); }
+.canvasZoomPercent {
+  min-width: 44px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.canvasInner[data-zoom-band="overview"] :is(
+  .nodeHeader,
+  .nodeControls,
+  .nodeRootMeta,
+  .nodeProse,
+  .scrutinyBadge,
+  .node > .roleBadge
+) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 .canvasLinks {
   position: absolute;
@@ -1434,6 +1660,14 @@ a:focus-visible {
   border-color: var(--line-strong);
   background: var(--surface-sunken);
   color: var(--muted);
+}
+
+[data-maker-absence="true"] {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--muted);
+  padding: 2px 6px;
 }
 
 .nodePending {
@@ -2575,12 +2809,104 @@ a:focus-visible {
   .synthPanel {
     display: none;
   }
-  .debateTopTitle {
-    max-width: 220px;
+  .debateTopBar {
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    height: auto;
+    min-height: 104px;
+    flex: 0 0 auto;
+    padding: 6px 14px 8px;
+  }
+  .debateTopIdentityRow,
+  .debateTopControlRow {
+    width: 100%;
+    min-width: 0;
+  }
+  .debateTopIdentityRow {
+    gap: 12px;
+  }
+  .debateTopClaim {
+    justify-content: flex-start;
+  }
+  .debateTopIdentityRow .debateTopTitle {
+    flex: 1 1 auto;
+    max-width: none;
+    text-overflow: ellipsis;
+  }
+  .debateTopControlRow {
+    gap: 8px;
+  }
+  .debateActionLabel {
+    display: none;
+  }
+  .debateOverflowMenu {
+    gap: 8px;
+  }
+  .debateInlineActions :where(.btn, .btnGhost) {
+    width: 44px;
+    padding-inline: 0;
+    justify-content: center;
   }
 }
 
 @media (max-width: 640px) {
+  .debateTopBar {
+    padding-inline: 8px;
+  }
+  .debateTopIdentityRow {
+    gap: 8px;
+  }
+  .debateTopIdentityRow .brand {
+    width: 44px;
+    justify-content: center;
+  }
+  .debateTopIdentityRow .brandText {
+    display: none;
+  }
+  .debateTopControlRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+    gap: 8px;
+  }
+  .debateInlineActions {
+    display: none;
+  }
+  .debateOverflow {
+    position: relative;
+    display: block;
+    width: 44px;
+  }
+  .debateTopControlRow .segment {
+    width: 100%;
+    min-width: 0;
+  }
+  .debateTopControlRow .segment button {
+    flex: 1 1 0;
+    min-width: 44px;
+    padding-inline: 0;
+  }
+  .topSwitch {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+  .topSwitch > span:first-child {
+    display: none;
+  }
+  .scoringInsightsStatus {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .scoringInsightsPanelCompact > .progressStrip {
+    height: auto;
+    min-height: 34px;
+    flex-wrap: wrap;
+    padding-block: 8px;
+  }
   .composer {
     flex-direction: column;
   }
@@ -2643,6 +2969,26 @@ a:focus-visible {
     transform: none;
     justify-content: center;
   }
+}
+
+@media (max-height: 640px) and (orientation: landscape) {
+  .canvasStickyToggle,
+  .canvasZoomCluster { pointer-events: none; }
+  .canvasStickyToggle > input,
+  .canvasZoomButton { pointer-events: auto; }
+  .canvasZoomCluster {
+    right: calc(var(--dock-w) + 30px);
+    bottom: var(--dock-offset-b);
+    width: auto;
+    max-width: calc(100% - var(--dock-w) - 48px);
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvasInner,
+  .nodeWrap { transition: none !important; }
 }
 
 /* ============================================================

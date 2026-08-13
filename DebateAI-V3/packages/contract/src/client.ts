@@ -8,6 +8,7 @@ import {
   InvestigationAcceptedSchema,
   NodeSchema,
   RunEventSchema,
+  RunProjectionSchema,
   SessionSchema,
   type Answer,
   type AnswerIndex,
@@ -20,6 +21,7 @@ import {
   type InvestigationRequest,
   type Node,
   type RunEvent,
+  type RunProjection,
   type Session
 } from "./index.js";
 
@@ -28,13 +30,19 @@ export type ContractErrorCode =
   | "RATE_LIMITED"
   | "NOT_FOUND"
   | "MALFORMED_REQUEST"
+  | "UNPROCESSABLE"
   | "FORBIDDEN"
   | "SERVER_FAILURE"
   | "NETWORK_FAILURE"
   | "INVALID_RESPONSE";
 
 export class ContractHttpError extends Error {
-  constructor(readonly code: ContractErrorCode, readonly status: number, message: string) {
+  constructor(
+    readonly code: ContractErrorCode,
+    readonly status: number,
+    message: string,
+    readonly serverCode: string | null = null
+  ) {
     super(message);
     this.name = "ContractHttpError";
   }
@@ -45,8 +53,28 @@ function codeForStatus(status: number): ContractErrorCode {
   if (status === 401) return "SESSION_REQUIRED";
   if (status === 403) return "FORBIDDEN";
   if (status === 404) return "NOT_FOUND";
+  if (status === 422) return "UNPROCESSABLE";
   if (status === 429) return "RATE_LIMITED";
   return "SERVER_FAILURE";
+}
+
+async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
+  let serverCode: string | null = null;
+  let serverMessage: string | null = null;
+  try {
+    const candidate: unknown = await response.json();
+    if (typeof candidate === "object" && candidate !== null) {
+      const body = candidate as Record<string, unknown>;
+      serverCode = typeof body.error === "string" && body.error.trim().length > 0 ? body.error : null;
+      serverMessage = typeof body.message === "string" && body.message.trim().length > 0 ? body.message : null;
+    }
+  } catch {
+    // A non-JSON failure still retains its transport status below.
+  }
+  const detail = serverCode !== null && serverMessage !== null
+    ? `${serverCode}: ${serverMessage}`
+    : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
+  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode);
 }
 
 async function requestJson<T>(
@@ -66,7 +94,7 @@ async function requestJson<T>(
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
   }
-  if (!response.ok) throw new ContractHttpError(codeForStatus(response.status), response.status, `Contract request failed with ${response.status}`);
+  if (!response.ok) throw await contractErrorForResponse(response);
   try {
     return schema.parse(await response.json());
   } catch (error) {
@@ -81,6 +109,7 @@ export interface ContractClient {
   readAnswerIndex(token: string, limit: number, offset: number): Promise<AnswerIndex>;
   readAnswer(answerId: string, token: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string, token: string): Promise<Answer>;
+  readRun(runId: string, token: string): Promise<RunProjection>;
   readInspection(answerId: string, token: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string, token: string): Promise<ExecutionLedgerDigest>;
   readNode(answerId: string, nodeId: string, token: string): Promise<Node>;
@@ -112,7 +141,7 @@ export function createContractClient(baseUrl: string, fetchImplementation: typeo
       if (signal?.aborted === true) throw error;
       throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
     }
-    if (!response.ok) throw new ContractHttpError(codeForStatus(response.status), response.status, `Contract request failed with ${response.status}`);
+    if (!response.ok) throw await contractErrorForResponse(response);
     return response;
   };
   const parseFrame = (frame: string): RunEvent | null => {
@@ -134,6 +163,7 @@ export function createContractClient(baseUrl: string, fetchImplementation: typeo
     readAnswerIndex: (token: string, limit: number, offset: number) => requestJson(root.href, fetchImplementation, `/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, token, AnswerIndexSchema),
     readAnswer: (answerId: string, token: string, version?: number) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, token, AnswerSchema),
     readRunAnswer: (runId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/answer`, token, AnswerSchema),
+    readRun: (runId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}`, token, RunProjectionSchema),
     readInspection: (answerId: string, token: string, version?: number) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, token, InspectionSchema),
     readLedgerDigest: (answerId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, token, ExecutionLedgerDigestSchema),
     readNode: (answerId: string, nodeId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, token, NodeSchema),

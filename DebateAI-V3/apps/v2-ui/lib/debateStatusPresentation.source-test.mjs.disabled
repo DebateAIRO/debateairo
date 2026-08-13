@@ -43,3 +43,18 @@ test("drawer and tree share model presentation helpers", () => {
   assert.match(drawer, /import \{ ModelMetaLine \} from "@\/components\/ModelPresentation";/);
   assert.match(tree, /import \{ ModelBadge, modelColorStyle \} from "@\/components\/ModelPresentation";/);
 });
+
+test("UI-02c keeps house identity and typed absence in the shared V2 model vocabulary", () => {
+  const helper = read("components/ModelPresentation.tsx");
+  const adapter = read("lib/v3/adapter.ts");
+  const cards = ["DebateCanvas", "DebateThread", "DebateOutline", "DebateSplit", "DebateMap"]
+    .map((name) => read(`components/${name}.tsx`));
+
+  assert.match(adapter, /maker: contractNode\.maker_lineage\?\.maker \?\? null/);
+  assert.match(helper, /House unavailable/);
+  assert.match(helper, /modelColor\(identity\)/);
+  for (const card of cards) {
+    assert.match(card, /ModelMetaLine/);
+    assert.match(card, /maker=/);
+  }
+});
