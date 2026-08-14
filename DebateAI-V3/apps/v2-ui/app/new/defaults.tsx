@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { Deployment, Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 
@@ -32,6 +31,62 @@ function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+const SET_A_HEADROOM_MULTIPLIER = 3;
+const HEALTHY_FIXED_MODEL_CALLS = 4;
+
+function ratifiedEnvelopeAttempts(depth: number, makerCount: number): number {
+  const treeAuthoringCalls = makerCount * (2 ** (depth + 1) - 1);
+  const crossRootAuthoringCalls = makerCount * (makerCount - 1);
+  const authoredNodeCalls = treeAuthoringCalls + crossRootAuthoringCalls;
+  return (authoredNodeCalls * 2 + HEALTHY_FIXED_MODEL_CALLS) * SET_A_HEADROOM_MULTIPLIER;
+}
+
+function deriveRatifiedMakerMaximum(deployment: Deployment): { readonly maximum: number; readonly provenance: string } {
+  const envelopeRow = deployment.register.rows.find((row) => row.row_key === "runCostEnvelope");
+  const envelope = record(envelopeRow?.value);
+  const members = envelope?.members;
+  if (envelopeRow === undefined || envelope?.kind !== "RUN_COST_ENVELOPE_POLICY" || !Array.isArray(members) || members.length === 0) {
+    throw new TypedDomainError(
+      "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
+      "The deployment runCostEnvelope cannot identify a ratified maker maximum."
+    );
+  }
+
+  const maxima = new Set<number>();
+  for (const rawMember of members) {
+    const member = record(rawMember);
+    const depthParams = record(member?.depth_params);
+    const depth = depthParams?.depth;
+    const ceiling = member?.max_model_attempts;
+    if (!Number.isInteger(depth) || Number(depth) < 1 || !Number.isInteger(ceiling) || Number(ceiling) < 1) {
+      throw new TypedDomainError(
+        "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
+        "The deployment runCostEnvelope has an invalid member."
+      );
+    }
+    let candidate = 1;
+    while (ratifiedEnvelopeAttempts(Number(depth), candidate) < Number(ceiling)) candidate += 1;
+    if (ratifiedEnvelopeAttempts(Number(depth), candidate) !== Number(ceiling)) {
+      throw new TypedDomainError(
+        "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
+        "The deployment runCostEnvelope does not encode a ratified maker maximum."
+      );
+    }
+    maxima.add(candidate);
+  }
+  if (maxima.size !== 1) {
+    throw new TypedDomainError(
+      "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
+      "The deployment runCostEnvelope members disagree on the ratified maker maximum."
+    );
+  }
+  const maximum = [...maxima][0]!;
+  return Object.freeze({
+    maximum,
+    provenance: `runCostEnvelope@${deployment.register.register_version}:${envelopeRow.source_ref}`
+  });
 }
 
 export function deriveAgentCountDefault(deployment: Deployment) {
@@ -76,9 +131,11 @@ export function deriveAgentCountDefault(deployment: Deployment) {
   }
 
   const makers = [...configuredMakers].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  const ratifiedMaximum = deriveRatifiedMakerMaximum(deployment);
+  const lawfulMakerCount = Math.min(makers.length, ratifiedMaximum.maximum);
   return Object.freeze({
-    agentCount: String(makers.length),
-    agentCountProvenance: `configuredProviderSet@${deployment.register.register_version}:${providerSetRow.source_ref} (${makers.join(", ")})`
+    agentCount: String(lawfulMakerCount),
+    agentCountProvenance: `configuredProviderSet@${deployment.register.register_version}:${providerSetRow.source_ref} (${makers.join(", ")}); capped by ${ratifiedMaximum.provenance} (M=${ratifiedMaximum.maximum})`
   });
 }
 
@@ -135,105 +192,4 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     decision_scope: defaults.decisionScope.trim(),
     as_of: asOf.toISOString()
   };
-}
-
-export function MachineDefaultHint({ children }: { children: ReactNode }) {
-  return <div className="optionHint">Machine default: {children}</div>;
-}
-
-export function MachineOwnedAskFields({
-  agentCount,
-  asOf,
-  decisionOwner,
-  actionOwner,
-  decisionScope,
-  agentCountDefault,
-  sessionDefaults,
-  onAgentCountChange,
-  onAsOfChange,
-  onDecisionOwnerChange,
-  onActionOwnerChange,
-  onDecisionScopeChange
-}: {
-  agentCount: string;
-  asOf: string;
-  decisionOwner: string;
-  actionOwner: string;
-  decisionScope: string;
-  agentCountDefault: ReturnType<typeof deriveAgentCountDefault> | null;
-  sessionDefaults: ReturnType<typeof deriveSessionAskDefaults> | null;
-  onAgentCountChange: (value: string) => void;
-  onAsOfChange: (value: string) => void;
-  onDecisionOwnerChange: (value: string) => void;
-  onActionOwnerChange: (value: string) => void;
-  onDecisionScopeChange: (value: string) => void;
-}) {
-  return (
-    <>
-      <div className="optionRow">
-        <div>
-          <label className="optionLabel" htmlFor="agentCount">Agent count</label>
-          <div className="optionHint">How many agents the run may enlist</div>
-          {agentCountDefault ? <MachineDefaultHint>{agentCountDefault.agentCountProvenance}</MachineDefaultHint> : null}
-        </div>
-        <div className="optionControl">
-          <input
-            id="agentCount"
-            type="number"
-            min={1}
-            step={1}
-            value={agentCount}
-            onChange={(event) => onAgentCountChange(event.target.value)}
-            aria-label="Agent count"
-          />
-        </div>
-      </div>
-      <div className="optionRow">
-        <div>
-          <label className="optionLabel" htmlFor="asOf">As of</label>
-          <div className="optionHint">The moment the answer should be true as of</div>
-          <MachineDefaultHint>{sessionDefaults?.asOfProvenance ?? "ask time; session provenance awaiting confirmation"}</MachineDefaultHint>
-        </div>
-        <div className="optionControl">
-          <input
-            id="asOf"
-            type="datetime-local"
-            value={asOf}
-            onChange={(event) => onAsOfChange(event.target.value)}
-            aria-label="As of"
-          />
-        </div>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="decisionOwner">Decision owner</label>
-        <input
-          id="decisionOwner"
-          value={decisionOwner}
-          onChange={(event) => onDecisionOwnerChange(event.target.value)}
-          placeholder="Who owns the decision this answer feeds"
-        />
-        <MachineDefaultHint>{sessionDefaults?.decisionOwnerProvenance ?? "authenticated session identity awaiting confirmation"}</MachineDefaultHint>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="actionOwner">Action owner</label>
-        <input
-          id="actionOwner"
-          value={actionOwner}
-          onChange={(event) => onActionOwnerChange(event.target.value)}
-          placeholder="Who will act on it"
-        />
-        <MachineDefaultHint>{sessionDefaults?.actionOwnerProvenance ?? "authenticated session identity awaiting confirmation"}</MachineDefaultHint>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="decisionScope">Decision scope</label>
-        <input
-          id="decisionScope"
-          value={decisionScope}
-          onChange={(event) => onDecisionScopeChange(event.target.value)}
-          placeholder="What the decision covers"
-        />
-        <MachineDefaultHint>{sessionDefaults?.decisionScopeProvenance ?? "V ruling DR-166"}</MachineDefaultHint>
-      </div>
-    </>
-  );
 }

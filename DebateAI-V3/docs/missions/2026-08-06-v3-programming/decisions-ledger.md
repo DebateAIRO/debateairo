@@ -1437,3 +1437,48 @@ supersedes | status`.
   server-deployment section inherits this hold. Current state audited:
   zero keys exist anywhere in the system today. | V bounded the
   portability path | binds all future provider work | — | ACTIVE
+
+| DR-180 | 2026-08-14 | V ("the Advanced tab? that should not be seen by
+  the user. Thats stuff the machine needs to compute on its own. let's
+  make it in such a way that it does not rely on a fixed number of
+  agents") | **THE ASK SURFACE, FINAL FORM — NO ADVANCED TAB, NO FIXED
+  PANEL SIZE.** Supersedes DR-166-B's collapsed-but-present disclosure:
+  the five machine fields (Agent Count, As Of, Decision Owner, Action
+  Owner, Decision Scope) leave the user surface ENTIRELY — machine-
+  computed, machine-owned, honest provenance persisted (PROV-01
+  machinery), DR-166-A user-relative identities preserved. The surface
+  remains DR-166-C's: QUESTION · RISK · BUDGET · DEPTH DIAL · START. And
+  the panel size is DERIVED, never fixed: lawful maker count = min(count
+  of configured-and-healthy providers, the ratified maximum read from the
+  SAME basis the M-guard enforces) — today min(3,2)=2 so bare Start works
+  again; a future M=3 ratification flows through with zero code change
+  (DR-162-A); plug-and-play discovery can never break the form. Root
+  cause honestly named: GROK-01's third provider silently moved the
+  DR-166 configured-count default to 3 while the ratified count stayed 2,
+  refusing every default ask — and the orchestrator's working-state
+  probes hardcoded agent counts, never driving V's real one-click flow
+  (the F1 class, again, confessed). Ticket ASK-01; V's order revives the
+  coding loop for it. | V hit the collision live | ASK-01 | — | ACTIVE
+
+| DR-181 | 2026-08-14 | V ("no more M=?. no more 'model ceiling'. it sees
+  the models present, that are up and running and creates a debate using
+  those models. Like a simple health script. the whole M=? logic
+  disappears" + "the algorithm should use all the models that are found in
+  the local CLI. Until we gather enough data to plug in an evaluator that
+  will help decide which models we use for what kind of debates") | **THE
+  PANEL IS DISCOVERY, THE M-APPARATUS IS DEAD.** (1) Panel composition =
+  the locally-present, healthy, authenticated CLI models at ask time —
+  health-script semantics; runs pin their discovered panel at admission.
+  (2) RETIRED: the ratified-maker-count concept, the M-guard
+  (RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE), per-M ceiling tables and
+  every future ceiling-ratification ceremony. No lawful debate is ever
+  refused over panel size again. (3) ORCHESTRATOR'S READING, recorded for
+  V's correction: the runaway-BUG tripwire survives only as pure computed
+  structural math (tree size x bounded attempts, derived at run time from
+  the discovered panel and depth; never ratified, never user-visible,
+  structurally incapable of refusing a normal debate) — it dies too on
+  V's word. (4) Model-selection-by-debate-kind via an evaluator is FUTURE
+  work once data accumulates (intake seed). (5) DR-179 stands: discovery
+  scans CLI shapes only, no API keys. Architecture-confounding →
+  DR-171+DR-175 consult fired before any ticket. | V retired the ceremony
+  that kept killing debates | the discovery mission | — | ACTIVE

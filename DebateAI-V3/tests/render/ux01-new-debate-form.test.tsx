@@ -91,7 +91,7 @@ const deployment: Deployment = {
         row_key: "runCostEnvelope",
         value: {
           kind: "RUN_COST_ENVELOPE_POLICY",
-          members: [{ depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 66 }]
+          members: [{ depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 108 }]
         },
         source_ref: "register:test:envelope"
       },
@@ -160,7 +160,7 @@ function textContent(node: ReactNode): string {
   return textContent((node.props as { children?: ReactNode }).children);
 }
 
-async function renderRealNewDebatePageState({ advanced = false }: { advanced?: boolean } = {}): Promise<{
+async function renderRealNewDebatePageState(): Promise<{
   html: string;
   tree: ReactNode;
 }> {
@@ -174,24 +174,11 @@ async function renderRealNewDebatePageState({ advanced = false }: { advanced?: b
   }
   hooks.beginRender();
   tree = evaluateElementTree(<NewDebatePage />);
-  if (advanced) {
-    const advancedButton = findElement(
-      tree,
-      (element) => element.type === "button" && textContent((element.props as { children?: ReactNode }).children).includes("Advanced")
-    );
-    expect(advancedButton).not.toBeNull();
-    (advancedButton!.props as { onClick: () => void }).onClick();
-    hooks.beginRender();
-    html = renderToStaticMarkup(<NewDebatePage />);
-    await hooks.flushEffects();
-    hooks.beginRender();
-    tree = evaluateElementTree(<NewDebatePage />);
-  }
   return { html, tree };
 }
 
-async function renderRealNewDebatePage(options: { advanced?: boolean } = {}): Promise<string> {
-  return (await renderRealNewDebatePageState(options)).html;
+async function renderRealNewDebatePage(): Promise<string> {
+  return (await renderRealNewDebatePageState()).html;
 }
 
 describe("UX-01 machine-defaulted real /new flow", () => {
@@ -204,10 +191,10 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     pageMocks.push.mockReset();
   });
 
-  it("B1/B3 + MUTATION agent_count: derives the two configured makers and ignores routing task classes", () => {
+  it("ASK-01 RED + mutations: caps configured makers at the ratified guard source without hardcoding two", () => {
     expect(deriveAgentCountDefault(deployment)).toEqual({
       agentCount: "2",
-      agentCountProvenance: "configuredProviderSet@8:acceptance:DR-140:V-approved (Anthropic, OpenAI)"
+      agentCountProvenance: "configuredProviderSet@8:acceptance:DR-140:V-approved (Anthropic, OpenAI); capped by runCostEnvelope@8:register:test:envelope (M=2)"
     });
     const providerSetRow = deployment.register.rows.find((row) => row.row_key === "configuredProviderSet")!;
     const providerSet = providerSetRow.value as { providers: unknown[] };
@@ -224,7 +211,22 @@ describe("UX-01 machine-defaulted real /new flow", () => {
         } : row)
       }
     };
-    expect(deriveAgentCountDefault(expandedDeployment).agentCount).toBe("3");
+    expect(deriveAgentCountDefault(expandedDeployment as Deployment).agentCount).toBe("2");
+    const ratifiedThreeDeployment = {
+      ...expandedDeployment,
+      register: {
+        ...expandedDeployment.register,
+        rows: expandedDeployment.register.rows.map((row) => row.row_key === "runCostEnvelope" ? {
+          ...row,
+          value: {
+            kind: "RUN_COST_ENVELOPE_POLICY",
+            members: [{ depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 174 }]
+          },
+          source_ref: "fixture:ratified-M3"
+        } : row)
+      }
+    };
+    expect(deriveAgentCountDefault(ratifiedThreeDeployment as Deployment).agentCount).toBe("3");
   });
 
   it("B2: an absent provider set does not suppress the independent deployment risk floor", () => {
@@ -244,10 +246,9 @@ describe("UX-01 machine-defaulted real /new flow", () => {
       ...deployment,
       register: { ...deployment.register, rows: deployment.register.rows.filter((row) => row.row_key !== "riskTier") }
     });
-    const html = await renderRealNewDebatePage({ advanced: true });
+    const html = await renderRealNewDebatePage();
     expect(html).toContain("ASK_RISK_TIER_DEFAULT_UNAVAILABLE");
-    expect(html).toMatch(/<input[^>]*id="agentCount"[^>]*value="2"[^>]*>/);
-    expect(html).toContain("configuredProviderSet@8:acceptance:DR-140:V-approved");
+    expect(html).not.toContain('id="agentCount"');
     expect(html).toMatch(/<select[^>]*id="riskTier"[^>]*><option value="" selected="">/);
     expect(html).toContain("Choose a risk tier with a ruled run-cost envelope before starting.");
     expect(html).toMatch(/<button type="submit" class="startBtn" disabled=""/);
@@ -258,8 +259,8 @@ describe("UX-01 machine-defaulted real /new flow", () => {
       ...deployment,
       register: { ...deployment.register, rows: deployment.register.rows.filter((row) => row.row_key !== "runCostEnvelope") }
     });
-    const html = await renderRealNewDebatePage({ advanced: true });
-    expect(html).toMatch(/<input[^>]*id="agentCount"[^>]*value="2"[^>]*>/);
+    const html = await renderRealNewDebatePage();
+    expect(html).not.toContain('id="agentCount"');
     expect(html).toContain('value="standard" selected=""');
     expect(html).not.toContain("At depth 2, this run may spend up to 66 model attempts");
     expect(html).toMatch(/<button type="submit" class="startBtn" disabled=""/);
@@ -290,34 +291,16 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     expect(config.as_of).toBe("2026-08-13T05:02:03.456Z");
   });
 
-  it("B4/DR-166-B expanded: Advanced reveals every prefilled field and keeps Start enabled", async () => {
-    const html = await renderRealNewDebatePage({ advanced: true });
-    expect(html).toMatch(/<button[^>]*aria-expanded="true"[^>]*aria-controls="machineOwnedAskFields"[^>]*>Advanced/);
-    expect(html).toContain('id="machineOwnedAskFields"');
-    expect(html).toContain('id="agentCount"');
-    expect(html).toContain('value="2"');
-    expect(html).toContain('value="asker:test-user-alpha"');
-    expect(html).toContain('value="personal"');
-    expect(html).toContain("configuredProviderSet@8:acceptance:DR-140:V-approved (Anthropic, OpenAI)");
+  it("DR-180 + MUTATION disclosure: renders only the DR-166-C ask surface and never renders machine controls", async () => {
+    const html = await renderRealNewDebatePage();
+    expect(html).not.toContain("Advanced");
+    expect(html).not.toContain('id="machineOwnedAskFields"');
     expect(html).toContain('id="budgetTier"');
+    expect(html).toContain('id="riskTier"');
+    expect(html).toContain('id="treeDepth"');
     expect(html).toContain('value="low" selected=""');
     expect(html).toMatch(/<button type="submit" class="startBtn ready"(?![^>]*disabled)/);
     expect(html).not.toContain("ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE");
-  });
-
-  it("DR-166-B + MUTATION visible-by-default: hides all five machine-owned controls until Advanced opens", async () => {
-    const html = await renderRealNewDebatePage();
-    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*>Advanced/);
-    expect(html).not.toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-controls="machineOwnedAskFields"/);
-    expect(html).not.toContain('id="machineOwnedAskFields"');
-    expect(html).toContain('id="riskTier"');
-    expect(html).toContain('id="budgetTier"');
-    expect(html).toContain('id="treeDepth"');
-    expect(html).toContain("Choose your risk tier, composition budget tier, and depth, then click Start.");
-    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*>Options/);
-    expect(html).not.toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-controls="additionalRunOptions"/);
-    expect(html).not.toContain('id="additionalRunOptions"');
-    expect(html).toMatch(/<button type="submit" class="startBtn ready"(?![^>]*disabled)/);
     for (const id of ["agentCount", "asOf", "decisionOwner", "actionOwner", "decisionScope"]) {
       expect(html, id).not.toContain(`id="${id}"`);
     }
@@ -349,6 +332,37 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     });
     expect(new Date((config as { as_of: string }).as_of).toISOString()).toBe((config as { as_of: string }).as_of);
     expect(pageMocks.push).toHaveBeenCalledWith("/debate/run%3Anew");
+  });
+
+  it("ASK-01 live regression: configured=3 and ratified=2 makes bare Start submit two and receive acceptance", async () => {
+    const providerSetRow = deployment.register.rows.find((row) => row.row_key === "configuredProviderSet")!;
+    const providerSet = providerSetRow.value as { providers: unknown[] };
+    pageMocks.readDeployment.mockResolvedValue({
+      ...deployment,
+      register: {
+        ...deployment.register,
+        rows: deployment.register.rows.map((row) => row.row_key === "configuredProviderSet" ? {
+          ...row,
+          value: {
+            ...(row.value as object),
+            providers: [...providerSet.providers, { providerRef: "provider:xai", adapterKind: "CLI", maker: "xAI" }]
+          }
+        } : row)
+      }
+    });
+    pageMocks.createDebate.mockImplementation(async (_topic, config: { agent_count: number }) => {
+      if (config.agent_count > 2) throw new Error("RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE");
+      return { id: "run:accepted" };
+    });
+
+    const { tree } = await renderRealNewDebatePageState();
+    const form = findElement(tree, (element) => element.type === "form");
+    expect(form).not.toBeNull();
+    await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> }).onSubmit({ preventDefault: vi.fn() });
+
+    expect(pageMocks.createDebate).toHaveBeenCalledOnce();
+    expect(pageMocks.createDebate.mock.calls[0]![1]).toMatchObject({ agent_count: 2 });
+    expect(pageMocks.push).toHaveBeenCalledWith("/debate/run%3Aaccepted");
   });
 
   it("PROV-01 mutation-proof: a user-edited risk tier is sent as ASKER, never MACHINE_DEFAULT", async () => {
@@ -387,19 +401,17 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     pageMocks.readSession.mockImplementation(async (token: string) => sessionsByToken[token]!);
 
     pageMocks.authToken = "token:test-user-alpha";
-    const alphaHtml = await renderRealNewDebatePage({ advanced: true });
+    const alphaHtml = await renderRealNewDebatePage();
     hooks.reset();
     pageMocks.authToken = "token:test-user-beta";
-    const betaHtml = await renderRealNewDebatePage({ advanced: true });
+    const betaHtml = await renderRealNewDebatePage();
 
     expect(pageMocks.readSession).toHaveBeenCalledWith("token:test-user-alpha");
     expect(pageMocks.readSession).toHaveBeenCalledWith("token:test-user-beta");
     for (const ownerField of ["decisionOwner", "actionOwner"]) {
-      expect(alphaHtml).toMatch(new RegExp(`<input[^>]*id="${ownerField}"[^>]*value="asker:test-user-alpha"[^>]*>`));
-      expect(betaHtml).toMatch(new RegExp(`<input[^>]*id="${ownerField}"[^>]*value="asker:test-user-beta"[^>]*>`));
+      expect(alphaHtml).not.toContain(`id="${ownerField}"`);
+      expect(betaHtml).not.toContain(`id="${ownerField}"`);
     }
-    expect(alphaHtml).not.toContain('value="asker:test-user-beta"');
-    expect(betaHtml).not.toContain('value="asker:test-user-alpha"');
   });
 
   it.runIf(process.env.UX01_LIVE_STACK === "1")("LIVE READ-ONLY: standing deployment derives two makers and enables Start", async () => {
@@ -414,9 +426,7 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     pageMocks.readDeployment.mockResolvedValue(await deploymentResponse.json() as Deployment);
     pageMocks.readSession.mockResolvedValue(await sessionResponse.json() as Session);
 
-    const html = await renderRealNewDebatePage({ advanced: true });
-    expect(html).toContain("configuredProviderSet@1:acceptance:DR-140:V-approved (Anthropic, OpenAI)");
-    expect(html).toMatch(/<input[^>]*id="agentCount"[^>]*value="2"[^>]*>/);
+    const html = await renderRealNewDebatePage();
     expect(html).toMatch(/<button type="submit" class="startBtn ready"(?![^>]*disabled)/);
     expect(html).not.toContain("ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE");
   });
@@ -426,22 +436,18 @@ describe("UX-01 machine-defaulted real /new flow", () => {
       ...deployment,
       register: { ...deployment.register, rows: deployment.register.rows.filter((row) => row.row_key !== "configuredProviderSet") }
     });
-    const html = await renderRealNewDebatePage({ advanced: true });
+    const html = await renderRealNewDebatePage();
     expect(html).toContain("ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE");
-    expect(html).toMatch(/<input[^>]*id="agentCount"[^>]*value=""[^>]*>/);
     expect(html).toContain('id="riskTier"');
     expect(html).toContain('value="standard" selected=""');
     expect(html).toMatch(/<button type="submit" class="startBtn" disabled=""/);
-    expect(html).not.toMatch(/<input[^>]*id="agentCount"[^>]*value="2"[^>]*>/);
+    expect(html).not.toContain('id="agentCount"');
   });
 
-  it("keeps all five machine-owned controls editable in the real rendered form", async () => {
-    const html = await renderRealNewDebatePage({ advanced: true });
+  it("keeps all five machine-owned values out of the real rendered form", async () => {
+    const html = await renderRealNewDebatePage();
     for (const id of ["agentCount", "asOf", "decisionOwner", "actionOwner", "decisionScope"]) {
-      const control = html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0];
-      expect(control, id).toBeDefined();
-      expect(control, id).not.toContain("readonly");
-      expect(control, id).not.toContain("disabled");
+      expect(html, id).not.toContain(`id="${id}"`);
     }
   });
 
