@@ -3,7 +3,7 @@
 Ticket: `t_2eb80121`  
 Worker session: `01a00017-b58a-70f2-b373-363486aa38aa`  
 Branch/worktree: `dev` / `/Users/vladmihaimiron/Documents/DebateAIRO`  
-Comments read through: `2026-08-14 14:55` (`CODEX HEARTBEAT`)
+Comments read through: `2026-08-14 15:29` (`REWORK ACKNOWLEDGED`, after the `2026-08-14 15:27` diamond finding)
 
 ## Inventory
 
@@ -19,13 +19,18 @@ Comments read through: `2026-08-14 14:55` (`CODEX HEARTBEAT`)
   - pins configured=3/ratified=2 bare-Start acceptance;
   - pins fixture-ratified=3 without ASK code changes;
   - pins the rendered absence of Advanced and all five machine controls;
-  - preserves PROV-01 and DR-166-A assertions.
+  - drives two bare-Start submissions through the real page under alpha and beta auth tokens, then proves each `createDebate` config carries its own asker's distinct `decision_owner` and `action_owner` while all five machine-control IDs remain absent;
+  - pins refusal of a non-exact Set-A envelope ceiling;
+  - pins the surviving Options disclosure's closed/open `aria-expanded`, `aria-controls`, and `additionalRunOptions` relationship;
+  - preserves PROV-01 assertions.
 - `tests/unit/v2ui-pages.test.ts`
   - replaces the superseded editable-machine-control source contract with DR-180's machine-derived/no-disclosure contract.
 - `docs/missions/2026-08-06-v3-programming/handoffs/ASK-01-progress.log`
   - major-step progress receipts.
 
 Pre-existing, not owned or modified by this worker: `decisions-ledger.md` was already dirty and `goal-packets/ASK-01-codex-goal.md` was already untracked at claim.
+
+Rev2 is tests-only. Its sole tracked diff is `tests/render/ux01-new-debate-form.test.tsx`; no product file changed during rework. Byte comparison against the pre-rework clone returned `defaults=0 page=0`, with product hashes `30f3d540cf3575fc83a053e1c7124672e647c97d37c3443c8a0cbb5428510417` and `dc66e8e7a16e089393e2d8bc5b009ce327b19f6c94ec78dab10f0e6175314af2`, matching the rev1 review receipts.
 
 ## Fixture-by-fixture status and acceptance evidence
 
@@ -36,7 +41,9 @@ Pre-existing, not owned or modified by this worker: `decisions-ledger.md` was al
 | no Advanced disclosure | GREEN | rendered HTML contains no `Advanced`, `machineOwnedAskFields`, or machine-field control IDs |
 | machine values persisted | GREEN | collapsed/bare submit still carries `agent_count`, `as_of`, `decision_owner`, `action_owner`, and `decision_scope` |
 | PROV-01 | GREEN | untouched risk sends `MACHINE_DEFAULT`; edited risk sends `ASKER` and never `MACHINE_DEFAULT` |
-| DR-166-A | GREEN | two session tokens still derive distinct asker-relative owner values while neither value renders as a control |
+| DR-166-A | GREEN | two bare-Start submits through the real page call `createDebate` twice: alpha carries alpha `decision_owner`/`action_owner`, beta carries beta values, the two tokens' values differ, and all five machine-control IDs are absent from both renders |
+| envelope exactness (M7) | GREEN | depth-2 ceiling `109` is not an exact Set-A value and throws `ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE` with the exactness-refusal message |
+| surviving Options a11y | GREEN | closed button has `aria-expanded=false` with no `aria-controls` and no panel; open button has `aria-expanded=true`, `aria-controls=additionalRunOptions`, and a matching panel ID |
 | forbidden guard/seed/contract work | GREEN | `git diff --exit-code -- apps/runner/src/index.ts packages/kernel/src/index.ts`; no migrations, register seed, contract vocabulary, or standing-stack control changed |
 
 ## TDD RED -> GREEN -> REFACTOR
@@ -77,6 +84,42 @@ REFACTOR under green:
 - derived the maximum from the already-ratified `runCostEnvelope` source rather than adding a register row or fixed panel-size literal;
 - updated stale source-level assertions to DR-180.
 
+### Rev2 reproduce-first correction
+
+Exact M6 reproduction in an isolated clone, before changing the test:
+
+```json
+{
+  "mutation": "decisionOwner/actionOwner fixed to asker:test-user-alpha",
+  "numTotalTestSuites": 228,
+  "numPassedTestSuites": 228,
+  "numTotalTests": 588,
+  "numPassedTests": 587,
+  "numFailedTests": 0,
+  "numPendingTests": 1,
+  "success": true
+}
+```
+
+After the tests-only correction, the same M6 mutation is RED:
+
+```text
+FAIL  DR-166-A + MUT-I: two tokens derive two different owner defaults through the real page
+Expected beta decision_owner/action_owner: asker:test-user-beta
+Received: asker:test-user-alpha
+Test Files  1 failed (1)
+Tests       1 failed | 17 passed | 1 skipped (19)
+```
+
+M7 exactness-removal replay is also RED:
+
+```text
+FAIL  M7: refuses a run-cost envelope ceiling that is not an exact Set-A maker maximum
+AssertionError: expected function to throw an error, but it didn't
+Test Files  1 failed (1)
+Tests       1 failed | 17 passed | 1 skipped (19)
+```
+
 ## Mutation ledger (P1)
 
 | Load-bearing assertion | Named mutation killed | Confirming test |
@@ -86,7 +129,9 @@ REFACTOR under green:
 | Advanced is gone in every render state | re-add the disclosure/button/component | `DR-180 + MUTATION disclosure...` plus the source contract test |
 | machine values remain submitted | remove hidden derivation or omit a machine field | `DR-166-B + MUTATION collapsed-submit...` |
 | provenance semantics are untouched | force `tier_source = MACHINE_DEFAULT` after user edit | `PROV-01 mutation-proof...` |
-| owners remain asker-relative | derive owners from token/session constants | decision/action owner mutations and the two-session DR-166-A fixture |
+| owners remain asker-relative through the real page | fix both submitted owners to the alpha asker | `DR-166-A + MUT-I...` drives alpha and beta bare-Start submits; beta expects beta owners and differs from alpha; mutation RED 1/17/1 |
+| envelope ceilings must encode an exact Set-A maximum | remove the exactness refusal and silently round up | `M7: refuses a run-cost envelope ceiling...`; mutation RED 1/17/1 because ceiling 109 no longer throws |
+| Options disclosure keeps a valid a11y relationship | advertise a missing panel while closed, or omit the relationship while open | `R3: the surviving Options disclosure exposes aria-controls only while its panel exists` pins both states and the matching panel ID |
 
 ## Verification with real output
 
@@ -96,9 +141,12 @@ Vitest collection proof:
 pnpm vitest list tests/render/ux01-new-debate-form.test.tsx
 
 tests/render/ux01-new-debate-form.test.tsx > ... > ASK-01 RED + mutations: caps configured makers at the ratified guard source without hardcoding two
+tests/render/ux01-new-debate-form.test.tsx > ... > M7: refuses a run-cost envelope ceiling that is not an exact Set-A maker maximum
 tests/render/ux01-new-debate-form.test.tsx > ... > DR-180 + MUTATION disclosure: renders only the DR-166-C ask surface and never renders machine controls
+tests/render/ux01-new-debate-form.test.tsx > ... > R3: the surviving Options disclosure exposes aria-controls only while its panel exists
 tests/render/ux01-new-debate-form.test.tsx > ... > ASK-01 live regression: configured=3 and ratified=2 makes bare Start submit two and receive acceptance
 tests/render/ux01-new-debate-form.test.tsx > ... > PROV-01 mutation-proof: a user-edited risk tier is sent as ASKER, never MACHINE_DEFAULT
+tests/render/ux01-new-debate-form.test.tsx > ... > DR-166-A + MUT-I: two tokens derive two different owner defaults through the real page
 ```
 
 Typechecks:
@@ -125,23 +173,29 @@ Full suite (JSON reporter, untruncated receipt):
   "numTotalTestSuites": 228,
   "numPassedTestSuites": 228,
   "numFailedTestSuites": 0,
-  "numTotalTests": 588,
-  "numPassedTests": 587,
+  "numTotalTests": 590,
+  "numPassedTests": 589,
   "numFailedTests": 0,
   "numPendingTests": 1,
   "success": true
 }
 ```
 
-The pending test is the explicit read-only live-stack gate; rerunning with `UX01_LIVE_STACK=1` produced `17 passed (17)` as pasted above.
+The pending test is the explicit read-only live-stack gate. Rev2 reran it with `UX01_LIVE_STACK=1 UX01_LIVE_BASE_URL=http://127.0.0.1:8790`:
+
+```text
+Test Files  1 passed (1)
+Tests       19 passed (19)
+Duration    411ms
+```
 
 ## Live verification (P3)
 
-- Performed: read-only `/v1/deployment` and `/v1/session` against the already-running stack through the opt-in render test; local updated `/new` rendered ready and all 17 tests passed.
-- Not performed: a real live ask submission. That would write product data and cross an IMPORTANT OPERATION; the packet also forbids standing-stack control. The exact configured=3/ratified=2 acceptance path is covered by the reproduce-first acceptance stub and must be included in product/human verification after integration/restart authorization.
+- Rev2 performed no product-data write and no standing-stack control. It reran read-only `/v1/deployment` and `/v1/session` against the standing stack through the opt-in render test; all 19 focused tests passed.
+- Opus rev1 supplies the already-authorized product proof in `reviews/ask01-opus-rev1.md`: the real authenticated one-click Start flow was accepted with `agent_count=2` derived from three configured makers, settled, and served using 20/60 model attempts. That proof establishes product behavior; rev2 corrects only the tests that certify it.
 
 ## Deferrals and questions for V
 
-- No implementation deferrals.
+- Next-mission item from both rev1 lenses/orchestrator: the runner M-guard literal and the form's envelope-derived count are independently editable sources; any future M=3 ratification must move them atomically or unify their source. This remains forbidden and deliberately untouched in ASK-01.
 - No questions for V.
 - Peer reviewers should independently rerun the mutation ledger and inspect the Set-A inverse derivation against DR-172/GROK-01 arithmetic.

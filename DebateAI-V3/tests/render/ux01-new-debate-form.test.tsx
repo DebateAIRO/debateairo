@@ -229,6 +229,27 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     expect(deriveAgentCountDefault(ratifiedThreeDeployment as Deployment).agentCount).toBe("3");
   });
 
+  it("M7: refuses a run-cost envelope ceiling that is not an exact Set-A maker maximum", () => {
+    const inexactEnvelopeDeployment = {
+      ...deployment,
+      register: {
+        ...deployment.register,
+        rows: deployment.register.rows.map((row) => row.row_key === "runCostEnvelope" ? {
+          ...row,
+          value: {
+            kind: "RUN_COST_ENVELOPE_POLICY",
+            members: [{ depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 109 }]
+          }
+        } : row)
+      }
+    };
+
+    expect(() => deriveAgentCountDefault(inexactEnvelopeDeployment as Deployment)).toThrow(expect.objectContaining({
+      code: "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
+      message: "The deployment runCostEnvelope does not encode a ratified maker maximum."
+    }));
+  });
+
   it("B2: an absent provider set does not suppress the independent deployment risk floor", () => {
     const withoutProviders = {
       ...deployment,
@@ -304,6 +325,25 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     for (const id of ["agentCount", "asOf", "decisionOwner", "actionOwner", "decisionScope"]) {
       expect(html, id).not.toContain(`id="${id}"`);
     }
+  });
+
+  it("R3: the surviving Options disclosure exposes aria-controls only while its panel exists", async () => {
+    const initial = await renderRealNewDebatePageState();
+    expect(initial.html).toMatch(/<button[^>]*class="optionsToggle"[^>]*aria-expanded="false"[^>]*>Options/);
+    expect(initial.html).not.toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-controls="additionalRunOptions"/);
+    expect(initial.html).not.toContain('id="additionalRunOptions"');
+
+    const optionsButton = findElement(initial.tree, (element) =>
+      element.type === "button" && element.props.className === "optionsToggle"
+    );
+    expect(optionsButton).not.toBeNull();
+    (optionsButton!.props as { onClick: () => void }).onClick();
+
+    hooks.beginRender();
+    const { default: NewDebatePage } = await import("../../apps/v2-ui/app/new/page.js");
+    const openHtml = renderToStaticMarkup(<NewDebatePage />);
+    expect(openHtml).toMatch(/<button[^>]*aria-expanded="true"[^>]*aria-controls="additionalRunOptions"[^>]*>Options/);
+    expect(openHtml).toContain('id="additionalRunOptions"');
   });
 
   it("DR-166-B + MUTATION collapsed-submit: creates the fully defaulted ask without opening Advanced", async () => {
@@ -400,17 +440,39 @@ describe("UX-01 machine-defaulted real /new flow", () => {
     };
     pageMocks.readSession.mockImplementation(async (token: string) => sessionsByToken[token]!);
 
-    pageMocks.authToken = "token:test-user-alpha";
-    const alphaHtml = await renderRealNewDebatePage();
-    hooks.reset();
-    pageMocks.authToken = "token:test-user-beta";
-    const betaHtml = await renderRealNewDebatePage();
+    const submitBareStart = async (token: string) => {
+      hooks.reset();
+      pageMocks.authToken = token;
+      const rendered = await renderRealNewDebatePageState();
+      const form = findElement(rendered.tree, (element) => element.type === "form");
+      expect(form).not.toBeNull();
+      await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> }).onSubmit({ preventDefault: vi.fn() });
+      return rendered.html;
+    };
+
+    const alphaHtml = await submitBareStart("token:test-user-alpha");
+    const betaHtml = await submitBareStart("token:test-user-beta");
 
     expect(pageMocks.readSession).toHaveBeenCalledWith("token:test-user-alpha");
     expect(pageMocks.readSession).toHaveBeenCalledWith("token:test-user-beta");
-    for (const ownerField of ["decisionOwner", "actionOwner"]) {
-      expect(alphaHtml).not.toContain(`id="${ownerField}"`);
-      expect(betaHtml).not.toContain(`id="${ownerField}"`);
+    expect(pageMocks.createDebate).toHaveBeenCalledTimes(2);
+    const [, alphaConfig, alphaToken] = pageMocks.createDebate.mock.calls[0]!;
+    const [, betaConfig, betaToken] = pageMocks.createDebate.mock.calls[1]!;
+    expect(alphaToken).toBe("token:test-user-alpha");
+    expect(betaToken).toBe("token:test-user-beta");
+    expect(alphaConfig).toMatchObject({
+      decision_owner: "asker:test-user-alpha",
+      action_owner: "asker:test-user-alpha"
+    });
+    expect(betaConfig).toMatchObject({
+      decision_owner: "asker:test-user-beta",
+      action_owner: "asker:test-user-beta"
+    });
+    expect((alphaConfig as { decision_owner: string }).decision_owner).not.toBe((betaConfig as { decision_owner: string }).decision_owner);
+    expect((alphaConfig as { action_owner: string }).action_owner).not.toBe((betaConfig as { action_owner: string }).action_owner);
+    for (const machineField of ["agentCount", "asOf", "decisionOwner", "actionOwner", "decisionScope"]) {
+      expect(alphaHtml).not.toContain(`id="${machineField}"`);
+      expect(betaHtml).not.toContain(`id="${machineField}"`);
     }
   });
 
