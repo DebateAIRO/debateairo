@@ -1312,3 +1312,74 @@ supersedes | status`.
   through the DR-171 architecture consult before any ticket. "For now"
   noted: V may re-rule after seeing it live. | a 40-call depth-5 run died
   to one throttled call site | run resilience | — | ACTIVE
+
+| DR-174-A | 2026-08-14 | V (architect cards) | **AMENDMENTS TO THE DEATH
+  POLICY, V's four answers.** (1) HOLD CAP: a run may spend at most TWO
+  10-minute holds; after the cap, further exhaustions proceed straight to
+  the serve-with-marks path. (2) TRANSPORT ONLY: holds apply to transport
+  exhaustion; schema exhaustion keeps its BUG-01 corrective-retry behavior
+  with no hold. (3) ROOT VOCABULARY CORRECTED BY V: "The root is the
+  question in its own, right? The root cannot die." — TRUE and now canon:
+  the tree's root is THE QUESTION (user-authored, no model call, undying);
+  the two maker POSITIONS are its children. The architect's "dead root"
+  scenario is therefore a DEAD MAKER-POSITION; its policy is an OPEN V ROW
+  (die loud vs serve the surviving maker with marks — interacts with the
+  pending mono-maker ruling). (4) HIDDEN, NOT PRUNED — V's design ruling:
+  "Not Pruned, not removed. But hidden. If it cannot be judged, or the
+  scoring is too low, it is hidden. we got a 'show hidden' button for a
+  reason." Authored-but-unjudgeable material is HIDDEN behind the existing
+  show-hidden affordance (recoverable, disclosed), NOT filtered out of
+  existence; never-authored legs (the call died before any node existed)
+  cannot be hidden or shown — the mark discloses that expansion halted
+  there. V EXTENDED the hidden class to LOW-SCORING nodes — the threshold
+  "too low" is an unruled VALUE: register row, V's number to come, never a
+  literal. Mark naming moves to V's hidden vocabulary (HIDDEN-UNJUDGEABLE
+  family, exact member minted at plan revision). DR-165(3) interplay: a
+  hidden unjudged node revealed by the button is DISCLOSED-as-unjudged,
+  not served-as-opinion — the plan revision must carry that distinction.
+  | V corrected the frame from removal to concealment | DR-174 plan
+  revision | — | ACTIVE
+
+| DR-175 | 2026-08-14 | V ("How about you let Grok Join the fun and let it
+  have a point of view in the debate as well? it can also review and MAYBE
+  it will prevent you and Codex from forming an echo chamber") | **GROK
+  GAINS A DELIBERATIVE SEAT — the cross-lineage law applied to the loop
+  itself.** The coding loop is structurally a debate (positions, reviews,
+  verdicts) whose frames were all set by one lineage: the orchestrator
+  (Claude) writes packets, Opus (Claude) architects plan, Opus lenses
+  verify — Grok held refutation authority only AFTER the frame existed.
+  Ruled changes: (1) DR-171 consults become two-lineage — the Opus
+  architect's plan is met by a GROK POSITION that may propose a different
+  design, not merely authorize/refute; genuine disagreements surface to V
+  as options, never pre-converged by one lineage. (2) Open value questions
+  travel to V carrying BOTH lineages' views where they differ — the
+  orchestrator's "(Recommended)" is no longer single-sourced on contested
+  calls. (3) Non-trivial goal packets may receive a Grok frame-critique
+  before dispatch when the orchestrator's scoping embeds contestable
+  design. (4) Grok keeps every existing review seat. Effective
+  immediately: DR-174's open rows (mark names, threshold shape,
+  dead-maker-position policy) go to V only after Grok's own position is
+  taken alongside the architect's. | V named the echo-chamber risk in the
+  loop's own architecture | loop governance | — | ACTIVE
+
+| DR-176 | 2026-08-14 | V (dual-lineage card round, the first under DR-175)
+  | **THE HIDDEN-FRAME VOCABULARY AND POLICY, settled.** (1) Mark members:
+  HIDDEN-UNJUDGEABLE (authored, cross-review dead — revealable),
+  HIDDEN-LOW-SCORE (authored, strength ≤ T — revealable), and
+  UNAUTHORED-BRANCH-HALTED (never authored — nothing to reveal; GROK'S
+  POSITION over the architect's HIDDEN-UNJUDGEABLE-UNAUTHORED, V ruling
+  that the HIDDEN family must not promise a reveal that cannot exist —
+  the first deliberative split resolved by V under DR-175). (2)
+  hiddenNodeScoreThreshold = 0.35 ABSOLUTE (strength ≤ T hides): V
+  legalizes the incumbent UI literal — no visual change, full provenance;
+  the hardcoded 0.35 in debateTreeUtils.ts is RETIRED for the register
+  row; the null-guard survives verbatim (a missing score is never a low
+  score). (3) DEAD MAKER POSITION: die-loud CONFIRMED (after the full
+  hold + final retry courtesy, which MUST also wrap the primary position
+  path per Grok's funnel refutation); the mono-maker ruling stays open.
+  (4) NODE_REVIEW_UNAVAILABLE loud stop RETIRED: one dead review hides
+  one subtree (class H, excluded from the evaluated snapshot, revealable
+  as disclosed-not-served) instead of killing the run; envelope/budget
+  refusals untouched. Both lineages' positions were before V on every
+  row; three converged, one split, V picked. | V ruled the consolidated
+  DR-174 packet | the resilience ticket binds to this | — | ACTIVE

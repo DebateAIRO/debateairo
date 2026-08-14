@@ -40,7 +40,7 @@ export function DebatesBuffer({ debates }: { readonly debates: readonly DebateSu
             );
           })}
         </div>
-        <div className={`pill ${complete ? "pillOk" : "pillGen"}`}>
+        <div className={`pill ${complete ? "pillOk" : debate.status === "failed" ? "pillBad" : "pillGen"}`}>
           <span className="dot" />
           {statusLabel(debate.status)}
         </div>

@@ -775,4 +775,372 @@ Rows for V. None is decided by this plan.
 
 ---
 
+*Sections 1–14 above are the plan as first written, kept verbatim for the
+record. **V ruled on the packet and corrected the frame at DR-174-A.** The
+binding version of §2's prune semantics, §3.2, §5, §6, §7, §8 and §14 is the
+revision below; where the two disagree, the revision wins.*
+
+---
+
+## Revision after V's rulings (DR-174-A)
+
+V's four answers (`decisions-ledger.md:1316-1341`, read verbatim before this
+revision was written):
+
+> (1) HOLD CAP: a run may spend at most TWO 10-minute holds; after the cap,
+> further exhaustions proceed straight to the serve-with-marks path.
+> (2) TRANSPORT ONLY … (3) ROOT VOCABULARY CORRECTED BY V: *"The root is the
+> question in its own, right? The root cannot die."* … (4) HIDDEN, NOT
+> PRUNED — *"Not Pruned, not removed. But hidden. If it cannot be judged, or
+> the scoring is too low, it is hidden. we got a 'show hidden' button for a
+> reason."*
+
+### R.0 What stands, what moves
+
+**Stands unchanged:** the cooldown seam in the runner lifecycle (§3.1); the
+final retry via the wrapper's `remaining = maxAttempts − consumed` arithmetic
+with **no `providers` change** (§4 Claim B); held time is not spend (§4 Claim
+A); the cooldown-aware pre-flight (§4 Claim C); the claim-TTL invariant (§4
+Claim D); the `HOLDING` projection and the two existing progress-event types
+(§3.3); both latent defects (§13 items 1–2); the alternatives table (§3.4).
+
+**Moves:** the word *prune* and everything that hung on it. V's frame is
+**concealment, not removal**, and it turns out to be a better fit for a
+system whose store is append-only anyway.
+
+### R.1 The hold cap — VROW-1 RULED
+
+`max_cooldown_holds_per_run: 2`, **V-ruled at DR-174-A(1)** — no longer
+`— none stated`. Semantics, stated so the ticket cannot drift:
+
+- the counter is **per run**, not per call site (the wall-clock hazard §5
+  named is what the cap answers);
+- holds 1 and 2 behave exactly as §3.1 describes (record `COOLDOWN_HOLD`,
+  wait `cooldown_ms`, record `COOLDOWN_RETRY`, one further attempt);
+- from the third exhaustion onward the run **does not hold and does not
+  retry** — it goes straight to the serve path with the mark. The bound on
+  added wall clock is therefore exactly `2 × 10 min = 20 minutes`, whatever
+  the depth and whatever the failure count. That number is now derivable, not
+  open, and the loading page has a worst case a user can be told.
+- the counter lives in the run's own recorded event stream (count of
+  `node.retrying` events with `state = 'COOLDOWN_HOLD'` for the run), not in
+  process memory — so it survives the read path and is replayable.
+
+### R.2 Transport only — VROW-3 RULED
+
+`ProviderCallFailedError` (transport) holds; `ProviderContentUnacceptedError`
+(schema, BUG-01's carrier) keeps its corrective-retry behaviour **with no
+hold**, as recommended. T13 stands as the mutation test that keeps the two
+carriers from merging.
+
+### R.3 Root vocabulary — corrected, and the correction is already true in code
+
+**V is right, and the code corroborates it.**
+`apps/v2-ui/lib/v3/adapter.ts:188-204` already synthesises the tree root as a
+`DebateNode` whose `claim` is `answer.question_line`, with the maker positions
+as its `rootChildren`. **The presentation layer has always modelled the
+question as the root.** The ambiguity was in the engine and in my §3.2: the
+runner writes both maker positions with `parentNodeId: null`
+(`apps/runner/src/index.ts:640-648`, `:842`), so in `core.node` they are
+parent-less siblings and the question exists only as `run.question_line` — a
+run field, not a node.
+
+**Canon from here:** *the root is THE QUESTION — user-authored, no model call,
+undying.* What §3.2 clause 4 called "roots" are **MAKER POSITIONS**, the
+question's children. Every occurrence of "root call site" in §3.2/§4/§8/§10/
+§14 above reads **"maker-position call site"**.
+
+*Recorded as a finding, not proposed as work:* the question is not a node in
+`core.node`, so the engine has no single object for the thing V calls the
+root. Making it one is a graph-shape change and is **out of scope**; it is
+named here because it is the reason "root" was ambiguous enough to need V's
+correction.
+
+#### The dead maker position — both branches, designed thin
+
+A maker-position authoring call (`JUDGE` at `:607-615`, or
+`JUDGE:root:secondary` at `:832-847`) that exhausts, holds, and fails its
+final retry. **Policy is an OPEN V ROW (VROW-4-R).** Both branches are
+specified so the ticket can bind either on one word from V:
+
+**Branch DIE-LOUD** *(today's behaviour; zero new code)*
+: the run terminal-fails with the typed carrier. Cost: if the *second* maker's
+  position dies at call ~2 of ~400, the run dies having spent almost nothing —
+  cheap. If it dies late, the loss is total.
+
+**Branch SERVE-SURVIVING** *(new code, and it is not small)*
+: the surviving maker's position and its subtree serve, carrying the
+  mono-maker honesty vocabulary that **already exists and already ships**:
+  `SINGLE-LINEAGE` + `CRITIQUE-UNAVAILABLE` records
+  (`apps/runner/src/index.ts:1054-1056`, `:1075-1095`), plus the new
+  unauthored-branch mark (R.4.4) naming the dead position. Wiring is a
+  recomputation of `effectiveMakerCount` after the loss, and the branch is
+  thin **only** at the record level.
+
+**The consequence V should see before ruling, which is why the two branches
+are not symmetric.** A maker position dies because that maker's relay is
+down. That same relay owes a **cross-maker review of every surviving node**
+(`selectDifferentMakerReviewer`, `apps/runner/src/index.ts:100-112`, called at
+`:926`). With one maker gone it throws
+`DIFFERENT_MAKER_REVIEWER_UNAVAILABLE` for **every** node, so under DR-165(3)
+**every surviving node becomes unjudgeable** — and under V's hidden frame,
+everything is hidden and nothing is left to serve. Branch SERVE-SURVIVING
+therefore only produces an answer if V *also* rules that a mid-run maker loss
+may re-derive the run's admitted maker count into a lawful mono-maker run
+(DR-137 admits mono-model runs **at ask time**; DR-143 clause 1 makes the
+>1-maker requirement run-level). **That is exactly the pending mono-maker
+ruling V flagged**, and this plan does not pre-empt it.
+
+Architecture's reading, offered not decided: **DIE-LOUD until the mono-maker
+ruling lands**, because SERVE-SURVIVING without it produces a served answer
+whose every node is hidden — the worst of both policies.
+
+### R.4 HIDDEN, not pruned — the frame replacing §2/§3.2's prune semantics
+
+#### R.4.1 The affordance already exists — cited, not invented
+
+V is right that the button exists. It is
+**`apps/v2-ui/components/DebateCanvas.tsx:141-152`**, a sticky checkbox
+labelled **"Show set-aside paths"**, driving
+`const visibleRoot = showSetAsidePaths ? root : withoutSetAsidePaths(root)`
+(`:108`). Its parts:
+
+| Piece | Location | Behaviour |
+|---|---|---|
+| the predicate | `DebateCanvas.tsx:38-45` `isSetAsidePath` | `path_status === "abandoned"` or `stopping_status ∈ {abandon, abandoned}` |
+| the filter | `DebateCanvas.tsx:47-52` `withoutSetAsidePaths` | recursive — **a set-aside node takes its whole subtree out of the default view**, and the toggle restores the whole subtree |
+| the card state | `DebateCanvas.tsx:288, 304, 350-357` | `data-set-aside`, the ⊗ "Stopped path" card |
+| the tree-view sibling | `DebateTree.tsx:240, 276-284` | an `abandonedPaths` group: *"⊗ N stopped paths"* |
+| the drawer's promise | `NodeDetailDrawer.tsx:215` | *"preserved here for reference — abandoned paths are never deleted"* |
+
+**That last line is V's ruling already written down in the product.** The
+hidden frame is not new UI work; it is *feeding an affordance that already
+exists* from V3's honesty records.
+
+#### R.4.2 Three classes, and only two of them can be hidden
+
+| Class | What it is | Node row exists? | Hideable / revealable? | Disclosure |
+|---|---|---|---|---|
+| **H — unjudgeable** | authored and judged by its own maker, but its **cross-maker review** never landed (the review call exhausted, held, and failed) → DR-165(3) unjudged | **yes** | **yes** — hidden by default, revealed by the button | mark + record; revealed card reads *disclosed-as-unjudged* |
+| **L — low score** | authored, judged, reviewed; its recorded strength is at or below the ruled threshold | **yes** | **yes** — same affordance | the threshold is a ruled register value, shown as the reason |
+| **N — unauthored** | the authoring call died before any node row existed (the DR-174 incident) | **no** | **no — nothing to hide and nothing to reveal** | mark only: expansion halted here |
+
+Class N's analysis from §3.2 and §7 **stands entirely**: `core.node` has
+`UPDATE`/`DELETE` revoked (`migrations/0000_s00.sql:305-306`), node rows are
+written only after their call returns (`apps/runner/src/index.ts:732-797`), so
+a dead authoring call leaves nothing — nothing to prune, nothing to conceal,
+nothing to restore. V's ruling and this analysis agree: *"never-authored legs
+cannot be hidden or shown."* The plan-filter mechanism of §3.2 is unchanged;
+only its **name** changes (it stops expansion, it does not prune a thing that
+existed).
+
+#### R.4.3 The DR-165(3) distinction, carried explicitly
+
+**Hiding is a presentation act. Unservability is a scoring act. They are
+different, and a hidden node needs both.**
+
+> A hidden unjudged node revealed by the button is **DISCLOSED-as-unjudged,
+> not served-as-opinion.** — DR-174-A(4)
+
+Concretely, for a class-H node:
+
+1. **Not in the served text.** Already guaranteed: DR-159 B2-A serves exactly
+   one position (`buildFixedSingleRootServeNodes`,
+   `apps/runner/src/index.ts:318-338`) and the composer may reference only the
+   supplied `"primary"` ref (`:1211-1216`).
+2. **Not in the served number.** This is the real work. The node carries a
+   real `reduced_judgement.tau` (`packages/graph/src/index.ts:552-558`
+   materialises `base_strength` from it), so it *would* propagate an arrow
+   into the served position's strength. **An unjudged opinion reaching the
+   served number is exactly what DR-165(3) forbids.** The runner therefore
+   projects the evaluated snapshot as **the judged graph**: the hidden subtree
+   is excluded from `nodes`, `arrows` and `arrowOrder` before `evaluate()`.
+   The seam already exists — the runner already rebuilds the snapshot at
+   `apps/runner/src/index.ts:978-1000` — and `packages/propagation` stays
+   **pure and untouched** (AC-09/AC-14: same engine, different input).
+3. **Excluded as a SUBTREE, never re-parented.** `snapshotWithoutNode`
+   (`packages/propagation/src/index.ts:506-512`) re-parents a removed node's
+   children onto its parent — correct for sensitivity counterfactuals,
+   **forbidden here**: re-attaching a child's argument to a grandparent it was
+   never authored against would assert a structural claim no model made
+   (DR-115's family). Exclusion is subtree-scoped, which also matches
+   `withoutSetAsidePaths`'s existing recursion — the same subtree hides and
+   reveals as one.
+4. **Still in the store, still reachable.** Nothing is deleted. The node, its
+   artifact, its judgement and its ledger rows are untouched and append-only;
+   the button restores it to the view with its typed reason attached.
+5. **The excluded set is recorded**, not implied: it rides the propagation
+   receipt input (`recordPropagation`, `:1004-1038`) and the condition-mark
+   records, so a replay can reconstruct exactly which graph was scored.
+
+This is 03 §10's **AC-11 × AC-21** row reached by a second route: *no arrow, a
+typed record, and the answer serves* — with V's addition that the material
+also stays **visible on demand** rather than merely recorded.
+
+**What this resolves.** Old VROW-6 asked whether a dead review call should
+kill the run. DR-174-A(4) supplies the mechanism it lacked, so the shipped
+loud stop `NODE_REVIEW_UNAVAILABLE` (`apps/runner/src/index.ts:955-958`) is
+replaced by hide-and-exclude for that node's subtree. Because that retires a
+shipped refusal, VROW-6-R keeps it as a one-word confirmation rather than
+assuming it.
+
+#### R.4.4 The mark family — VROW-2 superseded
+
+`PRUNED-UNJUDGEABLE-SUBTREE` is **withdrawn**. Proposed members in V's hidden
+vocabulary (`packages/kernel/src/index.ts:69-100`), for V to confirm:
+
+| Member | Class | Chip label | Required record carries |
+|---|---|---|---|
+| **`HIDDEN-UNJUDGEABLE`** | H | *"Hidden: could not be judged — show hidden to read it"* | node ids hidden, the dead review call-site key, transport outcome, and that the material is **excluded from the served number** |
+| **`HIDDEN-LOW-SCORE`** | L | *"Hidden: scored below the shown threshold"* | node ids hidden, the recorded strength, and the **ruled threshold with its register provenance** |
+| **`HIDDEN-UNJUDGEABLE-UNAUTHORED`** | N | *"Expansion stopped here — nothing was written to hide or show"* | the exhausted call-site key, the surviving parent node id, planned-but-unauthored leg count, transport outcome |
+
+The record fields, the `REQUIRED_CONDITION_MARK_RECORDS` two-way contract, the
+`affectedNodeIds`-must-be-real-nodes FK constraint and the DDL shape from §6.2
+and §6.3 all carry over unchanged — for classes H and L, `affectedNodeIds`
+now names the **hidden nodes themselves** (they exist); for class N it still
+names only the surviving parent.
+
+**One honest tension, flagged for V rather than smoothed over.** The word
+*hidden* implies something is there to reveal. For class N nothing is, and its
+member says so in its own label — but a reader who presses "show hidden"
+after seeing that chip will find nothing new. If V prefers the family reserved
+for material that actually exists, the alternative name for class N is
+`UNAUTHORED-BRANCH-HALTED`, and the plan is otherwise identical. VROW-2-R.
+
+**Vocabulary count:** `CONDITION_MARKS` goes 24 → **27** (three members).
+`tests/unit/s14-ui.test.ts:115` moves accordingly; both label switches
+(`apps/v2-ui/lib/v3/labels.ts`, `web/lib/v3Presentation.ts`) are exhaustive
+over `ConditionMark`, so omitting any of the three is a **compile error**.
+
+#### R.4.5 The low-score threshold — the number is V's, and there is an undeclared one in the code today
+
+**Register row proposed:** `hiddenNodeScoreThreshold`, scope deployment,
+value **`— none stated`** (AC-76/DR-039 — V's number), consumed by the node
+projection and shipped to the client through the register presentation the
+deployment endpoint already serves (`apps/api/src/index.ts:448-497`), so the
+UI reads a **ruled row with provenance** rather than a literal.
+
+**Does the existing propagation/band vocabulary offer a lawful derivation?
+Checked, and the honest answer is no.** `BandCeilingRegisterRow`
+(`packages/serve/src/index.ts:185-204`) cuts on **way-of-knowing shares**
+(`minimumShares` per `LOOKED_UP | RAN | REASONING`, applied at `:235-244`)
+and is **answer-scoped**; `NodeStrengthRecord`
+(`packages/propagation/src/index.ts:89-104`) carries `strength`,
+`rivalStrength` and lift markers but **no band and no boundary**. There is no
+ruled per-node strength cut anywhere in the register to derive from. The
+number must be minted fresh.
+
+**A finding V should see, because it is the same number un-ruled.**
+`apps/v2-ui/lib/debateTreeUtils.ts:116-122`:
+
+```
+export function isLowStrengthNode(strength: number | null | undefined, threshold = 0.35): boolean {
+  if (strength == null) return false;
+  return strength <= threshold;
+}
+```
+
+**`0.35` is a hardcoded literal on a served surface, with no register row, no
+provenance, and no test pinning it** (searched: `tests/**` has no assertion on
+it). It already dims nodes today behind `NEXT_PUBLIC_VERDICT_FIRST_UI`
+(`DebateCanvas.tsx:244-245`, `DebateTree.tsx:120`). V's ruling gives it a
+lawful home: **the register row replaces the default argument**, and the flag
+stops being the only thing standing between an invented number and V's screen.
+
+Its second line is worth keeping verbatim in the new code, because it is
+already the DR-115 rule: **`if (strength == null) return false`** — *a missing
+score is never treated as a low score.* Absence and lowness are different
+facts, and only lowness may hide anything.
+
+**Three candidate shapes to OFFER V (all need V's number; none is decided
+here):** (a) absolute — hide `strength ≤ T`; (b) relative — hide a node
+scoring below a share of its strongest sibling; (c) bottom-k per parent. (a)
+is the shape the existing code already assumes and the only one that needs a
+single scalar. VROW-7.
+
+### R.5 Register rows, consolidated after the rulings
+
+| Row | Field | Value | Provenance |
+|---|---|---|---|
+| `runDeathPolicy` | `cooldown_ms` | `600_000` | V-ruled, DR-174 |
+| | `final_retry_attempts` | `1` | V-ruled, DR-174 |
+| | `max_cooldown_holds_per_run` | **`2`** | **V-ruled, DR-174-A(1)** |
+| | `applies_to` | `TRANSPORT_EXHAUSTION` | V-ruled, DR-174-A(2) |
+| `hiddenNodeScoreThreshold` | value | **`— none stated`** | **V's number — VROW-7** |
+
+Both rows seeded at `acceptance/seed-register.ts`, schema in
+`acceptance/runtime-policy.ts`, resolved at `acceptance/main.ts`. Register
+hash changes → V's backup-then-reseed at next boot, once, for both.
+
+### R.6 Touch-list delta against §3.5
+
+| File | Delta |
+|---|---|
+| `packages/kernel/src/index.ts` | **three** members, not one (R.4.4) |
+| `apps/runner/src/index.ts:978-1000` | **new**: project the evaluated snapshot as the judged graph — exclude hidden subtrees, subtree-scoped, never re-parented (R.4.3) |
+| `apps/runner/src/index.ts:920-961` | **changed**: the XREV catch hides-and-excludes instead of throwing `NODE_REVIEW_UNAVAILABLE`; the envelope re-raises at `:948-952` are **untouched** |
+| `apps/runner/src/index.ts` (hold counter) | count `COOLDOWN_HOLD` events for the run; at 2, skip hold and retry (R.1) |
+| `packages/serve/src/index.ts` node projection | derive `hidden` + typed reason for classes H and L; class L compares the recorded strength against the ruled row |
+| `apps/v2-ui/lib/v3/adapter.ts:90-163` | map the projection's hidden reason onto the field `isSetAsidePath` already reads — **the existing button then works unchanged** |
+| `apps/v2-ui/lib/debateTreeUtils.ts:116-122` | `isLowStrengthNode`'s `threshold = 0.35` default **removed**; the threshold becomes a required register-sourced argument |
+| `apps/v2-ui/components/DebateCanvas.tsx`, `DebateTree.tsx`, `NodeDetailDrawer.tsx` | revealed cards read *disclosed-as-unjudged* with the typed reason, never as a served opinion (R.4.3) |
+| ~~prune naming~~ | every `PRUNED*` identifier in the ticket uses the hidden vocabulary; class N's mechanism keeps its plan-filter shape under the name *expansion halted* |
+
+Unchanged from §3.5: `providers` (typed-carrier fields only), `db`,
+`contract` (`HOLDING` only), `battery`, the single migration
+`0021_dr174_cooldown_prune.sql`, `tools/orphan-audit`, the acceptance wiring.
+**Still no new dependency edge.**
+
+### R.7 What the hidden frame does NOT change
+
+- **§7 stands.** No `packages/propagation` change. The engine is pure and is
+  handed a smaller true graph; nothing is estimated, interpolated or
+  defaulted for hidden or unauthored material (DR-115). Sensitivity still
+  quantifies only nodes that were scored.
+- **§8 stands.** Hiding mints no terminal. `SERVED`, `DOWNGRADED` (Q51's
+  way-of-knowing downgrade, orthogonal) and `COMPONENTS_ONLY` are unchanged;
+  the hidden classes ride as condition marks, exactly as DR-161's mark rides a
+  `SERVED` answer today.
+- **§9's three FORBIDDEN-by-default changes stand**, with change #1 now three
+  kernel members instead of one. No new event type, no new table, no new edge.
+
+### R.8 Test obligations — delta
+
+T1–T24 stand, with `PRUNED` read as *expansion halted* and "root" read as
+*maker position*. Added:
+
+| # | Assertion | Mutation it kills |
+|---:|---|---|
+| T25 | the **third** exhaustion in one run neither waits nor retries — it goes straight to the serve path; holds 1 and 2 do both | dropping the cap (V's 20-minute wall-clock bound is the property under test); counting holds per call site instead of per run |
+| T26 | the hold count is recovered from the recorded event stream, not process memory | an in-memory counter that a re-read cannot see |
+| T27 | a class-H node is **absent** from `strengths`, `arrowOrder` and the graph fingerprint, **and still present** in `core.node` with its judgement and artifact intact | excluding by deleting (impossible — the FK/grant proves it) or, worse, hiding it from the view while leaving its arrow in the number: **the exact DR-165(3) breach** |
+| T28 | a class-H node's children are excluded **with** it and are **never re-parented** onto its parent | reusing `snapshotWithoutNode`'s re-parenting — a fabricated structural claim |
+| T29 | reveal restores the whole hidden subtree, and each revealed card carries the *disclosed-as-unjudged* reason — never a served-opinion presentation | revealing without the disclosure, which would serve an unjudged opinion through the back door |
+| T30 | `isLowStrengthNode` with a **missing** score returns false at every threshold | treating absence as lowness — hiding a node because nobody scored it (DR-115) |
+| T31 | the low-score threshold comes from the register row with its provenance; the function has **no default argument** | restoring `= 0.35`, the undeclared literal this ruling retires |
+| T32 | class N produces **no** hidden node ids (nothing to hide) while classes H and L produce non-empty, FK-valid ones | conflating the three classes into one mark |
+| T33 | live-shaped integration: a run with one class-H subtree serves, its answer carries `HIDDEN-UNJUDGEABLE` + record, and the served number equals propagation over the judged graph only | a number computed over the full graph and merely *labelled* hidden |
+
+Live verification (§11) is unchanged and gains one step: the dead-relay
+scratch-stack run now also demonstrates the hold **cap** (a third exhaustion
+proceeding without a wait), which is observable in the recorded event stream
+without sitting through anything.
+
+### R.9 V DECISIONS PACKET — revised
+
+**Closed by DR-174-A:** VROW-1 (cap = 2), VROW-3 (transport only), VROW-2
+(superseded by the hidden vocabulary), VROW-6 (mechanism supplied; see
+VROW-6-R for the one-word confirmation).
+
+| Row | Question | Architecture's reading | Cost if V rules otherwise |
+|---|---|---|---|
+| **VROW-4-R** *(open, V's)* | A **maker position** dies after cooldown + final retry: DIE-LOUD, or SERVE-SURVIVING with marks? | **DIE-LOUD until the pending mono-maker ruling lands.** SERVE-SURVIVING is only coherent if a mid-run maker loss may lawfully re-derive the run's admitted maker count — otherwise every surviving node is unreviewable and therefore hidden, and the answer serves nothing (R.3) | both branches are specified thin; binding either is ticket scope, not a redesign |
+| **VROW-2-R** *(vocabulary, V mints)* | Confirm the three members: `HIDDEN-UNJUDGEABLE`, `HIDDEN-LOW-SCORE`, `HIDDEN-UNJUDGEABLE-UNAUTHORED` | as listed; the third is the one with a tension — nothing exists behind the button for it. Alternative: `UNAUTHORED-BRANCH-HALTED` | a rename before the ticket is one line; after the migration it is a data migration |
+| **VROW-7** *(register row, value `— none stated`)* | The "too low" threshold: its **number**, and its **shape** — (a) absolute `strength ≤ T`, (b) relative to the strongest sibling, (c) bottom-k per parent | shape **(a)**, the shape the existing code already assumes and the only one needing a single scalar. **The number is V's.** Note the un-ruled `0.35` already dimming nodes today (R.4.5) | (b)/(c) need a second value and a per-parent pass; all three retire the literal either way |
+| **VROW-6-R** *(confirmation)* | Confirm that DR-174-A(4) retires the shipped `NODE_REVIEW_UNAVAILABLE` loud stop in favour of hide-and-exclude | **yes** — that is what "authored-but-unjudgeable material is hidden" means for the only class that produces it. Raised because it retires a shipped refusal | keeping the loud stop means a single failed review call still kills a depth-5 run — the DR-174 failure mode, relocated |
+| **VROW-5** *(unchanged, open)* | Should hidden material inside the served position's subtree also **cap the confidence band** (AC-24's existing lever)? | the lever exists; **no ruled basis**, so nothing is invented — the marks disclose today | additive if ruled later |
+
+---
+
 **PLAN READY FOR GROK AUTHORIZATION**

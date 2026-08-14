@@ -26,6 +26,7 @@ import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkele
 import { ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import { buildApi, type AskApplication } from "@debateai/api";
+import { HOME_PAGE_SIZE } from "../../apps/v2-ui/lib/serverApi.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -468,12 +469,76 @@ describe("BUG-03 asker-scoped debates index", () => {
       expect(index.open_runs.map((run) => run.run_ref)).not.toContain(servedWork.runId);
       expect(index.items.length + index.open_runs.length).toBeLessThanOrEqual(index.limit);
       // MUT-BUG03-DROP-OPEN-READ: remove the open-run projection -> RED.
-      // MUT-BUG03-FOREIGN-LEAK: remove asker_id from the open arm -> RED.
+      // MUT-BUG03-FOREIGN-LEAK-BOTH-GUARDS: remove both asker guards -> RED.
       // MUT-BUG03-SERVED-DUPLICATE: remove NOT EXISTS serve.answer -> RED.
       // MUT-BUG03-FAILED-REASON: erase terminal_reason -> RED.
     } finally {
       await provider.stop();
     }
+  });
+
+  it("keeps a newer in-flight run on page one when served answers exceed HOME_PAGE_SIZE", async () => {
+    const ownerAskerId = `asker:bug04-ordering:${randomUUID()}`;
+    const servedFixtureCount = HOME_PAGE_SIZE + 1;
+
+    for (let fixtureIndex = 0; fixtureIndex < servedFixtureCount; fixtureIndex += 1) {
+      const label = `bug04-served-${fixtureIndex}-${randomUUID()}`;
+      const runId = await createRun(label, 10, 1, 1, ownerAskerId);
+      const carriers = await database.pool.query<{ work_item_id: string; fact_bundle_id: string }>(
+        `WITH work AS (
+           INSERT INTO core.work_item (
+             run_id, battery_row_id, node_set, command_key, state, created_at_seq
+           ) VALUES ($1,'Q1','[]'::jsonb,$2,'READY',ledger.allocate_sequence())
+           RETURNING work_item_id
+         ), bundle AS (
+           INSERT INTO serve.fact_bundle (run_id, facts, residual_objections, content_hash, version)
+           VALUES ($1,'[]'::jsonb,'[]'::jsonb,$3,1)
+           RETURNING fact_bundle_id
+         ) SELECT work_item_id, fact_bundle_id FROM work CROSS JOIN bundle`,
+        [runId, `bug04:${label}`, `hash:${label}`]
+      );
+      const answer = await database.pool.query<{ answer_id: string }>(
+        `INSERT INTO serve.answer (
+           answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
+           answer_form, condition_marks, fact_bundle_id, sealed_at_seq,
+           reversal_point, builds_on_previous, badges
+         ) VALUES (
+           1,$1,$2,'SERVED','COMPOSED','SUPPORTED','{}'::jsonb,'[]'::jsonb,$3,
+           ledger.allocate_sequence(),$4,'{"value":false,"answer_ref":null}'::jsonb,'[]'::jsonb
+         ) RETURNING answer_id`,
+        [runId, carriers.rows[0]!.work_item_id, carriers.rows[0]!.fact_bundle_id, `test-layer:${label}`]
+      );
+      await database.pool.query(
+        `UPDATE core.work_item
+         SET state='DONE', settled_attempt_id=gen_random_uuid(), settled_artifact_ref=$2
+         WHERE work_item_id=$1`,
+        [carriers.rows[0]!.work_item_id, answer.rows[0]!.answer_id]
+      );
+    }
+
+    const runningRunId = await createRun(`bug04-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+    const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId: runningRunId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug04:${runningRunId}:running`
+    });
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug04', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [runningWorkItemId]
+    );
+
+    const firstPage = await new ServeRepository(database.pool)
+      .readAnswerIndex(ownerAskerId, HOME_PAGE_SIZE, 0);
+
+    expect(firstPage.total).toBe(servedFixtureCount + 1);
+    expect(firstPage.open_runs).toEqual([
+      expect.objectContaining({ run_ref: runningRunId, state: "RUNNING" })
+    ]);
+    expect(firstPage.items).toHaveLength(HOME_PAGE_SIZE - 1);
+    // MUT-BUG04-SERVED-FIRST: order ANSWER rows before OPEN_RUN rows -> RED.
   });
 });
 

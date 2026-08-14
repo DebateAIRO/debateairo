@@ -60,10 +60,16 @@ describe("BUG-03 home debates buffer", () => {
     expect(html).toContain("Generating");
     expect(html).toContain('href="/debate/run:failed"');
     expect(html).toContain("Debate generation failed: TOTAL_REVIEW_COVERAGE_UNSATISFIED");
+    const failedDebate = debates.find((debate) => debate.id === "run:failed");
+    expect(failedDebate).toMatchObject({ status: "failed" });
+    const failedCardHtml = renderToStaticMarkup(<DebatesBuffer debates={[failedDebate!]} />);
+    expect(failedCardHtml).toContain('class="pill pillBad"');
+    expect(failedCardHtml).toContain("Failed");
+    expect(failedCardHtml).not.toContain("Generating");
     expect(html.match(/The served debate/g)).toHaveLength(1);
     // MUT-BUG03-RENDER-GENERATING-AS-DONE: the status assertion turns RED.
     // MUT-BUG03-OMIT-GENERATING: the link/topic assertions turn RED.
-    // MUT-BUG03-RENDER-FAILED-AS-GENERATING: the terminal-reason assertion turns RED.
+    // MUT-BUG04-RENDER-FAILED-AS-GENERATING: the failed card's own status/chrome assertions turn RED.
     // MUT-BUG03-UI-SERVED-DUPLICATE: the single occurrence assertion turns RED.
   });
 });
