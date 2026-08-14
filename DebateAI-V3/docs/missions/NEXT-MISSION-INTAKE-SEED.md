@@ -1,5 +1,11 @@
 # Next-mission intake seed (H0 material) — gathered 2026-08-13/14
 
+**STATUS: DRAFT — NOT AUTHORIZED (V's order, 2026-08-14: "DO NOT use that
+seed. I need to review it and give my approval"). Nothing in this document
+may be scoped, ticketed, dispatched, or treated as mission intake until V
+explicitly approves it. It is a gathering basket awaiting V's review —
+V may strike, amend, or re-rank anything below.**
+
 V's standing direction for the mission after PROG-V3-R1, assembled from
 ledger rulings and V's steers. Nothing here is scoped or scheduled; it is
 the intake basket.
