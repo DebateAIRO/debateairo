@@ -82,6 +82,12 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       terminal_reason: null
     }).state).toBe("QUEUED");
     expect(RunProjectionSchema.parse({
+      run_ref: "run:settled",
+      question_line: "Messi or Ronaldo?",
+      state: "SETTLED",
+      terminal_reason: null
+    }).state).toBe("SETTLED"); // MUT-BUG02-SETTLED-TYPE: remove SETTLED from the wire vocabulary -> RED.
+    expect(RunProjectionSchema.parse({
       run_ref: "run:failed",
       question_line: "Messi or Ronaldo?",
       state: "FAILED",

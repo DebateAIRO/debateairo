@@ -449,6 +449,7 @@ export function liveDebateDetail(runId: string, tree: DebateNode): DebateDetail 
 /** V2's generating card, backed only by the asker-owned typed run projection. */
 export function debateDetailFromRunProjection(run: RunProjection): DebateDetail {
   const status = run.state === "FAILED" ? "failed" : "generating";
+  const presentedState = run.state === "CLAIMED" ? "RUNNING" : run.state;
   return { ...liveDebateDetail(run.run_ref, {
     id: run.run_ref,
     debate_id: run.run_ref,
@@ -464,7 +465,7 @@ export function debateDetailFromRunProjection(run: RunProjection): DebateDetail 
     active_generation_id: null,
     active_generation: null,
     children: []
-  }), run_state: run.state };
+  }), run_state: presentedState };
 }
 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {

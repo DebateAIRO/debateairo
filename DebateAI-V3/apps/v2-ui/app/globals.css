@@ -1326,6 +1326,10 @@ a:focus-visible {
   border-radius: 3px;
   transition: width 0.4s ease;
 }
+.progressFillIndeterminate {
+  width: 100%;
+  background: linear-gradient(to right, oklch(0.62 0.09 165), oklch(0.72 0.08 105), oklch(0.62 0.09 165));
+}
 .progressCount {
   font-family: var(--font-mono);
   font-size: 10.5px;

@@ -3,7 +3,8 @@ import {
   createContractClient,
   type Answer,
   type AskRequest,
-  type ContractClient
+  type ContractClient,
+  type RunProjection
 } from "@debateai/contract";
 import type {
   DebateAdaptiveDepthApprovalRequest,
@@ -19,6 +20,7 @@ import type {
 import {
   adaptiveDepthUnavailable,
   debateDetailFromAnswer,
+  debateDetailFromRunProjection,
   scoringUnavailable,
   settingsViewFromDeployment,
   runCostEnvelopeFromDeployment,
@@ -133,25 +135,57 @@ export async function validateUserToken(token: string, client: ContractClient = 
   await client.readSession(token);
 }
 
-export type DebateBundle = { answer: Answer; detail: DebateDetail };
+export type DebateBundle =
+  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null }
+  | { kind: "loading"; answer: null; detail: DebateDetail; run: RunProjection }
+  | { kind: "failed"; answer: null; detail: DebateDetail; run: RunProjection };
+
+export type DebateBundleReadOptions = Readonly<{
+  /** A terminal stream event says an answer may already exist even if the run projection lags. */
+  answerExpected?: boolean;
+  /** A served answer already rendered by SSR is authoritative over a lagging projection. */
+  currentAnswer?: Answer | null;
+}>;
+
+function servedDebateBundle(answer: Answer): DebateBundle {
+  return { kind: "served", answer, detail: debateDetailFromAnswer(answer), run: null };
+}
 
 /**
- * Reads a debate by answer id, falling back to the run projection so both
- * /debate/{answer_id} and /debate/{run_ref} routes resolve (S14 pattern).
+ * Reads the run projection first so an ask redirect does not poll two
+ * deliberately absent answer resources while generation is in flight.
+ * Answer ids remain supported through one run miss followed by readAnswer.
  */
 export async function getDebateBundle(
   id: string,
   token: string,
-  client: ContractClient = contractClient
+  client: ContractClient = contractClient,
+  options: DebateBundleReadOptions = {}
 ): Promise<DebateBundle> {
-  let answer: Answer;
+  let run: RunProjection | null = null;
   try {
-    answer = await client.readAnswer(id, token);
+    run = await client.readRun(id, token);
   } catch (failure) {
     if (!isNotFound(failure)) throw failure;
-    answer = await client.readRunAnswer(id, token);
   }
-  return { answer, detail: debateDetailFromAnswer(answer) };
+  if (run !== null) {
+    if (run.state === "SETTLED" || options.answerExpected) {
+      try {
+        return servedDebateBundle(await client.readRunAnswer(id, token));
+      } catch (failure) {
+        // The projection and answer are committed by separate bounded writes.
+        // Treat a momentary answer miss as finalizing, never as a user error.
+        if (!isNotFound(failure)) throw failure;
+        if (options.currentAnswer) return servedDebateBundle(options.currentAnswer);
+      }
+    }
+    if (options.currentAnswer) return servedDebateBundle(options.currentAnswer);
+    if (run.state === "FAILED") {
+      return { kind: "failed", answer: null, detail: debateDetailFromRunProjection(run), run };
+    }
+    return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run), run };
+  }
+  return servedDebateBundle(await client.readAnswer(id, token));
 }
 
 export async function getDebate(id: string, client: ContractClient = contractClient): Promise<DebateDetail> {

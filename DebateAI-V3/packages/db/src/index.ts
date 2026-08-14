@@ -225,7 +225,7 @@ export interface CurrentRunState {
 export interface RunLoadingProjection {
   readonly runRef: string;
   readonly questionLine: string;
-  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "FAILED";
+  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "SETTLED" | "FAILED";
   readonly terminalReason: string | null;
 }
 
@@ -319,10 +319,11 @@ export class RunRepository {
     }>(
       `SELECT run.run_id, run.question_line,
          CASE
+           WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
-           WHEN bool_or(work.state = 'CLAIMED') THEN 'CLAIMED'
+           WHEN bool_or(work.state = 'CLAIMED') THEN 'RUNNING'
            WHEN bool_or(work.state = 'READY') THEN 'QUEUED'
-           ELSE 'RUNNING'
+           ELSE 'SETTLED'
          END AS state,
          (array_agg(work.terminal_reason ORDER BY work.created_at_seq DESC)
            FILTER (WHERE work.state = 'FAILED'))[1] AS terminal_reason

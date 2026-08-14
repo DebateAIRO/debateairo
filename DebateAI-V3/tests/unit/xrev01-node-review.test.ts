@@ -24,13 +24,15 @@ describe("XREV-01 cross-maker node review", () => {
     );
   });
 
-  it("refuses DR-165's unratified depth-3+ coverage before serving unreviewed opinions", () => {
+  it("carries DR-172's ratified depths 1..5 and refuses beyond the ratified table", () => {
+    // Kills: reverting the guard to the pre-DR-172 depth>2 placeholder
+    // (3/4/5 would throw); deleting the guard entirely (6 would pass).
     expect(() => assertReviewCoverageEnvelopeRatified(1)).not.toThrow();
     expect(() => assertReviewCoverageEnvelopeRatified(2)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(3)).toThrowError(expect.objectContaining({
-      code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
-    }));
-    expect(() => assertReviewCoverageEnvelopeRatified(5)).toThrowError(expect.objectContaining({
+    expect(() => assertReviewCoverageEnvelopeRatified(3)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(4)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(5)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(6)).toThrowError(expect.objectContaining({
       code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
     }));
   });

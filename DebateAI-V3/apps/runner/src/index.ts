@@ -112,13 +112,15 @@ export function selectDifferentMakerReviewer<T extends { readonly maker: string 
 }
 
 export function assertReviewCoverageEnvelopeRatified(depth: number): void {
-  // DR-165(3) explicitly rules current total-review coverage for depths 1–2
-  // and says the 114-attempt depth-3 member cannot carry it. Larger members
-  // remain V's to ratify; the worker must not derive replacement ceilings.
-  if (depth > 2) {
+  // DR-172 ratifies envelope Set A (60/108/204/396/780), sized by XREV-01's
+  // audited arithmetic to carry TOTAL cross-maker review coverage (DR-165(3))
+  // at depths 1..5. The pre-ratification depth>2 refusal is retired by that
+  // ruling. Depths beyond the ratified table remain a typed refusal — no
+  // member exists to carry their coverage, and no ceiling may be derived.
+  if (depth > 5) {
     throw new TypedDomainError(
       "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED",
-      `DR-165(3): total cross-maker review coverage is not ratified at depth ${depth}`
+      `DR-172: total cross-maker review coverage is ratified for depths 1..5; depth ${depth} has no ratified member`
     );
   }
 }

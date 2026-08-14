@@ -275,6 +275,77 @@ describe("BUG-01 content-rejection retry accounting", () => {
 });
 
 describe("LOAD-01 run projection ownership boundary", () => {
+  it("projects a freshly accepted zero-work-item run as QUEUED", async () => {
+    const askerId = `asker:bug02-zero:${randomUUID()}`;
+    const runId = await createRun("bug02-zero-work-items", 10, 1, 1, askerId);
+    await expect(new RunRepository(database.pool).readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "QUEUED"
+    }); // MUT-BUG02-B8-ZERO-WORK-ELSE: report a fresh run as RUNNING -> RED.
+  });
+
+  it("projects a claimed work item as RUNNING and an all-DONE run as SETTLED", async () => {
+    const askerId = `asker:bug02:${randomUUID()}`;
+    const runId = await createRun("bug02-honest-loading-state", 10, 1, 1, askerId);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:Q1`
+    });
+    const repository = new RunRepository(database.pool);
+
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug02', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [workItemId]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "RUNNING"
+    }); // MUT-BUG02-CLAIMED-CASE: return CLAIMED for an executing item -> RED.
+
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'DONE', claimed_by = NULL, claim_deadline = NULL
+       WHERE work_item_id = $1`,
+      [workItemId]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "SETTLED"
+    }); // MUT-BUG02-SETTLED-INTEGRATION: fall through to eternal RUNNING -> RED.
+  });
+
+  it("prioritizes FAILED, CLAIMED and READY behavior before the all-DONE terminal arm", async () => {
+    const askerId = `asker:bug02-priority:${randomUUID()}`;
+    const runId = await createRun("bug02-projection-priority", 10, 1, 1, askerId);
+    const work = new WorkItemRepository(database.pool);
+    const first = await work.enqueue({
+      runId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:priority:1`
+    });
+    const second = await work.enqueue({
+      runId,
+      batteryRowId: "Q2",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:priority:2`
+    });
+    const repository = new RunRepository(database.pool);
+
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "QUEUED" });
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug02', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [first]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "RUNNING" });
+    await work.recordTerminalFailure({ runId, workItemId: second, reason: "TEST_LAYER:BUG02_FAILED_PRIORITY" });
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "FAILED" });
+    // MUT-BUG02-PROJECTION-ARM-ORDER: weaken any earlier arm or settle mixed states -> RED.
+  });
+
   it("returns 401 to anonymous callers and 404 to a foreign asker", async () => {
     const ownerToken = "load01-owner-token";
     const ownerAskerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
@@ -981,16 +1052,19 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
-  it("refuses depth-3 M=2 review coverage before persisting any model call", async () => {
+  it("refuses beyond-max depth-6 M=2 with RUN_DEPTH_PARAMS_INVALID before persisting any model call", async () => {
+    // DR-172 ratifies coverage for depths 1..5, so DR-157's depth bound is
+    // now the first guard a beyond-table depth meets; the load-bearing
+    // property stays: typed refusal, zero spend.
     const primary = await startProviderDouble([]);
     const secondary = await startProviderDouble([]);
     try {
-      const runId = await createRun("xrev-01-depth-3-envelope-refusal", 114, 2, 3);
+      const runId = await createRun("xrev-01-depth-6-envelope-refusal", 204, 2, 6);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
         nodeSet: [],
-        commandKey: "runner-test:xrev-01-depth-3-envelope-refusal"
+        commandKey: "runner-test:xrev-01-depth-6-envelope-refusal"
       });
       const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
         endpoint: primary.endpoint,
@@ -1012,7 +1086,7 @@ describe("apps/runner — legal command lifecycle", () => {
       });
 
       await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
-        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+        code: "RUN_DEPTH_PARAMS_INVALID"
       });
       expect(primary.calls()).toBe(0);
       expect(secondary.calls()).toBe(0);
@@ -1030,16 +1104,16 @@ describe("apps/runner — legal command lifecycle", () => {
   it("calls the depth guard for a mono-maker run before persisting any model call", async () => {
     const provider = await startProviderDouble([]);
     try {
-      const runId = await createRun("xrev-01-depth-5-mono-envelope-refusal", 402, 1, 5);
+      const runId = await createRun("xrev-01-depth-6-mono-envelope-refusal", 780, 1, 6);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
         nodeSet: [],
-        commandKey: "runner-test:xrev-01-depth-5-mono-envelope-refusal"
+        commandKey: "runner-test:xrev-01-depth-6-mono-envelope-refusal"
       });
 
       await expect(runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId)).rejects.toMatchObject({
-        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+        code: "RUN_DEPTH_PARAMS_INVALID"
       });
       expect(provider.calls()).toBe(0);
       const calls = await database.pool.query<{ count: string }>(

@@ -23,6 +23,7 @@ export function statusLabel(status: string): string {
   if (s === "queued") return "Queued";
   if (s === "claimed") return "Claimed";
   if (s === "running") return "Running";
+  if (s === "settled") return "Settled";
   if (s === "generating" || s === "in_progress" || s === "pending") return "Generating";
   if (s === "failed" || s === "error") return "Failed";
   if (s === "draft") return "Draft";

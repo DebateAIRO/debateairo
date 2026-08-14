@@ -1264,3 +1264,23 @@ supersedes | status`.
   refuse-before-spend, per-call-site 3 attempts) stands. | V ruled the
   waiting finishing-packet §2 table after hitting the refusal live | depth
   3-5 unlock | — | ACTIVE
+
+| DR-172-A | 2026-08-14 | Orchestrator (V's small-ticket grant), on V hitting
+  the refusal live after ratification | **AMENDMENT — THE COVERAGE GUARD IS
+  SYNCED TO DR-172.** XREV-01's assertReviewCoverageEnvelopeRatified was a
+  hardcoded pre-ratification placeholder (`depth > 2` throw, comment:
+  larger members remain V's to ratify) that never read the register — so
+  DR-172's seed change alone could not unlock depth 3+, and V's first
+  post-ratification depth-5 ask was refused. Fix: the guard now carries the
+  ratified table (depths 1..5 pass; beyond stays the typed refusal, also
+  unreachable in production because DR-157's RUN_DEPTH_PARAMS_INVALID bound
+  fires first). Tests re-pinned: unit test kills the revert-to-placeholder
+  and delete-the-guard mutations; the two integration refusal scenarios
+  move to depth 6 and pin the TRUE first guard (RUN_DEPTH_PARAMS_INVALID,
+  zero spend). ORCHESTRATOR CONFESSION for the record: the 2026-08-13
+  "depth-5 unlock probe" proved nothing — its agent_count-3 poison died at
+  the maker guard, which fires BEFORE coverage, making the probe a check
+  that could not fail for its believed reason (F1, the retrospective's own
+  defect class, in the orchestrator's verification). Takes effect at the
+  next stack boot. | V's depth-5 ask refused after ratification | depth 3-5
+  unlock, for real | — | ACTIVE

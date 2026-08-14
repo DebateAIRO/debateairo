@@ -701,7 +701,7 @@ export type DebateDetail = {
   topic: string;
   status: string;
   /** Ask-run lifecycle truth while no served answer exists. */
-  run_state?: "QUEUED" | "CLAIMED" | "RUNNING" | "FAILED";
+  run_state?: "QUEUED" | "CLAIMED" | "RUNNING" | "SETTLED" | "FAILED";
   config: DebateConfig;
   direct_answer: null;
   root_node_id: string | null;

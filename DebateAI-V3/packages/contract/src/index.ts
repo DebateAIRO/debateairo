@@ -131,7 +131,7 @@ export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "FAILED"]),
+  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
