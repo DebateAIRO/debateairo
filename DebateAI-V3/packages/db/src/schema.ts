@@ -7,6 +7,7 @@ export const scorecard = pgSchema("scorecard");
 export const register = pgSchema("register");
 export const memory = pgSchema("memory");
 export const evidence = pgSchema("evidence");
+export const evaluator = pgSchema("evaluator");
 
 export const run = core.table("run", {
   runId: uuid("run_id").primaryKey(),
@@ -738,4 +739,229 @@ export const memoryCandidateRecord = memory.table("candidate_record", {
   atSeq: bigint("at_seq", { mode: "number" }).notNull()
 });
 
-void [scorecard, memory];
+export const evaluatorDomain = evaluator.table("domain", {
+  domainId: uuid("domain_id").primaryKey(),
+  canonicalName: text("canonical_name").notNull(),
+  normalizedName: text("normalized_name").notNull(),
+  origin: text("origin").notNull(),
+  proposedByProvider: text("proposed_by_provider"),
+  proposedByModelId: text("proposed_by_model_id"),
+  proposedByModelVersion: text("proposed_by_model_version"),
+  proposalRawArtifactRef: uuid("proposal_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  sourceRunId: uuid("source_run_id").references(() => run.runId),
+  guardrailVersion: bigint("guardrail_version", { mode: "number" }).notNull(),
+  provenanceRef: text("provenance_ref").notNull(),
+  admittedAt: timestamp("admitted_at", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorDomainAdmission = evaluator.table("domain_admission", {
+  domainAdmissionId: uuid("domain_admission_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  proposedName: text("proposed_name").notNull(),
+  normalizedName: text("normalized_name").notNull(),
+  decision: text("decision").notNull(),
+  domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
+  candidateSimilarities: jsonb("candidate_similarities").notNull(),
+  guardrailVersion: bigint("guardrail_version", { mode: "number" }).notNull(),
+  taggerRawArtifactRef: uuid("tagger_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  reason: text("reason").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorQuestionDomain = evaluator.table("question_domain", {
+  questionDomainId: uuid("question_domain_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  domainId: uuid("domain_id").notNull().references(() => evaluatorDomain.domainId),
+  assignmentBasis: text("assignment_basis").notNull(),
+  domainAdmissionId: uuid("domain_admission_id").notNull()
+    .references(() => evaluatorDomainAdmission.domainAdmissionId),
+  taggerRawArtifactRef: uuid("tagger_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorPipelineEvent = evaluator.table("pipeline_event", {
+  pipelineEventId: uuid("pipeline_event_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  pipeline: text("pipeline").notNull(),
+  pipelineVersion: bigint("pipeline_version", { mode: "number" }).notNull(),
+  attemptId: uuid("attempt_id").notNull(),
+  state: text("state").notNull(),
+  reason: text("reason").notNull(),
+  inputHash: text("input_hash").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorObservation = evaluator.table("observation", {
+  observationId: uuid("observation_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  modelVersion: text("model_version").notNull(),
+  domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
+  step: text("step").notNull(),
+  metric: text("metric").notNull(),
+  value: doublePrecision("value"),
+  outcomeJson: jsonb("outcome_json"),
+  truthBasis: text("truth_basis").notNull(),
+  sourceKind: text("source_kind").notNull(),
+  sourceRef: text("source_ref").notNull(),
+  sourceRawArtifactRef: uuid("source_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  answerOutcomeId: uuid("answer_outcome_id").references(() => answerOutcome.answerOutcomeId),
+  gradedRawArtifactRef: uuid("graded_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  graderRawArtifactRef: uuid("grader_raw_artifact_ref").references(() => rawArtifact.rawArtifactId),
+  derivationVersion: bigint("derivation_version", { mode: "number" }).notNull(),
+  supersedesObservationId: uuid("supersedes_observation_id"),
+  provenanceJson: jsonb("provenance_json").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorProfileCell = evaluator.table("profile_cell", {
+  profileCellId: uuid("profile_cell_id").primaryKey(),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  modelVersion: text("model_version").notNull(),
+  domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
+  step: text("step").notNull(),
+  metric: text("metric").notNull(),
+  asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+  value: doublePrecision("value"),
+  n: integer("n").notNull(),
+  intervalLower: doublePrecision("interval_lower"),
+  intervalUpper: doublePrecision("interval_upper"),
+  consensusCount: integer("consensus_count").notNull(),
+  settlementCount: integer("settlement_count").notNull(),
+  addonCount: integer("addon_count").notNull(),
+  basis: text("basis").notNull(),
+  derivationVersion: bigint("derivation_version", { mode: "number" }).notNull(),
+  derivationInput: jsonb("derivation_input").notNull(),
+  derivationHash: text("derivation_hash").notNull(),
+  strategyRowKey: text("strategy_row_key").notNull(),
+  strategyRegisterVersion: bigint("strategy_register_version", { mode: "number" }).notNull(),
+  strategySourceRef: text("strategy_source_ref").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorRankSnapshot = evaluator.table("rank_snapshot", {
+  rankSnapshotId: uuid("rank_snapshot_id").primaryKey(),
+  rankKind: text("rank_kind").notNull(),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  modelVersion: text("model_version").notNull(),
+  domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
+  step: text("step").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  score: doublePrecision("score").notNull(),
+  n: integer("n").notNull(),
+  intervalLower: doublePrecision("interval_lower"),
+  intervalUpper: doublePrecision("interval_upper"),
+  sourceProfileCellIds: jsonb("source_profile_cell_ids").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  derivationVersion: bigint("derivation_version", { mode: "number" }).notNull(),
+  asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorModelCallUsage = evaluator.table("model_call_usage", {
+  modelCallUsageId: uuid("model_call_usage_id").primaryKey(),
+  ledgerEntryId: uuid("ledger_entry_id").notNull().references(() => ledgerEntry.ledgerEntryId),
+  rawArtifactId: uuid("raw_artifact_id").references(() => rawArtifact.rawArtifactId),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  modelVersion: text("model_version").notNull(),
+  callSiteKey: text("call_site_key").notNull(),
+  runtimeClass: text("runtime_class").notNull(),
+  meteringStatus: text("metering_status").notNull(),
+  promptTokens: bigint("prompt_tokens", { mode: "number" }),
+  completionTokens: bigint("completion_tokens", { mode: "number" }),
+  totalTokens: bigint("total_tokens", { mode: "number" }),
+  reportedVendorAmount: doublePrecision("reported_vendor_amount"),
+  reportedVendorUnit: text("reported_vendor_unit"),
+  rawUsage: jsonb("raw_usage"),
+  captureVersion: bigint("capture_version", { mode: "number" }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorRelativeCostCell = evaluator.table("relative_cost_cell", {
+  relativeCostCellId: uuid("relative_cost_cell_id").primaryKey(),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  modelVersion: text("model_version").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+  relativeCost: doublePrecision("relative_cost"),
+  comparability: text("comparability").notNull(),
+  meteredCallCount: integer("metered_call_count").notNull(),
+  unmeteredCallCount: integer("unmetered_call_count").notNull(),
+  sourceUnitTotals: jsonb("source_unit_totals").notNull(),
+  normalizationBasis: text("normalization_basis").notNull(),
+  derivationVersion: bigint("derivation_version", { mode: "number" }).notNull(),
+  derivationInput: jsonb("derivation_input").notNull(),
+  derivationHash: text("derivation_hash").notNull(),
+  asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorShadowDecision = evaluator.table("shadow_decision", {
+  shadowDecisionId: uuid("shadow_decision_id").primaryKey(),
+  runId: uuid("run_id").references(() => run.runId),
+  kind: text("kind").notNull(),
+  inputJson: jsonb("input_json").notNull(),
+  inputHash: text("input_hash").notNull(),
+  outputJson: jsonb("output_json").notNull(),
+  bindingState: text("binding_state").notNull(),
+  formulaVersion: bigint("formula_version", { mode: "number" }).notNull(),
+  notConsumedReason: text("not_consumed_reason").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorVllmProbe = evaluator.table("vllm_probe", {
+  vllmProbeId: uuid("vllm_probe_id").primaryKey(),
+  providerRef: text("provider_ref").notNull(),
+  state: text("state").notNull(),
+  failureCode: text("failure_code"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorVllmCatalogModel = evaluator.table("vllm_catalog_model", {
+  vllmProbeId: uuid("vllm_probe_id").notNull().references(() => evaluatorVllmProbe.vllmProbeId),
+  modelId: text("model_id").notNull(),
+  metadataJson: jsonb("metadata_json").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorConsumerSelection = evaluator.table("consumer_selection", {
+  consumerSelectionId: uuid("consumer_selection_id").primaryKey(),
+  vllmProbeId: uuid("vllm_probe_id").notNull(),
+  modelId: text("model_id").notNull(),
+  selectedBy: text("selected_by").notNull(),
+  orderRef: text("order_ref").notNull(),
+  supersedesSelectionId: uuid("supersedes_selection_id"),
+  selectedAt: timestamp("selected_at", { withTimezone: true }).notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+export const evaluatorConsumerOutput = evaluator.table("consumer_output", {
+  consumerOutputId: uuid("consumer_output_id").primaryKey(),
+  consumerSelectionId: uuid("consumer_selection_id").notNull()
+    .references(() => evaluatorConsumerSelection.consumerSelectionId),
+  targetProvider: text("target_provider").notNull(),
+  targetModelId: text("target_model_id").notNull(),
+  targetModelVersion: text("target_model_version").notNull(),
+  domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
+  promptVersion: bigint("prompt_version", { mode: "number" }).notNull(),
+  aggregateSnapshotHash: text("aggregate_snapshot_hash").notNull(),
+  aggregateRefs: jsonb("aggregate_refs").notNull(),
+  blindedSampleRefs: jsonb("blinded_sample_refs").notNull(),
+  summary: text("summary").notNull(),
+  adjacentDomainFlags: jsonb("adjacent_domain_flags").notNull(),
+  generatedRawArtifactRef: uuid("generated_raw_artifact_ref").notNull()
+    .references(() => rawArtifact.rawArtifactId),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+});
+
+void [scorecard, memory, evaluator];
