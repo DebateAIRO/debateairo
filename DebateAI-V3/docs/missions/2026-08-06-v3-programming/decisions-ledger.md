@@ -1284,3 +1284,31 @@ supersedes | status`.
   defect class, in the orchestrator's verification). Takes effect at the
   next stack boot. | V's depth-5 ask refused after ratification | depth 3-5
   unlock, for real | — | ACTIVE
+
+| DR-173 | 2026-08-14 | V (deadline card: "180s") | **THE JUDGE CALL DEADLINE
+  IS 180 SECONDS PER ATTEMPT.** acceptanceOrganCostBounds.JUDGE.deadlineMs
+  moves 60_000 → 180_000. Evidence: V's first real depth-5 run (18a664d3,
+  "How do I fry scream?") died at JUDGE:critic:root0:r5:p17 after three
+  consecutive 60-second timeouts — the last SUCCESSFUL claude-relay call
+  took 50s of its 60s budget, so sustained deep-node latency was grazing
+  the ceiling until it tripped; 35 good calls of spend were lost. A truly
+  dead relay still fails within ~9 minutes (3 × 180s). COMPOSER and
+  CONFORMANCE stay at 60s (no observed pressure). Register hash changes →
+  backup-then-reseed at next boot. | one 60s-tuned bound met depth-5
+  reality | depth-5 viability | — | ACTIVE
+
+| DR-174 | 2026-08-14 | V (death-policy card: "For now, wait for 10 minutes
+  and then do Prune + Serve with marks") | **RUN DEATH POLICY — COOLDOWN,
+  FINAL RETRY, THEN PRUNE AND SERVE WITH MARKS.** Supersedes die-loud
+  (VROW-4 resolved). Orchestrator's stated reading of V's words, recorded
+  for correction: when a call site exhausts its attempt bound, the run
+  HOLDS for 10 minutes (provider recovery window), retries the site once
+  more, and only if still failing PRUNES the subtree that cannot be judged
+  and SERVES everything settled, carrying a typed honesty mark naming what
+  was pruned and why. V's no-opinion-unjudged law (DR-165(3)) holds — the
+  pruned nodes never serve. The 10-minute cooldown is V's ruled number (a
+  register row, never a literal). Implementation crosses module seams (new
+  kernel condition-mark vocabulary, runner lifecycle, serve marks) → goes
+  through the DR-171 architecture consult before any ticket. "For now"
+  noted: V may re-rule after seeing it live. | a 40-call depth-5 run died
+  to one throttled call site | run resilience | — | ACTIVE

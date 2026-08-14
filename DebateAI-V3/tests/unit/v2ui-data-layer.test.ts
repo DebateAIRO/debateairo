@@ -236,15 +236,18 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
       items: [
         {
           answer_id: "answer:fair-test",
+          run_ref: "run:fair-test",
           answer_version: 1,
           question_line: "Should the test question stand?",
           verdict_state: "CONTESTED",
           abstention: null,
           serve_state: "COMPOSED",
           staleness_state: "FRESH",
-          builds_on_previous: false
+          builds_on_previous: false,
+          created_at_sequence: 1
         }
       ],
+      open_runs: [],
       limit: 50,
       offset: 0,
       total: 1
@@ -256,7 +259,9 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
       status: "complete",
       created_at: "",
       completed_at: null,
-      models: []
+      models: [],
+      created_at_sequence: 1,
+      terminal_reason: null
     });
   });
 

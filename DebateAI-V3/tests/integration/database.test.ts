@@ -399,6 +399,84 @@ describe("LOAD-01 run projection ownership boundary", () => {
   });
 });
 
+describe("BUG-03 asker-scoped debates index", () => {
+  it("lists open owner runs honestly and excludes foreign or already-served runs", async () => {
+    const servedQuestion = `bug03-served-${randomUUID()}`;
+    const ownerAskerId = `asker:${servedQuestion}`;
+    const servedWork = await createRunnerWork(servedQuestion);
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A served test-layer answer.", way_of_knowing: "REASONING",
+        locator: null, restatement_text: "A served test-layer answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A served test-layer answer.", fidelity: 0.72 }, critic: { summary: "A test-layer counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A served test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    try {
+      const served = await runnerWithEndpoint(provider.endpoint).executeWorkItem(servedWork.workItemId);
+      if (served.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      const runningRunId = await createRun(`bug03-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId: runningRunId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `bug03:${runningRunId}:running`
+      });
+      await database.pool.query(
+        `UPDATE core.work_item
+         SET state = 'CLAIMED', claimed_by = 'worker:bug03', claim_deadline = clock_timestamp() + interval '1 hour'
+         WHERE work_item_id = $1`,
+        [runningWorkItemId]
+      );
+
+      const failedRunId = await createRun(`bug03-failed-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const failedWork = new WorkItemRepository(database.pool);
+      const failedWorkItemId = await failedWork.enqueue({
+        runId: failedRunId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `bug03:${failedRunId}:failed`
+      });
+      await failedWork.recordTerminalFailure({
+        runId: failedRunId,
+        workItemId: failedWorkItemId,
+        reason: "TEST_LAYER:BUG03_TERMINAL_FAILURE"
+      });
+
+      const foreignRunId = await createRun(`bug03-foreign-${randomUUID()}`, 10, 1, 1, `asker:foreign:${randomUUID()}`);
+      const index = await new ServeRepository(database.pool).readAnswerIndex(ownerAskerId, 10, 0);
+
+      expect(index.total).toBe(3);
+      expect(index.items).toEqual([
+        expect.objectContaining({ answer_id: served.answerId, run_ref: servedWork.runId })
+      ]);
+      expect(index.open_runs).toEqual([
+        expect.objectContaining({
+          run_ref: failedRunId,
+          state: "FAILED",
+          terminal_reason: "TEST_LAYER:BUG03_TERMINAL_FAILURE"
+        }),
+        expect.objectContaining({ run_ref: runningRunId, state: "RUNNING", terminal_reason: null })
+      ]);
+      expect(index.open_runs.map((run) => run.run_ref)).not.toContain(foreignRunId);
+      expect(index.open_runs.map((run) => run.run_ref)).not.toContain(servedWork.runId);
+      expect(index.items.length + index.open_runs.length).toBeLessThanOrEqual(index.limit);
+      // MUT-BUG03-DROP-OPEN-READ: remove the open-run projection -> RED.
+      // MUT-BUG03-FOREIGN-LEAK: remove asker_id from the open arm -> RED.
+      // MUT-BUG03-SERVED-DUPLICATE: remove NOT EXISTS serve.answer -> RED.
+      // MUT-BUG03-FAILED-REASON: erase terminal_reason -> RED.
+    } finally {
+      await provider.stop();
+    }
+  });
+});
+
 describe("S07 / FX-LED-06 / FX-LG-17 / FX-LG-18 — SPLIT persistence and terminality", () => {
   it("records replay identity exclusions and only lets a categorical decision spawn an atomic placeholder", async () => {
     const runId = await createRun("s07-categorical-spawn");

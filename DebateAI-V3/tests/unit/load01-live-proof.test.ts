@@ -39,7 +39,7 @@ function providerDoubleApplication(): AskApplication {
     readRun: async (runId) => runs.get(runId) ?? null,
     readAnswer: async () => null,
     readRunAnswer: async () => null,
-    readAnswerIndex: async (_session, limit, offset) => ({ items: [], limit, offset, total: 0 }),
+    readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
     readInspection: async () => null,
     readLedgerDigest: async () => null,
     readNode: async () => null,

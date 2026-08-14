@@ -259,16 +259,33 @@ export const AbstentionSchema = z.object({
 
 export const AnswerSummarySchema = z.object({
   answer_id: z.string().min(1),
+  run_ref: z.string().min(1),
   answer_version: z.number().int().positive(),
   question_line: z.string().min(1),
   verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
   abstention: AbstentionSchema.nullable(),
   serve_state: z.enum(["COMPOSED", "RECOMPOSED_ONCE", "COMPONENTS_ONLY"]),
   staleness_state: StalenessStateSchema,
-  builds_on_previous: z.boolean()
+  builds_on_previous: z.boolean(),
+  created_at_sequence: z.number().int().positive()
 }).strict();
+export const OpenRunSummarySchema = z.object({
+  run_ref: z.string().min(1),
+  question_line: z.string().trim().min(1),
+  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "SETTLED", "FAILED"]),
+  terminal_reason: z.string().trim().min(1).nullable(),
+  created_at_sequence: z.number().int().positive()
+}).strict().superRefine((run, context) => {
+  if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
+    context.addIssue({
+      code: "custom",
+      message: "FAILED requires a terminal reason and non-failed runs forbid one"
+    });
+  }
+});
 export const AnswerIndexSchema = z.object({
   items: z.array(AnswerSummarySchema),
+  open_runs: z.array(OpenRunSummarySchema),
   limit: z.number().int().positive(),
   offset: z.number().int().nonnegative(),
   total: z.number().int().nonnegative()
@@ -469,7 +486,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, AnswerIndexSchema,
+    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

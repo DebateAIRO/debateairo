@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import { allocateSequence, RunRepository, withWriteTransaction } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -1327,33 +1327,75 @@ export class ServeRepository {
     if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
       throw new TypedDomainError("ANSWER_INDEX_PAGE_INVALID", "An explicit positive limit and nonnegative offset are required");
     }
-    const [ids, count] = await Promise.all([
-      this.pool.query<{ answer_id: string }>(
-        `SELECT answer.answer_id
-         FROM serve.answer AS answer
-         JOIN core.run AS run ON run.run_id=answer.run_id
-         WHERE run.asker_id=$1
-         GROUP BY answer.answer_id
-         ORDER BY max(answer.sealed_at_seq) DESC
+    const [page, count] = await Promise.all([
+      this.pool.query<{
+        kind: "ANSWER" | "OPEN_RUN";
+        answer_id: string | null;
+        run_ref: string;
+        question_line: string;
+        created_at_sequence: string;
+      }>(
+        `WITH served AS (
+           SELECT DISTINCT ON (run.run_id)
+             'ANSWER'::text AS kind,
+             answer.answer_id,
+             run.run_id AS run_ref,
+             run.question_line,
+             run.created_at_seq AS created_at_sequence
+           FROM core.run AS run
+           JOIN serve.answer AS answer ON answer.run_id = run.run_id
+           WHERE run.asker_id = $1
+           ORDER BY run.run_id, answer.sealed_at_seq DESC
+         ), open_run AS (
+           SELECT
+             'OPEN_RUN'::text AS kind,
+             NULL::uuid AS answer_id,
+             run.run_id AS run_ref,
+             run.question_line,
+             run.created_at_seq AS created_at_sequence
+           FROM core.run AS run
+           WHERE run.asker_id = $1
+             AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
+         )
+         SELECT kind, answer_id, run_ref, question_line, created_at_sequence
+         FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
+         ORDER BY created_at_sequence DESC
          LIMIT $2 OFFSET $3`, [askerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(DISTINCT answer.answer_id)::text AS count
-         FROM serve.answer AS answer JOIN core.run AS run ON run.run_id=answer.run_id
-         WHERE run.asker_id=$1`, [askerId]
+        `SELECT count(*)::text AS count FROM core.run WHERE asker_id=$1`, [askerId]
       )
     ]);
-    const answers = await Promise.all(ids.rows.map((row) => this.readAnswerProjection(row.answer_id, askerId)));
+    const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
+    const answers = await Promise.all(answerRows.map(async (row) => ({
+      row,
+      answer: await this.readAnswerProjection(row.answer_id, askerId)
+    })));
+    const runRepository = new RunRepository(this.pool);
+    const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
+    const openRuns = await Promise.all(openRows.map(async (row) => ({
+      row,
+      projection: await runRepository.readLoadingProjection(row.run_ref, askerId)
+    })));
     return AnswerIndexSchema.parse({
-      items: answers.flatMap((answer) => answer === null ? [] : [{
+      items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
         answer_id: answer.answer_id,
+        run_ref: answer.run_ref,
         answer_version: answer.answer_version,
         question_line: answer.question_line,
         verdict_state: answer.verdict_state,
         abstention: answer.abstention,
         serve_state: answer.serve_state,
         staleness_state: answer.staleness_state,
-        builds_on_previous: answer.builds_on_previous.value
+        builds_on_previous: answer.builds_on_previous.value,
+        created_at_sequence: Number(row.created_at_sequence)
+      }]),
+      open_runs: openRuns.flatMap(({ row, projection }) => projection === null ? [] : [{
+        run_ref: projection.runRef,
+        question_line: projection.questionLine,
+        state: projection.state,
+        terminal_reason: projection.terminalReason,
+        created_at_sequence: Number(row.created_at_sequence)
       }]),
       limit,
       offset,

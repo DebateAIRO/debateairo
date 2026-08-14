@@ -162,7 +162,7 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       value: {
         kind: "ACCEPTANCE_ORGAN_COST_BOUNDS",
         organs: {
-          JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 },
+          JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 },
           COMPOSER: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 },
           CONFORMANCE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 }
         }

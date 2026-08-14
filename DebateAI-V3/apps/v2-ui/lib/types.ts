@@ -5,6 +5,8 @@ export type DebateSummary = {
   created_at: string;
   completed_at: string | null;
   models: string[];
+  created_at_sequence?: number;
+  terminal_reason?: string | null;
 };
 
 export type Generation = {

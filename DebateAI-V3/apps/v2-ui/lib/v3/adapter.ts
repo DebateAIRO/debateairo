@@ -469,17 +469,31 @@ export function debateDetailFromRunProjection(run: RunProjection): DebateDetail 
 }
 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
-  // Every index row is a served answer projection, so its V2 status is
-  // "complete"; timestamps and maker lineage are not part of the index
-  // contract — typed absence, rendered by the cards' own empty states.
-  return index.items.map((item) => ({
+  const servedRunRefs = new Set(index.items.map((item) => item.run_ref));
+  const served = index.items.map((item) => ({
     id: item.answer_id,
     topic: item.question_line,
     status: "complete",
     created_at: "",
     completed_at: null,
-    models: []
+    models: [],
+    created_at_sequence: item.created_at_sequence,
+    terminal_reason: null
   }));
+  const open = index.open_runs
+    .filter((run) => !servedRunRefs.has(run.run_ref))
+    .map((run) => ({
+      id: run.run_ref,
+      topic: run.question_line,
+      status: run.state === "FAILED" ? "failed" : "generating",
+      created_at: "",
+      completed_at: null,
+      models: [],
+      created_at_sequence: run.created_at_sequence,
+      terminal_reason: run.terminal_reason
+    }));
+  return [...served, ...open]
+    .sort((left, right) => right.created_at_sequence - left.created_at_sequence);
 }
 
 /**
