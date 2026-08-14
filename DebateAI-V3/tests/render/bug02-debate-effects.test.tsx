@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   emit: null as null | ((event: RunEvent) => void),
   streamEvents: vi.fn(),
   readEvents: vi.fn(),
+  readDeployment: vi.fn(),
   readLedgerDigest: vi.fn()
 }));
 
@@ -31,6 +32,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     contractClient: {
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,
+      readDeployment: mocks.readDeployment,
       readLedgerDigest: mocks.readLedgerDigest
     },
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
@@ -55,7 +57,8 @@ const runningRun = {
   run_ref: "run:fair-test",
   question_line: answer.question_line,
   state: "RUNNING" as const,
-  terminal_reason: null
+  terminal_reason: null,
+  hold_until: null
 };
 
 let root: Root | null = null;
@@ -106,6 +109,17 @@ describe("BUG-02 rendered refresh behaviour", () => {
     mocks.readRunAnswer.mockReset().mockResolvedValue(answer);
     mocks.readAnswer.mockReset();
     mocks.readEvents.mockReset().mockResolvedValue([]);
+    mocks.readDeployment.mockReset().mockResolvedValue({
+      register: {
+        register_version: 1,
+        rows: [{
+          row_key: "hiddenNodeScoreThreshold",
+          value: 0.35,
+          source_ref: "acceptance:DR-176:V-approved"
+        }]
+      },
+      scorecards: [], model_ledger: [], fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+    });
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef, _token, emit: (event: RunEvent) => void) => {
       mocks.emit = emit;
@@ -151,7 +165,8 @@ describe("BUG-02 rendered refresh behaviour", () => {
     mocks.readRun.mockResolvedValue({
       ...runningRun,
       state: "FAILED",
-      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED",
+      hold_until: null
     });
     await mount();
     expect(document.body.textContent).toContain("Debate generation failed: TOTAL_REVIEW_COVERAGE_UNSATISFIED");

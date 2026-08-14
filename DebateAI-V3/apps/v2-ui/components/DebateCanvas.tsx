@@ -75,6 +75,7 @@ type DebateCanvasProps = CanvasCallbacks & {
    * path with no served answer yet, a Map = the served graph.
    */
   v3NodesById?: ReadonlyMap<string, ContractNode> | null;
+  lowStrengthThreshold?: number;
   meta: { claims: number; depth: number; decomposer?: string };
   canvasRef?: (el: HTMLDivElement | null) => void;
 };
@@ -88,6 +89,7 @@ export function DebateCanvas({
   scoringErrorsByNodeId,
   scoreFilterNodeIds,
   v3NodesById,
+  lowStrengthThreshold,
   meta,
   onOpenNode,
   onChallengeNode,
@@ -96,7 +98,7 @@ export function DebateCanvas({
   canvasRef
 }: DebateCanvasProps) {
   const [heights, setHeights] = useState<Record<string, number>>({});
-  const [showSetAsidePaths, setShowSetAsidePaths] = useState(true);
+  const [showSetAsidePaths, setShowSetAsidePaths] = useState(false);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const heightOf = useCallback(
@@ -175,6 +177,7 @@ export function DebateCanvas({
           scoringError={scoringErrorsByNodeId?.get(placed.id)}
           scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
           v3NodesById={v3NodesById}
+          lowStrengthThreshold={lowStrengthThreshold}
           meta={meta}
           registerRef={(el) => {
             cardRefs.current[placed.id] = el;
@@ -198,6 +201,7 @@ type CanvasCardProps = CanvasCallbacks & {
   scoringError?: NodeScoringError;
   scoreFilterMatch: boolean;
   v3NodesById?: ReadonlyMap<string, ContractNode> | null;
+  lowStrengthThreshold?: number;
   meta: { claims: number; depth: number; decomposer?: string };
   registerRef: (el: HTMLDivElement | null) => void;
 };
@@ -211,6 +215,7 @@ function CanvasCard({
   scoringError,
   scoreFilterMatch,
   v3NodesById,
+  lowStrengthThreshold,
   meta,
   registerRef,
   onOpenNode,
@@ -241,7 +246,9 @@ function CanvasCard({
   // opacity: it scales whatever the existing rules already produced, so all
   // three states keep contributing and stay distinguishable in combination,
   // and the flag-off value is preserved exactly (multiplying by 1).
-  const lowStrength = isLowStrengthNode(scoring?.scores?.strength);
+  const lowStrength = lowStrengthThreshold === undefined
+    ? false
+    : isLowStrengthNode(scoring?.scores?.strength, lowStrengthThreshold);
   const lowStrengthDim = VERDICT_FIRST_UI_ENABLED && lowStrength ? 0.7 : 1;
 
   const cardStyle: CSSProperties = {

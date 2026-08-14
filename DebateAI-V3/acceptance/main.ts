@@ -8,7 +8,7 @@ import {
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import type { CompletionActivationResolution } from "@debateai/db";
+import { RunRepository, type CompletionActivationResolution } from "@debateai/db";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { resolveEffectiveRiskTier, resolveRunCostEnvelopeBasis } from "@debateai/register";
 import {
@@ -167,6 +167,7 @@ export async function createAcceptanceRuntime(input: {
   }
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const scoringOperator = await readOptionalScoringOperator(input.pool);
+  const runRepository = new RunRepository(input.pool);
   await readDeploymentMakerCapability(input.pool, ACCEPTANCE_REGISTER_VERSION);
   // The walking-skeleton judge/composer/conformance chain stays on the OpenAI
   // (codex) provider; FAIR-01 (DR-140(b)) adds the Anthropic relay as the
@@ -198,6 +199,26 @@ export async function createAcceptanceRuntime(input: {
     judgeBound: policy.bounds.JUDGE,
     composerBound: policy.bounds.COMPOSER,
     conformanceBound: policy.bounds.CONFORMANCE,
+    runDeathPolicy: policy.runDeathPolicy,
+    hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
+    holdRecorder: {
+      countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
+      record: (event) => runRepository.recordRunLifecycleEvent({
+        runId: event.runId,
+        kind: event.kind,
+        value: {
+          state: event.state,
+          call_site_key: event.callSiteKey,
+          parent_node_ref: event.parentNodeId,
+          hold_ms: event.holdMs,
+          hold_until: event.holdUntil,
+          attempts_spent: event.attemptsSpent,
+          transport_outcome: event.transportOutcome,
+          planned_leg_count: event.plannedLegCount
+        }
+      }),
+      wait: (cooldownMs) => new Promise((resolve) => setTimeout(resolve, cooldownMs))
+    },
     providerRef: policy.providers.openai.providerRef,
     maker: policy.providers.openai.maker,
     judgeContractHash: policy.hashes.judge,

@@ -10,8 +10,10 @@ import {
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
+  ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
+  ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF,
   ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
 } from "./seed-register.js";
 
@@ -44,6 +46,14 @@ const runtimeRowsSchema = z.object({
       max_model_attempts: z.number().int().positive()
     }).strict()).min(1)
   }).strict(),
+  runDeathPolicy: z.object({
+    kind: z.literal("RUN_DEATH_POLICY"),
+    cooldown_ms: z.number().int().positive(),
+    final_retry_attempts: z.literal(1),
+    max_cooldown_holds_per_run: z.literal(2),
+    applies_to: z.literal("TRANSPORT_EXHAUSTION")
+  }).strict(),
+  hiddenNodeScoreThreshold: z.literal(0.35),
   compositionBundleBudget: z.object({
     low: z.number().int().positive(),
     medium: z.number().int().positive(),
@@ -94,6 +104,15 @@ export interface AcceptanceRuntimePolicy {
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
   readonly bandCeiling: BandCeilingRegisterRow;
   readonly runCostEnvelopePolicy: RunCostEnvelopePolicyRow;
+  readonly runDeathPolicy: {
+    readonly cooldownMs: number;
+    readonly finalRetryAttempts: 1;
+    readonly maxCooldownHoldsPerRun: 2;
+  };
+  readonly hiddenNodeScoreThreshold: {
+    readonly value: 0.35;
+    readonly sourceRef: typeof ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
+  };
   /** FAIR-02: both configured real makers, by maker family. */
   readonly providers: {
     readonly openai: {
@@ -155,6 +174,8 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   if (result.rows.length !== keys.length) throw new Error("ACCEPTANCE_RUNTIME_POLICY_UNRESOLVED");
   const expectedSourceRef = (rowKey: string): string => {
     if (rowKey === "runCostEnvelope") return ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF;
+    if (rowKey === "runDeathPolicy") return ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF;
+    if (rowKey === "hiddenNodeScoreThreshold") return ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
     if (rowKey === "configuredProviderSet") return ACCEPTANCE_PROVIDER_SET_SOURCE_REF;
     return ACCEPTANCE_REGISTER_SOURCE_REF;
   };
@@ -189,6 +210,15 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       value: parsed.wayOfKnowingCeiling
     }),
     runCostEnvelopePolicy,
+    runDeathPolicy: Object.freeze({
+      cooldownMs: parsed.runDeathPolicy.cooldown_ms,
+      finalRetryAttempts: parsed.runDeathPolicy.final_retry_attempts,
+      maxCooldownHoldsPerRun: parsed.runDeathPolicy.max_cooldown_holds_per_run
+    }),
+    hiddenNodeScoreThreshold: Object.freeze({
+      value: parsed.hiddenNodeScoreThreshold,
+      sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
+    }),
     providers: Object.freeze({
       openai: parsed.configuredProviderSet.providers[0],
       anthropic: parsed.configuredProviderSet.providers[1]

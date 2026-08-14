@@ -472,13 +472,23 @@ export class LedgerRepository {
     readonly workItemId: string;
     readonly contractHash: string;
     readonly maxAttempts: number;
-  }): Promise<{ readonly attemptId: string; readonly artifactRef: string | null } | null> {
+  }): Promise<{
+    readonly attemptId: string;
+    readonly artifactRef: string | null;
+    readonly ledgerEntryRef: string;
+    readonly callSiteKey: string;
+    readonly outcome: "OK" | "FAILED" | "TIMED_OUT";
+  } | null> {
     const result = await this.pool.query<{
       attempt_id: string;
       raw_artifact_ref: string | null;
+      ledger_entry_id: string;
       attempt_count: string;
+      call_site_key: string;
+      outcome: "OK" | "FAILED" | "TIMED_OUT";
     }>(
-      `SELECT entry.attempt_id, entry.raw_artifact_ref, grouped.attempt_count
+      `SELECT entry.attempt_id, entry.raw_artifact_ref, entry.ledger_entry_id, entry.call_site_key,
+              entry.outcome, grouped.attempt_count
        FROM ledger.ledger_entry AS entry
        JOIN (
          SELECT call_site_key, count(*)::text AS attempt_count, max(sequence) AS last_sequence
@@ -495,7 +505,13 @@ export class LedgerRepository {
     );
     const row = result.rows[0];
     if (row === undefined || Number(row.attempt_count) < input.maxAttempts) return null;
-    return { attemptId: row.attempt_id, artifactRef: row.raw_artifact_ref };
+    return {
+      attemptId: row.attempt_id,
+      artifactRef: row.raw_artifact_ref,
+      ledgerEntryRef: row.ledger_entry_id,
+      callSiteKey: row.call_site_key,
+      outcome: row.outcome
+    };
   }
 
   async countModelAttempts(input: {

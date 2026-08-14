@@ -113,7 +113,19 @@ function projectGraph(answer: Answer): GraphProjection {
   }
 
   const visited = new Set<string>();
-  const build = (nodeId: string, parentId: string | null, depth: number, position: number, path: string): DebateNode => {
+  const hiddenRecordByNodeId = new Map<string, Answer["condition_mark_records"][number]>();
+  for (const record of answer.condition_mark_records) {
+    if (record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "HIDDEN-LOW-SCORE") continue;
+    for (const nodeId of record.affected_node_ids) hiddenRecordByNodeId.set(nodeId, record);
+  }
+  const build = (
+    nodeId: string,
+    parentId: string | null,
+    depth: number,
+    position: number,
+    path: string,
+    inheritedHiddenReason: string | null = null
+  ): DebateNode => {
     visited.add(nodeId);
     const contractNode = contractById.get(nodeId)!;
     const link = parentLinks.get(nodeId);
@@ -122,6 +134,13 @@ function projectGraph(answer: Answer): GraphProjection {
       ? { nodeType: "CLAIM", label: wayOfKnowingLabel(contractNode.way_of_knowing) }
       : childNodeType(link.edge.relation);
     const childIds = (childIdsByParent.get(nodeId) ?? []).filter((childId) => !visited.has(childId));
+    const hiddenRecord = hiddenRecordByNodeId.get(nodeId);
+    const ownHiddenReason = hiddenRecord?.mark === "HIDDEN-UNJUDGEABLE"
+      ? `Disclosed as unjudged — excluded from the served number: ${hiddenRecord.reason}`
+      : hiddenRecord?.mark === "HIDDEN-LOW-SCORE"
+        ? `Disclosed as set aside at the ruled score threshold: ${hiddenRecord.reason}`
+        : null;
+    const hiddenReason = ownHiddenReason ?? inheritedHiddenReason;
     const view: DebateNode = {
       id: contractNode.node_id,
       debate_id: answer.answer_id,
@@ -142,9 +161,22 @@ function projectGraph(answer: Answer): GraphProjection {
             maker: contractNode.maker_lineage.maker
           },
       maker: contractNode.maker_lineage?.maker ?? null,
+      ...(hiddenReason === null ? {} : {
+        path_status: "abandoned",
+        stopping_status: "abandon",
+        stopping_reason: hiddenRecord?.mark ?? "HIDDEN-ANCESTOR",
+        stopping_reason_human: hiddenReason
+      }),
       children: []
     };
-    view.children = childIds.map((childId, index) => build(childId, nodeId, depth + 1, index, `${path}.${index}`));
+    view.children = childIds.map((childId, index) => build(
+      childId,
+      nodeId,
+      depth + 1,
+      index,
+      `${path}.${index}`,
+      hiddenReason
+    ));
     return view;
   };
 
@@ -282,6 +314,9 @@ export function v3NodeScoreState(
   if (nodesById === null) return { status: "ABSENT", reason: "NO_SERVED_ANSWER" };
   const contractNode = nodesById.get(node.id);
   if (contractNode === undefined) return { status: "ABSENT", reason: "NODE_ABSENT_FROM_SERVED_ANSWER" };
+  if (contractNode.final_strength === null) {
+    return { status: "ABSENT", reason: "NODE_ABSENT_FROM_SERVED_ANSWER" };
+  }
   return {
     status: "PRESENT",
     base_score: contractNode.base_score,
@@ -336,6 +371,9 @@ export type V3NodeScoreDetails = readonly [V3NodeScoreDetail, V3NodeScoreDetail]
 
 /** The drawer-ready score records, kept executable so percentage drift is test-visible. */
 export function v3NodeScoreDetails(node: ContractNode): V3NodeScoreDetails {
+  if (node.final_strength === null) {
+    throw new TypedDomainError("FINAL_STRENGTH_WITHHELD", `Node ${node.node_id} was excluded from the served number`);
+  }
   return [
     {
       id: "base_score",
@@ -450,6 +488,13 @@ export function liveDebateDetail(runId: string, tree: DebateNode): DebateDetail 
 export function debateDetailFromRunProjection(run: RunProjection): DebateDetail {
   const status = run.state === "FAILED" ? "failed" : "generating";
   const presentedState = run.state === "CLAIMED" ? "RUNNING" : run.state;
+  const holdUntilMs = run.hold_until === null ? null : Date.parse(run.hold_until);
+  const remainingMinutes = holdUntilMs === null || Number.isNaN(holdUntilMs)
+    ? null
+    : Math.max(0, Math.ceil((holdUntilMs - Date.now()) / 60_000));
+  const holdReason = run.state === "HOLDING" && run.hold_until !== null
+    ? `The model provider stopped responding; one final attempt is scheduled for ${new Date(run.hold_until).toLocaleString()} (${remainingMinutes ?? 0} minute${remainingMinutes === 1 ? "" : "s"} remaining).`
+    : null;
   return { ...liveDebateDetail(run.run_ref, {
     id: run.run_ref,
     debate_id: run.run_ref,
@@ -465,7 +510,30 @@ export function debateDetailFromRunProjection(run: RunProjection): DebateDetail 
     active_generation_id: null,
     active_generation: null,
     children: []
-  }), run_state: presentedState };
+  }), run_state: presentedState, hold_until: run.hold_until,
+  ...(holdReason === null ? {} : {
+    completion: { state: "running" as const, reasonCode: "PROVIDER_RECOVERY_HOLD", humanReason: holdReason }
+  }) };
+}
+
+export function hiddenNodeScoreThresholdFromDeployment(deployment: Deployment): Readonly<{
+  value: number;
+  sourceRef: string;
+  registerVersion: number;
+}> {
+  const row = deployment.register.rows.find((candidate) => candidate.row_key === "hiddenNodeScoreThreshold");
+  if (row === undefined || typeof row.value !== "number" || !Number.isFinite(row.value)
+    || row.value < 0 || row.value > 1) {
+    throw new TypedDomainError(
+      "HIDDEN_NODE_SCORE_THRESHOLD_UNRESOLVED",
+      "Deployment register row hiddenNodeScoreThreshold is absent or invalid."
+    );
+  }
+  return Object.freeze({
+    value: row.value,
+    sourceRef: row.source_ref,
+    registerVersion: deployment.register.register_version
+  });
 }
 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {

@@ -1,4 +1,4 @@
-import type { ArgumentClaimRole, ArgumentClaimStatus, ArgumentClaimView, DebateNode } from "./types";
+import type { ArgumentClaimRole, ArgumentClaimStatus, ArgumentClaimView, DebateNode } from "./types.js";
 
 export function findNodeById(tree: DebateNode, id: string): DebateNode | null {
   if (tree.id === id) {
@@ -142,7 +142,7 @@ export function nodeToArgumentClaimView(node: DebateNode): ArgumentClaimView {
     children: node.children.map(nodeToArgumentClaimView),
     status: toArgumentClaimStatus(node.status),
     activeGenerationId: node.active_generation_id,
-    score: node.score,
+    ...(node.score === undefined ? {} : { score: node.score }),
   };
 }
 

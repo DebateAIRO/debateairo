@@ -32,7 +32,8 @@ function providerDoubleApplication(): AskApplication {
         run_ref: "run:load01",
         question_line: ask.question_line,
         state: "QUEUED",
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       });
       return { run_ref: "run:load01", status: "QUEUED" };
     },
@@ -87,7 +88,8 @@ describe("LOAD-01 provider-double composition proof", () => {
         run_ref: "run:load01",
         question_line: "Messi or Ronaldo?",
         state: "QUEUED",
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       }
     });
     await api.close();

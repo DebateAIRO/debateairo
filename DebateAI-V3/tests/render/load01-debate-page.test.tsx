@@ -24,7 +24,8 @@ const queuedRun = {
   run_ref: "run:queued",
   question_line: "Messi or Ronaldo?",
   state: "QUEUED" as const,
-  terminal_reason: null
+  terminal_reason: null,
+  hold_until: null
 };
 
 function renderClient(
@@ -56,7 +57,8 @@ describe("LOAD-01 real debate-page render", () => {
         run_ref: "run:transport",
         question_line: "How does someone efficiently lose weight?",
         state,
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       }),
       readAnswer: async () => {
         calls.push("answer-404");
@@ -82,7 +84,8 @@ describe("LOAD-01 real debate-page render", () => {
         run_ref: "run:fair-test",
         question_line: answer.question_line,
         state: "SETTLED" as const,
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       }),
       readRunAnswer: async () => answer
     } as unknown as ContractClient;
@@ -108,6 +111,19 @@ describe("LOAD-01 real debate-page render", () => {
     expect(html).toContain("progressTrack"); // MUT-BUG02-LOADING-BAR: remove the indeterminate loading bar -> RED.
     expect(html).toContain('aria-busy="true"');
     expect(html).not.toContain("40%");
+  });
+
+  it("T21 renders HOLDING with its honest remaining time and no error banner", () => {
+    const holdUntil = new Date(Date.now() + 600_000).toISOString();
+    const html = renderClient(debateDetailFromRunProjection({
+      ...queuedRun,
+      state: "HOLDING",
+      hold_until: holdUntil
+    }));
+    expect(html).toContain("Provider recovery hold");
+    expect(html).toContain("10 minutes remaining");
+    expect(html).toContain("one final attempt is scheduled");
+    expect(html).not.toContain("Debate generation failed");
   });
 
   it("renders a mid-session run.terminal failure as failed with no live progress", () => {

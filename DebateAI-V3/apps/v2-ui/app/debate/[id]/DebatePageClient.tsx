@@ -21,7 +21,11 @@ import {
   type InvestigationGap,
   type RunEvent
 } from "@debateai/contract";
-import { contractNodesById, liveDebateDetail } from "@/lib/v3/adapter";
+import {
+  contractNodesById,
+  hiddenNodeScoreThresholdFromDeployment,
+  liveDebateDetail
+} from "@/lib/v3/adapter";
 import { buildAnswerExport } from "@/lib/v3/answerExport";
 import {
   measureDebateHeaderCollapse,
@@ -358,6 +362,7 @@ export default function DebatePageClient({
   const [inspectionError, setInspectionError] = useState<string | null>(null);
   const [honestyOpen, setHonestyOpen] = useState(false);
   const [honestyActionState, setHonestyActionState] = useState<string | null>(null);
+  const [lowStrengthThreshold, setLowStrengthThreshold] = useState<number | undefined>(undefined);
   const [investigationInput, setInvestigationInput] = useState<Record<string, string>>({});
   const liveRef = useRef<LiveRunState>(createLiveRunState());
   const answerRef = useRef<Answer | null>(initialAnswer);
@@ -482,6 +487,27 @@ export default function DebatePageClient({
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    let active = true;
+    const token = getStoredToken();
+    if (!token) return;
+    contractClient.readDeployment(token)
+      .then((deployment) => {
+        if (!active) return;
+        setLowStrengthThreshold(hiddenNodeScoreThresholdFromDeployment(deployment).value);
+      })
+      .catch((failure) => {
+        if (!active) return;
+        setLowStrengthThreshold(undefined);
+        setHonestyActionState(
+          failure instanceof Error
+            ? `Hidden-node threshold unavailable: ${failure.message}`
+            : "Hidden-node threshold unavailable"
+        );
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1302,6 +1328,7 @@ export default function DebatePageClient({
                 scoringErrorsByNodeId={scoringErrorsByNodeId}
                 scoreFilterNodeIds={scoreAwareFilterNodeIds}
                 v3NodesById={v3NodeById}
+                lowStrengthThreshold={lowStrengthThreshold}
                 meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
                 canvasRef={(el) => {
                   canvasElRef.current = el;

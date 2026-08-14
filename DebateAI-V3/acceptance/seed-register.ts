@@ -7,6 +7,8 @@ export const ACCEPTANCE_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
 export const ACCEPTANCE_CONVERGENCE_SOURCE_REF = "acceptance:DR-136:V-approved" as const;
 export const ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF = "acceptance:DR-172:V-approved" as const;
+export const ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF = "acceptance:DR-174:V-approved" as const;
+export const ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF = "acceptance:DR-176:V-approved" as const;
 /** DR-142: V approved the normative claimTypeCompositionMap entry; the map
  * row carries the ruling that approved its current value-set (same
  * discipline as DR-136's convergenceStopDefaults). */
@@ -168,6 +170,22 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
         }
       },
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF
+    },
+    {
+      rowKey: "runDeathPolicy",
+      value: {
+        kind: "RUN_DEATH_POLICY",
+        cooldown_ms: 600_000,
+        final_retry_attempts: 1,
+        max_cooldown_holds_per_run: 2,
+        applies_to: "TRANSPORT_EXHAUSTION"
+      },
+      sourceRef: ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF
+    },
+    {
+      rowKey: "hiddenNodeScoreThreshold",
+      value: 0.35,
+      sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     },
     {
       rowKey: "runCostEnvelope",

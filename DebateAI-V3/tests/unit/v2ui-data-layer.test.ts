@@ -330,6 +330,8 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     expect(final!.pillText).toBe("FINAL 41%");
     for (const badge of presentation.badges) {
       const number = badge.id === "base_score" ? answer.nodes[0]!.base_score : answer.nodes[0]!.final_strength;
+      expect(number).not.toBeNull();
+      if (number === null) throw new Error("test fixture must include final strength");
       expect(badge.title).toContain(number.kind);
       expect(badge.title).toContain(number.producer);
       expect(badge.title).toContain(number.source);
@@ -347,6 +349,8 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
       )
     });
     const node = scored.nodes[0]!;
+    expect(node.final_strength).not.toBeNull();
+    if (node.final_strength === null) throw new Error("test fixture must include final strength");
     expect(v3NodeScoreDetails(node)).toEqual([
       {
         id: "base_score",
@@ -459,7 +463,8 @@ describe("v2-ui data access over the V3 contract client", () => {
       run_ref: "run:fair-test",
       question_line: answer.question_line,
       state: "RUNNING",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     });
     const client = { readRun } as unknown as ContractClient;
     await expect(getDebateBundle("run:fair-test", "token:test", client, { currentAnswer: answer }))

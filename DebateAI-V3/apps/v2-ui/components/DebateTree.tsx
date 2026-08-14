@@ -10,7 +10,9 @@ import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 function isAbandonedNode(node: DebateNode): boolean {
-  return isAbandonedArgumentStatus(node.status);
+  return isAbandonedArgumentStatus(node.status)
+    || isAbandonedArgumentStatus(node.path_status)
+    || isAbandonedArgumentStatus(node.stopping_status);
 }
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
@@ -44,6 +46,7 @@ type DebateTreeProps = {
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
   scoringByNodeId?: Map<string, NodeScoringPayload>;
+  lowStrengthThreshold?: number;
 };
 
 type ArgumentNodeCardProps = {
@@ -57,6 +60,7 @@ type ArgumentNodeCardProps = {
   onToggleChildren?: () => void;
   selectionLabel?: string;
   scoring?: NodeScoringPayload;
+  lowStrengthThreshold?: number;
 };
 
 function errorMessage(exc: unknown, fallback: string): string {
@@ -74,6 +78,7 @@ export function ArgumentNodeCard({
   onToggleChildren,
   selectionLabel,
   scoring,
+  lowStrengthThreshold,
 }: ArgumentNodeCardProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Generation[]>([]);
@@ -117,7 +122,9 @@ export function ArgumentNodeCard({
   // Additive, flag-gated low-strength dimming (Phase 9 Task 3). Never replaces
   // the existing abandoned/selection classes -- a node can be both abandoned
   // AND low-strength, and dimming never affects clickability or children.
-  const lowStrength = isLowStrengthNode(scoring?.scores?.strength);
+  const lowStrength = lowStrengthThreshold === undefined
+    ? false
+    : isLowStrengthNode(scoring?.scores?.strength, lowStrengthThreshold);
   return (
     <article
       className={[nodeClass(node, lowStrength), canToggleChildren ? "expandable" : "", isCardInteractive ? "selectable" : "", isSelected ? "selected" : ""]
@@ -233,6 +240,7 @@ export function DebateTree({
   onSelectNode,
   selectedNodeId,
   scoringByNodeId,
+  lowStrengthThreshold,
 }: DebateTreeProps) {
   const [childrenOpen, setChildrenOpen] = useState(node.node_type === "ROOT_CLAIM");
 
@@ -254,6 +262,7 @@ export function DebateTree({
         childrenOpen={childrenOpen}
         onToggleChildren={() => setChildrenOpen((current) => !current)}
         scoring={scoringByNodeId?.get(node.id)}
+        lowStrengthThreshold={lowStrengthThreshold}
       />
       {hasActiveChildren && childrenOpen ? (
         <div
@@ -269,6 +278,7 @@ export function DebateTree({
               onSelectNode={onSelectNode}
               selectedNodeId={selectedNodeId}
               scoringByNodeId={scoringByNodeId}
+              lowStrengthThreshold={lowStrengthThreshold}
             />
           ))}
         </div>
@@ -288,6 +298,7 @@ export function DebateTree({
                 onSelectNode={onSelectNode}
                 selectedNodeId={selectedNodeId}
                 scoringByNodeId={scoringByNodeId}
+                lowStrengthThreshold={lowStrengthThreshold}
               />
             ))}
           </div>

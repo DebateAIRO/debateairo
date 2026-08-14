@@ -79,26 +79,37 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       run_ref: "run:queued",
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     }).state).toBe("QUEUED");
     expect(RunProjectionSchema.parse({
       run_ref: "run:settled",
       question_line: "Messi or Ronaldo?",
       state: "SETTLED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     }).state).toBe("SETTLED"); // MUT-BUG02-SETTLED-TYPE: remove SETTLED from the wire vocabulary -> RED.
     expect(RunProjectionSchema.parse({
       run_ref: "run:failed",
       question_line: "Messi or Ronaldo?",
       state: "FAILED",
-      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED",
+      hold_until: null
     }).terminal_reason).toBe("TOTAL_REVIEW_COVERAGE_UNSATISFIED");
     expect(() => RunProjectionSchema.parse({
       run_ref: "run:failed",
       question_line: "Messi or Ronaldo?",
       state: "FAILED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     })).toThrow();
+    expect(RunProjectionSchema.parse({
+      run_ref: "run:holding",
+      question_line: "Messi or Ronaldo?",
+      state: "HOLDING",
+      terminal_reason: null,
+      hold_until: "2026-08-14T12:10:00.000Z"
+    }).state).toBe("HOLDING");
   });
 
   it("admits recorded per-node maker lineage and requires typed null when it is absent", () => {

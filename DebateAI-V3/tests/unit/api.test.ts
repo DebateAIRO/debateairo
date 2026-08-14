@@ -423,7 +423,8 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       run_ref: runId,
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     } : null;
     const api = buildApi({ application });
     const queued = await api.inject({
@@ -436,7 +437,8 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       run_ref: "run:queued",
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     });
     expect((await api.inject({
       method: "GET",
