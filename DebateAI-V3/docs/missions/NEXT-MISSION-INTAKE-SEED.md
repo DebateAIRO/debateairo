@@ -25,6 +25,15 @@ data-driven; GROK-01 is the last hand-built relay.
   Qwen").
 - ENVELOPE AS RATIFIED FORMULA (DR-178(3)): V ratifies the M×depth
   derivation once; panel sizes derive lawfully. Needs V's explicit card.
+- PLUG-AND-PLAY DISCOVERY (V, 2026-08-14): boot-time scan over known
+  adapter shapes -> liveness handshake -> verbatim identity capture ->
+  models register automatically with health state. V's value card:
+  detect-and-propose (found models sit "available, disabled" until V
+  enables — matches register provenance culture) vs detect-and-auto-enable
+  (anything healthy debates by default). Runs pin their panel at
+  admission; discovery never mutates an in-flight debate. Depends on the
+  envelope formula for lawful auto-scaling of M. DR-179 bounds discovery
+  to CLI shapes for now.
 
 ## Measurement (the trust thesis)
 The scorecard schema (scorecard.answer_outcome / model_identity /
