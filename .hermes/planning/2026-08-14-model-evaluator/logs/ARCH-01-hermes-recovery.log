@@ -1,0 +1,17 @@
+=== ARCH-01 recovery converse Fri Aug 14 21:11:29 EEST 2026 ===
+1. The failed patch was substantive. It added:
+   - DDL-role schema usage grants.
+   - Observation-supersession validation function and trigger.
+   - Worker source-schema usage grants.
+   - API sequence-allocation grants.
+
+   The prior session subsequently re-applied it successfully using the correct relative path. Follow-up grant fixes are also present.
+
+2. Yes. Architecture.md is complete against ARCH-01, including all four carried reviewer notes and the full lanes/worktrees/dependencies/merge-order plan.
+
+3. Yes. mission-graph.svg is final and validated: valid XML/SVG, lanes 02–11, worktrees, routers, planning gate, HITL, live blocker, lane-plan row, merge order, and 21 dependency paths.
+
+The self-report exists and was verified. No additional file changes were made because the substantive patch was already present on disk.
+
+READY FOR PEER REVIEW: docs/missions/2026-08-14-model-evaluator/architecture/Architecture.md
+=== hermes exited Fri Aug 14 21:13:13 EEST 2026 ===

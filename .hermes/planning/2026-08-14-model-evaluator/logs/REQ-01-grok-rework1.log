@@ -1,0 +1,36 @@
+=== REQ-01 rework1 launch Fri Aug 14 20:29:54 EEST 2026 ===
+Reading both peer reviews and verifying the cited schema facts so the rework plan is concrete.DoneStarting rework: reading the plan and both Opus peer reviews, then verifying every schema/code fact the blocking findings cite.All cited foundation facts confirmed. Writing the reproduce log, then amending Requirements.md.Rewriting Requirements.md to resolve every blocking finding while preserving prior strengths.## Rework round 1 complete
+
+Both Opus REWORK findings are addressed after **reproduce-first** verification against real schema/code.
+
+### Blocking fixes
+| Finding | Resolution |
+|---|---|
+| **B1/BF-1** `resolver_is_external` as consensus discriminator | Corrected: CHECK TRUE-only + Q59 named; consensus rows land in **evaluator-owned store** with insert/read ACs (FR-3.0, FR-3.2) |
+| **B2/BF-2** no (domain, step) | **FR-3.5** forces Option E (evaluator-owned columns); Option T only via Open question |
+| **BF-3** JUDGING/REVIEWING shape | **FR-3.0/3.1**: settlement `answer_outcome` is settlement-only; process steps use evaluator-owned tables |
+| **B3** seat-share vs DR-181 | **FR-8.0** panel-shape prerequisite; allocator isolation-only until redesign; M=1/≥3 ACs |
+| **B4** domain landing / backfill | **FR-1.3** dedicated link default; `question_type` dump disallowed; backfill only on link |
+| **B5** vLLM not production-selected | **FR-0.6** owns config, health, and model enumeration |
+
+### Also applied (cheap non-blocking)
+Add-on write-path different-maker guard; bias cell shape vs `deriveScorecardCell`; relative-cost normalization; identity granularity (FR-0.7); unbound judge-selection path; admission-time vs housekeeping; design-review gate labels; V/maker glosses.
+
+### Preserved
+FR-0.1 dark-launch, Boundaries, all 11 rulings, orchestrator-up Open questions (added 9–11), docs-only (no code/schema/ticket edits).
+
+### Evidence (scratch)
+`rework-r1-reproduce.md`, `rework-r1-false-claims.txt`, `rework-r1-coverage.md`, `rework-r1-changed-paths.txt`, `rework-r1-self-report-stat.txt`
+
+READY FOR PEER REVIEW: docs/missions/2026-08-14-model-evaluator/requirements/Requirements.mdI'll adversarially verify the rework against the peer reviews, plan acceptance criteria, and the actual schema/code facts they cite.Next I'll audit the implementer's evidence and the current Requirements.md against the real schema sources.I'll spot-check the schema claims and read the critical Requirements sections for residual false foundations or weak ACs.Evidence and schema spot-checks line up with the plan’s gating criteria; writing the verdict.Not RefutedI'll adversarially verify the reI'll adverswork against botharially verify the rework Opus reviews, against both the plan criteria Opus reviews,, and the actual schema/ the plan criteriacode citations, and the current. Requirements.md — starting with the reviews, plan, and implementer evidence.Evidence and Requirements.md next — I'll verify every blocking claim against the real schema.Next I'll read the implementer's evidence artifacts and the reworked Requirements.md, and spot-check the cited schema facts.All six blocking areas and schema facts check out against the real sources. Writing the verdict files.All six blocking fix areas and the plan's gating criteria check out against the reworked Requirements.md and schema evidence. Writing the Not Refuted verdict.Not RefutedNot RefutedI'll inspect the delivered requirements artifact and how it's meant to be used so the closing recap stays accurate and short.**Delivered:** Reworked Model Evaluator requirements at [`docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md`](docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md) — schema-aligned FRs, concrete acceptance criteria, and open questions after peer-review rework.
+
+**How to use:**
+- Open that file as the mission requirements source of truth.
+- Trace FRs to `wayfinder/map.md`, glossary, and tickets `01`–`11`.
+- Use acceptance criteria for design/QA gates; undecided items live under Open questions.**Delivered:** Reworked Model Evaluator requirements at [`docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md`](docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md) — schema-aligned FRs, concrete acceptance criteria, and open questions after peer-review rework.
+
+**How to use:**
+- Open that file as the mission requirements source of truth.
+- Trace FRs to `wayfinder/map.md`, glossary, and tickets `01`–`11`.
+- Use acceptance criteria for design/QA gates; undecided items live under Open questions.
+=== grok exited Fri Aug 14 20:38:01 EEST 2026 ===

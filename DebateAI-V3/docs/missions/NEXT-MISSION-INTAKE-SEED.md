@@ -58,6 +58,9 @@ one" from a judgment into a chart.
   in-node exchange).
 - V2 depth parity is the bar V names; V3 already wins truth/readability/
   empirical arguments (V's words, 2026-08-14).
+- DR-183 verdict (2026-08-14 evening, during the first 3-house depth-5
+  run): ANSWERS WAY SURPASS V2; UI still a bit behind V2 -> the UI lane's
+  charter is V2 polish parity on V3 truth.
 
 ## Open V rulings carried forward
 Mono-maker (serve/ban/band-cap — now entangled with dead-maker-position

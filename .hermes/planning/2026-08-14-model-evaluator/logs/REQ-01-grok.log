@@ -1,0 +1,33 @@
+=== REQ-01 grok launch Fri Aug 14 20:16:02 EEST 2026 ===
+I'll read the goal packet and related mission files to draft a precise, outcome-based plan.Reading the wayfinder map, glossary, and key tickets to lock scope into the plan.Skimming ticket titles and key constraints so acceptance criteria match the packet.Writing the structured plan from the goal packet and wayfinder scope.DoneI'll start by reading the plan and goal packet, then seed todos from the acceptance criteria.Seeding todos from acceptance criteria, then reading the mandated sources in order.Skimming foundations next, then drafting Requirements.md.I have the full read set. Drafting Requirements.md and creating the required directories.Writing the self-report and running the verification plan.False positives on the key scan and “ask V directly” checks — updating the coverage checklist with accurate notes, then finishing verification.## REQ-01 complete
+
+Authored the model-evaluator requirements from the wayfinder’s 11 V-ratified rulings.
+
+### Deliverables
+| Path | Role |
+|---|---|
+| `docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md` | Requirements (~469 lines): FRs + ACs + traceability |
+| `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-REQ-01.md` | Self-report (17 lines + token basis) |
+
+### Coverage
+- **Nine subsystems:** tagger, domain registry, harvest, judge add-on, bias/prowess, token metering, consumer reader, seat-share (dark), dev menu
+- **Cross-cutting:** dark-launch / no dispatch until V bind (FR-0.1), foundations reuse (scorecard, settlement, migration 0019, serve null tags), writers vs reader, DR-179
+- **Boundaries:** map Out of scope + Not yet specified (no billing, no Ollama/LM Studio, no auto go-live, etc.)
+- **Open questions:** orchestrator-up only — no direct-to-V worker routing
+- **Docs only:** no code, schema, migration, or wayfinder ticket edits; no commits/push
+
+### Verification evidence (scratch)
+`req01-artifact-stat.txt`, `req01-coverage-check.md`, `req01-self-report-stat.txt`, `req01-changed-paths.txt` under the goal scratch dir.
+
+READY FOR PEER REVIEW: docs/missions/2026-08-14-model-evaluator/requirements/Requirements.mdI'll spot-check Requirements.md against the wayfinder map and tickets for fidelity, and confirm the docs-only scope.Coverage matches the map, tickets, and foundations; verification evidence is complete. Writing the verdict.Not RefutedI'll adversarially verify REQ-01 against the goal packet, plan criteriaI'll, changed adversarially verify REQ- files, and01 against the goal packet, implementer evidence—without plan criteria, and the modifying shipped deliver theables workspace—.starting with the contract and evidence, not the agent's summary.Reading the deliverables, implementer evidence, and source map to cross-check coverage.Next I'll audit the Requirements artifact, self-report, and implementer coverage evidence against the goal packet's must-contain list.I'll spot-check map rulings and key tickets against the Requirements content to catch invented scope or mis-citations.Spot-checking grounding against wayfinder sources and whether any non-docs paths were touched.Spot-checking ticket 01 findings and a few subsystem tickets for invented or mis-cited requirements.All gating criteriaAll gating criteria hold with honest captured hold against evidence. Writing the verdict artifacts the artifact. and implementer evidence. Writing the verdict.Not RefutedNot Refuted**Delivered:** a stranger-readable requirements set for the model-evaluator mission at `docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md` (plus agent self-report under `.hermes/reports/.../grok-REQ-01.md`).
+
+**How to use it:**
+- Open that `Requirements.md` as the REQ-01 source of truth for subsystems, acceptance criteria, dark-launch, and open questions.
+- Peer reviewers follow `docs/missions/2026-08-14-model-evaluator/goal-packets/REQ-02-opus-review.md`.
+- Downstream architecture/implementation should implement only what this document requires (docs-only; no code was added).**Delivered:** a stranger-readable requirements set for the model-evaluator mission at `docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md` (plus agent self-report under `.hermes/reports/.../grok-REQ-01.md`).
+
+**How to use it:**
+- Open that `Requirements.md` as the REQ-01 source of truth for subsystems, acceptance criteria, dark-launch, and open questions.
+- Peer reviewers follow `docs/missions/2026-08-14-model-evaluator/goal-packets/REQ-02-opus-review.md`.
+- Downstream architecture/implementation should implement only what this document requires (docs-only; no code was added).
+=== grok exited Fri Aug 14 20:24:53 EEST 2026 ===

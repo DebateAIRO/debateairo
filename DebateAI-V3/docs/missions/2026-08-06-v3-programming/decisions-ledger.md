@@ -1506,3 +1506,15 @@ supersedes | status`.
   failure; genuinely mid-run deaths keep DR-174/176 unchanged. Ticket
   DISC-01 binds to the authorized plan + Grok's ten conditions + this row.
   | V ruled the consult's packet | DISC-01 | — | ACTIVE
+
+| DR-183 | 2026-08-14 | V ("its this version of the engine. UI-wise, its
+  still a bit behind V2. But Answers wise? It way surpasses V2") | **V'S
+  QUALITY VERDICT ON THE DISCOVERY-ERA ENGINE.** Delivered while the first
+  three-house depth-5 debate ran: ANSWERS WAY SURPASS V2 — the mission
+  thesis ("I want to see that two models bring better answers than one",
+  DR-162) is affirmed by V's own judgment, now at three models. UI remains
+  A BIT BEHIND V2 — V2 parity work (V earlier: "V2 had the depth part
+  pinned down real good") seeds the UI lane of the next mission. Companion
+  to DR-164's early quality signal; this one lands after depth, discovery,
+  and cross-house review all shipped. | V judged the whole thing, as
+  promised | next-mission UI lane | — | ACTIVE
