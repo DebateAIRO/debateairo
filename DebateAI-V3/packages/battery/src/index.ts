@@ -215,12 +215,19 @@ export function assertClaimCoversCall(input: {
   readonly claimMs: number;
   readonly deadlineMs: number;
   readonly marginMs: number;
+  readonly cooldownMs?: number;
+  readonly maxCooldownHoldsPerRun?: number;
 }): void {
-  if (![input.claimMs, input.deadlineMs, input.marginMs].every(Number.isFinite)) {
+  const cooldownMs = input.cooldownMs ?? 0;
+  const maxCooldownHoldsPerRun = input.maxCooldownHoldsPerRun ?? 0;
+  if (![input.claimMs, input.deadlineMs, input.marginMs, cooldownMs, maxCooldownHoldsPerRun].every(Number.isFinite)) {
     throw new TypeError("CLAIM_BOUND_MISMATCH: claim and call bounds must be configured finite values");
   }
-  if (input.claimMs < input.deadlineMs + input.marginMs) {
-    throw new TypeError("CLAIM_BOUND_MISMATCH: claim must cover call deadline plus configured margin");
+  const requiredMs = maxCooldownHoldsPerRun * (cooldownMs + input.deadlineMs)
+    + input.deadlineMs
+    + input.marginMs;
+  if (input.claimMs < requiredMs) {
+    throw new TypeError("CLAIM_BOUND_MISMATCH: claim must cover cooldown holds, call deadlines, and configured margin");
   }
 }
 

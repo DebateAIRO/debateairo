@@ -138,8 +138,14 @@ The CODING-LOOP-RETROSPECTIVE-2026-08-13 proposals are LAW for the next run
 12. **Terminal lifecycle (DR-170):** a terminal whose job is done is closed
     at once. The only windows kept open are ones the orchestrator has a
     question about for V and can point to. Supersedes reap-on-request.
-13. **Architecture-consult law (DR-171):** an architecture-confounding
-    blocker is never improvised in the coding loop — fire ONE Opus
-    architect (reads the current architecture docs, briefed on what went
-    on, produces a plan); GROK must authorize the plan before it binds and
-    re-enters the loop as ticket scope.
+13. **Architecture-consult law (DR-171, as amended by DR-175):** an
+    architecture-confounding blocker is never improvised in the coding
+    loop — fire ONE Opus architect (reads the current architecture docs,
+    briefed on what went on, produces a plan); GROK must authorize the
+    plan before it binds and re-enters the loop as ticket scope.
+14. **Grok's deliberative seat (DR-175 — the cross-lineage law applied to
+    the loop):** Grok is a VOICE, not only a verifier. In DR-171 consults
+    Grok may counter-propose designs, not merely authorize; contested
+    value questions reach V with BOTH lineages' positions marked;
+    non-trivial packets may get a Grok frame-critique pre-dispatch. One
+    lineage never sets a frame the other only gets to police.

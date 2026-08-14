@@ -22,10 +22,19 @@ import {
   readClaimTypeCompositionMap
 } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
+import {
+  createPostgresProviderGateway,
+  excludeHiddenSubtrees,
+  TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS,
+  WalkingSkeletonRunner,
+  type HoldProgressEvent,
+  type WalkingSkeletonSettings
+} from "@debateai/runner";
+import { evaluate } from "@debateai/propagation";
 import { ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
-import { buildApi, type AskApplication } from "@debateai/api";
+import { buildApi, PostgresAskApplication, type AskApplication } from "@debateai/api";
+import { HOME_PAGE_SIZE } from "../../apps/v2-ui/lib/serverApi.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -121,7 +130,7 @@ async function createRun(
   });
 }
 
-function judgementDouble(statement: string): string {
+function judgementDouble(statement: string, fidelity = 0.72): string {
   return JSON.stringify({
     statement,
     way_of_knowing: "REASONING",
@@ -130,7 +139,7 @@ function judgementDouble(statement: string): string {
     restatement_status: "PASS",
     value_laden: false,
     claim_type: "unknown",
-    steelman: { summary: statement, fidelity: 0.72 },
+    steelman: { summary: statement, fidelity },
     critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
     evidence: { quality: 0.72, relevance: 0.72 },
     context: { fit: 0.72, ambiguityFlags: [] },
@@ -150,7 +159,9 @@ async function createRunnerWork(questionLine: string): Promise<{ runId: string; 
   return { runId, workItemId };
 }
 
-async function startProviderDouble(contents: readonly string[]): Promise<{
+type ProviderDoubleResponse = string | Readonly<{ status: number; body?: string }>;
+
+async function startProviderDouble(contents: readonly ProviderDoubleResponse[]): Promise<{
   endpoint: string; calls(): number; stop(): Promise<void>;
 }> {
   let calls = 0;
@@ -159,6 +170,11 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
     const content = contents[calls++];
     if (content === undefined) {
       response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "unexpected test call" }));
+      return;
+    }
+    if (typeof content !== "string") {
+      response.writeHead(content.status, { "content-type": "application/json" })
+        .end(content.body ?? JSON.stringify({ error: "test-layer transport failure" }));
       return;
     }
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
@@ -175,6 +191,94 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
     calls: () => calls,
     async stop() { server.close(); await once(server, "close"); }
   };
+}
+
+const resil01Composition = JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text: "The judged position survives.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+] });
+
+async function executeResil01Scenario(input: {
+  readonly label: string;
+  readonly primary: readonly ProviderDoubleResponse[];
+  readonly secondary: readonly ProviderDoubleResponse[];
+  readonly depth?: number;
+  readonly beforeExecute?: (context: { runId: string; workItemId: string }) => Promise<void>;
+}) {
+  const primary = await startProviderDouble(input.primary);
+  const secondary = await startProviderDouble(input.secondary);
+  try {
+    const question = `${input.label}-${randomUUID()}`;
+    const runId = await createRun(question, 100, 2, input.depth ?? 1);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
+    });
+    await input.beforeExecute?.({ runId, workItemId });
+    const runRepository = new RunRepository(database.pool);
+    const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+    }), {
+      ...runnerSettings(),
+      claimMs: 1_204_000,
+      runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+      hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+      holdRecorder: {
+        countCooldownHolds: (candidateRunId) => runRepository.countCooldownHolds(candidateRunId),
+        record: (event) => runRepository.recordRunLifecycleEvent({
+          runId: event.runId,
+          kind: event.kind,
+          value: {
+            state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+            hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+            transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+          }
+        }),
+        wait: async () => undefined
+      },
+      critique: {
+        provider: createPostgresProviderGateway(database.pool, {
+          endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+        }),
+        providerRef: "provider:test-layer:secondary",
+        maker: "Secondary test maker"
+      },
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+    });
+    let result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null = null;
+    let error: unknown = null;
+    try {
+      result = await runner.executeWorkItem(workItemId);
+    } catch (candidate) {
+      error = candidate;
+    }
+    const answer = result?.kind === "COMPLETED"
+      ? await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`)
+      : null;
+    const lifecycle = await database.pool.query<{
+      kind: string;
+      state: string;
+      call_site_key: string;
+      attempts_spent: number;
+      planned_leg_count: number;
+    }>(
+      `SELECT kind, value_json->>'state' AS state,
+              value_json->>'call_site_key' AS call_site_key,
+              (value_json->>'attempts_spent')::integer AS attempts_spent,
+              (value_json->>'planned_leg_count')::integer AS planned_leg_count
+       FROM core.run_progress_event
+       WHERE run_id=$1 AND kind IN ('node.retrying', 'ledger.could_not_do')
+       ORDER BY at_seq`,
+      [runId]
+    );
+    return {
+      runId, workItemId, result, error, answer, lifecycle: lifecycle.rows,
+      snapshot: await new GraphRepository(database.pool).materialiseSnapshot(runId),
+      primaryCalls: primary.calls(), secondaryCalls: secondary.calls()
+    };
+  } finally {
+    await secondary.stop();
+    await primary.stop();
+  }
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
@@ -275,6 +379,128 @@ describe("BUG-01 content-rejection retry accounting", () => {
 });
 
 describe("LOAD-01 run projection ownership boundary", () => {
+  it("projects a freshly accepted zero-work-item run as QUEUED", async () => {
+    const askerId = `asker:bug02-zero:${randomUUID()}`;
+    const runId = await createRun("bug02-zero-work-items", 10, 1, 1, askerId);
+    await expect(new RunRepository(database.pool).readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "QUEUED"
+    }); // MUT-BUG02-B8-ZERO-WORK-ELSE: report a fresh run as RUNNING -> RED.
+  });
+
+  it("projects a claimed work item as RUNNING and an all-DONE run as SETTLED", async () => {
+    const askerId = `asker:bug02:${randomUUID()}`;
+    const runId = await createRun("bug02-honest-loading-state", 10, 1, 1, askerId);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:Q1`
+    });
+    const repository = new RunRepository(database.pool);
+
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug02', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [workItemId]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "RUNNING"
+    }); // MUT-BUG02-CLAIMED-CASE: return CLAIMED for an executing item -> RED.
+
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'DONE', claimed_by = NULL, claim_deadline = NULL
+       WHERE work_item_id = $1`,
+      [workItemId]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "SETTLED"
+    }); // MUT-BUG02-SETTLED-INTEGRATION: fall through to eternal RUNNING -> RED.
+  });
+
+  it("T17/T18 persists typed hold events in order and self-expires HOLDING on real PostgreSQL", async () => {
+    const ownerToken = `resil01-owner-${randomUUID()}`;
+    const askerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
+    const runId = await createRun(`resil01-holding-${randomUUID()}`, 10, 1, 1, askerId);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `resil01:${runId}:Q1`
+    });
+    await database.pool.query(
+      `UPDATE core.work_item SET state='CLAIMED', claimed_by='worker:resil01',
+       claim_deadline=clock_timestamp() + interval '1 hour' WHERE work_item_id=$1`,
+      [workItemId]
+    );
+    const repository = new RunRepository(database.pool);
+    const future = new Date(Date.now() + 600_000).toISOString();
+    const common = {
+      call_site_key: "JUDGE:critic:root0:r1:p0", parent_node_ref: randomUUID(), hold_ms: 600_000,
+      attempts_spent: 3, transport_outcome: "FAILED", planned_leg_count: 3
+    } as const;
+    await repository.recordRunLifecycleEvent({
+      runId, kind: "node.retrying", value: { ...common, state: "COOLDOWN_HOLD", hold_until: future }
+    });
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "HOLDING", holdUntil: new Date(future)
+    });
+
+    const application = new PostgresAskApplication(database.pool, {} as never, {} as never);
+    const api = buildApi({ application });
+    try {
+      const response = await api.inject({
+        method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}/events`,
+        headers: { "x-user-dev-token": ownerToken }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain("event: node.retrying");
+      expect(response.body).toContain('"state":"COOLDOWN_HOLD"');
+      expect(response.body).toContain(`"hold_until":"${future}"`);
+    } finally {
+      await api.close();
+    }
+
+    await repository.recordRunLifecycleEvent({
+      runId, kind: "node.retrying", value: {
+        ...common, state: "COOLDOWN_HOLD", hold_until: new Date(Date.now() - 1_000).toISOString()
+      }
+    });
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+      state: "RUNNING", holdUntil: null
+    });
+    expect(await repository.countCooldownHolds(runId)).toBe(2);
+  });
+
+  it("prioritizes FAILED, CLAIMED and READY behavior before the all-DONE terminal arm", async () => {
+    const askerId = `asker:bug02-priority:${randomUUID()}`;
+    const runId = await createRun("bug02-projection-priority", 10, 1, 1, askerId);
+    const work = new WorkItemRepository(database.pool);
+    const first = await work.enqueue({
+      runId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:priority:1`
+    });
+    const second = await work.enqueue({
+      runId,
+      batteryRowId: "Q2",
+      nodeSet: [],
+      commandKey: `bug02:${runId}:priority:2`
+    });
+    const repository = new RunRepository(database.pool);
+
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "QUEUED" });
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug02', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [first]
+    );
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "RUNNING" });
+    await work.recordTerminalFailure({ runId, workItemId: second, reason: "TEST_LAYER:BUG02_FAILED_PRIORITY" });
+    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({ state: "FAILED" });
+    // MUT-BUG02-PROJECTION-ARM-ORDER: weaken any earlier arm or settle mixed states -> RED.
+  });
+
   it("returns 401 to anonymous callers and 404 to a foreign asker", async () => {
     const ownerToken = "load01-owner-token";
     const ownerAskerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
@@ -292,7 +518,8 @@ describe("LOAD-01 run projection ownership boundary", () => {
         run_ref: run.runRef,
         question_line: run.questionLine,
         state: run.state,
-        terminal_reason: run.terminalReason
+        terminal_reason: run.terminalReason,
+        hold_until: run.holdUntil?.toISOString() ?? null
       };
     };
     const application = {
@@ -325,6 +552,148 @@ describe("LOAD-01 run projection ownership boundary", () => {
       });
       await api.close();
     }
+  });
+});
+
+describe("BUG-03 asker-scoped debates index", () => {
+  it("lists open owner runs honestly and excludes foreign or already-served runs", async () => {
+    const servedQuestion = `bug03-served-${randomUUID()}`;
+    const ownerAskerId = `asker:${servedQuestion}`;
+    const servedWork = await createRunnerWork(servedQuestion);
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A served test-layer answer.", way_of_knowing: "REASONING",
+        locator: null, restatement_text: "A served test-layer answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A served test-layer answer.", fidelity: 0.72 }, critic: { summary: "A test-layer counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A served test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    try {
+      const served = await runnerWithEndpoint(provider.endpoint).executeWorkItem(servedWork.workItemId);
+      if (served.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      const runningRunId = await createRun(`bug03-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId: runningRunId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `bug03:${runningRunId}:running`
+      });
+      await database.pool.query(
+        `UPDATE core.work_item
+         SET state = 'CLAIMED', claimed_by = 'worker:bug03', claim_deadline = clock_timestamp() + interval '1 hour'
+         WHERE work_item_id = $1`,
+        [runningWorkItemId]
+      );
+
+      const failedRunId = await createRun(`bug03-failed-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const failedWork = new WorkItemRepository(database.pool);
+      const failedWorkItemId = await failedWork.enqueue({
+        runId: failedRunId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `bug03:${failedRunId}:failed`
+      });
+      await failedWork.recordTerminalFailure({
+        runId: failedRunId,
+        workItemId: failedWorkItemId,
+        reason: "TEST_LAYER:BUG03_TERMINAL_FAILURE"
+      });
+
+      const foreignRunId = await createRun(`bug03-foreign-${randomUUID()}`, 10, 1, 1, `asker:foreign:${randomUUID()}`);
+      const index = await new ServeRepository(database.pool).readAnswerIndex(ownerAskerId, 10, 0);
+
+      expect(index.total).toBe(3);
+      expect(index.items).toEqual([
+        expect.objectContaining({ answer_id: served.answerId, run_ref: servedWork.runId })
+      ]);
+      expect(index.open_runs).toEqual([
+        expect.objectContaining({
+          run_ref: failedRunId,
+          state: "FAILED",
+          terminal_reason: "TEST_LAYER:BUG03_TERMINAL_FAILURE"
+        }),
+        expect.objectContaining({ run_ref: runningRunId, state: "RUNNING", terminal_reason: null })
+      ]);
+      expect(index.open_runs.map((run) => run.run_ref)).not.toContain(foreignRunId);
+      expect(index.open_runs.map((run) => run.run_ref)).not.toContain(servedWork.runId);
+      expect(index.items.length + index.open_runs.length).toBeLessThanOrEqual(index.limit);
+      // MUT-BUG03-DROP-OPEN-READ: remove the open-run projection -> RED.
+      // MUT-BUG03-FOREIGN-LEAK-BOTH-GUARDS: remove both asker guards -> RED.
+      // MUT-BUG03-SERVED-DUPLICATE: remove NOT EXISTS serve.answer -> RED.
+      // MUT-BUG03-FAILED-REASON: erase terminal_reason -> RED.
+    } finally {
+      await provider.stop();
+    }
+  });
+
+  it("keeps a newer in-flight run on page one when served answers exceed HOME_PAGE_SIZE", async () => {
+    const ownerAskerId = `asker:bug04-ordering:${randomUUID()}`;
+    const servedFixtureCount = HOME_PAGE_SIZE + 1;
+
+    for (let fixtureIndex = 0; fixtureIndex < servedFixtureCount; fixtureIndex += 1) {
+      const label = `bug04-served-${fixtureIndex}-${randomUUID()}`;
+      const runId = await createRun(label, 10, 1, 1, ownerAskerId);
+      const carriers = await database.pool.query<{ work_item_id: string; fact_bundle_id: string }>(
+        `WITH work AS (
+           INSERT INTO core.work_item (
+             run_id, battery_row_id, node_set, command_key, state, created_at_seq
+           ) VALUES ($1,'Q1','[]'::jsonb,$2,'READY',ledger.allocate_sequence())
+           RETURNING work_item_id
+         ), bundle AS (
+           INSERT INTO serve.fact_bundle (run_id, facts, residual_objections, content_hash, version)
+           VALUES ($1,'[]'::jsonb,'[]'::jsonb,$3,1)
+           RETURNING fact_bundle_id
+         ) SELECT work_item_id, fact_bundle_id FROM work CROSS JOIN bundle`,
+        [runId, `bug04:${label}`, `hash:${label}`]
+      );
+      const answer = await database.pool.query<{ answer_id: string }>(
+        `INSERT INTO serve.answer (
+           answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
+           answer_form, condition_marks, fact_bundle_id, sealed_at_seq,
+           reversal_point, builds_on_previous, badges
+         ) VALUES (
+           1,$1,$2,'SERVED','COMPOSED','SUPPORTED','{}'::jsonb,'[]'::jsonb,$3,
+           ledger.allocate_sequence(),$4,'{"value":false,"answer_ref":null}'::jsonb,'[]'::jsonb
+         ) RETURNING answer_id`,
+        [runId, carriers.rows[0]!.work_item_id, carriers.rows[0]!.fact_bundle_id, `test-layer:${label}`]
+      );
+      await database.pool.query(
+        `UPDATE core.work_item
+         SET state='DONE', settled_attempt_id=gen_random_uuid(), settled_artifact_ref=$2
+         WHERE work_item_id=$1`,
+        [carriers.rows[0]!.work_item_id, answer.rows[0]!.answer_id]
+      );
+    }
+
+    const runningRunId = await createRun(`bug04-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+    const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId: runningRunId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `bug04:${runningRunId}:running`
+    });
+    await database.pool.query(
+      `UPDATE core.work_item
+       SET state = 'CLAIMED', claimed_by = 'worker:bug04', claim_deadline = clock_timestamp() + interval '1 hour'
+       WHERE work_item_id = $1`,
+      [runningWorkItemId]
+    );
+
+    const firstPage = await new ServeRepository(database.pool)
+      .readAnswerIndex(ownerAskerId, HOME_PAGE_SIZE, 0);
+
+    expect(firstPage.total).toBe(servedFixtureCount + 1);
+    expect(firstPage.open_runs).toEqual([
+      expect.objectContaining({ run_ref: runningRunId, state: "RUNNING" })
+    ]);
+    expect(firstPage.items).toHaveLength(HOME_PAGE_SIZE - 1);
+    // MUT-BUG04-SERVED-FIRST: order ANSWER rows before OPEN_RUN rows -> RED.
   });
 });
 
@@ -981,16 +1350,19 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
-  it("refuses depth-3 M=2 review coverage before persisting any model call", async () => {
+  it("refuses beyond-max depth-6 M=2 with RUN_DEPTH_PARAMS_INVALID before persisting any model call", async () => {
+    // DR-172 ratifies coverage for depths 1..5, so DR-157's depth bound is
+    // now the first guard a beyond-table depth meets; the load-bearing
+    // property stays: typed refusal, zero spend.
     const primary = await startProviderDouble([]);
     const secondary = await startProviderDouble([]);
     try {
-      const runId = await createRun("xrev-01-depth-3-envelope-refusal", 114, 2, 3);
+      const runId = await createRun("xrev-01-depth-6-envelope-refusal", 204, 2, 6);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
         nodeSet: [],
-        commandKey: "runner-test:xrev-01-depth-3-envelope-refusal"
+        commandKey: "runner-test:xrev-01-depth-6-envelope-refusal"
       });
       const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
         endpoint: primary.endpoint,
@@ -1012,7 +1384,7 @@ describe("apps/runner — legal command lifecycle", () => {
       });
 
       await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
-        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+        code: "RUN_DEPTH_PARAMS_INVALID"
       });
       expect(primary.calls()).toBe(0);
       expect(secondary.calls()).toBe(0);
@@ -1030,16 +1402,16 @@ describe("apps/runner — legal command lifecycle", () => {
   it("calls the depth guard for a mono-maker run before persisting any model call", async () => {
     const provider = await startProviderDouble([]);
     try {
-      const runId = await createRun("xrev-01-depth-5-mono-envelope-refusal", 402, 1, 5);
+      const runId = await createRun("xrev-01-depth-6-mono-envelope-refusal", 780, 1, 6);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
         nodeSet: [],
-        commandKey: "runner-test:xrev-01-depth-5-mono-envelope-refusal"
+        commandKey: "runner-test:xrev-01-depth-6-mono-envelope-refusal"
       });
 
       await expect(runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId)).rejects.toMatchObject({
-        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+        code: "RUN_DEPTH_PARAMS_INVALID"
       });
       expect(provider.calls()).toBe(0);
       const calls = await database.pool.query<{ count: string }>(
@@ -1140,6 +1512,10 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(reviews.rows).toHaveLength(16);
       expect(reviews.rows.every((row) => row.author_maker !== row.reviewer_maker)).toBe(true);
       expect(new Set(reviews.rows.map((row) => row.outcome))).toEqual(new Set(["agree", "dispute"]));
+      expect(await new JudgementRepository(database.pool).readLatestReviewerMaker(
+        runId,
+        reviews.rows[0]!.author_maker
+      )).toBe(reviews.rows.filter((row) => row.author_maker === reviews.rows[0]!.author_maker).at(-1)!.reviewer_maker);
 
       const firstNode = await database.pool.query<{ node_id: string; provenance_ref: string }>(
         `SELECT node_id, provenance_ref::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq LIMIT 1`,
@@ -1179,6 +1555,85 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally {
       await secondary.stop();
       await primary.stop();
+    }
+  });
+
+  it("wires the latest persisted reviewer into three-maker rotation on real PostgreSQL", async () => {
+    const makerA = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation A position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("agree", `Rotation A review ${index + 1}`))
+    ]);
+    const makerB = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation B position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("dispute", `Rotation B review ${index + 1}`))
+    ]);
+    const makerC = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation C position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("cannot-assess", `Rotation C review ${index + 1}`))
+    ]);
+    try {
+      const runId = await createRun("grok-01-three-maker-review-rotation", 30, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:grok-01-three-maker-review-rotation"
+      });
+      const gatewayA = createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/rotation-a", maker: "Rotation maker A"
+      });
+      const gatewayB = createPostgresProviderGateway(database.pool, {
+        endpoint: makerB.endpoint, model: "test-layer/rotation-b", maker: "Rotation maker B"
+      });
+      const gatewayC = createPostgresProviderGateway(database.pool, {
+        endpoint: makerC.endpoint, model: "test-layer/rotation-c", maker: "Rotation maker C"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, gatewayA, {
+        ...runnerSettings(),
+        providerRef: "provider:test-layer:rotation-a",
+        maker: "Rotation maker A",
+        critique: {
+          provider: gatewayB,
+          providerRef: "provider:test-layer:rotation-b",
+          maker: "Rotation maker B"
+        },
+        additionalMakers: [{
+          provider: gatewayC,
+          providerRef: "provider:test-layer:rotation-c",
+          maker: "Rotation maker C"
+        }],
+        scoringOperator: {
+          deploymentRowValue: "accumulate",
+          registerRef: "test-layer:DR-144"
+        },
+        testOnlyMakerCountGuardBypass: TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+      const reviews = await database.pool.query<{ author_maker: string; reviewer_maker: string }>(
+        `SELECT author.maker AS author_maker, reviewer.maker AS reviewer_maker
+         FROM ledger.node_review AS review
+         JOIN ledger.raw_artifact AS author ON author.raw_artifact_id=review.author_raw_artifact_ref
+         JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id=review.review_raw_artifact_ref
+         WHERE review.run_id=$1 ORDER BY review.at_seq`,
+        [runId]
+      );
+      const reviewersFor = (author: string): readonly string[] => reviews.rows
+        .filter((row) => row.author_maker === author)
+        .map((row) => row.reviewer_maker);
+      expect(reviewersFor("Rotation maker A")).toEqual([
+        "Rotation maker B", "Rotation maker C", "Rotation maker B", "Rotation maker C", "Rotation maker B"
+      ]);
+      expect(reviewersFor("Rotation maker B")).toEqual([
+        "Rotation maker A", "Rotation maker C", "Rotation maker A", "Rotation maker C", "Rotation maker A"
+      ]);
+      expect(reviewersFor("Rotation maker C")).toEqual([
+        "Rotation maker A", "Rotation maker B", "Rotation maker A", "Rotation maker B", "Rotation maker A"
+      ]);
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
     }
   });
 
@@ -1237,6 +1692,389 @@ describe("apps/runner — legal command lifecycle", () => {
       await secondary.stop();
       await primary.stop();
     }
+  });
+
+  it("T33 serves over the judged graph while retaining a class-H subtree as disclosed unjudged material", async () => {
+    const composition = JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "The judged position survives.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+    ] });
+    const primary = await startProviderDouble([
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary hidden-frame position ${index + 1}`)),
+      reviewDouble("agree", "Primary review 1"),
+      { status: 503 }, { status: 503 },
+      reviewDouble("agree", "Primary review 3"), reviewDouble("agree", "Primary review 4"),
+      composition,
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    const secondary = await startProviderDouble([
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary hidden-frame position ${index + 1}`)),
+      ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary review ${index + 1}`))
+    ]);
+    try {
+      const question = `resil01-class-h-${randomUUID()}`;
+      const runId = await createRun(question, 40, 2, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `resil01-class-h:${runId}`
+      });
+      const runRepository = new RunRepository(database.pool);
+      const record = (event: HoldProgressEvent) => runRepository.recordRunLifecycleEvent({
+        runId: event.runId,
+        kind: event.kind,
+        value: {
+          state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+          hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+          transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+        }
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        claimMs: 1_204_000,
+        runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+        hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+        holdRecorder: {
+          countCooldownHolds: (candidateRunId) => runRepository.countCooldownHolds(candidateRunId),
+          record,
+          wait: async () => undefined
+        },
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, `asker:${question}`);
+      expect(answer?.condition_marks).toContain("HIDDEN-UNJUDGEABLE");
+      const hiddenRecord = answer?.condition_mark_records.find((candidate) => candidate.mark === "HIDDEN-UNJUDGEABLE");
+      expect(hiddenRecord).toMatchObject({
+        call_site_key: expect.stringMatching(/^JUDGE:review:/),
+        terminal_transport_outcome: "FAILED",
+        excluded_from_served_number: true
+      });
+      const hiddenNodeId = hiddenRecord?.affected_node_ids[0];
+      if (hiddenNodeId === undefined) throw new Error("TEST_EXPECTED_HIDDEN_NODE");
+      expect(answer?.nodes.find((node) => node.node_id === hiddenNodeId)).toMatchObject({
+        final_strength: null,
+        condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
+      });
+      const storedNodes = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM core.node WHERE run_id=$1", [runId]
+      );
+      expect(storedNodes.rows[0]?.count).toBe("8");
+      const storedSnapshot = await new GraphRepository(database.pool).materialiseSnapshot(runId);
+      const targetNodeIds = [...new Set(storedSnapshot.arrows
+        .filter((arrow) => arrow.targetKind === "NODE")
+        .map((arrow) => arrow.targetNodeId!))];
+      const judged = evaluate(excludeHiddenSubtrees({
+        ...storedSnapshot,
+        operatorResolutions: targetNodeIds.map((parentNodeId) => ({
+          parentNodeId, operator: "accumulate" as const, suppliedBy: "deployment" as const
+        }))
+      }, [hiddenNodeId]));
+      const servedNode = answer?.nodes.find((node) => node.node_id !== hiddenNodeId && node.final_strength !== null);
+      expect(servedNode?.final_strength?.value).toBe(
+        judged.strengths.find((row) => row.nodeId === servedNode?.node_id)?.strength
+      );
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  it("RESIL-01 rev2 R1 serves the surviving maker when the preferred root's cross-maker review dies", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-r1-served-review-dead",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary R1 position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary R1 review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary R1 position ${index + 1}`)),
+        { status: 503 }, { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("dispute", `Secondary R1 review ${index + 2}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const hidden = scenario.answer?.condition_mark_records.find((record) => record.mark === "HIDDEN-UNJUDGEABLE");
+    const selection = scenario.answer?.condition_mark_records.find((record) => record.mark === "UNSERVED-MAKER-POSITION");
+    expect(hidden?.affected_node_ids).toHaveLength(1);
+    expect(selection?.subject_ref).not.toBe(hidden?.affected_node_ids[0]);
+    expect(scenario.answer?.nodes.find((node) => node.node_id === selection?.subject_ref)?.final_strength)
+      .not.toBeNull();
+  });
+
+  it("RESIL-01 rev2 R1 reports the review cause when every maker root is class H", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-r1-no-served-root",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary no-root position ${index + 1}`)),
+        { status: 503 }, { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary no-root review ${index + 2}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary no-root position ${index + 1}`)),
+        { status: 503 }, { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("dispute", `Secondary no-root review ${index + 2}`))
+      ]
+    });
+
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toMatchObject({ code: "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW" });
+    expect(scenario.error).not.toMatchObject({ code: "EMPTY_PROPAGATION" });
+  });
+
+  it("RESIL-01 rev2 R2 keeps a healthy tau-0.30 graph servable and makes class L presentation-only", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-r2-tau-030",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary low position ${index + 1}`, 0.30)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary low review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary low position ${index + 1}`, 0.30)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary low review ${index + 1}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const lowRecords = scenario.answer?.condition_mark_records.filter((record) => record.mark === "HIDDEN-LOW-SCORE") ?? [];
+    expect(lowRecords.length).toBeGreaterThan(0);
+    expect(lowRecords.every((record) => record.excluded_from_served_number === false)).toBe(true);
+    expect(scenario.answer?.nodes.some((node) => node.final_strength !== null)).toBe(true);
+  });
+
+  it("RESIL-01 rev2 R2 keeps a hidden low-scoring attack in the served-number evaluation", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-r2-low-attack",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary attack-control ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary attack review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        judgementDouble("Secondary attack-control root"),
+        judgementDouble("Healthy support"),
+        judgementDouble("Low scoring attack", 0.30),
+        judgementDouble("Healthy cross-root response"),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary attack review ${index + 1}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const lowRecord = scenario.answer?.condition_mark_records.find((record) =>
+      record.mark === "HIDDEN-LOW-SCORE" && record.hidden_strength === 0.30
+    );
+    expect(lowRecord).toMatchObject({ excluded_from_served_number: false });
+    const selection = scenario.answer?.condition_mark_records.find((record) => record.mark === "UNSERVED-MAKER-POSITION");
+    const servedNodeId = selection?.subject_ref;
+    if (servedNodeId === undefined) throw new Error("TEST_EXPECTED_SERVED_ROOT");
+    const targetNodeIds = [...new Set(scenario.snapshot.arrows
+      .filter((arrow) => arrow.targetKind === "NODE")
+      .map((arrow) => arrow.targetNodeId!))];
+    const full = evaluate({
+      ...scenario.snapshot,
+      operatorResolutions: targetNodeIds.map((parentNodeId) => ({
+        parentNodeId, operator: "accumulate" as const, suppliedBy: "deployment" as const
+      }))
+    });
+    expect(scenario.answer?.nodes.find((node) => node.node_id === servedNodeId)?.final_strength?.value)
+      .toBe(full.strengths.find((row) => row.nodeId === servedNodeId)?.strength);
+  });
+
+  it("RESIL-01 rev2 H6 classifies the exact <= 0.35 runner boundary as presentation-only class L", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-h6-boundary",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary boundary ${index + 1}`, 0.35)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary boundary review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary boundary ${index + 1}`, 0.35)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary boundary review ${index + 1}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "HIDDEN-LOW-SCORE",
+      hidden_strength: 0.35,
+      hidden_score_threshold: 0.35,
+      excluded_from_served_number: false
+    }));
+  });
+
+  it("RESIL-01 rev2 H1 routes primary maker-position death through cooldown without an expansion event", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-h1-primary-wrap",
+      primary: [{ status: 503 }, { status: 503 }],
+      secondary: []
+    });
+    expect(scenario.error).toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      kind: "node.retrying", state: "COOLDOWN_HOLD", call_site_key: "JUDGE"
+    }));
+    expect(scenario.lifecycle.some((event) => event.state === "EXPANSION_HALTED")).toBe(false);
+  });
+
+  it("RESIL-01 rev2 H2 routes secondary maker-position death through cooldown without an expansion event", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-h2-secondary-wrap",
+      primary: [judgementDouble("Healthy primary maker position")],
+      secondary: [{ status: 503 }, { status: 503 }]
+    });
+    expect(scenario.error).toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      kind: "node.retrying", state: "COOLDOWN_HOLD", call_site_key: "JUDGE:root:secondary"
+    }));
+    expect(scenario.lifecycle.some((event) => event.state === "EXPANSION_HALTED")).toBe(false);
+  });
+
+  it("RESIL-01 rev2 H10 skips a halted expansion subtree and reports cumulative attempts spent", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "resil01-h10-halted-expansion",
+      depth: 2,
+      primary: [
+        ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Primary depth-2 surviving ${index + 1}`)),
+        ...Array.from({ length: 7 }, (_, index) => reviewDouble("agree", `Primary depth-2 review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        judgementDouble("Secondary depth-2 root"),
+        { status: 503 }, { status: 503 },
+        ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Secondary depth-2 surviving ${index + 1}`)),
+        ...Array.from({ length: 6 }, (_, index) => reviewDouble("dispute", `Secondary depth-2 review ${index + 1}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      kind: "ledger.could_not_do",
+      state: "EXPANSION_HALTED",
+      call_site_key: "JUDGE:defender:root0:r1:p0",
+      attempts_spent: 2,
+      planned_leg_count: 3
+    }));
+    const skippedDescendants = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ledger.ledger_entry
+       WHERE run_id=$1 AND action_kind='MODEL_CALL'
+         AND call_site_key IN ('JUDGE:defender:root0:r2:p2', 'JUDGE:critic:root0:r2:p2')`,
+      [scenario.runId]
+    );
+    expect(skippedDescendants.rows[0]?.count).toBe("0");
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED",
+      planned_leg_count: 3
+    }));
+  });
+
+  it("RESIL-01 rev2 T11 keeps an effective-bound site whose last attempt succeeded out of preflight terminal failure", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeResil01Scenario({
+      label: "resil01-t11-successful-last-attempt",
+      primary: [judgementDouble("Primary T11 root")],
+      secondary: [judgementDouble("Secondary T11 root")],
+      beforeExecute: async ({ runId, workItemId }) => {
+        const ledger = new LedgerRepository(database.pool);
+        for (const outcome of ["FAILED", "OK"] as const) {
+          const now = new Date();
+          await ledger.append({
+            runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey,
+            subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome,
+            actorRef: "provider:test-layer:secondary", inputHash: `input:${outcome}`,
+            contractHash: "contract:judge:test-layer", rawArtifactRef: null,
+            startedAt: now, finishedAt: now
+          });
+        }
+      }
+    });
+
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    const state = await database.pool.query<{ state: string }>(
+      "SELECT state FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(state.rows[0]?.state).toBe("CLAIMED");
+  });
+
+  it("RESIL-01 rev2 T12 hands an effective-bound failed non-root site to the halt path", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeResil01Scenario({
+      label: "resil01-t12-failed-site-pruned",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T12 ${index + 1}`)),
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary T12 review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Secondary T12 ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary T12 review ${index + 1}`))
+      ],
+      beforeExecute: async ({ runId, workItemId }) => {
+        const ledger = new LedgerRepository(database.pool);
+        for (let index = 0; index < 2; index += 1) {
+          const now = new Date();
+          await ledger.append({
+            runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey,
+            subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "FAILED",
+            actorRef: "provider:test-layer:secondary", inputHash: `input:failed:${index}`,
+            contractHash: "contract:judge:test-layer", rawArtifactRef: null,
+            startedAt: now, finishedAt: now
+          });
+        }
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 2
+    }));
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
   });
 
   it("preserves the database producer-grading refusal instead of laundering it", async () => {

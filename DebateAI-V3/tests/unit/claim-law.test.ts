@@ -16,5 +16,19 @@ describe("ADR-0017 clause 3 — six-case Hatchet composition", () => {
   it("refuses a claim duration that does not cover the call deadline plus configured margin", () => {
     expect(() => assertClaimCoversCall({ claimMs: 5_999, deadlineMs: 5_000, marginMs: 1_000 })).toThrow("CLAIM_BOUND_MISMATCH");
     expect(() => assertClaimCoversCall({ claimMs: 6_000, deadlineMs: 5_000, marginMs: 1_000 })).not.toThrow();
+    expect(() => assertClaimCoversCall({
+      claimMs: 1_215_999,
+      deadlineMs: 5_000,
+      marginMs: 1_000,
+      cooldownMs: 600_000,
+      maxCooldownHoldsPerRun: 2
+    })).toThrow("CLAIM_BOUND_MISMATCH");
+    expect(() => assertClaimCoversCall({
+      claimMs: 1_216_000,
+      deadlineMs: 5_000,
+      marginMs: 1_000,
+      cooldownMs: 600_000,
+      maxCooldownHoldsPerRun: 2
+    })).not.toThrow(); // MUT-RESIL01-T14: omit a hold/deadline term -> RED.
   });
 });

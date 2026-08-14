@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import { allocateSequence, RunRepository, withWriteTransaction } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -769,13 +769,20 @@ export interface MemoryQuestionRegistration {
 }
 
 export interface ConditionMarkRecord {
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
   readonly servedRootRule: "first-configured-provider" | null;
   readonly affectedNodeIds: readonly string[];
+  readonly callSiteKey?: string | null;
+  readonly plannedLegCount?: number | null;
+  readonly terminalTransportOutcome?: "TIMED_OUT" | "FAILED" | null;
+  readonly hiddenStrength?: number | null;
+  readonly hiddenScoreThreshold?: number | null;
+  readonly hiddenScoreThresholdSourceRef?: string | null;
+  readonly excludedFromServedNumber?: boolean | null;
 }
 
 const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
@@ -785,7 +792,10 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "UNRESOLVED-TYPE-FALLBACK",
   "UNSERVED-MAKER-POSITION",
   "SINGLE-LINEAGE",
-  "CRITIQUE-UNAVAILABLE"
+  "CRITIQUE-UNAVAILABLE",
+  "HIDDEN-UNJUDGEABLE",
+  "HIDDEN-LOW-SCORE",
+  "UNAUTHORED-BRANCH-HALTED"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -804,6 +814,25 @@ export function assertRequiredConditionMarkRecords(
       "CONDITION_MARK_RECORD_WITHOUT_MARK",
       `${orphan.mark} has a typed persistence record but is absent from the served answer marks`
     );
+  }
+  for (const record of records) {
+    if (record.mark === "HIDDEN-UNJUDGEABLE" && (
+      record.callSiteKey == null || record.terminalTransportOutcome == null
+      || record.excludedFromServedNumber !== true
+    )) {
+      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class H requires call site, transport outcome, and served-number exclusion");
+    }
+    if (record.mark === "HIDDEN-LOW-SCORE" && (
+      record.hiddenStrength == null || record.hiddenScoreThreshold == null
+      || record.hiddenScoreThresholdSourceRef == null || record.excludedFromServedNumber !== false
+    )) {
+      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class L requires strength, threshold provenance, and presentation-only status");
+    }
+    if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
+      record.callSiteKey == null || record.plannedLegCount == null || record.terminalTransportOutcome == null
+    )) {
+      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class N requires call site, planned leg count, and transport outcome");
+    }
   }
 }
 
@@ -1011,8 +1040,10 @@ export class ServeRepository {
       for (const record of conditionMarkRecords) {
         const mark = await client.query<{ condition_mark_id: string }>(
           `INSERT INTO serve.condition_mark (
-             answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule,
+             call_site_key, planned_leg_count, terminal_transport_outcome, hidden_strength,
+             hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number, at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
@@ -1023,6 +1054,13 @@ export class ServeRepository {
             record.reason,
             record.liftPath,
             record.servedRootRule,
+            record.callSiteKey ?? null,
+            record.plannedLegCount ?? null,
+            record.terminalTransportOutcome ?? null,
+            record.hiddenStrength ?? null,
+            record.hiddenScoreThreshold ?? null,
+            record.hiddenScoreThresholdSourceRef ?? null,
+            record.excludedFromServedNumber ?? null,
             await allocateSequence(client)
           ]
         );
@@ -1224,8 +1262,22 @@ export class ServeRepository {
       reason: string;
       lift_path: string | null;
       served_root_rule: "first-configured-provider" | null;
+      call_site_key: string | null;
+      planned_leg_count: number | null;
+      terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
+      hidden_strength: number | null;
+      hidden_score_threshold: number | null;
+      hidden_score_threshold_source_ref: string | null;
+      excluded_from_served_number: boolean | null;
+      affected_node_ids: string[];
     }>(
-      `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule
+      `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule,
+              call_site_key, planned_leg_count, terminal_transport_outcome,
+              hidden_strength, hidden_score_threshold, hidden_score_threshold_source_ref,
+              excluded_from_served_number,
+              ARRAY(SELECT link.node_id::text FROM serve.condition_mark_node AS link
+                    WHERE link.condition_mark_id=serve.condition_mark.condition_mark_id
+                    ORDER BY link.node_id) AS affected_node_ids
        FROM serve.condition_mark
        WHERE answer_id = $1 AND answer_version = $2
        ORDER BY at_seq`,
@@ -1284,7 +1336,15 @@ export class ServeRepository {
         subject_ref: record.subject_ref,
         reason: record.reason,
         lift_path: record.lift_path,
-        served_root_rule: record.served_root_rule
+        served_root_rule: record.served_root_rule,
+        call_site_key: record.call_site_key,
+        planned_leg_count: record.planned_leg_count,
+        terminal_transport_outcome: record.terminal_transport_outcome,
+        hidden_strength: record.hidden_strength === null ? null : Number(record.hidden_strength),
+        hidden_score_threshold: record.hidden_score_threshold === null ? null : Number(record.hidden_score_threshold),
+        hidden_score_threshold_source_ref: record.hidden_score_threshold_source_ref,
+        excluded_from_served_number: record.excluded_from_served_number,
+        affected_node_ids: record.affected_node_ids
       })),
       reversal_point: row.reversal_point,
       builds_on_previous: {
@@ -1327,33 +1387,75 @@ export class ServeRepository {
     if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
       throw new TypedDomainError("ANSWER_INDEX_PAGE_INVALID", "An explicit positive limit and nonnegative offset are required");
     }
-    const [ids, count] = await Promise.all([
-      this.pool.query<{ answer_id: string }>(
-        `SELECT answer.answer_id
-         FROM serve.answer AS answer
-         JOIN core.run AS run ON run.run_id=answer.run_id
-         WHERE run.asker_id=$1
-         GROUP BY answer.answer_id
-         ORDER BY max(answer.sealed_at_seq) DESC
+    const [page, count] = await Promise.all([
+      this.pool.query<{
+        kind: "ANSWER" | "OPEN_RUN";
+        answer_id: string | null;
+        run_ref: string;
+        question_line: string;
+        created_at_sequence: string;
+      }>(
+        `WITH served AS (
+           SELECT DISTINCT ON (run.run_id)
+             'ANSWER'::text AS kind,
+             answer.answer_id,
+             run.run_id AS run_ref,
+             run.question_line,
+             run.created_at_seq AS created_at_sequence
+           FROM core.run AS run
+           JOIN serve.answer AS answer ON answer.run_id = run.run_id
+           WHERE run.asker_id = $1
+           ORDER BY run.run_id, answer.sealed_at_seq DESC
+         ), open_run AS (
+           SELECT
+             'OPEN_RUN'::text AS kind,
+             NULL::uuid AS answer_id,
+             run.run_id AS run_ref,
+             run.question_line,
+             run.created_at_seq AS created_at_sequence
+           FROM core.run AS run
+           WHERE run.asker_id = $1
+             AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
+         )
+         SELECT kind, answer_id, run_ref, question_line, created_at_sequence
+         FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
+         ORDER BY created_at_sequence DESC
          LIMIT $2 OFFSET $3`, [askerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(DISTINCT answer.answer_id)::text AS count
-         FROM serve.answer AS answer JOIN core.run AS run ON run.run_id=answer.run_id
-         WHERE run.asker_id=$1`, [askerId]
+        `SELECT count(*)::text AS count FROM core.run WHERE asker_id=$1`, [askerId]
       )
     ]);
-    const answers = await Promise.all(ids.rows.map((row) => this.readAnswerProjection(row.answer_id, askerId)));
+    const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
+    const answers = await Promise.all(answerRows.map(async (row) => ({
+      row,
+      answer: await this.readAnswerProjection(row.answer_id, askerId)
+    })));
+    const runRepository = new RunRepository(this.pool);
+    const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
+    const openRuns = await Promise.all(openRows.map(async (row) => ({
+      row,
+      projection: await runRepository.readLoadingProjection(row.run_ref, askerId)
+    })));
     return AnswerIndexSchema.parse({
-      items: answers.flatMap((answer) => answer === null ? [] : [{
+      items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
         answer_id: answer.answer_id,
+        run_ref: answer.run_ref,
         answer_version: answer.answer_version,
         question_line: answer.question_line,
         verdict_state: answer.verdict_state,
         abstention: answer.abstention,
         serve_state: answer.serve_state,
         staleness_state: answer.staleness_state,
-        builds_on_previous: answer.builds_on_previous.value
+        builds_on_previous: answer.builds_on_previous.value,
+        created_at_sequence: Number(row.created_at_sequence)
+      }]),
+      open_runs: openRuns.flatMap(({ row, projection }) => projection === null ? [] : [{
+        run_ref: projection.runRef,
+        question_line: projection.questionLine,
+        state: projection.state,
+        terminal_reason: projection.terminalReason,
+        created_at_sequence: Number(row.created_at_sequence)
       }]),
       limit,
       offset,
@@ -1598,17 +1700,17 @@ export class ServeRepository {
       reviewer_provider_ref: string | null;
       locator: string | null;
       tau: number;
-      strength: number;
+      strength: number | null;
       base_number_kind: string;
       base_source_ref: string;
       base_producer: string;
       base_replay_handle: string;
       base_provenance_ref: string;
-      final_number_kind: string;
-      final_source_ref: string;
-      final_producer: string;
-      final_replay_handle: string;
-      final_provenance_ref: string;
+      final_number_kind: string | null;
+      final_source_ref: string | null;
+      final_producer: string | null;
+      final_replay_handle: string | null;
+      final_provenance_ref: string | null;
       disagreement: Readonly<Record<string, unknown>> | null;
       defeater_refs: string[];
       check_status: "PASS" | "FAIL" | "NOT_SAMPLED";
@@ -1654,7 +1756,7 @@ export class ServeRepository {
          SELECT reduced_judgement_id, tau, number_kind, source_ref, producer, replay_handle, disagreement FROM ledger.reduced_judgement
          WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1
        ) AS judgement ON true
-       JOIN LATERAL (
+       LEFT JOIN LATERAL (
          SELECT record.* FROM ledger.node_strength_record AS record
          JOIN ledger.propagation_run AS propagation
            ON propagation.propagation_run_id = record.propagation_run_id
@@ -1701,14 +1803,21 @@ export class ServeRepository {
         provenance_ref: row.base_provenance_ref,
         replay_handle: row.base_replay_handle
       },
-      final_strength: {
-        value: Number(row.strength),
-        kind: row.final_number_kind,
-        source: row.final_source_ref,
-        producer: row.final_producer,
-        provenance_ref: row.final_provenance_ref,
-        replay_handle: row.final_replay_handle
-      },
+      final_strength: row.strength === null
+        || row.final_number_kind === null
+        || row.final_source_ref === null
+        || row.final_producer === null
+        || row.final_provenance_ref === null
+        || row.final_replay_handle === null
+        ? null
+        : {
+            value: Number(row.strength),
+            kind: row.final_number_kind,
+            source: row.final_source_ref,
+            producer: row.final_producer,
+            provenance_ref: row.final_provenance_ref,
+            replay_handle: row.final_replay_handle
+          },
       provenance_ref: row.provenance_ref,
       maker_lineage: projectNodeMakerLineage(row),
       review: row.review_outcome === null || row.review_reasons === null || row.review_provenance_ref === null

@@ -222,7 +222,10 @@ describe("ACC-01 dry-run ceremony", () => {
       },
       // FAIR-01: the second maker's relay endpoint plus its honestly-reported
       // model id (live: the claude CLI handshake reports it; here: the double).
-      criticRelay: { baseUrl: criticProvider.endpoint, model: "test-layer/critic-model" }
+      makerRelays: [
+        { providerRef: "acceptance:claude-cli", baseUrl: criticProvider.endpoint, model: "test-layer/critic-model" },
+        { providerRef: "acceptance:grok-cli", baseUrl: criticProvider.endpoint, model: "test-layer/grok-model" }
+      ]
     });
     const token = "acc-01-owner-token";
     const ask = await runtime.api.inject({

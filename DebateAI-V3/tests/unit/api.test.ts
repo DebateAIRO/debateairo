@@ -16,7 +16,7 @@ function fixtureApplication(): AskApplication {
     readAnswer: async () => null,
     readRunAnswer: async () => null,
     readRun: async () => null,
-    readAnswerIndex: async (_session, limit, offset) => ({ items: [], limit, offset, total: 0 }),
+    readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
     readDeployment: async () => ({
       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
@@ -413,7 +413,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect((await api.inject({ method: "GET", url: "/v1/answers", headers: { "x-user-dev-token": "test-token" } })).statusCode).toBe(400);
     const response = await api.inject({ method: "GET", url: "/v1/answers?limit=3&offset=0", headers: { "x-user-dev-token": "test-token" } });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ items: [], limit: 3, offset: 0, total: 0 });
+    expect(response.json()).toEqual({ items: [], open_runs: [], limit: 3, offset: 0, total: 0 });
     await api.close();
   });
 
@@ -423,7 +423,8 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       run_ref: runId,
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     } : null;
     const api = buildApi({ application });
     const queued = await api.inject({
@@ -436,7 +437,8 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       run_ref: "run:queued",
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
-      terminal_reason: null
+      terminal_reason: null,
+      hold_until: null
     });
     expect((await api.inject({
       method: "GET",

@@ -47,7 +47,12 @@ export class ProviderCallFailedError extends TypedDomainError {
   override readonly code = "PROVIDER_CALL_FAILED";
   override readonly cause: unknown;
 
-  constructor(cause: unknown) {
+  constructor(
+    cause: unknown,
+    readonly attempts: number,
+    readonly lastOutcome: "TIMED_OUT" | "FAILED",
+    readonly lastLedgerEntryRef: string
+  ) {
     super("PROVIDER_CALL_FAILED", "PROVIDER_CALL_FAILED");
     this.name = "ProviderCallFailedError";
     this.cause = cause;
@@ -186,6 +191,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     }
     const fetcher = this.#options.fetchImplementation ?? fetch;
     let lastError: unknown;
+    let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
+    let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let attemptPacket = request.packet;
     let lastContentRejection: {
       attempts: number;
@@ -327,21 +334,24 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       } catch (error) {
         lastContentRejection = null;
         lastError = error;
-        if (!ledgerRecorded) await this.#options.appendLedgerEntry({
+        if (!ledgerRecorded) {
+          lastOutcome = error instanceof DOMException && error.name === "TimeoutError" ? "TIMED_OUT" : "FAILED";
+          lastLedgerEntryRef = await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
           actionKind: "MODEL_CALL",
           callSiteKey: request.callSiteKey,
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
-          outcome: error instanceof DOMException && error.name === "TimeoutError" ? "TIMED_OUT" : "FAILED",
+          outcome: lastOutcome,
           inputHash,
           contractHash: request.contractHash,
           actorRef: request.providerRef,
           rawArtifactRef,
           startedAt,
           finishedAt: new Date()
-        });
+          });
+        }
       }
     }
     if (lastContentRejection !== null) {
@@ -353,7 +363,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         lastContentRejection.ledgerEntryRef
       );
     }
-    throw new ProviderCallFailedError(lastError);
+    throw new ProviderCallFailedError(
+      lastError,
+      request.bound.maxAttempts,
+      lastOutcome,
+      lastLedgerEntryRef
+    );
   }
 }
 

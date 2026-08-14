@@ -73,6 +73,8 @@ describe("S05 ownership through the restored V2 data layer", () => {
   it("serves the owner their own debate (200 path)", async () => {
     const client = createBrowserContractClient(throughProxy);
     const bundle = await getDebateBundle(answer.answer_id, OWNER_TOKEN, client);
+    expect(bundle.kind).toBe("served");
+    if (bundle.kind !== "served") throw new Error("expected served owner debate");
     expect(bundle.answer.answer_id).toBe(answer.answer_id);
     expect(bundle.detail.topic).toBe(answer.question_line);
     expect(bundle.detail.tree?.children[0]?.children[0]?.node_type).toBe("CON");

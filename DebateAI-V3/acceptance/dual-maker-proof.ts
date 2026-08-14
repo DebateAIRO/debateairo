@@ -125,7 +125,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
         pool,
         endpoint: `${shim.baseUrl}/v1`,
         model: ACCEPTANCE_MODEL,
-        provider: policy.providers.openai,
+        provider: policy.providers[0]!,
         policy
       }),
       await callThroughMaker({
@@ -134,7 +134,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
         // DR-115: the Anthropic model id comes from the relay's real CLI
         // handshake, never from a literal in this file.
         model: relay.model,
-        provider: policy.providers.anthropic,
+        provider: policy.providers[1]!,
         policy
       })
     ];
@@ -154,7 +154,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
       }
     }
     const persistedMakers = [...new Set(persisted.rows.map((row) => row.maker))].sort();
-    const declaredMakers = [policy.providers.anthropic.maker, policy.providers.openai.maker].sort();
+    const declaredMakers = policy.providers.slice(0, 2).map((provider) => provider.maker).sort();
     if (persistedMakers.length !== declaredMakers.length
       || persistedMakers.some((maker, index) => maker !== declaredMakers[index])) {
       throw new Error(`DUAL_MAKER_PROOF_MAKERS_UNSATISFIED:${persistedMakers.join(",")}`);

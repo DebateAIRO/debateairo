@@ -225,8 +225,20 @@ export interface CurrentRunState {
 export interface RunLoadingProjection {
   readonly runRef: string;
   readonly questionLine: string;
-  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "FAILED";
+  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   readonly terminalReason: string | null;
+  readonly holdUntil: Date | null;
+}
+
+export interface RunLifecycleEventValue {
+  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "EXPANSION_HALTED";
+  readonly call_site_key: string;
+  readonly parent_node_ref: string | null;
+  readonly hold_ms: number;
+  readonly hold_until: string | null;
+  readonly attempts_spent: number;
+  readonly transport_outcome: "TIMED_OUT" | "FAILED";
+  readonly planned_leg_count: number;
 }
 
 export interface CompletionActivationResolution {
@@ -238,6 +250,31 @@ export interface CompletionActivationResolution {
 
 export class RunRepository {
   constructor(private readonly pool: Pool) {}
+
+  async countCooldownHolds(runId: string): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM core.run_progress_event
+       WHERE run_id=$1 AND kind='node.retrying'
+         AND value_json->>'state'='COOLDOWN_HOLD'`,
+      [runId]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async recordRunLifecycleEvent(input: {
+    readonly runId: string;
+    readonly kind: "node.retrying" | "ledger.could_not_do";
+    readonly value: RunLifecycleEventValue;
+  }): Promise<void> {
+    await withWriteTransaction(this.pool, async (client) => {
+      await client.query(
+        `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+         VALUES ($1,$2,$3,$4::jsonb)`,
+        [input.runId, await allocateSequence(client), input.kind, JSON.stringify(input.value)]
+      );
+    });
+  }
 
   async startRun(input: StartRunInput): Promise<string> {
     const client = await this.pool.connect();
@@ -316,16 +353,31 @@ export class RunRepository {
       question_line: string;
       state: RunLoadingProjection["state"];
       terminal_reason: string | null;
+      hold_until: Date | null;
     }>(
       `SELECT run.run_id, run.question_line,
          CASE
+           WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
-           WHEN bool_or(work.state = 'CLAIMED') THEN 'CLAIMED'
+           WHEN bool_or(work.state = 'CLAIMED') AND COALESCE((
+             SELECT event.value_json->>'state' = 'COOLDOWN_HOLD'
+               AND (event.value_json->>'hold_until')::timestamptz > clock_timestamp()
+             FROM core.run_progress_event AS event
+             WHERE event.run_id=run.run_id AND event.kind='node.retrying'
+             ORDER BY event.at_seq DESC LIMIT 1
+           ), false) THEN 'HOLDING'
+           WHEN bool_or(work.state = 'CLAIMED') THEN 'RUNNING'
            WHEN bool_or(work.state = 'READY') THEN 'QUEUED'
-           ELSE 'RUNNING'
+           ELSE 'SETTLED'
          END AS state,
          (array_agg(work.terminal_reason ORDER BY work.created_at_seq DESC)
-           FILTER (WHERE work.state = 'FAILED'))[1] AS terminal_reason
+           FILTER (WHERE work.state = 'FAILED'))[1] AS terminal_reason,
+         (SELECT CASE WHEN event.value_json->>'state' = 'COOLDOWN_HOLD'
+                           AND (event.value_json->>'hold_until')::timestamptz > clock_timestamp()
+                      THEN (event.value_json->>'hold_until')::timestamptz ELSE NULL END
+          FROM core.run_progress_event AS event
+          WHERE event.run_id=run.run_id AND event.kind='node.retrying'
+          ORDER BY event.at_seq DESC LIMIT 1) AS hold_until
        FROM core.run AS run
        LEFT JOIN core.work_item AS work ON work.run_id = run.run_id
        WHERE run.run_id = $1 AND run.asker_id = $2
@@ -338,7 +390,8 @@ export class RunRepository {
       runRef: row.run_id,
       questionLine: row.question_line,
       state: row.state,
-      terminalReason: row.terminal_reason
+      terminalReason: row.terminal_reason,
+      holdUntil: row.hold_until
     });
   }
 

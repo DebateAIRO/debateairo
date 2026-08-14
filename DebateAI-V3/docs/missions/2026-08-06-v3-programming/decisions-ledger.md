@@ -1264,3 +1264,176 @@ supersedes | status`.
   refuse-before-spend, per-call-site 3 attempts) stands. | V ruled the
   waiting finishing-packet §2 table after hitting the refusal live | depth
   3-5 unlock | — | ACTIVE
+
+| DR-172-A | 2026-08-14 | Orchestrator (V's small-ticket grant), on V hitting
+  the refusal live after ratification | **AMENDMENT — THE COVERAGE GUARD IS
+  SYNCED TO DR-172.** XREV-01's assertReviewCoverageEnvelopeRatified was a
+  hardcoded pre-ratification placeholder (`depth > 2` throw, comment:
+  larger members remain V's to ratify) that never read the register — so
+  DR-172's seed change alone could not unlock depth 3+, and V's first
+  post-ratification depth-5 ask was refused. Fix: the guard now carries the
+  ratified table (depths 1..5 pass; beyond stays the typed refusal, also
+  unreachable in production because DR-157's RUN_DEPTH_PARAMS_INVALID bound
+  fires first). Tests re-pinned: unit test kills the revert-to-placeholder
+  and delete-the-guard mutations; the two integration refusal scenarios
+  move to depth 6 and pin the TRUE first guard (RUN_DEPTH_PARAMS_INVALID,
+  zero spend). ORCHESTRATOR CONFESSION for the record: the 2026-08-13
+  "depth-5 unlock probe" proved nothing — its agent_count-3 poison died at
+  the maker guard, which fires BEFORE coverage, making the probe a check
+  that could not fail for its believed reason (F1, the retrospective's own
+  defect class, in the orchestrator's verification). Takes effect at the
+  next stack boot. | V's depth-5 ask refused after ratification | depth 3-5
+  unlock, for real | — | ACTIVE
+
+| DR-173 | 2026-08-14 | V (deadline card: "180s") | **THE JUDGE CALL DEADLINE
+  IS 180 SECONDS PER ATTEMPT.** acceptanceOrganCostBounds.JUDGE.deadlineMs
+  moves 60_000 → 180_000. Evidence: V's first real depth-5 run (18a664d3,
+  "How do I fry scream?") died at JUDGE:critic:root0:r5:p17 after three
+  consecutive 60-second timeouts — the last SUCCESSFUL claude-relay call
+  took 50s of its 60s budget, so sustained deep-node latency was grazing
+  the ceiling until it tripped; 35 good calls of spend were lost. A truly
+  dead relay still fails within ~9 minutes (3 × 180s). COMPOSER and
+  CONFORMANCE stay at 60s (no observed pressure). Register hash changes →
+  backup-then-reseed at next boot. | one 60s-tuned bound met depth-5
+  reality | depth-5 viability | — | ACTIVE
+
+| DR-174 | 2026-08-14 | V (death-policy card: "For now, wait for 10 minutes
+  and then do Prune + Serve with marks") | **RUN DEATH POLICY — COOLDOWN,
+  FINAL RETRY, THEN PRUNE AND SERVE WITH MARKS.** Supersedes die-loud
+  (VROW-4 resolved). Orchestrator's stated reading of V's words, recorded
+  for correction: when a call site exhausts its attempt bound, the run
+  HOLDS for 10 minutes (provider recovery window), retries the site once
+  more, and only if still failing PRUNES the subtree that cannot be judged
+  and SERVES everything settled, carrying a typed honesty mark naming what
+  was pruned and why. V's no-opinion-unjudged law (DR-165(3)) holds — the
+  pruned nodes never serve. The 10-minute cooldown is V's ruled number (a
+  register row, never a literal). Implementation crosses module seams (new
+  kernel condition-mark vocabulary, runner lifecycle, serve marks) → goes
+  through the DR-171 architecture consult before any ticket. "For now"
+  noted: V may re-rule after seeing it live. | a 40-call depth-5 run died
+  to one throttled call site | run resilience | — | ACTIVE
+
+| DR-174-A | 2026-08-14 | V (architect cards) | **AMENDMENTS TO THE DEATH
+  POLICY, V's four answers.** (1) HOLD CAP: a run may spend at most TWO
+  10-minute holds; after the cap, further exhaustions proceed straight to
+  the serve-with-marks path. (2) TRANSPORT ONLY: holds apply to transport
+  exhaustion; schema exhaustion keeps its BUG-01 corrective-retry behavior
+  with no hold. (3) ROOT VOCABULARY CORRECTED BY V: "The root is the
+  question in its own, right? The root cannot die." — TRUE and now canon:
+  the tree's root is THE QUESTION (user-authored, no model call, undying);
+  the two maker POSITIONS are its children. The architect's "dead root"
+  scenario is therefore a DEAD MAKER-POSITION; its policy is an OPEN V ROW
+  (die loud vs serve the surviving maker with marks — interacts with the
+  pending mono-maker ruling). (4) HIDDEN, NOT PRUNED — V's design ruling:
+  "Not Pruned, not removed. But hidden. If it cannot be judged, or the
+  scoring is too low, it is hidden. we got a 'show hidden' button for a
+  reason." Authored-but-unjudgeable material is HIDDEN behind the existing
+  show-hidden affordance (recoverable, disclosed), NOT filtered out of
+  existence; never-authored legs (the call died before any node existed)
+  cannot be hidden or shown — the mark discloses that expansion halted
+  there. V EXTENDED the hidden class to LOW-SCORING nodes — the threshold
+  "too low" is an unruled VALUE: register row, V's number to come, never a
+  literal. Mark naming moves to V's hidden vocabulary (HIDDEN-UNJUDGEABLE
+  family, exact member minted at plan revision). DR-165(3) interplay: a
+  hidden unjudged node revealed by the button is DISCLOSED-as-unjudged,
+  not served-as-opinion — the plan revision must carry that distinction.
+  | V corrected the frame from removal to concealment | DR-174 plan
+  revision | — | ACTIVE
+
+| DR-175 | 2026-08-14 | V ("How about you let Grok Join the fun and let it
+  have a point of view in the debate as well? it can also review and MAYBE
+  it will prevent you and Codex from forming an echo chamber") | **GROK
+  GAINS A DELIBERATIVE SEAT — the cross-lineage law applied to the loop
+  itself.** The coding loop is structurally a debate (positions, reviews,
+  verdicts) whose frames were all set by one lineage: the orchestrator
+  (Claude) writes packets, Opus (Claude) architects plan, Opus lenses
+  verify — Grok held refutation authority only AFTER the frame existed.
+  Ruled changes: (1) DR-171 consults become two-lineage — the Opus
+  architect's plan is met by a GROK POSITION that may propose a different
+  design, not merely authorize/refute; genuine disagreements surface to V
+  as options, never pre-converged by one lineage. (2) Open value questions
+  travel to V carrying BOTH lineages' views where they differ — the
+  orchestrator's "(Recommended)" is no longer single-sourced on contested
+  calls. (3) Non-trivial goal packets may receive a Grok frame-critique
+  before dispatch when the orchestrator's scoping embeds contestable
+  design. (4) Grok keeps every existing review seat. Effective
+  immediately: DR-174's open rows (mark names, threshold shape,
+  dead-maker-position policy) go to V only after Grok's own position is
+  taken alongside the architect's. | V named the echo-chamber risk in the
+  loop's own architecture | loop governance | — | ACTIVE
+
+| DR-176 | 2026-08-14 | V (dual-lineage card round, the first under DR-175)
+  | **THE HIDDEN-FRAME VOCABULARY AND POLICY, settled.** (1) Mark members:
+  HIDDEN-UNJUDGEABLE (authored, cross-review dead — revealable),
+  HIDDEN-LOW-SCORE (authored, strength ≤ T — revealable), and
+  UNAUTHORED-BRANCH-HALTED (never authored — nothing to reveal; GROK'S
+  POSITION over the architect's HIDDEN-UNJUDGEABLE-UNAUTHORED, V ruling
+  that the HIDDEN family must not promise a reveal that cannot exist —
+  the first deliberative split resolved by V under DR-175). (2)
+  hiddenNodeScoreThreshold = 0.35 ABSOLUTE (strength ≤ T hides): V
+  legalizes the incumbent UI literal — no visual change, full provenance;
+  the hardcoded 0.35 in debateTreeUtils.ts is RETIRED for the register
+  row; the null-guard survives verbatim (a missing score is never a low
+  score). (3) DEAD MAKER POSITION: die-loud CONFIRMED (after the full
+  hold + final retry courtesy, which MUST also wrap the primary position
+  path per Grok's funnel refutation); the mono-maker ruling stays open.
+  (4) NODE_REVIEW_UNAVAILABLE loud stop RETIRED: one dead review hides
+  one subtree (class H, excluded from the evaluated snapshot, revealable
+  as disclosed-not-served) instead of killing the run; envelope/budget
+  refusals untouched. Both lineages' positions were before V on every
+  row; three converged, one split, V picked. | V ruled the consolidated
+  DR-174 packet | the resilience ticket binds to this | — | ACTIVE
+
+| DR-177 | 2026-08-14 | V ("please add Grok whenever you do those algorithm
+  calls") | **GROK JOINS THE MAKER PANEL.** Orchestrator's reading,
+  recorded for correction: the PRODUCT's debate runs gain a third maker
+  lineage (xAI/Grok) — authoring its own positions, pros and cons, judged
+  and judging across lineage lines — not merely the dev-loop seat DR-175
+  already grants. What this lawfully requires, in order: (1) a Grok relay
+  speaking the engine's OpenAI-compatible shape (claude-relay.ts is the
+  pattern; the grok CLI carries V's auth), registered with maker "xAI" and
+  verbatim model id; (2) the configured provider set gains the third
+  member (N-generic algorithm per DR-162-A — no code change expected in
+  the tree walk or review selection; selectDifferentMakerReviewer gains a
+  choice, enabling V's rotation steer); (3) THE RATIFIED MAKER COUNT AND
+  ENVELOPE ARE M=2 LAW TODAY — the M-guard lawfully refuses agent_count 3
+  (V measured this personally), and the DR-172 Set A ceilings were derived
+  for two makers. M=3 needs the XREV-audited arithmetic RE-DERIVED and a
+  fresh ceiling table RATIFIED BY V before any three-maker run serves —
+  derived numbers are proposals, never seeds, until V's card (AC-76).
+  Ticket GROK-01, laned after RESIL-01. | V ordered the third house into
+  the debate | N=3 panel | — | ACTIVE
+
+| DR-178 | 2026-08-14 | V ("one day we will need to be able to use ALL
+  market existent models. it is not a 'Claude vs GPT vs Grok' app. it's an
+  'A.I debate harness'") | **PRODUCT IDENTITY — AN A.I DEBATE HARNESS,
+  MODEL-AGNOSTIC BY LAW.** The maker panel is open-ended: any market model
+  must be able to join a debate. Consequences that bind future work: (1)
+  provider onboarding must converge to REGISTRATION, NOT ENGINEERING — a
+  new model = a registration record (endpoint, auth, lineage metadata,
+  cost bounds) against a small closed set of adapter SHAPES
+  (OpenAI-compatible being the de-facto market shape; thin adapters for
+  the exceptions), never a hand-built relay per model. GROK-01's relay is
+  the LAST hand-built one; the harness mission builds the generic layer.
+  (2) Lineage identity (maker/house/family/model id) becomes fully
+  register-driven data — no house names in code. (3) The envelope must
+  become a RATIFIED FORMULA — V ratifies the M-and-depth derivation once,
+  and each new panel size derives lawfully from it — else every new model
+  triggers a new ceiling table ratification, which cannot scale to the
+  market (pattern evolution flagged for V's explicit ratification). (4)
+  Already aligned and preserved: code-as-hub prompting (no model relays
+  another's words), the N-generic walk (DR-162-A), different-lineage
+  review with rotation, per-artifact lineage provenance. | V named what
+  the product IS | the harness mission | — | ACTIVE
+
+| DR-179 | 2026-08-14 | V ("please no API KEYS for now") | **NO API KEYS —
+  STANDING PROHIBITION.** Model access remains exclusively through V's
+  authenticated CLI subscriptions (claude / codex / grok CLIs wrapped as
+  local relays). No direct API-key provider may be built, configured,
+  stored, or requested — no key material enters the repo, the register,
+  the environment, or any config — until V explicitly lifts this. DR-178's
+  registration-not-engineering direction stands as architecture, but its
+  key-based adapter shapes are DEFERRED; the harness-mission intake seed's
+  server-deployment section inherits this hold. Current state audited:
+  zero keys exist anywhere in the system today. | V bounded the
+  portability path | binds all future provider work | — | ACTIVE

@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RunEventSchema } from "@debateai/contract";
+import { ContractHttpError, RunEventSchema, type Answer, type ContractClient } from "@debateai/contract";
+import { getDebateBundle } from "../../apps/v2-ui/lib/api.js";
 import { debateDetailFromRunProjection } from "../../apps/v2-ui/lib/v3/adapter.js";
 import DebatePageClient, * as DebatePageModule from "../../apps/v2-ui/app/debate/[id]/DebatePageClient.js";
 import { createLiveRunState } from "../../apps/v2-ui/lib/v3/liveEvents.js";
+import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { readNotFoundCalls, resetNotFoundCalls } from "./stubs/next-navigation.js";
 
 const mocks = vi.hoisted(() => ({
@@ -22,15 +24,20 @@ const queuedRun = {
   run_ref: "run:queued",
   question_line: "Messi or Ronaldo?",
   state: "QUEUED" as const,
-  terminal_reason: null
+  terminal_reason: null,
+  hold_until: null
 };
 
-function renderClient(debate = debateDetailFromRunProjection(queuedRun), error: string | null = null): string {
+function renderClient(
+  debate = debateDetailFromRunProjection(queuedRun),
+  error: string | null = null,
+  answer: Answer | null = null
+): string {
   return renderToStaticMarkup(
     <DebatePageClient
       id={debate.id}
       initialDebate={debate}
-      initialAnswer={null}
+      initialAnswer={answer}
       initialError={error}
       initialPending
     />
@@ -43,17 +50,80 @@ describe("LOAD-01 real debate-page render", () => {
     resetNotFoundCalls();
   });
 
+  it.each(["CLAIMED", "RUNNING"] as const)("renders mocked-transport %s without either answer 404 probe", async (state) => {
+    const calls: string[] = [];
+    const client = {
+      readRun: async () => ({
+        run_ref: "run:transport",
+        question_line: "How does someone efficiently lose weight?",
+        state,
+        terminal_reason: null,
+        hold_until: null
+      }),
+      readAnswer: async () => {
+        calls.push("answer-404");
+        throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND");
+      },
+      readRunAnswer: async () => {
+        calls.push("run-answer-404");
+        throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED");
+      }
+    } as unknown as ContractClient;
+
+    const bundle = await getDebateBundle("run:transport", "token:test", client);
+    expect(bundle.kind).toBe("loading");
+    expect(renderClient(bundle.detail)).toContain("progressFillIndeterminate");
+    expect(renderClient(bundle.detail)).not.toContain("Claimed");
+    expect(calls).toEqual([]); // MUT-BUG02-RENDER-404-LOOP: probe either absent answer while the run is live -> RED.
+  });
+
+  it("renders the served debate after mocked transport advances to SETTLED", async () => {
+    const answer = buildFairShapedAnswer();
+    const client = {
+      readRun: async () => ({
+        run_ref: "run:fair-test",
+        question_line: answer.question_line,
+        state: "SETTLED" as const,
+        terminal_reason: null,
+        hold_until: null
+      }),
+      readRunAnswer: async () => answer
+    } as unknown as ContractClient;
+
+    const bundle = await getDebateBundle("run:fair-test", "token:test", client);
+    expect(bundle.kind).toBe("served");
+    if (bundle.kind !== "served") throw new Error("expected served debate");
+    const html = renderClient(bundle.detail, null, bundle.answer);
+    expect(html).toContain("Should the test question stand?");
+    expect(html).not.toContain("progressFillIndeterminate"); // MUT-BUG02-RENDER-SERVE-FLIP: keep loading after SETTLED -> RED.
+  });
+
   it.each([
     ["QUEUED", "Queued"],
-    ["CLAIMED", "Claimed"],
+    ["CLAIMED", "Running"],
     ["RUNNING", "Running"]
   ] as const)("renders %s as typed indeterminate truth with no invented progress", (state, label) => {
     const html = renderClient(debateDetailFromRunProjection({ ...queuedRun, state }));
     expect(html).toContain("Messi or Ronaldo?");
     expect(html).toContain(label);
+    expect(html).not.toContain("Claimed"); // MUT-BUG02-CLAIMED-LABEL: expose internal CLAIMED to the user -> RED.
     expect(html).not.toContain("Models arguing");
-    expect(html).not.toContain("progressTrack");
+    expect(html).toContain("progressTrack"); // MUT-BUG02-LOADING-BAR: remove the indeterminate loading bar -> RED.
+    expect(html).toContain('aria-busy="true"');
     expect(html).not.toContain("40%");
+  });
+
+  it("T21 renders HOLDING with its honest remaining time and no error banner", () => {
+    const holdUntil = new Date(Date.now() + 600_000).toISOString();
+    const html = renderClient(debateDetailFromRunProjection({
+      ...queuedRun,
+      state: "HOLDING",
+      hold_until: holdUntil
+    }));
+    expect(html).toContain("Provider recovery hold");
+    expect(html).toContain("10 minutes remaining");
+    expect(html).toContain("one final attempt is scheduled");
+    expect(html).not.toContain("Debate generation failed");
   });
 
   it("renders a mid-session run.terminal failure as failed with no live progress", () => {

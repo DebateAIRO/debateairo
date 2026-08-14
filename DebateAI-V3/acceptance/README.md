@@ -25,24 +25,31 @@ entry naming each battery row whose owed check has no recorded execution
 (`resolveAcceptanceTerminalActivations`) remains in place as the outermost
 fallback: it resolves nothing and fails typed-loud on any outstanding WAIT row.
 
-**Second real maker (FAIR-02, DR-140).** The relay layer now carries BOTH real
-makers behind one shared CLI-relay core (`relay-core.ts`, P4/P8):
+**Configured maker panel (FAIR-02 + GROK-01, DR-140/DR-177).** The relay layer
+carries all configured makers behind one shared CLI-relay core (`relay-core.ts`, P4/P8):
 `model-shim.ts` relays to the codex CLI (maker `OpenAI`, ruled model
 `gpt-5.6-sol`) and `claude-relay.ts` relays to the local Claude Code CLI
-(`claude -p <prompt> --output-format json`, maker `Anthropic`). The Anthropic
-relay performs a REAL CLI handshake at startup and reports the model id the
-CLI itself returns in each envelope's `modelUsage` — never a guessed literal,
+(`claude -p <prompt> --output-format json`, maker `Anthropic`), while
+`grok-relay.ts` relays to the local Grok Build CLI (maker `xAI`). Both external
+CLI relays perform a REAL handshake at startup and report the model id the
+CLI itself returns in its JSON lineage fields — never a guessed literal,
 never "shim" (DR-115); zero or several reported models, a CLI-declared
 `is_error`, nonzero exit, unparseable output or a deadline are typed loud
 HTTP errors (`CLAUDE_CLI_FAILED` / `CLAUDE_CLI_OUTPUT_INVALID` /
 `CLAUDE_CLI_MODEL_UNRESOLVED` / `CLAUDE_CLI_TIMEOUT`), never fabricated
-choices. `configuredProviderSet` now lists both providers
-(`acceptance:codex-cli`, `acceptance:claude-cli`) with provenance
-`acceptance:DR-140:V-approved`, so the deployment maker-capability read
-honestly reports 2 configured makers; `requiredDistinctMakers` stays 1 per
+choices. `configuredProviderSet` now lists all three providers
+(`acceptance:codex-cli`, `acceptance:claude-cli`, `acceptance:grok-cli`) with
+provenance `acceptance:DR-177:V-approved`, so the deployment maker-capability
+read honestly reports 3 configured makers; `requiredDistinctMakers` stays 1 per
 DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
 stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet` — reset the
 standing data directory rather than mutating sealed rows.
+
+The M=3 run envelope is not yet ratified, so `agent_count: 3` remains a typed
+refusal and current M=2 runs select the first two configured providers exactly
+as before. Ceremony boot still handshakes all three. Grok's fixed relay port is
+operator-supplied as `ACCEPTANCE_GROK_RELAY_PORT`; GROK-01 proposes the durable
+register row and does not invent or seed a port number before V ratification.
 
 The orchestrator drives the LIVE dual-maker proof (one call round-tripped
 through EACH maker, honest lineage rows persisted in `ledger.raw_artifact`)
@@ -119,6 +126,7 @@ ACCEPTANCE_DB_PORT=<free port> \
 ACCEPTANCE_API_HOST=127.0.0.1 \
 ACCEPTANCE_API_PORT=<free port> \
 ACCEPTANCE_SHIM_PORT=<free port> \
+ACCEPTANCE_GROK_RELAY_PORT=<V/operator-supplied port> \
 ACCEPTANCE_STRANGER_SAMPLE_RATE=1 \
 ACCEPTANCE_BATTERY_VERSION=acceptance-v1 \
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:pro01-depth2 \

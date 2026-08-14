@@ -422,7 +422,8 @@ export class PostgresAskApplication implements AskApplication {
       run_ref: run.runRef,
       question_line: run.questionLine,
       state: run.state,
-      terminal_reason: run.terminalReason
+      terminal_reason: run.terminalReason,
+      hold_until: run.holdUntil?.toISOString() ?? null
     });
   }
 

@@ -24,13 +24,29 @@ describe("XREV-01 cross-maker node review", () => {
     );
   });
 
-  it("refuses DR-165's unratified depth-3+ coverage before serving unreviewed opinions", () => {
+  it("rotates away from the last recorded reviewer when a third maker gives a lawful choice", () => {
+    const makers = [
+      { maker: "house-a", value: 1 },
+      { maker: "house-b", value: 2 },
+      { maker: "house-c", value: 3 }
+    ] as const;
+
+    expect(selectDifferentMakerReviewer("house-a", makers, "house-b")).toBe(makers[2]);
+    expect(selectDifferentMakerReviewer("house-a", makers, "house-c")).toBe(makers[1]);
+    // Removing the third member leaves the ratified M=2 policy byte-stable:
+    // the sole different-maker reviewer remains selected on every review.
+    expect(selectDifferentMakerReviewer("house-a", makers.slice(0, 2), "house-b")).toBe(makers[1]);
+  });
+
+  it("carries DR-172's ratified depths 1..5 and refuses beyond the ratified table", () => {
+    // Kills: reverting the guard to the pre-DR-172 depth>2 placeholder
+    // (3/4/5 would throw); deleting the guard entirely (6 would pass).
     expect(() => assertReviewCoverageEnvelopeRatified(1)).not.toThrow();
     expect(() => assertReviewCoverageEnvelopeRatified(2)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(3)).toThrowError(expect.objectContaining({
-      code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
-    }));
-    expect(() => assertReviewCoverageEnvelopeRatified(5)).toThrowError(expect.objectContaining({
+    expect(() => assertReviewCoverageEnvelopeRatified(3)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(4)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(5)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(6)).toThrowError(expect.objectContaining({
       code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
     }));
   });

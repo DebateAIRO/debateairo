@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } from "@debateai/contract";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
 import {
   createAcceptanceRuntime,
@@ -127,11 +128,15 @@ export interface AcceptanceCeremonyOptions {
 async function closeAll(
   database: StandingDatabase | null,
   shim: ModelShimHandle | null,
-  relay: ClaudeRelayHandle | null,
+  claudeRelay: ClaudeRelayHandle | null,
+  grokRelay: GrokRelayHandle | null,
   api: Awaited<ReturnType<typeof createAcceptanceRuntime>>["api"] | null
 ): Promise<void> {
   await api?.close().catch(() => undefined);
-  await relay?.close().catch(() => undefined);
+  await Promise.all([
+    claudeRelay?.close().catch(() => undefined),
+    grokRelay?.close().catch(() => undefined)
+  ]);
   await shim?.close().catch(() => undefined);
   await database?.stop().catch(() => undefined);
 }
@@ -144,7 +149,8 @@ export async function runAcceptanceCeremony(
   const ceremony = loadAcceptanceCeremonyEnvironment(source);
   let database: StandingDatabase | null = null;
   let shim: ModelShimHandle | null = null;
-  let relay: ClaudeRelayHandle | null = null;
+  let claudeRelay: ClaudeRelayHandle | null = null;
+  let grokRelay: GrokRelayHandle | null = null;
   let api: Awaited<ReturnType<typeof createAcceptanceRuntime>>["api"] | null = null;
   try {
     database = await startStandingDatabase({
@@ -160,7 +166,13 @@ export async function runAcceptanceCeremony(
     // FAIR-01 (DR-140(b)): the SECOND real maker — the FAIR-02 claude CLI
     // relay. Its startup handshake proves the CLI is alive and captures the
     // CLI-reported model id (DR-143(2)/(3)); a dead CLI refuses the ceremony.
-    relay = await startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs });
+    [claudeRelay, grokRelay] = await Promise.all([
+      startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs }),
+      startGrokRelay({
+        port: ceremony.ACCEPTANCE_GROK_RELAY_PORT,
+        timeoutMs: policy.bounds.JUDGE.deadlineMs
+      })
+    ]);
     const runtimeEnvironment: AcceptanceEnvironment = {
       DATABASE_URL: database.connectionString,
       API_HOST: ceremony.ACCEPTANCE_API_HOST,
@@ -173,7 +185,10 @@ export async function runAcceptanceCeremony(
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
       environment: runtimeEnvironment,
-      criticRelay: { baseUrl: relay.baseUrl, model: relay.model }
+      makerRelays: [
+        { providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model },
+        { providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }
+      ]
     });
     api = runtime.api;
     await api.listen({ host: runtimeEnvironment.API_HOST, port: runtimeEnvironment.API_PORT });
@@ -288,7 +303,8 @@ export async function runAcceptanceCeremony(
     console.info(`ACC-01 UI: ${uiUrl}`);
     const liveDatabase = database;
     const liveShim = shim;
-    const liveRelay = relay;
+    const liveClaudeRelay = claudeRelay;
+    const liveGrokRelay = grokRelay;
     const liveApi = api;
     return Object.freeze({
       runId: accepted.run_ref,
@@ -298,10 +314,10 @@ export async function runAcceptanceCeremony(
       modelCallCount,
       nodeMakerLineage,
       nodeReviewLineage,
-      close: () => closeAll(liveDatabase, liveShim, liveRelay, liveApi)
+      close: () => closeAll(liveDatabase, liveShim, liveClaudeRelay, liveGrokRelay, liveApi)
     });
   } catch (error) {
-    await closeAll(database, shim, relay, api);
+    await closeAll(database, shim, claudeRelay, grokRelay, api);
     throw error;
   }
 }

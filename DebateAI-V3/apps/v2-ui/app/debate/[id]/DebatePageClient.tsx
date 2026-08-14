@@ -10,7 +10,6 @@ import {
   getDebateBundle,
   getDebateScoring,
   getStoredToken,
-  isNotFound,
   setStoredToken,
   validateUserToken
 } from "@/lib/api";
@@ -22,7 +21,11 @@ import {
   type InvestigationGap,
   type RunEvent
 } from "@debateai/contract";
-import { contractNodesById, liveDebateDetail } from "@/lib/v3/adapter";
+import {
+  contractNodesById,
+  hiddenNodeScoreThresholdFromDeployment,
+  liveDebateDetail
+} from "@/lib/v3/adapter";
 import { buildAnswerExport } from "@/lib/v3/answerExport";
 import {
   measureDebateHeaderCollapse,
@@ -114,7 +117,7 @@ export type DebatePageRunEventConsumerInput = {
   updateDebate: (update: (current: DebateDetail | null) => DebateDetail | null) => void;
   updateSynthesisDraft: (update: StateUpdate<SynthesisDraft | null>) => void;
   writeError: (next: string | null) => void;
-  refresh: () => void | Promise<void>;
+  refresh: (answerExpected?: boolean) => void | Promise<void>;
 };
 
 /** The single event-consumption seam used by the live stream and render tests. */
@@ -150,7 +153,7 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
         ? null
         : `Debate generation failed: ${next.terminalFailure}`);
     }
-    if (refreshTriggeredBy(event.event_type)) void input.refresh();
+    if (refreshTriggeredBy(event.event_type)) void input.refresh(event.event_type === "run.terminal");
   };
 }
 
@@ -359,6 +362,7 @@ export default function DebatePageClient({
   const [inspectionError, setInspectionError] = useState<string | null>(null);
   const [honestyOpen, setHonestyOpen] = useState(false);
   const [honestyActionState, setHonestyActionState] = useState<string | null>(null);
+  const [lowStrengthThreshold, setLowStrengthThreshold] = useState<number | undefined>(undefined);
   const [investigationInput, setInvestigationInput] = useState<Record<string, string>>({});
   const liveRef = useRef<LiveRunState>(createLiveRunState());
   const answerRef = useRef<Answer | null>(initialAnswer);
@@ -410,26 +414,37 @@ export default function DebatePageClient({
   const debateHeaderInlineActionsRef = useRef<HTMLDivElement | null>(null);
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (answerExpected = false) => {
     const token = getStoredToken();
     if (!token) return; // AuthGate supplies the token before this page mounts
     try {
-      const bundle = await getDebateBundle(id, token);
-      answerRef.current = bundle.answer;
-      setAnswer(bundle.answer);
-      setDebate(bundle.detail);
+      const bundle = await getDebateBundle(id, token, contractClient, {
+        answerExpected,
+        currentAnswer: answerRef.current
+      });
+      if (bundle.kind === "served") {
+        answerRef.current = bundle.answer;
+        setAnswer(bundle.answer);
+        setDebate(bundle.detail);
+        // V3 composes prose into the served answer itself; a live composition
+        // draft is superseded the moment a settled answer arrives.
+        if (bundle.detail.synthesis) setSynthesisDraft(null);
+      } else {
+        setDebate((current) => current?.id === bundle.detail.id && current.tree?.children.length
+          ? { ...current, run_state: bundle.detail.run_state, status: bundle.detail.status }
+          : bundle.detail);
+      }
       // Self-heal: recovered data must always clear any stale error banner/fatal
       // screen (e.g. a transient SSR coordinator timeout, or an earlier failed
       // poll). Without this, a debate that arrives after a transient failure
       // would stay stuck behind an old error (see the `error && !debate` gate).
-      setError(null);
-      // V3 composes prose into the served answer itself; a live composition
-      // draft is superseded the moment a settled answer arrives.
-      if (bundle.detail.synthesis) setSynthesisDraft(null);
+      setError(bundle.kind === "failed"
+        ? `Debate generation failed: ${bundle.run.terminal_reason}`
+        : null);
     } catch (exc) {
-      // A 404 while the run is still open is not an error: nothing is served
-      // yet. The event stream resolves a genuine NOT_FOUND loudly instead.
-      if (isNotFound(exc)) return;
+      // Existing in-flight runs resolve through the loading bundle above.
+      // A remaining NOT_FOUND therefore means neither a visible run nor a
+      // visible answer exists, and must remain an honest fatal result.
       setError(exc instanceof ContractHttpError ? exc.code : exc instanceof Error ? exc.message : "Unable to load debate");
     }
   }, [id]);
@@ -472,6 +487,27 @@ export default function DebatePageClient({
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    let active = true;
+    const token = getStoredToken();
+    if (!token) return;
+    contractClient.readDeployment(token)
+      .then((deployment) => {
+        if (!active) return;
+        setLowStrengthThreshold(hiddenNodeScoreThresholdFromDeployment(deployment).value);
+      })
+      .catch((failure) => {
+        if (!active) return;
+        setLowStrengthThreshold(undefined);
+        setHonestyActionState(
+          failure instanceof Error
+            ? `Hidden-node threshold unavailable: ${failure.message}`
+            : "Hidden-node threshold unavailable"
+        );
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -607,7 +643,7 @@ export default function DebatePageClient({
           // The stream closed. If the run reached terminal we are done —
           // refresh() pulls the settled projection; otherwise reconnect.
           if (liveRef.current.runPhase === "terminal") {
-            void refresh();
+            void refresh(true);
             return;
           }
           void refresh();
@@ -1228,14 +1264,14 @@ export default function DebatePageClient({
       {generating ? (
         <div className="progressStrip">
           <span className="progressLabel">{progress.label}</span>
-          {progress.pct === null ? null : (
-            <>
-              <div className="progressTrack">
+          <div className="progressTrack" aria-busy={progress.pct === null ? true : undefined}>
+            {progress.pct === null ? (
+              <div className="progressFill progressFillIndeterminate" />
+            ) : (
                 <div className="progressFill" style={{ width: `${progress.pct}%` }} />
-              </div>
-              <span className="progressCount">{progress.count}</span>
-            </>
-          )}
+            )}
+          </div>
+          {progress.pct === null ? null : <span className="progressCount">{progress.count}</span>}
         </div>
       ) : null}
 
@@ -1292,6 +1328,7 @@ export default function DebatePageClient({
                 scoringErrorsByNodeId={scoringErrorsByNodeId}
                 scoreFilterNodeIds={scoreAwareFilterNodeIds}
                 v3NodesById={v3NodeById}
+                lowStrengthThreshold={lowStrengthThreshold}
                 meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
                 canvasRef={(el) => {
                   canvasElRef.current = el;

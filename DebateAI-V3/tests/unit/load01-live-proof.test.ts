@@ -32,14 +32,15 @@ function providerDoubleApplication(): AskApplication {
         run_ref: "run:load01",
         question_line: ask.question_line,
         state: "QUEUED",
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       });
       return { run_ref: "run:load01", status: "QUEUED" };
     },
     readRun: async (runId) => runs.get(runId) ?? null,
     readAnswer: async () => null,
     readRunAnswer: async () => null,
-    readAnswerIndex: async (_session, limit, offset) => ({ items: [], limit, offset, total: 0 }),
+    readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
     readInspection: async () => null,
     readLedgerDigest: async () => null,
     readNode: async () => null,
@@ -87,7 +88,8 @@ describe("LOAD-01 provider-double composition proof", () => {
         run_ref: "run:load01",
         question_line: "Messi or Ronaldo?",
         state: "QUEUED",
-        terminal_reason: null
+        terminal_reason: null,
+        hold_until: null
       }
     });
     await api.close();

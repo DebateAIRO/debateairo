@@ -8,7 +8,7 @@ import {
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import type { CompletionActivationResolution } from "@debateai/db";
+import { RunRepository, type CompletionActivationResolution } from "@debateai/db";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { resolveEffectiveRiskTier, resolveRunCostEnvelopeBasis } from "@debateai/register";
 import {
@@ -17,6 +17,7 @@ import {
   type RunnerExecutionResult
 } from "@debateai/runner";
 import { startClaudeRelay } from "./claude-relay.js";
+import { startGrokRelay } from "./grok-relay.js";
 import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION } from "./seed-register.js";
 import { readAcceptanceRuntimePolicy, readOptionalScoringOperator } from "./runtime-policy.js";
 
@@ -35,6 +36,7 @@ const ceremonyEnvironmentSchema = z.object({
   ACCEPTANCE_API_HOST: z.string().min(1),
   ACCEPTANCE_API_PORT: z.coerce.number().int().positive().max(65_535),
   ACCEPTANCE_SHIM_PORT: z.coerce.number().int().positive().max(65_535),
+  ACCEPTANCE_GROK_RELAY_PORT: z.coerce.number().int().positive().max(65_535),
   ACCEPTANCE_STRANGER_SAMPLE_RATE: z.coerce.number().min(0).max(1),
   ACCEPTANCE_BATTERY_VERSION: z.string().min(1),
   ACCEPTANCE_SETTLEMENT_WATCH_HANDLE: z.string().min(1)
@@ -105,13 +107,13 @@ export interface AcceptanceRuntime {
 }
 
 /**
- * FAIR-01 (DR-140(b)): the SECOND real maker's relay endpoint — live, the
- * FAIR-02 claude CLI relay after its startup handshake (the model id is the
- * one the CLI itself reported, DR-143(2)). The acceptance runtime REQUIRES
- * it: DR-143 clause 1 makes the more-than-one-maker requirement run-level
- * fair-debate law, enforced on the acceptance debate at this composition root.
+ * A non-primary maker's live relay endpoint after its startup handshake. The
+ * model id is the one the CLI itself reported (DR-143(2)). DR-143 clause 1
+ * makes the more-than-one-maker requirement run-level fair-debate law,
+ * enforced on the acceptance debate at this composition root.
  */
-export interface AcceptanceCriticRelay {
+export interface AcceptanceMakerRelay {
+  readonly providerRef: string;
   readonly baseUrl: string;
   readonly model: string;
 }
@@ -155,7 +157,7 @@ export function resolveAcceptanceRisk(
 export async function createAcceptanceRuntime(input: {
   readonly pool: Pool;
   readonly environment: AcceptanceEnvironment;
-  readonly criticRelay: AcceptanceCriticRelay;
+  readonly makerRelays: readonly AcceptanceMakerRelay[];
   readonly testOnlyTerminalEvaluator?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];
@@ -167,7 +169,25 @@ export async function createAcceptanceRuntime(input: {
   }
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const scoringOperator = await readOptionalScoringOperator(input.pool);
+  const runRepository = new RunRepository(input.pool);
   await readDeploymentMakerCapability(input.pool, ACCEPTANCE_REGISTER_VERSION);
+  const primaryProviderPolicy = policy.providers[0];
+  if (primaryProviderPolicy === undefined) throw new Error("ACCEPTANCE_PRIMARY_PROVIDER_UNRESOLVED");
+  const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
+  const additionalProviderPolicies = policy.providers.slice(1);
+  const additionalProviders = additionalProviderPolicies.map((configured) => {
+    const relay = relaysByProviderRef.get(configured.providerRef);
+    if (relay === undefined) throw new Error(`ACCEPTANCE_PROVIDER_RELAY_UNRESOLVED:${configured.providerRef}`);
+    return Object.freeze({
+      gateway: createPostgresProviderGateway(input.pool, {
+        endpoint: `${relay.baseUrl}/v1`,
+        model: relay.model,
+        maker: configured.maker
+      }),
+      providerRef: configured.providerRef,
+      maker: configured.maker
+    });
+  });
   // The walking-skeleton judge/composer/conformance chain stays on the OpenAI
   // (codex) provider; FAIR-01 (DR-140(b)) adds the Anthropic relay as the
   // debate's SECOND maker — it runs the critic leg, so the counter-position
@@ -175,13 +195,7 @@ export async function createAcceptanceRuntime(input: {
   const provider = createPostgresProviderGateway(input.pool, {
     endpoint: input.environment.MODEL_BASE_URL,
     model: "gpt-5.6-sol",
-    maker: policy.providers.openai.maker
-  });
-  const criticProvider = createPostgresProviderGateway(input.pool, {
-    endpoint: `${input.criticRelay.baseUrl}/v1`,
-    // DR-115/DR-143(2): the model id is the relay's honestly-reported one.
-    model: input.criticRelay.model,
-    maker: policy.providers.anthropic.maker
+    maker: primaryProviderPolicy.maker
   });
   const longestDeadline = Math.max(
     policy.bounds.JUDGE.deadlineMs,
@@ -198,8 +212,28 @@ export async function createAcceptanceRuntime(input: {
     judgeBound: policy.bounds.JUDGE,
     composerBound: policy.bounds.COMPOSER,
     conformanceBound: policy.bounds.CONFORMANCE,
-    providerRef: policy.providers.openai.providerRef,
-    maker: policy.providers.openai.maker,
+    runDeathPolicy: policy.runDeathPolicy,
+    hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
+    holdRecorder: {
+      countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
+      record: (event) => runRepository.recordRunLifecycleEvent({
+        runId: event.runId,
+        kind: event.kind,
+        value: {
+          state: event.state,
+          call_site_key: event.callSiteKey,
+          parent_node_ref: event.parentNodeId,
+          hold_ms: event.holdMs,
+          hold_until: event.holdUntil,
+          attempts_spent: event.attemptsSpent,
+          transport_outcome: event.transportOutcome,
+          planned_leg_count: event.plannedLegCount
+        }
+      }),
+      wait: (cooldownMs) => new Promise((resolve) => setTimeout(resolve, cooldownMs))
+    },
+    providerRef: primaryProviderPolicy.providerRef,
+    maker: primaryProviderPolicy.maker,
     judgeContractHash: policy.hashes.judge,
     composerContractHash: policy.hashes.composer,
     conformanceContractHash: policy.hashes.conformance,
@@ -228,14 +262,19 @@ export async function createAcceptanceRuntime(input: {
       judgeWeightVersion: "acceptance:single-judge:v1",
       reducerVersion: "acceptance:DR-133:v1"
     },
-    // FAIR-01 (DR-140(b)): the critique leg — the second maker judges the
-    // counter-position; its maker rides every persisted artifact via the
-    // gateway lineage (one maker per artifact, from the RULED provider set).
+    // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
+    // leg for M=2 compatibility. Every further configured maker is carried by
+    // additionalMakers; each artifact persists its maker/provider lineage.
     critique: {
-      provider: criticProvider,
-      providerRef: policy.providers.anthropic.providerRef,
-      maker: policy.providers.anthropic.maker
+      provider: additionalProviders[0]!.gateway,
+      providerRef: additionalProviders[0]!.providerRef,
+      maker: additionalProviders[0]!.maker
     },
+    additionalMakers: additionalProviders.slice(1).map((configured) => ({
+      provider: configured.gateway,
+      providerRef: configured.providerRef,
+      maker: configured.maker
+    })),
     // DR-074: the raw deployment row when V has ruled it; absent ⇒ the runner
     // stops loudly before any claim or model call (AC-76 — never invented).
     ...(scoringOperator === undefined ? {} : { scoringOperator }),
@@ -275,11 +314,18 @@ async function main(): Promise<void> {
   // startup handshake proves the claude CLI is alive and captures its honest
   // model id before the API accepts any ask (DR-143(3)).
   const policy = await readAcceptanceRuntimePolicy(pool);
-  const relay = await startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs });
+  const grokRelayPort = z.coerce.number().int().positive().max(65_535).parse(process.env.GROK_RELAY_PORT);
+  const [claudeRelay, grokRelay] = await Promise.all([
+    startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs }),
+    startGrokRelay({ port: grokRelayPort, timeoutMs: policy.bounds.JUDGE.deadlineMs })
+  ]);
   const runtime = await createAcceptanceRuntime({
     pool,
     environment,
-    criticRelay: { baseUrl: relay.baseUrl, model: relay.model }
+    makerRelays: [
+      { providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model },
+      { providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }
+    ]
   });
   await runtime.api.listen({ host: environment.API_HOST, port: environment.API_PORT });
 }

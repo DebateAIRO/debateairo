@@ -95,7 +95,16 @@ export const CONDITION_MARKS = [
   // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed
   // check has no recorded execution — the run settles and the served answer
   // names each such check loudly (one condition-mark record per row).
-  "OWED-CHECK-UNEXECUTED"
+  "OWED-CHECK-UNEXECUTED",
+  // DR-176: authored material whose cross-maker review transport exhausted.
+  // It remains append-only and revealable, but is excluded from the served
+  // number and disclosed as unjudged when revealed.
+  "HIDDEN-UNJUDGEABLE",
+  // DR-176: authored material at or below the ruled deployment threshold.
+  "HIDDEN-LOW-SCORE",
+  // DR-176: authoring stopped before a node existed. Nothing is hidden or
+  // revealable; this mark names the halted expansion without fabricating it.
+  "UNAUTHORED-BRANCH-HALTED"
 ] as const;
 export type ConditionMark = typeof CONDITION_MARKS[number];
 

@@ -131,14 +131,18 @@ export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "FAILED"]),
-  terminal_reason: z.string().trim().min(1).nullable()
+  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  terminal_reason: z.string().trim().min(1).nullable(),
+  hold_until: z.iso.datetime().nullable()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
       code: "custom",
       message: "FAILED requires a terminal reason and non-failed runs forbid one"
     });
+  }
+  if ((run.state === "HOLDING") !== (run.hold_until !== null)) {
+    context.addIssue({ code: "custom", message: "HOLDING requires hold_until and other states forbid it" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -259,16 +263,33 @@ export const AbstentionSchema = z.object({
 
 export const AnswerSummarySchema = z.object({
   answer_id: z.string().min(1),
+  run_ref: z.string().min(1),
   answer_version: z.number().int().positive(),
   question_line: z.string().min(1),
   verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
   abstention: AbstentionSchema.nullable(),
   serve_state: z.enum(["COMPOSED", "RECOMPOSED_ONCE", "COMPONENTS_ONLY"]),
   staleness_state: StalenessStateSchema,
-  builds_on_previous: z.boolean()
+  builds_on_previous: z.boolean(),
+  created_at_sequence: z.number().int().positive()
 }).strict();
+export const OpenRunSummarySchema = z.object({
+  run_ref: z.string().min(1),
+  question_line: z.string().trim().min(1),
+  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  terminal_reason: z.string().trim().min(1).nullable(),
+  created_at_sequence: z.number().int().positive()
+}).strict().superRefine((run, context) => {
+  if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
+    context.addIssue({
+      code: "custom",
+      message: "FAILED requires a terminal reason and non-failed runs forbid one"
+    });
+  }
+});
 export const AnswerIndexSchema = z.object({
   items: z.array(AnswerSummarySchema),
+  open_runs: z.array(OpenRunSummarySchema),
   limit: z.number().int().positive(),
   offset: z.number().int().nonnegative(),
   total: z.number().int().nonnegative()
@@ -296,7 +317,7 @@ export const NodeSchema = z.object({
   claim: z.string().min(1),
   way_of_knowing: WayOfKnowingSchema,
   base_score: LabeledNumberSchema,
-  final_strength: LabeledNumberSchema,
+  final_strength: LabeledNumberSchema.nullable(),
   provenance_ref: z.string().min(1),
   maker_lineage: MakerLineageSchema.nullable(),
   review: NodeReviewSchema.nullable(),
@@ -358,8 +379,30 @@ export const AnswerSchema = z.object({
     subject_ref: z.string().min(1),
     reason: z.string().min(1),
     lift_path: z.string().nullable(),
-    served_root_rule: z.literal("first-configured-provider").nullable()
-  }).strict()),
+    served_root_rule: z.literal("first-configured-provider").nullable(),
+    call_site_key: z.string().min(1).nullable().default(null),
+    planned_leg_count: z.number().int().nonnegative().nullable().default(null),
+    terminal_transport_outcome: z.enum(["TIMED_OUT", "FAILED"]).nullable().default(null),
+    hidden_strength: z.number().min(0).max(1).nullable().default(null),
+    hidden_score_threshold: z.number().min(0).max(1).nullable().default(null),
+    hidden_score_threshold_source_ref: z.string().min(1).nullable().default(null),
+    excluded_from_served_number: z.boolean().nullable().default(null),
+    affected_node_ids: z.array(z.string().min(1)).default([])
+  }).strict().superRefine((record, context) => {
+    if (record.mark === "HIDDEN-UNJUDGEABLE" && (
+      record.call_site_key === null || record.terminal_transport_outcome === null
+      || record.excluded_from_served_number !== true || record.affected_node_ids.length === 0
+    )) context.addIssue({ code: "custom", message: "Class H requires transport provenance and affected hidden nodes" });
+    if (record.mark === "HIDDEN-LOW-SCORE" && (
+      record.hidden_strength === null || record.hidden_score_threshold === null
+      || record.hidden_score_threshold_source_ref === null
+      || record.excluded_from_served_number !== false || record.affected_node_ids.length === 0
+    )) context.addIssue({ code: "custom", message: "Class L requires threshold provenance, presentation-only status, and affected hidden nodes" });
+    if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
+      record.call_site_key === null || record.planned_leg_count === null
+      || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0
+    )) context.addIssue({ code: "custom", message: "Class N requires halted-call provenance and a surviving parent" });
+  })),
   reversal_point: z.string().min(1),
   builds_on_previous: z.object({
     value: z.boolean(),
@@ -469,7 +512,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, AnswerIndexSchema,
+    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

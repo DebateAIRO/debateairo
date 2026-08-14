@@ -10,8 +10,10 @@ import {
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
+  ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
+  ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF,
   ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
 } from "./seed-register.js";
 
@@ -42,8 +44,16 @@ const runtimeRowsSchema = z.object({
       depth_params: z.object({ depth: z.number().int().min(1).max(5) }).strict(),
       risk_tier: z.enum(["standard", "high-stakes"]),
       max_model_attempts: z.number().int().positive()
-    }).strict()).min(1)
+    }).strict()).min(2)
   }).strict(),
+  runDeathPolicy: z.object({
+    kind: z.literal("RUN_DEATH_POLICY"),
+    cooldown_ms: z.number().int().positive(),
+    final_retry_attempts: z.literal(1),
+    max_cooldown_holds_per_run: z.literal(2),
+    applies_to: z.literal("TRANSPORT_EXHAUSTION")
+  }).strict(),
+  hiddenNodeScoreThreshold: z.literal(0.35),
   compositionBundleBudget: z.object({
     low: z.number().int().positive(),
     medium: z.number().int().positive(),
@@ -66,15 +76,11 @@ const runtimeRowsSchema = z.object({
   configuredProviderSet: z.object({
     kind: z.literal("CONFIGURED_PROVIDER_SET"),
     requiredDistinctMakers: z.literal(1),
-    providers: z.tuple([z.object({
-      providerRef: z.literal("acceptance:codex-cli"),
+    providers: z.array(z.object({
+      providerRef: z.string().trim().min(1),
       adapterKind: z.literal("openai-compatible-http"),
-      maker: z.literal("OpenAI")
-    }).strict(), z.object({
-      providerRef: z.literal("acceptance:claude-cli"),
-      adapterKind: z.literal("openai-compatible-http"),
-      maker: z.literal("Anthropic")
-    }).strict()])
+      maker: z.string().trim().min(1)
+    }).strict()).min(1)
   }).strict(),
   judgeContractHash: z.string().regex(/^[a-f0-9]{64}$/),
   composerContractHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -94,19 +100,17 @@ export interface AcceptanceRuntimePolicy {
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
   readonly bandCeiling: BandCeilingRegisterRow;
   readonly runCostEnvelopePolicy: RunCostEnvelopePolicyRow;
-  /** FAIR-02: both configured real makers, by maker family. */
-  readonly providers: {
-    readonly openai: {
-      readonly providerRef: "acceptance:codex-cli";
-      readonly adapterKind: "openai-compatible-http";
-      readonly maker: "OpenAI";
-    };
-    readonly anthropic: {
-      readonly providerRef: "acceptance:claude-cli";
-      readonly adapterKind: "openai-compatible-http";
-      readonly maker: "Anthropic";
-    };
+  readonly runDeathPolicy: {
+    readonly cooldownMs: number;
+    readonly finalRetryAttempts: 1;
+    readonly maxCooldownHoldsPerRun: 2;
   };
+  readonly hiddenNodeScoreThreshold: {
+    readonly value: 0.35;
+    readonly sourceRef: typeof ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
+  };
+  /** DR-162-A/DR-177: configured real makers remain register-driven data. */
+  readonly providers: ReadonlyArray<z.infer<typeof runtimeRowsSchema>["configuredProviderSet"]["providers"][number]>;
   readonly hashes: {
     readonly judge: string;
     readonly composer: string;
@@ -155,6 +159,8 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   if (result.rows.length !== keys.length) throw new Error("ACCEPTANCE_RUNTIME_POLICY_UNRESOLVED");
   const expectedSourceRef = (rowKey: string): string => {
     if (rowKey === "runCostEnvelope") return ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF;
+    if (rowKey === "runDeathPolicy") return ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF;
+    if (rowKey === "hiddenNodeScoreThreshold") return ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
     if (rowKey === "configuredProviderSet") return ACCEPTANCE_PROVIDER_SET_SOURCE_REF;
     return ACCEPTANCE_REGISTER_SOURCE_REF;
   };
@@ -189,10 +195,16 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       value: parsed.wayOfKnowingCeiling
     }),
     runCostEnvelopePolicy,
-    providers: Object.freeze({
-      openai: parsed.configuredProviderSet.providers[0],
-      anthropic: parsed.configuredProviderSet.providers[1]
+    runDeathPolicy: Object.freeze({
+      cooldownMs: parsed.runDeathPolicy.cooldown_ms,
+      finalRetryAttempts: parsed.runDeathPolicy.final_retry_attempts,
+      maxCooldownHoldsPerRun: parsed.runDeathPolicy.max_cooldown_holds_per_run
     }),
+    hiddenNodeScoreThreshold: Object.freeze({
+      value: parsed.hiddenNodeScoreThreshold,
+      sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
+    }),
+    providers: Object.freeze(parsed.configuredProviderSet.providers),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,
       composer: parsed.composerContractHash,

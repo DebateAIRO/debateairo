@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CONDITION_MARKS } from "@debateai/kernel";
 import { ContractHttpError, type ContractClient, type Deployment, type Session } from "@debateai/contract";
 import {
@@ -45,6 +45,7 @@ import {
 } from "../../apps/v2-ui/lib/v3/adapter.js";
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel } from "../../apps/v2-ui/lib/v3/labels.js";
 import { getDebateServer } from "../../apps/v2-ui/lib/serverApi.js";
+import { statusLabel } from "../../apps/v2-ui/lib/format.js";
 import {
   selectRunCostEnvelopeMember,
   selectRunCostEnvelopeMembers
@@ -235,15 +236,18 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
       items: [
         {
           answer_id: "answer:fair-test",
+          run_ref: "run:fair-test",
           answer_version: 1,
           question_line: "Should the test question stand?",
           verdict_state: "CONTESTED",
           abstention: null,
           serve_state: "COMPOSED",
           staleness_state: "FRESH",
-          builds_on_previous: false
+          builds_on_previous: false,
+          created_at_sequence: 1
         }
       ],
+      open_runs: [],
       limit: 50,
       offset: 0,
       total: 1
@@ -255,7 +259,9 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
       status: "complete",
       created_at: "",
       completed_at: null,
-      models: []
+      models: [],
+      created_at_sequence: 1,
+      terminal_reason: null
     });
   });
 
@@ -324,6 +330,8 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     expect(final!.pillText).toBe("FINAL 41%");
     for (const badge of presentation.badges) {
       const number = badge.id === "base_score" ? answer.nodes[0]!.base_score : answer.nodes[0]!.final_strength;
+      expect(number).not.toBeNull();
+      if (number === null) throw new Error("test fixture must include final strength");
       expect(badge.title).toContain(number.kind);
       expect(badge.title).toContain(number.producer);
       expect(badge.title).toContain(number.source);
@@ -341,6 +349,8 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
       )
     });
     const node = scored.nodes[0]!;
+    expect(node.final_strength).not.toBeNull();
+    if (node.final_strength === null) throw new Error("test fixture must include final strength");
     expect(v3NodeScoreDetails(node)).toEqual([
       {
         id: "base_score",
@@ -430,6 +440,129 @@ describe("v2-ui honesty labels cover the full closed vocabulary", () => {
 });
 
 describe("v2-ui data access over the V3 contract client", () => {
+  it("lets an available answer win over a lagging RUNNING projection after a terminal signal", async () => {
+    const answer = buildFairShapedAnswer();
+    const client = {
+      readRun: async () => ({
+        run_ref: "run:fair-test",
+        question_line: answer.question_line,
+        state: "RUNNING" as const,
+        terminal_reason: null
+      }),
+      readRunAnswer: async () => answer
+    } as unknown as ContractClient;
+
+    await expect(getDebateBundle("run:fair-test", "token:test", client, { answerExpected: true }))
+      .resolves.toMatchObject({ kind: "served", answer: { answer_id: "answer:fair-test" } });
+    // MUT-BUG02-RUNNING-ANSWER-200: trust only the lagging projection -> RED.
+  });
+
+  it("keeps an already-held answer authoritative over a lagging projection", async () => {
+    const answer = buildFairShapedAnswer();
+    const readRun = vi.fn().mockResolvedValue({
+      run_ref: "run:fair-test",
+      question_line: answer.question_line,
+      state: "RUNNING",
+      terminal_reason: null,
+      hold_until: null
+    });
+    const client = { readRun } as unknown as ContractClient;
+    await expect(getDebateBundle("run:fair-test", "token:test", client, { currentAnswer: answer }))
+      .resolves.toMatchObject({ kind: "served", answer: { answer_id: "answer:fair-test" } });
+    expect(readRun).toHaveBeenCalledTimes(1);
+    // MUT-BUG02-SSR-ANSWER-DOWNGRADE: let a loading projection erase the held answer -> RED.
+  });
+
+  it("returns a typed client failure instead of an eternal loading bundle", async () => {
+    const client = {
+      readRun: async () => ({
+        run_ref: "run:failed",
+        question_line: "A failed run",
+        state: "FAILED" as const,
+        terminal_reason: "NODE_REVIEW_UNAVAILABLE"
+      })
+    } as unknown as ContractClient;
+    await expect(getDebateBundle("run:failed", "token:test", client)).resolves.toMatchObject({
+      kind: "failed",
+      run: { terminal_reason: "NODE_REVIEW_UNAVAILABLE" }
+    });
+    // MUT-BUG02-B4-DELETE-CLIENT-FAILED: delete the FAILED arm -> RED.
+  });
+
+  it.each(["CLAIMED", "RUNNING"] as const)("reads an in-flight %s run first without probing either answer endpoint", async (state) => {
+    const calls: string[] = [];
+    const client = {
+      readRun: async () => {
+        calls.push("run");
+        return {
+          run_ref: "run:in-flight",
+          question_line: "How does someone efficiently lose weight?",
+          state,
+          terminal_reason: null
+        };
+      },
+      readAnswer: async () => {
+        calls.push("answer");
+        throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND");
+      },
+      readRunAnswer: async () => {
+        calls.push("run-answer");
+        throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED");
+      }
+    } as unknown as ContractClient;
+
+    const bundle = await getDebateBundle("run:in-flight", "token:test", client);
+    expect(bundle).toMatchObject({ kind: "loading", answer: null });
+    expect(bundle.detail).toMatchObject({ status: "generating", run_state: "RUNNING" });
+    expect(calls).toEqual(["run"]); // MUT-BUG02-RUN-FIRST: restore the repeated answer-404 probe pair -> RED.
+  });
+
+  it("flips a settled run to its served answer without a manual refresh", async () => {
+    const answer = buildFairShapedAnswer();
+    const calls: string[] = [];
+    const client = {
+      readRun: async () => {
+        calls.push("run");
+        return {
+          run_ref: "run:fair-test",
+          question_line: "Should the test question stand?",
+          state: "SETTLED" as const,
+          terminal_reason: null
+        };
+      },
+      readRunAnswer: async () => {
+        calls.push("run-answer");
+        return answer;
+      },
+      readAnswer: async () => {
+        calls.push("answer");
+        throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND");
+      }
+    } as unknown as ContractClient;
+
+    const bundle = await getDebateBundle("run:fair-test", "token:test", client);
+    expect(bundle).toMatchObject({ kind: "served", answer: { answer_id: "answer:fair-test" } });
+    expect(bundle.detail.status).toBe("complete");
+    expect(calls).toEqual(["run", "run-answer"]); // MUT-BUG02-SERVE-FLIP: stop the SETTLED -> answer read -> RED.
+  });
+
+  it("keeps an existing in-flight run out of the error path", async () => {
+    const client = {
+      readRun: async () => ({
+        run_ref: "run:quiet",
+        question_line: "A quiet in-flight run",
+        state: "RUNNING" as const,
+        terminal_reason: null
+      }),
+      readAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); },
+      readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED"); }
+    } as unknown as ContractClient;
+    await expect(getDebateBundle("run:quiet", "token:test", client)).resolves.toMatchObject({
+      kind: "loading",
+      answer: null
+    }); // MUT-BUG02-404-BANNER: throw the by-design answer 404 for an existing run -> RED.
+  });
+
   it("renders V's exact queued run flow from the typed run projection, not a 404", async () => {
     const client = {
       readAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); },
@@ -487,16 +620,14 @@ describe("v2-ui data access over the V3 contract client", () => {
   it("falls back from answer id to run ref when reading a debate", async () => {
     const answer = buildFairShapedAnswer();
     const client = {
-      readAnswer: async () => {
-        throw new ContractHttpError("NOT_FOUND", 404, "Contract request failed with 404");
-      },
-      readRunAnswer: async (runId: string) => {
-        expect(runId).toBe("run:fair-test");
+      readRun: async () => { throw new ContractHttpError("NOT_FOUND", 404, "RUN_NOT_FOUND"); },
+      readAnswer: async (answerId: string) => {
+        expect(answerId).toBe("answer:fair-test");
         return answer;
       }
     } as unknown as ContractClient;
-    const bundle = await getDebateBundle("run:fair-test", "token:test", client);
-    expect(bundle.answer.answer_id).toBe("answer:fair-test");
+    const bundle = await getDebateBundle("answer:fair-test", "token:test", client);
+    expect(bundle).toMatchObject({ kind: "served", answer: { answer_id: "answer:fair-test" } });
     expect(bundle.detail.tree?.children[0]?.id).toBe("node:position");
   });
 
@@ -787,6 +918,14 @@ describe("v2-ui data access over the V3 contract client", () => {
     ).not.toBe(
       modelLedgerIdentityKey({ model_id: "a", model_version: "b c", provider: "d" })
     );
+  });
+});
+
+describe("BUG-02 projection labels", () => {
+  it("labels the SETTLED transport token in plain words", () => {
+    expect(statusLabel("SETTLED")).toBe("Settled");
+    expect(statusLabel("SETTLED")).not.toBe("SETTLED");
+    // MUT-BUG02-B6-RAW-SETTLED-LABEL: remove the SETTLED label arm -> RED.
   });
 });
 

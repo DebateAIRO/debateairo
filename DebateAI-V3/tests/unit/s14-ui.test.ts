@@ -18,6 +18,7 @@ import {
   summarizeFreshness
 } from "../../web/lib/v3Presentation.js";
 import { projectNodeMakerLineage, projectServeEdge } from "@debateai/serve";
+import { conditionMarkLabel as v2ConditionMarkLabel } from "../../apps/v2-ui/lib/v3/labels.js";
 
 const labeledNumber = Object.freeze({
   value: 0.75,
@@ -112,11 +113,15 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
   });
 
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
-    expect(CONDITION_MARKS).toHaveLength(24);
+    expect(CONDITION_MARKS).toHaveLength(27);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");
-    expect(CONDITION_MARKS.map(conditionMarkLabel).every((label) => label.trim().length > 0)).toBe(true);
+    for (const render of [conditionMarkLabel, v2ConditionMarkLabel]) {
+      const labels = CONDITION_MARKS.map(render);
+      expect(labels.every((label) => label.trim().length > 0)).toBe(true);
+      expect(new Set(labels).size).toBe(CONDITION_MARKS.length);
+    }
   });
 
   it("has a renderer for every one of spec section 12.3's five abstention kinds", () => {

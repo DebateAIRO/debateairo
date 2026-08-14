@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ACCEPTANCE_CONVERGENCE_SOURCE_REF,
+  ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
+  ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF,
   ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF,
   ACCEPTANCE_SCORING_OPERATOR_SOURCE_REF,
   buildAcceptanceRegisterRows
@@ -41,7 +43,15 @@ describe("ACC-01 acceptance register", () => {
     const rows = await buildAcceptanceRegisterRows();
     const byKey = Object.fromEntries(rows.map((row) => [row.rowKey, row]));
 
-    expect(rows.filter((row) => !["convergenceStopDefaults", "runCostEnvelope", "claimTypeCompositionMap", "configuredProviderSet", "scoringOperator"].includes(row.rowKey))
+    expect(rows.filter((row) => ![
+      "convergenceStopDefaults",
+      "runCostEnvelope",
+      "runDeathPolicy",
+      "hiddenNodeScoreThreshold",
+      "claimTypeCompositionMap",
+      "configuredProviderSet",
+      "scoringOperator"
+    ].includes(row.rowKey))
       .every((row) => row.sourceRef === ACCEPTANCE_REGISTER_SOURCE_REF)).toBe(true);
     expect(byKey.riskTier?.value).toBe("standard");
     // DR-144: V ruled the DR-074 mandatory deployment scoringOperator row =
@@ -100,7 +110,7 @@ describe("ACC-01 acceptance register", () => {
       value: {
         kind: "ACCEPTANCE_ORGAN_COST_BOUNDS",
         organs: {
-          JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 },
+          JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 },
           COMPOSER: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 },
           CONFORMANCE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 60_000 }
         }
@@ -126,6 +136,24 @@ describe("ACC-01 acceptance register", () => {
       },
       sourceRef: ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
     });
+    expect(byKey.runDeathPolicy).toEqual({
+      rowKey: "runDeathPolicy",
+      value: {
+        kind: "RUN_DEATH_POLICY",
+        cooldown_ms: 600_000,
+        final_retry_attempts: 1,
+        max_cooldown_holds_per_run: 2,
+        applies_to: "TRANSPORT_EXHAUSTION"
+      },
+      sourceRef: ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF
+    });
+    expect(ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF).toBe("acceptance:DR-174:V-approved");
+    expect(byKey.hiddenNodeScoreThreshold).toEqual({
+      rowKey: "hiddenNodeScoreThreshold",
+      value: 0.35,
+      sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
+    });
+    expect(ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF).toBe("acceptance:DR-176:V-approved");
     expect(ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF).toBe("acceptance:DR-172:V-approved");
     const envelopeMembers = (byKey.runCostEnvelope?.value as {
       members: readonly { depth_params: { depth: number }; risk_tier: string }[];
@@ -159,13 +187,14 @@ describe("ACC-01 acceptance register", () => {
     // fair-debate requirement is DR-140(b) run-level law, not a deployment
     // capability floor edit.
     expect(byKey.configuredProviderSet?.sourceRef).toBe(ACCEPTANCE_PROVIDER_SET_SOURCE_REF);
-    expect(ACCEPTANCE_PROVIDER_SET_SOURCE_REF).toBe("acceptance:DR-140:V-approved");
+    expect(ACCEPTANCE_PROVIDER_SET_SOURCE_REF).toBe("acceptance:DR-177:V-approved");
     expect(byKey.configuredProviderSet?.value).toEqual({
       kind: "CONFIGURED_PROVIDER_SET",
       requiredDistinctMakers: 1,
       providers: [
         { providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" },
-        { providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" }
+        { providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" },
+        { providerRef: "acceptance:grok-cli", adapterKind: "openai-compatible-http", maker: "xAI" }
       ]
     });
 

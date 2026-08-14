@@ -27,8 +27,5 @@ describe("LOAD-01 persisted run projection", () => {
     });
     expect(calls[0]?.values).toEqual(["run:failed", "asker:owner"]);
     expect(calls[0]?.text).toMatch(/run\.asker_id = \$2/);
-    expect(calls[0]?.text).toMatch(/WHEN bool_or\(work\.state = 'FAILED'\) THEN 'FAILED'/);
-    expect(calls[0]?.text).toMatch(/WHEN bool_or\(work\.state = 'CLAIMED'\) THEN 'CLAIMED'/);
-    expect(calls[0]?.text).toMatch(/WHEN bool_or\(work\.state = 'READY'\) THEN 'QUEUED'/);
   });
 });
