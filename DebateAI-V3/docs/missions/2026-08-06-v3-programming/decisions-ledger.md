@@ -1482,3 +1482,27 @@ supersedes | status`.
   scans CLI shapes only, no API keys. Architecture-confounding →
   DR-171+DR-175 consult fired before any ticket. | V retired the ceremony
   that kept killing debates | the discovery mission | — | ACTIVE
+
+| DR-182 | 2026-08-14 | V (dual-lineage card, DR-181 consult) | **THE
+  DISCOVERY-PANEL VALUE ROWS, settled.** (1) panelDiscoveryPolicy:
+  probe_freshness_ms = 600_000 (10 min, matching the cooldown), silent
+  per-provider re-probe on staleness, probe_max_attempts 1. (2) MONO-PANEL
+  DAYS SERVE: one healthy model debates alone with a LOUD disclosure that
+  the depth dial could not apply (closes the DR-115 gap the consult
+  surfaced). (3) HIGH-STAKES AT M=1 SERVES WITH BAND CAP + marks — V
+  knowingly narrows the DR-137 two-house floor (the shipped
+  applyCriticUnavailableCap finally gets its caller). (4) THE TRIPWIRE
+  STAYS as invisible computed structural math (ceiling = engine call-site
+  inventory x bounded attempts, derived at admission, recorded on
+  envelope_basis, incapable of refusing a normal run) — its derivation
+  already exposed the old "ratified" Set A as 14 attempts short of the
+  lawful worst case: the ceremony had frozen a drifted copy of a computed
+  number. (5) NO models-found widget on /new. (6) GAP DEATHS (VROW-5, the
+  split — GROK'S MECHANISM WINS its second deliberative split): a panel
+  member healthy at ask but gone at claim gets ONE instant re-probe (no
+  cooldown hold — "a gateway that was never wired can't be woken by
+  waiting"), a recorded ABSENT with evidence, panel shrinks with
+  disclosure, the remainder serves; empty panel = loud typed config
+  failure; genuinely mid-run deaths keep DR-174/176 unchanged. Ticket
+  DISC-01 binds to the authorized plan + Grok's ten conditions + this row.
+  | V ruled the consult's packet | DISC-01 | — | ACTIVE
