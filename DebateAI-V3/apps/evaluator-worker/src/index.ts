@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import {
+  assertEvaluatorProviderIsolation,
   EvaluatorCatalogRepository,
   probeEvaluatorVllmCatalog,
   type EvaluatorProviderFamilyRow
@@ -16,9 +17,17 @@ export const EVALUATOR_TASK_FAMILIES = Object.freeze([
 
 export async function runEvaluatorCatalogProbe(
   pool: Pool,
-  family: EvaluatorProviderFamilyRow
+  family: EvaluatorProviderFamilyRow,
+  deployment: {
+    readonly configuredProviders: readonly {
+      readonly providerRef: string;
+      readonly maker: string;
+    }[];
+  },
+  fetchImplementation: typeof fetch = fetch
 ): Promise<{ readonly probeId: string; readonly state: "AVAILABLE" | "UNAVAILABLE" }> {
-  const probe = await probeEvaluatorVllmCatalog(family);
+  assertEvaluatorProviderIsolation(family, deployment);
+  const probe = await probeEvaluatorVllmCatalog(family, fetchImplementation);
   const probeId = await new EvaluatorCatalogRepository(pool).record(family, probe);
   return Object.freeze({ probeId, state: probe.state });
 }

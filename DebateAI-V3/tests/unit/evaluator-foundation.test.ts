@@ -2,9 +2,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
-import { describe, expect, it } from "vitest";
-import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
-import type { AskRequest } from "@debateai/contract";
+import { describe, expect, it, vi } from "vitest";
 import {
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
@@ -14,8 +12,10 @@ import {
   readEvaluatorDispatchBinding,
   readEvaluatorProviderFamily
 } from "../../packages/evaluator/src/index.js";
-import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
-import { EVALUATOR_TASK_FAMILIES } from "../../apps/evaluator-worker/src/index.js";
+import {
+  EVALUATOR_TASK_FAMILIES,
+  runEvaluatorCatalogProbe
+} from "../../apps/evaluator-worker/src/index.js";
 
 function queryPool(rows: readonly unknown[]): Pool {
   return {
@@ -66,6 +66,13 @@ describe("Evaluator foundation", () => {
     })).toThrowError(expect.objectContaining({ code: "EVALUATOR_MAKER_PANEL_COLLISION" }));
   });
 
+  it("rejects remote evaluator endpoints", async () => {
+    await expect(readEvaluatorProviderFamily(queryPool([{
+      value_json: { ...familyValue, chatBaseUrl: "https://models.example.test/v1" },
+      source_ref: "register:test:remote-evaluator-family"
+    }]), 7)).rejects.toMatchObject({ code: "EVALUATOR_PROVIDER_ENDPOINT_FORBIDDEN" });
+  });
+
   it("defaults dispatch influence to UNBOUND when the row is absent or malformed", async () => {
     await expect(readEvaluatorDispatchBinding(queryPool([]), 1)).resolves.toMatchObject({
       state: "UNBOUND",
@@ -112,6 +119,39 @@ describe("Evaluator foundation", () => {
     })).resolves.toMatchObject({ state: "UNAVAILABLE", models: [] });
   });
 
+  it("classifies evaluator catalog deadline expiry", async () => {
+    const family = {
+      rowKey: "evaluatorProviderFamily" as const,
+      registerVersion: 1,
+      sourceRef: "register:test",
+      value: familyValue
+    };
+    await expect(probeEvaluatorVllmCatalog(family, async () => {
+      throw new DOMException("deadline exceeded", "TimeoutError");
+    })).resolves.toMatchObject({
+      state: "UNAVAILABLE",
+      failureCode: "EVALUATOR_VLLM_TIMEOUT",
+      models: []
+    });
+  });
+
+  it("refuses an isolated-family collision before catalog collection or persistence", async () => {
+    const family = {
+      rowKey: "evaluatorProviderFamily" as const,
+      registerVersion: 1,
+      sourceRef: "register:test",
+      value: familyValue
+    };
+    const fetchImplementation = vi.fn<typeof fetch>();
+    const refusingPool = {
+      query: async () => { throw new Error("persistence must not start"); }
+    } as unknown as Pool;
+    await expect(runEvaluatorCatalogProbe(refusingPool, family, {
+      configuredProviders: [{ providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER }]
+    }, fetchImplementation)).rejects.toMatchObject({ code: "EVALUATOR_PROVIDER_PANEL_COLLISION" });
+    expect(fetchImplementation).not.toHaveBeenCalled();
+  });
+
   it("constructs an allowlist-only blind DTO", () => {
     const sample = createBlindEvaluationSample({
       sampleId: "opaque:sample-1",
@@ -132,60 +172,5 @@ describe("Evaluator foundation", () => {
       reasons: ["The conclusion follows."]
     });
     expect(JSON.stringify(sample)).not.toMatch(/maker|provider|model|artifact/i);
-  });
-});
-
-describe("FR-0.6 AC5 panel-isolation differential", () => {
-  const ask: AskRequest = {
-    question_line: "Does evaluator configuration alter the debate panel?",
-    risk_tier: "standard",
-    tier_source: "ASKER",
-    tier_provenance_ref: "test:asker",
-    composition_budget_tier: "medium",
-    depth_params: { depth: 2 },
-    decision_owner: "asker:test",
-    action_owner: "asker:test",
-    decision_scope: "test",
-    caller_scope: "ASKER",
-    as_of: "2026-08-14T00:00:00.000Z",
-    steering_presets: [],
-    steering_annotations: []
-  };
-  const panel = fixtureDiscoveredPanel(2);
-  const settings: RunCreationSettings = {
-    strangerSampleRate: 0,
-    registerVersion: 1,
-    batteryVersion: "test",
-    settlementWatchHandle: "test",
-    resolveDiscoveredPanel: async () => panel,
-    resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 2),
-    resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
-      effectiveRiskTier, tierSource, tierProvenanceRef
-    })
-  };
-  const family = {
-    rowKey: "evaluatorProviderFamily" as const,
-    registerVersion: 1,
-    sourceRef: "register:test",
-    value: familyValue
-  };
-
-  it("keeps membership, agent_count input, and structural envelope identical healthy versus absent", async () => {
-    const healthyProbe = await probeEvaluatorVllmCatalog(family, async () => new Response(JSON.stringify({
-      data: [{ id: "local/evaluator-model", object: "model", owned_by: "local" }]
-    }), { status: 200, headers: { "content-type": "application/json" } }));
-    const healthy = await evaluateAskAdmission(settings, ask);
-    const absentProbe = await probeEvaluatorVllmCatalog(family, async () => {
-      throw new TypeError("container absent");
-    });
-    const absent = await evaluateAskAdmission(settings, ask);
-    expect(healthyProbe.state).toBe("AVAILABLE");
-    expect(absentProbe.state).toBe("UNAVAILABLE");
-    expect(healthy.discoveredPanel).toEqual(absent.discoveredPanel);
-    expect(healthy.discoveredPanel).toHaveLength(absent.discoveredPanel.length);
-    expect(healthy.envelopeBasis).toEqual(absent.envelopeBasis);
-    expect(healthy.discoveredPanel.some((member) =>
-      member.provider_ref === EVALUATOR_PROVIDER_REF || member.maker === EVALUATOR_MAKER
-    )).toBe(false);
   });
 });

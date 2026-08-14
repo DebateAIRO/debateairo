@@ -22,9 +22,9 @@ GRANT REFERENCES (run_id) ON core.run TO debateai_evaluator_ddl;
 GRANT REFERENCES (raw_artifact_id) ON ledger.raw_artifact TO debateai_evaluator_ddl;
 GRANT REFERENCES (ledger_entry_id) ON ledger.ledger_entry TO debateai_evaluator_ddl;
 
-CREATE SCHEMA evaluator AUTHORIZATION debateai_evaluator_ddl;
+CREATE SCHEMA IF NOT EXISTS evaluator AUTHORIZATION debateai_evaluator_ddl;
 
-CREATE TABLE evaluator.domain (
+CREATE TABLE IF NOT EXISTS evaluator.domain (
   domain_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   canonical_name text NOT NULL CHECK (length(btrim(canonical_name)) BETWEEN 1 AND 80),
   normalized_name text NOT NULL UNIQUE CHECK (length(btrim(normalized_name)) BETWEEN 1 AND 80),
@@ -50,7 +50,7 @@ CREATE TABLE evaluator.domain (
   )
 );
 
-CREATE TABLE evaluator.domain_admission (
+CREATE TABLE IF NOT EXISTS evaluator.domain_admission (
   domain_admission_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id uuid NOT NULL REFERENCES core.run(run_id),
   proposed_name text NOT NULL CHECK (length(btrim(proposed_name)) > 0),
@@ -71,7 +71,7 @@ CREATE TABLE evaluator.domain_admission (
   )
 );
 
-CREATE TABLE evaluator.question_domain (
+CREATE TABLE IF NOT EXISTS evaluator.question_domain (
   question_domain_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id uuid NOT NULL UNIQUE REFERENCES core.run(run_id),
   domain_id uuid NOT NULL REFERENCES evaluator.domain(domain_id),
@@ -83,7 +83,7 @@ CREATE TABLE evaluator.question_domain (
   CHECK (assignment_basis <> 'TAGGER' OR tagger_raw_artifact_ref IS NOT NULL)
 );
 
-CREATE TABLE evaluator.pipeline_event (
+CREATE TABLE IF NOT EXISTS evaluator.pipeline_event (
   pipeline_event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id uuid NOT NULL REFERENCES core.run(run_id),
   pipeline text NOT NULL CHECK (pipeline IN ('TAG','HARVEST','ADDON','AGGREGATE','CONSUMER')),
@@ -98,7 +98,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS evaluator_pipeline_one_success
   ON evaluator.pipeline_event (run_id, pipeline, pipeline_version)
   WHERE state='SUCCEEDED';
 
-CREATE TABLE evaluator.observation (
+CREATE TABLE IF NOT EXISTS evaluator.observation (
   observation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id uuid NOT NULL REFERENCES core.run(run_id),
   provider text NOT NULL CHECK (length(btrim(provider)) > 0),
@@ -167,6 +167,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS reject_same_maker_addon ON evaluator.observation;
 CREATE TRIGGER reject_same_maker_addon
   BEFORE INSERT ON evaluator.observation
   FOR EACH ROW EXECUTE FUNCTION evaluator.reject_same_maker_addon();
@@ -200,11 +201,12 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS validate_observation_supersession ON evaluator.observation;
 CREATE TRIGGER validate_observation_supersession
   BEFORE INSERT ON evaluator.observation
   FOR EACH ROW EXECUTE FUNCTION evaluator.validate_observation_supersession();
 
-CREATE TABLE evaluator.profile_cell (
+CREATE TABLE IF NOT EXISTS evaluator.profile_cell (
   profile_cell_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   provider text NOT NULL CHECK (length(btrim(provider)) > 0),
   model_id text NOT NULL CHECK (length(btrim(model_id)) > 0),
@@ -237,7 +239,7 @@ CREATE TABLE evaluator.profile_cell (
   )
 );
 
-CREATE TABLE evaluator.rank_snapshot (
+CREATE TABLE IF NOT EXISTS evaluator.rank_snapshot (
   rank_snapshot_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   rank_kind text NOT NULL CHECK (rank_kind IN ('JUDGE','PROWESS')),
   provider text NOT NULL CHECK (length(btrim(provider)) > 0),
@@ -263,7 +265,7 @@ CREATE TABLE evaluator.rank_snapshot (
   )
 );
 
-CREATE TABLE evaluator.shadow_decision (
+CREATE TABLE IF NOT EXISTS evaluator.shadow_decision (
   shadow_decision_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id uuid REFERENCES core.run(run_id),
   kind text NOT NULL CHECK (kind IN ('JUDGE_SELECTION','SEAT_SHARE')),
@@ -277,7 +279,7 @@ CREATE TABLE evaluator.shadow_decision (
   UNIQUE NULLS NOT DISTINCT (run_id, kind, input_hash, formula_version)
 );
 
-CREATE TABLE evaluator.model_call_usage (
+CREATE TABLE IF NOT EXISTS evaluator.model_call_usage (
   model_call_usage_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ledger_entry_id uuid NOT NULL UNIQUE REFERENCES ledger.ledger_entry(ledger_entry_id),
   raw_artifact_id uuid UNIQUE REFERENCES ledger.raw_artifact(raw_artifact_id),
@@ -315,7 +317,7 @@ CREATE TABLE evaluator.model_call_usage (
   )
 );
 
-CREATE TABLE evaluator.relative_cost_cell (
+CREATE TABLE IF NOT EXISTS evaluator.relative_cost_cell (
   relative_cost_cell_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   provider text NOT NULL CHECK (length(btrim(provider)) > 0),
   model_id text NOT NULL CHECK (length(btrim(model_id)) > 0),
@@ -339,7 +341,7 @@ CREATE TABLE evaluator.relative_cost_cell (
   )
 );
 
-CREATE TABLE evaluator.vllm_probe (
+CREATE TABLE IF NOT EXISTS evaluator.vllm_probe (
   vllm_probe_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_ref text NOT NULL CHECK (length(btrim(provider_ref)) > 0),
   state text NOT NULL CHECK (state IN ('AVAILABLE','UNAVAILABLE')),
@@ -351,7 +353,7 @@ CREATE TABLE evaluator.vllm_probe (
   CHECK (state<>'UNAVAILABLE' OR length(btrim(failure_code)) > 0)
 );
 
-CREATE TABLE evaluator.vllm_catalog_model (
+CREATE TABLE IF NOT EXISTS evaluator.vllm_catalog_model (
   vllm_probe_id uuid NOT NULL REFERENCES evaluator.vllm_probe(vllm_probe_id),
   model_id text NOT NULL CHECK (length(btrim(model_id)) > 0),
   metadata_json jsonb NOT NULL CHECK (jsonb_typeof(metadata_json)='object'),
@@ -359,7 +361,7 @@ CREATE TABLE evaluator.vllm_catalog_model (
   PRIMARY KEY (vllm_probe_id, model_id)
 );
 
-CREATE TABLE evaluator.consumer_selection (
+CREATE TABLE IF NOT EXISTS evaluator.consumer_selection (
   consumer_selection_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vllm_probe_id uuid NOT NULL,
   model_id text NOT NULL,
@@ -372,7 +374,7 @@ CREATE TABLE evaluator.consumer_selection (
     REFERENCES evaluator.vllm_catalog_model(vllm_probe_id, model_id)
 );
 
-CREATE TABLE evaluator.consumer_output (
+CREATE TABLE IF NOT EXISTS evaluator.consumer_output (
   consumer_output_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   consumer_selection_id uuid NOT NULL REFERENCES evaluator.consumer_selection(consumer_selection_id),
   target_provider text NOT NULL CHECK (length(btrim(target_provider)) > 0),
@@ -404,6 +406,7 @@ BEGIN
     'evaluator.vllm_probe','evaluator.vllm_catalog_model',
     'evaluator.consumer_selection','evaluator.consumer_output'
   ] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS reject_mutation ON %s', table_name);
     EXECUTE format(
       'CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON %s '
       'FOR EACH ROW EXECUTE FUNCTION core.reject_mutation()', table_name
