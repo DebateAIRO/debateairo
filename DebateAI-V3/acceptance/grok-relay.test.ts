@@ -28,6 +28,24 @@ afterEach(async () => {
 });
 
 describe("GROK-01 Grok Build CLI relay", () => {
+  it("replays the redacted real Grok Build 1.0.0 text/modelUsage envelope", async () => {
+    process.env.FAKE_GROK_CAPTURED_ENVELOPE = "1";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("grok-4.6-build");
+      expect(relay.handshakeCostUsd).toBe(0.00001);
+      const response = await postCompletion(relay, "Captured-envelope replay");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        model: "grok-4.6-build",
+        maker: "xAI",
+        choices: [{ message: { content: "OK" } }]
+      });
+    } finally {
+      delete process.env.FAKE_GROK_CAPTURED_ENVELOPE;
+    }
+  });
+
   it("handshakes before serving and exposes xAI plus the CLI-reported model verbatim", async () => {
     const relay = await start();
     expect(relay.maker).toBe("xAI");

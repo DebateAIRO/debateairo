@@ -15,14 +15,17 @@ export const GROK_HANDSHAKE_PROMPT =
   "GROK-01 acceptance transport handshake. Reply with the single word: OK" as const;
 
 const envelopeSchema = z.object({
-  is_error: z.boolean().optional(),
-  result: z.string(),
-  model: z.string().trim().min(1).optional(),
-  model_id: z.string().trim().min(1).optional(),
-  modelUsage: z.record(z.string(), z.unknown()).optional()
+  text: z.string(),
+  stopReason: z.string().trim().min(1),
+  total_cost_usd: z.number().nonnegative(),
+  modelUsage: z.record(z.string().trim().min(1), z.unknown())
 }).passthrough();
 
-function parseGrokEnvelope(stdout: string): { readonly content: string; readonly model: string } {
+function parseGrokEnvelope(stdout: string): {
+  readonly content: string;
+  readonly model: string;
+  readonly costUsd: number;
+} {
   let decoded: unknown;
   try {
     decoded = JSON.parse(stdout);
@@ -31,20 +34,14 @@ function parseGrokEnvelope(stdout: string): { readonly content: string; readonly
   }
   const envelope = envelopeSchema.safeParse(decoded);
   if (!envelope.success) throw new CliRelayFailure("FAILED", "GROK_CLI_OUTPUT_INVALID");
-  if (envelope.data.is_error === true) throw new CliRelayFailure("FAILED", "GROK_CLI_FAILED");
-  const content = envelope.data.result.trim();
+  const content = envelope.data.text.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "GROK_CLI_OUTPUT_INVALID");
-  const reportedModels = [
-    ...(envelope.data.model === undefined ? [] : [envelope.data.model]),
-    ...(envelope.data.model_id === undefined ? [] : [envelope.data.model_id]),
-    ...Object.keys(envelope.data.modelUsage ?? {})
-  ];
-  const distinctModels = [...new Set(reportedModels)];
-  const model = distinctModels[0];
-  if (distinctModels.length !== 1 || model === undefined) {
+  const reportedModels = Object.keys(envelope.data.modelUsage);
+  const model = reportedModels[0];
+  if (reportedModels.length !== 1 || model === undefined) {
     throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_UNRESOLVED");
   }
-  return Object.freeze({ content, model });
+  return Object.freeze({ content, model, costUsd: envelope.data.total_cost_usd });
 }
 
 const grokAdapter: CliRelayAdapter = {
@@ -73,6 +70,7 @@ export interface GrokRelayOptions {
 export interface GrokRelayHandle extends CliRelayHandle {
   readonly model: string;
   readonly maker: typeof XAI_MAKER;
+  readonly handshakeCostUsd: number;
 }
 
 export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {
@@ -81,7 +79,12 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );
-  const handshake = await invokeCli(command, grokAdapter, GROK_HANDSHAKE_PROMPT, options.timeoutMs);
+  const handshake = await invokeCli(
+    command,
+    grokAdapter,
+    GROK_HANDSHAKE_PROMPT,
+    options.timeoutMs
+  ) as ReturnType<typeof parseGrokEnvelope>;
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,
@@ -93,6 +96,7 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     baseUrl: server.baseUrl,
     model: handshake.model,
     maker: XAI_MAKER,
+    handshakeCostUsd: handshake.costUsd,
     close: () => server.close()
   });
 }

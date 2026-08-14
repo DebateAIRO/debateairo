@@ -296,6 +296,11 @@ export function excludeHiddenSubtrees(
   });
 }
 
+/** @internal Test capability; never place this token in production wiring. */
+export const TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS = Symbol(
+  "TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS"
+);
+
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
   readonly claimMs: number;
@@ -330,6 +335,11 @@ export interface WalkingSkeletonSettings {
   };
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
+  /**
+   * Test-layer only: exercises N-maker wiring before V ratifies M>2 spend.
+   * The symbol capability cannot arrive through serialized production config.
+   */
+  readonly testOnlyMakerCountGuardBypass?: typeof TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -546,7 +556,7 @@ export function buildMultiMakerExpansionPlan(
   return Object.freeze(legs);
 }
 
-/** One ordered response per maker: defend its own root and attack the other root. */
+/** One response per ordered distinct maker pair: defend one root against each other root. */
 export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
   if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
     throw new TypedDomainError("RUN_MAKER_COUNT_INVALID", "The effective maker count must be a positive integer");
@@ -581,7 +591,7 @@ export function buildUnservedMakerPositionRecord(
       ? "Serve the other maker root in a separately ruled answer"
       : "Serve another maker root in a separately ruled answer",
     servedRootRule: SERVED_ROOT_RULE,
-    affectedNodeIds: Object.freeze(authoredMakerPositions.map((root) => root.nodeId))
+    affectedNodeIds: Object.freeze([servedRoot.nodeId, ...unserved.map((root) => root.nodeId)])
   });
 }
 
@@ -821,7 +831,12 @@ export class WalkingSkeletonRunner {
     };
     const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
     const expansionDepth = resolveExpansionDepth(envelopeBasis.derivedFrom.depthParams);
-    assertRatifiedMakerCount(run.agentCount);
+    if (
+      this.settings.testOnlyMakerCountGuardBypass !==
+      TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS
+    ) {
+      assertRatifiedMakerCount(run.agentCount);
+    }
     if (this.#configuredMakers.length < run.agentCount) {
       throw new TypedDomainError(
         "RUN_MAKER_CONFIGURATION_MISMATCH",
@@ -1244,9 +1259,10 @@ export class WalkingSkeletonRunner {
       authoredNodes.set(leg.childIndex, authored.value);
     }
 
-    // DR-154(2): each maker authors one ordered cross-root response. The same
-    // real response node defends its own root and attacks the other root; both
-    // S07 edges carry UNKNOWN magnitude until independently judged.
+    // DR-154(2) generalized proposal: each maker authors one ordered response
+    // per other maker root. Each real response node defends its own root and
+    // attacks its named target; both S07 edges carry UNKNOWN magnitude until
+    // independently judged.
     for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
       const authorRoot = authoredNodes.get(exchange.authorRootIndex);
       const targetRoot = authoredNodes.get(exchange.targetRootIndex);
@@ -1265,7 +1281,11 @@ export class WalkingSkeletonRunner {
         role: "cross-root response",
         parentNodeId: authorRoot.nodeId,
         childKind: "support",
-        siblingOrdinal: 3,
+        // Root expansion occupies ordinals 1/2. Preserve M=2's historical
+        // ordinal 3 while allocating one deterministic slot per other root.
+        siblingOrdinal: 3 + (exchange.targetRootIndex < exchange.authorRootIndex
+          ? exchange.targetRootIndex
+          : exchange.targetRootIndex - 1),
         plannedLegCount: 1,
         explorationDecision: "challenge",
         edges: [

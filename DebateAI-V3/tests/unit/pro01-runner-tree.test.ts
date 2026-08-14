@@ -74,6 +74,10 @@ describe("PANEL-01 multi-maker root authorship", () => {
     expect(buildCrossRootExchangePlan(roots.slice(0, 2).length)).toHaveLength(2);
     expect(buildUnservedMakerPositionRecord(roots.slice(0, 2), roots[0]).affectedNodeIds)
       .toEqual(["node:openai", "node:anthropic"]);
+    // Reachable RESIL-01 exclusion path: the first root is class H, so the
+    // second root is served. Preserve the pre-GROK-01 [served, unserved] bytes.
+    expect(buildUnservedMakerPositionRecord(roots.slice(0, 2), roots[1]).affectedNodeIds)
+      .toEqual(["node:anthropic", "node:openai"]);
   });
 
   it("observes DR-159 B2-A independently of the fixed-single-root guard", () => {

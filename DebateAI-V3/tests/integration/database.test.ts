@@ -25,6 +25,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import {
   createPostgresProviderGateway,
   excludeHiddenSubtrees,
+  TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
@@ -1554,6 +1555,85 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally {
       await secondary.stop();
       await primary.stop();
+    }
+  });
+
+  it("wires the latest persisted reviewer into three-maker rotation on real PostgreSQL", async () => {
+    const makerA = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation A position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("agree", `Rotation A review ${index + 1}`))
+    ]);
+    const makerB = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation B position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("dispute", `Rotation B review ${index + 1}`))
+    ]);
+    const makerC = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Rotation C position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("cannot-assess", `Rotation C review ${index + 1}`))
+    ]);
+    try {
+      const runId = await createRun("grok-01-three-maker-review-rotation", 30, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:grok-01-three-maker-review-rotation"
+      });
+      const gatewayA = createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/rotation-a", maker: "Rotation maker A"
+      });
+      const gatewayB = createPostgresProviderGateway(database.pool, {
+        endpoint: makerB.endpoint, model: "test-layer/rotation-b", maker: "Rotation maker B"
+      });
+      const gatewayC = createPostgresProviderGateway(database.pool, {
+        endpoint: makerC.endpoint, model: "test-layer/rotation-c", maker: "Rotation maker C"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, gatewayA, {
+        ...runnerSettings(),
+        providerRef: "provider:test-layer:rotation-a",
+        maker: "Rotation maker A",
+        critique: {
+          provider: gatewayB,
+          providerRef: "provider:test-layer:rotation-b",
+          maker: "Rotation maker B"
+        },
+        additionalMakers: [{
+          provider: gatewayC,
+          providerRef: "provider:test-layer:rotation-c",
+          maker: "Rotation maker C"
+        }],
+        scoringOperator: {
+          deploymentRowValue: "accumulate",
+          registerRef: "test-layer:DR-144"
+        },
+        testOnlyMakerCountGuardBypass: TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+      const reviews = await database.pool.query<{ author_maker: string; reviewer_maker: string }>(
+        `SELECT author.maker AS author_maker, reviewer.maker AS reviewer_maker
+         FROM ledger.node_review AS review
+         JOIN ledger.raw_artifact AS author ON author.raw_artifact_id=review.author_raw_artifact_ref
+         JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id=review.review_raw_artifact_ref
+         WHERE review.run_id=$1 ORDER BY review.at_seq`,
+        [runId]
+      );
+      const reviewersFor = (author: string): readonly string[] => reviews.rows
+        .filter((row) => row.author_maker === author)
+        .map((row) => row.reviewer_maker);
+      expect(reviewersFor("Rotation maker A")).toEqual([
+        "Rotation maker B", "Rotation maker C", "Rotation maker B", "Rotation maker C", "Rotation maker B"
+      ]);
+      expect(reviewersFor("Rotation maker B")).toEqual([
+        "Rotation maker A", "Rotation maker C", "Rotation maker A", "Rotation maker C", "Rotation maker A"
+      ]);
+      expect(reviewersFor("Rotation maker C")).toEqual([
+        "Rotation maker A", "Rotation maker B", "Rotation maker A", "Rotation maker B", "Rotation maker A"
+      ]);
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
     }
   });
 
