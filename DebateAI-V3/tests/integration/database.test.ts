@@ -11,7 +11,7 @@ import {
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
 import { BudgetRepository } from "@debateai/budget";
-import { RunRepository, migrate } from "@debateai/db";
+import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import {
@@ -22,10 +22,10 @@ import {
   readClaimTypeCompositionMap
 } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   createPostgresProviderGateway,
   excludeHiddenSubtrees,
-  TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
@@ -118,14 +118,8 @@ async function createRun(
     questionLine, askerId, sessionId: `session:${questionLine}`, callerScope: "ASKER",
     asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
-    depthParams: { depth }, agentCount, strangerSampleRate: 1,
-    envelopeBasis: {
-      max_model_attempts: maxModelAttempts,
-      register_row_key: "runCostEnvelope",
-      register_version: 1,
-      source_ref: "test-layer:run-cost-envelope",
-      derived_from: { depth_params: { depth }, risk_tier: "casual" }
-    },
+    depthParams: { depth }, discoveredPanel: fixtureDiscoveredPanel(agentCount), strangerSampleRate: 1,
+    envelopeBasis: fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5)),
     registerVersion: 1, batteryVersion: "s00", batteryRows
   });
 }
@@ -805,7 +799,7 @@ describe("S07 / FX-LED-06 / FX-LG-17 / FX-LG-18 — SPLIT persistence and termin
       questionLine: "s07-wait-drain", askerId: "asker:s07-wait-drain", sessionId: "session:s07-wait-drain",
       callerScope: "ASKER", asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual",
       effectiveRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker-declaration:s07-wait-drain",
-      compositionBudgetTier: "low", depthParams: { depth: 1 }, agentCount: 1, strangerSampleRate: 1,
+      compositionBudgetTier: "low", depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
       envelopeBasis: { source: "test-layer" }, registerVersion: 1, batteryVersion: "s07",
       batteryRows: [{
         batteryRowId: "Q30", predicateRef: "docs/architecture/10-row-contracts.md §6.6 Q30",
@@ -891,7 +885,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       tierProvenanceRef: "asker-declaration:test",
       compositionBudgetTier: "low",
       depthParams: { depth: 1 },
-      agentCount: 1,
+      discoveredPanel: fixtureDiscoveredPanel(1),
       strangerSampleRate: 1,
       envelopeBasis: { key: "test-envelope" },
       registerVersion: 1,
@@ -909,18 +903,64 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
     expect(state.activations.find((row) => row.batteryRowId === "Q2")?.state).toBe("WAIT");
   });
 
+  it("DR-181 T4 derives agent_count from the frozen panel and enforces append-only probe evidence", async () => {
+    const runId = await createRun("dr181-panel-identity", 10, 3);
+    const head = await database.pool.query<{ agent_count: number; panel_count: number }>(
+      `SELECT agent_count, jsonb_array_length(discovered_panel) AS panel_count
+       FROM core.run WHERE run_id=$1`, [runId]
+    );
+    expect(head.rows[0]).toEqual({ agent_count: 3, panel_count: 3 });
+
+    await expect(database.pool.query(
+      `INSERT INTO core.run (
+         question_line, asker_id, session_id, caller_scope, as_of,
+         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+         composition_budget_tier, depth_params, agent_count, discovered_panel,
+         stranger_sample_rate, envelope_basis, register_version,
+         battery_version, created_at_seq
+       ) VALUES (
+         'bad panel identity', 'asker:bad-panel', 'session:bad-panel', 'ASKER', now(),
+         'casual', 'casual', 'ASKER', 'asker-declaration:bad-panel',
+         'low', '{"depth":1}', 2, '[]', 1, '{}', 1, 's00', ledger.allocate_sequence()
+       )`
+    )).rejects.toThrow(/run_panel_count_identity/);
+
+    const probeId = randomUUID();
+    const probes = new ProviderProbeRepository(database.pool);
+    await probes.record({
+      probeEvidenceRef: probeId,
+      providerRef: "provider:dr181",
+      maker: "maker:dr181",
+      state: "HEALTHY",
+      modelId: "model:dr181",
+      failureCode: null,
+      probedAt: new Date()
+    });
+    await expect(database.pool.query(
+      "UPDATE core.provider_probe SET model_id='model:mutated' WHERE probe_id=$1", [probeId]
+    )).rejects.toThrow();
+    await expect(database.pool.query(
+      `INSERT INTO core.provider_probe
+         (probe_id, provider_ref, maker, state, model_id, failure_code, probed_at)
+       VALUES ($1, 'provider:bad', 'maker:bad', 'ABSENT', 'forbidden-model', NULL, now())`,
+      [randomUUID()]
+    )).rejects.toThrow();
+  });
+
   it("returns a typed error instead of defaulting an empty progress stream", async () => {
     const result = await database.pool.query<{ run_id: string }>(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
       ) VALUES (
         'raw fixture', 'asker:raw', 'session:raw', 'ASKER', now(),
         'casual', 'casual', 'ASKER', 'asker-declaration:raw',
-        'low', '{}', 1, 1, '{}', 1, 's00', 9999
+        'low', '{}', 1,
+        '[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',
+        1, '{}', 1, 's00', 9999
       ) RETURNING run_id
     `);
     const repository = new RunRepository(database.pool);
@@ -944,10 +984,10 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('a','a','s','ASKER',now(),'casual','casual','ASKER','asker:a','low','{}',1,1,'{}',1,'s00',10001)
+      ) VALUES ('a','a','s','ASKER',now(),'casual','casual','ASKER','asker:a','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10001)
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(asker.rows[0]).toEqual({ tier_source: "ASKER", tier_provenance_ref: "asker:a" });
@@ -955,10 +995,10 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine','machine','s','ASKER',now(),'standard','standard','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10005)
+      ) VALUES ('machine','machine','s','ASKER',now(),'standard','standard','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10005)
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(machineDefault.rows[0]).toEqual({
@@ -969,37 +1009,37 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('asker-raised','asker-raised','s','ASKER',now(),'casual','high-stakes','ASKER','asker:raised','low','{}',1,1,'{}',1,'s00',10006)
+      ) VALUES ('asker-raised','asker-raised','s','ASKER',now(),'casual','high-stakes','ASKER','asker:raised','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10006)
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine-raised','machine-raised','s','ASKER',now(),'casual','high-stakes','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10007)
+      ) VALUES ('machine-raised','machine-raised','s','ASKER',now(),'casual','high-stakes','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10007)
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine-lowered','machine-lowered','s','ASKER',now(),'high-stakes','casual','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10008)
+      ) VALUES ('machine-lowered','machine-lowered','s','ASKER',now(),'high-stakes','casual','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10008)
     `)).rejects.toThrow();
     const raised = await database.pool.query(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('b','b','s','ASKER',now(),'casual','standard','DEPLOYMENT_POLICY','asker:b','low','{}',1,1,'{}',1,'s00',10002)
+      ) VALUES ('b','b','s','ASKER',now(),'casual','standard','DEPLOYMENT_POLICY','asker:b','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10002)
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(raised.rows[0]).toEqual({ tier_source: "DEPLOYMENT_POLICY", tier_provenance_ref: "asker:b" });
@@ -1007,19 +1047,19 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('c','c','s','ASKER',now(),'standard','casual','DEPLOYMENT_POLICY','asker:c','low','{}',1,1,'{}',1,'s00',10003)
+      ) VALUES ('c','c','s','ASKER',now(),'standard','casual','DEPLOYMENT_POLICY','asker:c','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10003)
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
         asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-        composition_budget_tier, depth_params, agent_count,
+        composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('d','d','s','ASKER',now(),'casual','standard','DERIVED','asker:d','low','{}',1,1,'{}',1,'s00',10004)
+      ) VALUES ('d','d','s','ASKER',now(),'casual','standard','DERIVED','asker:d','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10004)
     `)).rejects.toThrow();
   });
 });
@@ -1058,7 +1098,7 @@ describe("P7 — graph aggregate write seam", () => {
       tierProvenanceRef: "asker-declaration:graph",
       compositionBudgetTier: "low",
       depthParams: { depth: 1 },
-      agentCount: 1,
+      discoveredPanel: fixtureDiscoveredPanel(1),
       strangerSampleRate: 1,
       envelopeBasis: { key: "graph-envelope" },
       registerVersion: 1,
@@ -1326,27 +1366,69 @@ describe("FX-LG-16 / DR-128 — claim-type composition register carrier", () => 
 });
 
 describe("apps/runner — legal command lifecycle", () => {
-  it.each([
-    [3, "RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE"],
-    [2, "RUN_MAKER_CONFIGURATION_MISMATCH"]
-  ])("refuses agent_count %i with %s before any model call", async (agentCount, code) => {
-    const provider = await startProviderDouble([]);
+  it("re-probes once at claim, records a missing pinned member, shrinks, discloses, and serves", async () => {
+    const provider = await startProviderDouble([judgementDouble("Claim-time surviving position", 0.4)]);
     try {
-      const runId = await createRun(`maker-guard-${agentCount}`, 10, agentCount);
+      const runId = await createRun("claim-panel-revision", 1, 2);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
-        runId,
-        batteryRowId: "Q1",
-        nodeSet: [],
-        commandKey: `runner-test:maker-guard-${agentCount}`
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: "runner-test:claim-panel-revision"
+      });
+      let claimProbeCalls = 0;
+      const runner = runnerWithEndpoint(provider.endpoint, {
+        ...runnerSettings(),
+        claimTimeProbe: async (member) => {
+          claimProbeCalls += 1;
+          return { state: "HEALTHY", modelId: member.model_id, failureCode: null };
+        }
       });
 
-      await expect(runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId)).rejects.toMatchObject({ code });
-      expect(provider.calls()).toBe(0);
-      const calls = await database.pool.query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'",
-        [runId]
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      expect(claimProbeCalls).toBe(1);
+      expect(provider.calls()).toBe(1);
+      const absent = await database.pool.query<{ state: string; failure_code: string }>(
+        `SELECT state, failure_code FROM core.provider_probe
+         WHERE provider_ref='provider:test-layer:secondary' ORDER BY probed_at DESC LIMIT 1`
       );
-      expect(calls.rows[0]?.count).toBe("0");
+      expect(absent.rows[0]).toEqual({ state: "ABSENT", failure_code: "CLAIM_GATEWAY_UNRESOLVED" });
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const projection = await new ServeRepository(database.pool).readAnswerProjection(
+        result.answerId, "asker:claim-panel-revision"
+      );
+      expect(projection?.condition_mark_records).toContainEqual(expect.objectContaining({
+        mark: "CRITIQUE-UNAVAILABLE",
+        reason: expect.stringContaining("CLAIM_PANEL_REVISED:provider:test-layer:secondary=CLAIM_GATEWAY_UNRESOLVED")
+      }));
+      expect(projection?.condition_marks.filter((mark) => mark === "CRITIQUE-UNAVAILABLE")).toHaveLength(1);
+    } finally { await provider.stop(); }
+  });
+
+  it("records a failed claim-time re-probe and stops loudly only when the effective panel is empty", async () => {
+    const provider = await startProviderDouble([]);
+    try {
+      const runId = await createRun("claim-panel-empty", 10, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: "runner-test:claim-panel-empty"
+      });
+      let claimProbeCalls = 0;
+      const runner = runnerWithEndpoint(provider.endpoint, {
+        ...runnerSettings(),
+        claimTimeProbe: async () => {
+          claimProbeCalls += 1;
+          return { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROBE_TRANSPORT_FAILED" };
+        }
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
+        code: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM"
+      });
+      expect(claimProbeCalls).toBe(1);
+      expect(provider.calls()).toBe(0);
+      const absent = await database.pool.query<{ state: string; failure_code: string }>(
+        `SELECT state, failure_code FROM core.provider_probe
+         WHERE provider_ref='provider:test-layer' ORDER BY probed_at DESC LIMIT 1`
+      );
+      expect(absent.rows[0]).toEqual({ state: "ABSENT", failure_code: "CLAIM_PROBE_TRANSPORT_FAILED" });
     } finally { await provider.stop(); }
   });
 
@@ -1590,23 +1672,22 @@ describe("apps/runner — legal command lifecycle", () => {
       });
       const runner = new WalkingSkeletonRunner(database.pool, gatewayA, {
         ...runnerSettings(),
-        providerRef: "provider:test-layer:rotation-a",
+          providerRef: "provider:test-layer",
         maker: "Rotation maker A",
         critique: {
           provider: gatewayB,
-          providerRef: "provider:test-layer:rotation-b",
+          providerRef: "provider:test-layer:secondary",
           maker: "Rotation maker B"
         },
         additionalMakers: [{
           provider: gatewayC,
-          providerRef: "provider:test-layer:rotation-c",
+          providerRef: "provider:test-layer:third",
           maker: "Rotation maker C"
         }],
         scoringOperator: {
           deploymentRowValue: "accumulate",
           registerRef: "test-layer:DR-144"
         },
-        testOnlyMakerCountGuardBypass: TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS
       });
 
       await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
@@ -2195,7 +2276,7 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection).toMatchObject({
         verdict_state: "SUPPORTED",
         verdict_unavailable: null,
-        confidence_band: "TEST_TOP_BAND",
+        confidence_band: "TEST_CAPPED_BAND",
         band_ceiling: { label: "TEST_DEFAULT_CEILING" },
         condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
       });
@@ -2207,7 +2288,7 @@ describe("apps/runner — legal command lifecycle", () => {
         }),
         expect.objectContaining({
           mark: "CRITIQUE-UNAVAILABLE",
-          reason: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
+          reason: "MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=1",
           lift_path: "RUN_DIFFERENT_MAKER_CRITIQUE"
         })
       ]));
@@ -2461,8 +2542,9 @@ describe("apps/runner — legal command lifecycle", () => {
           protected_core: "NEVER_SKIPPABLE",
           basis: {
             max_model_attempts: 1,
-            register_row_key: "runCostEnvelope",
-            source_ref: "test-layer:run-cost-envelope"
+            kind: "COMPUTED_STRUCTURAL_CEILING",
+            formula_version: "test-v1",
+            bounds_source_ref: "test:engine+register"
           }
         }
       });

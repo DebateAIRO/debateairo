@@ -14,6 +14,10 @@ import {
 } from "@debateai/kernel";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
+export const ENGINE_BRANCHING_FACTOR = 2 as const;
+export const ENGINE_COMPOSITION_SEGMENT_CAP = 2 as const;
+export const ENGINE_FIXED_ORGANS_PER_COMPOSITION = 1 + ENGINE_COMPOSITION_SEGMENT_CAP + 1;
+export const ENGINE_MAX_RECOMPOSE = 2 as const;
 
 const unitIntervalSchema = z.number().finite().min(0).max(1);
 const compositionMetricSchema = z.enum([
@@ -100,7 +104,6 @@ export async function readClaimTypeCompositionMap(
   });
 }
 
-export const RUN_COST_ENVELOPE_ROW_KEY = "runCostEnvelope" as const;
 export const DEPLOYMENT_RISK_TIER_ROW_KEY = "riskTier" as const;
 export const CONVERGENCE_EPSILON_ROW_KEY = "convergenceEpsilon" as const;
 export const CONVERGENCE_STOP_DEFAULTS_ROW_KEY = "convergenceStopDefaults" as const;
@@ -147,14 +150,117 @@ export async function readLivenessPolicy(pool: Pool, registerVersion: number, qu
   });
 }
 
-const runCostEnvelopePolicySchema = z.object({
-  kind: z.literal("RUN_COST_ENVELOPE_POLICY"),
-  members: z.array(z.object({
-    depth_params: z.record(z.string(), z.unknown()),
-    risk_tier: z.enum(RISK_TIERS),
-    max_model_attempts: z.number().int().positive()
-  }).strict()).min(1)
-}).strict();
+export interface StructuralCeilingInput {
+  readonly panelSize: number;
+  readonly depth: number;
+  readonly judgeMaxAttempts: number;
+  readonly organMaxAttempts: number;
+  readonly maxRecompose: number;
+  readonly maxCooldownHoldsPerRun: number;
+  readonly finalRetryAttempts: number;
+  readonly branchingFactor: number;
+  readonly compositionSegmentCap: number;
+  readonly fixedOrgansPerComposition: number;
+}
+
+/** DR-181/182: an invisible bug tripwire derived from the engine's exported facts. */
+export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
+  readonly max_model_attempts: number;
+} {
+  for (const [name, value] of Object.entries(input)) {
+    if (!Number.isInteger(value) || value < 1) throw new TypeError(`STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`);
+  }
+  const nodesPerRoot = input.panelSize === 1
+    ? 1
+    : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
+  if (!Number.isInteger(nodesPerRoot)) throw new TypeError("STRUCTURAL_CEILING_TREE_INVALID");
+  const authored = input.panelSize === 1
+    ? 1
+    : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
+  const reviews = input.panelSize === 1 ? 0 : authored;
+  const fixedSites = input.maxRecompose * input.fixedOrgansPerComposition;
+  const finalRetryTotal = input.maxCooldownHoldsPerRun * input.finalRetryAttempts;
+  const maxModelAttempts = (authored + reviews) * input.judgeMaxAttempts
+    + fixedSites * input.organMaxAttempts
+    + finalRetryTotal;
+  return Object.freeze({
+    kind: "COMPUTED_STRUCTURAL_CEILING",
+    max_model_attempts: maxModelAttempts,
+    panel_size: input.panelSize,
+    depth: input.depth,
+    per_site_attempts: Object.freeze({ judge: input.judgeMaxAttempts, organ: input.organMaxAttempts }),
+    hold_cap: input.maxCooldownHoldsPerRun,
+    final_retry_attempts: input.finalRetryAttempts,
+    formula_version: "DR-181-v1",
+    bounds_source_ref: "engine-exports+register"
+  });
+}
+
+const structuralBoundSchema = z.object({
+  kind: z.literal("ACCEPTANCE_ORGAN_COST_BOUNDS"),
+  organs: z.object({
+    JUDGE: z.object({ maxAttempts: z.number().int().positive() }).passthrough(),
+    COMPOSER: z.object({ maxAttempts: z.number().int().positive() }).passthrough(),
+    CONFORMANCE: z.object({ maxAttempts: z.number().int().positive() }).passthrough()
+  }).passthrough()
+}).passthrough();
+
+const structuralDeathSchema = z.object({
+  kind: z.literal("RUN_DEATH_POLICY"),
+  final_retry_attempts: z.number().int().positive(),
+  max_cooldown_holds_per_run: z.number().int().positive()
+}).passthrough();
+
+export async function readStructuralCeilingPolicyInputs(pool: Pool, registerVersion: number): Promise<{
+  readonly judgeMaxAttempts: number;
+  readonly organMaxAttempts: number;
+  readonly finalRetryAttempts: number;
+  readonly maxCooldownHoldsPerRun: number;
+}> {
+  const result = await pool.query<{ row_key: string; value_json: unknown }>(
+    `SELECT row_key, value_json FROM register.register_row
+     WHERE register_version=$1 AND row_key=ANY($2::text[])`,
+    [registerVersion, ["acceptanceOrganCostBounds", "runDeathPolicy"]]
+  );
+  const byKey = new Map(result.rows.map((row) => [row.row_key, row.value_json]));
+  const bounds = structuralBoundSchema.safeParse(byKey.get("acceptanceOrganCostBounds"));
+  const death = structuralDeathSchema.safeParse(byKey.get("runDeathPolicy"));
+  if (!bounds.success || !death.success) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "The engine attempt bounds or death policy are absent");
+  }
+  return Object.freeze({
+    judgeMaxAttempts: bounds.data.organs.JUDGE.maxAttempts,
+    organMaxAttempts: Math.max(bounds.data.organs.COMPOSER.maxAttempts, bounds.data.organs.CONFORMANCE.maxAttempts),
+    finalRetryAttempts: death.data.final_retry_attempts,
+    maxCooldownHoldsPerRun: death.data.max_cooldown_holds_per_run
+  });
+}
+
+export async function readPanelDiscoveryPolicy(pool: Pool, registerVersion: number): Promise<{
+  readonly probeFreshnessMs: number;
+  readonly probeMaxAttempts: 1;
+  readonly sourceRef: string;
+}> {
+  const result = await pool.query<{ value_json: unknown; source_ref: string }>(
+    `SELECT value_json, source_ref FROM register.register_row
+     WHERE register_version=$1 AND row_key='panelDiscoveryPolicy'`,
+    [registerVersion]
+  );
+  const row = result.rows[0];
+  const parsed = z.object({
+    kind: z.literal("PANEL_DISCOVERY_POLICY"),
+    probe_freshness_ms: z.number().int().positive(),
+    probe_max_attempts: z.literal(1)
+  }).strict().safeParse(row?.value_json);
+  if (row === undefined || !parsed.success || row.source_ref.trim() === "") {
+    throw new TypedDomainError("PANEL_DISCOVERY_POLICY_UNRESOLVED", "No ruled discovery policy is available");
+  }
+  return Object.freeze({
+    probeFreshnessMs: parsed.data.probe_freshness_ms,
+    probeMaxAttempts: parsed.data.probe_max_attempts,
+    sourceRef: row.source_ref
+  });
+}
 
 export interface DeploymentRiskTierRow {
   readonly rowKey: typeof DEPLOYMENT_RISK_TIER_ROW_KEY;
@@ -196,83 +302,6 @@ export async function readDeploymentRiskTier(
     registerVersion,
     sourceRef: row.source_ref,
     value: parsed.data
-  });
-}
-
-export interface RunCostEnvelopePolicyRow {
-  readonly rowKey: typeof RUN_COST_ENVELOPE_ROW_KEY;
-  readonly registerVersion: number;
-  readonly sourceRef: string;
-  readonly value: z.infer<typeof runCostEnvelopePolicySchema>;
-}
-
-export async function readRunCostEnvelopePolicy(
-  pool: Pool,
-  registerVersion: number
-): Promise<RunCostEnvelopePolicyRow> {
-  if (!Number.isInteger(registerVersion) || registerVersion < 1) {
-    throw new TypeError("A positive register version is required for the run cost envelope");
-  }
-  const result = await pool.query<{ row_key: string; value_json: unknown; source_ref: string }>(
-    `SELECT row_key, value_json, source_ref
-     FROM register.register_row
-     WHERE register_version = $1 AND row_key = $2`,
-    [registerVersion, RUN_COST_ENVELOPE_ROW_KEY]
-  );
-  const row = result.rows[0];
-  if (row === undefined) {
-    throw new TypedDomainError(
-      "RUN_COST_ENVELOPE_UNRESOLVED",
-      `No V-ratified ${RUN_COST_ENVELOPE_ROW_KEY} exists in register version ${registerVersion}`
-    );
-  }
-  const parsed = runCostEnvelopePolicySchema.safeParse(row.value_json);
-  if (!parsed.success) {
-    throw new TypedDomainError("RUN_COST_ENVELOPE_INVALID", `${RUN_COST_ENVELOPE_ROW_KEY} has an invalid member shape`);
-  }
-  if (row.source_ref.trim() === "") {
-    throw new TypedDomainError("RUN_COST_ENVELOPE_PROVENANCE_MISSING", `${RUN_COST_ENVELOPE_ROW_KEY} has no source_ref`);
-  }
-  return Object.freeze({
-    rowKey: RUN_COST_ENVELOPE_ROW_KEY,
-    registerVersion,
-    sourceRef: row.source_ref,
-    value: parsed.data
-  });
-}
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    return `{${Object.entries(value).sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
-      .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function resolveRunCostEnvelopeBasis(
-  row: RunCostEnvelopePolicyRow,
-  input: { readonly depthParams: Readonly<Record<string, unknown>>; readonly riskTier: RiskTier }
-): Readonly<Record<string, unknown>> {
-  const depthFingerprint = canonicalJson(input.depthParams);
-  const member = row.value.members.find((candidate) =>
-    candidate.risk_tier === input.riskTier && canonicalJson(candidate.depth_params) === depthFingerprint
-  );
-  if (member === undefined) {
-    throw new TypedDomainError(
-      "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
-      `No ${RUN_COST_ENVELOPE_ROW_KEY} member matches the declared depth and effective risk tier`
-    );
-  }
-  return Object.freeze({
-    max_model_attempts: member.max_model_attempts,
-    register_row_key: row.rowKey,
-    register_version: row.registerVersion,
-    source_ref: row.sourceRef,
-    derived_from: Object.freeze({
-      depth_params: Object.freeze({ ...input.depthParams }),
-      risk_tier: input.riskTier
-    })
   });
 }
 

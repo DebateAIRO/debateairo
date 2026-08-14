@@ -1,11 +1,10 @@
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
-import { createContractClient, type Deployment } from "@debateai/contract";
+import { createContractClient } from "@debateai/contract";
 import { ContractHttpError } from "@debateai/contract";
 import { readDeploymentRiskTier } from "@debateai/register";
 import { createDebate } from "../../apps/v2-ui/lib/api.js";
-import { runCostEnvelopeFromDeployment } from "../../apps/v2-ui/lib/v3/adapter.js";
 import {
   classifyTokenUnlockFailure,
   shouldClearStoredTokenAfterUnlockFailure
@@ -13,24 +12,6 @@ import {
 
 function poolReturning(rows: readonly Record<string, unknown>[]): Pool {
   return { query: async () => ({ rows }) } as unknown as Pool;
-}
-
-const envelopeRow = {
-  row_key: "runCostEnvelope",
-  value: {
-    kind: "RUN_COST_ENVELOPE_POLICY",
-    members: [{ depth_params: { depth: 1 }, risk_tier: "standard", max_model_attempts: 9 }]
-  },
-  source_ref: "register:test:envelope"
-} as const;
-
-function deployment(rows: Deployment["register"]["rows"]): Deployment {
-  return {
-    register: { register_version: 7, rows },
-    scorecards: [],
-    model_ledger: [],
-    fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
-  };
 }
 
 describe("POL-01 register-owned deployment floor", () => {
@@ -55,14 +36,6 @@ describe("POL-01 register-owned deployment floor", () => {
     });
   });
 
-  it("makes an absent UI policy distinguishable from a present NULL policy", () => {
-    expect(runCostEnvelopeFromDeployment(deployment([envelopeRow])).deploymentRiskTier).toBeNull();
-    expect(() => runCostEnvelopeFromDeployment(deployment([
-      envelopeRow,
-      { row_key: "riskTier", value: null, source_ref: "register:test:risk" }
-    ]))).toThrowError(expect.objectContaining({ code: "RISK_TIER_POLICY_INVALID" }));
-  });
-
   it("composes apps/api/main from the same register row rather than DEPLOYMENT_RISK_TIER", async () => {
     const source = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
     expect(source).toContain("readDeploymentRiskTier");
@@ -72,8 +45,8 @@ describe("POL-01 register-owned deployment floor", () => {
 
   it("surfaces the typed refusal code and reason through the /new form data path", async () => {
     const client = createContractClient("http://api.test", (async () => new Response(JSON.stringify({
-      error: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
-      message: "No runCostEnvelope member matches the declared depth and effective risk tier"
+      error: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
+      message: "No healthy provider remained at claim"
     }), { status: 422, headers: { "content-type": "application/json" } })) as typeof fetch);
 
     await expect(createDebate("What follows from this evidence?", {
@@ -82,13 +55,12 @@ describe("POL-01 register-owned deployment floor", () => {
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",
       depth: 3,
-      agent_count: 1,
       decision_owner: "asker:test",
       action_owner: "asker:test",
       decision_scope: "POL-01 UI disclosure",
       as_of: "2026-08-12T08:00:00.000Z"
     }, "test-token", client)).rejects.toThrow(
-      "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED: No runCostEnvelope member matches the declared depth and effective risk tier"
+      "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM: No healthy provider remained at claim"
     );
   });
 

@@ -1,10 +1,8 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createDebate, contractClient } from "@/lib/api";
-import { runCostEnvelopeFromDeployment, type RunCostEnvelopeView } from "@/lib/v3/adapter";
-import { selectRunCostEnvelopeMember, selectRunCostEnvelopeMembers } from "@/lib/runCostEnvelopeSelection";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
 import {
@@ -12,11 +10,8 @@ import {
   askDefaultFailureMessage,
   DECISION_SCOPE_DEFAULT,
   dateTimeLocalValue,
-  deriveAgentCountDefault,
   deriveRiskTierDefault,
   deriveSessionAskDefaults,
-  MachineDefaultHint,
-  MachineOwnedAskFields,
   PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
   type CompositionBudgetTier,
   type RiskTier
@@ -44,12 +39,9 @@ function NewDebateForm({ token }: { token: string }) {
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
-  const [depth, setDepth] = useState<number | null>(null);
-  const [runCostEnvelope, setRunCostEnvelope] = useState<RunCostEnvelopeView | null>(null);
-  const [envelopeError, setEnvelopeError] = useState<string | null>(null);
+  const [depth, setDepth] = useState(1);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
@@ -57,17 +49,11 @@ function NewDebateForm({ token }: { token: string }) {
   const [riskTier, setRiskTier] = useState("");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
-  const [agentCount, setAgentCount] = useState("");
   const [decisionOwner, setDecisionOwner] = useState("");
   const [actionOwner, setActionOwner] = useState("");
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
-  const [asOfWasEdited, setAsOfWasEdited] = useState(false);
-  const asOfEditedRef = useRef(false);
-  const [agentCountDefault, setAgentCountDefault] = useState<ReturnType<typeof deriveAgentCountDefault> | null>(null);
   const [riskTierDefault, setRiskTierDefault] = useState<ReturnType<typeof deriveRiskTierDefault> | null>(null);
-  const [sessionDefaultsProvenance, setSessionDefaultsProvenance] = useState<ReturnType<typeof deriveSessionAskDefaults> | null>(null);
-  const [agentCountDefaultError, setAgentCountDefaultError] = useState<string | null>(null);
   const [riskTierDefaultError, setRiskTierDefaultError] = useState<string | null>(null);
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,22 +63,6 @@ function NewDebateForm({ token }: { token: string }) {
     let active = true;
     void contractClient.readDeployment(token).then((deployment) => {
       if (!active) return;
-      try {
-        setRunCostEnvelope(runCostEnvelopeFromDeployment(deployment));
-        setEnvelopeError(null);
-      } catch (failure) {
-        setRunCostEnvelope(null);
-        setEnvelopeError(failure instanceof Error ? failure.message : "RUN_COST_ENVELOPE_UNAVAILABLE");
-      }
-      try {
-        const defaults = deriveAgentCountDefault(deployment);
-        setAgentCountDefault(defaults);
-        setAgentCount((current) => current.trim().length > 0 ? current : defaults.agentCount);
-        setAgentCountDefaultError(null);
-      } catch (failure) {
-        setAgentCountDefault(null);
-        setAgentCountDefaultError(askDefaultFailureMessage(failure, "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE"));
-      }
       try {
         const defaults = deriveRiskTierDefault(deployment);
         setRiskTierDefault(defaults);
@@ -104,53 +74,32 @@ function NewDebateForm({ token }: { token: string }) {
       }
     }).catch((failure: unknown) => {
       if (!active) return;
-      setRunCostEnvelope(null);
-      setEnvelopeError(failure instanceof Error ? failure.message : "RUN_COST_ENVELOPE_UNAVAILABLE");
-      setAgentCountDefault(null);
       setRiskTierDefault(null);
-      setAgentCountDefaultError(`ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Deployment read failed"}`);
       setRiskTierDefaultError(`ASK_RISK_TIER_DEFAULT_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Deployment read failed"}`);
     });
     void contractClient.readSession(token).then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session);
-      setSessionDefaultsProvenance(defaults);
       setDecisionOwner((current) => current.trim().length > 0 ? current : defaults.decisionOwner);
       setActionOwner((current) => current.trim().length > 0 ? current : defaults.actionOwner);
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
-      setAsOf((current) => asOfEditedRef.current ? current : defaults.asOf);
+      setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
-      setSessionDefaultsProvenance(null);
       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
     });
     return () => { active = false; };
   }, [token]);
 
-  useEffect(() => {
-    const members = runCostEnvelope === null
-      ? []
-      : selectRunCostEnvelopeMembers(runCostEnvelope.members, riskTier, runCostEnvelope.deploymentRiskTier);
-    setDepth((current) => members.some((member) => member.depth === current) ? current : members[0]?.depth ?? null);
-  }, [riskTier, runCostEnvelope]);
-
-  const askAgentCount = Number(agentCount);
   const askAsOf = new Date(asOf);
-  const allowedEnvelopeMembers = runCostEnvelope === null
-    ? []
-    : selectRunCostEnvelopeMembers(runCostEnvelope.members, riskTier, runCostEnvelope.deploymentRiskTier);
-  const selectedEnvelopeMember = selectRunCostEnvelopeMember(allowedEnvelopeMembers, depth);
   // The button becomes ready only for the complete ask that will be submitted.
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    selectedEnvelopeMember !== null &&
+    depth >= 1 && depth <= 5 &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
-    agentCount.trim().length > 0 &&
-    Number.isInteger(askAgentCount) &&
-    askAgentCount >= 1 &&
     decisionOwner.trim().length > 0 &&
     actionOwner.trim().length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -164,17 +113,16 @@ function NewDebateForm({ token }: { token: string }) {
     setError(null);
     try {
       const submitTime = new Date();
-      if (!asOfWasEdited) setAsOf(dateTimeLocalValue(submitTime));
+      setAsOf(dateTimeLocalValue(submitTime));
       const config = buildNewDebateAskConfig({
-        agentCount,
         riskTier: riskTier as RiskTier,
         budgetTier: budgetTier as CompositionBudgetTier,
         decisionOwner,
         actionOwner,
         decisionScope,
         asOf,
-        depth: selectedEnvelopeMember!.depth,
-        asOfWasEdited,
+        depth,
+        asOfWasEdited: false,
         riskTierWasEdited
       }, submitTime);
       const debate = await createDebate(topic.trim(), config, token);
@@ -211,7 +159,7 @@ function NewDebateForm({ token }: { token: string }) {
 
           <div className="optionsPanel" style={{ marginTop: 18 }}>
             <div className="optionHint" style={{ marginBottom: 4 }}>
-              Choose your risk tier, composition budget tier, and depth, then click Start. Machine-owned fields remain editable under Advanced.
+              Choose your risk tier, composition budget tier, and depth, then click Start.
             </div>
             <div className="optionRow">
               <div>
@@ -219,7 +167,7 @@ function NewDebateForm({ token }: { token: string }) {
                   Risk tier
                 </label>
                 <div className="optionHint">How much is riding on the answer</div>
-                {riskTierDefault ? <MachineDefaultHint>{riskTierDefault.riskTierProvenance}</MachineDefaultHint> : null}
+                {riskTierDefault ? <div className="optionHint">Machine default: {riskTierDefault.riskTierProvenance}</div> : null}
               </div>
               <div className="optionControl">
                 <select
@@ -263,7 +211,7 @@ function NewDebateForm({ token }: { token: string }) {
             <div className="optionRow">
               <div>
                 <label className="optionLabel" htmlFor="treeDepth">Tree depth</label>
-                <div className="optionHint">Allowed by the deployment run-cost envelope for the chosen risk tier</div>
+                <div className="optionHint">How far the debate expands when cross-maker review is available</div>
               </div>
               <div className="optionControl">
                 <select
@@ -271,51 +219,13 @@ function NewDebateForm({ token }: { token: string }) {
                   value={depth ?? ""}
                   onChange={(event) => setDepth(Number(event.target.value))}
                   aria-label="Tree depth"
-                  disabled={allowedEnvelopeMembers.length === 0}
                 >
-                  <option value="">Choose a ruled depth…</option>
-                  {allowedEnvelopeMembers.map((member) => (
-                    <option key={`${member.riskTier}:${member.depth}`} value={member.depth}>
-                      {member.depth} — up to {member.maxModelAttempts} model attempts
-                    </option>
-                  ))}
+                  {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </div>
             </div>
-            <button
-              type="button"
-              className="optionsToggle"
-              aria-expanded={advancedOpen}
-              aria-controls={advancedOpen ? "machineOwnedAskFields" : undefined}
-              onClick={() => setAdvancedOpen((value) => !value)}
-            >
-              Advanced <span style={{ fontSize: 9 }}>{advancedOpen ? "▲" : "▼"}</span>
-            </button>
-            {advancedOpen ? (
-              <div id="machineOwnedAskFields">
-                <MachineOwnedAskFields
-                  agentCount={agentCount}
-                  asOf={asOf}
-                  decisionOwner={decisionOwner}
-                  actionOwner={actionOwner}
-                  decisionScope={decisionScope}
-                  agentCountDefault={agentCountDefault}
-                  sessionDefaults={sessionDefaultsProvenance}
-                  onAgentCountChange={setAgentCount}
-                  onAsOfChange={(value) => {
-                    asOfEditedRef.current = true;
-                    setAsOf(value);
-                    setAsOfWasEdited(true);
-                  }}
-                  onDecisionOwnerChange={setDecisionOwner}
-                  onActionOwnerChange={setActionOwner}
-                  onDecisionScopeChange={setDecisionScope}
-                />
-              </div>
-            ) : null}
           </div>
 
-          {agentCountDefaultError ? <div className="error" style={{ marginTop: 14 }}>{agentCountDefaultError}</div> : null}
           {riskTierDefaultError ? <div className="error" style={{ marginTop: 14 }}>{riskTierDefaultError}</div> : null}
           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
 
@@ -434,19 +344,6 @@ function NewDebateForm({ token }: { token: string }) {
               </div>
             </div>
           ) : null}
-
-          {envelopeError ? (
-            <div className="error" style={{ marginTop: 14 }}>{envelopeError}</div>
-          ) : selectedEnvelopeMember ? (
-            <div className="optionHint" style={{ marginTop: 14 }}>
-              At depth {selectedEnvelopeMember.depth}, this run may spend up to {selectedEnvelopeMember.maxModelAttempts}{" "}
-              model attempts against the configured CLI subscriptions (register v{runCostEnvelope?.registerVersion}).
-            </div>
-          ) : (
-            <div className="optionHint" style={{ marginTop: 14 }}>
-              Choose a risk tier with a ruled run-cost envelope before starting.
-            </div>
-          )}
 
           <div className="formActions">
             <button type="submit" className={`startBtn${ready ? " ready" : ""}`} disabled={!ready || submitting}>

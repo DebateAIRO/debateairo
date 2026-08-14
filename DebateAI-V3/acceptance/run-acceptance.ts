@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } from "@debateai/contract";
+import { ProviderProbeRepository } from "@debateai/db";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
@@ -28,7 +30,6 @@ const supportedArguments = new Set([
   "--tier-provenance-ref",
   "--composition-budget-tier",
   "--depth-params",
-  "--agent-count",
   "--decision-owner",
   "--action-owner",
   "--decision-scope",
@@ -80,7 +81,6 @@ export function parseAcceptanceArguments(
     tier_provenance_ref: values.get("--tier-provenance-ref") ?? "acceptance:cli-default",
     composition_budget_tier: values.get("--composition-budget-tier") ?? "low",
     depth_params: parseJson(values.get("--depth-params") ?? '{"depth":1}', "--depth-params"),
-    agent_count: Number(values.get("--agent-count") ?? "2"),
     decision_owner: values.get("--decision-owner") ?? "acceptance-user",
     action_owner: values.get("--action-owner") ?? "acceptance-user",
     decision_scope: values.get("--decision-scope") ?? "prototype-acceptance",
@@ -100,6 +100,10 @@ export interface LiveAcceptanceCeremony {
   readonly fairDebate: FairDebateReport;
   /** Retry-tolerant run total: failed/timed-out attempts remain counted. */
   readonly modelCallCount: number;
+  readonly discoveredPanelSize: number;
+  readonly structuralCeilingMaxModelAttempts: number;
+  /** Append-only probe evidence rows for this isolated ceremony (boot/admission/claim). */
+  readonly providerProbeEvidenceCount: number;
   readonly nodeMakerLineage: readonly {
     readonly nodeId: string;
     readonly depth: number;
@@ -159,20 +163,37 @@ export async function runAcceptanceCeremony(
     });
     await seedAcceptanceRegister(database.pool);
     const policy = await readAcceptanceRuntimePolicy(database.pool);
-    shim = await startModelShim({
-      port: ceremony.ACCEPTANCE_SHIM_PORT,
-      timeoutMs: policy.bounds.JUDGE.deadlineMs
-    });
-    // FAIR-01 (DR-140(b)): the SECOND real maker — the FAIR-02 claude CLI
-    // relay. Its startup handshake proves the CLI is alive and captures the
-    // CLI-reported model id (DR-143(2)/(3)); a dead CLI refuses the ceremony.
-    [claudeRelay, grokRelay] = await Promise.all([
+    const relayStarts = await Promise.allSettled([
+      startModelShim({
+        port: ceremony.ACCEPTANCE_SHIM_PORT,
+        timeoutMs: policy.bounds.JUDGE.deadlineMs
+      }),
       startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs }),
       startGrokRelay({
         port: ceremony.ACCEPTANCE_GROK_RELAY_PORT,
         timeoutMs: policy.bounds.JUDGE.deadlineMs
       })
     ]);
+    shim = relayStarts[0]?.status === "fulfilled" ? relayStarts[0].value : null;
+    claudeRelay = relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null;
+    grokRelay = relayStarts[2]?.status === "fulfilled" ? relayStarts[2].value : null;
+    const probes = new ProviderProbeRepository(database.pool);
+    for (const [index, result] of relayStarts.entries()) {
+      if (result.status === "fulfilled") continue;
+      const configured = policy.providers[index];
+      if (configured === undefined) continue;
+      await probes.record({
+        probeEvidenceRef: randomUUID(),
+        providerRef: configured.providerRef,
+        maker: configured.maker,
+        state: "ABSENT",
+        modelId: null,
+        failureCode: result.reason instanceof Error && result.reason.message.trim() !== ""
+          ? result.reason.message
+          : "PROVIDER_RELAY_START_FAILED",
+        probedAt: new Date()
+      });
+    }
     const runtimeEnvironment: AcceptanceEnvironment = {
       DATABASE_URL: database.connectionString,
       API_HOST: ceremony.ACCEPTANCE_API_HOST,
@@ -180,14 +201,15 @@ export async function runAcceptanceCeremony(
       STRANGER_SAMPLE_RATE: ceremony.ACCEPTANCE_STRANGER_SAMPLE_RATE,
       BATTERY_VERSION: ceremony.ACCEPTANCE_BATTERY_VERSION,
       SETTLEMENT_WATCH_HANDLE: ceremony.ACCEPTANCE_SETTLEMENT_WATCH_HANDLE,
-      MODEL_BASE_URL: `${shim.baseUrl}/v1`
+      MODEL_BASE_URL: `${shim?.baseUrl ?? "http://127.0.0.1:1"}/v1`
     };
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
       environment: runtimeEnvironment,
       makerRelays: [
-        { providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model },
-        { providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }
+        ...(shim === null ? [] : [{ providerRef: "acceptance:codex-cli", baseUrl: shim.baseUrl, model: shim.model }]),
+        ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
+        ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])
       ]
     });
     api = runtime.api;
@@ -228,7 +250,7 @@ export async function runAcceptanceCeremony(
     // more than one node, more than one persisted maker, a real attack edge,
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
-    const [modelCalls, lineage, reviewLineage] = await Promise.all([
+    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence] = await Promise.all([
       database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry
          WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
@@ -269,9 +291,25 @@ export async function runAcceptanceCeremony(
          JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id=review.review_raw_artifact_ref
          WHERE review.run_id=$1 ORDER BY review.at_seq`,
         [accepted.run_ref]
+      ),
+      database.pool.query<{ panel_size: number; structural_ceiling: number }>(
+        `SELECT jsonb_array_length(discovered_panel)::int AS panel_size,
+                (envelope_basis->>'max_model_attempts')::int AS structural_ceiling
+         FROM core.run WHERE run_id=$1`,
+        [accepted.run_ref]
+      ),
+      database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM core.provider_probe"
       )
     ]);
     const modelCallCount = Number(modelCalls.rows[0]?.count ?? 0);
+    const discoveredPanelSize = Number(runFacts.rows[0]?.panel_size);
+    const structuralCeilingMaxModelAttempts = Number(runFacts.rows[0]?.structural_ceiling);
+    const providerProbeEvidenceCount = Number(probeEvidence.rows[0]?.count ?? 0);
+    if (!Number.isInteger(discoveredPanelSize) || discoveredPanelSize < 1
+      || !Number.isInteger(structuralCeilingMaxModelAttempts) || structuralCeilingMaxModelAttempts < 1) {
+      throw new Error("ACCEPTANCE_RUN_DISCOVERY_FACTS_INVALID");
+    }
     const nodeMakerLineage = Object.freeze(lineage.rows.map((row) => Object.freeze({
       nodeId: row.node_id,
       depth: Number(row.depth),
@@ -298,6 +336,10 @@ export async function runAcceptanceCeremony(
       `independent attack edges: ${fairDebate.independentAttackEdgeCount}`
     );
     console.info(`PRO-01 model calls (all outcomes): ${modelCallCount}`);
+    console.info(
+      `DISC-01 panel/ceiling/probe evidence: ${discoveredPanelSize} / ` +
+      `${structuralCeilingMaxModelAttempts} / ${providerProbeEvidenceCount}`
+    );
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
@@ -312,6 +354,9 @@ export async function runAcceptanceCeremony(
       uiUrl,
       fairDebate,
       modelCallCount,
+      discoveredPanelSize,
+      structuralCeilingMaxModelAttempts,
+      providerProbeEvidenceCount,
       nodeMakerLineage,
       nodeReviewLineage,
       close: () => closeAll(liveDatabase, liveShim, liveClaudeRelay, liveGrokRelay, liveApi)

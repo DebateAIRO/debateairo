@@ -202,13 +202,74 @@ export interface StartRunInput {
   readonly tierProvenanceRef: string;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly depthParams: Readonly<Record<string, unknown>>;
-  readonly agentCount: number;
+  readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly strangerSampleRate: number;
   readonly envelopeBasis: Readonly<Record<string, unknown>>;
   readonly registerVersion: number;
   readonly batteryVersion: string;
   readonly batteryRows: readonly InitialBatteryRow[];
   readonly askContract?: Readonly<Record<string, unknown>>;
+}
+
+export interface DiscoveredPanelMember {
+  readonly provider_ref: string;
+  readonly maker: string;
+  readonly model_id: string;
+  readonly probe_evidence_ref: string;
+  readonly probed_at: string;
+}
+
+export interface ProviderProbeRecord {
+  readonly probeEvidenceRef: string;
+  readonly providerRef: string;
+  readonly maker: string;
+  readonly state: "HEALTHY" | "ABSENT";
+  readonly modelId: string | null;
+  readonly failureCode: string | null;
+  readonly probedAt: Date;
+}
+
+export class ProviderProbeRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async record(input: ProviderProbeRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO core.provider_probe (
+         probe_id, provider_ref, maker, state, model_id, failure_code, probed_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [input.probeEvidenceRef, input.providerRef, input.maker, input.state,
+        input.modelId, input.failureCode, input.probedAt]
+    );
+  }
+
+  async readLatest(providerRefs: readonly string[]): Promise<readonly ProviderProbeRecord[]> {
+    if (providerRefs.length === 0) return Object.freeze([]);
+    const result = await this.pool.query<{
+      probe_id: string;
+      provider_ref: string;
+      maker: string;
+      state: "HEALTHY" | "ABSENT";
+      model_id: string | null;
+      failure_code: string | null;
+      probed_at: Date;
+    }>(
+      `SELECT DISTINCT ON (provider_ref)
+         probe_id, provider_ref, maker, state, model_id, failure_code, probed_at
+       FROM core.provider_probe
+       WHERE provider_ref=ANY($1::text[])
+       ORDER BY provider_ref, probed_at DESC, probe_id DESC`,
+      [providerRefs]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      probeEvidenceRef: row.probe_id,
+      providerRef: row.provider_ref,
+      maker: row.maker,
+      state: row.state,
+      modelId: row.model_id,
+      failureCode: row.failure_code,
+      probedAt: row.probed_at
+    })));
+  }
 }
 
 export interface CurrentRunState {
@@ -285,17 +346,17 @@ export class RunRepository {
         `INSERT INTO core.run (
           question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier, depth_params, agent_count,
+          composition_budget_tier, depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11::jsonb, $12, $13, $14::jsonb, $15, $16, $17::jsonb, $18
+          $11::jsonb, jsonb_array_length($12::jsonb), $12::jsonb, $13, $14::jsonb, $15, $16, $17::jsonb, $18
         ) RETURNING run_id`,
         [
           input.questionLine, input.askerId, input.sessionId, input.callerScope, input.asOf,
           input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
-          input.compositionBudgetTier, JSON.stringify(input.depthParams), input.agentCount,
+          input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
           input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
           input.batteryVersion, JSON.stringify(input.askContract ?? {}), createdAtSeq
         ]
@@ -486,6 +547,8 @@ export class RunRepository {
     readonly runId: string;
     readonly questionLine: string;
     readonly agentCount: number;
+    readonly discoveredPanel: readonly DiscoveredPanelMember[];
+    readonly depthParams: Readonly<Record<string, unknown>>;
     readonly compositionBudgetTier: CompositionBudgetTier;
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
@@ -494,11 +557,14 @@ export class RunRepository {
       run_id: string;
       question_line: string;
       agent_count: number;
+      discovered_panel: DiscoveredPanelMember[];
+      depth_params: Readonly<Record<string, unknown>>;
       composition_budget_tier: CompositionBudgetTier;
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
     }>(
-      `SELECT run_id, question_line, agent_count, composition_budget_tier, stranger_sample_rate, envelope_basis
+      `SELECT run_id, question_line, agent_count, discovered_panel, depth_params,
+              composition_budget_tier, stranger_sample_rate, envelope_basis
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -508,6 +574,8 @@ export class RunRepository {
       runId: row.run_id,
       questionLine: row.question_line,
       agentCount: Number(row.agent_count),
+      discoveredPanel: Object.freeze(row.discovered_panel.map((member) => Object.freeze({ ...member }))),
+      depthParams: Object.freeze({ ...row.depth_params }),
       compositionBudgetTier: row.composition_budget_tier,
       strangerSampleRate: Number(row.stranger_sample_rate),
       envelopeBasis: Object.freeze({ ...row.envelope_basis })

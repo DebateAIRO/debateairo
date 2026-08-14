@@ -16,10 +16,9 @@ import {
  * suite (the rev-3 advisory: a node --test [...] glob silently runs zero
  * tests).
  *
- * What they protect: the V3 ask contract requires seven values the asker must
- * supply explicitly (S14 precedent, AC-76 — the UI invents none of them). A
- * form that carries the state but never binds an input, or a submit gate that
- * ignores them, ships a button whose only outcome is ASK_FIELD_REQUIRED.
+ * What they protect: DR-180 leaves risk, budget, and depth on the asker-facing
+ * surface while the five machine-owned values are derived and submitted
+ * without rendering controls.
  */
 
 function source(relativePath: string): string {
@@ -40,22 +39,18 @@ function buttonBlocksContaining(text: string, label: string): string[] {
     .filter((block) => block.includes(label));
 }
 
-/** Every field apps/v2-ui/lib/api.ts::createDebate demands from the asker. */
-const REQUIRED_ASK_FIELDS = [
+const USER_ASK_FIELDS = [
   { config: "risk_tier", state: "riskTier", source: "page", write: "setRiskTier(event.target.value" },
-  { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(event.target.value" },
-  { config: "agent_count", state: "agentCount", source: "defaults", write: "onAgentCountChange(event.target.value" },
-  { config: "decision_owner", state: "decisionOwner", source: "defaults", write: "onDecisionOwnerChange(event.target.value" },
-  { config: "action_owner", state: "actionOwner", source: "defaults", write: "onActionOwnerChange(event.target.value" },
-  { config: "decision_scope", state: "decisionScope", source: "defaults", write: "onDecisionScopeChange(event.target.value" },
-  { config: "as_of", state: "asOf", source: "defaults", write: "onAsOfChange(event.target.value" }
+  { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(event.target.value" }
 ] as const;
+
+const MACHINE_ASK_FIELDS = ["decisionOwner", "actionOwner", "decisionScope", "asOf"] as const;
 
 describe("v2-ui /new collects every value the V3 ask requires", () => {
   const newPage = source("app/new/page.tsx");
   const defaults = source("app/new/defaults.tsx");
 
-  it.each(REQUIRED_ASK_FIELDS)("binds a control the asker can actually fill for $config", (field) => {
+  it.each(USER_ASK_FIELDS)("binds a control the asker can actually fill for $config", (field) => {
     // A controlled input: the state is rendered as a value AND an onChange
     // writes it back. State that is only declared can never be supplied.
     const controlSource = field.source === "page" ? newPage : defaults;
@@ -67,9 +62,16 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
     const readyLine = newPage.split("\n").find((line) => line.includes("const ready ="));
     expect(readyLine).toBeDefined();
     const readyBlock = newPage.slice(newPage.indexOf("const ready ="), newPage.indexOf("async function submit"));
-    for (const field of REQUIRED_ASK_FIELDS) {
+    for (const field of [...USER_ASK_FIELDS, ...MACHINE_ASK_FIELDS.map((state) => ({ state }))]) {
       expect(readyBlock).toContain(field.state);
     }
+  });
+
+  it("DR-180 computes every machine value without rendering the retired disclosure", () => {
+    expect(newPage).not.toContain("Advanced");
+    expect(newPage).not.toContain("machineOwnedAskFields");
+    expect(defaults).not.toContain("MachineOwnedAskFields");
+    for (const state of MACHINE_ASK_FIELDS) expect(newPage).toContain(state);
   });
 
   it("never silently posts V2 controls the V3 ask cannot carry", () => {
@@ -82,13 +84,11 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
     }
   });
 
-  it("derives allowed depths and attempt disclosure from the deployment register envelope", () => {
+  it("offers the ruled depth range without exposing the computed tripwire", () => {
     expect(newPage).toContain("contractClient.readDeployment");
-    expect(newPage).toContain("runCostEnvelopeFromDeployment");
-    expect(newPage).toContain("selectRunCostEnvelopeMembers");
-    expect(newPage).toContain("selectRunCostEnvelopeMember");
-    expect(newPage).toContain("maxModelAttempts");
-    expect(newPage).not.toContain("useState(1)");
+    expect(newPage).toContain("[1, 2, 3, 4, 5].map");
+    expect(newPage).not.toContain("runCostEnvelope");
+    expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");
   });
 });

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { Deployment, Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 
@@ -28,60 +27,6 @@ export function deriveSessionAskDefaults(session: Session, now: Date = new Date(
   });
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-export function deriveAgentCountDefault(deployment: Deployment) {
-  const providerSetRow = deployment.register.rows.find((row) => row.row_key === "configuredProviderSet");
-  const providerSet = record(providerSetRow?.value);
-  const providers = providerSet?.providers;
-  const requiredDistinctMakers = providerSet?.requiredDistinctMakers;
-  if (
-    providerSetRow === undefined ||
-    providerSet?.kind !== "CONFIGURED_PROVIDER_SET" ||
-    !Array.isArray(providers) ||
-    !Number.isInteger(requiredDistinctMakers) ||
-    Number(requiredDistinctMakers) < 1
-  ) {
-    throw new TypedDomainError(
-      "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
-      "The deployment configuredProviderSet row is invalid; Agent count awaits input."
-    );
-  }
-
-  const configuredMakers = new Set<string>();
-  for (const provider of providers) {
-    const candidate = record(provider);
-    if (
-      candidate === null ||
-      typeof candidate.providerRef !== "string" || candidate.providerRef.trim().length === 0 ||
-      typeof candidate.adapterKind !== "string" || candidate.adapterKind.trim().length === 0 ||
-      typeof candidate.maker !== "string" || candidate.maker.trim().length === 0
-    ) {
-      throw new TypedDomainError(
-        "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
-        "The deployment configuredProviderSet row is invalid; Agent count awaits input."
-      );
-    }
-    configuredMakers.add(candidate.maker);
-  }
-  if (configuredMakers.size === 0) {
-    throw new TypedDomainError(
-      "ASK_AGENT_COUNT_DEFAULT_UNAVAILABLE",
-      "The deployment configuredProviderSet names no makers; Agent count awaits input."
-    );
-  }
-
-  const makers = [...configuredMakers].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
-  return Object.freeze({
-    agentCount: String(makers.length),
-    agentCountProvenance: `configuredProviderSet@${deployment.register.register_version}:${providerSetRow.source_ref} (${makers.join(", ")})`
-  });
-}
-
 export function deriveRiskTierDefault(deployment: Deployment) {
   const riskRow = deployment.register.rows.find((row) => row.row_key === "riskTier");
   if (riskRow === undefined || !["casual", "standard", "high-stakes"].includes(String(riskRow.value))) {
@@ -102,7 +47,6 @@ export function askDefaultFailureMessage(failure: unknown, fallbackCode: string)
 }
 
 export type NewDebateAskDefaults = {
-  readonly agentCount: string;
   readonly riskTier: RiskTier;
   readonly budgetTier: CompositionBudgetTier;
   readonly decisionOwner: string;
@@ -115,11 +59,7 @@ export type NewDebateAskDefaults = {
 };
 
 export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTime: Date): Record<string, unknown> {
-  const agentCount = Number(defaults.agentCount);
   const asOf = defaults.asOfWasEdited ? new Date(defaults.asOf) : submitTime;
-  if (!Number.isInteger(agentCount) || agentCount < 1) {
-    throw new TypedDomainError("ASK_AGENT_COUNT_INVALID", "Agent count must be a positive integer.");
-  }
   if (Number.isNaN(asOf.valueOf())) {
     throw new TypedDomainError("ASK_AS_OF_INVALID", "As of must be a valid date and time.");
   }
@@ -129,111 +69,9 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:deployment-floor",
     composition_budget_tier: defaults.budgetTier,
     depth: defaults.depth,
-    agent_count: agentCount,
     decision_owner: defaults.decisionOwner.trim(),
     action_owner: defaults.actionOwner.trim(),
     decision_scope: defaults.decisionScope.trim(),
     as_of: asOf.toISOString()
   };
-}
-
-export function MachineDefaultHint({ children }: { children: ReactNode }) {
-  return <div className="optionHint">Machine default: {children}</div>;
-}
-
-export function MachineOwnedAskFields({
-  agentCount,
-  asOf,
-  decisionOwner,
-  actionOwner,
-  decisionScope,
-  agentCountDefault,
-  sessionDefaults,
-  onAgentCountChange,
-  onAsOfChange,
-  onDecisionOwnerChange,
-  onActionOwnerChange,
-  onDecisionScopeChange
-}: {
-  agentCount: string;
-  asOf: string;
-  decisionOwner: string;
-  actionOwner: string;
-  decisionScope: string;
-  agentCountDefault: ReturnType<typeof deriveAgentCountDefault> | null;
-  sessionDefaults: ReturnType<typeof deriveSessionAskDefaults> | null;
-  onAgentCountChange: (value: string) => void;
-  onAsOfChange: (value: string) => void;
-  onDecisionOwnerChange: (value: string) => void;
-  onActionOwnerChange: (value: string) => void;
-  onDecisionScopeChange: (value: string) => void;
-}) {
-  return (
-    <>
-      <div className="optionRow">
-        <div>
-          <label className="optionLabel" htmlFor="agentCount">Agent count</label>
-          <div className="optionHint">How many agents the run may enlist</div>
-          {agentCountDefault ? <MachineDefaultHint>{agentCountDefault.agentCountProvenance}</MachineDefaultHint> : null}
-        </div>
-        <div className="optionControl">
-          <input
-            id="agentCount"
-            type="number"
-            min={1}
-            step={1}
-            value={agentCount}
-            onChange={(event) => onAgentCountChange(event.target.value)}
-            aria-label="Agent count"
-          />
-        </div>
-      </div>
-      <div className="optionRow">
-        <div>
-          <label className="optionLabel" htmlFor="asOf">As of</label>
-          <div className="optionHint">The moment the answer should be true as of</div>
-          <MachineDefaultHint>{sessionDefaults?.asOfProvenance ?? "ask time; session provenance awaiting confirmation"}</MachineDefaultHint>
-        </div>
-        <div className="optionControl">
-          <input
-            id="asOf"
-            type="datetime-local"
-            value={asOf}
-            onChange={(event) => onAsOfChange(event.target.value)}
-            aria-label="As of"
-          />
-        </div>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="decisionOwner">Decision owner</label>
-        <input
-          id="decisionOwner"
-          value={decisionOwner}
-          onChange={(event) => onDecisionOwnerChange(event.target.value)}
-          placeholder="Who owns the decision this answer feeds"
-        />
-        <MachineDefaultHint>{sessionDefaults?.decisionOwnerProvenance ?? "authenticated session identity awaiting confirmation"}</MachineDefaultHint>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="actionOwner">Action owner</label>
-        <input
-          id="actionOwner"
-          value={actionOwner}
-          onChange={(event) => onActionOwnerChange(event.target.value)}
-          placeholder="Who will act on it"
-        />
-        <MachineDefaultHint>{sessionDefaults?.actionOwnerProvenance ?? "authenticated session identity awaiting confirmation"}</MachineDefaultHint>
-      </div>
-      <div className="fieldGroup">
-        <label htmlFor="decisionScope">Decision scope</label>
-        <input
-          id="decisionScope"
-          value={decisionScope}
-          onChange={(event) => onDecisionScopeChange(event.target.value)}
-          placeholder="What the decision covers"
-        />
-        <MachineDefaultHint>{sessionDefaults?.decisionScopeProvenance ?? "V ruling DR-166"}</MachineDefaultHint>
-      </div>
-    </>
-  );
 }

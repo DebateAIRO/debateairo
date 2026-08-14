@@ -9,6 +9,7 @@ import {
 } from "@debateai/api";
 import { createContractClient, type AskRequest } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 function fixtureApplication(): AskApplication {
   return {
@@ -50,11 +51,7 @@ function admissionSettings(
     registerVersion: 1,
     batteryVersion: "battery:test",
     settlementWatchHandle: "watch:test",
-    resolveDeploymentMakerAvailability: async () => ({
-      deploymentMakerCapability: true,
-      configuredMakers: ["maker:a", "maker:b"],
-      registerRef: "configuredProviderSet@1:test"
-    }),
+    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
     resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
       effectiveRiskTier,
@@ -102,7 +99,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       tier_provenance_ref: "machine:deployment-floor",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      agent_count: 2,
       decision_owner: "asker:test",
       action_owner: "asker:test",
       decision_scope: "test-layer scope",
@@ -128,7 +124,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       tier_provenance_ref: "asker:test",
       composition_budget_tier: "low",
       depth_params: { depth: 3 },
-      agent_count: 1,
       decision_owner: "asker:test",
       action_owner: "asker:test",
       decision_scope: "test-layer scope",
@@ -138,33 +133,32 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings({
-      resolveDeploymentMakerAvailability: async () => ({
-        deploymentMakerCapability: true,
-        configuredMakers: ["maker:a"],
-        registerRef: "configuredProviderSet@1:test"
-      })
-    }), ask)).rejects.toMatchObject({
-      name: "AskRefusal",
-      code: "MAKER_INVENTORY_UNSATISFIED"
+      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(1)
+    }), ask)).resolves.toMatchObject({
+      criticUnavailableCap: {
+        serves: true,
+        confidenceBandCapRequired: true,
+        conditionMarks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
+      }
     });
 
     await expect(evaluateAskAdmission(admissionSettings({
       resolveEnvelopeBasis: async () => {
-        throw new TypedDomainError("RUN_COST_ENVELOPE_MEMBER_UNRESOLVED", "No matching envelope member");
+        throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "No computed structural ceiling");
       }
     }), { ...ask, risk_tier: "casual" })).rejects.toMatchObject({
       name: "AskRefusal",
-      code: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
-      message: "No matching envelope member"
+      code: "STRUCTURAL_CEILING_INPUTS_UNRESOLVED",
+      message: "No computed structural ceiling"
     });
 
     await expect(evaluateAskAdmission(admissionSettings({
-      resolveDeploymentMakerAvailability: async () => {
-        throw new TypedDomainError("CONFIGURED_PROVIDER_SET_UNRESOLVED", "Deployment register is broken");
+      resolveDiscoveredPanel: async () => {
+        throw new TypedDomainError("PROVIDER_PROBE_UNRESOLVED", "Discovery evidence is broken");
       }
     }), ask)).rejects.toMatchObject({
       name: "TypedDomainError",
-      code: "CONFIGURED_PROVIDER_SET_UNRESOLVED"
+      code: "PROVIDER_PROBE_UNRESOLVED"
     });
   });
   it("resolves the provisional user_dev_token session surface without treating SSR as privileged", async () => {
@@ -215,7 +209,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        agent_count: 1,
         decision_owner: "asker:test",
         action_owner: "asker:test",
         decision_scope: "test-layer scope",
@@ -251,7 +244,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 3 },
-        agent_count: 1,
         decision_owner: "asker:test",
         action_owner: "asker:test",
         decision_scope: "test-layer scope",
@@ -290,7 +282,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        agent_count: 1,
         decision_owner: "asker:test",
         action_owner: "asker:test",
         decision_scope: "test-layer scope",
@@ -363,7 +354,6 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        agent_count: 1,
         decision_owner: "asker:test",
         action_owner: "asker:test",
         decision_scope: "test-layer scope",

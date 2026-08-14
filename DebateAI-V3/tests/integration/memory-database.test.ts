@@ -15,6 +15,7 @@ import {
 } from "@debateai/settlement";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 let database: TestDatabase;
 
@@ -32,7 +33,7 @@ async function createRun(label: string, questionLine: string): Promise<string> {
     questionLine, askerId: "asker:s13-test-layer", sessionId: `session:${label}`, callerScope: "ASKER",
     asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
-    depthParams: { depth: 1 }, agentCount: 1, strangerSampleRate: 1,
+    depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
     envelopeBasis: { source: "test-layer" }, registerVersion: 1,
     batteryVersion: "s13-test-layer", batteryRows: []
   });

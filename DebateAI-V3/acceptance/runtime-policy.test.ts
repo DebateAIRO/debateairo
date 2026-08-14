@@ -1,21 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { buildAcceptanceRegisterRows } from "./seed-register.js";
-import { parseAcceptanceRuntimeRows } from "./runtime-policy.js";
+import { computeAcceptanceStructuralCeiling, parseAcceptanceRuntimeRows } from "./runtime-policy.js";
 import { loadAcceptanceCeremonyEnvironment } from "./main.js";
 
 describe("ACC-01 acceptance runtime policy", () => {
-  it("accepts the complete DR-159 depth-by-reachable-tier envelope", async () => {
+  it("accepts the ruled DR-182 discovery freshness and one-attempt policy", async () => {
     const rows = Object.fromEntries((await buildAcceptanceRegisterRows()).map((row) => [row.rowKey, row.value]));
-    const members = [1, 2, 3, 4, 5].flatMap((depth) => [
-      { depth_params: { depth }, risk_tier: "standard", max_model_attempts: 42 },
-      { depth_params: { depth }, risk_tier: "high-stakes", max_model_attempts: 42 }
-    ]);
 
     expect(() => parseAcceptanceRuntimeRows({
       riskTier: rows.riskTier,
       acceptanceOrganCostBounds: rows.acceptanceOrganCostBounds,
-      runCostEnvelope: { kind: "RUN_COST_ENVELOPE_POLICY", members },
+      panelDiscoveryPolicy: rows.panelDiscoveryPolicy,
       runDeathPolicy: rows.runDeathPolicy,
       hiddenNodeScoreThreshold: rows.hiddenNodeScoreThreshold,
       compositionBundleBudget: rows.compositionBundleBudget,
@@ -34,7 +30,7 @@ describe("ACC-01 acceptance runtime policy", () => {
     const parsed = parseAcceptanceRuntimeRows({
       riskTier: rows.riskTier,
       acceptanceOrganCostBounds: rows.acceptanceOrganCostBounds,
-      runCostEnvelope: rows.runCostEnvelope,
+      panelDiscoveryPolicy: rows.panelDiscoveryPolicy,
       runDeathPolicy: rows.runDeathPolicy,
       hiddenNodeScoreThreshold: rows.hiddenNodeScoreThreshold,
       compositionBundleBudget: rows.compositionBundleBudget,
@@ -57,7 +53,7 @@ describe("ACC-01 acceptance runtime policy", () => {
     const parsed = parseAcceptanceRuntimeRows({
       riskTier: rows.riskTier,
       acceptanceOrganCostBounds: rows.acceptanceOrganCostBounds,
-      runCostEnvelope: rows.runCostEnvelope,
+      panelDiscoveryPolicy: rows.panelDiscoveryPolicy,
       runDeathPolicy: rows.runDeathPolicy,
       hiddenNodeScoreThreshold: rows.hiddenNodeScoreThreshold,
       compositionBundleBudget: rows.compositionBundleBudget,
@@ -78,18 +74,43 @@ describe("ACC-01 acceptance runtime policy", () => {
     ]);
   });
 
-  it("delegates maker admission and the run-level envelope basis to shipped rules", async () => {
-    const [mainSource, policySource] = await Promise.all([
+  it("pins the live composition root to complete discovery and register-owned structural bounds", async () => {
+    const [mainSource, policySource, panelProofSource, reviewProofSource] = await Promise.all([
       readFile(new URL("./main.ts", import.meta.url), "utf8"),
-      readFile(new URL("./runtime-policy.ts", import.meta.url), "utf8")
+      readFile(new URL("./runtime-policy.ts", import.meta.url), "utf8"),
+      readFile(new URL("./panel01-depth1-proof.ts", import.meta.url), "utf8"),
+      readFile(new URL("./xrev01-depth1-proof.ts", import.meta.url), "utf8")
     ]);
 
-    expect(mainSource).toContain("readDeploymentMakerCapability");
-    expect(mainSource).toContain("resolveRunCostEnvelopeBasis");
+    expect(mainSource).toContain("ProviderProbeRepository");
+    expect(mainSource).toContain("resolveFreshDiscovery({");
+    expect(mainSource).toContain("return toDiscoveredPanel(resolved.panel);");
+    expect(mainSource).not.toMatch(/\.slice\(0,\s*2\)/);
+    expect(mainSource).toContain("computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)");
+    expect(mainSource).toContain(
+      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth))"
+    );
+    expect(mainSource).not.toContain("computeStructuralCeilingBasis");
     expect(mainSource).not.toContain("deploymentMakerCapability: true");
-    expect(policySource).toContain("readRunCostEnvelopePolicy");
+    expect(policySource).toContain("panelDiscoveryPolicy");
     expect(policySource).not.toContain("const totalAttempts");
     expect(policySource).not.toContain("max_model_attempts: totalAttempts");
+    expect(computeAcceptanceStructuralCeiling({
+      bounds: {
+        JUDGE: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 },
+        COMPOSER: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 },
+        CONFORMANCE: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 }
+      },
+      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 }
+    }, 2, 1)).toMatchObject({
+      max_model_attempts: 74,
+      per_site_attempts: { judge: 3, organ: 3 }
+    });
+    for (const proofSource of [panelProofSource, reviewProofSource]) {
+      expect(proofSource).toContain("structuralCeilingMaxModelAttempts");
+      expect(proofSource).toContain("providerProbeEvidenceCount");
+      expect(proofSource).not.toMatch(/M=2|\/42|DR159|RATIFIED_ENVELOPE/);
+    }
   });
 
   it("requires an operator-supplied Grok relay port instead of inventing a number", () => {

@@ -41,7 +41,7 @@ export interface CliRelayAdapter {
   readonly timeoutCode: string;
   buildArguments(prompt: string): readonly string[];
   /** Throws CliRelayFailure instead of ever inventing content or lineage. */
-  parseCompletion(stdout: string, prompt: string): CliCompletion;
+  parseCompletion(stdout: string, prompt: string): CliCompletion | Promise<CliCompletion>;
 }
 
 export function renderPromptTranscript(messages: readonly {

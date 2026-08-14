@@ -1,0 +1,13 @@
+#!/bin/zsh
+# ASK-01 rev2 same-session rework resume (tests-only; DR-168-A tracked)
+set -u
+MISSION_DIR="/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3"
+LOG="${MISSION_DIR}/docs/missions/2026-08-06-v3-programming/logs/ASK-01-codex.log"
+SESSION="01a00017-b58a-70f2-b373-363486aa38aa"
+cd "${MISSION_DIR}" || exit 1
+if pgrep -f "codex exec.*(/goal|resume)" >/dev/null 2>&1; then print "REFUSING: codex seat busy" | tee -a "${LOG}"; exit 1; fi
+print "=== ASK-01 rev2 resuming ${SESSION} $(date -u +%FT%TZ) ===" | tee -a "${LOG}"
+codex exec resume "${SESSION}" -c model='"gpt-5.6-sol"' -c sandbox_mode='"danger-full-access"' \
+  "/goal ASK-01 rev1 diamond: BOTH lenses BLOCKING on the SAME independently-found defect — read reviews/ask01-grok-rev1.md AND reviews/ask01-opus-rev1.md IN FULL plus the newest orchestrator comment on t_2eb80121, then rework in THIS session. The product behavior is live-proven correct (Opus drove the real one-click flow: accepted, agent_count 2 derived, served) — the rework is TESTS-ONLY, do not touch product code. R1 (BLOCKING, both lenses): you gutted the DR-166-A dual-token page proof (kept the test name, deleted its four value assertions; mutation 'owners not user-relative' now survives all 587 tests where it was RED on baseline 884230c). REPRODUCE-FIRST: run that mutation, watch it survive; then restore an equal-or-stronger proof WITHOUT reintroducing any control: two bare-Start submits through the REAL page under two different auth tokens, asserting each submitted createDebate config carries ITS OWN asker's decision_owner/action_owner (values differ between the tokens), plus the machine-control-ids-absent assertions; the mutation must go RED again; align the handoff prose with what the test actually asserts (Grok's required-rework item 2). R2 (advisory, fold in): the new envelope-exactness refusal branch has no test (Opus M7 survived) — pin it. R3 (advisory-high, fold in): the aria-controls/additionalRunOptions a11y assertions were removed with zero successor — either pin the equivalent a11y contract on the surviving surface or state explicitly in the handoff that the disclosure's a11y contract died WITH the disclosure by DR-180 and name what a11y contract now applies to the bare surface. Re-run EVERY gate with REAL pasted output, update the mutation ledger, set the ticket back to review with 'REWORK READY FOR PEER REVIEW - ASK-01 rev2'. Tests-only discipline: any product-code diff in your delta is itself a blocking finding." \
+  </dev/null 2>&1 | tee -a "${LOG}"
+print "=== ASK-01 rev2 exited $(date -u +%FT%TZ) ===" | tee -a "${LOG}"

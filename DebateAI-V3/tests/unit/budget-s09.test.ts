@@ -9,17 +9,9 @@ import {
 } from "@debateai/budget";
 import { TIER_SOURCES } from "@debateai/kernel";
 import { resolveEffectiveRiskTier } from "@debateai/register";
+import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 
-const testLayerEnvelope = Object.freeze({
-  max_model_attempts: 2,
-  register_row_key: "runCostEnvelope",
-  register_version: 1,
-  source_ref: "test-layer:run-cost-envelope",
-  derived_from: {
-    depth_params: { depth: 1 },
-    risk_tier: "standard" as const
-  }
-});
+const testLayerEnvelope = fixtureStructuralCeiling(2);
 
 describe("S09 / DR-108 — the ratified 71-row budget split", () => {
   it("classifies exactly Q27 and Q49 as enrichment and every other row as correctness", () => {

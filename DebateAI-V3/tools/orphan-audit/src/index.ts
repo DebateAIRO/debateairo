@@ -684,7 +684,7 @@ export async function auditOrphans(): Promise<{
       { package: "packages/budget.decideBudgetPressure", evidence: "WalkingSkeletonRunner evaluates the pinned run basis before and after the serve model calls" },
       { package: "packages/budget.BudgetRepository.countRunModelAttempts", evidence: "runner and provider gateway fold MODEL_CALL facts from ledger.ledger_entry" },
       { package: "packages/register.resolveEffectiveRiskTier", evidence: "API composition resolves parent then run then deployment and only records a policy source when it raises" },
-      { package: "packages/register.readRunCostEnvelopePolicy", evidence: "API composition reads the sealed row before listening and resolves an exact depth/risk member per ask" },
+      { package: "packages/register.computeStructuralCeilingBasis", evidence: "API composition computes the run-total tripwire from exported engine facts and register-supplied bounds" },
       { package: "packages/serve.createEnvelopeExhaustedResult", evidence: "WalkingSkeletonRunner converts envelope exhaustion to components-only without a DEFECT mark" },
       { package: "packages/serve.ServeRepository.persist.conditionMarks", evidence: "typed S09 marks are inserted with non-empty affected-node links and projected by node inspection" },
       { package: "packages/budget.compareConvergence", evidence: "pure H8 comparison is test-covered; production convergence-loop attachment belongs to its later loop owner" },

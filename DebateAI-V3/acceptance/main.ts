@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
 import { buildApi, PostgresAskApplication, type Dispatcher } from "@debateai/api";
@@ -7,19 +8,33 @@ import {
   WorkItemRepository,
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
-import { readDeploymentMakerCapability } from "@debateai/critique";
-import { RunRepository, type CompletionActivationResolution } from "@debateai/db";
-import { TypedDomainError, type RiskTier } from "@debateai/kernel";
-import { resolveEffectiveRiskTier, resolveRunCostEnvelopeBasis } from "@debateai/register";
 import {
+  ProviderProbeRepository,
+  RunRepository,
+  type CompletionActivationResolution
+} from "@debateai/db";
+import { TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { resolveEffectiveRiskTier } from "@debateai/register";
+import {
+  RUNNER_MAX_RECOMPOSE,
   createPostgresProviderGateway,
   WalkingSkeletonRunner,
   type RunnerExecutionResult
 } from "@debateai/runner";
 import { startClaudeRelay } from "./claude-relay.js";
+import {
+  probeRelay,
+  resolveFreshDiscovery,
+  toDiscoveredPanel,
+  type DiscoveredProvider
+} from "./discovery.js";
 import { startGrokRelay } from "./grok-relay.js";
 import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION } from "./seed-register.js";
-import { readAcceptanceRuntimePolicy, readOptionalScoringOperator } from "./runtime-policy.js";
+import {
+  computeAcceptanceStructuralCeiling,
+  readAcceptanceRuntimePolicy,
+  readOptionalScoringOperator
+} from "./runtime-policy.js";
 
 const environmentSchema = z.object({
   DATABASE_URL: z.string().url(),
@@ -170,14 +185,15 @@ export async function createAcceptanceRuntime(input: {
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const scoringOperator = await readOptionalScoringOperator(input.pool);
   const runRepository = new RunRepository(input.pool);
-  await readDeploymentMakerCapability(input.pool, ACCEPTANCE_REGISTER_VERSION);
-  const primaryProviderPolicy = policy.providers[0];
-  if (primaryProviderPolicy === undefined) throw new Error("ACCEPTANCE_PRIMARY_PROVIDER_UNRESOLVED");
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
-  const additionalProviderPolicies = policy.providers.slice(1);
-  const additionalProviders = additionalProviderPolicies.map((configured) => {
+  const discoveredProviders = policy.providers.flatMap((configured) => {
     const relay = relaysByProviderRef.get(configured.providerRef);
-    if (relay === undefined) throw new Error(`ACCEPTANCE_PROVIDER_RELAY_UNRESOLVED:${configured.providerRef}`);
+    return relay === undefined ? [] : [{ configured, relay }];
+  });
+  const primary = discoveredProviders[0];
+  if (primary === undefined) throw new Error("ACCEPTANCE_PRIMARY_PROVIDER_UNRESOLVED");
+  const primaryProviderPolicy = primary.configured;
+  const additionalProviders = discoveredProviders.slice(1).map(({ configured, relay }) => {
     return Object.freeze({
       gateway: createPostgresProviderGateway(input.pool, {
         endpoint: `${relay.baseUrl}/v1`,
@@ -193,8 +209,8 @@ export async function createAcceptanceRuntime(input: {
   // debate's SECOND maker — it runs the critic leg, so the counter-position
   // in the answer graph is genuinely independent of the position's maker.
   const provider = createPostgresProviderGateway(input.pool, {
-    endpoint: input.environment.MODEL_BASE_URL,
-    model: "gpt-5.6-sol",
+    endpoint: `${primary.relay.baseUrl}/v1`,
+    model: primary.relay.model,
     maker: primaryProviderPolicy.maker
   });
   const longestDeadline = Math.max(
@@ -202,12 +218,13 @@ export async function createAcceptanceRuntime(input: {
     policy.bounds.COMPOSER.deadlineMs,
     policy.bounds.CONFORMANCE.deadlineMs
   );
-  const maximumRunAttempts = Math.max(
-    ...policy.runCostEnvelopePolicy.value.members.map((member) => member.max_model_attempts)
-  );
+  const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)
+    .max_model_attempts;
+  const probes = new ProviderProbeRepository(input.pool);
   const runner = new WalkingSkeletonRunner(input.pool, provider, {
     workerId: "acceptance:walking-skeleton",
-    claimMs: longestDeadline * maximumRunAttempts,
+    claimMs: longestDeadline * maximumRunAttempts
+      + policy.runDeathPolicy.cooldownMs * policy.runDeathPolicy.maxCooldownHoldsPerRun,
     claimMarginMs: 0,
     judgeBound: policy.bounds.JUDGE,
     composerBound: policy.bounds.COMPOSER,
@@ -239,7 +256,7 @@ export async function createAcceptanceRuntime(input: {
     conformanceContractHash: policy.hashes.conformance,
     propagationContractHash: policy.hashes.propagation,
     serveContractHash: policy.hashes.serve,
-    maxRecompose: 2,
+    maxRecompose: RUNNER_MAX_RECOMPOSE,
     factBundleVersion: ACCEPTANCE_REGISTER_VERSION,
     judgementNumberKind: "base-probability",
     judgementProducer: "judgement:acceptance",
@@ -265,16 +282,32 @@ export async function createAcceptanceRuntime(input: {
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
     // additionalMakers; each artifact persists its maker/provider lineage.
-    critique: {
-      provider: additionalProviders[0]!.gateway,
-      providerRef: additionalProviders[0]!.providerRef,
-      maker: additionalProviders[0]!.maker
-    },
+    ...(additionalProviders[0] === undefined ? {} : { critique: {
+      provider: additionalProviders[0].gateway,
+      providerRef: additionalProviders[0].providerRef,
+      maker: additionalProviders[0].maker
+    } }),
     additionalMakers: additionalProviders.slice(1).map((configured) => ({
       provider: configured.gateway,
       providerRef: configured.providerRef,
       maker: configured.maker
     })),
+    claimTimeProbe: async (member) => {
+      const relay = relaysByProviderRef.get(member.provider_ref);
+      if (relay === undefined) {
+        return { state: "ABSENT", modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
+      }
+      try {
+        const healthy = await probeRelay({ ...relay, maker: member.maker });
+        return { state: "HEALTHY", modelId: healthy.modelId, failureCode: null };
+      } catch (error) {
+        return {
+          state: "ABSENT",
+          modelId: null,
+          failureCode: error instanceof TypedDomainError ? error.code : "CLAIM_PROVIDER_PROBE_FAILED"
+        };
+      }
+    },
     // DR-074: the raw deployment row when V has ruled it; absent ⇒ the runner
     // stops loudly before any claim or model call (AC-76 — never invented).
     ...(scoringOperator === undefined ? {} : { scoringOperator }),
@@ -284,19 +317,82 @@ export async function createAcceptanceRuntime(input: {
     resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(input.pool)
   });
   const dispatcher = new AcceptanceDispatcher(runner, new WorkItemRepository(input.pool));
+  for (const { configured, relay } of discoveredProviders) {
+    await probes.record({
+      probeEvidenceRef: randomUUID(),
+      providerRef: configured.providerRef,
+      maker: configured.maker,
+      state: "HEALTHY",
+      modelId: relay.model,
+      failureCode: null,
+      probedAt: new Date()
+    });
+  }
   const application = new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
     batteryVersion: input.environment.BATTERY_VERSION,
     settlementWatchHandle: input.environment.SETTLEMENT_WATCH_HANDLE,
-    resolveDeploymentMakerAvailability: () => readDeploymentMakerCapability(
-      input.pool,
-      ACCEPTANCE_REGISTER_VERSION
-    ),
-    resolveEnvelopeBasis: async (basis) => resolveRunCostEnvelopeBasis(
-      policy.runCostEnvelopePolicy,
-      basis
-    ),
+    resolveDiscoveredPanel: async () => {
+      const latest = await probes.readLatest(policy.providers.map((provider) => provider.providerRef));
+      const latestRecords: DiscoveredProvider[] = latest.map((record) => {
+        if (record.state === "HEALTHY" && record.modelId !== null) return {
+          probeEvidenceRef: record.probeEvidenceRef,
+          providerRef: record.providerRef,
+          maker: record.maker,
+          state: "HEALTHY",
+          modelId: record.modelId,
+          probedAt: record.probedAt
+        };
+        if (record.state === "ABSENT" && record.failureCode !== null) return {
+          probeEvidenceRef: record.probeEvidenceRef,
+          providerRef: record.providerRef,
+          maker: record.maker,
+          state: "ABSENT",
+          failureCode: record.failureCode,
+          probedAt: record.probedAt
+        };
+        throw new TypedDomainError("PROVIDER_PROBE_RECORD_INVALID", record.providerRef);
+      });
+      const resolved = await resolveFreshDiscovery({
+        targets: discoveredProviders.map(({ configured, relay }) => ({
+          providerRef: configured.providerRef,
+          maker: configured.maker,
+          relay
+        })),
+        latestRecords,
+        probeFreshnessMs: policy.panelDiscoveryPolicy.probeFreshnessMs,
+        now: new Date(),
+        probe: async (target): Promise<DiscoveredProvider> => {
+          let observation: DiscoveredProvider;
+          try {
+            observation = await probeRelay({ ...target.relay, maker: target.maker });
+          } catch (error) {
+            observation = {
+              probeEvidenceRef: randomUUID(),
+              providerRef: target.providerRef,
+              maker: target.maker,
+              state: "ABSENT",
+              failureCode: error instanceof TypedDomainError ? error.code : "PROVIDER_PROBE_FAILED",
+              probedAt: new Date()
+            };
+          }
+          await probes.record({
+            probeEvidenceRef: observation.probeEvidenceRef,
+            providerRef: observation.providerRef,
+            maker: observation.maker,
+            state: observation.state,
+            modelId: observation.state === "HEALTHY" ? observation.modelId : null,
+            failureCode: observation.state === "ABSENT" ? observation.failureCode : null,
+            probedAt: observation.probedAt
+          });
+          return observation;
+        }
+      });
+      return toDiscoveredPanel(resolved.panel);
+    },
+    resolveEnvelopeBasis: async (basis) =>
+      computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth)),
     resolveRisk: (askerRiskTier, askerProvenanceRef) => resolveAcceptanceRisk(
       askerRiskTier,
       askerProvenanceRef,
@@ -315,16 +411,18 @@ async function main(): Promise<void> {
   // model id before the API accepts any ask (DR-143(3)).
   const policy = await readAcceptanceRuntimePolicy(pool);
   const grokRelayPort = z.coerce.number().int().positive().max(65_535).parse(process.env.GROK_RELAY_PORT);
-  const [claudeRelay, grokRelay] = await Promise.all([
+  const relayStarts = await Promise.allSettled([
     startClaudeRelay({ port: 0, timeoutMs: policy.bounds.JUDGE.deadlineMs }),
     startGrokRelay({ port: grokRelayPort, timeoutMs: policy.bounds.JUDGE.deadlineMs })
   ]);
+  const claudeRelay = relayStarts[0]?.status === "fulfilled" ? relayStarts[0].value : null;
+  const grokRelay = relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null;
   const runtime = await createAcceptanceRuntime({
     pool,
     environment,
     makerRelays: [
-      { providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model },
-      { providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }
+      ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
+      ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])
     ]
   });
   await runtime.api.listen({ host: environment.API_HOST, port: environment.API_PORT });

@@ -1,7 +1,6 @@
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import {
-  assertRatifiedMakerCount,
   buildCrossRootExchangePlan,
   buildUnservedMakerPositionRecord,
   buildFixedSingleRootServeNodes,
@@ -10,13 +9,12 @@ import {
   partitionServedSegments,
   resolveExpansionDepth
 } from "@debateai/runner";
+import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 
 describe("PANEL-01 multi-maker root authorship", () => {
-  it("guards DR-159's envelope against more than the ratified two makers", () => {
-    expect(() => assertRatifiedMakerCount(2)).not.toThrow();
-    expect(() => assertRatifiedMakerCount(3)).toThrowError(expect.objectContaining({
-      code: "RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE"
-    }));
+  it("keeps discovery N-generic beyond the historical two-maker ceiling", () => {
+    expect(buildMultiMakerExpansionPlan(1, 4)).toHaveLength(8);
+    expect(buildCrossRootExchangePlan(4)).toHaveLength(12);
   });
 
   it("grows each maker-authored root through its own B3-B tree", () => {
@@ -146,13 +144,7 @@ describe("PRO-01 depth-driven pro/con expansion", () => {
   });
 
   it("stops a defender call loudly on the pinned RUN_COST_ENVELOPE_EXHAUSTED path", async () => {
-    const envelope = {
-      max_model_attempts: 2,
-      register_row_key: "runCostEnvelope",
-      register_version: 1,
-      source_ref: "test:DR-159",
-      derived_from: { depth_params: { depth: 2 }, risk_tier: "standard" }
-    } as const;
+    const envelope = fixtureStructuralCeiling(2, 2, 2);
     const pool = {
       query: vi.fn(async (sql: string) => {
         if (sql.includes("SELECT envelope_basis")) return { rows: [{ envelope_basis: envelope }] };
