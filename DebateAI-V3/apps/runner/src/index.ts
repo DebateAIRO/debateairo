@@ -41,6 +41,7 @@ import {
 } from "@debateai/valuation";
 import {
   OpenAICompatibleProviderGateway,
+  ProviderCallFailedError,
   ProviderContentUnacceptedError,
   type CallBound,
   type ContentClassification,
@@ -136,6 +137,160 @@ export interface ScoringOperatorRegisterInput {
   readonly registerRef: string;
 }
 
+export interface RunDeathPolicy {
+  readonly cooldownMs: number;
+  readonly finalRetryAttempts: number;
+  readonly maxCooldownHoldsPerRun: number;
+}
+
+export interface HoldProgressEvent {
+  readonly kind: "node.retrying" | "ledger.could_not_do";
+  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "EXPANSION_HALTED";
+  readonly runId: string;
+  readonly callSiteKey: string;
+  readonly parentNodeId: string | null;
+  readonly holdMs: number;
+  readonly holdUntil: string | null;
+  readonly attemptsSpent: number;
+  readonly transportOutcome: "TIMED_OUT" | "FAILED";
+  readonly plannedLegCount: number;
+}
+
+export interface HoldRecorder {
+  countCooldownHolds(runId: string): Promise<number>;
+  record(event: HoldProgressEvent): Promise<void>;
+  wait(cooldownMs: number): Promise<void>;
+}
+
+export interface HaltedExpansionRecord {
+  readonly callSiteKey: string;
+  readonly parentNodeId: string | null;
+  readonly plannedLegCount: number;
+  readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED";
+  readonly lastLedgerEntryRef: string;
+}
+
+export function remainingProviderAttempts(maxAttempts: number, consumed: number): number {
+  return maxAttempts - consumed;
+}
+
+export async function withCooldownRetry<T>(input: {
+  readonly runId: string;
+  readonly callSiteKey: string;
+  readonly parentNodeId: string | null;
+  readonly plannedLegCount: number;
+  readonly baseMaxAttempts: number;
+  readonly policy: RunDeathPolicy;
+  readonly hold: HoldRecorder;
+  readonly attempt: (maxAttempts: number) => Promise<T>;
+}): Promise<
+  | { readonly kind: "AUTHORED"; readonly value: T }
+  | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
+> {
+  const halted = async (error: ProviderCallFailedError) => {
+    const record = Object.freeze({
+      callSiteKey: input.callSiteKey,
+      parentNodeId: input.parentNodeId,
+      plannedLegCount: input.plannedLegCount,
+      terminalTransportOutcome: error.lastOutcome,
+      lastLedgerEntryRef: error.lastLedgerEntryRef
+    });
+    await input.hold.record({
+      kind: "ledger.could_not_do",
+      state: "EXPANSION_HALTED",
+      runId: input.runId,
+      callSiteKey: input.callSiteKey,
+      parentNodeId: input.parentNodeId,
+      holdMs: input.policy.cooldownMs,
+      holdUntil: null,
+      attemptsSpent: error.attempts,
+      transportOutcome: error.lastOutcome,
+      plannedLegCount: input.plannedLegCount
+    });
+    return { kind: "HALTED" as const, record };
+  };
+  try {
+    return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
+  } catch (error) {
+    if (!(error instanceof ProviderCallFailedError)) throw error;
+    const holds = await input.hold.countCooldownHolds(input.runId);
+    if (holds >= input.policy.maxCooldownHoldsPerRun) return halted(error);
+    const holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+    await input.hold.record({
+      kind: "node.retrying",
+      state: "COOLDOWN_HOLD",
+      runId: input.runId,
+      callSiteKey: input.callSiteKey,
+      parentNodeId: input.parentNodeId,
+      holdMs: input.policy.cooldownMs,
+      holdUntil,
+      attemptsSpent: error.attempts,
+      transportOutcome: error.lastOutcome,
+      plannedLegCount: input.plannedLegCount
+    });
+    await input.hold.wait(input.policy.cooldownMs);
+    await input.hold.record({
+      kind: "node.retrying",
+      state: "COOLDOWN_RETRY",
+      runId: input.runId,
+      callSiteKey: input.callSiteKey,
+      parentNodeId: input.parentNodeId,
+      holdMs: input.policy.cooldownMs,
+      holdUntil,
+      attemptsSpent: error.attempts,
+      transportOutcome: error.lastOutcome,
+      plannedLegCount: input.plannedLegCount
+    });
+    try {
+      return {
+        kind: "AUTHORED",
+        value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
+      };
+    } catch (retryError) {
+      if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
+      return halted(retryError);
+    }
+  }
+}
+
+/** DR-174-A: remove a hidden node and every descendant as one subtree. */
+export function excludeHiddenSubtrees(
+  snapshot: EvaluationSnapshot,
+  hiddenNodeIds: readonly string[]
+): EvaluationSnapshot {
+  const excluded = new Set(hiddenNodeIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const node of snapshot.nodes) {
+      if (node.parentNodeId !== null && node.parentNodeId !== undefined
+        && excluded.has(node.parentNodeId) && !excluded.has(node.nodeId)) {
+        excluded.add(node.nodeId);
+        changed = true;
+      }
+    }
+  }
+  let arrows = snapshot.arrows.filter((arrow) =>
+    !excluded.has(arrow.sourceNodeId)
+    && !(arrow.targetKind === "NODE" && arrow.targetNodeId !== null && excluded.has(arrow.targetNodeId))
+  );
+  let removedArrowIds = new Set(snapshot.arrows.filter((arrow) => !arrows.includes(arrow)).map((arrow) => arrow.arrowId));
+  while (arrows.some((arrow) => arrow.targetKind === "EDGE" && arrow.targetEdgeId !== null && removedArrowIds.has(arrow.targetEdgeId))) {
+    arrows = arrows.filter((arrow) =>
+      !(arrow.targetKind === "EDGE" && arrow.targetEdgeId !== null && removedArrowIds.has(arrow.targetEdgeId))
+    );
+    removedArrowIds = new Set(snapshot.arrows.filter((arrow) => !arrows.includes(arrow)).map((arrow) => arrow.arrowId));
+  }
+  const keptArrowIds = new Set(arrows.map((arrow) => arrow.arrowId));
+  return Object.freeze({
+    nodes: Object.freeze(snapshot.nodes.filter((node) => !excluded.has(node.nodeId))),
+    arrows: Object.freeze(arrows),
+    arrowOrder: Object.freeze(snapshot.arrowOrder.filter((arrowId) => keptArrowIds.has(arrowId))),
+    operatorResolutions: Object.freeze(snapshot.operatorResolutions.filter((row) => !excluded.has(row.parentNodeId))),
+    clusterRecords: snapshot.clusterRecords
+  });
+}
+
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
   readonly claimMs: number;
@@ -170,6 +325,12 @@ export interface WalkingSkeletonSettings {
   };
   readonly critique?: RunnerCritiqueSettings;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
+  readonly runDeathPolicy?: RunDeathPolicy;
+  readonly hiddenNodeScoreThreshold?: {
+    readonly value: number;
+    readonly sourceRef: string;
+  };
+  readonly holdRecorder?: HoldRecorder;
   readonly resolveTerminalActivations?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];

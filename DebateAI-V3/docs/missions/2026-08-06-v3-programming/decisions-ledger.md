@@ -1383,3 +1383,45 @@ supersedes | status`.
   refusals untouched. Both lineages' positions were before V on every
   row; three converged, one split, V picked. | V ruled the consolidated
   DR-174 packet | the resilience ticket binds to this | — | ACTIVE
+
+| DR-177 | 2026-08-14 | V ("please add Grok whenever you do those algorithm
+  calls") | **GROK JOINS THE MAKER PANEL.** Orchestrator's reading,
+  recorded for correction: the PRODUCT's debate runs gain a third maker
+  lineage (xAI/Grok) — authoring its own positions, pros and cons, judged
+  and judging across lineage lines — not merely the dev-loop seat DR-175
+  already grants. What this lawfully requires, in order: (1) a Grok relay
+  speaking the engine's OpenAI-compatible shape (claude-relay.ts is the
+  pattern; the grok CLI carries V's auth), registered with maker "xAI" and
+  verbatim model id; (2) the configured provider set gains the third
+  member (N-generic algorithm per DR-162-A — no code change expected in
+  the tree walk or review selection; selectDifferentMakerReviewer gains a
+  choice, enabling V's rotation steer); (3) THE RATIFIED MAKER COUNT AND
+  ENVELOPE ARE M=2 LAW TODAY — the M-guard lawfully refuses agent_count 3
+  (V measured this personally), and the DR-172 Set A ceilings were derived
+  for two makers. M=3 needs the XREV-audited arithmetic RE-DERIVED and a
+  fresh ceiling table RATIFIED BY V before any three-maker run serves —
+  derived numbers are proposals, never seeds, until V's card (AC-76).
+  Ticket GROK-01, laned after RESIL-01. | V ordered the third house into
+  the debate | N=3 panel | — | ACTIVE
+
+| DR-178 | 2026-08-14 | V ("one day we will need to be able to use ALL
+  market existent models. it is not a 'Claude vs GPT vs Grok' app. it's an
+  'A.I debate harness'") | **PRODUCT IDENTITY — AN A.I DEBATE HARNESS,
+  MODEL-AGNOSTIC BY LAW.** The maker panel is open-ended: any market model
+  must be able to join a debate. Consequences that bind future work: (1)
+  provider onboarding must converge to REGISTRATION, NOT ENGINEERING — a
+  new model = a registration record (endpoint, auth, lineage metadata,
+  cost bounds) against a small closed set of adapter SHAPES
+  (OpenAI-compatible being the de-facto market shape; thin adapters for
+  the exceptions), never a hand-built relay per model. GROK-01's relay is
+  the LAST hand-built one; the harness mission builds the generic layer.
+  (2) Lineage identity (maker/house/family/model id) becomes fully
+  register-driven data — no house names in code. (3) The envelope must
+  become a RATIFIED FORMULA — V ratifies the M-and-depth derivation once,
+  and each new panel size derives lawfully from it — else every new model
+  triggers a new ceiling table ratification, which cannot scale to the
+  market (pattern evolution flagged for V's explicit ratification). (4)
+  Already aligned and preserved: code-as-hub prompting (no model relays
+  another's words), the N-generic walk (DR-162-A), different-lineage
+  review with rotation, per-artifact lineage provenance. | V named what
+  the product IS | the harness mission | — | ACTIVE
