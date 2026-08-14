@@ -37,16 +37,16 @@ export function modelKey(modelId: string): string {
 /** Friendly display name for a model id, preserving any size/variant suffix. */
 export function modelMeta(modelId: string): ModelMeta {
   const key = modelKey(modelId);
-  const dot = DOTS[key] ?? DOTS.default;
+  const dot = DOTS[key] ?? DOTS.default!;
   if (key === "default") {
     return { key, name: modelId || "Model", dot };
   }
-  const base = NAMES[key];
+  const base = NAMES[key]!;
   const isLocal = (modelId || "").toLowerCase().includes("local") || (modelId || "").toLowerCase().includes("qwen");
   const name = key === "qwen" || isLocal ? `${base}·local` : base;
   return { key, name, dot };
 }
 
 export function modelDot(modelId: string): string {
-  return DOTS[modelKey(modelId)] ?? DOTS.default;
+  return DOTS[modelKey(modelId)] ?? DOTS.default!;
 }

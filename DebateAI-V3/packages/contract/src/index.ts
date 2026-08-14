@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, TIER_SOURCES } from "@debateai/kernel";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
-export const TierSourceSchema = z.enum(["ASKER", "DEPLOYMENT_POLICY"]);
+export const TierSourceSchema = z.enum(TIER_SOURCES);
+export const AskTierSourceSchema = z.enum(["ASKER", "MACHINE_DEFAULT"]);
 export const CompositionBudgetTierSchema = z.enum(["low", "medium", "high"]);
 export const WayOfKnowingSchema = z.enum(["LOOKED_UP", "RAN", "REASONING"]);
 export const CheckStatusSchema = z.enum(["PASS", "FAIL", "NOT_SAMPLED"]);
@@ -106,7 +107,7 @@ export const NODE_LIFECYCLE_EVENT_CONSUMERS = Object.freeze({
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
   risk_tier: RiskTierSchema,
-  tier_source: z.literal("ASKER"),
+  tier_source: AskTierSourceSchema,
   tier_provenance_ref: z.string().trim().min(1),
   composition_budget_tier: CompositionBudgetTierSchema,
   depth_params: z.record(z.string(), z.unknown()),
@@ -126,6 +127,21 @@ export const AskAcceptedSchema = z.object({
   status: z.literal("QUEUED")
 }).strict();
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
+
+export const RunProjectionSchema = z.object({
+  run_ref: z.string().min(1),
+  question_line: z.string().trim().min(1),
+  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "FAILED"]),
+  terminal_reason: z.string().trim().min(1).nullable()
+}).strict().superRefine((run, context) => {
+  if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
+    context.addIssue({
+      code: "custom",
+      message: "FAILED requires a terminal reason and non-failed runs forbid one"
+    });
+  }
+});
+export type RunProjection = z.infer<typeof RunProjectionSchema>;
 
 export const SessionSchema = z.object({
   asker_id: z.string().min(1),
@@ -259,6 +275,22 @@ export const AnswerIndexSchema = z.object({
 }).strict();
 export type AnswerIndex = z.infer<typeof AnswerIndexSchema>;
 
+export const MakerLineageSchema = z.object({
+  maker: z.string().min(1),
+  model_id: z.string().min(1),
+  transport: z.string().min(1),
+  provider_ref: z.string().min(1)
+}).strict();
+export type MakerLineage = z.infer<typeof MakerLineageSchema>;
+
+export const NodeReviewSchema = z.object({
+  outcome: z.enum(["agree", "dispute", "cannot-assess"]),
+  reasons: z.array(z.string().trim().min(1)).min(1),
+  provenance_ref: z.string().min(1),
+  reviewer_lineage: MakerLineageSchema
+}).strict();
+export type NodeReview = z.infer<typeof NodeReviewSchema>;
+
 export const NodeSchema = z.object({
   node_id: z.string().min(1),
   claim: z.string().min(1),
@@ -266,6 +298,8 @@ export const NodeSchema = z.object({
   base_score: LabeledNumberSchema,
   final_strength: LabeledNumberSchema,
   provenance_ref: z.string().min(1),
+  maker_lineage: MakerLineageSchema.nullable(),
+  review: NodeReviewSchema.nullable(),
   locator: z.string().nullable(),
   stranger_restatement: z.object({ check_status: CheckStatusSchema }).passthrough(),
   defeater_refs: z.array(z.string().min(1)),
@@ -323,7 +357,8 @@ export const AnswerSchema = z.object({
     scope: z.enum(["answer", "node"]),
     subject_ref: z.string().min(1),
     reason: z.string().min(1),
-    lift_path: z.string().nullable()
+    lift_path: z.string().nullable(),
+    served_root_rule: z.literal("first-configured-provider").nullable()
   }).strict()),
   reversal_point: z.string().min(1),
   builds_on_previous: z.object({
@@ -429,11 +464,12 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/nodes/{nodeId}",
     "GET /v1/answers/{id}/ledger-digest",
     "POST /v1/answers/{id}/investigations/{gapRef}",
-    "GET /v1/runs/{id}/events"
-    ,"GET /v1/runs/{id}/answer"
+    "GET /v1/runs/{id}",
+    "GET /v1/runs/{id}/events",
+    "GET /v1/runs/{id}/answer"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, AnswerIndexSchema,
+    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

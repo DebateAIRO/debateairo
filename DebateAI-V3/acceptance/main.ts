@@ -199,6 +199,7 @@ export async function createAcceptanceRuntime(input: {
     composerBound: policy.bounds.COMPOSER,
     conformanceBound: policy.bounds.CONFORMANCE,
     providerRef: policy.providers.openai.providerRef,
+    maker: policy.providers.openai.maker,
     judgeContractHash: policy.hashes.judge,
     composerContractHash: policy.hashes.composer,
     conformanceContractHash: policy.hashes.conformance,
@@ -232,7 +233,8 @@ export async function createAcceptanceRuntime(input: {
     // gateway lineage (one maker per artifact, from the RULED provider set).
     critique: {
       provider: criticProvider,
-      providerRef: policy.providers.anthropic.providerRef
+      providerRef: policy.providers.anthropic.providerRef,
+      maker: policy.providers.anthropic.maker
     },
     // DR-074: the raw deployment row when V has ruled it; absent ⇒ the runner
     // stops loudly before any claim or model call (AC-76 — never invented).

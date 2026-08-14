@@ -14,11 +14,13 @@ export default function DebatePageGate({
   id,
   initialDebate,
   initialAnswer,
+  initialError,
   initialPending
 }: {
   id: string;
   initialDebate: DebateDetail | null;
   initialAnswer: Answer | null;
+  initialError: string | null;
   initialPending: boolean;
 }) {
   return (
@@ -28,7 +30,7 @@ export default function DebatePageGate({
           id={id}
           initialDebate={initialDebate}
           initialAnswer={initialAnswer}
-          initialError={null}
+          initialError={initialError}
           initialPending={initialPending}
         />
       )}

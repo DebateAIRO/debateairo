@@ -1,0 +1,103 @@
+import { describe, expect, it, vi } from "vitest";
+import { REVIEW_OUTCOMES } from "@debateai/kernel";
+import { Judge } from "@debateai/judgement";
+import { assertReviewCoverageEnvelopeRatified, selectDifferentMakerReviewer } from "@debateai/runner";
+import type { ProviderGateway } from "@debateai/providers";
+import type { Pool } from "pg";
+import { createPostgresProviderGateway } from "@debateai/runner";
+
+describe("XREV-01 cross-maker node review", () => {
+  it("mints the closed outcome vocabulary once in the kernel", () => {
+    expect(REVIEW_OUTCOMES).toEqual(["agree", "dispute", "cannot-assess"]);
+  });
+
+  it("selects any configured maker other than the author without assuming a pair", () => {
+    const makers = [
+      { maker: "house-a", value: 1 },
+      { maker: "house-b", value: 2 },
+      { maker: "house-c", value: 3 }
+    ] as const;
+    expect(selectDifferentMakerReviewer("house-a", makers)).toBe(makers[1]);
+    expect(selectDifferentMakerReviewer("house-b", makers)).toBe(makers[0]);
+    expect(() => selectDifferentMakerReviewer("house-a", [makers[0]])).toThrowError(
+      expect.objectContaining({ code: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE" })
+    );
+  });
+
+  it("refuses DR-165's unratified depth-3+ coverage before serving unreviewed opinions", () => {
+    expect(() => assertReviewCoverageEnvelopeRatified(1)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(2)).not.toThrow();
+    expect(() => assertReviewCoverageEnvelopeRatified(3)).toThrowError(expect.objectContaining({
+      code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+    }));
+    expect(() => assertReviewCoverageEnvelopeRatified(5)).toThrowError(expect.objectContaining({
+      code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+    }));
+  });
+
+  it("records the review model's own typed outcome and artifact lineage", async () => {
+    const call = vi.fn(async () => ({
+      rawArtifactRef: "artifact:review",
+      ledgerEntryRef: "ledger:review",
+      content: JSON.stringify({ outcome: "dispute", reasons: ["The conclusion outruns the supplied premise."] }),
+      provider: "test",
+      model: "model-b",
+      maker: "house-b",
+      modelVersion: "model-b"
+    }));
+    const reviewer = new Judge({ call } as ProviderGateway);
+
+    await expect(reviewer.review({
+      runId: "run:test",
+      subjectItemId: "work:test",
+      callSiteKey: "JUDGE:review:node:test",
+      questionLine: "Should the proposal stand?",
+      statement: "The proposal should stand.",
+      authorMaker: "house-a",
+      providerRef: "provider:b",
+      contractHash: "b".repeat(64),
+      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 }
+    })).resolves.toMatchObject({
+      outcome: "dispute",
+      reasons: ["The conclusion outruns the supplied premise."],
+      provenanceRef: "artifact:review"
+    });
+    expect(call).toHaveBeenCalledWith(expect.objectContaining({
+      role: "JUDGE",
+      callSiteKey: "JUDGE:review:node:test"
+    }));
+  });
+
+  it("stops a review loudly when the ratified model-call envelope is exhausted", async () => {
+    const pool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("SELECT envelope_basis")) return { rows: [{ envelope_basis: {
+          max_model_attempts: 8,
+          register_row_key: "runCostEnvelope",
+          register_version: 1,
+          source_ref: "test-layer:XREV-01",
+          derived_from: { depth_params: { depth: 1 }, risk_tier: "standard" }
+        } }] };
+        if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "8" }] };
+        throw new Error(`UNEXPECTED_QUERY:${sql}`);
+      })
+    } as unknown as Pool;
+    const gateway = createPostgresProviderGateway(pool, {
+      endpoint: "http://127.0.0.1:1",
+      model: "test/model",
+      maker: "reviewer"
+    });
+
+    await expect(gateway.call({
+      runId: "run:review-exhausted",
+      subjectItemId: "work:review-exhausted",
+      callSiteKey: "JUDGE:review:node:8",
+      role: "JUDGE",
+      lane: "served",
+      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 1_000 },
+      contractHash: "c".repeat(64),
+      providerRef: "provider:reviewer",
+      packet: { messages: [{ role: "user", content: "review" }] }
+    })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+  });
+});

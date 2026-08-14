@@ -2,11 +2,12 @@
 
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useState } from "react";
-import { nodeGenerations, regenerateNode } from "@/lib/api";
+import { nodeGenerations } from "@/lib/api";
 import type { DebateNode, Generation, NodeScoringPayload } from "@/lib/types";
 import { isAbandonedArgumentStatus, isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { branchLabelOf } from "@/lib/debatePresentation";
 import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 function isAbandonedNode(node: DebateNode): boolean {
   return isAbandonedArgumentStatus(node.status);
@@ -39,9 +40,7 @@ function nodeLabel(node: DebateNode): string {
 type DebateTreeProps = {
   node: DebateNode;
   token: string | null;
-  onQueued: () => void;
   onError: (message: string) => void;
-  onAuthRejected: () => void;
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
   scoringByNodeId?: Map<string, NodeScoringPayload>;
@@ -50,9 +49,7 @@ type DebateTreeProps = {
 type ArgumentNodeCardProps = {
   node: DebateNode;
   token: string | null;
-  onQueued: () => void;
   onError: (message: string) => void;
-  onAuthRejected: () => void;
   onSelectNode?: (nodeId: string) => void;
   isSelected?: boolean;
   canToggleChildren?: boolean;
@@ -66,17 +63,10 @@ function errorMessage(exc: unknown, fallback: string): string {
   return exc instanceof Error ? exc.message : fallback;
 }
 
-function looksAuthRelated(message: string): boolean {
-  const lower = message.toLowerCase();
-  return lower.includes("401") || lower.includes("403") || lower.includes("invalid user token");
-}
-
 export function ArgumentNodeCard({
   node,
   token,
-  onQueued,
   onError,
-  onAuthRejected,
   onSelectNode,
   isSelected = false,
   canToggleChildren = false,
@@ -85,24 +75,8 @@ export function ArgumentNodeCard({
   selectionLabel,
   scoring,
 }: ArgumentNodeCardProps) {
-  const [busyNode, setBusyNode] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Generation[]>([]);
-
-  async function regenerate(id: string) {
-    if (!token) return;
-    setBusyNode(id);
-    try {
-      await regenerateNode(id, token);
-      onQueued();
-    } catch (exc) {
-      const message = errorMessage(exc, "Unable to regenerate node");
-      onError(message);
-      if (looksAuthRelated(message)) onAuthRejected();
-    } finally {
-      setBusyNode(null);
-    }
-  }
 
   async function toggleHistory() {
     if (!token) return;
@@ -114,7 +88,6 @@ export function ArgumentNodeCard({
     } catch (exc) {
       const message = errorMessage(exc, "Unable to load generation history");
       onError(message);
-      if (looksAuthRelated(message)) onAuthRejected();
     }
   }
 
@@ -140,7 +113,7 @@ export function ArgumentNodeCard({
   const workerName = generation?.worker_name || generation?.worker_id;
   const isCardInteractive = Boolean(onSelectNode);
   const cardLabel = selectionLabel ?? (isCardInteractive ? `Select argument: ${node.claim}` : undefined);
-  const modelStyle = generation ? modelColorStyle(generation.model_id) : undefined;
+  const modelStyle = generation ? modelColorStyle(generation.maker ?? generation.model_id) : undefined;
   // Additive, flag-gated low-strength dimming (Phase 9 Task 3). Never replaces
   // the existing abandoned/selection classes -- a node can be both abandoned
   // AND low-strength, and dimming never affects clickability or children.
@@ -175,7 +148,9 @@ export function ArgumentNodeCard({
             <span className={`badge${isAbandonedNode(node) ? " abandonedBadge" : ""}`}>
               {isAbandonedNode(node) ? "Stopped" : node.status}
             </span>
-            {generation ? <ModelBadge modelId={generation.model_id} /> : null}
+            {generation || node.maker !== undefined ? (
+              <ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} />
+            ) : null}
             {generation ? <span className="badge" data-worker-name={workerName}>{workerName}</span> : null}
             {generation ? <span className="badge">{generation.role}</span> : null}
           </div>
@@ -191,43 +166,42 @@ export function ArgumentNodeCard({
             {argument}
           </div>
         </div>
-        {(token && !isAbandonedNode(node)) || canToggleChildren ? (
-          <div className="toolbar nodeActionToolbar">
-            {canToggleChildren ? (
-              <button
-                className="secondary"
-                type="button"
-                aria-expanded={childrenOpen}
-                aria-label={`${childrenOpen ? "Collapse" : "Expand"} child arguments for: ${node.claim}`}
-                onClick={onToggleChildren}
-              >
-                {childrenOpen ? "Collapse" : "Expand"}
-              </button>
-            ) : null}
-            {token && !isAbandonedNode(node) ? (
-              <>
-                <button
-                  className="secondary"
-                  type="button"
-                  disabled={busyNode === node.id}
-                  aria-label={`Regenerate argument: ${node.claim}`}
-                  onClick={() => regenerate(node.id)}
-                >
-                  Regenerate
-                </button>
-                <button
-                  className="secondary"
-                  type="button"
-                  aria-label={`${historyOpen ? "Hide" : "Show"} generation history for argument: ${node.claim}`}
-                  aria-expanded={historyOpen}
-                  onClick={toggleHistory}
-                >
-                  History
-                </button>
-              </>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="toolbar nodeActionToolbar">
+          {canToggleChildren ? (
+            <button
+              className="secondary"
+              type="button"
+              aria-expanded={childrenOpen}
+              aria-label={`${childrenOpen ? "Collapse" : "Expand"} child arguments for: ${node.claim}`}
+              onClick={onToggleChildren}
+            >
+              {childrenOpen ? "Collapse" : "Expand"}
+            </button>
+          ) : null}
+          {token && !isAbandonedNode(node) ? (
+            <button
+              className="secondary"
+              type="button"
+              disabled
+              aria-disabled="true"
+              aria-label={`Regenerate argument: ${node.claim}`}
+              title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+            >
+              Regenerate
+            </button>
+          ) : null}
+          {token && !isAbandonedNode(node) ? (
+            <button
+              className="secondary"
+              type="button"
+              aria-label={`${historyOpen ? "Hide" : "Show"} generation history for argument: ${node.claim}`}
+              aria-expanded={historyOpen}
+              onClick={toggleHistory}
+            >
+              History
+            </button>
+          ) : null}
+        </div>
       </div>
       {historyOpen ? (
         <div className="historyPanel">
@@ -255,9 +229,7 @@ export function ArgumentNodeCard({
 export function DebateTree({
   node,
   token,
-  onQueued,
   onError,
-  onAuthRejected,
   onSelectNode,
   selectedNodeId,
   scoringByNodeId,
@@ -275,9 +247,7 @@ export function DebateTree({
       <ArgumentNodeCard
         node={node}
         token={token}
-        onQueued={onQueued}
         onError={onError}
-        onAuthRejected={onAuthRejected}
         onSelectNode={onSelectNode}
         isSelected={selectedNodeId === node.id}
         canToggleChildren={canToggleChildren}
@@ -295,9 +265,7 @@ export function DebateTree({
               key={child.id}
               node={child}
               token={token}
-              onQueued={onQueued}
               onError={onError}
-              onAuthRejected={onAuthRejected}
               onSelectNode={onSelectNode}
               selectedNodeId={selectedNodeId}
               scoringByNodeId={scoringByNodeId}
@@ -316,9 +284,7 @@ export function DebateTree({
                 key={child.id}
                 node={child}
                 token={token}
-                onQueued={onQueued}
                 onError={onError}
-                onAuthRejected={onAuthRejected}
                 onSelectNode={onSelectNode}
                 selectedNodeId={selectedNodeId}
                 scoringByNodeId={scoringByNodeId}

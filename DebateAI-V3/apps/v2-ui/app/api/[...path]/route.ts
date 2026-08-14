@@ -47,7 +47,17 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
     ? { method: request.method, headers, cache: "no-store" }
     : { method: request.method, headers, body: await request.arrayBuffer(), cache: "no-store" };
 
-  const response = await fetch(target, init);
+  let response: Response;
+  try {
+    response = await fetch(target, init);
+  } catch {
+    // fetch rejected before an HTTP response existed. 502 states only the
+    // observed proxy fact; it never fabricates an API-side verdict (DR-115).
+    return Response.json({
+      error: "API_UPSTREAM_UNREACHABLE",
+      message: "The API upstream did not answer the proxy request."
+    }, { status: 502 });
+  }
 
   return new Response(
     request.method === "HEAD" || BODYLESS_STATUSES.has(response.status) ? null : response.body,

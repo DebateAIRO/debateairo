@@ -84,6 +84,9 @@ export const CONDITION_MARKS = [
   "UNPRICED",
   "UNADJUDICATED",
   "UNCOVERED-SCOPE",
+  // DR-161: another maker authored a complete root position, but the ruled
+  // one-root serve selected a different maker's root.
+  "UNSERVED-MAKER-POSITION",
   "NON-COMPARABLE",
   "NOT_SAMPLED",
   "OFF-SUBJECT-DOWNGRADE",
@@ -99,7 +102,7 @@ export type ConditionMark = typeof CONDITION_MARKS[number];
 export const RISK_TIERS = ["casual", "standard", "high-stakes"] as const;
 export type RiskTier = typeof RISK_TIERS[number];
 
-export const TIER_SOURCES = ["ASKER", "DEPLOYMENT_POLICY"] as const;
+export const TIER_SOURCES = ["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"] as const;
 export type TierSource = typeof TIER_SOURCES[number];
 
 // DR-017/DR-053: these vocabularies are minted once here. In particular,
@@ -133,6 +136,10 @@ export type ChildKind = typeof CHILD_KINDS[number];
 
 export const GENERATION_STATUSES = ["pending", "complete", "failed", "stale"] as const;
 export type GenerationStatus = typeof GENERATION_STATUSES[number];
+
+// DR-148(4): a second maker's review conclusion is data, never UI-parsed prose.
+export const REVIEW_OUTCOMES = ["agree", "dispute", "cannot-assess"] as const;
+export type ReviewOutcome = typeof REVIEW_OUTCOMES[number];
 
 export const PATH_STATUSES = ["active", "abandoned"] as const;
 export type PathStatus = typeof PATH_STATUSES[number];

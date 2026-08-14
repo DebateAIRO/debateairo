@@ -794,3 +794,473 @@ supersedes | status`.
   law with the goal packet OFF argv at
   `goal-packets/EXEC-01-codex-goal.md`. | V wants the debate-start blocker
   fixed and named the seats | EXEC-01 and every ticket after it | — | ACTIVE
+
+| DR-154 | 2026-08-11 | V (UI question card, four rulings at once) | **DEPTH IS
+  V'S DIAL; OPINIONS ARE AUTHORED, NOT GRADED; OPUS 5 RATIFIED; SCORES SHOW AS
+  PERCENTAGES.**
+  (1) DEPTH — V ruled *"a debate should go as deep as I select it."* This
+  REFRAMES the question asked: V declined to pick one fixed depth and instead
+  ruled that DEPTH IS AN ASK-TIME CHOICE. Consequence: the register's
+  runCostEnvelope must carry a MEMBER PER SELECTABLE DEPTH, not the single
+  `{standard, depth 1, 9}` it holds today, and `/new`'s depth control must
+  offer exactly the ruled set — which it now already does, because EXEC-01 made
+  that control render from the register. The per-depth ATTEMPT CEILINGS remain
+  V-ruled numbers nobody may invent (AC-76/DR-039): new ticket DEPTH-01
+  computes the true cost per depth from the shipped organs and returns a
+  proposed member table for V to ratify. Until V ratifies it, depth 1 stays the
+  only selectable depth.
+  (2) PANEL-01 SHAPE RULED — **each model AUTHORS its own position on the
+  question**: N independent root cards, one per maker, which then attack and
+  defend one another. V explicitly did NOT choose the shipped `runJudgePanel`
+  shape (N models GRADING one artifact with dispersion and declared
+  disagreement). PANEL-01 is therefore new engine work, not merely composing
+  the dormant panel routing; those dormant surfaces stay dormant and their
+  orphan-audit rows stand unchanged.
+  (3) DR-152 RATIFIED — Opus 5 is the Anthropic maker. V accepted both the cost
+  and the quota contention with the Opus review lenses. DR-152 moves
+  PENDING V → ACTIVE.
+  (4) SCORE DISPLAY — **percentage**. V chose neither raw `0.98` nor a bare
+  `98`. Lawful under AC-76 because ×100 with a % sign is a faithful restatement
+  of a probability, not an invented number — but it is now a RULED display
+  decision rather than an assumed one, and the label must not imply a precision
+  the underlying value does not carry.
+  | V's four answers, one of which reframed the question asked | DEPTH-01 (new)
+  + PANEL-01 + PRO-01 + UI-02a follow-up + DR-152 | — | ACTIVE
+
+| DR-155 | 2026-08-11 | Orchestrator (record of a completed diamond; no V
+  decision) | **EXEC-01 DONE — four revisions, both lenses APPROVED.** Recorded
+  because the REVISION HISTORY is the useful artifact, not the outcome.
+  rev1: Grok APPROVED, Opus 3 blocking — both lenses independently reached the
+  SAME facts and differed only on severity. rev2: all three closed, but the
+  ORCHESTRATOR'S INDEPENDENT GATE RUN caught a root typecheck RED while the
+  worker's log claimed it green (vitest does not typecheck, so 411 passing
+  tests hid it); reviewers were NOT fired on a non-compiling tree. rev3: Grok
+  APPROVED, Opus 1 blocking — `/new` filtered envelope members by the ASKER's
+  risk tier while the engine resolves by the EFFECTIVE tier after escalating to
+  the deployment floor; the orchestrator VERIFIED IT LIVE (`risk_tier: casual`
+  returns 202 while the form disabled Start with a false explanation) instead
+  of adjudicating between lenses. rev4: both APPROVED.
+  THREE STANDING LESSONS: (a) a green test suite is NOT a green typecheck —
+  each gate must be run and pasted, never inferred from another; (b) the SAME
+  drift class reappeared at three layers (hardcoded literals → page-level
+  selection → a re-declared tier ordering), so fixing a drift defect must move
+  the TEST to where the divergence now lives, not merely change the code;
+  (c) an approving lens and a blocking lens are not a tie — the orchestrator
+  reproduces the disputed claim against the running system and rules on
+  evidence.
+  ORCHESTRATOR'S OWN ERROR, recorded so it is not repeated: `codex exec resume
+  <id>` does NOT replace a running resume of the same session — it runs
+  CONCURRENTLY. Three piled up on this ticket and wedged it with
+  `Orphan function call output` errors and zero progress. No work was lost
+  (verified: typecheck clean, 411 tests, no edit had landed). The launcher now
+  REFUSES to start while any `codex exec` process is alive. Resuming a session
+  is not idempotent and requires a liveness check first — the standing protocol
+  does not say so, and should.
+  | the loop's own failure modes are worth more than the ticket | how every
+  future diamond is run | — | ACTIVE
+
+| DR-156 | 2026-08-11 | V ("first make sure that they all touch different
+  files. then, if the answer is genuinely yes (use Grok for a second review),
+  fire the parallel session. Thats a rule by the way. if you are 100% sure they
+  wont touch different files, run parallel") | **STANDING LAW — THE PARALLEL
+  DISPATCH GATE.** Parallel worker sessions are PERMITTED, but only through
+  this gate, every time:
+  (1) The orchestrator determines each candidate ticket's WRITE FOOTPRINT from
+  evidence — ticket bodies and the code — not from intuition, and writes the
+  determination down.
+  (2) That determination goes to GROK as an INDEPENDENT SECOND REVIEW, whose
+  job is to FALSIFY it, not to agree with it.
+  (3) Only on a genuine disjointness finding does the parallel dispatch fire.
+  Any collision, or any unresolved doubt, means sequential.
+  SCOPE NOTE the orchestrator adds and V may overrule: "different files" must
+  include SHARED RUNTIME STATE, not just source paths — two sessions in one
+  working tree also share the live acceptance stack (PG 55432, shim 8791, API
+  8790, UI :3000), the register seed, the dev server's dist dir, and the kanban
+  SQLite database. A port or database collision is as fatal as a file
+  collision, so the gate asks about those too.
+  WHY V MINTED THIS: the orchestrator had been running tickets strictly one at
+  a time and admitted the caution was costing throughput — four `ready` tickets
+  were idle. V wants the speed, but not at the price of the wedge that already
+  happened today when three concurrent `codex exec resume` calls on ONE session
+  produced `Orphan function call output` errors and zero progress (DR-155).
+  First application: UI-02b ‖ DEPTH-01, on the determination that DEPTH-01's
+  write set this pass is exactly one markdown file under
+  `docs/missions/.../ratification/` (its ticket orders it to STOP and hand up
+  before seeding anything). HYG-01, POL-01 and XREV-01 were REJECTED for
+  parallel on named collisions; S15 was rejected on a collision risk plus its
+  own unresolved attestation problem.
+  | throughput, without repeating today's wedge | every future dispatch
+  decision | — | ACTIVE
+
+| DR-157 | 2026-08-12 | V ("leave the max depth to 5 for now. the test call I
+  want it on depth 3") | **MAX SELECTABLE DEPTH = 5; TEST RUNS AT DEPTH 3 —
+  PLUS A FINDING THAT CHANGES WHAT THAT MEANS.**
+  (1) V OVERRODE the DEPTH-01 proposal's recommended ceiling of N=4 and ruled
+  **N=5**, accepting its costed depth-5 figure of ~70 model attempts per debate
+  once PRO-01 and PANEL-01 land. The envelope therefore needs members for
+  depths 1..5, not 1..4.
+  (2) The acceptance/test debate runs at **depth 3**.
+  (3) **FINDING, surfaced by the orchestrator BEFORE V's ruling was written as
+  law: DEPTH IS INERT TODAY.** `depth_params` is validated by the contract
+  (`packages/contract/src/index.ts:112`), persisted on the run
+  (`packages/db`), and read for EXACTLY ONE PURPOSE — selecting the cost
+  envelope member (`packages/budget/src/index.ts:42-73`,
+  `resolveRunCostEnvelopeBasis`). `apps/runner/src/index.ts` contains **ZERO**
+  occurrences of "depth". It does not drive node count, tree growth, or any
+  expansion. A run at depth 3 today produces the SAME 2-node debate as depth 1,
+  with only a larger permitted ceiling.
+  CONSEQUENCE FOR SEQUENCING: ratifying the envelope enables the BUDGET for a
+  deeper debate but cannot by itself produce one. V's "test call on depth 3" is
+  only meaningful once PRO-01 makes depth actually drive expansion. PRO-01's
+  scope is therefore AMENDED: it must make `depth_params.depth` govern how far
+  the pro/con tree expands, not merely add one defender leg. Without that
+  amendment PRO-01 would have shipped a fixed-shape tree and V's depth dial
+  would have stayed decorative.
+  | V's ceiling ruling, and the fact that the dial it names is not yet wired to
+  anything | envelope seeding + PRO-01 + the depth-3 test run | — | ACTIVE
+
+| DR-159 | 2026-08-12 | V (UI question card, three rulings on the
+  dual-greenlit DEPTH-01 proposal) | **THE RUN COST ENVELOPE IS RATIFIED.**
+  V selected one column out of the four conventions × two retry regimes the
+  proposal laid out:
+  (1) **B3-B — depth counts EXPANSION ROUNDS.** Depth 1 = a root position PLUS
+  its PRO and its CON child; `2^(d+1)−1` authored nodes → 3, 7, 15, 31, 63 at
+  depths 1–5. V rejected the authored-level convention, which would have made
+  PRO-01 a NO-OP at depth 1 and contradicted V's own DR-149 words. The live
+  evidence agreed with V: every existing run already has two node levels and
+  the UI already reports tree depth 2.
+  (2) **B2-A — fixed two-segment serve.** `serve = 7` regardless of depth. V
+  accepted the consequence knowingly: authored positions are COMPRESSED into
+  two composed segments, so most positions are never individually
+  conformance-checked at serve time. V chose cost over per-position checking.
+  (3) **B1-B — retry-tolerant ceilings, 3× headroom.** Failed and timed-out
+  model calls are charged to the envelope (`packages/providers/src/index.ts:245-262`,
+  counted with no outcome filter at `packages/budget/src/index.ts:246-253`) and
+  each call site independently permits 3 attempts. V accepted that a transient
+  provider failure should be survivable rather than fatal, on the orchestrator's
+  point that a ceiling is a LIMIT, not a spend — a healthy run costs the same.
+  **RATIFIED MEMBERS** (to be seeded for BOTH reachable tiers, `standard` and
+  `high-stakes`; `casual` is unreachable under the standard deployment floor
+  and must NOT be seeded):
+  depth 1 → 42 · depth 2 → 66 · depth 3 → 114 · depth 4 → 210 · depth 5 → 402.
+  Typical healthy spend is roughly a third of each: ~14 / 22 / 38 / 70 / 134.
+  V's ruled test run is depth 3 — ceiling 114, expected spend ~38.
+  **TWO RATIFICATION RISKS RECORDED, NOT RESOLVED** (both are ways a ratified
+  number can be silently invalidated by something the register match key cannot
+  see): A-1 — B2-A's two-segment cap DOES NOT EXIST IN CODE
+  (`apps/runner/src/index.ts:67-74` has `.min(1)` and no ceiling), so a
+  composer emitting 4 segments breaks even today's ratified 9; A-2 — the 3×
+  attempt bound comes from env vars (`apps/runner/src/main.ts:26-28`) invisible
+  to the envelope row. Both go to the seeding ticket.
+  | V ruled the numbers the whole PRO-01/PANEL-01 lane was blocked on |
+  ENV-01 seeding + PRO-01 + PANEL-01 unblock | — | ACTIVE
+
+| DR-160 | 2026-08-12 | V (UI question card, on the UI-01 rev1 diamond's B3
+  finding) | **THE OVERFLOW MENU IS CONTENT-AWARE, NOT A BREAKPOINT.** The
+  top bar collapses less-used controls into the overflow menu WHENEVER THE
+  TITLE LACKS THE ROOM IT NEEDS, at any window width. V explicitly declined a
+  1440px fixed threshold and declined keeping V2's own 640px (which was
+  honestly ported and honestly cited, but leaves the title at 159px of its
+  needed 526px at 1280px — the exact complaint that minted DR-146(2)).
+  Consequence: no magic number exists to re-rule when controls are added
+  later; the RULE is the ruled value. Implementation measures needed vs
+  available width and collapses on demand; an enforced test must fail when a
+  crowded bar stops collapsing. | closes the one UI-01 rev1 blocker that was
+  V's to close | UI-01 rework rev2 | — | ACTIVE
+
+| DR-161 | 2026-08-12 | V (UI question card, on PANEL-01's rev1 diamond — both
+  lenses blocked on the same honesty gap) | **NEW KERNEL CONDITION MARK:
+  `UNSERVED-MAKER-POSITION`.** A served answer composed from ONE maker's root
+  while another maker's full authored position exists unserved in the graph
+  MUST carry this dedicated mark, with a typed ConditionMarkRecord naming BOTH
+  makers and which root was served. V chose minting a new mark over reusing
+  `UNCOVERED-SCOPE`, which already means the DR-020 knob-8 scope-coverage
+  diagnostic (battery Q27) — one chip label carrying two meanings on the same
+  answer was the alternative. Contract cost accepted: the closed CONDITION_MARKS
+  vocabulary gains one member, with its own chip label in the UI vocabulary and
+  a required-record entry in the serve gate. Also bound into PANEL-01 rev2 by
+  the same diamond: the SERVED-ROOT CHOICE must be visible and
+  provenance-carried (today it is `providers[0]` — OpenAI every run, by array
+  position, recorded nowhere), and the M-guard needs an integration test (the
+  guard is correct but deleting it leaves the whole suite green).
+  PANEL-01 rev2 implementation note: independent root authorship adds one
+  logical call beyond DR-159's original arithmetic (depth 1 observed 12 rather
+  than 11; depth 5 computes to 405 rather than 402). The gateway's ratified
+  402-attempt ceiling remains the authority and therefore hard-stops gracefully
+  before an unfunded call; revising that ceiling remains V's decision.
+  | both lenses failed PANEL-01 on disclosure; the fix needed a contract word
+  only V can mint | PANEL-01 rev2 | — | ACTIVE
+
+| DR-162 | 2026-08-12 | V ("adding the possibility of plugging more models to
+  the debate is for the future. for now I want to see that two models bring
+  better answers than one model") | **SCOPE RULING + THE ARC'S SUCCESS
+  CRITERION.** (1) M>2 makers is FUTURE scope — no third-relay ticket is cut
+  now; PANEL-01's M-guard (typed refusal above 2, naming DR-159) stands as the
+  lawful boundary, and a third maker would arrive via its own roster ruling,
+  relay, and re-ratified cost table. (2) The criterion this arc answers to:
+  **do two models bring better answers than one model?** That is an EVALUATION
+  question — the machinery that would answer it honestly already exists in
+  design (S12 scorecards, MEASURED_PROCESS vs MEASURED_OUTCOME; see the
+  2026-08-11 judge-comparison answer in PAUSED-STATE UPDATE 3) and remains
+  empty until questions resolve or cross-model review (XREV-01) supplies
+  process-grounded comparison. The near-term honest surface: V's own eye on
+  the depth-3 two-maker debate vs the single-maker debates already served.
+  | V named what winning looks like | scope guard + future M=3 costing +
+  XREV-01's purpose | — | ACTIVE
+
+| DR-162-A | 2026-08-12 | V (clarifying DR-162: "it doesnt matter how many
+  agents I hook, the algorithm should work for that number") | **AMENDMENT —
+  THE ALGORITHM IS N-GENERIC BY LAW.** No algorithmic path may assume a maker
+  count. The ONLY lawful places "how many" lives: (1) CONFIGURATION — the
+  provider roster (which relays exist); (2) V-RATIFIED COST ROWS — the
+  envelope members for a given M, enforced by PANEL-01's M-guard, which
+  refuses counts the ratified numbers did not assume. The guard is a COST
+  boundary, not an algorithmic one: hooking a third model must require only a
+  relay + roster row + a re-ratified cost table + the guard constant following
+  it — never an engine rewrite.
+  AUDIT OBLIGATION recorded for the M=3 future ticket (and noted to HYG-01):
+  verify the multi-maker path carries no hidden 2-assumptions — specifically
+  (a) the cross-root exchange builder (currently two ordered responses; at N
+  makers the exchange set must scale, and its COST formula with it), (b) the
+  DR-161 record prose, which is currently phrased as naming "both makers" —
+  at N makers it must name the served maker and ALL unserved positions,
+  (c) the served-root rule, which must stay well-defined at any N. The
+  expansion planner itself was verified M-parameterised by the PANEL-01 rev1
+  Opus lens. | V ruled the shape of future growth | future M=3 ticket +
+  HYG-01 audit note | — | ACTIVE
+
+| DR-163 | 2026-08-12 | Orchestrator (ops law from a review-integrity incident;
+  no V decision) | **MUTATING LENSES RUN ISOLATED OR SERIALISED.** During
+  HYG-01's diamond the Opus lens caught the Grok lens's mid-flight mutation in
+  the SHARED working tree (runner:964 briefly carrying a PANEL-01 mutation) —
+  in a tree holding eight tickets of UNCOMMITTED work, two agents mutating and
+  restoring the same files can restore each other's mutation as "baseline"
+  with no commit to fall back to. UI-02c's "transient reds" were likely this.
+  LAW: any lens that mutates files runs either SERIALISED (one at a time) or
+  in an ISOLATED CLONE (the Opus lens's APFS-clone method: verify byte-
+  identity, mutate there, write only the verdict back). The orchestrator
+  enforces this at dispatch. | two mutating reviewers is a race on truth |
+  every future diamond | — | ACTIVE
+
+| DR-164 | 2026-08-12 | V (unprompted, after browsing the spawned debate at
+  localhost) | **FIRST POSITIVE QUALITY SIGNAL, recorded verbatim:** "I have
+  checked the migrated debate you guys spawned on local host. the quality of
+  the arguments is top notch and its amazing to see it unfold like an actual
+  debate does. If the same quality is kept when I ask a question, then I'm
+  gonna be real impressed." This is an INFORMAL signal, not the DR-145 visual
+  gate (that still awaits the post-restart UI-01 surface) — but it is the
+  first eye-level reading on DR-162's criterion, and it is positive. V's bar
+  for the next reading: the SAME quality on a question V asks themself. That
+  path is identical machinery (same judge/composer organs, same envelope), so
+  the main risk to it is question-dependence of argument quality, not code.
+  V also flagged improvements to propose AFTER this stage completes — parked,
+  V's to open. | the mission's point, measured for the first time | the
+  depth-3 self-asked test run | — | ACTIVE
+
+| DR-163-A | 2026-08-12 | Orchestrator (the hazard recurred during HYG-01's
+  confirmation) | **AMENDMENT — THE ISOLATION LAW BINDS WORKERS TOO.** The
+  UI-02c rev2 REWORK WORKER appended to a file under active mutation-review
+  (tests/unit/v2ui-pages.test.ts, a HYG-01 surface) while the confirming lens
+  was mid-clone. Benign this time; the class is not. LAW: no coder edits files
+  under active mutation-review — the orchestrator serialises on FILE OVERLAP,
+  not merely on seat count. Reviewers in isolated clones, workers serialised
+  against them where surfaces intersect. | the race recurred within hours of
+  DR-163 | every future dispatch | — | ACTIVE
+
+| DR-165 | 2026-08-13 | V (UI question card, awake past midnight) | **THREE
+  RULINGS.** (1) THE 404-DURING-GENERATION MUST NEVER HAPPEN: "I want those
+  404's to never happen. a Loading state would be nice... I think V2 had a
+  loading state." A debate page whose run is still executing shows a LOADING /
+  generating state — never a 404. V2 had one; the live path exists (EXEC-01
+  built typed run states) but did not engage for V's own first question. New
+  ticket LOAD-01, and V's VISUAL GATE IMPLICITLY WAITS ON IT — V answered the
+  gate question with this requirement instead of pass/fail, so UI-01 stays
+  open until V passes it with the 404 dead. (2) CARDS SHOW HOUSE + FAMILY +
+  THE EXACT MODEL: "I want to see if its sol, Sonnet, fable or Opus" — the
+  verbatim model id joins the rendered card text (UI-02d amended). (3) TOTAL
+  REVIEW COVERAGE: "Each model's opinions must be judged by another model. And
+  no opinion on this debate goes unjudged." Cross-maker review is NOT
+  depth-limited — it is a COVERAGE LAW. Consequences: XREV-01 must treat an
+  unjudged opinion as unservable — where the ratified envelope cannot fit
+  reviews at a depth, the run STOPS LOUDLY rather than serving unjudged
+  opinions; and the per-depth review arithmetic table becomes a MANDATORY
+  XREV-01 deliverable so V can ratify the bigger envelope members the law
+  requires (numbers are V's, AC-76 — the current 114 at depth 3 cannot carry
+  total coverage). (4) V HOLDS the improvements list until seeing the whole
+  thing. | V ruled while the first human-asked debate settled | LOAD-01 +
+  UI-02d + XREV-01 scope + a coming envelope re-ratification | — | ACTIVE
+
+| DR-166 | 2026-08-13 | V ("5 fields in the debate creation screen that I
+  think the user should not own... Those should be defaulted by the machine,
+  since even I, without asking you, could not create a Debate") | **THE ASK
+  FORM DEFAULTS ITSELF.** Agent Count, As Of, Decision Owner, Action Owner
+  and Decision Scope are MACHINE-DEFAULTED; the user clicks and types as
+  little as possible. V's own failed test is the proof case: V typed Agent
+  Count 3 and the M-guard lawfully refused (typed
+  RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE, recorded FAILED, zero spend —
+  three prior tickets behaving exactly as built) — but no user can know the
+  ratified maker count. Defaults, each machine-derivable: agent_count = the
+  CONFIGURED MAKER COUNT from the deployment (N-generic per DR-162-A, 2
+  today); as_of = ask time; decision_owner and action_owner = the asker's
+  session identity; decision_scope = "personal" (V's own habitual value in
+  probes; V may re-rule the string). Fields stay EDITABLE for the user who
+  knows better — prefilled, not hidden, so AC-76's no-hidden-default
+  discipline becomes visible-machine-default with provenance. This SUPERSEDES
+  the /new page's deliberate refuse-all-defaults stance, BY V'S OWN RULING —
+  the value authority the stance existed to protect. | V could not use their
+  own product without asking the orchestrator | UX-01 | — | ACTIVE
+
+| DR-166-A | 2026-08-13 | V ("Decision Scope should not always be V by the
+  way. there are gonna be people, other than V who are gonna use this") |
+  **AMENDMENT — DEFAULTS ARE USER-RELATIVE, NEVER PERSON-CONSTANTS.** Every
+  identity-bearing default on the ask form derives from the ASKING USER'S
+  SESSION — decision_owner and action_owner are whoever is asking, and
+  decision_scope's "personal" means THE ASKER'S personal scope, not V's. No
+  default may encode V or any named person as a constant. This is the
+  product's first multi-user ruling: V is one user among the users to come.
+  (The orchestrator's own manual API probes had typed decision_owner "V" —
+  lawful for a probe, but the pattern must not leak into defaults.) The S05
+  ownership scoping already enforces per-asker isolation server-side; this
+  amendment aligns the form's defaults with it. | V named the product's
+  future audience | UX-01 rev2 | — | ACTIVE
+
+| DR-166-B | 2026-08-13 | V (screenshot of the live /new form: "user should
+  not have to type in there, or even see those") | **AMENDMENT — THE FIVE
+  MACHINE FIELDS ARE INVISIBLE BY DEFAULT.** Prefilled-but-visible (the
+  DR-166 implementation, working correctly in V's screenshot) is REJECTED:
+  the machine-owned fields — Agent Count, As Of, Decision Owner, Action
+  Owner, Decision Scope — do not appear on the default form at all. They
+  live behind a collapsed "Advanced" disclosure, closed by default, so the
+  rare user who knows better can still see and edit them (preserving
+  DR-166's editability) while the default surface is: QUESTION, the depth
+  dial (V's own DR-157 selector), and START. The provenance hints move into
+  the disclosure with the fields. | V saw the machinery and ruled it noise |
+  UX-02 | — | ACTIVE
+
+| DR-166-C | 2026-08-13 | V (UI card: risk/budget "no, those are user
+  selected") | **THE RULED DEFAULT FORM SURFACE, settled:** QUESTION ·
+  RISK TIER · COMPOSITION BUDGET TIER · THE DEPTH DIAL · START. Risk and
+  budget are USER choices and stay visible (their machine-default prefills
+  remain as starting values, not as hidden machinery). The five DR-166
+  fields stay collapsed in Advanced (DR-166-B). The depth dial — V's own
+  DR-157 selector — belongs ON the default surface; UX-02 rev1 had silently
+  left it buried in an Options panel, caught by the diamond. | V drew the
+  line between machinery and choice | UX-02 rev2 | — | ACTIVE
+
+| DR-167 | 2026-08-13 | V ("Okay, all 10 approved, exception P6") | **THE
+  CODING-LOOP RETROSPECTIVE IS RATIFIED.** All ten improvement proposals in
+  CODING-LOOP-RETROSPECTIVE-2026-08-13.md are approved as law for the next
+  run: P1 mutation ledger as handoff requirement; P2 "a gate runs it"
+  collection proof; P3 live verification as review-packet constant; P4
+  worktrees per seat; P5 the commit floor (local micro-commits at
+  dual-greenlit close; push stays V-personal); P7 reports generated at
+  ticket close; P8 latency cuts incl. the tests-only single-lens fast path;
+  P9 stack lifecycle automation + version-skew detector; P10 one source of
+  truth per ticket. P6 (supervise-the-supervisor) is REJECTED AS DESIGNED
+  and replaced by V's own mechanism — see DR-168. | V read the
+  retrospective and ruled on every proposal | next coding loop | — | ACTIVE
+
+| DR-168 | 2026-08-13 | V ("We need to find a healthier way to wake the
+  orchestrator up that does not require another orchestrator. can't you get
+  notified by another agent? or simply check their terminals... I think that
+  a way to cure this is dependency lanes") | **DEPENDENCY LANES + WORKER-
+  COMPLETION NOTIFICATION replace the second-orchestrator design.** (1)
+  DEPENDENCY LANES: every ticket carries a pointer to its PREVIOUS ticket
+  and its NEXT ticket — except the very first (no previous) and the very
+  last (no next). When a ticket moves to DONE, the next-pointer says exactly
+  what dispatches next and the previous-pointer says what came before; the
+  orchestrator never has to rediscover the route from board scans. (2)
+  NOTIFICATION WAKE: the orchestrator is woken BY the workers' own
+  completion, not by a supervising orchestrator — every dispatch is paired
+  with a harness-tracked watcher (a background process that tails the
+  worker's log until the handoff marker appears, then exits; its exit
+  re-invokes the orchestrator). Checking terminals happens when they finish,
+  event-driven, not by polling on a timer. The six-hour night stall's root
+  cause — workers in detached windows the orchestrator's harness cannot see
+  — is cured by the wire, and the lane pointer tells the woken orchestrator
+  where to go. | V designed the cure for F4's stall | next coding loop | —
+  | ACTIVE
+
+| DR-169 | 2026-08-13 | V ("DO NOT leave tickets which have their work done
+  on 'for review'. move them to DONE instead. I will simply check when the
+  whole process is over and come do verifications myself and if bugs
+  arrive, we make [bug] tickets") | **KANBAN RULE — DONE MEANS WORK-DONE,
+  NOT V-VERIFIED.** A ticket whose work is complete (dual greenlight per
+  the standing diamond) moves to DONE immediately; it never parks in review
+  awaiting V. V verifies personally when the whole process is over; any
+  defect found becomes a fresh [bug] ticket rather than a reopened one. The
+  dual diamond itself is unchanged — this rule governs the STATUS after the
+  diamond, not the diamond. Applied retroactively same day: UI-01
+  (t_5f35d086, dual-greenlit, was holding for the DR-145 visual gate) moved
+  to done; the visual gate remains V's to run, a fail arriving as [bug].
+  PROV-01 stays in review truthfully — its rev2 confirmation never ran, so
+  its work is submitted, not done. | two dual-greenlit tickets had camped
+  in review awaiting V | board discipline | — | ACTIVE
+
+| DR-170 | 2026-08-13 | V ("When a terminal's job is done, it has to be let
+  go of. Only keep terminals up for me to see when you got questions and
+  you can point me to what a terminal did") | **TERMINAL LIFECYCLE LAW.** A
+  terminal whose job is done is CLOSED at once — no idle windows, no
+  zombie pollers, no "finished but visible" clutter. The ONLY terminals
+  that stay open are ones the orchestrator has a QUESTION about for V,
+  where the window itself is the evidence V should look at; the
+  orchestrator must be able to point at any kept window and say what it did
+  and why it is still up. This tightens the v3.2.0 window-hygiene law
+  (which kept failed windows open by default) and supersedes DR-158's
+  reap-on-request: reaping is now continuous and automatic at job end. |
+  V's screen was polluted by dirty terminals twice this run | fleet
+  hygiene | — | ACTIVE
+
+| DR-171 | 2026-08-13 | V ("Whenever a blocker that confounds with the
+  architecture arrives, you have to consult the Architecture loop. You just
+  fire an Opus architect that reads the current document, knows what went
+  on and makes a plan that Grok has to authorize") | **ARCHITECTURE-CONSULT
+  LAW.** Any blocker that touches the architecture — a contract boundary, a
+  module seam, a dependency edge, anything the architecture documents
+  govern — must NOT be improvised inside the coding loop. The orchestrator
+  fires the Architecture loop: ONE Opus architect that (a) reads the
+  current architecture documents, (b) is briefed on what went on, and (c)
+  produces a plan; GROK must authorize the plan before it binds. Only an
+  authorized plan re-enters the coding loop as ticket scope. This gives
+  architecture-confounding blockers the same dual-key discipline code has
+  (author + independent authorizer), and keeps the coding loop from
+  quietly amending the architecture. | mid-run architecture questions had
+  no ruled escalation path short of V | next coding loop | — | ACTIVE
+
+| DR-168-A | 2026-08-13 | V ("your fix is better than mine. a single command
+  line argument is better than the complicated thing i proposed. approved to
+  implement change") | **AMENDMENT — WORKERS ARE THE TRACKED PROCESSES;
+  WINDOWS BECOME VIEWERS.** DR-168's paired-watcher mechanism is RETIRED
+  before ever being built. The ruled design: the orchestrator launches every
+  worker seat (Codex, Grok lenses) DIRECTLY as a harness-tracked background
+  process — the worker's own exit is the orchestrator's wake, and a CRASH
+  fires the same callback as a finish (exit code tells them apart), so the
+  dead-worker-silent-log failure mode is structurally gone. Mid-run progress
+  is a direct read of the tracked task's output, not a log inference. V's
+  visible window becomes a VIEWER: a terminal running `tail -f` on the
+  worker's log (logs/open-viewer.sh) — identical live text, fully decoupled
+  from the process, so closing any window kills NOTHING (DR-170 safe by
+  construction; the reaper-kills-live-worker accident class is now
+  impossible). Accepted trade: tracked processes orphan if the orchestrator
+  session dies — cured by the standing continuity law (session ids recorded
+  at claim, `codex exec resume`, board as source of truth). The
+  dependency-lanes half of DR-168 is unchanged. | V weighed both mechanisms
+  and ruled for the simpler wire | next coding loop | — | ACTIVE
+
+| DR-172 | 2026-08-13 | V (ceiling card: "Set A — 3× headroom") | **THE
+  REVIEW-COVERAGE ENVELOPE IS RATIFIED — SET A.** runCostEnvelope members
+  become 60/108/204/396/780 max_model_attempts for depths 1..5 (standard
+  and high-stakes identically; casual stays unreachable per DR-159). Set A
+  sizes each ceiling at three times the healthy spend (~20/36/68/132/260) —
+  headroom for retries and judge slips, tighter runaway guard than set B's
+  full reservation. This UNLOCKS depth 3-5 debates under DR-165(3)'s
+  no-opinion-unjudged law: full cross-review coverage now fits inside the
+  ceiling, so the typed NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED refusal
+  (which correctly stopped V's own depth-5 ask 045beacd at zero spend) no
+  longer triggers for ratified depths. Seed source_ref advances to
+  acceptance:DR-172:V-approved; register hash changes, so the standing
+  stack requires V's ruled backup-then-reseed flow on next boot. Supersedes
+  DR-159's member VALUES; every other DR-159 clause (retry tolerance,
+  refuse-before-spend, per-call-site 3 attempts) stands. | V ruled the
+  waiting finishing-packet §2 table after hitting the refusal live | depth
+  3-5 unlock | — | ACTIVE

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
+import { LEDGER_OUTCOMES } from "@debateai/kernel";
 import {
   auditArchitecture,
   auditMigrationReplaySafety,
@@ -11,6 +12,12 @@ import {
 } from "../../tools/orphan-audit/src/index.js";
 
 describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
+  it("BUG-01 T14 keeps the ruled ledger outcome vocabulary unchanged", () => {
+    expect(LEDGER_OUTCOMES).toEqual([
+      "OK", "FAILED", "BLOCKED", "TIMED_OUT", "REFUSED", "SKIPPED_BY_BUDGET"
+    ]);
+  });
+
   it("matches all 27 dependency-edge rows and structural rules 1–5", async () => {
     const report = await auditArchitecture();
     expect(report.edgeRowsChecked).toBe(27);

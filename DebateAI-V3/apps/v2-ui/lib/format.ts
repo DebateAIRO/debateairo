@@ -20,7 +20,10 @@ export function relativeTime(input: string | null | undefined): string {
 export function statusLabel(status: string): string {
   const s = (status || "").toLowerCase();
   if (s === "complete" || s === "completed" || s === "done") return "Complete";
-  if (s === "generating" || s === "running" || s === "in_progress" || s === "pending") return "Generating";
+  if (s === "queued") return "Queued";
+  if (s === "claimed") return "Claimed";
+  if (s === "running") return "Running";
+  if (s === "generating" || s === "in_progress" || s === "pending") return "Generating";
   if (s === "failed" || s === "error") return "Failed";
   if (s === "draft") return "Draft";
   return status || "—";

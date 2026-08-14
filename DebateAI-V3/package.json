@@ -16,6 +16,7 @@
     "lint": "pnpm run audit:architecture && pnpm run audit:source",
     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
+    "audit:text-bytes": "tsx tools/check-text-control-bytes.ts",
     "audit:orphans": "tsx tools/orphan-audit/src/cli.ts orphans",
     "generate:contract": "tsx packages/contract/src/generate.ts",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",

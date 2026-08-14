@@ -132,6 +132,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "UNPRICED": return "Abstention cell unpriced";
     case "UNADJUDICATED": return "No adverse evidence found";
     case "UNCOVERED-SCOPE": return "Scope not fully covered";
+    case "UNSERVED-MAKER-POSITION": return "Another maker's position was not served";
     case "NON-COMPARABLE": return "Results are not compute-matched";
     case "NOT_SAMPLED": return "Not sampled";
     case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";

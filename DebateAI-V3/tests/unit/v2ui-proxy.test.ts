@@ -97,6 +97,22 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
     await expect(response.json()).resolves.toEqual({ error: "UPSTREAM_EXPLODED" });
   });
 
+  it("names a transport outage as 502 without inventing an API verdict", async () => {
+    globalThis.fetch = (async () => {
+      throw new TypeError("fetch failed: ECONNREFUSED");
+    }) as typeof fetch;
+
+    const response = await route.GET(new Request("http://web.local/api/v1/session"), {
+      params: Promise.resolve({ path: ["v1", "session"] })
+    });
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "API_UPSTREAM_UNREACHABLE",
+      message: "The API upstream did not answer the proxy request."
+    });
+  });
+
   it("fails loudly when the server-only upstream base is absent", async () => {
     delete process.env.DIALECTICAL_API_BASE;
     globalThis.fetch = (async () => {

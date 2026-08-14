@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import type { DebateNode, NodeScoringError, NodeScoringPayload } from "@/lib/types";
 import { ROLE_PALETTES, flattenOutline, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { modelMeta } from "@/lib/models";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill } from "@/lib/scoringFormat";
 
 type DebateOutlineProps = {
@@ -33,7 +33,6 @@ export function DebateOutline({
           const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
           const empty = renderStateOf(node) === "empty";
           const generation = node.active_generation;
-          const model = generation ? modelMeta(generation.model_id) : null;
           const scoring = scoringByNodeId?.get(node.id);
           const scoringError = scoringErrorsByNodeId?.get(node.id);
           const selected = selectedNodeId === node.id;
@@ -60,11 +59,8 @@ export function DebateOutline({
                 <span className="outlineRole" style={{ color: pal.text }}>
                   {pal.arrow} {roleLabel(node)}
                 </span>
-                {model ? (
-                  <span className="metaLine">
-                    <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                    {model.name}
-                  </span>
+                {generation || node.maker !== undefined ? (
+                  <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
                 ) : null}
                 <OutlineScoringMetadata scoring={scoring} scoringError={scoringError} nodeClaim={node.claim} />
               </div>

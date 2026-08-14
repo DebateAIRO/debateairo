@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { TypedDomainError, type WayOfKnowing } from "@debateai/kernel";
-import type { CallBound, ProviderGateway } from "@debateai/providers";
+import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
+import { ProviderContentUnacceptedError, type CallBound, type PromptPacket, type ProviderGateway } from "@debateai/providers";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import {
@@ -22,9 +22,23 @@ const judgeArtifactSchema = z.object({
   restatement_text: z.string().trim().min(1),
   restatement_status: z.enum(["PASS", "FAIL", "NOT_SAMPLED"]),
   value_laden: z.boolean(),
-  claim_type: z.unknown().optional(),
+  claim_type: z.enum(CLAIM_TYPES).optional(),
   ...judgeAssessmentSchema.shape
 }).strict();
+
+const nodeReviewArtifactSchema = z.object({
+  outcome: z.enum(REVIEW_OUTCOMES),
+  reasons: z.array(z.string().trim().min(1)).min(1)
+}).strict();
+
+function buildContentRepairPacket(packet: PromptPacket, parseError: string): PromptPacket {
+  return {
+    messages: [...packet.messages, {
+      role: "user",
+      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}\nReturn a new response that follows the system schema exactly.`
+    }]
+  };
+}
 
 export interface JudgeInput {
   readonly runId: string | null;
@@ -58,26 +72,37 @@ export interface JudgedNode {
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
+export interface NodeReviewInput {
+  readonly runId: string | null;
+  readonly subjectItemId: string;
+  readonly callSiteKey: string;
+  readonly questionLine: string;
+  readonly statement: string;
+  readonly authorMaker: string;
+  readonly providerRef: string;
+  readonly contractHash: string;
+  readonly bound: CallBound;
+}
+
+export interface ReviewedNode {
+  readonly outcome: ReviewOutcome;
+  readonly reasons: readonly string[];
+  readonly provenanceRef: string;
+  readonly providerLedgerRef: string;
+  readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
   async judge(input: JudgeInput): Promise<JudgedNode> {
     const classificationLine = input.claimClassificationLine ?? input.questionLine;
     const codeClaim = classifyClaimText(classificationLine);
-    const response = await this.provider.call({
-      runId: input.runId,
-      subjectItemId: input.subjectItemId,
-      callSiteKey: input.callSiteKey,
-      role: "JUDGE",
-      lane: "served",
-      bound: input.bound,
-      contractHash: input.contractHash,
-      providerRef: input.providerRef,
-      packet: {
-        messages: [
-          {
-            role: "system",
-            content: `Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:
+    const packet: PromptPacket = {
+      messages: [
+        {
+          role: "system",
+          content: `Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:
 {
   "statement": non-empty string,
   "way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING",
@@ -93,19 +118,38 @@ export class Judge {
   "fallacy": { "severity": number [0,1], "fatalFlags": [{ "type": non-empty string, "severity": number [0,1], "description": non-empty string }] }
 }
 Never invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. LOOKED_UP requires a resolving locator.${codeClaim.claimType === "unknown" ? " The code classifier returned unknown; include claim_type from the declared closed vocabulary." : " Omit claim_type; the code-first classifier already resolved it."}`
-          },
-          { role: "user", content: input.questionLine }
-        ]
-      },
-      classifyContent: (content) => {
-        const outcome = parseStructuredArtifact(content, judgeArtifactSchema);
-        if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
-        return {
-          parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
-          parseError: outcome.message
-        };
+        },
+        { role: "user", content: input.questionLine }
+      ]
+    };
+    let response;
+    try {
+      response = await this.provider.call({
+        runId: input.runId,
+        subjectItemId: input.subjectItemId,
+        callSiteKey: input.callSiteKey,
+        role: "JUDGE",
+        lane: "served",
+        bound: input.bound,
+        contractHash: input.contractHash,
+        providerRef: input.providerRef,
+        packet,
+        buildRepairPacket: ({ parseError }) => buildContentRepairPacket(packet, parseError),
+        classifyContent: (content) => {
+          const outcome = parseStructuredArtifact(content, judgeArtifactSchema);
+          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
+          return {
+            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
+            parseError: outcome.message
+          };
+        }
+      });
+    } catch (error) {
+      if (error instanceof ProviderContentUnacceptedError) {
+        throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error.lastParseError);
       }
-    });
+      throw error;
+    }
     const parsed = parseStructuredArtifact(response.content, judgeArtifactSchema);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("JUDGE_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", parsed.message);
@@ -139,6 +183,72 @@ Never invent evidence, citations, or sources. Score relevance against the questi
       parseStrategy: parsed.strategy
     };
   }
+
+  async review(input: NodeReviewInput): Promise<ReviewedNode> {
+    const packet: PromptPacket = {
+      messages: [
+        {
+          role: "system",
+          content: `Review an existing debate node authored by a different maker. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. Never invent evidence, citations, or sources.`
+        },
+        {
+          role: "user",
+          content: [
+            `Question under debate: ${input.questionLine}`,
+            `Node author maker: ${input.authorMaker}`,
+            `Node to review: ${input.statement}`
+          ].join("\n")
+        }
+      ]
+    };
+    let response;
+    try {
+      response = await this.provider.call({
+        runId: input.runId,
+        subjectItemId: input.subjectItemId,
+        callSiteKey: input.callSiteKey,
+        role: "JUDGE",
+        lane: "served",
+        bound: input.bound,
+        contractHash: input.contractHash,
+        providerRef: input.providerRef,
+        packet,
+        buildRepairPacket: ({ parseError }) => buildContentRepairPacket(packet, parseError),
+        classifyContent: (content) => {
+          const outcome = parseStructuredArtifact(content, nodeReviewArtifactSchema);
+          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
+          return {
+            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
+            parseError: outcome.message
+          };
+        }
+      });
+    } catch (error) {
+      if (error instanceof ProviderContentUnacceptedError) {
+        throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", error.lastParseError);
+      }
+      throw error;
+    }
+    const parsed = parseStructuredArtifact(response.content, nodeReviewArtifactSchema);
+    if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("NODE_REVIEW_PARSE_FAILURE", parsed.message);
+    if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", parsed.message);
+    return Object.freeze({
+      outcome: parsed.value.outcome,
+      reasons: Object.freeze([...parsed.value.reasons]),
+      provenanceRef: response.rawArtifactRef,
+      providerLedgerRef: response.ledgerEntryRef,
+      parseStrategy: parsed.strategy
+    });
+  }
+}
+
+export interface RecordNodeReviewInput {
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly authorRawArtifactRef: string;
+  readonly reviewRawArtifactRef: string;
+  readonly outcome: ReviewOutcome;
+  readonly reasons: readonly string[];
 }
 
 export interface RecordJudgementInput {
@@ -210,5 +320,29 @@ export class JudgementRepository {
       );
       return result.rows[0]!.reduced_judgement_id;
     });
+  }
+
+  async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        const nodeReviewId = randomUUID();
+        const result = await client.query<{ node_review_id: string }>(
+          `INSERT INTO ledger.node_review (
+            node_review_id, run_id, node_id, author_raw_artifact_ref,
+            review_raw_artifact_ref, outcome, reasons, at_seq
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING node_review_id`,
+          [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
+            input.reviewRawArtifactRef, input.outcome, JSON.stringify(input.reasons),
+            await allocateSequence(client)]
+        );
+        return result.rows[0]!.node_review_id;
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith("PRODUCER_GRADING_FORBIDDEN:")) {
+        throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message);
+      }
+      throw error;
+    }
   }
 }

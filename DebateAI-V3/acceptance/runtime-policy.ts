@@ -38,11 +38,11 @@ const runtimeRowsSchema = z.object({
   }).strict(),
   runCostEnvelope: z.object({
     kind: z.literal("RUN_COST_ENVELOPE_POLICY"),
-    members: z.tuple([z.object({
-      depth_params: z.object({ depth: z.literal(1) }).strict(),
-      risk_tier: z.literal("standard"),
-      max_model_attempts: z.literal(9)
-    }).strict()])
+    members: z.array(z.object({
+      depth_params: z.object({ depth: z.number().int().min(1).max(5) }).strict(),
+      risk_tier: z.enum(["standard", "high-stakes"]),
+      max_model_attempts: z.number().int().positive()
+    }).strict()).min(1)
   }).strict(),
   compositionBundleBudget: z.object({
     low: z.number().int().positive(),

@@ -5,6 +5,7 @@ import { getSettingsView } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 import { modelMeta } from "@/lib/models";
 import type { SettingsView } from "@/lib/v3/adapter";
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 /**
  * UI-01 (DR-145): V2's settings screen, kept whole, reading V3's deployment
@@ -169,6 +170,18 @@ function SettingsScreen({ token }: { token: string }) {
             />
           </div>
         ) : null}
+
+        <div className="formActions">
+          <button
+            type="button"
+            className="startBtn"
+            disabled
+            aria-disabled="true"
+            title={V3_MISSING_CAPABILITIES.settingsWrite}
+          >
+            Save changes
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { preserveEnvelopeTerminalConditionMarkRecords } from "@debateai/runner";
 import {
   buildFactBundle,
+  assertRequiredConditionMarkRecords,
   compositionEvidenceRequired,
+  createEnvelopeExhaustedResult,
   deriveAnswerServeState,
   deriveBandCeiling,
   deriveConformanceOutcome,
@@ -17,6 +20,7 @@ import {
   type BandCeilingDecision,
   type BandCeilingRegisterRow,
   type ComposedSegment,
+  type ConditionMarkRecord,
   type ServeGateInput,
   type ServeGateDependencies
 } from "@debateai/serve";
@@ -265,6 +269,63 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
 });
 
 describe("S05 AC-54/55/63 — machine-owned output shape", () => {
+  it("PANEL-01 rev3 preserves the DR-161 record when an M=2 serve exhausts its envelope", () => {
+    const exhausted = createEnvelopeExhaustedResult({
+      factBundle: buildFactBundle({
+        ...factBundle(),
+        conditionMarks: ["UNSERVED-MAKER-POSITION"]
+      }),
+      compositionBudget: input().compositionBudget,
+      verifiedNodeIds: ["node:openai-root"],
+      skippedEnrichmentRows: [],
+      protectedCoreVerified: true
+    });
+    const unservedMakerRecord = {
+      mark: "UNSERVED-MAKER-POSITION",
+      scope: "answer",
+      subjectRef: "node:openai-root",
+      reason: "The first configured maker's root was served: OpenAI position node:openai-root; Anthropic position node:anthropic-root remains graph-visible but unserved",
+      liftPath: null,
+      servedRootRule: "first-configured-provider",
+      affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
+    } as const satisfies ConditionMarkRecord;
+    const envelopeRecord = {
+      mark: "ENVELOPE_EXHAUSTED",
+      scope: "answer",
+      subjectRef: "run:two-maker",
+      reason: "RUN_COST_ENVELOPE_EXHAUSTED",
+      liftPath: null,
+      servedRootRule: null,
+      affectedNodeIds: ["node:openai-root"]
+    } as const satisfies ConditionMarkRecord;
+
+    const records = preserveEnvelopeTerminalConditionMarkRecords([unservedMakerRecord], [envelopeRecord]);
+
+    expect(exhausted).toMatchObject({
+      terminal: "COMPONENTS_ONLY",
+      conditionMarks: ["UNSERVED-MAKER-POSITION", "ENVELOPE_EXHAUSTED"]
+    });
+    expect(() => assertRequiredConditionMarkRecords(exhausted.conditionMarks, records)).not.toThrow();
+  });
+
+  it("DR-161 refuses either half of the unserved-maker mark/record contract when missing", () => {
+    const record = {
+      mark: "UNSERVED-MAKER-POSITION",
+      scope: "answer",
+      subjectRef: "node:openai-root",
+      reason: "first-configured-provider served OpenAI root node:openai-root; Anthropic root node:anthropic-root remains unserved",
+      liftPath: null,
+      servedRootRule: "first-configured-provider",
+      affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
+    } as const;
+
+    expect(() => assertRequiredConditionMarkRecords(["UNSERVED-MAKER-POSITION"], []))
+      .toThrowError(expect.objectContaining({ code: "CONDITION_MARK_RECORD_REQUIRED" }));
+    expect(() => assertRequiredConditionMarkRecords([], [record]))
+      .toThrowError(expect.objectContaining({ code: "CONDITION_MARK_RECORD_WITHOUT_MARK" }));
+    expect(() => assertRequiredConditionMarkRecords(["UNSERVED-MAKER-POSITION"], [record])).not.toThrow();
+  });
+
   it("requires honesty fields outside the composition model and renders them in components-only mode", async () => {
     const marked = input();
     marked.factBundle = buildFactBundle({ ...factBundle(), conditionMarks: ["TEST-LAYER-MARK"] });

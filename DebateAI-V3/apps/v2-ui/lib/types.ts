@@ -24,6 +24,17 @@ export type Generation = {
 };
 
 /**
+ * A node may know only the recorded model that authored it. V3 uses this
+ * narrow projection instead of fabricating Generation's unrelated fields.
+ * Full V2 generations remain assignable to the same presentation shape.
+ */
+export type GenerationPresentation = Pick<Generation, "model_id"> &
+  Partial<Omit<Generation, "model_id">> & {
+    /** Recorded model maker/house. Null means the contract supplied typed absence. */
+    maker?: string | null;
+  };
+
+/**
  * The four legacy POV lenses plus the structural node types. Kept as named
  * literals so existing narrowing (`node.node_type === "SCIENTIFIC_POV"`) and
  * editor autocomplete keep working.
@@ -75,7 +86,9 @@ export type DebateNode = {
   stopping_reason_human?: string | null;
   materialized_path: string;
   active_generation_id: string | null;
-  active_generation: Generation | null;
+  active_generation: GenerationPresentation | null;
+  /** V3's recorded maker/house; undefined only for legacy V2 payloads. */
+  maker?: string | null;
   children: DebateNode[];
   score?: NodeScore | null;
   /**
@@ -687,6 +700,8 @@ export type DebateDetail = {
   id: string;
   topic: string;
   status: string;
+  /** Ask-run lifecycle truth while no served answer exists. */
+  run_state?: "QUEUED" | "CLAIMED" | "RUNNING" | "FAILED";
   config: DebateConfig;
   direct_answer: null;
   root_node_id: string | null;
@@ -764,7 +779,7 @@ export type InvestigationPathStatus =
 export type ArgumentClaimStatus = InvestigationPathStatus;
 
 /** Domain alias: a ClaimGeneration is the LLM output that produced the argument text. */
-export type ClaimGeneration = Generation;
+export type ClaimGeneration = GenerationPresentation;
 
 /** Domain alias: scoring information for an ArgumentClaim. */
 export type ArgumentScore = NodeScore;

@@ -6,9 +6,118 @@ import { TypedDomainError, type ActivationState, type CompositionBudgetTier, typ
 
 const { Pool: PgPool } = pg;
 const writeTransaction = new AsyncLocalStorage<boolean>();
+const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
+const wrappedPoolClients = new WeakSet<PoolClient>();
+
+type UntypedMethod = (...args: unknown[]) => unknown;
+
+function typedPoolFailure(error: unknown): TypedDomainError {
+  if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
+  const detail = error instanceof Error ? error.message : String(error);
+  return new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+}
+
+function typedQueryFailure(error: unknown): unknown {
+  if (typeof error !== "object" || error === null) return error;
+  const code = "code" in error && typeof error.code === "string" ? error.code : "";
+  const message = error instanceof Error ? error.message : "";
+  const connectionFailure = code.startsWith("08")
+    || ["57P01", "57P02", "57P03", "ECONNREFUSED", "ECONNRESET", "EPIPE", "ETIMEDOUT"].includes(code)
+    || /connection (?:terminated|reset)|server closed the connection|terminating connection due to administrator command/i.test(message);
+  return connectionFailure ? typedPoolFailure(error) : error;
+}
+
+function rejectKnownFailure(args: readonly unknown[], failure: TypedDomainError): unknown {
+  const callback = args.at(-1);
+  if (typeof callback === "function") {
+    queueMicrotask(() => callback(failure));
+    return undefined;
+  }
+  return Promise.reject(failure);
+}
+
+function wrapClientQueries(client: PoolClient): PoolClient {
+  if (wrappedPoolClients.has(client)) return client;
+  const mutableClient = client as unknown as { query: UntypedMethod };
+  const query = mutableClient.query.bind(client);
+  mutableClient.query = (...args: unknown[]): unknown => {
+    const callback = args.at(-1);
+    if (typeof callback === "function") {
+      const wrappedArgs = [...args];
+      wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
+        callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
+      };
+      return query(...wrappedArgs);
+    }
+    try {
+      const result = query(...args);
+      return result instanceof Promise
+        ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
+        : result;
+    } catch (error) {
+      throw typedQueryFailure(error);
+    }
+  };
+  wrappedPoolClients.add(client);
+  return client;
+}
 
 export function createPool(connectionString: string): Pool {
-  return new PgPool({ connectionString });
+  const pool = new PgPool({ connectionString });
+  let terminalFailure: TypedDomainError | undefined;
+
+  pool.on("error", (error: Error) => {
+    terminalFailure ??= typedPoolFailure(error);
+    console.error(`[${DATABASE_POOL_FAILED}] ${terminalFailure.message}`);
+  });
+
+  const mutablePool = pool as unknown as { query: UntypedMethod; connect: UntypedMethod };
+  const query = mutablePool.query.bind(pool);
+  mutablePool.query = (...args: unknown[]): unknown => {
+    if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
+    const callback = args.at(-1);
+    if (typeof callback === "function") {
+      const wrappedArgs = [...args];
+      wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
+        callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
+      };
+      return query(...wrappedArgs);
+    }
+    try {
+      const result = query(...args);
+      return result instanceof Promise
+        ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
+        : result;
+    } catch (error) {
+      throw typedQueryFailure(error);
+    }
+  };
+
+  const connect = mutablePool.connect.bind(pool);
+  mutablePool.connect = (...args: unknown[]): unknown => {
+    if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
+    const callback = args.at(-1);
+    if (typeof callback === "function") {
+      return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
+        callback(
+          error === undefined || error === null ? error : typedPoolFailure(error),
+          client === undefined ? undefined : wrapClientQueries(client),
+          release
+        );
+      });
+    }
+    try {
+      const result = connect();
+      return result instanceof Promise
+        ? result.then((client: PoolClient) => wrapClientQueries(client))
+          .catch((error: unknown) => Promise.reject(typedPoolFailure(error)))
+        : result;
+    } catch (error) {
+      throw typedPoolFailure(error);
+    }
+  };
+
+  return pool;
 }
 
 export async function migrate(pool: Pool): Promise<void> {
@@ -113,6 +222,13 @@ export interface CurrentRunState {
   }[];
 }
 
+export interface RunLoadingProjection {
+  readonly runRef: string;
+  readonly questionLine: string;
+  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "FAILED";
+  readonly terminalReason: string | null;
+}
+
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;
   readonly state: Exclude<ActivationState, "WAIT">;
@@ -192,6 +308,38 @@ export class RunRepository {
     } finally {
       client.release();
     }
+  }
+
+  async readLoadingProjection(runId: string, askerId: string): Promise<RunLoadingProjection | null> {
+    const result = await this.pool.query<{
+      run_id: string;
+      question_line: string;
+      state: RunLoadingProjection["state"];
+      terminal_reason: string | null;
+    }>(
+      `SELECT run.run_id, run.question_line,
+         CASE
+           WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
+           WHEN bool_or(work.state = 'CLAIMED') THEN 'CLAIMED'
+           WHEN bool_or(work.state = 'READY') THEN 'QUEUED'
+           ELSE 'RUNNING'
+         END AS state,
+         (array_agg(work.terminal_reason ORDER BY work.created_at_seq DESC)
+           FILTER (WHERE work.state = 'FAILED'))[1] AS terminal_reason
+       FROM core.run AS run
+       LEFT JOIN core.work_item AS work ON work.run_id = run.run_id
+       WHERE run.run_id = $1 AND run.asker_id = $2
+       GROUP BY run.run_id, run.question_line`,
+      [runId, askerId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    return Object.freeze({
+      runRef: row.run_id,
+      questionLine: row.question_line,
+      state: row.state,
+      terminalReason: row.terminal_reason
+    });
   }
 
   async readCurrentState(runId: string): Promise<CurrentRunState> {
@@ -284,6 +432,7 @@ export class RunRepository {
   async readFrozenHead(runId: string): Promise<{
     readonly runId: string;
     readonly questionLine: string;
+    readonly agentCount: number;
     readonly compositionBudgetTier: CompositionBudgetTier;
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
@@ -291,11 +440,12 @@ export class RunRepository {
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      agent_count: number;
       composition_budget_tier: CompositionBudgetTier;
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
     }>(
-      `SELECT run_id, question_line, composition_budget_tier, stranger_sample_rate, envelope_basis
+      `SELECT run_id, question_line, agent_count, composition_budget_tier, stranger_sample_rate, envelope_basis
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -304,6 +454,7 @@ export class RunRepository {
     return {
       runId: row.run_id,
       questionLine: row.question_line,
+      agentCount: Number(row.agent_count),
       compositionBudgetTier: row.composition_budget_tier,
       strangerSampleRate: Number(row.stranger_sample_rate),
       envelopeBasis: Object.freeze({ ...row.envelope_basis })

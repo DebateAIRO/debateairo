@@ -555,6 +555,7 @@ function evaluateInternal(snapshot: EvaluationSnapshot, includeSensitivity: bool
     const strength = primary.values.get(node.nodeId);
     if (strength === undefined) return [];
     const resolution = resolutions.get(node.nodeId);
+    const rivalStrength = resolution === undefined ? null : rival.values.get(node.nodeId) ?? null;
     const nodeArrows = incoming.get(node.nodeId) ?? [];
     return [Object.freeze({
       nodeId: node.nodeId,
@@ -569,8 +570,11 @@ function evaluateInternal(snapshot: EvaluationSnapshot, includeSensitivity: bool
       operatorLevel: resolution?.suppliedBy ?? null,
       positionLabel: node.positionLabel ?? null,
       liftMarker: Object.freeze(markers.get(node.nodeId) ?? []),
-      rivalOperator: resolution === undefined ? null : rivalOperator(resolution.operator),
-      rivalStrength: resolution === undefined ? null : rival.values.get(node.nodeId) ?? null
+      // The ledger owns this as an all-or-nothing pair. A strict-and rival can
+      // be withheld by an honestly UNKNOWN support magnitude; recording only
+      // its operator would claim a rival result that does not exist.
+      rivalOperator: rivalStrength === null ? null : rivalOperator(resolution!.operator),
+      rivalStrength
     })];
   });
   const withheld = snapshot.nodes

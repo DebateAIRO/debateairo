@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { buildApi, type AskApplication } from "@debateai/api";
+import {
+  AskRefusal,
+  buildApi,
+  evaluateAskAdmission,
+  preserveSubmittedTierSource,
+  type AskApplication,
+  type RunCreationSettings
+} from "@debateai/api";
+import { createContractClient, type AskRequest } from "@debateai/contract";
+import { TypedDomainError } from "@debateai/kernel";
 
 function fixtureApplication(): AskApplication {
   return {
     submit: async () => ({ run_ref: "run:test", status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
+    readRun: async () => null,
     readAnswerIndex: async (_session, limit, offset) => ({ items: [], limit, offset, total: 0 }),
     readDeployment: async () => ({
       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
@@ -32,7 +42,131 @@ function fixtureApplication(): AskApplication {
   };
 }
 
+function admissionSettings(
+  override: Partial<RunCreationSettings> = {}
+): RunCreationSettings {
+  return {
+    strangerSampleRate: 0,
+    registerVersion: 1,
+    batteryVersion: "battery:test",
+    settlementWatchHandle: "watch:test",
+    resolveDeploymentMakerAvailability: async () => ({
+      deploymentMakerCapability: true,
+      configuredMakers: ["maker:a", "maker:b"],
+      registerRef: "configuredProviderSet@1:test"
+    }),
+    resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
+    resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+      effectiveRiskTier,
+      tierSource,
+      tierProvenanceRef
+    }),
+    ...override
+  };
+}
+
 describe("Fastify sole facade / FX-WIRE-03", () => {
+  it.each([
+    {
+      submitted: "ASKER" as const,
+      resolved: { effectiveRiskTier: "standard" as const, tierSource: "ASKER" as const, tierProvenanceRef: "asker:test" },
+      expectedSource: "ASKER" as const
+    },
+    {
+      submitted: "MACHINE_DEFAULT" as const,
+      resolved: { effectiveRiskTier: "standard" as const, tierSource: "ASKER" as const, tierProvenanceRef: "machine:deployment-floor" },
+      expectedSource: "MACHINE_DEFAULT" as const
+    },
+    {
+      submitted: "ASKER" as const,
+      resolved: { effectiveRiskTier: "high-stakes" as const, tierSource: "DEPLOYMENT_POLICY" as const, tierProvenanceRef: "asker:test" },
+      expectedSource: "DEPLOYMENT_POLICY" as const
+    },
+    {
+      submitted: "MACHINE_DEFAULT" as const,
+      resolved: { effectiveRiskTier: "high-stakes" as const, tierSource: "DEPLOYMENT_POLICY" as const, tierProvenanceRef: "machine:deployment-floor" },
+      expectedSource: "DEPLOYMENT_POLICY" as const
+    }
+  ])("preserves $submitted when policy escalation is $expectedSource", ({ submitted, resolved, expectedSource }) => {
+    expect(preserveSubmittedTierSource(resolved, submitted)).toEqual({
+      ...resolved,
+      tierSource: expectedSource
+    });
+  });
+
+  it("preserves MACHINE_DEFAULT provenance through admission without changing the effective tier", async () => {
+    const ask: AskRequest = {
+      question_line: "What follows from this evidence?",
+      risk_tier: "standard",
+      tier_source: "MACHINE_DEFAULT",
+      tier_provenance_ref: "machine:deployment-floor",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      agent_count: 2,
+      decision_owner: "asker:test",
+      action_owner: "asker:test",
+      decision_scope: "test-layer scope",
+      caller_scope: "ASKER",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+    await expect(evaluateAskAdmission(admissionSettings(), ask)).resolves.toMatchObject({
+      risk: {
+        effectiveRiskTier: "standard",
+        tierSource: "MACHINE_DEFAULT",
+        tierProvenanceRef: "machine:deployment-floor"
+      }
+    });
+  });
+
+  it("marks only maker and envelope evaluation refusals for the 422 face", async () => {
+    const ask: AskRequest = {
+      question_line: "What follows from this evidence?",
+      risk_tier: "high-stakes",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker:test",
+      composition_budget_tier: "low",
+      depth_params: { depth: 3 },
+      agent_count: 1,
+      decision_owner: "asker:test",
+      action_owner: "asker:test",
+      decision_scope: "test-layer scope",
+      caller_scope: "ASKER",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+    await expect(evaluateAskAdmission(admissionSettings({
+      resolveDeploymentMakerAvailability: async () => ({
+        deploymentMakerCapability: true,
+        configuredMakers: ["maker:a"],
+        registerRef: "configuredProviderSet@1:test"
+      })
+    }), ask)).rejects.toMatchObject({
+      name: "AskRefusal",
+      code: "MAKER_INVENTORY_UNSATISFIED"
+    });
+
+    await expect(evaluateAskAdmission(admissionSettings({
+      resolveEnvelopeBasis: async () => {
+        throw new TypedDomainError("RUN_COST_ENVELOPE_MEMBER_UNRESOLVED", "No matching envelope member");
+      }
+    }), { ...ask, risk_tier: "casual" })).rejects.toMatchObject({
+      name: "AskRefusal",
+      code: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
+      message: "No matching envelope member"
+    });
+
+    await expect(evaluateAskAdmission(admissionSettings({
+      resolveDeploymentMakerAvailability: async () => {
+        throw new TypedDomainError("CONFIGURED_PROVIDER_SET_UNRESOLVED", "Deployment register is broken");
+      }
+    }), ask)).rejects.toMatchObject({
+      name: "TypedDomainError",
+      code: "CONFIGURED_PROVIDER_SET_UNRESOLVED"
+    });
+  });
   it("resolves the provisional user_dev_token session surface without treating SSR as privileged", async () => {
     const api = buildApi({ application: fixtureApplication() });
     const response = await api.inject({
@@ -97,6 +231,153 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     await api.close();
   });
 
+  it("maps ask-boundary domain refusals to 422 with their real code and message", async () => {
+    const application = fixtureApplication();
+    application.submit = async () => {
+      throw new AskRefusal(new TypedDomainError(
+        "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
+        "No runCostEnvelope member matches the declared depth and effective risk tier"
+      ));
+    };
+    const api = buildApi({ application });
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: { "x-user-dev-token": "test-token" },
+      payload: {
+        question_line: "What follows from this evidence?",
+        risk_tier: "casual",
+        tier_source: "ASKER",
+        tier_provenance_ref: "asker-declaration:test",
+        composition_budget_tier: "low",
+        depth_params: { depth: 3 },
+        agent_count: 1,
+        decision_owner: "asker:test",
+        action_owner: "asker:test",
+        decision_scope: "test-layer scope",
+        caller_scope: "ASKER",
+        as_of: "2026-08-07T00:00:00.000Z",
+        steering_presets: [],
+        steering_annotations: []
+      }
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
+      message: "No runCostEnvelope member matches the declared depth and effective risk tier"
+    });
+    await api.close();
+  });
+
+  it("keeps typed internal faults and untyped crashes on the 500 face", async () => {
+    const submitApplication = fixtureApplication();
+    submitApplication.submit = async () => {
+      throw new TypedDomainError(
+        "MEMORY_MATCH_PREDICATE_DRIFT",
+        "Database and domain match predicates disagree"
+      );
+    };
+    const submitApi = buildApi({ application: submitApplication });
+    const submitResponse = await submitApi.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: { "x-user-dev-token": "test-token" },
+      payload: {
+        question_line: "What follows from this evidence?",
+        risk_tier: "casual",
+        tier_source: "ASKER",
+        tier_provenance_ref: "asker-declaration:test",
+        composition_budget_tier: "low",
+        depth_params: { depth: 1 },
+        agent_count: 1,
+        decision_owner: "asker:test",
+        action_owner: "asker:test",
+        decision_scope: "test-layer scope",
+        caller_scope: "ASKER",
+        as_of: "2026-08-07T00:00:00.000Z",
+        steering_presets: [],
+        steering_annotations: []
+      }
+    });
+    expect(submitResponse.statusCode).toBe(500);
+    expect(submitResponse.json()).toEqual({
+      error: "INTERNAL_ERROR",
+      message: "Database and domain match predicates disagree"
+    });
+    await submitApi.close();
+
+    const typedApplication = fixtureApplication();
+    typedApplication.readDeployment = async () => {
+      throw new TypedDomainError("DEPLOYMENT_REGISTER_UNAVAILABLE", "No sealed V3 deployment register exists");
+    };
+    const typedApi = buildApi({ application: typedApplication });
+    const typedResponse = await typedApi.inject({
+      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
+    });
+    expect(typedResponse.statusCode).toBe(500);
+    expect(typedResponse.json()).toEqual({
+      error: "INTERNAL_ERROR",
+      message: "No sealed V3 deployment register exists"
+    });
+    await typedApi.close();
+
+    const crashedApplication = fixtureApplication();
+    crashedApplication.readDeployment = async () => { throw new Error("database connection lost"); };
+    const crashedApi = buildApi({ application: crashedApplication });
+    const crashedResponse = await crashedApi.inject({
+      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
+    });
+    expect(crashedResponse.statusCode).toBe(500);
+    expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "database connection lost" });
+    await crashedApi.close();
+  });
+
+  it("preserves a non-2xx server code and message in the contract-client error", async () => {
+    const client = createContractClient("http://api.test", (async () => new Response(JSON.stringify({
+      error: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
+      message: "No matching envelope member"
+    }), { status: 422, headers: { "content-type": "application/json" } })) as typeof fetch);
+    const ask = {} as AskRequest;
+
+    await expect(client.submitAsk(ask, "test-token")).rejects.toMatchObject({
+      code: "UNPROCESSABLE",
+      status: 422,
+      serverCode: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED",
+      message: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED: No matching envelope member"
+    });
+  });
+
+  it("keeps an invalid application response on the 500 face", async () => {
+    const application = fixtureApplication();
+    application.submit = async () => ({ status: "QUEUED" }) as never;
+    const api = buildApi({ application });
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: { "x-user-dev-token": "test-token" },
+      payload: {
+        question_line: "What follows from this evidence?",
+        risk_tier: "casual",
+        tier_source: "ASKER",
+        tier_provenance_ref: "asker-declaration:test",
+        composition_budget_tier: "low",
+        depth_params: { depth: 1 },
+        agent_count: 1,
+        decision_owner: "asker:test",
+        action_owner: "asker:test",
+        decision_scope: "test-layer scope",
+        caller_scope: "ASKER",
+        as_of: "2026-08-07T00:00:00.000Z",
+        steering_presets: [],
+        steering_annotations: []
+      }
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({ error: "INTERNAL_ERROR" });
+    await api.close();
+  });
+
   it("rejects missing identity and malformed asks loudly", async () => {
     const api = buildApi({ application: fixtureApplication() });
     expect((await api.inject({ method: "GET", url: "/v1/session" })).statusCode).toBe(401);
@@ -133,6 +414,35 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     const response = await api.inject({ method: "GET", url: "/v1/answers?limit=3&offset=0", headers: { "x-user-dev-token": "test-token" } });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ items: [], limit: 3, offset: 0, total: 0 });
+    await api.close();
+  });
+
+  it("projects an asker-owned queued run and distinguishes a nonexistent id", async () => {
+    const application = fixtureApplication();
+    application.readRun = async (runId, session) => runId === "run:queued" ? {
+      run_ref: runId,
+      question_line: "Messi or Ronaldo?",
+      state: "QUEUED",
+      terminal_reason: null
+    } : null;
+    const api = buildApi({ application });
+    const queued = await api.inject({
+      method: "GET",
+      url: "/v1/runs/run:queued",
+      headers: { "x-user-dev-token": "test-token" }
+    });
+    expect(queued.statusCode).toBe(200);
+    expect(queued.json()).toEqual({
+      run_ref: "run:queued",
+      question_line: "Messi or Ronaldo?",
+      state: "QUEUED",
+      terminal_reason: null
+    });
+    expect((await api.inject({
+      method: "GET",
+      url: "/v1/runs/run:missing",
+      headers: { "x-user-dev-token": "test-token" }
+    })).statusCode).toBe(404);
     await api.close();
   });
 
@@ -220,6 +530,43 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(response.body).toContain("event: run.accepted");
     expect(response.body).toContain('"event_type":"run.accepted"');
     expect((await api.inject({ method: "GET", url: "/v1/runs/run:test/events" })).statusCode).toBe(401);
+    await api.close();
+  });
+
+  it("aborts a stale SSE connection without killing subsequent API requests", async () => {
+    const application = fixtureApplication();
+    application.events = async function* (runId) {
+      expect(runId).toBe("run:missing-from-reseed");
+      throw new TypedDomainError("RUN_NOT_FOUND", "No run exists for this stale EventSource");
+    };
+    const api = buildApi({ application });
+    await api.listen({ host: "127.0.0.1", port: 0 });
+    const address = api.server.address();
+    if (address === null || typeof address === "string") throw new Error("Expected a TCP test listener");
+
+    const abort = new AbortController();
+    const streamOutcome = await Promise.race([
+      fetch(`http://127.0.0.1:${address.port}/v1/runs/run:missing-from-reseed/events`, {
+        headers: { "x-user-dev-token": "stale-tab-token" },
+        signal: abort.signal
+      }).then(async (stream) => {
+        expect(stream.status).toBe(200);
+        await stream.text();
+        return "ended_by_server" as const;
+      }).then(
+        (outcome) => outcome,
+        () => "aborted_by_server" as const
+      ),
+      new Promise<"timed_out">((resolve) => setTimeout(() => resolve("timed_out"), 1_000))
+    ]);
+    if (streamOutcome === "timed_out") abort.abort();
+    expect(streamOutcome).toBe("aborted_by_server");
+
+    const survivor = await fetch(`http://127.0.0.1:${address.port}/v1/session`, {
+      headers: { "x-user-dev-token": "other-user-token" }
+    });
+    expect(survivor.status).toBe(200);
+    await expect(survivor.json()).resolves.toMatchObject({ caller_scope: "ASKER" });
     await api.close();
   });
 });

@@ -111,14 +111,31 @@ describe("ACC-01 acceptance register", () => {
       rowKey: "runCostEnvelope",
       value: {
         kind: "RUN_COST_ENVELOPE_POLICY",
-        members: [{
-          depth_params: { depth: 1 },
-          risk_tier: "standard",
-          max_model_attempts: 9
-        }]
+        members: [
+          { depth_params: { depth: 1 }, risk_tier: "standard", max_model_attempts: 60 },
+          { depth_params: { depth: 1 }, risk_tier: "high-stakes", max_model_attempts: 60 },
+          { depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 108 },
+          { depth_params: { depth: 2 }, risk_tier: "high-stakes", max_model_attempts: 108 },
+          { depth_params: { depth: 3 }, risk_tier: "standard", max_model_attempts: 204 },
+          { depth_params: { depth: 3 }, risk_tier: "high-stakes", max_model_attempts: 204 },
+          { depth_params: { depth: 4 }, risk_tier: "standard", max_model_attempts: 396 },
+          { depth_params: { depth: 4 }, risk_tier: "high-stakes", max_model_attempts: 396 },
+          { depth_params: { depth: 5 }, risk_tier: "standard", max_model_attempts: 780 },
+          { depth_params: { depth: 5 }, risk_tier: "high-stakes", max_model_attempts: 780 }
+        ]
       },
       sourceRef: ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
     });
+    expect(ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF).toBe("acceptance:DR-172:V-approved");
+    const envelopeMembers = (byKey.runCostEnvelope?.value as {
+      members: readonly { depth_params: { depth: number }; risk_tier: string }[];
+    }).members;
+    expect(envelopeMembers.map(({ depth_params, risk_tier }) => `${depth_params.depth}:${risk_tier}`).sort())
+      .toEqual([1, 2, 3, 4, 5].flatMap((depth) => [
+        `${depth}:standard`,
+        `${depth}:high-stakes`
+      ]).sort());
+    expect(envelopeMembers.some(({ risk_tier }) => risk_tier === "casual")).toBe(false);
     expect(byKey.compositionBundleBudget?.value).toEqual({ low: 10_000, medium: 20_000, high: 30_000 });
     expect(byKey.convergenceEpsilon?.value).toBe(0.001);
     expect(byKey.convergenceStopDefaults).toEqual({

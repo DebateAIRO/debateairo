@@ -307,3 +307,69 @@ have the graph carry a support edge) — V's call, not a code defect.
   requires a CONTRACT CHANGE (a per-node maker/lineage field, or a new
   inspection resource) plus the serve path to populate it — not a mapping the
   worker forgot. UPDATE 2's framing understated this; scope it before dispatch.
+
+---
+
+## UPDATE 5 — 2026-08-12 ~12:12: V CLEARED THE GOAL ("I will re-start the process"). All agents parked clean.
+
+**Every agent process killed** (codex ×2, grok ×2 — all were <1 min old, no
+work lost). Nothing is mid-edit: ENV-01's session died ~40s in, BEFORE any
+edit — `seed-register.ts` / `runtime-policy.ts` verified untouched, no register
+row seeded, no `.pgdata` touched. ENV-01 reset `running` → `ready`.
+
+**Board at park:** done 41 (incl. EXEC-01, UI-02a, UI-02b, DEPTH-01) ·
+review 2 (POL-01 rev2 AWAITING ITS DIAMOND — rev2 closed the route-vs-stage
+boundary defect both lenses found; UI-01 awaiting its DR-146 rework, never
+dispatched) · ready 5 (ENV-01 first — its goal packet is COMPLETE at
+`goal-packets/ENV-01-codex-goal.md`; then UI-02c, HYG-01, XREV-01) ·
+blocked 3 (PRO-01 + PANEL-01 on ENV-01 landing; S15 parked by V).
+
+**Live services:** stack UP (PG 55432 · shim 8791 · API 8790 · UI :3000,
+token `v-dev`). NOTE: the API process predates POL-01/UI-02b, so served
+behaviour is older than the working tree — restart the ceremony after ENV-01
+lands anyway (its reseed forces it).
+
+**Standing laws minted since the last update:** DR-156 (parallel-dispatch
+gate: Grok-verified disjointness incl. shared runtime state) · DR-157 (max
+depth 5; test at depth 3; DEPTH IS INERT — PRO-01 owns wiring it) · DR-158
+(agent lifecycle reaping — `logs/reap-and-dispatch.sh` runs before every
+dispatch) · DR-159 (ENVELOPE RATIFIED: B3-B expansion rounds / B2-A two-segment
+serve / B1-B retry-tolerant → 42/66/114/210/402 for standard + high-stakes,
+casual not seeded).
+
+**Git:** remote `dev` = `68e2a47` (cleaned history, 573 V3 files, no junk).
+Local `dev` still points at the pre-clean commits and has diverged — fast-
+forward it onto `origin/dev` when the tree is quiet. Working tree carries
+the post-commit ticket work (POL-01 rev2, DEPTH-01 docs, ledger updates),
+uncommitted. Push auth now works via gh.
+
+**Suggested restart order:** dispatch ENV-01 (packet ready) → diamond POL-01
+rev2 → UI-01 rework (DR-146, then V's visual gate) → UI-02c → HYG-01 →
+PRO-01/PANEL-01 (unblock on ENV-01) → XREV-01.
+
+---
+
+## UPDATE 6 — 2026-08-13 ~18:18: V STOPPED THE HEARTBEAT PROTOCOL. Final park.
+
+All agents reaped; nothing mid-edit. The STACK STAYS UP for V's browsing
+(API 8790 / UI :3000, token `v-dev`; reviewed ceremony debate at
+`/debate/8e78cfc8-a778-4a32-8ecd-806c3a058def`).
+
+**Board: 54 done · 2 in review · S15 parked by V · 0 ready.**
+- **UI-01** (review): code dual-greenlit through four revisions; waits ONLY on
+  V's DR-145 visual verdict.
+- **PROV-01** (review): behaviour verified correct both directions; parked
+  mid-rev2 on two small guards (B1 importable-function test matrix, B2 the
+  DB CHECK) + one rendered drawer assertion. Resume:
+  `logs/run-prov01-rev2.sh` (session id on the ticket).
+
+**This run closed 18 tickets by dual greenlight** (EXEC-01, UI-02a/b/c/d/e,
+POL-01/02/03, ENV-01, DEPTH-01, PRO-01, PANEL-01, XREV-01, HYG-01, LOAD-01,
+UX-01/02) across ~45 diamond verdicts, every gate independently re-run by the
+orchestrator. Rulings DR-149..DR-166-C minted; suite grew 385 → 529 tests
+incl. an enforced render layer.
+
+**V's open decisions** (all in `V-FINISHING-PACKET-2026-08-13.md`): the
+visual gate · the review-coverage ceiling table (sets A/B) · the mono-maker
+ruling · the improvements list · the protocol revision (lessons list §5) ·
+the next push (commit-coupling note §6).

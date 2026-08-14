@@ -41,6 +41,13 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
         base_score: labeled(0.62, "judge:base:position"),
         final_strength: labeled(0.41, "propagation:final:position"),
         provenance_ref: "prov:node:position",
+        maker_lineage: {
+          maker: "OpenAI",
+          model_id: "gpt-5",
+          transport: "openai-compatible-http",
+          provider_ref: "provider:openai"
+        },
+        review: null,
         locator: null,
         stranger_restatement: { check_status: "PASS" },
         defeater_refs: ["node:defeater"],
@@ -58,6 +65,8 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
         base_score: labeled(0.55, "judge:base:defeater"),
         final_strength: labeled(0.55, "propagation:final:defeater"),
         provenance_ref: "prov:node:defeater",
+        maker_lineage: null,
+        review: null,
         locator: null,
         stranger_restatement: { check_status: "PASS" },
         defeater_refs: [],
@@ -91,14 +100,16 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
         scope: "answer",
         subject_ref: "battery:row:consistency",
         reason: "The owed consistency check has no recorded execution at terminal.",
-        lift_path: "execute the owed check and re-serve"
+        lift_path: "execute the owed check and re-serve",
+        served_root_rule: null
       },
       {
         mark: "UNRESOLVED-TYPE-FALLBACK",
         scope: "answer",
         subject_ref: "question-type:resolver",
         reason: "Question type unresolved; fallback composition entry served.",
-        lift_path: null
+        lift_path: null,
+        served_root_rule: null
       }
     ],
     reversal_point: "A verified counter-example to the position claim.",
@@ -108,7 +119,7 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
     tier_source: "ASKER",
     tier_provenance_ref: "asker:test",
     cost_envelope: {
-      basis: { max_model_attempts: 9 },
+      basis: { max_model_attempts: 42 },
       state: "WITHIN",
       consumed_model_attempts: 3,
       protected_core: "NEVER_SKIPPABLE"
@@ -121,5 +132,21 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
     staleness_state: "FRESH",
     relevant_as_of: "2026-08-10T00:00:00.000Z",
     ...overrides
+  });
+}
+
+/** UI-02c's named regression: two recorded houses reporting the same model id. */
+export function buildSameModelDifferentMakerAnswer(): Answer {
+  const base = buildFairShapedAnswer();
+  return buildFairShapedAnswer({
+    nodes: base.nodes.map((node, index) => ({
+      ...node,
+      maker_lineage: {
+        maker: index === 0 ? "OpenAI" : "Anthropic",
+        model_id: "test-layer/model",
+        transport: "openai-compatible-http",
+        provider_ref: index === 0 ? "provider:openai" : "provider:anthropic"
+      }
+    }))
   });
 }

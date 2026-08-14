@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import {
-  approveDebateAdaptiveDepthExpansion,
   clearStoredToken,
   contractClient,
   getDebateAdaptiveDepthDryRun,
@@ -13,7 +12,6 @@ import {
   getStoredToken,
   isNotFound,
   setStoredToken,
-  submitScoringFeedback,
   validateUserToken
 } from "@/lib/api";
 import {
@@ -26,7 +24,16 @@ import {
 } from "@debateai/contract";
 import { contractNodesById, liveDebateDetail } from "@/lib/v3/adapter";
 import { buildAnswerExport } from "@/lib/v3/answerExport";
-import { tokenUnlockFailureMessage } from "@/lib/v3/tokenUnlock";
+import {
+  measureDebateHeaderCollapse,
+  observeDebateHeaderFit,
+  readDebateHeaderGeometry
+} from "@/lib/debateHeaderOverflow";
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import {
+  shouldClearStoredTokenAfterUnlockFailure,
+  tokenUnlockFailureMessage
+} from "@/lib/v3/tokenUnlock";
 import {
   applyRunEvent,
   createLiveRunState,
@@ -37,7 +44,6 @@ import {
 import { AnswerHonestyDrawer } from "@/components/AnswerHonestyDrawer";
 import type {
   AdaptiveDepthDryRunItem,
-  CurrentUserFeedbackVote,
   DebateAdaptiveDepthDryRunResponse,
   DebateDetail,
   DebateNode,
@@ -45,13 +51,11 @@ import type {
   DepthPressure,
   InvestigationAction,
   LifecycleDecision,
-  NodeFeedbackSummary,
   NodeScoringPayload,
   RecommendedInvestigation,
-  ScoringFeedbackResponse,
-  ScoringFeedbackVote,
   SingleShotResult
 } from "@/lib/types";
+
 import { BrandMark } from "@/components/TopBar";
 import { DebateCanvas } from "@/components/DebateCanvas";
 import { RecommendedInvestigations } from "@/components/RecommendedInvestigations";
@@ -85,11 +89,70 @@ import type {
 } from "@/lib/scoringResponse";
 import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scoringStatusCopy";
 
+export function debateAfterRunTerminalFailure(debate: DebateDetail, reason: string): DebateDetail {
+  return {
+    ...debate,
+    status: "failed",
+    run_state: "FAILED",
+    completion: { state: "failed", reasonCode: reason, humanReason: null }
+  };
+}
+
 type SynthesisDraft = {
   model_id?: string;
   worker_id?: string;
   raw: string;
 };
+
+type StateUpdate<T> = T | ((current: T) => T);
+
+export type DebatePageRunEventConsumerInput = {
+  runRef: string;
+  readLive: () => LiveRunState;
+  writeLive: (next: LiveRunState) => void;
+  hasAnswer: () => boolean;
+  updateDebate: (update: (current: DebateDetail | null) => DebateDetail | null) => void;
+  updateSynthesisDraft: (update: StateUpdate<SynthesisDraft | null>) => void;
+  writeError: (next: string | null) => void;
+  refresh: () => void | Promise<void>;
+};
+
+/** The single event-consumption seam used by the live stream and render tests. */
+export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsumerInput): (event: RunEvent) => void {
+  return (event) => {
+    const next = applyRunEvent(input.readLive(), event);
+    input.writeLive(next);
+    if (!input.hasAnswer()) {
+      const tree = liveTreeFromState(next, input.runRef, "");
+      if (tree) input.updateDebate((current) => input.hasAnswer()
+        ? current
+        : { ...liveDebateDetail(input.runRef, tree), run_state: current?.run_state === "FAILED" ? "FAILED" : "RUNNING" });
+    }
+    if (event.event_type === "serve.composition_started") {
+      input.updateSynthesisDraft({ raw: "" });
+    } else if (event.event_type === "serve.composition_delta") {
+      input.updateSynthesisDraft((current) => ({
+        model_id: current?.model_id,
+        worker_id: current?.worker_id,
+        raw: next.compositionText
+      }));
+    } else if (event.event_type === "node.failed") {
+      input.writeError("Claim generation failed");
+    } else if (event.event_type === "node.retrying") {
+      input.writeError(null);
+    } else if (event.event_type === "run.terminal") {
+      if (next.terminalFailure !== null) {
+        input.updateDebate((current) => current === null
+          ? current
+          : debateAfterRunTerminalFailure(current, next.terminalFailure!));
+      }
+      input.writeError(next.terminalFailure === null
+        ? null
+        : `Debate generation failed: ${next.terminalFailure}`);
+    }
+    if (refreshTriggeredBy(event.event_type)) void input.refresh();
+  };
+}
 
 type StreamState = {
   status: "connecting" | "live" | "reconnecting";
@@ -114,20 +177,6 @@ type AdaptiveDepthDryRunAsyncState =
   | { status: "loaded"; data: DebateAdaptiveDepthDryRunResponse; error: null }
   | { status: "unavailable"; data: DebateAdaptiveDepthDryRunResponse | null; error: string | null }
   | { status: "error"; data: DebateAdaptiveDepthDryRunResponse | null; error: string };
-
-type AdaptiveDepthApprovalState =
-  | { status: "idle"; error: null }
-  | { status: "starting"; error: null }
-  | { status: "recorded"; error: null }
-  | { status: "queued"; error: null }
-  | { status: "unavailable"; error: string }
-  | { status: "error"; error: string };
-
-type FeedbackSubmitState = {
-  nodeId: string | null;
-  status: "idle" | "submitting" | "error";
-  error: string | null;
-};
 
 const SCORE_AWARE_FILTERS = [
   { id: "all", label: "All" },
@@ -248,50 +297,6 @@ function collectRecommendedInvestigations(response: DebateScoringResponse | null
   return (response?.items ?? []).flatMap((item) => item.recommended_investigations ?? []);
 }
 
-function upsertFeedbackSummary(
-  summaries: NodeFeedbackSummary[] | null | undefined,
-  nextSummary: NodeFeedbackSummary
-): NodeFeedbackSummary[] {
-  const existing = summaries ?? [];
-  let found = false;
-  const next = existing.map((summary) => {
-    if (summary.node_id !== nextSummary.node_id) return summary;
-    found = true;
-    return nextSummary;
-  });
-  return found ? next : [...next, nextSummary];
-}
-
-function upsertCurrentUserFeedbackVote(
-  votes: CurrentUserFeedbackVote[] | null | undefined,
-  nodeId: string,
-  vote: ScoringFeedbackVote
-): CurrentUserFeedbackVote[] {
-  const existing = votes ?? [];
-  let found = false;
-  const next = existing.map((item) => {
-    if (item.node_id !== nodeId) return item;
-    found = true;
-    return { node_id: nodeId, vote };
-  });
-  return found ? next : [...next, { node_id: nodeId, vote }];
-}
-
-function applyFeedbackResponse(
-  response: DebateScoringResponse,
-  feedback: ScoringFeedbackResponse
-): DebateScoringResponse {
-  return {
-    ...response,
-    feedback_summary: upsertFeedbackSummary(response.feedback_summary, feedback.feedback_summary),
-    current_user_votes: upsertCurrentUserFeedbackVote(
-      response.current_user_votes,
-      feedback.node_id,
-      feedback.current_user_vote
-    )
-  };
-}
-
 function formatAdaptiveDepthAction(action: InvestigationAction | null): string {
   if (!action) return "Review";
   return action.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -312,11 +317,6 @@ function formatAdaptiveDepthScore(score: number): string {
 
 function compactNodeId(nodeId: string): string {
   return nodeId.length > 13 ? `${nodeId.slice(0, 8)}...` : nodeId;
-}
-
-function looksAuthRelated(message: string): boolean {
-  const lower = message.toLowerCase();
-  return lower.includes("401") || lower.includes("403") || lower.includes("invalid user token");
 }
 
 function adaptiveDepthDryRunStateFromPayload(
@@ -378,15 +378,6 @@ export default function DebatePageClient({
     data: null,
     error: null
   });
-  const [adaptiveDepthApprovalState, setAdaptiveDepthApprovalState] = useState<AdaptiveDepthApprovalState>({
-    status: "idle",
-    error: null
-  });
-  const [feedbackSubmitState, setFeedbackSubmitState] = useState<FeedbackSubmitState>({
-    nodeId: null,
-    status: "idle",
-    error: null
-  });
   const [scoreAwareFilter, setScoreAwareFilter] = useState<ScoreAwareFilter>("all");
   const [actionToken, setActionToken] = useState<string | null>(null);
   const [tokenDraft, setTokenDraft] = useState("");
@@ -411,6 +402,13 @@ export default function DebatePageClient({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const canvasElRef = useRef<HTMLDivElement | null>(null);
+  const debateHeaderRef = useRef<HTMLElement | null>(null);
+  const debateHeaderIdentityRef = useRef<HTMLDivElement | null>(null);
+  const debateHeaderClaimRef = useRef<HTMLDivElement | null>(null);
+  const debateHeaderTitleMeasureRef = useRef<HTMLSpanElement | null>(null);
+  const debateHeaderControlsRef = useRef<HTMLDivElement | null>(null);
+  const debateHeaderInlineActionsRef = useRef<HTMLDivElement | null>(null);
+  const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
 
   const refresh = useCallback(async () => {
     const token = getStoredToken();
@@ -448,8 +446,6 @@ export default function DebatePageClient({
     setScoringState({ status: "idle", data: null, error: null });
     setScoringRefreshState({ status: "idle", jobId: null, error: null });
     setAdaptiveDepthDryRunState({ status: "idle", data: null, error: null });
-    setAdaptiveDepthApprovalState({ status: "idle", error: null });
-    setFeedbackSubmitState({ nodeId: null, status: "idle", error: null });
   }, [id]);
 
   useEffect(() => {
@@ -506,9 +502,12 @@ export default function DebatePageClient({
       try {
         await validateUserToken(stored);
         if (active) setActionToken(stored);
-      } catch {
-        clearStoredToken();
-        if (active) setActionToken(null);
+      } catch (error) {
+        if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
+        if (active) {
+          setActionToken(null);
+          setError(tokenUnlockFailureMessage(error));
+        }
       }
     }
     validateStoredToken();
@@ -527,33 +526,19 @@ export default function DebatePageClient({
     if (!token) return;
     const runRef = answerRef.current?.run_ref ?? id;
 
-    const consume = (event: RunEvent) => {
-      const next = applyRunEvent(liveRef.current, event);
-      liveRef.current = next;
-      setLive(next);
-      if (answerRef.current === null) {
-        const tree = liveTreeFromState(next, runRef, "");
-        if (tree) setDebate((current) => (answerRef.current === null ? liveDebateDetail(runRef, tree) : current));
-      }
-      if (event.event_type === "serve.composition_started") {
-        setSynthesisDraft({ raw: "" });
-      } else if (event.event_type === "serve.composition_delta") {
-        setSynthesisDraft((current) => ({
-          model_id: current?.model_id,
-          worker_id: current?.worker_id,
-          raw: next.compositionText
-        }));
-      } else if (event.event_type === "node.failed") {
-        setError("Claim generation failed");
-      } else if (event.event_type === "node.retrying") {
-        setError(null);
-      } else if (event.event_type === "run.terminal") {
-        setError(next.terminalFailure === null
-          ? null
-          : `Debate generation failed: ${next.terminalFailure}`);
-      }
-      if (refreshTriggeredBy(event.event_type)) void refresh();
-    };
+    const consume = createDebatePageRunEventConsumer({
+      runRef,
+      readLive: () => liveRef.current,
+      writeLive: (next) => {
+        liveRef.current = next;
+        setLive(next);
+      },
+      hasAnswer: () => answerRef.current !== null,
+      updateDebate: setDebate,
+      updateSynthesisDraft: setSynthesisDraft,
+      writeError: setError,
+      refresh
+    });
 
     if (debateTerminal) {
       // Settled run: replay the recorded stream once so the honesty surfaces
@@ -796,7 +781,11 @@ export default function DebatePageClient({
       (node.children || []).forEach(walk);
     };
     if (debate.tree) walk(debate.tree);
-    const pct = total ? Math.round((done / total) * 100) : complete ? 100 : 40;
+    if (total === 0 && !complete) {
+      const label = statusLabel(debate.run_state ?? "generating");
+      return { pct: null, label, count: "" };
+    }
+    const pct = total ? Math.round((done / total) * 100) : 100;
     return { pct, label: "Models arguing", count: `${pct}%` };
   }, [debate, hasTree, complete]);
 
@@ -808,6 +797,37 @@ export default function DebatePageClient({
         debate.selected_agents.length ||
         debate.agent_runs.length)
   );
+
+  useLayoutEffect(() => {
+    const header = debateHeaderRef.current;
+    const identity = debateHeaderIdentityRef.current;
+    const claim = debateHeaderClaimRef.current;
+    const titleMeasure = debateHeaderTitleMeasureRef.current;
+    const controls = debateHeaderControlsRef.current;
+    const inlineActions = debateHeaderInlineActionsRef.current;
+    if (!header || !identity || !claim || !titleMeasure || !controls || !inlineActions) return;
+
+    const measureHeaderFit = () => {
+      const geometry = readDebateHeaderGeometry({
+        header,
+        identity,
+        claim,
+        titleMeasure,
+        controls
+      }, (element) => window.getComputedStyle(element));
+      const fit = measureDebateHeaderCollapse(geometry);
+      setHeaderActionsCollapsed(fit.collapse);
+    };
+
+    measureHeaderFit();
+    const observer = new ResizeObserver(measureHeaderFit);
+    return observeDebateHeaderFit({
+      observer,
+      targets: [header, titleMeasure, inlineActions],
+      resizeTarget: window,
+      measure: measureHeaderFit
+    });
+  }, [answerExport.available, debate?.completion?.humanReason, debate?.status, debate?.topic, hasArtifacts, hasTree]);
 
   const detailNode = findNode(debate?.tree ?? null, detailNodeId);
   const { scoringByNodeId, scoringErrorsByNodeId } = useMemo(
@@ -944,7 +964,7 @@ export default function DebatePageClient({
       setTokenDraft("");
       setTokenBarOpen(false);
     } catch (error) {
-      clearStoredToken();
+      if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
       setActionToken(null);
       // DR-115: only say "rejected" when the coordinator actually rejected it.
       setError(tokenUnlockFailureMessage(error));
@@ -978,76 +998,6 @@ export default function DebatePageClient({
       provider: scoringState.data?.model_metadata?.provider,
       model: scoringState.data?.model_metadata?.model
     });
-  }
-
-  async function approveAdaptiveDepthExpansion(selectedNodeIds: string[]) {
-    if (!actionToken || selectedNodeIds.length === 0 || adaptiveDepthApprovalState.status === "starting") return;
-    setAdaptiveDepthApprovalState({ status: "starting", error: null });
-    try {
-      const result = await approveDebateAdaptiveDepthExpansion(
-        id,
-        {
-          debate_id: id,
-          selected_node_ids: selectedNodeIds,
-          approval_reason: "User approved adaptive depth expansion from dry-run recommendations."
-        },
-        actionToken
-      );
-      if (result.status === "unavailable") {
-        setAdaptiveDepthApprovalState({
-          status: "unavailable",
-          error: result.reason || "Selected adaptive depth expansions are unavailable."
-        });
-        return;
-      }
-      if (result.status === "recorded") {
-        // Honest outcome (W0/B4): the approval is audited but no expansion
-        // work is queued yet -- never claim jobs were started.
-        setAdaptiveDepthApprovalState({ status: "recorded", error: null });
-        showToast("Expansion approval recorded — automatic expansion is not yet supported");
-        return;
-      }
-      setAdaptiveDepthApprovalState({ status: "queued", error: null });
-      showToast(`Queued ${result.queued_node_ids.length} adaptive expansion${result.queued_node_ids.length === 1 ? "" : "s"}`);
-      await refresh();
-      try {
-        const dryRunPayload = await getDebateAdaptiveDepthDryRun(id);
-        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(dryRunPayload));
-      } catch (exc) {
-        setAdaptiveDepthDryRunState((current) => ({
-          status: "error",
-          data: current.data,
-          error: exc instanceof Error ? exc.message : "Unable to load adaptive depth dry-run"
-        }));
-      }
-    } catch (exc) {
-      setAdaptiveDepthApprovalState({
-        status: "error",
-        error: exc instanceof Error ? exc.message : "Unable to approve adaptive depth expansion"
-      });
-    }
-  }
-
-  async function submitNodeFeedback(nodeId: string, vote: ScoringFeedbackVote) {
-    if (!actionToken || feedbackSubmitState.status === "submitting") return;
-    setFeedbackSubmitState({ nodeId, status: "submitting", error: null });
-    try {
-      const feedback = await submitScoringFeedback(id, nodeId, vote, actionToken);
-      setScoringState((current) => {
-        if (!current.data) return current;
-        const data = applyFeedbackResponse(current.data, feedback);
-        if (current.status === "loaded" || current.status === "unavailable" || current.status === "loading") {
-          return { ...current, data };
-        }
-        return current;
-      });
-      setFeedbackSubmitState({ nodeId, status: "idle", error: null });
-      showToast(vote === "up" ? "Feedback saved: useful" : "Feedback saved: not useful");
-    } catch (exc) {
-      const message = exc instanceof Error ? exc.message : "Unable to save feedback";
-      setFeedbackSubmitState({ nodeId, status: "error", error: message });
-      if (looksAuthRelated(message)) rejectActionToken();
-    }
   }
 
   // Fatal dead-end ONLY for a definitive error with no data. A transient SSR
@@ -1087,20 +1037,20 @@ export default function DebatePageClient({
       data-scoring-visibility={scoringVisibility.kind}
       data-scoring-node-count={scoringByNodeId.size}
       data-adaptive-depth-dry-run-state={adaptiveDepthDryRunState.status}
+      data-actions-collapsed={headerActionsCollapsed ? "true" : "false"}
     >
       {/* ---- top bar ---- */}
-      <header className="debateTopBar">
-        <BrandMark />
-        <div className="debateTopCenter">
-          <span className="topBarDivider" aria-hidden />
-          <Link className="btnGhost" href="/">
-            ← Library
-          </Link>
-          <div className="debateTopClaim">
+      <header className="debateTopBar" ref={debateHeaderRef}>
+        <div className="debateTopIdentityRow" ref={debateHeaderIdentityRef}>
+          <BrandMark />
+          <div className="debateTopClaim" ref={debateHeaderClaimRef}>
             <span className="debateTopTitle">{debate.topic}</span>
+            <span className="debateTopTitle debateTopTitleMeasure" aria-hidden ref={debateHeaderTitleMeasureRef}>
+              {debate.topic}
+            </span>
             <span className={`pill ${statusKind}`}>
               <span className="dot" />
-              {statusLabel(debate.status)}
+              {statusLabel(debate.run_state ?? debate.status)}
             </span>
             {debate.completion?.humanReason ? (
               <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
@@ -1109,12 +1059,26 @@ export default function DebatePageClient({
             ) : null}
           </div>
         </div>
-        <div className="debateTopActions">
+        <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
+          {hasTree ? (
+            <div className="segment" role="group" aria-label="View">
+              <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+                Thread
+              </button>
+              <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+                Split
+              </button>
+              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+                Tree
+              </button>
+              <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+                Map
+              </button>
+            </div>
+          ) : null}
           <ScoringErrorBoundary>
             <div className="topSwitch">
               <span>Scoring</span>
-              {scoringStatusText ? <span className="topSwitchStatus">{scoringStatusText}</span> : null}
-              {scoringConfidenceText ? <span className="topSwitchStatus">{scoringConfidenceText}</span> : null}
               <button
                 type="button"
                 className="iconBtn"
@@ -1126,54 +1090,65 @@ export default function DebatePageClient({
               </button>
             </div>
           </ScoringErrorBoundary>
-          {hasTree ? (
-            <>
-              <div className="segment" role="group" aria-label="View">
-                <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
-                  Thread
-                </button>
-                <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
-                  Split
-                </button>
-                <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                  Tree
-                </button>
-                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
-                  Map
-                </button>
-              </div>
-              <button type="button" className="btn" onClick={replayGeneration} title="Replay generation">
-                ↻ Replay
+          <div className="debateInlineActions" ref={debateHeaderInlineActionsRef}>
+            <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
+              <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+            </Link>
+            {hasTree ? (
+              <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
+                <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
               </button>
-            </>
-          ) : null}
-          {hasArtifacts ? (
-            <button type="button" className="btn" onClick={() => setWorkspaceOpen(true)}>
-              ◫ Workspace
-            </button>
-          ) : null}
-          {answer ? (
-            <button type="button" className="btn" onClick={() => setHonestyOpen(true)}>
-              ◈ Honesty
-            </button>
-          ) : null}
-          {answerExport.available ? (
-            <a
-              className="btn"
-              href={answerExport.href}
-              download={answerExport.filename}
-              title={answerExport.label}
-              onClick={() => showToast(answerExport.toast)}
-            >
-              ↓ Export
-            </a>
-          ) : null}
-          <button type="button" className="iconBtn" aria-label="How it works" onClick={() => setGuideOpen(true)}>
-            ?
-          </button>
-          <Link className="iconBtn" href="/settings" aria-label="Settings">
-            ⚙
-          </Link>
+            ) : null}
+            {hasArtifacts ? (
+              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
+                <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+              </button>
+            ) : null}
+            {answer ? (
+              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
+                <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+              </button>
+            ) : null}
+            {answerExport.available ? (
+              <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
+                <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+              </a>
+            ) : null}
+            <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
+            <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>
+          </div>
+          <details className="debateOverflow">
+            <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
+              <span aria-hidden>⋯</span>
+            </summary>
+            <div className="debateOverflowMenu">
+              <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
+                <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+              </Link>
+              {hasTree ? (
+                <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
+                  <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
+                </button>
+              ) : null}
+              {hasArtifacts ? (
+                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
+                  <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+                </button>
+              ) : null}
+              {answer ? (
+                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
+                  <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+                </button>
+              ) : null}
+              {answerExport.available ? (
+                <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
+                  <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+                </a>
+              ) : null}
+              <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
+              <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -1187,6 +1162,12 @@ export default function DebatePageClient({
               <span className="progressLabel">Scoring insights</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+              {scoringStatusText || scoringConfidenceText ? (
+                <span className="scoringInsightsStatus" data-mobile-scoring-status="true">
+                  {scoringStatusText ? <span>{scoringStatusText}</span> : null}
+                  {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
+                </span>
+              ) : null}
             </summary>
             <div className="scoringInsightsBody scroll">
               <ScoringVisibilityPanel state={scoringVisibility} />
@@ -1215,9 +1196,6 @@ export default function DebatePageClient({
               <AdaptiveDepthDryRunPanel
                 enabled={true}
                 state={adaptiveDepthDryRunState}
-                actionToken={actionToken}
-                approvalState={adaptiveDepthApprovalState}
-                onApprove={approveAdaptiveDepthExpansion}
               />
             </div>
           </details>
@@ -1231,7 +1209,17 @@ export default function DebatePageClient({
               <span className="progressLabel">Scoring insights</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
+              {scoringStatusText || scoringConfidenceText ? (
+                <span className="scoringInsightsStatus" data-mobile-scoring-status="true">
+                  {scoringStatusText ? <span>{scoringStatusText}</span> : null}
+                  {scoringConfidenceText ? <span>{scoringConfidenceText}</span> : null}
+                </span>
+              ) : null}
             </div>
+            <AdaptiveDepthDryRunPanel
+              enabled={true}
+              state={adaptiveDepthDryRunState}
+            />
           </section>
         )}
       </ScoringErrorBoundary>
@@ -1240,10 +1228,14 @@ export default function DebatePageClient({
       {generating ? (
         <div className="progressStrip">
           <span className="progressLabel">{progress.label}</span>
-          <div className="progressTrack">
-            <div className="progressFill" style={{ width: `${progress.pct}%` }} />
-          </div>
-          <span className="progressCount">{progress.count}</span>
+          {progress.pct === null ? null : (
+            <>
+              <div className="progressTrack">
+                <div className="progressFill" style={{ width: `${progress.pct}%` }} />
+              </div>
+              <span className="progressCount">{progress.count}</span>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -1356,13 +1348,7 @@ export default function DebatePageClient({
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
           lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
-          feedbackSubmitState={
-            feedbackSubmitState.nodeId === detailNode.id
-              ? { status: feedbackSubmitState.status, error: feedbackSubmitState.error }
-              : { status: "idle", error: null }
-          }
           token={actionToken}
-          onSubmitFeedback={(vote) => submitNodeFeedback(detailNode.id, vote)}
           onClose={() => setDetailNodeId(null)}
           onChallenge={(anchor, text) => openChallenge(detailNode, anchor, text)}
           onFocusRecommendationNode={focusRecommendationNode}
@@ -1448,7 +1434,7 @@ export default function DebatePageClient({
 
       {toast ? <Toast message={toast} /> : null}
 
-      {/* ---- action token (subtle, bottom-left) ---- */}
+      {/* ---- action token (subtle, bottom-right) ---- */}
       <div className="tokenDock">
         {actionToken ? (
           <button type="button" className="btn" onClick={lockActions}>
@@ -1719,16 +1705,10 @@ function ScoringDiagnosticsDrawer({
 
 function AdaptiveDepthDryRunPanel({
   enabled,
-  state,
-  actionToken,
-  approvalState,
-  onApprove
+  state
 }: {
   enabled: boolean;
   state: AdaptiveDepthDryRunAsyncState;
-  actionToken: string | null;
-  approvalState: AdaptiveDepthApprovalState;
-  onApprove: (selectedNodeIds: string[]) => void;
 }) {
   const reason =
     state.error ||
@@ -1758,6 +1738,18 @@ function AdaptiveDepthDryRunPanel({
       <section className="progressStrip" aria-label="Adaptive depth dry-run">
         <span className="progressLabel">Adaptive depth dry-run unavailable</span>
         <span className="progressCount">{reason || "No dry-run plan is available."}</span>
+        <button
+          type="button"
+          className="btn btnDark"
+          disabled
+          aria-disabled="true"
+          title={V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+        >
+          Approve selected expansions
+        </button>
+        <span className="progressCount adaptiveDepthActionMessage">
+          {V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+        </span>
       </section>
     );
   }
@@ -1765,21 +1757,6 @@ function AdaptiveDepthDryRunPanel({
   if (!state.data) return null;
 
   const items = state.data.plan.items;
-  const actionableItems = items.filter((item) => item.expansion_hint === "expand");
-  const actionLocked = !actionToken;
-  const actionBusy = approvalState.status === "starting";
-  const actionDisabled = actionLocked || actionBusy || actionableItems.length === 0;
-  const actionMessage = actionLocked
-    ? "Unlock actions to approve adaptive expansion."
-    : actionableItems.length === 0
-      ? "No selected expand recommendations are available."
-      : approvalState.status === "recorded"
-        ? "Approval recorded. Automatic expansion is not yet supported."
-        : approvalState.status === "queued"
-          ? "Adaptive expansion jobs queued."
-          : approvalState.status === "unavailable" || approvalState.status === "error"
-            ? approvalState.error
-            : null;
   return (
     <section
       className="progressStrip adaptiveDepthStrip"
@@ -1804,16 +1781,15 @@ function AdaptiveDepthDryRunPanel({
         <button
           type="button"
           className="btn btnDark"
-          disabled={actionDisabled}
-          onClick={() => onApprove(actionableItems.map((item) => item.node_id))}
+          disabled
+          aria-disabled="true"
+          title={V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
         >
-          {actionBusy ? "Submitting approvals" : "Approve selected expansions"}
+          Approve selected expansions
         </button>
-        {actionMessage ? (
-          <span className="progressCount adaptiveDepthActionMessage">
-            {actionMessage}
-          </span>
-        ) : null}
+        <span className="progressCount adaptiveDepthActionMessage">
+          {V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+        </span>
       </div>
     </section>
   );

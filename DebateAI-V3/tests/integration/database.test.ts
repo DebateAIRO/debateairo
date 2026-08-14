@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   BATTERY_EXECUTION_CONTRACTS,
   createInitialBatteryRows,
@@ -10,6 +10,7 @@ import {
   WorkItemRepository
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
+import { BudgetRepository } from "@debateai/budget";
 import { RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
@@ -24,6 +25,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
 import { ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
+import { buildApi, type AskApplication } from "@debateai/api";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -33,7 +35,7 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
   judgeBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
   composerBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
   conformanceBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
-  providerRef: "provider:test-layer", judgeContractHash: "contract:judge:test-layer",
+  providerRef: "provider:test-layer", maker: "test-layer", judgeContractHash: "contract:judge:test-layer",
   composerContractHash: "contract:composer:test-layer", conformanceContractHash: "contract:conformance:test-layer",
   propagationContractHash: "contract:propagation:test-layer", serveContractHash: "contract:serve:test-layer",
   maxRecompose: 2, factBundleVersion: 1, judgementNumberKind: "base-probability",
@@ -96,21 +98,48 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
   }))
 });
 
-async function createRun(questionLine: string, maxModelAttempts = 10): Promise<string> {
+async function createRun(
+  questionLine: string,
+  maxModelAttempts = 10,
+  agentCount = 1,
+  depth = 1,
+  askerId = `asker:${questionLine}`
+): Promise<string> {
   return new RunRepository(database.pool).startRun({
-    questionLine, askerId: `asker:${questionLine}`, sessionId: `session:${questionLine}`, callerScope: "ASKER",
+    questionLine, askerId, sessionId: `session:${questionLine}`, callerScope: "ASKER",
     asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
-    depthParams: { depth: 1 }, agentCount: 1, strangerSampleRate: 1,
+    depthParams: { depth }, agentCount, strangerSampleRate: 1,
     envelopeBasis: {
       max_model_attempts: maxModelAttempts,
       register_row_key: "runCostEnvelope",
       register_version: 1,
       source_ref: "test-layer:run-cost-envelope",
-      derived_from: { depth_params: { depth: 1 }, risk_tier: "casual" }
+      derived_from: { depth_params: { depth }, risk_tier: "casual" }
     },
     registerVersion: 1, batteryVersion: "s00", batteryRows
   });
+}
+
+function judgementDouble(statement: string): string {
+  return JSON.stringify({
+    statement,
+    way_of_knowing: "REASONING",
+    locator: null,
+    restatement_text: statement,
+    restatement_status: "PASS",
+    value_laden: false,
+    claim_type: "unknown",
+    steelman: { summary: statement, fidelity: 0.72 },
+    critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.72, relevance: 0.72 },
+    context: { fit: 0.72, ambiguityFlags: [] },
+    fallacy: { severity: 0.28, fatalFlags: [] }
+  });
+}
+
+function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
+  return JSON.stringify({ outcome, reasons: [reason] });
 }
 
 async function createRunnerWork(questionLine: string): Promise<{ runId: string; workItemId: string }> {
@@ -161,6 +190,142 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await database?.stop();
+});
+
+describe("BUG-01 content-rejection retry accounting", () => {
+  it("T11/T13 charges every rejected attempt while terminal execution counts only the accepted attempt", async () => {
+    const question = `bug01-accounting-${randomUUID()}`;
+    const { runId, workItemId } = await createRunnerWork(question);
+    const provider = await startProviderDouble(["rejected-one", "rejected-two", "accepted-three"]);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      });
+      const result = await gateway.call({
+        runId, subjectItemId: workItemId, callSiteKey: "JUDGE", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
+        contractHash: "contract:bug01-accounting", providerRef: "provider:test-layer",
+        packet: { messages: [{ role: "user", content: "test-layer accounting fixture" }] },
+        classifyContent: (content) => content === "accepted-three"
+          ? { parseStatus: "PARSED", parseError: null }
+          : { parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` }
+      });
+      expect(result.content).toBe("accepted-three");
+      expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(3);
+      expect(await new LedgerRepository(database.pool).countModelAttempts({
+        runId, workItemId, contractHash: "contract:bug01-accounting", callSiteKey: "JUDGE"
+      })).toBe(3);
+      const facts = await readTerminalRecordedFacts(database.pool, runId);
+      expect(facts.ledger.judgeCallCount).toBe(1);
+      const outcomes = await database.pool.query<{ outcome: string; parse_status: string }>(
+        `SELECT entry.outcome, artifact.parse_status
+         FROM ledger.ledger_entry AS entry
+         JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref
+         WHERE entry.run_id = $1 AND entry.call_site_key = 'JUDGE'
+         ORDER BY entry.sequence`,
+        [runId]
+      );
+      expect(outcomes.rows).toEqual([
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "OK", parse_status: "PARSED" }
+      ]);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:BUG01_ACCOUNTING_COMPLETE"
+      });
+    }
+  });
+
+  it("T12 exposes the last rejected artifact to the redelivery exhaustion check", async () => {
+    const question = `bug01-exhaustion-${randomUUID()}`;
+    const { runId, workItemId } = await createRunnerWork(question);
+    const provider = await startProviderDouble(["rejected-one", "rejected-two", "rejected-three"]);
+    const ledger = new LedgerRepository(database.pool);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      });
+      await expect(gateway.call({
+        runId, subjectItemId: workItemId, callSiteKey: "JUDGE:retry", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 64, deadlineMs: 5_000 },
+        contractHash: "contract:bug01-exhaustion", providerRef: "provider:test-layer",
+        packet: { messages: [{ role: "user", content: "test-layer exhaustion fixture" }] },
+        classifyContent: (content) => ({ parseStatus: "SCHEMA_FAILED", parseError: `schema:${content}` })
+      })).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 3 });
+      const exhausted = await ledger.findExhaustedModelAttempt({
+        runId, workItemId, contractHash: "contract:bug01-exhaustion", maxAttempts: 3
+      });
+      expect(exhausted).toEqual(expect.objectContaining({ artifactRef: expect.any(String) }));
+      const last = await database.pool.query<{ raw_artifact_ref: string }>(
+        `SELECT raw_artifact_ref FROM ledger.ledger_entry
+         WHERE run_id = $1 AND subject_item_id = $2 AND call_site_key = 'JUDGE:retry'
+         ORDER BY sequence DESC LIMIT 1`,
+        [runId, workItemId]
+      );
+      expect(exhausted?.artifactRef).toBe(last.rows[0]!.raw_artifact_ref);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:BUG01_EXHAUSTION_COMPLETE"
+      });
+    }
+  });
+});
+
+describe("LOAD-01 run projection ownership boundary", () => {
+  it("returns 401 to anonymous callers and 404 to a foreign asker", async () => {
+    const ownerToken = "load01-owner-token";
+    const ownerAskerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
+    const runId = await createRun("load01-owned-loading-run", 10, 1, 1, ownerAskerId);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId,
+      batteryRowId: "Q1",
+      nodeSet: [],
+      commandKey: `load01:${runId}:Q1`
+    });
+    const repository = new RunRepository(database.pool);
+    const readRun: AskApplication["readRun"] = async (candidateRunId, session) => {
+      const run = await repository.readLoadingProjection(candidateRunId, session.asker_id);
+      return run === null ? null : {
+        run_ref: run.runRef,
+        question_line: run.questionLine,
+        state: run.state,
+        terminal_reason: run.terminalReason
+      };
+    };
+    const application = {
+      readRun
+    } as unknown as AskApplication;
+    const api = buildApi({ application });
+    try {
+      const anonymous = await api.inject({ method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}` });
+      expect(anonymous.statusCode).toBe(401);
+
+      const foreign = await api.inject({
+        method: "GET",
+        url: `/v1/runs/${encodeURIComponent(runId)}`,
+        headers: { "x-user-dev-token": "load01-foreign-token" }
+      });
+      expect(foreign.statusCode).toBe(404);
+
+      const owner = await api.inject({
+        method: "GET",
+        url: `/v1/runs/${encodeURIComponent(runId)}`,
+        headers: { "x-user-dev-token": ownerToken }
+      });
+      expect(owner.statusCode).toBe(200);
+      expect(owner.json()).toMatchObject({ run_ref: runId, state: "QUEUED" });
+    } finally {
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId,
+        workItemId,
+        reason: "TEST_FIXTURE_CLEANUP"
+      });
+      await api.close();
+    }
+  });
 });
 
 describe("S07 / FX-LED-06 / FX-LG-17 / FX-LG-18 — SPLIT persistence and terminality", () => {
@@ -417,6 +582,47 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(asker.rows[0]).toEqual({ tier_source: "ASKER", tier_provenance_ref: "asker:a" });
+    const machineDefault = await database.pool.query(`
+      INSERT INTO core.run (
+        question_line, asker_id, session_id, caller_scope, as_of,
+        asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+        composition_budget_tier, depth_params, agent_count,
+        stranger_sample_rate, envelope_basis, register_version,
+        battery_version, created_at_seq
+      ) VALUES ('machine','machine','s','ASKER',now(),'standard','standard','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10005)
+      RETURNING tier_source, tier_provenance_ref
+    `);
+    expect(machineDefault.rows[0]).toEqual({
+      tier_source: "MACHINE_DEFAULT",
+      tier_provenance_ref: "machine:deployment-floor"
+    });
+    await expect(database.pool.query(`
+      INSERT INTO core.run (
+        question_line, asker_id, session_id, caller_scope, as_of,
+        asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+        composition_budget_tier, depth_params, agent_count,
+        stranger_sample_rate, envelope_basis, register_version,
+        battery_version, created_at_seq
+      ) VALUES ('asker-raised','asker-raised','s','ASKER',now(),'casual','high-stakes','ASKER','asker:raised','low','{}',1,1,'{}',1,'s00',10006)
+    `)).rejects.toThrow();
+    await expect(database.pool.query(`
+      INSERT INTO core.run (
+        question_line, asker_id, session_id, caller_scope, as_of,
+        asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+        composition_budget_tier, depth_params, agent_count,
+        stranger_sample_rate, envelope_basis, register_version,
+        battery_version, created_at_seq
+      ) VALUES ('machine-raised','machine-raised','s','ASKER',now(),'casual','high-stakes','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10007)
+    `)).rejects.toThrow();
+    await expect(database.pool.query(`
+      INSERT INTO core.run (
+        question_line, asker_id, session_id, caller_scope, as_of,
+        asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+        composition_budget_tier, depth_params, agent_count,
+        stranger_sample_rate, envelope_basis, register_version,
+        battery_version, created_at_seq
+      ) VALUES ('machine-lowered','machine-lowered','s','ASKER',now(),'high-stakes','casual','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,1,'{}',1,'s00',10008)
+    `)).rejects.toThrow();
     const raised = await database.pool.query(`
       INSERT INTO core.run (
         question_line, asker_id, session_id, caller_scope, as_of,
@@ -751,6 +957,337 @@ describe("FX-LG-16 / DR-128 — claim-type composition register carrier", () => 
 });
 
 describe("apps/runner — legal command lifecycle", () => {
+  it.each([
+    [3, "RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE"],
+    [2, "RUN_MAKER_CONFIGURATION_MISMATCH"]
+  ])("refuses agent_count %i with %s before any model call", async (agentCount, code) => {
+    const provider = await startProviderDouble([]);
+    try {
+      const runId = await createRun(`maker-guard-${agentCount}`, 10, agentCount);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `runner-test:maker-guard-${agentCount}`
+      });
+
+      await expect(runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId)).rejects.toMatchObject({ code });
+      expect(provider.calls()).toBe(0);
+      const calls = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'",
+        [runId]
+      );
+      expect(calls.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  it("refuses depth-3 M=2 review coverage before persisting any model call", async () => {
+    const primary = await startProviderDouble([]);
+    const secondary = await startProviderDouble([]);
+    try {
+      const runId = await createRun("xrev-01-depth-3-envelope-refusal", 114, 2, 3);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:xrev-01-depth-3-envelope-refusal"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint,
+        model: "test-layer/primary-model",
+        maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
+        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+      });
+      expect(primary.calls()).toBe(0);
+      expect(secondary.calls()).toBe(0);
+      const calls = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'",
+        [runId]
+      );
+      expect(calls.rows[0]?.count).toBe("0");
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  it("calls the depth guard for a mono-maker run before persisting any model call", async () => {
+    const provider = await startProviderDouble([]);
+    try {
+      const runId = await createRun("xrev-01-depth-5-mono-envelope-refusal", 402, 1, 5);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:xrev-01-depth-5-mono-envelope-refusal"
+      });
+
+      await expect(runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId)).rejects.toMatchObject({
+        code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+      });
+      expect(provider.calls()).toBe(0);
+      const calls = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'",
+        [runId]
+      );
+      expect(calls.rows[0]?.count).toBe("0");
+    } finally {
+      await provider.stop();
+    }
+  });
+
+  it("runs a depth-2 two-maker tree and preserves the single-root disclosure at envelope terminal", async () => {
+    const primary = await startProviderDouble(
+      [
+        ...Array.from({ length: 8 }, (_, index) => judgementDouble(`Primary maker position ${index + 1}`)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`))
+      ]
+    );
+    const secondary = await startProviderDouble(
+      [
+        ...Array.from({ length: 8 }, (_, index) => judgementDouble(`Secondary maker position ${index + 1}`)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("dispute", `Secondary review ${index + 1}`))
+      ]
+    );
+    try {
+      // Sixteen authored calls plus one cross-maker review per authored node
+      // exactly fill this test-layer envelope.
+      // The serve gate therefore takes its real envelope-terminal path with
+      // zero composer/conformance calls and zero external model calls.
+      const runId = await createRun("hyg-01-depth-2-two-maker", 32, 2, 2);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:hyg-01-depth-2-two-maker"
+      });
+      const primaryGateway = createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint,
+        model: "test-layer/primary-model",
+        maker: "Primary test maker"
+      });
+      const secondaryGateway = createPostgresProviderGateway(database.pool, {
+        endpoint: secondary.endpoint,
+        model: "test-layer/secondary-model",
+        maker: "Secondary test maker"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, primaryGateway, {
+        ...runnerSettings(),
+        critique: {
+          provider: secondaryGateway,
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator: {
+          deploymentRowValue: "accumulate",
+          registerRef: "test-layer:DR-144"
+        }
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      expect(primary.calls()).toBe(16);
+      expect(secondary.calls()).toBe(16);
+
+      const nodes = await database.pool.query<{ node_id: string }>(
+        "SELECT node_id FROM core.node WHERE run_id=$1 ORDER BY created_at_seq",
+        [runId]
+      );
+      // Kills both `if (leg.round > 1) break` and hard-coded depth 1: each
+      // mutation leaves only eight nodes and removes every r2 call site.
+      expect(nodes.rows).toHaveLength(16);
+      const expansionCalls = await database.pool.query<{ call_site_key: string }>(
+        `SELECT call_site_key FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE 'JUDGE:%:root%:r%'
+         ORDER BY call_site_key`,
+        [runId]
+      );
+      expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r1:"))).toHaveLength(4);
+      expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r2:"))).toHaveLength(8);
+
+      const reviews = await database.pool.query<{
+        node_id: string;
+        author_maker: string;
+        reviewer_maker: string;
+        outcome: string;
+      }>(
+        `SELECT review.node_id, author.maker AS author_maker,
+                reviewer.maker AS reviewer_maker, review.outcome
+         FROM ledger.node_review AS review
+         JOIN ledger.raw_artifact AS author ON author.raw_artifact_id=review.author_raw_artifact_ref
+         JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id=review.review_raw_artifact_ref
+         WHERE review.run_id=$1 ORDER BY review.at_seq`,
+        [runId]
+      );
+      // Kills removal of the review loop, hard-coded partial coverage, or a
+      // selector mutation from `!==` to `===`.
+      expect(reviews.rows).toHaveLength(16);
+      expect(reviews.rows.every((row) => row.author_maker !== row.reviewer_maker)).toBe(true);
+      expect(new Set(reviews.rows.map((row) => row.outcome))).toEqual(new Set(["agree", "dispute"]));
+
+      const firstNode = await database.pool.query<{ node_id: string; provenance_ref: string }>(
+        `SELECT node_id, provenance_ref::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq LIMIT 1`,
+        [runId]
+      );
+      await expect(new JudgementRepository(database.pool).recordNodeReview({
+        runId,
+        nodeId: firstNode.rows[0]!.node_id,
+        authorRawArtifactRef: firstNode.rows[0]!.provenance_ref,
+        reviewRawArtifactRef: firstNode.rows[0]!.provenance_ref,
+        outcome: "agree",
+        reasons: ["mutation probe"]
+      })).rejects.toThrow(/PRODUCER_GRADING_FORBIDDEN/);
+
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:hyg-01-depth-2-two-maker");
+      // Kills the PANEL-01 call-site regression that replaces rather than
+      // appends envelope-terminal records.
+      expect(projection?.condition_marks).toEqual(expect.arrayContaining([
+        "UNSERVED-MAKER-POSITION",
+        "ENVELOPE_EXHAUSTED"
+      ]));
+      const unservedRecord = projection?.condition_mark_records.find(
+        (record) => record.mark === "UNSERVED-MAKER-POSITION"
+      );
+      expect(unservedRecord).toMatchObject({
+        served_root_rule: "first-configured-provider"
+      });
+      expect(unservedRecord?.reason).toContain("test-layer");
+      expect(unservedRecord?.reason).toContain("Secondary test maker");
+      expect(projection?.nodes).toHaveLength(16);
+      expect(projection?.nodes.every((node) => node.review !== null)).toBe(true);
+      // If the shipped served-node set is widened to both roots, the same
+      // fixture fails typed-loud at FIXED_SINGLE_ROOT_SERVE_VIOLATED.
+      expect(projection?.number_slots.filter((slot) => slot.status === "PRESENT")).toHaveLength(0);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  it("leaves a failed review honestly absent and makes the authored opinions unservable", async () => {
+    const primary = await startProviderDouble([
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary depth-1 position ${index + 1}`)),
+      ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`))
+    ]);
+    const secondary = await startProviderDouble([
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary depth-1 position ${index + 1}`)),
+      JSON.stringify({ outcome: "fabricated-pass", reasons: ["outside the closed vocabulary"] }),
+      ...Array.from({ length: 3 }, (_, index) => reviewDouble("cannot-assess", `Secondary review ${index + 2}`))
+    ]);
+    try {
+      const runId = await createRun("xrev-01-failed-review-absence", 16, 2, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:xrev-01-failed-review-absence"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint,
+        model: "test-layer/primary-model",
+        maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
+        code: "NODE_REVIEW_UNAVAILABLE"
+      });
+      const reviews = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM ledger.node_review WHERE run_id=$1",
+        [runId]
+      );
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1",
+        [runId]
+      );
+      // Kills fabricating cannot-assess in the catch path and kills continuing
+      // into a served answer with incomplete coverage.
+      expect(reviews.rows[0]?.count).toBe("0");
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  it("preserves the database producer-grading refusal instead of laundering it", async () => {
+    const primary = await startProviderDouble(
+      Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary shared-maker position ${index + 1}`))
+    );
+    const secondary = await startProviderDouble([
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary shared-maker position ${index + 1}`)),
+      reviewDouble("agree", "The recorded maker is intentionally shared for this integrity probe.")
+    ]);
+    try {
+      const runId = await createRun("xrev-01-producer-grading-preserved", 42, 2, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: "runner-test:xrev-01-producer-grading-preserved"
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint,
+        model: "test-layer/primary-model",
+        maker: "Recorded shared maker"
+      }), {
+        ...runnerSettings(),
+        maker: "Declared primary maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Recorded shared maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Declared secondary maker"
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).rejects.toMatchObject({
+        code: "PRODUCER_GRADING_FORBIDDEN"
+      });
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1",
+        [runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
   it("finding 14 — refuses unresolved judgement policy before claiming the work item", async () => {
     const provider = await startProviderDouble([]);
     try {
@@ -821,14 +1358,33 @@ describe("apps/runner — legal command lifecycle", () => {
         verdict_state: "SUPPORTED",
         verdict_unavailable: null,
         confidence_band: "TEST_TOP_BAND",
-        band_ceiling: { label: "TEST_DEFAULT_CEILING" }
+        band_ceiling: { label: "TEST_DEFAULT_CEILING" },
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
       });
+      expect(projection?.condition_mark_records).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          mark: "SINGLE-LINEAGE",
+          reason: "MONO_MAKER_RUN",
+          lift_path: "RUN_DIFFERENT_MAKER_CRITIQUE"
+        }),
+        expect.objectContaining({
+          mark: "CRITIQUE-UNAVAILABLE",
+          reason: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
+          lift_path: "RUN_DIFFERENT_MAKER_CRITIQUE"
+        })
+      ]));
       expect(projection?.nodes[0]?.base_score).toMatchObject({
         kind: "base-probability", producer: "judgement:test-layer"
       });
       expect(projection?.nodes[0]?.base_score.replay_handle).toMatch(/^judgement:/);
       expect(projection?.nodes[0]?.final_strength).toMatchObject({
         kind: "propagated-probability", producer: "propagation:test-layer"
+      });
+      expect(projection?.nodes[0]?.maker_lineage).toEqual({
+        maker: "test-layer",
+        model_id: "test-layer/model",
+        transport: "openai-compatible-http",
+        provider_ref: "provider:test-layer"
       });
 
       const nodeId = projection?.nodes[0]?.node_id;
@@ -1014,7 +1570,7 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection).toMatchObject({
         terminal: "COMPONENTS_ONLY",
         serve_state: "COMPONENTS_ONLY",
-        condition_marks: ["DEFECT"],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
         verdict_state: null,
         verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
         confidence_band: null,
@@ -1050,7 +1606,12 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection).toMatchObject({
         terminal: "COMPONENTS_ONLY",
         serve_state: "COMPONENTS_ONLY",
-        condition_marks: ["SKIPPED-BY-BUDGET", "ENVELOPE_EXHAUSTED"],
+        condition_marks: [
+          "SINGLE-LINEAGE",
+          "CRITIQUE-UNAVAILABLE",
+          "SKIPPED-BY-BUDGET",
+          "ENVELOPE_EXHAUSTED"
+        ],
         verdict_state: null,
         verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" },
         risk_tier: "casual",
@@ -1070,6 +1631,8 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection?.condition_marks).not.toContain("DEFECT");
       expect(projection?.nodes).toHaveLength(1);
       expect(projection?.nodes[0]?.condition_marks).toEqual([
+        "SINGLE-LINEAGE",
+        "CRITIQUE-UNAVAILABLE",
         "SKIPPED-BY-BUDGET",
         "ENVELOPE_EXHAUSTED"
       ]);
@@ -1137,7 +1700,8 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       expect(row.rows[0]).toMatchObject({
         state: "DONE", terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY",
-        composed_text_id: null, conformance_record_id: null, condition_marks: ["DEFECT"],
+        composed_text_id: null, conformance_record_id: null,
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
         fact_bundle_id: expect.any(String)
       });
       expect(row.rows[0]?.settled_artifact_ref).toBe(result.kind === "COMPLETED" ? result.answerId : null);
@@ -1150,7 +1714,9 @@ describe("apps/runner — legal command lifecycle", () => {
         verdict_state: null,
         verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
         confidence_band: null, band_ceiling: null,
-        composed_text: [], condition_marks: ["DEFECT"], conformance_outcome: "NOT_RUN"
+        composed_text: [],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
+        conformance_outcome: "NOT_RUN"
       });
       const terminal = await database.pool.query(
         "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]
@@ -1333,9 +1899,11 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
   async function startContractAwareProviderDouble(): Promise<{
     readonly endpoint: string;
     composerSystemPrompt(): string;
+    composerCalls(): number;
     stop(): Promise<void>;
   }> {
     let composerSystemPrompt = "";
+    let composerCalls = 0;
     const server: Server = createServer((request, response) => {
       const chunks: Buffer[] = [];
       request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -1359,7 +1927,10 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         } else if (system.startsWith("Return only JSON with a segments array")) {
           composerSystemPrompt = system;
           const contractDeclared = reasoningContractFragments.every((fragment) => system.includes(fragment));
-          content = contractDeclared
+          composerCalls += 1;
+          content = composerCalls === 1
+            ? JSON.stringify({ segments: "test-layer schema rejection" })
+            : contractDeclared
             ? JSON.stringify({ segments: [
                 { segment_id: "segment:hypothesis", text: "Hypothesis: the reasoning answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
                 { segment_id: "segment:research-plan", text: "Research plan: gather independent evidence that could lift or defeat the hypothesis.", node_refs: [], served_number_refs: [] }
@@ -1386,6 +1957,7 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     return {
       endpoint: `http://127.0.0.1:${address.port}`,
       composerSystemPrompt: () => composerSystemPrompt,
+      composerCalls: () => composerCalls,
       async stop() {
         server.close();
         await once(server, "close");
@@ -1397,8 +1969,13 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     const provider = await startContractAwareProviderDouble();
     try {
       const work = await createRunnerWork("term01-composer-reasoning-contract");
-      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
+      const settings = runnerSettings();
+      const result = await runnerWithEndpoint(provider.endpoint, {
+        ...settings,
+        composerBound: { ...settings.composerBound, maxAttempts: 2 }
+      }).executeWorkItem(work.workItemId);
       expect(result.kind).toBe("COMPLETED");
+      expect(provider.composerCalls()).toBe(2);
       expect(reasoningContractFragments.every((fragment) => provider.composerSystemPrompt().includes(fragment)))
         .toBe(true);
       const answer = await database.pool.query<{ terminal: string; answer_form: { kind: string; hypothesis: string; researchPlan: string } }>(
@@ -1414,6 +1991,18 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         hypothesis: "Hypothesis: the reasoning answer holds provisionally.",
         researchPlan: "Research plan: gather independent evidence that could lift or defeat the hypothesis."
       });
+      const composerAttempts = await database.pool.query<{ outcome: string; parse_status: string }>(
+        `SELECT entry.outcome, artifact.parse_status
+         FROM ledger.ledger_entry AS entry
+         JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref
+         WHERE entry.run_id = $1 AND entry.call_site_key LIKE 'COMPOSER:%'
+         ORDER BY entry.sequence`,
+        [work.runId]
+      );
+      expect(composerAttempts.rows).toEqual([
+        { outcome: "FAILED", parse_status: "SCHEMA_FAILED" },
+        { outcome: "OK", parse_status: "PARSED" }
+      ]);
     } finally { await provider.stop(); }
   });
 });

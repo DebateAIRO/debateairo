@@ -1,52 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { rmSync } from "node:fs";
-import { join } from "node:path";
-import test, { after } from "node:test";
-import { pathToFileURL } from "node:url";
+import test from "node:test";
 
-const outDir = join(process.cwd(), ".tmp-scoring-response-test");
-
-function compileHelper() {
-  rmSync(outDir, { recursive: true, force: true });
-  const tscCommand = process.platform === "win32"
-    ? join(process.cwd(), "node_modules", ".bin", "tsc.cmd")
-    : join(process.cwd(), "node_modules", ".bin", "tsc");
-  const tscArgs = [
-    "lib/scoringResponse.ts",
-    "--target",
-    "ES2022",
-    "--module",
-    "NodeNext",
-    "--moduleResolution",
-    "NodeNext",
-    "--rootDir",
-    ".",
-    "--outDir",
-    outDir,
-    "--skipLibCheck",
-    "--strict",
-  ];
-
-  if (process.platform === "win32") {
-    execFileSync("cmd.exe", ["/d", "/s", "/c", tscCommand, ...tscArgs], {
-      cwd: process.cwd(),
-      stdio: "pipe",
-    });
-    return;
-  }
-
-  execFileSync(tscCommand, tscArgs, { cwd: process.cwd(), stdio: "pipe" });
-}
-
-after(() => {
-  rmSync(outDir, { recursive: true, force: true });
-});
+const helperUrl = new URL("./scoringResponse.ts", import.meta.url).href;
 
 async function loadHelper() {
-  compileHelper();
-  const moduleUrl = pathToFileURL(join(outDir, "lib", "scoringResponse.js")).href;
-  return import(`${moduleUrl}?cacheBust=${Date.now()}`);
+  return import(`${helperUrl}?cacheBust=${Date.now()}`);
 }
 
 test("indexScoringResponse keeps partial node errors separate from successful scores", async () => {

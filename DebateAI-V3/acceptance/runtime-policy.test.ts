@@ -4,6 +4,28 @@ import { buildAcceptanceRegisterRows } from "./seed-register.js";
 import { parseAcceptanceRuntimeRows } from "./runtime-policy.js";
 
 describe("ACC-01 acceptance runtime policy", () => {
+  it("accepts the complete DR-159 depth-by-reachable-tier envelope", async () => {
+    const rows = Object.fromEntries((await buildAcceptanceRegisterRows()).map((row) => [row.rowKey, row.value]));
+    const members = [1, 2, 3, 4, 5].flatMap((depth) => [
+      { depth_params: { depth }, risk_tier: "standard", max_model_attempts: 42 },
+      { depth_params: { depth }, risk_tier: "high-stakes", max_model_attempts: 42 }
+    ]);
+
+    expect(() => parseAcceptanceRuntimeRows({
+      riskTier: rows.riskTier,
+      acceptanceOrganCostBounds: rows.acceptanceOrganCostBounds,
+      runCostEnvelope: { kind: "RUN_COST_ENVELOPE_POLICY", members },
+      compositionBundleBudget: rows.compositionBundleBudget,
+      wayOfKnowingCeiling: rows.wayOfKnowingCeiling,
+      configuredProviderSet: rows.configuredProviderSet,
+      judgeContractHash: rows.judgeContractHash,
+      composerContractHash: rows.composerContractHash,
+      conformanceContractHash: rows.conformanceContractHash,
+      propagationContractHash: rows.propagationContractHash,
+      serveContractHash: rows.serveContractHash
+    })).not.toThrow();
+  });
+
   it("accepts the ruled partial way-of-knowing share map without inventing absent shares", async () => {
     const rows = Object.fromEntries((await buildAcceptanceRegisterRows()).map((row) => [row.rowKey, row.value]));
     const parsed = parseAcceptanceRuntimeRows({

@@ -104,6 +104,27 @@ export function projectConditionMarksByNode(
   return projected;
 }
 
+export function projectNodeMakerLineage(recorded: {
+  readonly maker: string | null;
+  readonly model_id: string | null;
+  readonly model_version: string | null;
+  readonly provider: string | null;
+  readonly provider_ref: string | null;
+}): Node["maker_lineage"] {
+  if (
+    recorded.maker === null ||
+    recorded.model_id === null ||
+    recorded.provider === null ||
+    recorded.provider_ref === null
+  ) return null;
+  return {
+    maker: recorded.maker,
+    model_id: recorded.model_id,
+    transport: recorded.provider,
+    provider_ref: recorded.provider_ref
+  };
+}
+
 export function projectServeEdge(row: {
   readonly edgeId: string;
   readonly sourceNodeId: string;
@@ -748,12 +769,42 @@ export interface MemoryQuestionRegistration {
 }
 
 export interface ConditionMarkRecord {
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
+  readonly servedRootRule: "first-configured-provider" | null;
   readonly affectedNodeIds: readonly string[];
+}
+
+const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
+  "SKIPPED-BY-BUDGET",
+  "ENVELOPE_EXHAUSTED",
+  "OWED-CHECK-UNEXECUTED",
+  "UNRESOLVED-TYPE-FALLBACK",
+  "UNSERVED-MAKER-POSITION",
+  "SINGLE-LINEAGE",
+  "CRITIQUE-UNAVAILABLE"
+] as const);
+
+/** DR-161: required typed records and answer marks are a two-way contract. */
+export function assertRequiredConditionMarkRecords(
+  conditionMarks: readonly string[],
+  records: readonly ConditionMarkRecord[]
+): void {
+  for (const mark of REQUIRED_CONDITION_MARK_RECORDS) {
+    if (conditionMarks.includes(mark) && !records.some((record) => record.mark === mark)) {
+      throw new TypedDomainError("CONDITION_MARK_RECORD_REQUIRED", `${mark} has no typed persistence record`);
+    }
+  }
+  const orphan = records.find((record) => !conditionMarks.includes(record.mark));
+  if (orphan !== undefined) {
+    throw new TypedDomainError(
+      "CONDITION_MARK_RECORD_WITHOUT_MARK",
+      `${orphan.mark} has a typed persistence record but is absent from the served answer marks`
+    );
+  }
 }
 
 export class ServeRepository {
@@ -857,11 +908,7 @@ export class ServeRepository {
       throw new TypedDomainError("INVALID_COMPOSITION_ATTEMPT", "A composition artifact requires a positive attempt number");
     }
     const conditionMarkRecords = input.conditionMarkRecords ?? [];
-    for (const mark of ["SKIPPED-BY-BUDGET", "ENVELOPE_EXHAUSTED", "OWED-CHECK-UNEXECUTED", "UNRESOLVED-TYPE-FALLBACK"] as const) {
-      if (input.result.conditionMarks.includes(mark) && !conditionMarkRecords.some((record) => record.mark === mark)) {
-        throw new TypedDomainError("CONDITION_MARK_RECORD_REQUIRED", `${mark} has no typed persistence record`);
-      }
-    }
+    assertRequiredConditionMarkRecords(input.result.conditionMarks, conditionMarkRecords);
     if (conditionMarkRecords.some((record) =>
       record.subjectRef.trim() === "" || record.reason.trim() === "" || record.affectedNodeIds.length === 0
     )) {
@@ -964,8 +1011,8 @@ export class ServeRepository {
       for (const record of conditionMarkRecords) {
         const mark = await client.query<{ condition_mark_id: string }>(
           `INSERT INTO serve.condition_mark (
-             answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule, at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
@@ -975,6 +1022,7 @@ export class ServeRepository {
             record.subjectRef,
             record.reason,
             record.liftPath,
+            record.servedRootRule,
             await allocateSequence(client)
           ]
         );
@@ -1175,8 +1223,9 @@ export class ServeRepository {
       subject_ref: string;
       reason: string;
       lift_path: string | null;
+      served_root_rule: "first-configured-provider" | null;
     }>(
-      `SELECT mark, scope, subject_ref, reason, lift_path
+      `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule
        FROM serve.condition_mark
        WHERE answer_id = $1 AND answer_version = $2
        ORDER BY at_seq`,
@@ -1234,7 +1283,8 @@ export class ServeRepository {
         scope: record.scope,
         subject_ref: record.subject_ref,
         reason: record.reason,
-        lift_path: record.lift_path
+        lift_path: record.lift_path,
+        served_root_rule: record.served_root_rule
       })),
       reversal_point: row.reversal_point,
       builds_on_previous: {
@@ -1533,6 +1583,19 @@ export class ServeRepository {
       claim_text: string;
       way_of_knowing: Node["way_of_knowing"];
       provenance_ref: string;
+      maker: string | null;
+      model_id: string | null;
+      model_version: string | null;
+      provider: string | null;
+      provider_ref: string | null;
+      review_outcome: "agree" | "dispute" | "cannot-assess" | null;
+      review_reasons: string[] | null;
+      review_provenance_ref: string | null;
+      reviewer_maker: string | null;
+      reviewer_model_id: string | null;
+      reviewer_model_version: string | null;
+      reviewer_provider: string | null;
+      reviewer_provider_ref: string | null;
       locator: string | null;
       tau: number;
       strength: number;
@@ -1552,7 +1615,16 @@ export class ServeRepository {
       relevant_as_of: Date;
     }>(
       `SELECT node.node_id, node.claim_text, node.way_of_knowing,
-              node.provenance_ref::text, node.locator, judgement.tau,
+              node.provenance_ref::text, artifact.maker, artifact.model_id,
+              artifact.model_version, artifact.provider, artifact.provider_ref,
+              review.outcome AS review_outcome, review.reasons AS review_reasons,
+              review.review_raw_artifact_ref::text AS review_provenance_ref,
+              review_artifact.maker AS reviewer_maker,
+              review_artifact.model_id AS reviewer_model_id,
+              review_artifact.model_version AS reviewer_model_version,
+              review_artifact.provider AS reviewer_provider,
+              review_artifact.provider_ref AS reviewer_provider_ref,
+              node.locator, judgement.tau,
               judgement.number_kind AS base_number_kind, judgement.source_ref AS base_source_ref,
               judgement.producer AS base_producer, judgement.replay_handle AS base_replay_handle,
               judgement.reduced_judgement_id::text AS base_provenance_ref,
@@ -1570,6 +1642,14 @@ export class ServeRepository {
                 ORDER BY incoming.created_at_seq
               ) AS defeater_refs
        FROM core.node AS node
+       LEFT JOIN ledger.raw_artifact AS artifact
+         ON artifact.raw_artifact_id = node.provenance_ref
+       LEFT JOIN LATERAL (
+         SELECT outcome, reasons, review_raw_artifact_ref FROM ledger.node_review
+         WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1
+       ) AS review ON true
+       LEFT JOIN ledger.raw_artifact AS review_artifact
+         ON review_artifact.raw_artifact_id = review.review_raw_artifact_ref
        JOIN LATERAL (
          SELECT reduced_judgement_id, tau, number_kind, source_ref, producer, replay_handle, disagreement FROM ledger.reduced_judgement
          WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1
@@ -1630,6 +1710,21 @@ export class ServeRepository {
         replay_handle: row.final_replay_handle
       },
       provenance_ref: row.provenance_ref,
+      maker_lineage: projectNodeMakerLineage(row),
+      review: row.review_outcome === null || row.review_reasons === null || row.review_provenance_ref === null
+        ? null
+        : {
+            outcome: row.review_outcome,
+            reasons: row.review_reasons,
+            provenance_ref: row.review_provenance_ref,
+            reviewer_lineage: projectNodeMakerLineage({
+              maker: row.reviewer_maker,
+              model_id: row.reviewer_model_id,
+              model_version: row.reviewer_model_version,
+              provider: row.reviewer_provider,
+              provider_ref: row.reviewer_provider_ref
+            })!
+          },
       locator: row.locator,
       stranger_restatement: { check_status: row.check_status },
       defeater_refs: row.defeater_refs,

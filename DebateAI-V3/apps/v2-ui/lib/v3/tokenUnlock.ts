@@ -33,6 +33,12 @@ export function classifyTokenUnlockFailure(error: unknown): TokenUnlockFailure {
       message: `Token check failed before any verdict arrived (${detail}). The token was not rejected.`
     };
   }
+  if (error.serverCode === "API_UPSTREAM_UNREACHABLE" || [502, 503, 504].includes(error.status)) {
+    return {
+      kind: "UNREACHABLE",
+      message: "Could not reach the coordinator, so the token was never checked. Is the API running?"
+    };
+  }
   switch (error.code) {
     case "SESSION_REQUIRED":
     case "FORBIDDEN":
@@ -58,6 +64,7 @@ export function classifyTokenUnlockFailure(error: unknown): TokenUnlockFailure {
         message: `The coordinator has no session endpoint at this address (HTTP ${error.status}). The token was not checked.`
       };
     case "MALFORMED_REQUEST":
+    case "UNPROCESSABLE":
     case "INVALID_RESPONSE":
       return {
         kind: "COORDINATOR_FAILED",
@@ -69,4 +76,9 @@ export function classifyTokenUnlockFailure(error: unknown): TokenUnlockFailure {
 /** The user-facing line. Never claims a rejection the coordinator did not make. */
 export function tokenUnlockFailureMessage(error: unknown): string {
   return classifyTokenUnlockFailure(error).message;
+}
+
+/** Forget a stored token only when the coordinator actually declined it. */
+export function shouldClearStoredTokenAfterUnlockFailure(error: unknown): boolean {
+  return classifyTokenUnlockFailure(error).kind === "REJECTED";
 }

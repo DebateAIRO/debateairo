@@ -101,6 +101,7 @@ export async function readClaimTypeCompositionMap(
 }
 
 export const RUN_COST_ENVELOPE_ROW_KEY = "runCostEnvelope" as const;
+export const DEPLOYMENT_RISK_TIER_ROW_KEY = "riskTier" as const;
 export const CONVERGENCE_EPSILON_ROW_KEY = "convergenceEpsilon" as const;
 export const CONVERGENCE_STOP_DEFAULTS_ROW_KEY = "convergenceStopDefaults" as const;
 export const LIVENESS_POLICY_ROW_KEY = "livenessPolicy" as const;
@@ -154,6 +155,49 @@ const runCostEnvelopePolicySchema = z.object({
     max_model_attempts: z.number().int().positive()
   }).strict()).min(1)
 }).strict();
+
+export interface DeploymentRiskTierRow {
+  readonly rowKey: typeof DEPLOYMENT_RISK_TIER_ROW_KEY;
+  readonly registerVersion: number;
+  readonly sourceRef: string;
+  readonly value: RiskTier;
+}
+
+/** One deployment-floor source for every composition root and UI projection. */
+export async function readDeploymentRiskTier(
+  pool: Pool,
+  registerVersion: number
+): Promise<DeploymentRiskTierRow> {
+  if (!Number.isInteger(registerVersion) || registerVersion < 1) {
+    throw new TypeError("A positive register version is required for the deployment risk tier");
+  }
+  const result = await pool.query<{ row_key: string; value_json: unknown; source_ref: string }>(
+    `SELECT row_key, value_json, source_ref
+     FROM register.register_row
+     WHERE register_version = $1 AND row_key = $2`,
+    [registerVersion, DEPLOYMENT_RISK_TIER_ROW_KEY]
+  );
+  const row = result.rows[0];
+  if (row === undefined) {
+    throw new TypedDomainError(
+      "RISK_TIER_POLICY_UNRESOLVED",
+      `No V-ratified ${DEPLOYMENT_RISK_TIER_ROW_KEY} exists in register version ${registerVersion}`
+    );
+  }
+  const parsed = z.enum(RISK_TIERS).safeParse(row.value_json);
+  if (!parsed.success) {
+    throw new TypedDomainError("RISK_TIER_POLICY_INVALID", `${DEPLOYMENT_RISK_TIER_ROW_KEY} is not a ruled risk tier`);
+  }
+  if (row.source_ref.trim() === "") {
+    throw new TypedDomainError("RISK_TIER_POLICY_PROVENANCE_MISSING", `${DEPLOYMENT_RISK_TIER_ROW_KEY} has no source_ref`);
+  }
+  return Object.freeze({
+    rowKey: DEPLOYMENT_RISK_TIER_ROW_KEY,
+    registerVersion,
+    sourceRef: row.source_ref,
+    value: parsed.data
+  });
+}
 
 export interface RunCostEnvelopePolicyRow {
   readonly rowKey: typeof RUN_COST_ENVELOPE_ROW_KEY;

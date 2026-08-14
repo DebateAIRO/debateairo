@@ -13,7 +13,7 @@ import {
   roleOf,
   type PlacedClaim
 } from "@/lib/debatePresentation";
-import { modelMeta } from "@/lib/models";
+import { ModelBadge, ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import {
   formatIndependencePill,
@@ -23,9 +23,11 @@ import {
   formatUncertaintyPill
 } from "@/lib/scoringFormat";
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
+import { CanvasViewport } from "@/components/CanvasViewport";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Node as ContractNode } from "@debateai/contract";
 import { v3NodeScoreState, v3ScorePresentation, type V3ScorePresentation } from "@/lib/v3/adapter";
+import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
 // gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
@@ -53,7 +55,6 @@ function withoutSetAsidePaths(node: DebateNode): DebateNode {
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
   onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
-  onRegenNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (nodeId: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
 };
@@ -90,7 +91,6 @@ export function DebateCanvas({
   meta,
   onOpenNode,
   onChallengeNode,
-  onRegenNode,
   onToggleExpand,
   onProseSelect,
   canvasRef
@@ -136,70 +136,56 @@ export function DebateCanvas({
   }, [root, showSetAsidePaths]);
 
   return (
-    <div className="canvas scroll" ref={canvasRef}>
-      <label
-        style={{
-          position: "sticky",
-          top: 12,
-          left: 12,
-          zIndex: 4,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          margin: 12,
-          padding: "7px 10px",
-          border: "1px solid var(--line-2)",
-          borderRadius: 8,
-          background: "var(--surface)",
-          color: "var(--text-2)",
-          boxShadow: "var(--shadow-card)"
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={showSetAsidePaths}
-          onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
-        />
-        Show set-aside paths
-      </label>
-      <div className="canvasInner" style={{ width: layout.width, height: layout.height }}>
-        <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
-          {layout.connectors.map((c) => (
-            <path
-              key={c.id}
-              d={c.d}
-              fill="none"
-              stroke={c.color}
-              strokeWidth={c.width}
-              strokeDasharray={c.dash}
-              opacity={c.opacity}
-            />
-          ))}
-        </svg>
-        {layout.placed.map((placed) => (
-          <CanvasCard
-            key={placed.id}
-            placed={placed}
-            expanded={expanded.has(placed.id)}
-            selected={selectedNodeId === placed.id}
-            scrutinyStatus={scrutiny[placed.id]}
-            scoring={scoringByNodeId?.get(placed.id)}
-            scoringError={scoringErrorsByNodeId?.get(placed.id)}
-            scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
-            v3NodesById={v3NodesById}
-            meta={meta}
-            registerRef={(el) => {
-              cardRefs.current[placed.id] = el;
-            }}
-            onOpenNode={onOpenNode}
-            onChallengeNode={onChallengeNode}
-            onRegenNode={onRegenNode}
-            onToggleExpand={onToggleExpand}
-            onProseSelect={onProseSelect}
+    <CanvasViewport
+      layoutWidth={layout.width}
+      layoutHeight={layout.height}
+      canvasRef={canvasRef}
+      stickyControl={
+        <label className="canvasStickyToggle">
+          <input
+            type="checkbox"
+            checked={showSetAsidePaths}
+            onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
+          />
+          Show set-aside paths
+        </label>
+      }
+    >
+      <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
+        {layout.connectors.map((c) => (
+          <path
+            key={c.id}
+            d={c.d}
+            fill="none"
+            stroke={c.color}
+            strokeWidth={c.width}
+            strokeDasharray={c.dash}
+            opacity={c.opacity}
           />
         ))}
-      </div>
-    </div>
+      </svg>
+      {layout.placed.map((placed) => (
+        <CanvasCard
+          key={placed.id}
+          placed={placed}
+          expanded={expanded.has(placed.id)}
+          selected={selectedNodeId === placed.id}
+          scrutinyStatus={scrutiny[placed.id]}
+          scoring={scoringByNodeId?.get(placed.id)}
+          scoringError={scoringErrorsByNodeId?.get(placed.id)}
+          scoreFilterMatch={!scoreFilterNodeIds || scoreFilterNodeIds.has(placed.id)}
+          v3NodesById={v3NodesById}
+          meta={meta}
+          registerRef={(el) => {
+            cardRefs.current[placed.id] = el;
+          }}
+          onOpenNode={onOpenNode}
+          onChallengeNode={onChallengeNode}
+          onToggleExpand={onToggleExpand}
+          onProseSelect={onProseSelect}
+        />
+      ))}
+    </CanvasViewport>
   );
 }
 
@@ -229,14 +215,12 @@ function CanvasCard({
   registerRef,
   onOpenNode,
   onChallengeNode,
-  onRegenNode,
   onToggleExpand,
   onProseSelect
 }: CanvasCardProps) {
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
   const generation = node.active_generation;
-  const model = generation ? modelMeta(generation.model_id) : null;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const setAside = isSetAsidePath(node);
   // Task 13 (P1.5): sourcing-breadth chip, derived straight from the node's
@@ -248,6 +232,7 @@ function CanvasCard({
   // typed reason there are none (never 0, never a dash — DR-115).
   const v3Scores =
     v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
+  const v3Review = v3NodesById?.get(node.id)?.review ?? null;
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -298,6 +283,7 @@ function CanvasCard({
     <div
       className="nodeWrap"
       style={cardStyle}
+      data-node-id={node.id}
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
       data-set-aside={setAside ? "true" : undefined}
     >
@@ -353,10 +339,10 @@ function CanvasCard({
             </span>
             <div>
               <div className="nodeEmptyText">No strong argument found.</div>
-              {model ? (
+              {generation || node.maker !== undefined ? (
                 <div className="metaLine" style={{ marginTop: 5 }}>
-                  <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                  {model.name} conceded
+                  <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+                  {generation ? " conceded" : null}
                 </div>
               ) : null}
             </div>
@@ -386,11 +372,8 @@ function CanvasCard({
               <span className="roleBadge" style={{ color: pal?.text, background: pal?.bg, borderColor: pal?.border }}>
                 {pal?.arrow} {roleLabel(node)}
               </span>
-              {model ? (
-                <span className="metaLine">
-                  <span className="modelDot" style={{ ["--dot" as string]: model.dot }} />
-                  {model.name}
-                </span>
+              {generation || node.maker !== undefined ? (
+                <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
               ) : null}
               <ScoringErrorBoundary>
                 {scoring ? (
@@ -402,6 +385,22 @@ function CanvasCard({
                 ) : null}
                 {v3Scores ? (
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
+                ) : null}
+                {v3NodesById !== undefined ? (
+                  <span className="nodeReviewBadges" data-node-review={v3Review?.outcome ?? "absent"}>
+                    <ModelBadge
+                      modelId={v3Review?.reviewer_lineage.model_id ?? null}
+                      maker={v3Review?.reviewer_lineage.maker ?? null}
+                    />
+                    <span
+                      className={`scoreBadge ${v3Review === null ? "unavailable" : "v3"}`}
+                      title={v3Review === null
+                        ? "No completed second-maker review is recorded for this node."
+                        : v3Review.reasons.join(" ")}
+                    >
+                      {v3Review === null ? "REVIEW N/A" : `REVIEW ${v3Review.outcome.toUpperCase()}`}
+                    </span>
+                  </span>
                 ) : null}
               </ScoringErrorBoundary>
               {independencePill ? (
@@ -447,18 +446,15 @@ function CanvasCard({
                   >
                     ⚐ Challenge
                   </button>
-                  {onRegenNode ? (
-                    <button
-                      type="button"
-                      className="nodeCtrl"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onRegenNode(node, event.currentTarget);
-                      }}
-                    >
-                      ↻ Regenerate
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="nodeCtrl"
+                    disabled
+                    aria-disabled="true"
+                    title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                  >
+                    ↻ Regenerate
+                  </button>
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
@@ -536,8 +532,9 @@ function ScoreBadges({
  * UI-02a: V3's per-node numbers in V2's own badge vocabulary — the same
  * `scoreBadgeButton` / `scoreBadge` pills the V2 scoring path uses, opening the
  * same node drawer where the fuller detail lives. No new widget, no redesign
- * (DR-145). Values are printed exactly as the contract recorded them; a card
- * with no recorded number shows the typed reason, never a placeholder digit.
+ * (DR-145). DR-154's percentage and precision rule is applied once in the
+ * adapter; a card with no recorded number shows the typed reason, never a
+ * placeholder digit.
  */
 function V3ScoreBadges({
   node,
