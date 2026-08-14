@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
-import { ACCEPTANCE_MODEL, startModelShim, type ModelShimHandle } from "./model-shim.js";
+import { startModelShim, type ModelShimHandle } from "./model-shim.js";
 import type { CommandSpec } from "./relay-core.js";
 import { readAcceptanceRuntimePolicy, type AcceptanceRuntimePolicy } from "./runtime-policy.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
@@ -124,7 +124,8 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
       await callThroughMaker({
         pool,
         endpoint: `${shim.baseUrl}/v1`,
-        model: ACCEPTANCE_MODEL,
+        // DR-181/D1: lineage comes from the Codex startup handshake.
+        model: shim.model,
         provider: policy.providers[0]!,
         policy
       }),

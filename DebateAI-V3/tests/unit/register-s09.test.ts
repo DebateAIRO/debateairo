@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   CONVERGENCE_EPSILON_ROW_KEY,
   CONVERGENCE_STOP_DEFAULTS_ROW_KEY,
-  RUN_COST_ENVELOPE_ROW_KEY,
+  computeStructuralCeilingBasis,
   readConvergenceControls,
-  readRunCostEnvelopePolicy,
-  resolveRunCostEnvelopeBasis
+  readPanelDiscoveryPolicy
 } from "@debateai/register";
 
 function poolReturning(rows: readonly Record<string, unknown>[]): Pool {
@@ -16,43 +15,19 @@ function poolReturning(rows: readonly Record<string, unknown>[]): Pool {
 }
 
 describe("S09 register authorities", () => {
-  it("resolves the cost envelope from an exact depth/risk member and prints provenance", async () => {
-    const row = await readRunCostEnvelopePolicy(poolReturning([{
-      row_key: RUN_COST_ENVELOPE_ROW_KEY,
-      value_json: {
-        kind: "RUN_COST_ENVELOPE_POLICY",
-        members: [{
-          depth_params: { depth: 1 },
-          risk_tier: "standard",
-          max_model_attempts: 7
-        }]
-      },
-      source_ref: "test-layer:run-cost-envelope"
-    }]), 3);
-    expect(resolveRunCostEnvelopeBasis(row, {
-      depthParams: { depth: 1 },
-      riskTier: "standard"
-    })).toEqual({
-      max_model_attempts: 7,
-      register_row_key: RUN_COST_ENVELOPE_ROW_KEY,
-      register_version: 3,
-      source_ref: "test-layer:run-cost-envelope",
-      derived_from: { depth_params: { depth: 1 }, risk_tier: "standard" }
-    });
+  it("computes a structural ceiling without a ratified member table", () => {
+    expect(computeStructuralCeilingBasis({
+      panelSize: 2, depth: 1, judgeMaxAttempts: 3, organMaxAttempts: 3,
+      maxRecompose: 2, maxCooldownHoldsPerRun: 2, finalRetryAttempts: 1,
+      branchingFactor: 2, compositionSegmentCap: 2, fixedOrgansPerComposition: 4
+    })).toMatchObject({ kind: "COMPUTED_STRUCTURAL_CEILING", max_model_attempts: 74, panel_size: 2, depth: 1 });
   });
 
-  it("fails loudly when no ratified envelope member matches", async () => {
-    const row = await readRunCostEnvelopePolicy(poolReturning([{
-      row_key: RUN_COST_ENVELOPE_ROW_KEY,
-      value_json: {
-        kind: "RUN_COST_ENVELOPE_POLICY",
-        members: [{ depth_params: { depth: 1 }, risk_tier: "casual", max_model_attempts: 2 }]
-      },
-      source_ref: "test-layer:run-cost-envelope"
-    }]), 1);
-    expect(() => resolveRunCostEnvelopeBasis(row, {
-      depthParams: { depth: 2 }, riskTier: "casual"
-    })).toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_MEMBER_UNRESOLVED" }));
+  it("reads DR-182 discovery freshness and the one-attempt bound", async () => {
+    await expect(readPanelDiscoveryPolicy(poolReturning([{
+      value_json: { kind: "PANEL_DISCOVERY_POLICY", probe_freshness_ms: 600_000, probe_max_attempts: 1 },
+      source_ref: "acceptance:DR-182:V-approved"
+    }]), 1)).resolves.toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
   });
 
   it("reads H8 epsilon and one consolidated typed defaults row without supplying defaults", async () => {

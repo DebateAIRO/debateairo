@@ -20,7 +20,6 @@ import {
   nodeGenerations,
   backendStatus,
   getSettingsView,
-  getRunCostEnvelope,
   saveSettings
 } from "../../apps/v2-ui/lib/api.js";
 import {
@@ -40,16 +39,11 @@ import {
   v3ScoreAbsenceCopy,
   v3ScorePresentation,
   v3ScoringStatusLabel,
-  wayOfKnowingLabel,
-  runCostEnvelopeFromDeployment
+  wayOfKnowingLabel
 } from "../../apps/v2-ui/lib/v3/adapter.js";
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel } from "../../apps/v2-ui/lib/v3/labels.js";
 import { getDebateServer } from "../../apps/v2-ui/lib/serverApi.js";
 import { statusLabel } from "../../apps/v2-ui/lib/format.js";
-import {
-  selectRunCostEnvelopeMember,
-  selectRunCostEnvelopeMembers
-} from "../../apps/v2-ui/lib/runCostEnvelopeSelection.js";
 
 const sessionFixture: Session = {
   asker_id: "asker:test",
@@ -703,7 +697,6 @@ describe("v2-ui data access over the V3 contract client", () => {
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
         depth: 1,
-        agent_count: 2,
         decision_owner: "owner",
         action_owner: "actor",
         decision_scope: "scope",
@@ -719,72 +712,8 @@ describe("v2-ui data access over the V3 contract client", () => {
       tier_source: "MACHINE_DEFAULT",
       tier_provenance_ref: "machine:deployment-floor",
       caller_scope: "ASKER",
-      agent_count: 2,
       depth_params: { depth: 1 }
     });
-  });
-
-  it("projects changed deployment envelope values into allowed depth and cost disclosure", async () => {
-    const deployment: Deployment = {
-      register: {
-        register_version: 8,
-        rows: [
-          { row_key: "riskTier", value: "standard", source_ref: "register:test:risk" },
-          {
-            row_key: "runCostEnvelope",
-            value: {
-              kind: "RUN_COST_ENVELOPE_POLICY",
-              members: [{ depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 12 }]
-            },
-            source_ref: "register:test:envelope"
-          },
-        ]
-      },
-      scorecards: [],
-      model_ledger: [],
-      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
-    };
-    expect(runCostEnvelopeFromDeployment(deployment)).toEqual({
-      registerVersion: 8,
-      sourceRef: "register:test:envelope",
-      deploymentRiskTier: "standard",
-      members: [{ depth: 2, riskTier: "standard", maxModelAttempts: 12 }]
-    });
-    const client = { readDeployment: async () => deployment } as unknown as ContractClient;
-    await expect(getRunCostEnvelope("tok", client)).resolves.toEqual(
-      expect.objectContaining({ members: [{ depth: 2, riskTier: "standard", maxModelAttempts: 12 }] })
-    );
-  });
-
-  it("selects the effective standard envelope for a casual ask escalated by the deployment floor", () => {
-    const standardMember = { depth: 1, riskTier: "standard", maxModelAttempts: 9 } as const;
-
-    expect(selectRunCostEnvelopeMembers([standardMember], "casual", "standard")).toEqual([standardMember]);
-    expect(selectRunCostEnvelopeMember([standardMember], 1)).toEqual(standardMember);
-
-    const misleadingSubFloorMember = { depth: 1, riskTier: "casual", maxModelAttempts: 3 } as const;
-    expect(
-      selectRunCostEnvelopeMembers([misleadingSubFloorMember, standardMember], "casual", "standard")
-    ).toEqual([standardMember]);
-  });
-
-  it("fails loudly instead of inventing a run envelope when deployment policy is absent or malformed", () => {
-    const base: Deployment = {
-      register: { register_version: 8, rows: [] },
-      scorecards: [],
-      model_ledger: [],
-      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
-    };
-    expect(() => runCostEnvelopeFromDeployment(base)).toThrowError(
-      expect.objectContaining({ name: "TypedDomainError", code: "RUN_COST_ENVELOPE_UNAVAILABLE" })
-    );
-    expect(() => runCostEnvelopeFromDeployment({
-      ...base,
-      register: {
-        ...base.register,
-        rows: [{ row_key: "runCostEnvelope", value: { members: [] }, source_ref: "register:test:bad" }]
-      }
-    })).toThrowError(expect.objectContaining({ name: "TypedDomainError", code: "RUN_COST_ENVELOPE_INVALID" }));
   });
 
   it("maps the typed fleet onto V2 worker rows and refuses an untyped fleet", async () => {

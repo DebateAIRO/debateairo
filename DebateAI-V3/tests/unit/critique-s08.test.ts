@@ -129,20 +129,21 @@ describe("S08 / FX-PRV-01a/01b/02 / FX-C52-04 — maker predicates", () => {
     expect(availability).toEqual({
       deploymentMakerCapability: true,
       configuredMakers: ["maker:a"],
+      configuredProviders: [{ providerRef: "provider:mono", maker: "maker:a" }],
       registerRef: "configuredProviderSet@1:acceptance:DR-137:V-approved"
     });
     expect(() => assertMakerAdmission("standard", availability)).not.toThrow();
   });
 
-  it("retains the two-maker admission floor for high-stakes runs (DR-137)", () => {
+  it("serves a high-stakes mono panel under the DR-182 critic-unavailable cap", () => {
     expect(() => assertMakerAdmission("high-stakes", {
       deploymentMakerCapability: true,
       configuredMakers: ["maker:a"],
       registerRef: "configuredProviderSet@1:acceptance:DR-137:V-approved"
-    })).toThrowError(expect.objectContaining({ code: "MAKER_INVENTORY_UNSATISFIED" }));
+    })).not.toThrow();
   });
 
-  it("refuses standard+ for standing one-maker capability failure", () => {
+  it("does not turn standing maker-count capability into a panel-size refusal", () => {
     const availability = evaluateMakerAvailability({
       configuredProviders: [{ providerRef: "p1", maker: "maker:a" }],
       reachedProviderRefs: ["p1"],
@@ -150,10 +151,8 @@ describe("S08 / FX-PRV-01a/01b/02 / FX-C52-04 — maker predicates", () => {
       policy
     });
     expect(availability).toMatchObject({ deploymentMakerCapability: false, classification: "STANDING_MISCONFIGURATION" });
-    expect(() => assertMakerAdmission("standard", availability)).toThrowError(expect.objectContaining({
-      code: "MAKER_INVENTORY_UNSATISFIED"
-    }));
-    expect(() => assertMakerAdmission("high-stakes", availability)).toThrow();
+    expect(() => assertMakerAdmission("standard", availability)).not.toThrow();
+    expect(() => assertMakerAdmission("high-stakes", availability)).not.toThrow();
     expect(() => assertMakerAdmission("casual", availability)).not.toThrow();
   });
 

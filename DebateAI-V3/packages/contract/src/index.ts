@@ -111,7 +111,6 @@ export const AskRequestSchema = z.object({
   tier_provenance_ref: z.string().trim().min(1),
   composition_budget_tier: CompositionBudgetTierSchema,
   depth_params: z.record(z.string(), z.unknown()),
-  agent_count: z.number().int().positive(),
   decision_owner: z.string().trim().min(1),
   action_owner: z.string().trim().min(1),
   decision_scope: z.string().trim().min(1),

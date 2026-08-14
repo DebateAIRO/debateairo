@@ -22,6 +22,7 @@ export const run = core.table("run", {
   compositionBudgetTier: text("composition_budget_tier").notNull(),
   depthParams: jsonb("depth_params").notNull(),
   agentCount: integer("agent_count").notNull(),
+  discoveredPanel: jsonb("discovered_panel").notNull(),
   strangerSampleRate: doublePrecision("stranger_sample_rate").notNull(),
   envelopeBasis: jsonb("envelope_basis").notNull(),
   registerVersion: bigint("register_version", { mode: "number" }).notNull(),

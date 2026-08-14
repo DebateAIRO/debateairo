@@ -8,7 +8,7 @@ import {
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
   ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF,
-  ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF,
+  ACCEPTANCE_DISCOVERY_SOURCE_REF,
   ACCEPTANCE_SCORING_OPERATOR_SOURCE_REF,
   buildAcceptanceRegisterRows
 } from "./seed-register.js";
@@ -45,7 +45,7 @@ describe("ACC-01 acceptance register", () => {
 
     expect(rows.filter((row) => ![
       "convergenceStopDefaults",
-      "runCostEnvelope",
+      "panelDiscoveryPolicy",
       "runDeathPolicy",
       "hiddenNodeScoreThreshold",
       "claimTypeCompositionMap",
@@ -117,24 +117,14 @@ describe("ACC-01 acceptance register", () => {
       },
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF
     });
-    expect(byKey.runCostEnvelope).toEqual({
-      rowKey: "runCostEnvelope",
+    expect(byKey.panelDiscoveryPolicy).toEqual({
+      rowKey: "panelDiscoveryPolicy",
       value: {
-        kind: "RUN_COST_ENVELOPE_POLICY",
-        members: [
-          { depth_params: { depth: 1 }, risk_tier: "standard", max_model_attempts: 60 },
-          { depth_params: { depth: 1 }, risk_tier: "high-stakes", max_model_attempts: 60 },
-          { depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 108 },
-          { depth_params: { depth: 2 }, risk_tier: "high-stakes", max_model_attempts: 108 },
-          { depth_params: { depth: 3 }, risk_tier: "standard", max_model_attempts: 204 },
-          { depth_params: { depth: 3 }, risk_tier: "high-stakes", max_model_attempts: 204 },
-          { depth_params: { depth: 4 }, risk_tier: "standard", max_model_attempts: 396 },
-          { depth_params: { depth: 4 }, risk_tier: "high-stakes", max_model_attempts: 396 },
-          { depth_params: { depth: 5 }, risk_tier: "standard", max_model_attempts: 780 },
-          { depth_params: { depth: 5 }, risk_tier: "high-stakes", max_model_attempts: 780 }
-        ]
+        kind: "PANEL_DISCOVERY_POLICY",
+        probe_freshness_ms: 600_000,
+        probe_max_attempts: 1
       },
-      sourceRef: ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
+      sourceRef: ACCEPTANCE_DISCOVERY_SOURCE_REF
     });
     expect(byKey.runDeathPolicy).toEqual({
       rowKey: "runDeathPolicy",
@@ -154,16 +144,7 @@ describe("ACC-01 acceptance register", () => {
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     });
     expect(ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF).toBe("acceptance:DR-176:V-approved");
-    expect(ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF).toBe("acceptance:DR-172:V-approved");
-    const envelopeMembers = (byKey.runCostEnvelope?.value as {
-      members: readonly { depth_params: { depth: number }; risk_tier: string }[];
-    }).members;
-    expect(envelopeMembers.map(({ depth_params, risk_tier }) => `${depth_params.depth}:${risk_tier}`).sort())
-      .toEqual([1, 2, 3, 4, 5].flatMap((depth) => [
-        `${depth}:standard`,
-        `${depth}:high-stakes`
-      ]).sort());
-    expect(envelopeMembers.some(({ risk_tier }) => risk_tier === "casual")).toBe(false);
+    expect(ACCEPTANCE_DISCOVERY_SOURCE_REF).toBe("acceptance:DR-182:V-approved");
     expect(byKey.compositionBundleBudget?.value).toEqual({ low: 10_000, medium: 20_000, high: 30_000 });
     expect(byKey.convergenceEpsilon?.value).toBe(0.001);
     expect(byKey.convergenceStopDefaults).toEqual({

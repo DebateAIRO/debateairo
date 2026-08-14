@@ -1,11 +1,16 @@
 import { z } from "zod";
 import type { Pool } from "pg";
 import type { RiskTier } from "@debateai/kernel";
+import { computeStructuralCeilingBasis } from "@debateai/register";
+import {
+  RUNNER_BRANCHING_FACTOR,
+  RUNNER_COMPOSITION_SEGMENT_CAP,
+  RUNNER_FIXED_ORGANS_PER_COMPOSITION,
+  RUNNER_MAX_RECOMPOSE
+} from "@debateai/runner";
 import {
   readClaimTypeCompositionMap,
-  readRunCostEnvelopePolicy,
-  type CompositionMapRegisterRow,
-  type RunCostEnvelopePolicyRow
+  type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
@@ -14,7 +19,7 @@ import {
   ACCEPTANCE_REGISTER_SOURCE_REF,
   ACCEPTANCE_REGISTER_VERSION,
   ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF,
-  ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
+  ACCEPTANCE_DISCOVERY_SOURCE_REF
 } from "./seed-register.js";
 
 const costBoundSchema = z.object({
@@ -38,13 +43,10 @@ const runtimeRowsSchema = z.object({
       CONFORMANCE: costBoundSchema
     }).strict()
   }).strict(),
-  runCostEnvelope: z.object({
-    kind: z.literal("RUN_COST_ENVELOPE_POLICY"),
-    members: z.array(z.object({
-      depth_params: z.object({ depth: z.number().int().min(1).max(5) }).strict(),
-      risk_tier: z.enum(["standard", "high-stakes"]),
-      max_model_attempts: z.number().int().positive()
-    }).strict()).min(2)
+  panelDiscoveryPolicy: z.object({
+    kind: z.literal("PANEL_DISCOVERY_POLICY"),
+    probe_freshness_ms: z.literal(600_000),
+    probe_max_attempts: z.literal(1)
   }).strict(),
   runDeathPolicy: z.object({
     kind: z.literal("RUN_DEATH_POLICY"),
@@ -99,7 +101,10 @@ export interface AcceptanceRuntimePolicy {
   readonly bounds: z.infer<typeof runtimeRowsSchema>["acceptanceOrganCostBounds"]["organs"];
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
   readonly bandCeiling: BandCeilingRegisterRow;
-  readonly runCostEnvelopePolicy: RunCostEnvelopePolicyRow;
+  readonly panelDiscoveryPolicy: {
+    readonly probeFreshnessMs: 600_000;
+    readonly probeMaxAttempts: 1;
+  };
   readonly runDeathPolicy: {
     readonly cooldownMs: number;
     readonly finalRetryAttempts: 1;
@@ -118,6 +123,25 @@ export interface AcceptanceRuntimePolicy {
     readonly propagation: string;
     readonly serve: string;
   };
+}
+
+export function computeAcceptanceStructuralCeiling(
+  policy: Pick<AcceptanceRuntimePolicy, "bounds" | "runDeathPolicy">,
+  panelSize: number,
+  depth: number
+): ReturnType<typeof computeStructuralCeilingBasis> {
+  return computeStructuralCeilingBasis({
+    panelSize,
+    depth,
+    judgeMaxAttempts: policy.bounds.JUDGE.maxAttempts,
+    organMaxAttempts: Math.max(policy.bounds.COMPOSER.maxAttempts, policy.bounds.CONFORMANCE.maxAttempts),
+    maxRecompose: RUNNER_MAX_RECOMPOSE,
+    maxCooldownHoldsPerRun: policy.runDeathPolicy.maxCooldownHoldsPerRun,
+    finalRetryAttempts: policy.runDeathPolicy.finalRetryAttempts,
+    branchingFactor: RUNNER_BRANCHING_FACTOR,
+    compositionSegmentCap: RUNNER_COMPOSITION_SEGMENT_CAP,
+    fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION
+  });
 }
 
 /**
@@ -158,7 +182,7 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   );
   if (result.rows.length !== keys.length) throw new Error("ACCEPTANCE_RUNTIME_POLICY_UNRESOLVED");
   const expectedSourceRef = (rowKey: string): string => {
-    if (rowKey === "runCostEnvelope") return ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF;
+    if (rowKey === "panelDiscoveryPolicy") return ACCEPTANCE_DISCOVERY_SOURCE_REF;
     if (rowKey === "runDeathPolicy") return ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF;
     if (rowKey === "hiddenNodeScoreThreshold") return ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
     if (rowKey === "configuredProviderSet") return ACCEPTANCE_PROVIDER_SET_SOURCE_REF;
@@ -170,10 +194,7 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   const parsed = parseAcceptanceRuntimeRows(Object.fromEntries(
     result.rows.map((row) => [row.row_key, row.value_json])
   ));
-  const [compositionRow, runCostEnvelopePolicy] = await Promise.all([
-    readClaimTypeCompositionMap(pool, ACCEPTANCE_REGISTER_VERSION),
-    readRunCostEnvelopePolicy(pool, ACCEPTANCE_REGISTER_VERSION)
-  ]);
+  const compositionRow = await readClaimTypeCompositionMap(pool, ACCEPTANCE_REGISTER_VERSION);
   const compositionBudgets = Object.freeze(Object.fromEntries(
     Object.entries(parsed.compositionBundleBudget).map(([tier, bound]) => [tier, Object.freeze({
       tier: tier as "low" | "medium" | "high",
@@ -194,7 +215,10 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF,
       value: parsed.wayOfKnowingCeiling
     }),
-    runCostEnvelopePolicy,
+    panelDiscoveryPolicy: Object.freeze({
+      probeFreshnessMs: parsed.panelDiscoveryPolicy.probe_freshness_ms,
+      probeMaxAttempts: parsed.panelDiscoveryPolicy.probe_max_attempts
+    }),
     runDeathPolicy: Object.freeze({
       cooldownMs: parsed.runDeathPolicy.cooldown_ms,
       finalRetryAttempts: parsed.runDeathPolicy.final_retry_attempts,

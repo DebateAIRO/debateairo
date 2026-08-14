@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { RISK_TIERS, TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
@@ -34,25 +34,21 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
 );
 
 const costEnvelopeBasisSchema = z.object({
+  kind: z.literal("COMPUTED_STRUCTURAL_CEILING"),
   max_model_attempts: z.number().int().positive(),
-  register_row_key: z.string().trim().min(1),
-  register_version: z.number().int().positive(),
-  source_ref: z.string().trim().min(1),
-  derived_from: z.object({
-    depth_params: z.record(z.string(), z.unknown()),
-    risk_tier: z.enum(RISK_TIERS)
-  }).strict()
+  panel_size: z.number().int().positive(),
+  depth: z.number().int().min(1).max(5),
+  per_site_attempts: z.object({ judge: z.number().int().positive(), organ: z.number().int().positive() }).strict(),
+  hold_cap: z.number().int().positive(),
+  final_retry_attempts: z.number().int().positive(),
+  formula_version: z.string().trim().min(1),
+  bounds_source_ref: z.string().trim().min(1)
 }).strict();
 
 export interface CostEnvelopeBasis {
   readonly maxModelAttempts: number;
-  readonly registerRowKey: string;
-  readonly registerVersion: number;
-  readonly sourceRef: string;
-  readonly derivedFrom: {
-    readonly depthParams: Readonly<Record<string, unknown>>;
-    readonly riskTier: RiskTier;
-  };
+  readonly panelSize: number;
+  readonly depth: number;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -66,13 +62,8 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
   }
   return Object.freeze({
     maxModelAttempts: parsed.data.max_model_attempts,
-    registerRowKey: parsed.data.register_row_key,
-    registerVersion: parsed.data.register_version,
-    sourceRef: parsed.data.source_ref,
-    derivedFrom: Object.freeze({
-      depthParams: Object.freeze({ ...parsed.data.derived_from.depth_params }),
-      riskTier: parsed.data.derived_from.risk_tier
-    }),
+    panelSize: parsed.data.panel_size,
+    depth: parsed.data.depth,
     wire: Object.freeze(parsed.data)
   });
 }
@@ -267,7 +258,7 @@ export class BudgetRepository {
     if (await this.countRunModelAttempts(runId) >= basis.maxModelAttempts) {
       throw new TypedDomainError(
         "RUN_COST_ENVELOPE_EXHAUSTED",
-        `Run ${runId} exhausted its pinned ${basis.registerRowKey} basis`
+        `Run ${runId} exhausted its pinned computed structural ceiling`
       );
     }
   }

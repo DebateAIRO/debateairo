@@ -6,7 +6,7 @@ import { loadBootstrapRegister } from "@debateai/register";
 export const ACCEPTANCE_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
 export const ACCEPTANCE_CONVERGENCE_SOURCE_REF = "acceptance:DR-136:V-approved" as const;
-export const ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF = "acceptance:DR-172:V-approved" as const;
+export const ACCEPTANCE_DISCOVERY_SOURCE_REF = "acceptance:DR-182:V-approved" as const;
 export const ACCEPTANCE_RUN_DEATH_POLICY_SOURCE_REF = "acceptance:DR-174:V-approved" as const;
 export const ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF = "acceptance:DR-176:V-approved" as const;
 /** DR-142: V approved the normative claimTypeCompositionMap entry; the map
@@ -186,23 +186,13 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     },
     {
-      rowKey: "runCostEnvelope",
+      rowKey: "panelDiscoveryPolicy",
       value: {
-        kind: "RUN_COST_ENVELOPE_POLICY",
-        members: [
-          { depth_params: { depth: 1 }, risk_tier: "standard", max_model_attempts: 60 },
-          { depth_params: { depth: 1 }, risk_tier: "high-stakes", max_model_attempts: 60 },
-          { depth_params: { depth: 2 }, risk_tier: "standard", max_model_attempts: 108 },
-          { depth_params: { depth: 2 }, risk_tier: "high-stakes", max_model_attempts: 108 },
-          { depth_params: { depth: 3 }, risk_tier: "standard", max_model_attempts: 204 },
-          { depth_params: { depth: 3 }, risk_tier: "high-stakes", max_model_attempts: 204 },
-          { depth_params: { depth: 4 }, risk_tier: "standard", max_model_attempts: 396 },
-          { depth_params: { depth: 4 }, risk_tier: "high-stakes", max_model_attempts: 396 },
-          { depth_params: { depth: 5 }, risk_tier: "standard", max_model_attempts: 780 },
-          { depth_params: { depth: 5 }, risk_tier: "high-stakes", max_model_attempts: 780 }
-        ]
+        kind: "PANEL_DISCOVERY_POLICY",
+        probe_freshness_ms: 600_000,
+        probe_max_attempts: 1
       },
-      sourceRef: ACCEPTANCE_RUN_ENVELOPE_SOURCE_REF
+      sourceRef: ACCEPTANCE_DISCOVERY_SOURCE_REF
     },
     {
       rowKey: "compositionBundleBudget",

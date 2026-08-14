@@ -1,0 +1,2 @@
+{"timestamp":"2026-08-14T15:19:20.000Z","type":"session_meta","payload":{"id":"01a000e7-3ea0-7f91-b166-7104741ef333"}}
+{"timestamp":"2026-08-14T15:19:20.001Z","type":"turn_context","payload":{"turn_id":"fixture-turn","model":"gpt-5.6-sol","effort":"xhigh"}}

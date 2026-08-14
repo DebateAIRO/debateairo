@@ -13,13 +13,15 @@ async function createRun(label: string): Promise<string> {
     INSERT INTO core.run (
       question_line, asker_id, session_id, caller_scope, as_of,
       asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-      composition_budget_tier, depth_params, agent_count,
+      composition_budget_tier, depth_params, agent_count, discovered_panel,
       stranger_sample_rate, envelope_basis, register_version,
       battery_version, created_at_seq
     ) VALUES (
       $1, $2, $3, 'ASKER', '2026-08-08T00:00:00.000Z',
       'casual', 'casual', 'ASKER', $4,
-      'low', '{}', 1, 1, '{}', 1, 's02', ledger.allocate_sequence()
+      'low', '{}', 1,
+      '[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',
+      1, '{}', 1, 's02', ledger.allocate_sequence()
     ) RETURNING run_id
   `, [label, `asker:${label}`, `session:${label}`, `asker-declaration:${label}`]);
   return result.rows[0]!.run_id;

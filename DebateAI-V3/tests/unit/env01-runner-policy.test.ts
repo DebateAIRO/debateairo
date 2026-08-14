@@ -14,7 +14,7 @@ describe("ENV-01 ratified envelope assumptions", () => {
       segments: [segment("one"), segment("two"), segment("three")]
     }))).toThrowError(expect.objectContaining({
       code: "COMPOSITION_CONTRACT_ERROR",
-      message: expect.stringContaining("ratified two-segment serve cap")
+      message: expect.stringContaining("engine segment cap")
     }));
   });
 });

@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { REVIEW_OUTCOMES } from "@debateai/kernel";
 import { Judge } from "@debateai/judgement";
-import { assertReviewCoverageEnvelopeRatified, selectDifferentMakerReviewer } from "@debateai/runner";
+import { resolveExpansionDepth, selectDifferentMakerReviewer } from "@debateai/runner";
 import type { ProviderGateway } from "@debateai/providers";
 import type { Pool } from "pg";
 import { createPostgresProviderGateway } from "@debateai/runner";
+import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 
 describe("XREV-01 cross-maker node review", () => {
   it("mints the closed outcome vocabulary once in the kernel", () => {
@@ -38,16 +39,10 @@ describe("XREV-01 cross-maker node review", () => {
     expect(selectDifferentMakerReviewer("house-a", makers.slice(0, 2), "house-b")).toBe(makers[1]);
   });
 
-  it("carries DR-172's ratified depths 1..5 and refuses beyond the ratified table", () => {
-    // Kills: reverting the guard to the pre-DR-172 depth>2 placeholder
-    // (3/4/5 would throw); deleting the guard entirely (6 would pass).
-    expect(() => assertReviewCoverageEnvelopeRatified(1)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(2)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(3)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(4)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(5)).not.toThrow();
-    expect(() => assertReviewCoverageEnvelopeRatified(6)).toThrowError(expect.objectContaining({
-      code: "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED"
+  it("pins the single depth authority at 1..5 after the coverage-table guard retires", () => {
+    for (const depth of [1, 2, 3, 4, 5]) expect(resolveExpansionDepth({ depth })).toBe(depth);
+    expect(() => resolveExpansionDepth({ depth: 6 })).toThrowError(expect.objectContaining({
+      code: "RUN_DEPTH_PARAMS_INVALID"
     }));
   });
 
@@ -87,13 +82,9 @@ describe("XREV-01 cross-maker node review", () => {
   it("stops a review loudly when the ratified model-call envelope is exhausted", async () => {
     const pool = {
       query: vi.fn(async (sql: string) => {
-        if (sql.includes("SELECT envelope_basis")) return { rows: [{ envelope_basis: {
-          max_model_attempts: 8,
-          register_row_key: "runCostEnvelope",
-          register_version: 1,
-          source_ref: "test-layer:XREV-01",
-          derived_from: { depth_params: { depth: 1 }, risk_tier: "standard" }
-        } }] };
+        if (sql.includes("SELECT envelope_basis")) {
+          return { rows: [{ envelope_basis: fixtureStructuralCeiling(8, 2, 1) }] };
+        }
         if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "8" }] };
         throw new Error(`UNEXPECTED_QUERY:${sql}`);
       })

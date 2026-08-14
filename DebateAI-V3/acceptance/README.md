@@ -45,9 +45,9 @@ DR-137. Seed freshness stays loud: a standing `.pgdata` seeded before FAIR-02
 stops with `ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet` — reset the
 standing data directory rather than mutating sealed rows.
 
-The M=3 run envelope is not yet ratified, so `agent_count: 3` remains a typed
-refusal and current M=2 runs select the first two configured providers exactly
-as before. Ceremony boot still handshakes all three. Grok's fixed relay port is
+Ceremony boot handshakes all three providers independently. Healthy relays form
+the discovered panel; no caller supplies a maker count and no panel-size
+ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
 operator-supplied as `ACCEPTANCE_GROK_RELAY_PORT`; GROK-01 proposes the durable
 register row and does not invent or seed a port number before V ratification.
 
@@ -62,8 +62,7 @@ ACCEPTANCE_DB_PORT=<port> ./node_modules/.bin/tsx acceptance/dual-maker-proof.ts
 
 **Multi-maker depth-driven debate (FAIR-01 + PRO-01 + PANEL-01, DR-140(b),
 DR-149, DR-154(2), DR-159).** The ceremony starts the Anthropic relay beside
-the codex shim and requires `agent_count: 2`, matching the two makers funded by
-DR-159; larger or mismatched counts refuse with a typed reason. Each maker
+the codex shim. The healthy discovered panel is pinned at admission; each maker
 independently authors a depth-0 position root. `depth_params.depth` counts
 expansion rounds below each root: every node authored in the previous round receives one real
 `support` child and one real `attack`/`rebutting` child through the same shipped
@@ -105,18 +104,24 @@ standing `.pgdata` sealed before DR-144 stops with
 `ACCEPTANCE_REGISTER_VERSION_CONFLICT` — reset the standing acceptance data
 directory before the live gate.
 
-DR-137 makes the honest one-maker `configuredProviderSet` lawful for casual and
-standard runs; high-stakes admission still requires at least two distinct
-makers in the shipped critique rule. DR-159 supplies the shipped run-level
-`runCostEnvelope` members for depths 1–5 at both reachable tiers (`standard`
-and `high-stakes`) with the DR-159 retry-tolerant ceilings 42, 66, 114, 210,
-and 402 and provenance exactly `acceptance:DR-159:V-approved`. No `casual`
-member is seeded because the standard deployment floor makes it unreachable.
-The earlier DR-133 per-organ attempt, token, and
-deadline bounds remain byte-faithful in the acceptance-only
-`acceptanceOrganCostBounds` row. This split lets the live API exercise the
-shipped run-envelope reader without conflating its run-level schema with the
-acceptance runner's per-organ call bounds.
+DR-182 makes every nonempty discovered panel lawful at every risk tier. A mono
+answer serves with `SINGLE-LINEAGE` / `CRITIQUE-UNAVAILABLE`, the ruled lower
+confidence band, and an explicit depth-not-expanded reason. The
+`panelDiscoveryPolicy` row fixes probe freshness at 600,000 ms and one attempt.
+The run-total tripwire is computed from exported engine facts and the existing
+register-supplied organ/death-policy bounds; it is persisted for honesty but is
+not shown as a user-facing promise.
+
+Discovery probes are real provider completions, not free health checks. On a
+fresh N-member ceremony the normal path spends N startup handshakes plus N
+claim-time probes before debate work; a stale admission can spend up to N more.
+The ceremony prints its append-only `core.provider_probe` evidence-row count
+alongside the discovered panel and structural ceiling. Probe completions are not
+written to `ledger.ledger_entry`: boot probes have no run/work-item identity and
+the ledger's action-kind vocabulary has no probe member, so doing that honestly
+requires a separately ruled schema/action migration rather than disguising them
+as `MODEL_CALL`. During DISC-01 rev2, the one authorized real Codex handshake
+reported 16,009 input tokens (11,008 cached) and 5 output tokens.
 
 PRO-01's one authorized live depth-2 proof is isolated from the sealed standing
 database and runs with:
@@ -133,7 +138,8 @@ ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:pro01-depth2 \
 ./node_modules/.bin/tsx acceptance/pro01-depth2-proof.ts
 ```
 
-PANEL-01's one authorized live depth-1, M=2 proof is likewise isolated:
+PANEL-01's one authorized live depth-1 proof is likewise isolated and evaluates
+the complete discovered panel rather than assuming M=2:
 
 ```text
 ACCEPTANCE_DB_PORT=<free port> ACCEPTANCE_API_PORT=<free port> \
@@ -142,9 +148,10 @@ ACCEPTANCE_SHIM_PORT=<free port> \
 ```
 
 The proof prints the run/answer IDs, total model attempts (including failed or
-timed-out attempts), and every node's persisted maker/model/provider lineage,
-then removes only its caller-owned temporary database. Depth 3 remains reserved
-for V's acceptance run.
+timed-out attempts) against the run's computed structural ceiling, the probe
+evidence count, and every node's persisted maker/model/provider lineage, then
+removes only its caller-owned temporary database. Depth 3 remains reserved for
+V's acceptance run.
 
 The runtime environment is strict and contains no Hatchet keys:
 
@@ -184,7 +191,6 @@ Ask-input defaults (all overrideable by the named CLI flag) are:
 - `--tier-provenance-ref`: `acceptance:cli-default`
 - `--composition-budget-tier`: `low`
 - `--depth-params`: `{"depth":1}`
-- `--agent-count`: `1`
 - `--decision-owner` and `--action-owner`: `acceptance-user`
 - `--decision-scope`: `prototype-acceptance`
 - `--as-of`: invocation time in ISO-8601 form

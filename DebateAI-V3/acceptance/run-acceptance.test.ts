@@ -17,7 +17,6 @@ describe("ACC-01 one-shot ceremony arguments", () => {
       tier_provenance_ref: "acceptance:cli-default",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      agent_count: 2,
       decision_owner: "acceptance-user",
       action_owner: "acceptance-user",
       decision_scope: "prototype-acceptance",

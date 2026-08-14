@@ -29,9 +29,9 @@ import {
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
-import { RunRepository } from "@debateai/db";
+import { RunRepository, type DiscoveredPanelMember } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
-import { assertMakerAdmission, type DeploymentMakerCapability } from "@debateai/critique";
+import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
@@ -286,10 +286,11 @@ export interface RunCreationSettings {
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
-  readonly resolveDeploymentMakerAvailability: () => Promise<DeploymentMakerCapability>;
+  readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
     readonly riskTier: RiskTier;
+    readonly panelSize: number;
   }) => Promise<Readonly<Record<string, unknown>>>;
   readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
@@ -316,9 +317,20 @@ export async function evaluateAskAdmission(
 ): Promise<{
   readonly risk: ReturnType<RunCreationSettings["resolveRisk"]>;
   readonly envelopeBasis: Readonly<Record<string, unknown>>;
+  readonly discoveredPanel: readonly DiscoveredPanelMember[];
+  readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
 }> {
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
-  const makerAvailability = await settings.resolveDeploymentMakerAvailability();
+  const discoveredPanel = await settings.resolveDiscoveredPanel();
+  const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);
+  const makerAvailability = Object.freeze({
+    deploymentMakerCapability: makers.length > 0,
+    runMakerReachability: makers.length >= 2,
+    classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
+    configuredMakers: makers,
+    reachedMakers: makers,
+    registerRef: discoveredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
+  });
   try {
     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
   } catch (error) {
@@ -328,12 +340,13 @@ export async function evaluateAskAdmission(
   try {
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
-      riskTier: risk.effectiveRiskTier
+      riskTier: risk.effectiveRiskTier,
+      panelSize: discoveredPanel.length
     });
   } catch (error) {
     markAskRefusal(error);
   }
-  return { risk, envelopeBasis };
+  return { risk, envelopeBasis, discoveredPanel, criticUnavailableCap: applyCriticUnavailableCap(makerAvailability) };
 }
 
 export class PostgresAskApplication implements AskApplication {
@@ -357,7 +370,7 @@ export class PostgresAskApplication implements AskApplication {
 
   async submit(ask: AskRequest, session: Session): Promise<AskAccepted> {
     await this.#liveness.recordQuery(ask.question_line, session.asker_id, new Date(ask.as_of));
-    const { risk, envelopeBasis } = await evaluateAskAdmission(this.settings, ask);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const runId = await this.#runs.startRun({
       questionLine: ask.question_line,
       askerId: session.asker_id,
@@ -370,7 +383,7 @@ export class PostgresAskApplication implements AskApplication {
       tierProvenanceRef: risk.tierProvenanceRef,
       compositionBudgetTier: ask.composition_budget_tier,
       depthParams: ask.depth_params,
-      agentCount: ask.agent_count,
+      discoveredPanel,
       strangerSampleRate: this.settings.strangerSampleRate,
       envelopeBasis,
       registerVersion: this.settings.registerVersion,
@@ -380,7 +393,8 @@ export class PostgresAskApplication implements AskApplication {
         action_owner: ask.action_owner,
         decision_scope: ask.decision_scope,
         steering_presets: ask.steering_presets,
-        steering_annotations: ask.steering_annotations
+        steering_annotations: ask.steering_annotations,
+        critic_unavailable_cap: criticUnavailableCap
       },
       batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
     });

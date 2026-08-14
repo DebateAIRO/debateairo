@@ -23,9 +23,7 @@ import {
   debateDetailFromRunProjection,
   scoringUnavailable,
   settingsViewFromDeployment,
-  runCostEnvelopeFromDeployment,
   workersFromDeployment,
-  type RunCostEnvelopeView,
   type SettingsView
 } from "./v3/adapter.js";
 
@@ -246,13 +244,6 @@ export async function getSettingsView(
   return settingsViewFromDeployment(await client.readDeployment(token));
 }
 
-export async function getRunCostEnvelope(
-  token: string,
-  client: ContractClient = contractClient
-): Promise<RunCostEnvelopeView> {
-  return runCostEnvelopeFromDeployment(await client.readDeployment(token));
-}
-
 export function saveSettings(): Promise<never> {
   return Promise.reject(new Error("V3_HAS_NO_SETTINGS_WRITE: deployment configuration is register-governed, not UI-writable."));
 }
@@ -316,7 +307,6 @@ export async function createDebate(
     tier_provenance_ref: tierProvenanceRef,
     composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
     depth_params: { depth: requiredInteger(config, "depth", 0) },
-    agent_count: requiredInteger(config, "agent_count", 1),
     decision_owner: requiredString(config, "decision_owner"),
     action_owner: requiredString(config, "action_owner"),
     decision_scope: requiredString(config, "decision_scope"),

@@ -84,6 +84,7 @@ beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), "debateai-acc-01-"));
   database = await startStandingDatabase({ port: await reservePort(), dataDirectory });
   provider = await startProviderDouble([
+    "claim-health-probe",
     judgementDouble("A provisional acceptance answer."),
     judgementDouble("A primary-maker defence of the second root."),
     judgementDouble("A primary-maker attack on the second root."),
@@ -100,6 +101,7 @@ beforeAll(async () => {
   // PANEL-01: the second maker independently authors a root, grows both
   // primary-root children, and authors its ordered cross-root response.
   criticProvider = await startProviderDouble([
+    "claim-health-probe",
     judgementDouble("An independent Anthropic position on the question."),
     judgementDouble("A genuine supporting case for the acceptance answer."),
     judgementDouble("The strongest genuine counter-position to the acceptance answer."),
@@ -223,8 +225,8 @@ describe("ACC-01 dry-run ceremony", () => {
       // FAIR-01: the second maker's relay endpoint plus its honestly-reported
       // model id (live: the claude CLI handshake reports it; here: the double).
       makerRelays: [
-        { providerRef: "acceptance:claude-cli", baseUrl: criticProvider.endpoint, model: "test-layer/critic-model" },
-        { providerRef: "acceptance:grok-cli", baseUrl: criticProvider.endpoint, model: "test-layer/grok-model" }
+        { providerRef: "acceptance:codex-cli", baseUrl: provider.endpoint, model: "test-layer/model" },
+        { providerRef: "acceptance:claude-cli", baseUrl: criticProvider.endpoint, model: "test-layer/model" },
       ]
     });
     const token = "acc-01-owner-token";
@@ -239,7 +241,6 @@ describe("ACC-01 dry-run ceremony", () => {
         tier_provenance_ref: "acceptance:test-layer:asker",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        agent_count: 2,
         decision_owner: "acceptance-test-owner",
         action_owner: "acceptance-test-owner",
         decision_scope: "acceptance-test",

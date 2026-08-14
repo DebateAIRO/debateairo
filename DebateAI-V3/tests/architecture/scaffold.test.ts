@@ -147,7 +147,7 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
       expect.objectContaining({ package: "packages/budget.decideBudgetPressure", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/budget.BudgetRepository.countRunModelAttempts", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/register.resolveEffectiveRiskTier", attachment: "ATTACHED" }),
-      expect.objectContaining({ package: "packages/register.readRunCostEnvelopePolicy", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/register.computeStructuralCeilingBasis", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/serve.createEnvelopeExhaustedResult", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/serve.ServeRepository.persist.conditionMarks", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/budget.compareConvergence", attachment: "UNATTACHED" }),

@@ -6,6 +6,7 @@ import { EvidenceRepository } from "../../packages/evidence/src/index.js";
 import { GraphRepository } from "@debateai/graph";
 import { LedgerRepository } from "@debateai/ledger";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 let database: TestDatabase;
 
@@ -14,7 +15,7 @@ async function createRunAndNode(label: string): Promise<{ runId: string; nodeId:
     questionLine: label, askerId: `asker:${label}`, sessionId: `session:${label}`, callerScope: "ASKER",
     asOf: new Date("2026-08-08T00:00:00Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
-    depthParams: { depth: 1 }, agentCount: 1, strangerSampleRate: 1,
+    depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
     envelopeBasis: { source: "test-layer" }, registerVersion: 1, batteryVersion: "s06",
     batteryRows: createInitialBatteryRows({ settlementWatchHandle: `watch:${label}` })
   });

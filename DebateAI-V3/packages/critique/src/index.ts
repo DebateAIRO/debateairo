@@ -236,6 +236,7 @@ export interface MakerAvailability {
 export interface DeploymentMakerCapability {
   readonly deploymentMakerCapability: boolean;
   readonly configuredMakers: readonly string[];
+  readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
   readonly registerRef: string;
 }
 
@@ -284,6 +285,9 @@ export async function readDeploymentMakerCapability(
   return Object.freeze({
     deploymentMakerCapability: configuredMakers.length >= (requiredDistinctMakers as number),
     configuredMakers: Object.freeze(configuredMakers),
+    configuredProviders: Object.freeze(typedProviders.map(({ providerRef, maker }) =>
+      Object.freeze({ providerRef, maker })
+    )),
     registerRef: `${CONFIGURED_PROVIDER_SET_ROW_KEY}@${registerVersion}:${row.source_ref}`
   });
 }
@@ -325,14 +329,12 @@ export function assertMakerAdmission(
   riskTier: RiskTier,
   availability: Pick<MakerAvailability, "deploymentMakerCapability" | "configuredMakers" | "registerRef">
 ): void {
-  // DR-137: mono-model deployments are lawful for casual/standard runs; the
-  // anti-monoculture floor remains an independent high-stakes admission rule.
-  const highStakesMakerFloorSatisfied = new Set(availability.configuredMakers).size >= 2;
-  if ((riskTier !== "casual" && !availability.deploymentMakerCapability)
-    || (riskTier === "high-stakes" && !highStakesMakerFloorSatisfied)) {
+  // DR-182 narrows DR-137: every nonempty discovered panel serves. High-stakes
+  // mono answers are capped by applyCriticUnavailableCap, never refused.
+  if (new Set(availability.configuredMakers).size < 1) {
     throw new TypedDomainError(
       "MAKER_INVENTORY_UNSATISFIED",
-      `Maker admission is unsatisfied for ${riskTier} (${availability.registerRef})`
+      `No healthy maker was discovered for ${riskTier} (${availability.registerRef})`
     );
   }
 }

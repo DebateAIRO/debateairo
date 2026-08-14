@@ -14,7 +14,6 @@ const ASK: AskRequest = {
   tier_provenance_ref: "asker:test",
   composition_budget_tier: "low",
   depth_params: { depth: 1 },
-  agent_count: 2,
   decision_owner: "asker:test",
   action_owner: "asker:test",
   decision_scope: "test provider-double composition",

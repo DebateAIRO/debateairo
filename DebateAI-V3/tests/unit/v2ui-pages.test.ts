@@ -44,7 +44,7 @@ const USER_ASK_FIELDS = [
   { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(event.target.value" }
 ] as const;
 
-const MACHINE_ASK_FIELDS = ["agentCount", "decisionOwner", "actionOwner", "decisionScope", "asOf"] as const;
+const MACHINE_ASK_FIELDS = ["decisionOwner", "actionOwner", "decisionScope", "asOf"] as const;
 
 describe("v2-ui /new collects every value the V3 ask requires", () => {
   const newPage = source("app/new/page.tsx");
@@ -84,13 +84,11 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
     }
   });
 
-  it("derives allowed depths and attempt disclosure from the deployment register envelope", () => {
+  it("offers the ruled depth range without exposing the computed tripwire", () => {
     expect(newPage).toContain("contractClient.readDeployment");
-    expect(newPage).toContain("runCostEnvelopeFromDeployment");
-    expect(newPage).toContain("selectRunCostEnvelopeMembers");
-    expect(newPage).toContain("selectRunCostEnvelopeMember");
-    expect(newPage).toContain("maxModelAttempts");
-    expect(newPage).not.toContain("useState(1)");
+    expect(newPage).toContain("[1, 2, 3, 4, 5].map");
+    expect(newPage).not.toContain("runCostEnvelope");
+    expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");
   });
 });

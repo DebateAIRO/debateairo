@@ -9,6 +9,7 @@ import {
   createWeightSource
 } from "@debateai/valuation";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 let database: TestDatabase;
 
@@ -33,7 +34,7 @@ describe("S10 / P17 / DR-053 — real PostgreSQL value-overlay carriers", () => 
       tierProvenanceRef: "asker-declaration:s10-test-layer",
       compositionBudgetTier: "low",
       depthParams: { depth: 1 },
-      agentCount: 1,
+      discoveredPanel: fixtureDiscoveredPanel(1),
       strangerSampleRate: 1,
       envelopeBasis: { source: "test-layer" },
       registerVersion: 1,

@@ -2,9 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
 import {
+  ProviderProbeRepository,
   RunRepository,
   assertNoOpenWriteTransaction,
-  type CompletionActivationResolution
+  type CompletionActivationResolution,
+  type DiscoveredPanelMember
 } from "@debateai/db";
 import {
   WorkItemRepository,
@@ -22,7 +24,13 @@ import {
   type JudgementSelectionRule
 } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
-import { resolveScoringOperator } from "@debateai/register";
+import {
+  ENGINE_BRANCHING_FACTOR,
+  ENGINE_COMPOSITION_SEGMENT_CAP,
+  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
+  ENGINE_MAX_RECOMPOSE,
+  resolveScoringOperator
+} from "@debateai/register";
 import {
   BudgetRepository,
   BATTERY_BUDGET_CONTRACTS,
@@ -69,13 +77,18 @@ import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from 
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
+export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
+export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
+export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
+export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
+
 const compositionSchema = z.object({
   segments: z.array(z.object({
     segment_id: z.string().trim().min(1),
     text: z.string().trim().min(1),
     node_refs: z.array(z.string().trim().min(1)),
     served_number_refs: z.array(z.string().trim().min(1))
-  }).strict()).min(1).max(2, "Composer output exceeds DR-159's ratified two-segment serve cap")
+  }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP, "Composer output exceeds the engine segment cap")
 }).strict();
 const conformanceSchema = z.object({ conforms: z.boolean(), findings: z.array(z.string()) }).strict();
 const r9Schema = z.object({ pass: z.boolean() }).strict();
@@ -112,20 +125,6 @@ export function selectDifferentMakerReviewer<T extends { readonly maker: string 
     );
   }
   return reviewer;
-}
-
-export function assertReviewCoverageEnvelopeRatified(depth: number): void {
-  // DR-172 ratifies envelope Set A (60/108/204/396/780), sized by XREV-01's
-  // audited arithmetic to carry TOTAL cross-maker review coverage (DR-165(3))
-  // at depths 1..5. The pre-ratification depth>2 refusal is retired by that
-  // ruling. Depths beyond the ratified table remain a typed refusal — no
-  // member exists to carry their coverage, and no ceiling may be derived.
-  if (depth > 5) {
-    throw new TypedDomainError(
-      "NODE_REVIEW_COVERAGE_ENVELOPE_UNRATIFIED",
-      `DR-172: total cross-maker review coverage is ratified for depths 1..5; depth ${depth} has no ratified member`
-    );
-  }
 }
 
 /**
@@ -296,11 +295,6 @@ export function excludeHiddenSubtrees(
   });
 }
 
-/** @internal Test capability; never place this token in production wiring. */
-export const TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS = Symbol(
-  "TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS"
-);
-
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
   readonly claimMs: number;
@@ -335,11 +329,12 @@ export interface WalkingSkeletonSettings {
   };
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
-  /**
-   * Test-layer only: exercises N-maker wiring before V ratifies M>2 spend.
-   * The symbol capability cannot arrive through serialized production config.
-   */
-  readonly testOnlyMakerCountGuardBypass?: typeof TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS;
+  /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
+  readonly claimTimeProbe?: (member: DiscoveredPanelMember) => Promise<{
+    readonly state: "HEALTHY" | "ABSENT";
+    readonly modelId: string | null;
+    readonly failureCode: string | null;
+  }>;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -425,21 +420,6 @@ async function callWithContentContract(
 
 export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
   return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
-}
-
-const DR159_RATIFIED_MAKER_COUNT = 2;
-
-/** PANEL-01/DR-159: the ratified envelope arithmetic is valid for at most M=2. */
-export function assertRatifiedMakerCount(effectiveMakerCount: number): void {
-  if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
-    throw new TypedDomainError("RUN_MAKER_COUNT_INVALID", "The effective maker count must be a positive integer");
-  }
-  if (effectiveMakerCount > DR159_RATIFIED_MAKER_COUNT) {
-    throw new TypedDomainError(
-      "RUN_MAKER_COUNT_EXCEEDS_RATIFIED_ENVELOPE",
-      `DR-159 ratified the run-cost envelope for M=${DR159_RATIFIED_MAKER_COUNT}; received M=${effectiveMakerCount}`
-    );
-  }
 }
 
 export interface DebateExpansionLeg {
@@ -544,7 +524,10 @@ export function buildMultiMakerExpansionPlan(
       const authorIndex = (rootIndex + round) % effectiveMakerCount;
       const nextFrontier: number[] = [];
       for (const parentIndex of frontier) {
-        for (const polarity of ["support", "attack"] as const) {
+        for (const polarity of Array.from(
+          { length: RUNNER_BRANCHING_FACTOR },
+          (_, index) => index === 0 ? "support" as const : "attack" as const
+        )) {
           const childIndex = nextNodeIndex++;
           legs.push(Object.freeze({ round, rootIndex, parentIndex, childIndex, polarity, authorIndex }));
           nextFrontier.push(childIndex);
@@ -623,6 +606,20 @@ export function partitionServedSegments(
   return Object.freeze({ conformanceSegments, persistedSegments });
 }
 
+export function applySingleLineageBandCap(
+  candidateBand: string,
+  bandCeiling: BandCeilingRegisterRow
+): string {
+  const candidateIndex = bandCeiling.value.bandOrder.indexOf(candidateBand);
+  if (candidateIndex < 1) {
+    throw new TypedDomainError(
+      "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED",
+      `No ruled band exists immediately below ${candidateBand}`
+    );
+  }
+  return bandCeiling.value.bandOrder[candidateIndex - 1]!;
+}
+
 export class WalkingSkeletonRunner {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -634,6 +631,7 @@ export class WalkingSkeletonRunner {
   readonly #serve: ServeRepository;
   readonly #valuation: ValuationRepository;
   readonly #memory: MemoryRepository;
+  readonly #providerProbes: ProviderProbeRepository;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly providerRef: string;
@@ -655,6 +653,7 @@ export class WalkingSkeletonRunner {
     this.#serve = new ServeRepository(pool);
     this.#valuation = new ValuationRepository(pool);
     this.#memory = new MemoryRepository(pool);
+    this.#providerProbes = new ProviderProbeRepository(pool);
     this.#configuredMakers = Object.freeze([
       Object.freeze({ judge: this.#judge, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
@@ -830,22 +829,70 @@ export class WalkingSkeletonRunner {
       });
     };
     const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
-    const expansionDepth = resolveExpansionDepth(envelopeBasis.derivedFrom.depthParams);
-    if (
-      this.settings.testOnlyMakerCountGuardBypass !==
-      TEST_ONLY_UNRATIFIED_MAKER_COUNT_BYPASS
-    ) {
-      assertRatifiedMakerCount(run.agentCount);
+    const expansionDepth = resolveExpansionDepth(run.depthParams);
+    const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
+    const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
+    const configuredMakers: Array<{
+      readonly judge: Judge;
+      readonly providerRef: string;
+      readonly maker: string;
+    }> = [];
+    for (const member of run.discoveredPanel) {
+      const configured = configuredByProviderRef.get(member.provider_ref);
+      let state: "HEALTHY" | "ABSENT" = configured === undefined ? "ABSENT" : "HEALTHY";
+      let modelId: string | null = configured === undefined ? null : member.model_id;
+      let failureCode: string | null = configured === undefined ? "CLAIM_GATEWAY_UNRESOLVED" : null;
+      if (configured !== undefined && this.settings.claimTimeProbe !== undefined) {
+        try {
+          const probe = await this.settings.claimTimeProbe(member);
+          state = probe.state;
+          modelId = probe.modelId;
+          failureCode = probe.failureCode;
+          if (state === "HEALTHY" && modelId !== member.model_id) {
+            state = "ABSENT";
+            modelId = null;
+            failureCode = "CLAIM_MODEL_IDENTITY_CHANGED";
+          }
+        } catch (error) {
+          state = "ABSENT";
+          modelId = null;
+          failureCode = error instanceof TypedDomainError ? error.code : "CLAIM_PROVIDER_PROBE_FAILED";
+        }
+      }
+      if (state === "ABSENT") {
+        const resolvedFailureCode = failureCode ?? "CLAIM_PROVIDER_ABSENT";
+        await this.#providerProbes.record({
+          probeEvidenceRef: randomUUID(),
+          providerRef: member.provider_ref,
+          maker: member.maker,
+          state: "ABSENT",
+          modelId: null,
+          failureCode: resolvedFailureCode,
+          probedAt: new Date()
+        });
+        absentAtClaim.push(Object.freeze({ member, failureCode: resolvedFailureCode }));
+        continue;
+      }
+      if (this.settings.claimTimeProbe !== undefined) {
+        await this.#providerProbes.record({
+          probeEvidenceRef: randomUUID(),
+          providerRef: member.provider_ref,
+          maker: member.maker,
+          state: "HEALTHY",
+          modelId,
+          failureCode: null,
+          probedAt: new Date()
+        });
+      }
+      configuredMakers.push(configured!);
     }
-    if (this.#configuredMakers.length < run.agentCount) {
+    if (configuredMakers.length === 0) {
       throw new TypedDomainError(
-        "RUN_MAKER_CONFIGURATION_MISMATCH",
-        `The run requests ${run.agentCount} maker(s), but only ${this.#configuredMakers.length} real maker gateway(s) are configured`
+        "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
+        "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
-    const configuredMakers = this.#configuredMakers.slice(0, run.agentCount);
     const effectiveMakerCount = configuredMakers.length;
-    assertReviewCoverageEnvelopeRatified(expansionDepth);
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
       runId: run.runId,
@@ -1470,6 +1517,7 @@ export class WalkingSkeletonRunner {
       ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
       : [] as const;
     const hiddenConditionMarks = Object.freeze([
+      ...(absentAtClaim.length > 0 ? ["CRITIQUE-UNAVAILABLE" as const] : []),
       ...(hiddenReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
       ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : [])
@@ -1478,10 +1526,10 @@ export class WalkingSkeletonRunner {
       facts: Object.freeze([servedRoot.statement]),
       residualObjections: Object.freeze([]),
       badges: Object.freeze([]),
-      conditionMarks: Object.freeze([
+      conditionMarks: Object.freeze([...new Set([
         ...(effectiveMakerCount > 1 ? ["UNSERVED-MAKER-POSITION" as const] : [...monoMakerConditionMarks]),
         ...hiddenConditionMarks
-      ]),
+      ])]),
       reversalPoint: servedRoot.reversalPoint,
       buildsOnPrevious: {
         value: memoryDisclosure?.matched === true,
@@ -1508,7 +1556,12 @@ export class WalkingSkeletonRunner {
             mark: "CRITIQUE-UNAVAILABLE",
             scope: "answer",
             subjectRef: servedRoot.nodeId,
-            reason: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
+            reason: [
+              ...(absentAtClaim.length === 0 ? [] : [
+                `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
+              ]),
+              `MONO_LINEAGE_DEPTH_NOT_EXPANDED:requested_depth=${expansionDepth}`
+            ].join("|"),
             liftPath: "RUN_DIFFERENT_MAKER_CRITIQUE",
             servedRootRule: null,
             affectedNodeIds: Object.freeze([servedRoot.nodeId])
@@ -1517,6 +1570,15 @@ export class WalkingSkeletonRunner {
       : [buildUnservedMakerPositionRecord(authoredMakerPositions, servedRoot)];
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
+      ...(absentAtClaim.length === 0 || effectiveMakerCount === 1 ? [] : [Object.freeze({
+        mark: "CRITIQUE-UNAVAILABLE" as const,
+        scope: "answer" as const,
+        subjectRef: servedRoot.nodeId,
+        reason: `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`,
+        liftPath: "RESTORE_PINNED_PROVIDER_AND_RUN_AGAIN",
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([servedRoot.nodeId])
+      })]),
       ...hiddenReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
         mark: "HIDDEN-UNJUDGEABLE",
         scope: "node",
@@ -1632,7 +1694,9 @@ export class WalkingSkeletonRunner {
       maxRecompose: this.settings.maxRecompose,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
       strangerSampleRate: run.strangerSampleRate,
-      candidateConfidenceBand: servePolicy.candidateConfidenceBand
+      candidateConfidenceBand: effectiveMakerCount === 1
+        ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
+        : servePolicy.candidateConfidenceBand
     }, {
       measureCompositionBundle: (facts) => Buffer.byteLength(JSON.stringify(facts), "utf8"),
       compose: async (facts, attempt) => {

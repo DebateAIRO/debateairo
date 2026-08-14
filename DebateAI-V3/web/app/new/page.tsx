@@ -16,11 +16,10 @@ export default function NewQuestionPage() {
     const token = getStoredToken();
     if (token === null) { setError("Add your development identity token in Settings first."); return; }
     const data = new FormData(event.currentTarget);
-    const agentCount = Number(data.get("agent_count"));
     const depth = Number(data.get("depth"));
     const asOf = new Date(String(data.get("as_of") ?? ""));
-    if (!Number.isInteger(agentCount) || agentCount < 1 || !Number.isInteger(depth) || depth < 0) {
-      setError("Agent count and depth must be explicit whole numbers."); return;
+    if (!Number.isInteger(depth) || depth < 1) {
+      setError("Depth must be an explicit positive whole number."); return;
     }
     if (Number.isNaN(asOf.valueOf())) { setError("As-of must be an explicit date and time."); return; }
     const lines = (name: string) => String(data.get(name) ?? "").split("\n").filter((line) => line.trim().length > 0);
@@ -31,7 +30,6 @@ export default function NewQuestionPage() {
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: String(data.get("composition_budget_tier")) as AskRequest["composition_budget_tier"],
       depth_params: { depth },
-      agent_count: agentCount,
       decision_owner: String(data.get("decision_owner") ?? ""),
       action_owner: String(data.get("action_owner") ?? ""),
       decision_scope: String(data.get("decision_scope") ?? ""),
@@ -56,7 +54,6 @@ export default function NewQuestionPage() {
       <label>Risk tier<select name="risk_tier" required defaultValue=""><option value="" disabled>Choose</option><option value="casual">Casual</option><option value="standard">Standard</option><option value="high-stakes">High stakes</option></select></label>
       <label>Composition budget tier<select name="composition_budget_tier" required defaultValue=""><option value="" disabled>Choose</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
       <label>Depth<input name="depth" inputMode="numeric" required /></label>
-      <label>Agent count<input name="agent_count" inputMode="numeric" required /></label>
       <label>Decision owner<input name="decision_owner" required /></label>
       <label>Action owner<input name="action_owner" required /></label>
       <label>Decision scope<textarea name="decision_scope" required rows={3} /></label>

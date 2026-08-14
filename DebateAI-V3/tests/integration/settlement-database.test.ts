@@ -9,6 +9,7 @@ import {
   type SettlementOutcomeInput
 } from "@debateai/settlement";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 let database: TestDatabase;
 
@@ -47,7 +48,7 @@ async function createCompletedAnswer(label: string): Promise<{ readonly runId: s
     tierProvenanceRef: `asker:${label}`,
     compositionBudgetTier: "low",
     depthParams: { depth: 1 },
-    agentCount: 1,
+    discoveredPanel: fixtureDiscoveredPanel(1),
     strangerSampleRate: 1,
     envelopeBasis: { source: "test-layer" },
     registerVersion: 1,
@@ -156,7 +157,7 @@ describe("S12 / AC-40..43 / AC-73 — real PostgreSQL settlement carriers", () =
       questionLine: "Incomplete settlement fixture", askerId: "asker:incomplete", sessionId: "session:incomplete",
       callerScope: "ASKER", asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual",
       effectiveRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker:incomplete",
-      compositionBudgetTier: "low", depthParams: { depth: 1 }, agentCount: 1, strangerSampleRate: 1,
+      compositionBudgetTier: "low", depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
       envelopeBasis: { source: "test-layer" }, registerVersion: 1, batteryVersion: "s12-test-layer", batteryRows: []
     });
     const result = await new SettlementRepository(database.pool).settle({
