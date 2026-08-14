@@ -44,7 +44,7 @@ const runtimeRowsSchema = z.object({
       depth_params: z.object({ depth: z.number().int().min(1).max(5) }).strict(),
       risk_tier: z.enum(["standard", "high-stakes"]),
       max_model_attempts: z.number().int().positive()
-    }).strict()).min(1)
+    }).strict()).min(2)
   }).strict(),
   runDeathPolicy: z.object({
     kind: z.literal("RUN_DEATH_POLICY"),
@@ -76,15 +76,11 @@ const runtimeRowsSchema = z.object({
   configuredProviderSet: z.object({
     kind: z.literal("CONFIGURED_PROVIDER_SET"),
     requiredDistinctMakers: z.literal(1),
-    providers: z.tuple([z.object({
-      providerRef: z.literal("acceptance:codex-cli"),
+    providers: z.array(z.object({
+      providerRef: z.string().trim().min(1),
       adapterKind: z.literal("openai-compatible-http"),
-      maker: z.literal("OpenAI")
-    }).strict(), z.object({
-      providerRef: z.literal("acceptance:claude-cli"),
-      adapterKind: z.literal("openai-compatible-http"),
-      maker: z.literal("Anthropic")
-    }).strict()])
+      maker: z.string().trim().min(1)
+    }).strict()).min(1)
   }).strict(),
   judgeContractHash: z.string().regex(/^[a-f0-9]{64}$/),
   composerContractHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -113,19 +109,8 @@ export interface AcceptanceRuntimePolicy {
     readonly value: 0.35;
     readonly sourceRef: typeof ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
   };
-  /** FAIR-02: both configured real makers, by maker family. */
-  readonly providers: {
-    readonly openai: {
-      readonly providerRef: "acceptance:codex-cli";
-      readonly adapterKind: "openai-compatible-http";
-      readonly maker: "OpenAI";
-    };
-    readonly anthropic: {
-      readonly providerRef: "acceptance:claude-cli";
-      readonly adapterKind: "openai-compatible-http";
-      readonly maker: "Anthropic";
-    };
-  };
+  /** DR-162-A/DR-177: configured real makers remain register-driven data. */
+  readonly providers: ReadonlyArray<z.infer<typeof runtimeRowsSchema>["configuredProviderSet"]["providers"][number]>;
   readonly hashes: {
     readonly judge: string;
     readonly composer: string;
@@ -219,10 +204,7 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       value: parsed.hiddenNodeScoreThreshold,
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     }),
-    providers: Object.freeze({
-      openai: parsed.configuredProviderSet.providers[0],
-      anthropic: parsed.configuredProviderSet.providers[1]
-    }),
+    providers: Object.freeze(parsed.configuredProviderSet.providers),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,
       composer: parsed.composerContractHash,

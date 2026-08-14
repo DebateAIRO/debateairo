@@ -1425,3 +1425,15 @@ supersedes | status`.
   another's words), the N-generic walk (DR-162-A), different-lineage
   review with rotation, per-artifact lineage provenance. | V named what
   the product IS | the harness mission | — | ACTIVE
+
+| DR-179 | 2026-08-14 | V ("please no API KEYS for now") | **NO API KEYS —
+  STANDING PROHIBITION.** Model access remains exclusively through V's
+  authenticated CLI subscriptions (claude / codex / grok CLIs wrapped as
+  local relays). No direct API-key provider may be built, configured,
+  stored, or requested — no key material enters the repo, the register,
+  the environment, or any config — until V explicitly lifts this. DR-178's
+  registration-not-engineering direction stands as architecture, but its
+  key-based adapter shapes are DEFERRED; the harness-mission intake seed's
+  server-deployment section inherits this hold. Current state audited:
+  zero keys exist anywhere in the system today. | V bounded the
+  portability path | binds all future provider work | — | ACTIVE

@@ -187,13 +187,14 @@ describe("ACC-01 acceptance register", () => {
     // fair-debate requirement is DR-140(b) run-level law, not a deployment
     // capability floor edit.
     expect(byKey.configuredProviderSet?.sourceRef).toBe(ACCEPTANCE_PROVIDER_SET_SOURCE_REF);
-    expect(ACCEPTANCE_PROVIDER_SET_SOURCE_REF).toBe("acceptance:DR-140:V-approved");
+    expect(ACCEPTANCE_PROVIDER_SET_SOURCE_REF).toBe("acceptance:DR-177:V-approved");
     expect(byKey.configuredProviderSet?.value).toEqual({
       kind: "CONFIGURED_PROVIDER_SET",
       requiredDistinctMakers: 1,
       providers: [
         { providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" },
-        { providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" }
+        { providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" },
+        { providerRef: "acceptance:grok-cli", adapterKind: "openai-compatible-http", maker: "xAI" }
       ]
     });
 

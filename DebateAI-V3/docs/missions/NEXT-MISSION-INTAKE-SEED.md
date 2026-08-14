@@ -16,9 +16,10 @@ provider onboarding (adapter shapes + register records); lineage fully
 data-driven; GROK-01 is the last hand-built relay.
 
 ## Panel & review
-- All-market-model support; server deployability (API-key providers replace
-  CLI relays; secrets governance becomes first-class; embedded PG per-
-  platform binaries exist).
+- All-market-model support; server deployability. **DR-179 HOLD: no API
+  keys for now (V, 2026-08-14)** — CLI-relay access remains the only
+  lawful mechanism until V lifts the hold; key-based providers + secrets
+  governance stay design-only. Embedded PG per-platform binaries exist.
 - Review-lineage ROTATION across the pool (V: "if Claude gave GPT some
   pros and cons, it should be debated by Grok next time. or Gemini. or
   Qwen").

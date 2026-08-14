@@ -1511,6 +1511,10 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(reviews.rows).toHaveLength(16);
       expect(reviews.rows.every((row) => row.author_maker !== row.reviewer_maker)).toBe(true);
       expect(new Set(reviews.rows.map((row) => row.outcome))).toEqual(new Set(["agree", "dispute"]));
+      expect(await new JudgementRepository(database.pool).readLatestReviewerMaker(
+        runId,
+        reviews.rows[0]!.author_maker
+      )).toBe(reviews.rows.filter((row) => row.author_maker === reviews.rows[0]!.author_maker).at(-1)!.reviewer_maker);
 
       const firstNode = await database.pool.query<{ node_id: string; provenance_ref: string }>(
         `SELECT node_id, provenance_ref::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq LIMIT 1`,

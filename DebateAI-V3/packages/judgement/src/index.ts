@@ -345,4 +345,20 @@ export class JudgementRepository {
       throw error;
     }
   }
+
+  async readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null> {
+    const result = await this.pool.query<{ reviewer_maker: string }>(
+      `SELECT reviewer.maker AS reviewer_maker
+       FROM ledger.node_review AS review
+       JOIN ledger.raw_artifact AS author
+         ON author.raw_artifact_id = review.author_raw_artifact_ref
+       JOIN ledger.raw_artifact AS reviewer
+         ON reviewer.raw_artifact_id = review.review_raw_artifact_ref
+       WHERE review.run_id=$1 AND author.maker=$2
+       ORDER BY review.at_seq DESC
+       LIMIT 1`,
+      [runId, authorMaker]
+    );
+    return result.rows[0]?.reviewer_maker ?? null;
+  }
 }

@@ -13,10 +13,8 @@ export const ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF = "acceptance:DR-176:V-approved"
  * row carries the ruling that approved its current value-set (same
  * discipline as DR-136's convergenceStopDefaults). */
 export const ACCEPTANCE_COMPOSITION_MAP_SOURCE_REF = "acceptance:DR-142:V-approved" as const;
-/** FAIR-02 / DR-140: V ruled the fair-debate roster — the provider set gains
- * the second real maker (Claude Code CLI relay, maker Anthropic); the updated
- * row carries the DR-140 ruling as its provenance. */
-export const ACCEPTANCE_PROVIDER_SET_SOURCE_REF = "acceptance:DR-140:V-approved" as const;
+/** DR-177 extends the FAIR-02 roster with Grok Build, maker xAI. */
+export const ACCEPTANCE_PROVIDER_SET_SOURCE_REF = "acceptance:DR-177:V-approved" as const;
 /** FAIR-01 / DR-144: V ruled the DR-074 mandatory deployment scoringOperator
  * row = "accumulate" (provisional pending the DR-023 sitting). The row is
  * seeded byte-faithfully with this ruling's provenance; the runner resolves
@@ -242,9 +240,9 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
     { rowKey: "scoringOperator", value: "accumulate", sourceRef: ACCEPTANCE_SCORING_OPERATOR_SOURCE_REF },
     {
       rowKey: "configuredProviderSet",
-      // FAIR-02 (DR-140): the SECOND real maker joins the deployment — the
-      // Claude Code CLI relay, maker Anthropic — so the maker-capability read
-      // honestly reports 2 configured makers. requiredDistinctMakers stays 1:
+      // GROK-01 (DR-177): the Grok Build CLI relay, maker xAI, joins OpenAI
+      // and Anthropic so the capability read honestly reports three configured
+      // makers. requiredDistinctMakers stays 1:
       // DR-137 keeps mono-model admission lawful for casual/standard tiers;
       // the more-than-one-maker fair-debate requirement is DR-140(b) run-level
       // law, enforced on the debate itself, not a deployment capability floor.
@@ -259,6 +257,10 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
           providerRef: "acceptance:claude-cli",
           adapterKind: "openai-compatible-http",
           maker: "Anthropic"
+        }, {
+          providerRef: "acceptance:grok-cli",
+          adapterKind: "openai-compatible-http",
+          maker: "xAI"
         }]
       },
       sourceRef: ACCEPTANCE_PROVIDER_SET_SOURCE_REF

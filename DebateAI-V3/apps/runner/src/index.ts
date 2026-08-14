@@ -100,9 +100,11 @@ export interface RunnerCritiqueSettings {
 
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
   authorMaker: string,
-  configuredMakers: readonly T[]
+  configuredMakers: readonly T[],
+  latestReviewerMaker: string | null = null
 ): T {
-  const reviewer = configuredMakers.find((candidate) => candidate.maker !== authorMaker);
+  const candidates = configuredMakers.filter((candidate) => candidate.maker !== authorMaker);
+  const reviewer = candidates.find((candidate) => candidate.maker !== latestReviewerMaker) ?? candidates[0];
   if (reviewer === undefined) {
     throw new TypedDomainError(
       "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
@@ -327,6 +329,7 @@ export interface WalkingSkeletonSettings {
     readonly reducerVersion: string;
   };
   readonly critique?: RunnerCritiqueSettings;
+  readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -414,8 +417,6 @@ export function parseComposerOutput(content: string): z.infer<typeof composition
   return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
 }
 
-export type DebateMakerRole = "primary" | "secondary";
-
 const DR159_RATIFIED_MAKER_COUNT = 2;
 
 /** PANEL-01/DR-159: the ratified envelope arithmetic is valid for at most M=2. */
@@ -436,7 +437,7 @@ export interface DebateExpansionLeg {
   readonly parentIndex: number;
   readonly childIndex: number;
   readonly polarity: "support" | "attack";
-  readonly author: DebateMakerRole;
+  readonly authorIndex: number;
 }
 
 export interface MultiMakerExpansionLeg extends DebateExpansionLeg {
@@ -444,7 +445,7 @@ export interface MultiMakerExpansionLeg extends DebateExpansionLeg {
 }
 
 export interface CrossRootExchangeLeg {
-  readonly author: DebateMakerRole;
+  readonly authorIndex: number;
   readonly authorRootIndex: number;
   readonly targetRootIndex: number;
 }
@@ -519,11 +520,10 @@ export function buildMultiMakerExpansionPlan(
   effectiveMakerCount: number
 ): readonly MultiMakerExpansionLeg[] {
   const ruledDepth = resolveExpansionDepth({ depth });
-  assertRatifiedMakerCount(effectiveMakerCount);
-  if (effectiveMakerCount !== DR159_RATIFIED_MAKER_COUNT) {
+  if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 2) {
     throw new TypedDomainError(
-      "MULTI_MAKER_PLAN_REQUIRES_TWO_MAKERS",
-      "The PANEL-01 multi-maker planner requires exactly two configured makers"
+      "MULTI_MAKER_PLAN_REQUIRES_MULTIPLE_MAKERS",
+      "The PANEL-01 multi-maker planner requires at least two configured makers"
     );
   }
   const legs: MultiMakerExpansionLeg[] = [];
@@ -531,15 +531,12 @@ export function buildMultiMakerExpansionPlan(
   for (let rootIndex = 0; rootIndex < effectiveMakerCount; rootIndex += 1) {
     let frontier = [rootIndex];
     for (let round = 1; round <= ruledDepth; round += 1) {
-      const rootAuthor: DebateMakerRole = rootIndex === 0 ? "primary" : "secondary";
-      const author: DebateMakerRole = round % 2 === 0
-        ? rootAuthor
-        : rootAuthor === "primary" ? "secondary" : "primary";
+      const authorIndex = (rootIndex + round) % effectiveMakerCount;
       const nextFrontier: number[] = [];
       for (const parentIndex of frontier) {
         for (const polarity of ["support", "attack"] as const) {
           const childIndex = nextNodeIndex++;
-          legs.push(Object.freeze({ round, rootIndex, parentIndex, childIndex, polarity, author }));
+          legs.push(Object.freeze({ round, rootIndex, parentIndex, childIndex, polarity, authorIndex }));
           nextFrontier.push(childIndex);
         }
       }
@@ -551,12 +548,41 @@ export function buildMultiMakerExpansionPlan(
 
 /** One ordered response per maker: defend its own root and attack the other root. */
 export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
-  assertRatifiedMakerCount(effectiveMakerCount);
-  if (effectiveMakerCount === 1) return Object.freeze([]);
-  return Object.freeze([
-    Object.freeze({ author: "primary" as const, authorRootIndex: 0, targetRootIndex: 1 }),
-    Object.freeze({ author: "secondary" as const, authorRootIndex: 1, targetRootIndex: 0 })
-  ]);
+  if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
+    throw new TypedDomainError("RUN_MAKER_COUNT_INVALID", "The effective maker count must be a positive integer");
+  }
+  return Object.freeze(Array.from({ length: effectiveMakerCount }, (_, authorRootIndex) =>
+    Array.from({ length: effectiveMakerCount }, (_, targetRootIndex) => targetRootIndex === authorRootIndex
+      ? null
+      : Object.freeze({ authorIndex: authorRootIndex, authorRootIndex, targetRootIndex }))
+  ).flat().filter((leg): leg is CrossRootExchangeLeg => leg !== null));
+}
+
+export interface MakerPositionDisclosureRoot {
+  readonly nodeId: string;
+  readonly maker: string;
+}
+
+export function buildUnservedMakerPositionRecord(
+  authoredMakerPositions: readonly MakerPositionDisclosureRoot[],
+  servedRoot: MakerPositionDisclosureRoot
+): ConditionMarkRecord {
+  const unserved = authoredMakerPositions.filter((root) => root.nodeId !== servedRoot.nodeId);
+  if (unserved.length === 0) {
+    throw new TypedDomainError("UNSERVED_MAKER_POSITION_UNRESOLVED", "No unserved maker position exists");
+  }
+  const unservedDescription = unserved.map((root) => `${root.maker} position ${root.nodeId}`).join(", ");
+  return Object.freeze({
+    mark: "UNSERVED-MAKER-POSITION",
+    scope: "answer",
+    subjectRef: servedRoot.nodeId,
+    reason: `The first post-exclusion configured maker root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedDescription} ${unserved.length === 1 ? "remains" : "remain"} graph-visible but unserved`,
+    liftPath: unserved.length === 1
+      ? "Serve the other maker root in a separately ruled answer"
+      : "Serve another maker root in a separately ruled answer",
+    servedRootRule: SERVED_ROOT_RULE,
+    affectedNodeIds: Object.freeze(authoredMakerPositions.map((root) => root.nodeId))
+  });
 }
 
 /**
@@ -598,7 +624,11 @@ export class WalkingSkeletonRunner {
   readonly #serve: ServeRepository;
   readonly #valuation: ValuationRepository;
   readonly #memory: MemoryRepository;
-  readonly #criticJudge: Judge | null;
+  readonly #configuredMakers: readonly {
+    readonly judge: Judge;
+    readonly providerRef: string;
+    readonly maker: string;
+  }[];
 
   constructor(
     pool: Pool,
@@ -615,9 +645,19 @@ export class WalkingSkeletonRunner {
     this.#serve = new ServeRepository(pool);
     this.#valuation = new ValuationRepository(pool);
     this.#memory = new MemoryRepository(pool);
-    // FAIR-01: the critic is the SAME shipped Judge organ over the second
-    // maker's gateway — genuinely independent lineage, no new organ minted.
-    this.#criticJudge = settings.critique === undefined ? null : new Judge(settings.critique.provider);
+    this.#configuredMakers = Object.freeze([
+      Object.freeze({ judge: this.#judge, providerRef: settings.providerRef, maker: settings.maker }),
+      ...(settings.critique === undefined ? [] : [Object.freeze({
+        judge: new Judge(settings.critique.provider),
+        providerRef: settings.critique.providerRef,
+        maker: settings.critique.maker
+      })]),
+      ...(settings.additionalMakers ?? []).map((maker) => Object.freeze({
+        judge: new Judge(maker.provider),
+        providerRef: maker.providerRef,
+        maker: maker.maker
+      }))
+    ]);
   }
 
   async executeNext(): Promise<RunnerExecutionResult> {
@@ -702,8 +742,7 @@ export class WalkingSkeletonRunner {
         "S05 requires V-ratified composition-budget and band-ceiling register rows"
       );
     }
-    const critiqueSettings = this.settings.critique;
-    if (critiqueSettings !== undefined && this.settings.scoringOperator === undefined) {
+    if (this.#configuredMakers.length > 1 && this.settings.scoringOperator === undefined) {
       // FAIR-01 × DR-074: the critique leg always yields an attack arrow, and
       // an arrow-bearing graph cannot propagate without the mandatory
       // deployment scoringOperator row. The value is V's at DR-023 — stop
@@ -782,15 +821,15 @@ export class WalkingSkeletonRunner {
     };
     const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
     const expansionDepth = resolveExpansionDepth(envelopeBasis.derivedFrom.depthParams);
-    const criticJudge = this.#criticJudge;
-    const effectiveMakerCount = critiqueSettings !== undefined && criticJudge !== null ? 2 : 1;
     assertRatifiedMakerCount(run.agentCount);
-    if (run.agentCount !== effectiveMakerCount) {
+    if (this.#configuredMakers.length < run.agentCount) {
       throw new TypedDomainError(
         "RUN_MAKER_CONFIGURATION_MISMATCH",
-        `The run requests ${run.agentCount} maker(s), but exactly ${effectiveMakerCount} real maker gateway(s) are configured`
+        `The run requests ${run.agentCount} maker(s), but only ${this.#configuredMakers.length} real maker gateway(s) are configured`
       );
     }
+    const configuredMakers = this.#configuredMakers.slice(0, run.agentCount);
+    const effectiveMakerCount = configuredMakers.length;
     assertReviewCoverageEnvelopeRatified(expansionDepth);
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
@@ -936,7 +975,7 @@ export class WalkingSkeletonRunner {
       readonly locator: string | null;
       readonly restatementStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
       readonly reversalPoint: string;
-      readonly author: DebateMakerRole;
+      readonly authorIndex: number;
       readonly maker: string;
     }
     const authoredNodes = new Map<number, AuthoredDebateNode>([[0, Object.freeze({
@@ -948,7 +987,7 @@ export class WalkingSkeletonRunner {
       locator: judged.locator,
       restatementStatus: judged.restatementStatus,
       reversalPoint: judged.assessment.critic.summary,
-      author: "primary",
+      authorIndex: 0,
       maker: this.settings.maker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
@@ -958,7 +997,7 @@ export class WalkingSkeletonRunner {
     }> = [];
 
     const authorPosition = async (input: {
-      readonly author: DebateMakerRole;
+      readonly authorIndex: number;
       readonly questionLine: string;
       readonly callSiteKey: string;
       readonly role: string;
@@ -975,9 +1014,10 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "AUTHORED"; readonly value: AuthoredDebateNode }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-      const selectedMaker = input.author === "primary"
-        ? { judge: this.#judge, providerRef: this.settings.providerRef, maker: this.settings.maker }
-        : { judge: criticJudge!, providerRef: critiqueSettings!.providerRef, maker: critiqueSettings!.maker };
+      const selectedMaker = configuredMakers[input.authorIndex];
+      if (selectedMaker === undefined) {
+        throw new TypedDomainError("DEBATE_MAKER_UNRESOLVED", `No configured maker exists at index ${input.authorIndex}`);
+      }
         await this.#ledger.append({
           runId: run.runId,
           attemptId: runnerAttemptId,
@@ -1094,14 +1134,14 @@ export class WalkingSkeletonRunner {
           locator: childJudged.locator,
           restatementStatus: childJudged.restatementStatus,
           reversalPoint: childJudged.assessment.critic.summary,
-          author: input.author,
+          authorIndex: input.authorIndex,
           maker: selectedMaker.maker
         }) };
     };
 
-    if (effectiveMakerCount === 2) {
+    if (effectiveMakerCount > 1) {
       const secondary = await authorPosition({
-        author: "secondary",
+        authorIndex: 1,
         questionLine: [
           "Independently author your own position on the question. Do not grade or imitate another maker.",
           `Question under debate: ${run.questionLine}`
@@ -1124,9 +1164,34 @@ export class WalkingSkeletonRunner {
       authoredNodes.set(1, secondary.value);
     }
 
+    for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
+      const additionalRoot = await authorPosition({
+        authorIndex: makerIndex,
+        questionLine: [
+          "Independently author your own position on the question. Do not grade or imitate another maker.",
+          `Question under debate: ${run.questionLine}`
+        ].join("\n"),
+        callSiteKey: `JUDGE:root:${makerIndex}`,
+        role: "additional maker root author",
+        parentNodeId: null,
+        childKind: null,
+        siblingOrdinal: 0,
+        plannedLegCount: 1,
+        explorationDecision: "continue",
+        edges: []
+      });
+      if (additionalRoot.kind === "HALTED") {
+        throw new TypedDomainError(
+          "MAKER_POSITION_UNAVAILABLE",
+          `Maker position ${makerIndex} failed after the full cooldown and final-retry courtesy`
+        );
+      }
+      authoredNodes.set(makerIndex, additionalRoot.value);
+    }
+
     // PRO-01 × PANEL-01: each independently authored root owns its own B3-B
     // breadth-first pro/con tree, with real per-node maker lineage.
-    const expansionPlan = effectiveMakerCount === 2
+    const expansionPlan = effectiveMakerCount > 1
       ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount)
       : [];
     const haltedIndices = new Set<number>();
@@ -1159,7 +1224,7 @@ export class WalkingSkeletonRunner {
             "State and defend the strongest genuine counter-position to that position."
           ].join("\n");
       const authored = await authorPosition({
-        author: leg.author,
+        authorIndex: leg.authorIndex,
         questionLine: childQuestionLine,
         callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
         role,
@@ -1189,7 +1254,7 @@ export class WalkingSkeletonRunner {
         throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
       }
       const authored = await authorPosition({
-        author: exchange.author,
+        authorIndex: exchange.authorIndex,
         questionLine: [
           "Author one direct cross-root response: defend your own position and attack the other maker's position.",
           `Question under debate: ${run.questionLine}`,
@@ -1222,12 +1287,9 @@ export class WalkingSkeletonRunner {
     // invalid review call leaves the append-only review resource absent and
     // makes the run unservable; envelope refusal is likewise never swallowed.
     if (effectiveMakerCount > 1) {
-      const configuredReviewers = [
-        { judge: this.#judge, providerRef: this.settings.providerRef, maker: this.settings.maker },
-        { judge: criticJudge!, providerRef: critiqueSettings!.providerRef, maker: critiqueSettings!.maker }
-      ] as const;
       for (const authoredNode of authoredNodes.values()) {
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredReviewers);
+        const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
+        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
         try {
           const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
           const reviewAttempt = await cooldownAttempt({
@@ -1329,9 +1391,6 @@ export class WalkingSkeletonRunner {
     }
     const servedRootSelection = selectServedRoot(servableMakerPositions);
     const servedRoot = servedRootSelection.root;
-    const unservedRoot = effectiveMakerCount === 2
-      ? authoredMakerPositions.find((root) => root.nodeId !== servedRoot.nodeId)
-      : undefined;
     const servedNodes = buildFixedSingleRootServeNodes(
       authoredMakerPositions,
       servedRoot.nodeId
@@ -1400,7 +1459,7 @@ export class WalkingSkeletonRunner {
       residualObjections: Object.freeze([]),
       badges: Object.freeze([]),
       conditionMarks: Object.freeze([
-        ...(effectiveMakerCount === 2 ? ["UNSERVED-MAKER-POSITION" as const] : [...monoMakerConditionMarks]),
+        ...(effectiveMakerCount > 1 ? ["UNSERVED-MAKER-POSITION" as const] : [...monoMakerConditionMarks]),
         ...hiddenConditionMarks
       ]),
       reversalPoint: servedRoot.reversalPoint,
@@ -1435,17 +1494,7 @@ export class WalkingSkeletonRunner {
             affectedNodeIds: Object.freeze([servedRoot.nodeId])
           })
         ]
-      : unservedRoot === undefined
-        ? []
-      : [Object.freeze({
-          mark: "UNSERVED-MAKER-POSITION",
-          scope: "answer",
-          subjectRef: servedRoot.nodeId,
-          reason: `The first post-exclusion configured maker root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedRoot.maker} position ${unservedRoot.nodeId} remains graph-visible but unserved`,
-          liftPath: "Serve the other maker root in a separately ruled answer",
-          servedRootRule: servedRootSelection.rule,
-          affectedNodeIds: Object.freeze([servedRoot.nodeId, unservedRoot.nodeId])
-        })];
+      : [buildUnservedMakerPositionRecord(authoredMakerPositions, servedRoot)];
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
       ...hiddenReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({

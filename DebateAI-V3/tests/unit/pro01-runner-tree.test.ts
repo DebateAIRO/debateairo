@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertRatifiedMakerCount,
   buildCrossRootExchangePlan,
+  buildUnservedMakerPositionRecord,
   buildFixedSingleRootServeNodes,
   buildMultiMakerExpansionPlan,
   createPostgresProviderGateway,
@@ -20,24 +21,59 @@ describe("PANEL-01 multi-maker root authorship", () => {
 
   it("grows each maker-authored root through its own B3-B tree", () => {
     expect(buildMultiMakerExpansionPlan(1, 2)).toEqual([
-      { round: 1, rootIndex: 0, parentIndex: 0, childIndex: 2, polarity: "support", author: "secondary" },
-      { round: 1, rootIndex: 0, parentIndex: 0, childIndex: 3, polarity: "attack", author: "secondary" },
-      { round: 1, rootIndex: 1, parentIndex: 1, childIndex: 4, polarity: "support", author: "primary" },
-      { round: 1, rootIndex: 1, parentIndex: 1, childIndex: 5, polarity: "attack", author: "primary" }
+      { round: 1, rootIndex: 0, parentIndex: 0, childIndex: 2, polarity: "support", authorIndex: 1 },
+      { round: 1, rootIndex: 0, parentIndex: 0, childIndex: 3, polarity: "attack", authorIndex: 1 },
+      { round: 1, rootIndex: 1, parentIndex: 1, childIndex: 4, polarity: "support", authorIndex: 0 },
+      { round: 1, rootIndex: 1, parentIndex: 1, childIndex: 5, polarity: "attack", authorIndex: 0 }
     ]);
   });
 
   it("has no FAIR-illegal one-maker branch in the multi-maker planner", () => {
     expect(() => buildMultiMakerExpansionPlan(1, 1)).toThrowError(expect.objectContaining({
-      code: "MULTI_MAKER_PLAN_REQUIRES_TWO_MAKERS"
+      code: "MULTI_MAKER_PLAN_REQUIRES_MULTIPLE_MAKERS"
     }));
   });
 
   it("plans one ordered cross-root attack-and-defence exchange per maker", () => {
     expect(buildCrossRootExchangePlan(2)).toEqual([
-      { author: "primary", authorRootIndex: 0, targetRootIndex: 1 },
-      { author: "secondary", authorRootIndex: 1, targetRootIndex: 0 }
+      { authorIndex: 0, authorRootIndex: 0, targetRootIndex: 1 },
+      { authorIndex: 1, authorRootIndex: 1, targetRootIndex: 0 }
     ]);
+  });
+
+  it("scales the tree walk, ordered exchange set, and unserved disclosure over the configured maker count", () => {
+    const threeMakerPlan = buildMultiMakerExpansionPlan(1, 3);
+    expect(threeMakerPlan).toHaveLength(6);
+    expect(new Set(threeMakerPlan.map((leg) => leg.rootIndex))).toEqual(new Set([0, 1, 2]));
+    expect(threeMakerPlan.map((leg) => leg.authorIndex)).toEqual([1, 1, 2, 2, 0, 0]);
+    expect(buildCrossRootExchangePlan(3)).toEqual([
+      { authorIndex: 0, authorRootIndex: 0, targetRootIndex: 1 },
+      { authorIndex: 0, authorRootIndex: 0, targetRootIndex: 2 },
+      { authorIndex: 1, authorRootIndex: 1, targetRootIndex: 0 },
+      { authorIndex: 1, authorRootIndex: 1, targetRootIndex: 2 },
+      { authorIndex: 2, authorRootIndex: 2, targetRootIndex: 0 },
+      { authorIndex: 2, authorRootIndex: 2, targetRootIndex: 1 }
+    ]);
+
+    const roots = [
+      { nodeId: "node:openai", maker: "OpenAI" },
+      { nodeId: "node:anthropic", maker: "Anthropic" },
+      { nodeId: "node:xai", maker: "xAI" }
+    ] as const;
+    expect(buildUnservedMakerPositionRecord(roots, roots[0])).toMatchObject({
+      mark: "UNSERVED-MAKER-POSITION",
+      subjectRef: "node:openai",
+      affectedNodeIds: ["node:openai", "node:anthropic", "node:xai"]
+    });
+    expect(buildUnservedMakerPositionRecord(roots, roots[0]).reason).toContain(
+      "Anthropic position node:anthropic, xAI position node:xai remain graph-visible but unserved"
+    );
+
+    // DR-162-A mutation: remove the third roster member and all M=2 outputs
+    // remain the existing two-root/two-exchange/one-unserved shape.
+    expect(buildCrossRootExchangePlan(roots.slice(0, 2).length)).toHaveLength(2);
+    expect(buildUnservedMakerPositionRecord(roots.slice(0, 2), roots[0]).affectedNodeIds)
+      .toEqual(["node:openai", "node:anthropic"]);
   });
 
   it("observes DR-159 B2-A independently of the fixed-single-root guard", () => {
