@@ -4,6 +4,7 @@ import type { AskRequest, Session } from "@debateai/contract";
 import { migrate, ProviderProbeRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  DomainRegistryRepository,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF
 } from "../../packages/evaluator/src/index.js";
@@ -98,6 +99,162 @@ describe("0023 evaluator foundation migration", () => {
     )).toBe(false);
   });
 });
+
+describe("domain registry repository", () => {
+  it("records exact, rejected near-duplicate, and grown admission decisions", async () => {
+    const runId = await insertEvaluatorRun("domain admission decisions");
+    const repository = new DomainRegistryRepository(database.pool);
+    const starter = await insertStarterDomain("Software Engineering", "test:starter:software");
+
+    await expect(repository.admitProposal({
+      runId,
+      proposedName: "SOFTWARE   ENGINEERING",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: null,
+      provenanceRef: "test:proposal:exact"
+    })).resolves.toMatchObject({ decision: "MATCHED_EXISTING", domainId: starter.domainId });
+
+    await expect(repository.admitProposal({
+      runId,
+      proposedName: "Software Engineer",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: null,
+      provenanceRef: "test:proposal:near"
+    })).resolves.toMatchObject({ decision: "REJECTED_NEAR_DUPLICATE", domainId: null });
+
+    const grown = await repository.admitProposal({
+      runId,
+      proposedName: "Climate Science",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: await insertRawArtifact(runId, "artifact:domain:climate"),
+      provenanceRef: "test:proposal:new"
+    });
+    expect(grown).toMatchObject({ decision: "ADMITTED_NEW" });
+    const persisted = await repository.listDomains();
+    expect(persisted.map((row) => [row.normalizedName, row.origin])).toEqual([
+      ["climate science", "GROWN"],
+      ["software engineering", "STARTER"]
+    ]);
+  });
+
+  it("backfills the dedicated question link once and keeps domain identity append-only", async () => {
+    const runId = await insertEvaluatorRun("domain backfill landing");
+    const repository = new DomainRegistryRepository(database.pool);
+    const domain = await insertStarterDomain("Mathematics", "test:starter:mathematics");
+    const admission = await repository.admitProposal({
+      runId,
+      proposedName: "Mathematics",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: null,
+      provenanceRef: "test:proposal:math"
+    });
+
+    await repository.assignQuestionDomain({
+      runId,
+      domainId: domain.domainId,
+      domainAdmissionId: admission.domainAdmissionId,
+      basis: "BACKFILL",
+      rawArtifactRef: null
+    });
+    await expect(repository.assignQuestionDomain({
+      runId,
+      domainId: domain.domainId,
+      domainAdmissionId: admission.domainAdmissionId,
+      basis: "BACKFILL",
+      rawArtifactRef: null
+    })).rejects.toThrow();
+    await expect(database.pool.query(
+      "UPDATE evaluator.question_domain SET domain_id=domain_id WHERE run_id=$1",
+      [runId]
+    )).rejects.toThrow(/append-only or immutable table question_domain rejects UPDATE/);
+    await expect(repository.readQuestionDomain(runId)).resolves.toMatchObject({
+      runId,
+      domainId: domain.domainId,
+      assignmentBasis: "BACKFILL"
+    });
+  });
+
+  it("serializes concurrent near-duplicate proposals into one grown domain", async () => {
+    const runId = await insertEvaluatorRun("concurrent domain proposal");
+    const rawArtifactRef = await insertRawArtifact(runId, "artifact:domain:robotics");
+    const repository = new DomainRegistryRepository(database.pool);
+    const input = {
+      runId,
+      proposedName: "Robotics",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef,
+      provenanceRef: "test:proposal:robotics"
+    } as const;
+
+    const results = await Promise.all([
+      repository.admitProposal(input),
+      repository.admitProposal({ ...input, proposedName: "Robotic" })
+    ]);
+    expect(results.map((result) => result.decision).sort()).toEqual([
+      "ADMITTED_NEW",
+      "REJECTED_NEAR_DUPLICATE"
+    ]);
+    const count = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM evaluator.domain
+      WHERE normalized_name IN ('robotics', 'robotic')
+    `);
+    expect(count.rows[0]!.count).toBe("1");
+  });
+});
+
+async function insertEvaluatorRun(questionLine: string): Promise<string> {
+  const result = await database.pool.query<{ run_id: string }>(`
+    INSERT INTO core.run (
+      question_line, asker_id, session_id, caller_scope, as_of, asker_risk_tier,
+      risk_tier, tier_source, tier_provenance_ref, composition_budget_tier,
+      depth_params, agent_count, discovered_panel, stranger_sample_rate,
+      envelope_basis, register_version, battery_version, ask_contract, created_at_seq
+    ) VALUES (
+      $1, 'asker:evaluator-domain', gen_random_uuid()::text, 'ASKER', now(), 'casual',
+      'casual', 'ASKER', 'test', 'low', '{}'::jsonb, 1, $2::jsonb, 0,
+      '{}'::jsonb, 1, 'test', '{}'::jsonb, ledger.allocate_sequence()
+    ) RETURNING run_id
+  `, [questionLine, JSON.stringify(fixtureDiscoveredPanel(1))]);
+  return result.rows[0]!.run_id;
+}
+
+async function insertRawArtifact(runId: string, callSite: string): Promise<string> {
+  const result = await database.pool.query<{ raw_artifact_id: string }>(`
+    INSERT INTO ledger.raw_artifact (
+      raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
+      maker, model_version, raw_text, metadata_json, parse_status, input_hash,
+      contract_hash, content_hash, at_seq
+    ) VALUES (
+      gen_random_uuid(), gen_random_uuid(), $1, 'provider:test', 'provider:test',
+      'model:test', 'maker:evaluator-domain', 'v1', $2, '{}'::jsonb, 'PARSED',
+      repeat('b', 64), repeat('c', 64), repeat('a', 64), ledger.allocate_sequence()
+    ) RETURNING raw_artifact_id
+  `, [runId, callSite]);
+  return result.rows[0]!.raw_artifact_id;
+}
+
+async function insertStarterDomain(canonicalName: string, provenanceRef: string): Promise<{
+  readonly domainId: string;
+}> {
+  const result = await database.pool.query<{ domain_id: string }>(`
+    INSERT INTO evaluator.domain (
+      canonical_name, normalized_name, origin, guardrail_version,
+      provenance_ref, admitted_at, at_seq
+    ) VALUES ($1, lower($1), 'STARTER', 1, $2, now(), ledger.allocate_sequence())
+    RETURNING domain_id
+  `, [canonicalName, provenanceRef]);
+  return { domainId: result.rows[0]!.domain_id };
+}
 
 describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
   const absentVersion = 201;
