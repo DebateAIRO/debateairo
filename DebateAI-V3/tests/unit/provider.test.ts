@@ -11,6 +11,31 @@ afterEach(async () => {
 });
 
 describe("FX-HR-H1 — one provider interface", () => {
+  it("preserves observed usage in raw artifact metadata and uses null when absent", async () => {
+    const artifacts: Record<string, unknown>[] = [];
+    let responseUsage: unknown = { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, x_cost_usd: 0.01 };
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1", model: "fixture", maker: "fixture",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "call", model: "fixture", choices: [{ message: { content: "ok" } }], usage: responseUsage
+      })),
+      persistRawArtifact: async (artifact) => { artifacts.push(artifact.metadata); return artifact.artifactId; },
+      appendLedgerEntry: async () => "ledger:test",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    const request = {
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE" as const,
+      lane: "served" as const, bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
+      contractHash: "contract", providerRef: "provider", packet: { messages: [{ role: "user" as const, content: "x" }] }
+    };
+    await gateway.call(request);
+    responseUsage = null;
+    await gateway.call(request);
+    expect(artifacts.map((metadata) => metadata.usage)).toEqual([
+      { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, x_cost_usd: 0.01 },
+      null
+    ]);
+  });
   it("FX-LG-16 persists the contract classifier's parse-vs-schema outcome on the unconditional artifact", async () => {
     let attempt = 0;
     const server = createServer((_request, response) => response.end(JSON.stringify({

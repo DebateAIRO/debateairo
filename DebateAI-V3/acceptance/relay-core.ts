@@ -30,6 +30,15 @@ export interface CliCompletion {
   readonly content: string;
   /** The model id honestly attributable to this completion (DR-115). */
   readonly model: string;
+  /** Observed CLI-reported usage only. Missing telemetry is represented by null. */
+  readonly usage: CliUsage | null;
+}
+
+export interface CliUsage {
+  readonly promptTokens?: number;
+  readonly completionTokens?: number;
+  readonly totalTokens?: number;
+  readonly costUsd?: number;
 }
 
 /** P8 strategy: how one maker's CLI is invoked and how its output is parsed. */
@@ -162,6 +171,12 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
         created: Math.floor(Date.now() / 1_000),
         model: completion.model,
         maker: options.adapter.maker,
+        usage: completion.usage === null ? null : {
+          prompt_tokens: completion.usage.promptTokens,
+          completion_tokens: completion.usage.completionTokens,
+          total_tokens: completion.usage.totalTokens,
+          x_cost_usd: completion.usage.costUsd
+        },
         choices: [{ index: 0, message: { role: "assistant", content: completion.content }, finish_reason: "stop" }]
       });
     } catch (error) {

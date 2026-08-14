@@ -51,8 +51,10 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       model: string;
       maker: string;
       choices: readonly { message: { content: string } }[];
+      usage: { completion_tokens: number; x_cost_usd: number };
     };
     expect(completion).toMatchObject({ model: "claude-fake-cli-model", maker: "Anthropic" });
+    expect(completion.usage).toEqual({ completion_tokens: 5, x_cost_usd: 0 });
     const relayed = JSON.parse(completion.choices[0]!.message.content) as {
       prompt: string;
       argumentList: readonly string[];

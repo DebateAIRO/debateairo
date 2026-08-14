@@ -8,6 +8,7 @@ import {
   EVALUATOR_PROVIDER_REF,
   assertEvaluatorProviderIsolation,
   createBlindEvaluationSample,
+  deriveRelativeCostCellsV1,
   probeEvaluatorVllmCatalog,
   readEvaluatorDispatchBinding,
   readEvaluatorProviderFamily
@@ -35,6 +36,18 @@ const familyValue = {
 } as const;
 
 describe("Evaluator foundation", () => {
+  it("normalizes observed external spend without treating larger local token volume as paid cost", () => {
+    const cells = deriveRelativeCostCellsV1([
+      { provider: "vllm", modelId: "local", modelVersion: "v1", runtimeClass: "LOCAL_VLLM", usage: { total_tokens: 50_000 } },
+      { provider: "xai", modelId: "grok", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { total_tokens: 10, x_cost_usd: 0.02 } },
+      { provider: "anthropic", modelId: "claude", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: null }
+    ]);
+    expect(cells).toEqual([
+      expect.objectContaining({ modelId: "local", relativeCost: 0, comparability: "COMPARABLE", meteredCallCount: 1 }),
+      expect.objectContaining({ modelId: "grok", relativeCost: 1, comparability: "COMPARABLE", meteredCallCount: 1 }),
+      expect.objectContaining({ modelId: "claude", relativeCost: null, comparability: "UNKNOWN", unmeteredCallCount: 1 })
+    ]);
+  });
   it("scaffolds the evaluator worker as a separate composition root", () => {
     expect(EVALUATOR_TASK_FAMILIES).toEqual([
       "evaluator.tag-question",

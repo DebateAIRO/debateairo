@@ -39,7 +39,8 @@ describe("GROK-01 Grok Build CLI relay", () => {
       await expect(response.json()).resolves.toMatchObject({
         model: "grok-4.6-build",
         maker: "xAI",
-        choices: [{ message: { content: "OK" } }]
+        choices: [{ message: { content: "OK" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, x_cost_usd: 0.00001 }
       });
     } finally {
       delete process.env.FAKE_GROK_CAPTURED_ENVELOPE;

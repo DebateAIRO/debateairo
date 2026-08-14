@@ -18,13 +18,22 @@ const envelopeSchema = z.object({
   text: z.string(),
   stopReason: z.string().trim().min(1),
   total_cost_usd: z.number().nonnegative(),
-  modelUsage: z.record(z.string().trim().min(1), z.unknown())
+  modelUsage: z.record(z.string().trim().min(1), z.object({
+    input_tokens: z.number().int().nonnegative().optional(),
+    output_tokens: z.number().int().nonnegative().optional()
+  }).passthrough())
 }).passthrough();
 
 function parseGrokEnvelope(stdout: string): {
   readonly content: string;
   readonly model: string;
   readonly costUsd: number;
+  readonly usage: {
+    readonly promptTokens?: number;
+    readonly completionTokens?: number;
+    readonly totalTokens?: number;
+    readonly costUsd: number;
+  };
 } {
   let decoded: unknown;
   try {
@@ -41,7 +50,21 @@ function parseGrokEnvelope(stdout: string): {
   if (reportedModels.length !== 1 || model === undefined) {
     throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_UNRESOLVED");
   }
-  return Object.freeze({ content, model, costUsd: envelope.data.total_cost_usd });
+  const observed = envelope.data.modelUsage[model]!;
+  const usage = {
+    ...(observed.input_tokens === undefined ? {} : { promptTokens: observed.input_tokens }),
+    ...(observed.output_tokens === undefined ? {} : { completionTokens: observed.output_tokens }),
+    ...(observed.input_tokens === undefined || observed.output_tokens === undefined
+      ? {}
+      : { totalTokens: observed.input_tokens + observed.output_tokens }),
+    costUsd: envelope.data.total_cost_usd
+  };
+  return Object.freeze({
+    content,
+    model,
+    costUsd: envelope.data.total_cost_usd,
+    usage: Object.freeze(usage)
+  });
 }
 
 const grokAdapter: CliRelayAdapter = {

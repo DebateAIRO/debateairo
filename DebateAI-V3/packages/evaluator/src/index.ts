@@ -281,3 +281,146 @@ export function createBlindEvaluationSample(input: {
     reasons: Object.freeze([...input.reasons])
   });
 }
+
+export const METERING_CAPTURE_VERSION = 1 as const;
+export const RELATIVE_COST_DERIVATION_VERSION = 1 as const;
+export const RELATIVE_COST_NORMALIZATION_BASIS = "relative-external-spend/v1" as const;
+
+export interface ObservedModelCallUsage {
+  readonly prompt_tokens?: number;
+  readonly completion_tokens?: number;
+  readonly total_tokens?: number;
+  readonly x_cost_usd?: number;
+}
+
+export interface ModelCallUsageInput {
+  readonly ledgerEntryId: string;
+  readonly rawArtifactId: string | null;
+  readonly provider: string;
+  readonly modelId: string;
+  readonly modelVersion: string;
+  readonly callSiteKey: string;
+  readonly runtimeClass: "PAID_REMOTE" | "LOCAL_VLLM";
+  readonly usage: ObservedModelCallUsage | null;
+}
+
+function assertObservedUsage(usage: ObservedModelCallUsage): void {
+  const values = [usage.prompt_tokens, usage.completion_tokens, usage.total_tokens, usage.x_cost_usd];
+  if (!values.some((value) => value !== undefined)) throw new TypeError("MODEL_CALL_USAGE_EMPTY");
+  if (values.some((value) => value !== undefined && (!Number.isFinite(value) || value < 0))) {
+    throw new TypeError("MODEL_CALL_USAGE_INVALID");
+  }
+  if ([usage.prompt_tokens, usage.completion_tokens, usage.total_tokens]
+    .some((value) => value !== undefined && !Number.isInteger(value))) {
+    throw new TypeError("MODEL_CALL_USAGE_TOKEN_INVALID");
+  }
+  if (usage.total_tokens !== undefined && usage.prompt_tokens !== undefined
+    && usage.completion_tokens !== undefined
+    && usage.total_tokens !== usage.prompt_tokens + usage.completion_tokens) {
+    throw new TypeError("MODEL_CALL_USAGE_TOTAL_MISMATCH");
+  }
+}
+
+export class EvaluatorMeteringRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async recordCall(input: ModelCallUsageInput): Promise<string> {
+    if (input.usage !== null) assertObservedUsage(input.usage);
+    return withWriteTransaction(this.pool, async (client) => {
+      const sequence = await allocateSequence(client);
+      const inserted = await client.query<{ model_call_usage_id: string }>(`
+        INSERT INTO evaluator.model_call_usage (
+          ledger_entry_id, raw_artifact_id, provider, model_id, model_version,
+          call_site_key, runtime_class, metering_status, prompt_tokens,
+          completion_tokens, total_tokens, reported_vendor_amount,
+          reported_vendor_unit, raw_usage, capture_version, at_seq
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16)
+        RETURNING model_call_usage_id
+      `, [
+        input.ledgerEntryId,
+        input.rawArtifactId,
+        input.provider,
+        input.modelId,
+        input.modelVersion,
+        input.callSiteKey,
+        input.runtimeClass,
+        input.usage === null ? "UNMETERED" : "METERED",
+        input.usage?.prompt_tokens ?? null,
+        input.usage?.completion_tokens ?? null,
+        input.usage?.total_tokens ?? null,
+        input.usage?.x_cost_usd ?? null,
+        input.usage?.x_cost_usd === undefined ? null : "USD",
+        input.usage === null ? null : JSON.stringify(input.usage),
+        METERING_CAPTURE_VERSION,
+        sequence
+      ]);
+      return inserted.rows[0]!.model_call_usage_id;
+    });
+  }
+}
+
+export interface RelativeCostUsageSample {
+  readonly provider: string;
+  readonly modelId: string;
+  readonly modelVersion: string;
+  readonly runtimeClass: "PAID_REMOTE" | "LOCAL_VLLM";
+  readonly usage: ObservedModelCallUsage | null;
+}
+
+export interface RelativeCostCellV1 {
+  readonly provider: string;
+  readonly modelId: string;
+  readonly modelVersion: string;
+  readonly relativeCost: number | null;
+  readonly comparability: "COMPARABLE" | "UNKNOWN";
+  readonly meteredCallCount: number;
+  readonly unmeteredCallCount: number;
+  readonly sourceUnitTotals: Readonly<{ tokens: number; usd: number }>;
+  readonly normalizationBasis: typeof RELATIVE_COST_NORMALIZATION_BASIS;
+}
+
+export function deriveRelativeCostCellsV1(
+  samples: readonly RelativeCostUsageSample[]
+): readonly RelativeCostCellV1[] {
+  const groups = new Map<string, RelativeCostUsageSample[]>();
+  for (const sample of samples) {
+    const key = JSON.stringify([sample.provider, sample.modelId, sample.modelVersion]);
+    groups.set(key, [...(groups.get(key) ?? []), sample]);
+  }
+  const summaries = [...groups.values()].map((calls) => {
+    const first = calls[0]!;
+    const metered = calls.filter((call) => call.usage !== null);
+    const paidAmounts = metered.flatMap((call) => call.usage?.x_cost_usd === undefined ? [] : [call.usage.x_cost_usd]);
+    return {
+      first,
+      meteredCallCount: metered.length,
+      unmeteredCallCount: calls.length - metered.length,
+      tokens: metered.reduce((sum, call) => sum + (call.usage?.total_tokens ?? 0), 0),
+      usd: paidAmounts.reduce((sum, amount) => sum + amount, 0),
+      meanPaidUsd: paidAmounts.length === 0 ? null : paidAmounts.reduce((sum, amount) => sum + amount, 0) / paidAmounts.length
+    };
+  });
+  const maximumPositiveMean = Math.max(0, ...summaries.flatMap((summary) =>
+    summary.first.runtimeClass === "PAID_REMOTE" && summary.meanPaidUsd !== null && summary.meanPaidUsd > 0
+      ? [summary.meanPaidUsd]
+      : []
+  ));
+  return Object.freeze(summaries.map((summary) => {
+    const relativeCost = summary.first.runtimeClass === "LOCAL_VLLM"
+      ? 0
+      : summary.meanPaidUsd !== null && summary.meanPaidUsd > 0 && maximumPositiveMean > 0
+        ? summary.meanPaidUsd / maximumPositiveMean
+        : null;
+    return Object.freeze({
+      provider: summary.first.provider,
+      modelId: summary.first.modelId,
+      modelVersion: summary.first.modelVersion,
+      relativeCost,
+      comparability: relativeCost === null ? "UNKNOWN" as const : "COMPARABLE" as const,
+      meteredCallCount: summary.meteredCallCount,
+      unmeteredCallCount: summary.unmeteredCallCount,
+      sourceUnitTotals: Object.freeze({ tokens: summary.tokens, usd: summary.usd }),
+      normalizationBasis: RELATIVE_COST_NORMALIZATION_BASIS
+    });
+  }));
+}

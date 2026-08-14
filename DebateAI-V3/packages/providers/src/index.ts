@@ -121,7 +121,7 @@ export interface RawArtifactInput {
   readonly maker: string;
   readonly modelVersion: string | null;
   readonly rawText: string;
-  readonly metadata: Readonly<Record<string, string | number | boolean | null>>;
+  readonly metadata: Readonly<Record<string, unknown>>;
   readonly parseStatus: "PARSED" | "UNPARSED" | "PARSE_FAILED" | "SCHEMA_FAILED";
   readonly parseError?: string | null;
   readonly inputHash: string;
@@ -159,6 +159,12 @@ export interface OpenAICompatibleGatewayOptions {
 const responseSchema = z.object({
   id: z.string().min(1),
   model: z.string().min(1),
+  usage: z.object({
+    prompt_tokens: z.number().int().nonnegative().optional(),
+    completion_tokens: z.number().int().nonnegative().optional(),
+    total_tokens: z.number().int().nonnegative().optional(),
+    x_cost_usd: z.number().nonnegative().optional()
+  }).passthrough().nullable().optional(),
   choices: z.array(z.object({
     message: z.object({ content: z.string() })
   })).min(1)
@@ -260,7 +266,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           maker: this.#options.maker,
           modelVersion: candidate.success ? candidate.data.model : null,
           rawText,
-          metadata: { status: response.status, attempt },
+          metadata: {
+            status: response.status,
+            attempt,
+            usage: strict.success ? strict.data.usage ?? null : null
+          },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,
           inputHash,
