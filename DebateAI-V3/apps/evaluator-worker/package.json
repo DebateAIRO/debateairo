@@ -1,0 +1,12 @@
+{
+  "name": "@debateai/evaluator-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@debateai/db": "workspace:*",
+    "@debateai/evaluator": "workspace:*",
+    "pg": "8.22.0"
+  }
+}
