@@ -1593,3 +1593,38 @@ supersedes | status`.
   net. (9) FLEET SCOPE until Grok's seat is funded: Claude reviews, Codex
   codes — DR-185's exception extends to this ticket's diamond, disclosed.
   | V ratified the dual-verdict package | REVCOV-01 | — | ACTIVE
+
+| DR-187 | 2026-08-15 | V (card: "Re-baseline the checksum in place") |
+  **ONE-ROW REGISTER RE-BASELINE.** serveContractHash — a drift-detector
+  checksum computed from packages/serve source at seed time, NOT a V-ruled
+  value — is updated in place (owner-level, the runtime remains revoked)
+  to the hash of the serve layer shipped by the dual-greenlit REVCOV-01
+  commit 4caf539. Basis: the guard exists to catch UNAUTHORIZED drift; the
+  drift here is a lawfully reviewed change, and the ruled reseed ceremony
+  would wipe the served three-house debate (091b7663) that the catch-up
+  exists to heal. Canonical-JSON verification confirmed every OTHER
+  register row byte-identical (the quick-diff's seven false positives were
+  jsonb key-order artifacts). Single use; register-versioning remains the
+  proper future mechanism (intake seed). | the checksum outlived its
+  source lawfully | the catch-up ceremony | — | ACTIVE
+
+| DR-188 | 2026-08-15 | V ("database deletion should never happen on either
+  DEV, or MAIN. because our app will be hosted one day, and users will
+  need to use it, and having their debates deleted after an update would
+  surely crack things up") | **THE DATA-PRESERVATION LAW.** User debate
+  data survives every update, on every environment, forever. Consequences:
+  (1) migrations must remain additive/data-preserving (0021 and 0025
+  already were — this becomes LAW, not habit); (2) the backup-then-reseed
+  ceremony is recognized as ACCEPTANCE-ERA DEBT — its trigger (the
+  register conflict guard forcing datadir swaps on computed-hash drift) is
+  the single mechanism that ever displaces data, and the harness mission's
+  register-versioning work is ELEVATED by this ruling from nice-to-have to
+  mandatory: a lawful in-place path for register evolution so no update
+  ever again requires moving a datadir; (3) no datadir is ever DELETED —
+  archives are permanent until V personally disposes of them (the full
+  .pgdata-backup chain stands); (4) the archived truth-pursuit debate
+  (.pgdata-debate-091b7663-awaiting-rebaseline) is V's research corpus —
+  revival per DEBATE-REVIVAL-091b7663.md, and readable TODAY via direct
+  SQL on a side port without any re-baseline. | V named the hosted future's
+  hardest requirement | the harness mission inherits it as law | — |
+  ACTIVE
