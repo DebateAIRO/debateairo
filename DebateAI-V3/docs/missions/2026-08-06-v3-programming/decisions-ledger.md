@@ -1518,3 +1518,27 @@ supersedes | status`.
   to DR-164's early quality signal; this one lands after depth, discovery,
   and cross-house review all shipped. | V judged the whole thing, as
   promised | next-mission UI lane | — | ACTIVE
+
+| DR-184 | 2026-08-15 | V ("only 5 nodes are shown in the UI without the
+  'Show set aside paths'. We need to make it in such a way that the
+  scoring and judges can judge everything") | **REVIEW COVERAGE MUST BE
+  COMPLETABLE — EVERYTHING JUDGED.** Evidence from the first three-house
+  depth-5 run (091b7663): 122 authored nodes, ALL 122 carry their own
+  judge scores, ZERO hidden for low score — but 210 of 262 cross-house
+  review CALLS transport-failed (reviews run LAST, on relays exhausted by
+  ~5h of authoring; review sites received NO cooldown courtesy — the seam
+  the DR-174 architect explicitly deferred as VROW-6-R) → 70 nodes
+  class-H hidden → and because hiding is SUBTREE-wise, judged descendants
+  vanish under unjudged ancestors: the default canvas collapsed to ~5
+  nodes over a 122-node debate. V rules the capability: the system must
+  be able to JUDGE EVERYTHING — (a) in-run: review completion gets the
+  same resilience courtesy as authoring (holds/retry discipline,
+  interleaving with authoring so reviews stop inheriting dead-tired
+  relays); (b) post-serve: a REVIEW CATCH-UP pass re-runs failed reviews
+  on a served answer, judges the hidden, un-hides what passes, and
+  re-propagates the scores — a debate improves after serving. DR-165(3)
+  stands absolute throughout (unjudged still never serves as opinion —
+  the fix is completing judgment, never waiving it). Architecture-
+  confounding (the deferred larger seam) → DR-171+DR-175 consult before
+  any ticket. | V watched 57% of a masterpiece sit in the dark | the
+  review-completion consult | — | ACTIVE

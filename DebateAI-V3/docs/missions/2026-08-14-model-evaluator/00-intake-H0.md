@@ -48,3 +48,12 @@ down), visible-launch law (macOS Terminal windows, tee'd logs under
 terminal rework, per-agent token reporting + self-reports
 (`.hermes/reports/2026-08-14-model-evaluator/agent-reports/`), DR-179 no API keys,
 no push without V approval.
+
+## Gate record
+
+- 2026-08-14: REQUIREMENTS closed (HERMES STAGE VERDICT: REQUIREMENTS APPROVED,
+  after dual-Opus PASS across 3 rounds).
+- 2026-08-14: ARCHITECTURE peer review PASS (Grok ARCH-02 round 1).
+- 2026-08-14 ~21:2x: V APPROVED the planning-graph gate ("Approved — release
+  programming") after reading Architecture.md and the mission graph. PROGRAMMING
+  loop released, starting lane codex/eval-02-foundation.

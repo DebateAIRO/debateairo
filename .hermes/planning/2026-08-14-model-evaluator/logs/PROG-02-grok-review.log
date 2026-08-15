@@ -1,0 +1,41 @@
+=== PROG-02 grok review launch Fri Aug 14 21:48:05 EEST 2026 ===
+I'll inspect the binding mission docs and branch context so the plan matches the actual review contract.Writing the frozen plan for the PROG-02 peer-review analysis.DoneI'll start by reading the plan and binding docs, then review the lane diff against the architecture and requirements.Diff is in scope. Next I'll read the binding docs and inspect the foundation code and tests.Examining migration style, schema mapping, and whether the panel-isolation test is a real differential.Writing the review and self-report with a REWORK verdict on the panel-isolation differential.## PROG-02 Grok peer review complete
+
+Reviewed `git diff dev...codex/eval-02-foundation` (10 files, +1366/−1) against MAIN Architecture §§1–4, 6, 7 tier-0, 8 and Requirements FR-0.1 / FR-0.6 AC5 / FR-3.x.
+
+### Axis results
+
+| Axis | Result |
+|---|---|
+| **(a) Deliverable completeness** | Mostly complete (package, worker, `0023`, readers, catalog, collisions, UNBOUND resolver, blind DTO, DB tests). Merge gate for panel isolation fails → overall **FAIL** |
+| **(b) Panel-isolation differential genuine** | **FAIL** — tautology |
+| **(c) No BOUND / zero live-run change** | **PASS** |
+| **(d) Migration style, triggers, grants** | **PASS** |
+| **(e) Tests assert real contracts** | **FAIL** on the differential only; other foundation tests are real |
+
+### Blocker
+
+The test labeled `FR-0.6 AC5 panel-isolation differential` in `tests/unit/evaluator-foundation.test.ts` mocks `resolveDiscoveredPanel` as a constant fixture and never feeds healthy vs absent evaluator probes into admission. Equality is guaranteed by the mock, not by product isolation (`apps/api` discovery still maps only `configuredProviders`). Collision helper tests are real; they do not replace AC5.
+
+Foundation quality elsewhere is solid: UNBOUND-only binding, no product dispatch edits, hand-written `0023` with append-only triggers and narrow grants, real unit/DB contracts. Focused unit suite: 6/6 pass (including the defective differential).
+
+### Outputs
+
+- Review: `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-1.md`
+- Self-report: `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`
+- No worktree code edits; no commits
+
+REVIEW VERDICT: REWORKI'll adversarially verify the peer-review deliverable: plan, written review files, and whether claims hold against the diff and binding docs.Checking the review content, implementer evidence, and the disputed panel-isolation test against the binding docs.Spot-checking the panel-isolation test and binding requirements against the analysis claims.Checking whether review files land only on MAIN and whether the analysis has any factual errors.Analysis is sound and evidence-backed. Writing the Not Refuted verdict.Not RefutedI'll adversarially verify the peer-review deliverable against the plan, binding docs, and the actual branch diff—not the implementer's prose alone.I'll adversarially verify the peer-review deliverable against the plan, binding docs, and the actual diff—starting with the plan, claimed review files, and implementer evidence.Review files exist on MAIN. Next I'll verify their claims against the branch diff, binding docs, and implementer evidence.Next I'll spot-check the claimed blocker against the actual test, admission path, and binding docs.Spot-checking the panel-isolation test and binding docs against the review's main claims.Reading the differential test and product admission path to verify the tautology claim.The review is evidence-grounded: the differential is a tautology, outputs and verdict are correct. Writing the skeptic verdict.Claims check out: the differential test is a tautology, other axes match the code/docs, and both required review outputs exist with a consistent REWORK verdict. Writing the skeptic verdict files.Not RefutedNot RefutedGrok peer review of Codex lane `eval-02-foundation` (PROG-02) is complete with **REVIEW VERDICT: REWORK** (panel-isolation differential is a tautology).
+
+**Read the review:**
+- Full axis findings: `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-1.md`
+- Short self-report: `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`
+
+**Next:** fix blocker #1 in the review (genuine healthy-vs-absent panel-isolation test on product discovery), then re-request review.Grok peer review of Codex lane `eval-02-foundation` (PROG-02) is complete with **REVIEW VERDICT: REWORK** (panel-isolation differential is a tautology).
+
+**Read the review:**
+- Full axis findings: `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-1.md`
+- Short self-report: `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`
+
+**Next:** fix blocker #1 in the review (genuine healthy-vs-absent panel-isolation test on product discovery), then re-request review.
+=== grok exited Fri Aug 14 21:56:38 EEST 2026 ===
