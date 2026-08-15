@@ -18,6 +18,11 @@ Direct worker writes are limited to evaluator-owned `domain`,
 `shadow_decision`, `vllm_probe`, `vllm_catalog_model`, and `consumer_output`.
 The evaluator API role may insert only `consumer_selection`. Normal provider
 gateway calls separately retain their existing narrow ledger write authority.
+Tagger calls use evaluator-scoped attempt ids and a null ledger `run_id`; the
+product run is correlated only by evaluator-owned admission, assignment, and
+pipeline rows. Consequently tag attempts cannot consume a product cost
+envelope, enter its execution digest, or participate in product liveness
+partitions.
 No evaluator role can write product `core`, `serve`, `memory`, settlement
 `scorecard`, or routing/session-assignment rows.
 
@@ -51,7 +56,9 @@ locks, then re-reads the registry before deciding and inserting. The registry
 lock also prevents two differently spelled near duplicates from racing. A grown
 row requires
 provider/model/version, source run, raw tagger artifact, guardrail version, and
-provenance. Registry and admission history remain append-only.
+provenance. The source run is evaluator-owned correlation metadata; the tagger
+artifact itself remains null-run evaluator evidence. Registry and admission
+history remain append-only.
 
 Question domains land only in `evaluator.question_domain`. The `run_id` and
 `domain_admission_id` uniqueness constraints make assignment singular; a
@@ -73,7 +80,9 @@ the raw question and current registry, re-runs
 and accepts only strict JSON decisions: `SELECT_EXISTING`, `PROPOSE_NEW`, or
 `REFUSED`. Existing ids receive their own admission receipt; proposals pass
 through deterministic registry admission; refusal and blank proposals receive
-typed `REFUSED` receipts. Only successful admissions insert the singular
+typed `REFUSED` receipts, including unresolved existing-domain ids. Re-delivery
+of an already-tagged run short-circuits before another model call or admission
+receipt. Only successful admissions insert the singular
 `evaluator.question_domain` link.
 
 `apps/evaluator-worker` exposes ask-time and reconciliation entry points over a

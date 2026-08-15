@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ProviderGateway } from "@debateai/providers";
+import { ProviderCallFailedError, type ProviderGateway } from "@debateai/providers";
 import {
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
@@ -32,6 +32,7 @@ function repository(): EvaluatorTagRepository & {
   const admissions: unknown[] = [];
   const assignments: unknown[] = [];
   const events: unknown[] = [];
+  let questionDomain: Awaited<ReturnType<EvaluatorTagRepository["readQuestionDomain"]>> = null;
   return {
     admissions,
     assignments,
@@ -44,6 +45,7 @@ function repository(): EvaluatorTagRepository & {
       guardrailVersion: 1,
       provenanceRef: "seed:test"
     }],
+    readQuestionDomain: async () => questionDomain,
     admitProposal: async (input) => {
       admissions.push({ kind: "proposal", input });
       return {
@@ -79,6 +81,12 @@ function repository(): EvaluatorTagRepository & {
     },
     assignQuestionDomain: async (input) => {
       assignments.push(input);
+      questionDomain = {
+        runId: input.runId,
+        domainId: input.domainId,
+        assignmentBasis: input.basis,
+        domainAdmissionId: input.domainAdmissionId
+      };
       return "question-domain:test";
     },
     recordTagPipelineEvent: async (input) => {
@@ -131,6 +139,11 @@ describe("ask-time evaluator tagger", () => {
       expect.objectContaining({ state: "STARTED" }),
       expect.objectContaining({ state: "SUCCEEDED" })
     ]);
+    expect(gateway.call).toHaveBeenCalledWith(expect.objectContaining({
+      runId: null,
+      role: "CLASSIFIER",
+      lane: "evaluator"
+    }));
   });
 
   it("routes a genuinely new proposal through deterministic admission guardrails", async () => {
@@ -164,6 +177,52 @@ describe("ask-time evaluator tagger", () => {
       .resolves.toMatchObject({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_FAILED" });
     expect(records.assignments).toEqual([]);
     expect(records.events.at(-1)).toEqual(expect.objectContaining({ state: "FAILED" }));
+  });
+
+  it("records a typed timeout result instead of collapsing it into a generic provider failure", async () => {
+    const records = repository();
+    const gateway: ProviderGateway = {
+      call: vi.fn(async () => {
+        throw new ProviderCallFailedError(
+          new DOMException("deadline", "TimeoutError"),
+          1,
+          "TIMED_OUT",
+          "ledger:timed-out"
+        );
+      })
+    };
+
+    await expect(runEvaluatorQuestionTagger({ ...baseInput, provider: gateway, repository: records }))
+      .resolves.toEqual({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_TIMED_OUT" });
+    expect(records.events.at(-1)).toEqual(expect.objectContaining({
+      state: "FAILED",
+      reason: "TAGGER_PROVIDER_TIMED_OUT"
+    }));
+  });
+
+  it("returns typed UNTAGGED when repository preflight fails", async () => {
+    const records = repository();
+    const gateway = provider(JSON.stringify({ decision: "REFUSED", reason: "unused" }));
+    const failing = { ...records, listDomains: vi.fn(async () => { throw new Error("database down"); }) };
+
+    await expect(runEvaluatorQuestionTagger({ ...baseInput, provider: gateway, repository: failing }))
+      .resolves.toEqual({ state: "UNTAGGED", reason: "TAGGER_PREFLIGHT_FAILED" });
+    expect(gateway.call).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits an already-tagged retry without another provider call or admission", async () => {
+    const records = repository();
+    const gateway = provider(JSON.stringify({ decision: "SELECT_EXISTING", domain_id: "domain:software" }));
+
+    await runEvaluatorQuestionTagger({ ...baseInput, provider: gateway, repository: records });
+    await expect(runEvaluatorQuestionTagger({ ...baseInput, provider: gateway, repository: records }))
+      .resolves.toEqual({ state: "UNTAGGED", reason: "TAGGER_ALREADY_TAGGED" });
+    expect(gateway.call).toHaveBeenCalledTimes(1);
+    expect(records.admissions).toHaveLength(1);
+    expect(records.events.at(-1)).toEqual(expect.objectContaining({
+      state: "SKIPPED",
+      reason: "TAGGER_ALREADY_TAGGED"
+    }));
   });
 
   it("re-asserts provider isolation before the observed vLLM call boundary", async () => {

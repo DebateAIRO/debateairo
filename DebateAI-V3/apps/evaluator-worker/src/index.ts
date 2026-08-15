@@ -81,7 +81,9 @@ async function runPersistedQuestionTag(input: {
     [input.runId]
   );
   const rawQuestion = run.rows[0]?.question_line;
-  if (rawQuestion === undefined) throw new TypeError(`EVALUATOR_TAG_RUN_UNRESOLVED:${input.runId}`);
+  if (rawQuestion === undefined) {
+    return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_RUN_UNRESOLVED" });
+  }
   return runEvaluatorQuestionTagger({
     runId: input.runId,
     rawQuestion,

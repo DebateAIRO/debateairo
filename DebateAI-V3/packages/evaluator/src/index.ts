@@ -3,7 +3,12 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import type { CallBound, ProviderGateway } from "@debateai/providers";
+import {
+  ProviderCallFailedError,
+  ProviderContentUnacceptedError,
+  type CallBound,
+  type ProviderGateway
+} from "@debateai/providers";
 
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
@@ -458,20 +463,22 @@ async function assertAdmissionArtifact(
   if (input.rawArtifactRef === null) return;
   const artifact = await client.query<{
     run_id: string | null;
+    provider_ref: string;
     provider: string;
     model_id: string;
     model_version: string | null;
   }>(`
-    SELECT run_id, provider, model_id, model_version
+    SELECT run_id, provider_ref, provider, model_id, model_version
     FROM ledger.raw_artifact WHERE raw_artifact_id=$1
   `, [input.rawArtifactRef]);
   const artifactRow = artifact.rows[0];
-  if (artifactRow === undefined || artifactRow.run_id !== input.runId
+  const expectedRunId = artifactRow?.provider_ref === EVALUATOR_PROVIDER_REF ? null : input.runId;
+  if (artifactRow === undefined || artifactRow.run_id !== expectedRunId
     || artifactRow.provider !== input.provider || artifactRow.model_id !== input.modelId
     || artifactRow.model_version !== input.modelVersion) {
     throw new TypedDomainError(
       "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH",
-      "Domain proposal identity must match its source run and raw artifact"
+      "Domain proposal identity must match its evaluator scope and raw artifact"
     );
   }
 }
@@ -628,10 +635,25 @@ export class DomainRegistryRepository {
       `, [input.domainId]);
       const row = selected.rows[0];
       if (row === undefined) {
-        throw new TypedDomainError(
-          "EVALUATOR_DOMAIN_SELECTION_UNRESOLVED",
-          `Selected evaluator domain does not exist: ${input.domainId}`
-        );
+        const reason = `EVALUATOR_DOMAIN_SELECTION_UNRESOLVED:${input.domainId}`;
+        const domainAdmissionId = await insertDomainAdmission(client, {
+          runId: input.runId,
+          proposedName: input.domainId,
+          normalizedName: normalizeDomainName(input.domainId),
+          decision: "REFUSED",
+          domainId: null,
+          candidates: Object.freeze([]),
+          rawArtifactRef: input.rawArtifactRef,
+          reason
+        });
+        return Object.freeze({
+          decision: "REFUSED" as const,
+          normalizedName: normalizeDomainName(input.domainId),
+          domainId: null,
+          candidates: Object.freeze([]),
+          reason,
+          domainAdmissionId
+        });
       }
       const candidates = Object.freeze([Object.freeze({
         domainId: row.domain_id,
@@ -789,6 +811,12 @@ export interface TagPipelineEventInput {
 
 export interface EvaluatorTagRepository {
   listDomains(): Promise<readonly EvaluatorDomain[]>;
+  readQuestionDomain(runId: string): Promise<{
+    readonly runId: string;
+    readonly domainId: string;
+    readonly assignmentBasis: "TAGGER" | "BACKFILL";
+    readonly domainAdmissionId: string;
+  } | null>;
   admitProposal(input: AdmitDomainProposalInput): Promise<DomainAdmissionResult>;
   admitExistingDomainSelection(input: AdmitExistingDomainSelectionInput): Promise<DomainAdmissionResult>;
   recordRefusal(input: RecordDomainRefusalInput): Promise<DomainAdmissionResult>;
@@ -818,7 +846,17 @@ const taggerDecisionSchema = z.discriminatedUnion("decision", [
 ]);
 
 function parseTaggerDecision(content: string): z.infer<typeof taggerDecisionSchema> {
-  return taggerDecisionSchema.parse(JSON.parse(content));
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(content);
+  } catch {
+    throw new TypedDomainError("EVALUATOR_TAGGER_OUTPUT_INVALID", "Tagger output is not JSON");
+  }
+  const parsed = taggerDecisionSchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new TypedDomainError("EVALUATOR_TAGGER_OUTPUT_INVALID", "Tagger output violates its contract");
+  }
+  return parsed.data;
 }
 
 function taggerInputHash(runId: string, rawQuestion: string, domains: readonly EvaluatorDomain[]): string {
@@ -839,8 +877,11 @@ export type EvaluatorQuestionTagResult =
   | {
       readonly state: "UNTAGGED";
       readonly reason: "TAGGER_REFUSED" | "TAGGER_ADMISSION_REFUSED"
-        | "TAGGER_PROVIDER_FAILED" | "TAGGER_PROVIDER_ISOLATION_FAILED"
-        | "TAGGER_EXECUTION_FAILED";
+        | "TAGGER_PROVIDER_FAILED" | "TAGGER_PROVIDER_TIMED_OUT"
+        | "TAGGER_CONTENT_REFUSED" | "TAGGER_PROVIDER_ISOLATION_FAILED"
+        | "TAGGER_EXECUTION_FAILED" | "TAGGER_INPUT_INVALID"
+        | "TAGGER_PREFLIGHT_FAILED" | "TAGGER_ALREADY_TAGGED"
+        | "TAGGER_RUN_UNRESOLVED";
     };
 
 export async function runEvaluatorQuestionTagger(input: {
@@ -856,37 +897,64 @@ export async function runEvaluatorQuestionTagger(input: {
   readonly basis: "TAGGER" | "BACKFILL";
   readonly provenanceRef: string;
 }): Promise<EvaluatorQuestionTagResult> {
-  requireNonblank(input.runId, "EVALUATOR_TAG_RUN_ID_INVALID");
-  requireNonblank(input.rawQuestion, "EVALUATOR_TAG_QUESTION_INVALID");
-  requireNonblank(input.provenanceRef, "EVALUATOR_TAG_PROVENANCE_INVALID");
   const attemptId = randomUUID();
-  const domains = await input.repository.listDomains();
-  const inputHash = taggerInputHash(input.runId, input.rawQuestion, domains);
-  await input.repository.recordTagPipelineEvent({
-    runId: input.runId,
-    attemptId,
-    state: "STARTED",
-    reason: input.basis === "TAGGER" ? "ASK_TIME_TAG_STARTED" : "TAG_RECONCILIATION_STARTED",
-    inputHash
-  });
+  try {
+    requireNonblank(input.runId, "EVALUATOR_TAG_RUN_ID_INVALID");
+    requireNonblank(input.rawQuestion, "EVALUATOR_TAG_QUESTION_INVALID");
+    requireNonblank(input.provenanceRef, "EVALUATOR_TAG_PROVENANCE_INVALID");
+  } catch {
+    return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_INPUT_INVALID" });
+  }
+  let domains: readonly EvaluatorDomain[];
+  let inputHash: string;
+  try {
+    domains = await input.repository.listDomains();
+    inputHash = taggerInputHash(input.runId, input.rawQuestion, domains);
+    const existing = await input.repository.readQuestionDomain(input.runId);
+    if (existing !== null) {
+      await input.repository.recordTagPipelineEvent({
+        runId: input.runId, attemptId, state: "SKIPPED",
+        reason: "TAGGER_ALREADY_TAGGED", inputHash
+      });
+      return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_ALREADY_TAGGED" });
+    }
+    await input.repository.recordTagPipelineEvent({
+      runId: input.runId,
+      attemptId,
+      state: "STARTED",
+      reason: input.basis === "TAGGER" ? "ASK_TIME_TAG_STARTED" : "TAG_RECONCILIATION_STARTED",
+      inputHash
+    });
+  } catch {
+    return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_PREFLIGHT_FAILED" });
+  }
+  const recordTerminalEvent = async (
+    state: "SUCCEEDED" | "FAILED" | "SKIPPED",
+    reason: string
+  ): Promise<void> => {
+    try {
+      await input.repository.recordTagPipelineEvent({
+        runId: input.runId, attemptId, state, reason, inputHash
+      });
+    } catch {
+      // A receipt outage cannot turn evaluator enrichment into a product-path failure.
+    }
+  };
   try {
     assertEvaluatorProviderIsolation(input.family, input.deployment);
   } catch {
-    await input.repository.recordTagPipelineEvent({
-      runId: input.runId, attemptId, state: "FAILED",
-      reason: "TAGGER_PROVIDER_ISOLATION_FAILED", inputHash
-    });
+    await recordTerminalEvent("FAILED", "TAGGER_PROVIDER_ISOLATION_FAILED");
     return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_ISOLATION_FAILED" });
   }
 
   let stage: "PROVIDER_CALL" | "EXECUTION" = "PROVIDER_CALL";
   try {
     const response = await input.provider.call({
-      runId: input.runId,
-      subjectItemId: `evaluator:tag:${input.runId}`,
+      runId: null,
+      subjectItemId: `evaluator:tag-attempt:${attemptId}`,
       callSiteKey: "evaluator.tag-question.v1",
-      role: "JUDGE",
-      lane: "critic-exempt",
+      role: "CLASSIFIER",
+      lane: "evaluator",
       bound: input.bound,
       contractHash: createHash("sha256").update("evaluator-domain-tagger/v1").digest("hex"),
       providerRef: input.family.value.providerRef,
@@ -932,9 +1000,7 @@ export async function runEvaluatorQuestionTagger(input: {
     };
     if (decision.decision === "REFUSED") {
       await input.repository.recordRefusal({ ...identity, proposedName: "", reason: decision.reason });
-      await input.repository.recordTagPipelineEvent({
-        runId: input.runId, attemptId, state: "SKIPPED", reason: "TAGGER_REFUSED", inputHash
-      });
+      await recordTerminalEvent("SKIPPED", "TAGGER_REFUSED");
       return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_REFUSED" });
     }
     const admission = decision.decision === "SELECT_EXISTING"
@@ -942,10 +1008,7 @@ export async function runEvaluatorQuestionTagger(input: {
       : await input.repository.admitProposal({ ...identity, proposedName: decision.proposed_name });
     if (admission.domainId === null
       || !["ADMITTED_NEW", "MATCHED_EXISTING"].includes(admission.decision)) {
-      await input.repository.recordTagPipelineEvent({
-        runId: input.runId, attemptId, state: "SKIPPED",
-        reason: `TAGGER_ADMISSION_${admission.decision}`, inputHash
-      });
+      await recordTerminalEvent("SKIPPED", `TAGGER_ADMISSION_${admission.decision}`);
       return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_ADMISSION_REFUSED" });
     }
     const questionDomainId = await input.repository.assignQuestionDomain({
@@ -955,20 +1018,22 @@ export async function runEvaluatorQuestionTagger(input: {
       basis: input.basis,
       rawArtifactRef: response.rawArtifactRef
     });
-    await input.repository.recordTagPipelineEvent({
-      runId: input.runId, attemptId, state: "SUCCEEDED", reason: "TAGGER_DOMAIN_ASSIGNED", inputHash
-    });
+    await recordTerminalEvent("SUCCEEDED", "TAGGER_DOMAIN_ASSIGNED");
     return Object.freeze({
       state: "TAGGED",
       domainId: admission.domainId,
       domainAdmissionId: admission.domainAdmissionId,
       questionDomainId
     });
-  } catch {
-    const reason = stage === "PROVIDER_CALL" ? "TAGGER_PROVIDER_FAILED" : "TAGGER_EXECUTION_FAILED";
-    await input.repository.recordTagPipelineEvent({
-      runId: input.runId, attemptId, state: "FAILED", reason, inputHash
-    });
+  } catch (error) {
+    const reason: Extract<EvaluatorQuestionTagResult, { state: "UNTAGGED" }>["reason"] =
+      error instanceof ProviderCallFailedError && error.lastOutcome === "TIMED_OUT"
+        ? "TAGGER_PROVIDER_TIMED_OUT"
+        : error instanceof ProviderContentUnacceptedError
+          || (error instanceof TypedDomainError && error.code === "EVALUATOR_TAGGER_OUTPUT_INVALID")
+          ? "TAGGER_CONTENT_REFUSED"
+          : stage === "PROVIDER_CALL" ? "TAGGER_PROVIDER_FAILED" : "TAGGER_EXECUTION_FAILED";
+    await recordTerminalEvent("FAILED", reason);
     return Object.freeze({ state: "UNTAGGED", reason });
   }
 }
