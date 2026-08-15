@@ -141,3 +141,32 @@ Profile aggregation (ticket 07) must treat a settlement row as replacing the
 consensus row named by `supersedes_observation_id`; it must not pool or average
 both values. Rows without a supersession link remain separate auditable
 settlement evidence.
+
+## Blind judge-grading add-on
+
+`runEvaluatorJudgeAddon` is the one-pass post-harvest grader. Its register-owned
+`evaluatorJudgeAddonPolicy` is always `COLLECT_ONLY`, selects every Nth run by
+the append-only run ordinal (`N=1` is the development/every-run policy), and
+provides the deadline/token bound plus at most two provider attempts. Evaluator
+ADDON receipts independently cap cross-invocation attempts at three per run;
+the product run attempt counter is never consulted. An absent policy records an
+explicit `ADDON_POLICY_UNAVAILABLE` skip. Each invocation can make exactly one gateway call, with `runId: null`, an
+`evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. The
+product run's attempt accounting is never used as a retry bound.
+
+The repository requires a successful HARVEST receipt, selects at most one
+reduced judgement deterministically, and creates a fresh allowlist-only blind
+DTO. The prompt contains only an opaque sample id, question/task excerpts, the
+grade, and explicitly selected reason strings; maker, provider, model, artifact,
+and provenance fields are absent. `assertEvaluatorProviderIsolation` runs at
+the final boundary before the only model call.
+
+Successful grades append `judging.blind-grade.v1` observations with step
+`JUDGING`, truth basis `BLIND_ADDON`, and source kind `BLIND_JUDGE_GRADE`. The
+profile identity is the graded judge's exact provider/model/version; graded and
+grader artifacts remain separate evidence references. Code refuses equal
+makers before calling and again before inserting. Migration 0026 makes the
+database guard compatible with the required null-run grader artifact while
+still requiring the graded artifact to belong to the product run and refusing
+equal makers. The add-on stays collect-only and has no dispatch or routing read
+path.
