@@ -42,6 +42,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "MISSING-NUMBER": return "Number removed after replay failure";
     case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";
     case "HIDDEN-UNJUDGEABLE": return "Hidden: could not be judged — show hidden to read it";
+    case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";
     case "UNAUTHORED-BRANCH-HALTED": return "Expansion stopped here — nothing was written to hide or show";
   }

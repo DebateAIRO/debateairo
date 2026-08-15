@@ -123,8 +123,7 @@ function projectGraph(answer: Answer): GraphProjection {
     parentId: string | null,
     depth: number,
     position: number,
-    path: string,
-    inheritedHiddenReason: string | null = null
+    path: string
   ): DebateNode => {
     visited.add(nodeId);
     const contractNode = contractById.get(nodeId)!;
@@ -140,7 +139,7 @@ function projectGraph(answer: Answer): GraphProjection {
       : hiddenRecord?.mark === "HIDDEN-LOW-SCORE"
         ? `Disclosed as set aside at the ruled score threshold: ${hiddenRecord.reason}`
         : null;
-    const hiddenReason = ownHiddenReason ?? inheritedHiddenReason;
+    const hiddenReason = ownHiddenReason;
     const view: DebateNode = {
       id: contractNode.node_id,
       debate_id: answer.answer_id,
@@ -174,8 +173,7 @@ function projectGraph(answer: Answer): GraphProjection {
       nodeId,
       depth + 1,
       index,
-      `${path}.${index}`,
-      hiddenReason
+      `${path}.${index}`
     ));
     return view;
   };

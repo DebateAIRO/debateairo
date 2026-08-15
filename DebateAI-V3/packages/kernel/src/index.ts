@@ -100,6 +100,9 @@ export const CONDITION_MARKS = [
   // It remains append-only and revealable, but is excluded from the served
   // number and disclosed as unjudged when revealed.
   "HIDDEN-UNJUDGEABLE",
+  // DR-184-A/DR-186: the node's own cross-house review is missing, but it
+  // remains visible and numeric on the authority of its judged arguments.
+  "DERIVED-STANDING-UNREVIEWED",
   // DR-176: authored material at or below the ruled deployment threshold.
   "HIDDEN-LOW-SCORE",
   // DR-176: authoring stopped before a node existed. Nothing is hidden or

@@ -6,7 +6,7 @@ import {
   ProviderContentUnacceptedError
 } from "@debateai/providers";
 import {
-  excludeHiddenSubtrees,
+  projectJudgedStanding,
   remainingProviderAttempts,
   withCooldownRetry,
   type HoldProgressEvent
@@ -74,7 +74,7 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     expect(hold.wait).not.toHaveBeenCalled();
   });
 
-  it("T25/T26 recovers the per-run cap from recorded holds and the third exhaustion neither waits nor retries", async () => {
+  it("T25/T26 recovers the per-run cap while preserving the final attempt without a third wait", async () => {
     const hold = recorder(2);
     const attempt = vi.fn(async () => { throw transportFailure(); });
     await expect(withCooldownRetry({
@@ -89,7 +89,8 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
       attempt
     })).resolves.toMatchObject({ kind: "HALTED", record: { callSiteKey: "JUDGE:third-site" } });
     expect(hold.countCooldownHolds).toHaveBeenCalledWith("run:test");
-    expect(attempt).toHaveBeenCalledTimes(1);
+    expect(attempt).toHaveBeenCalledTimes(2);
+    expect(attempt.mock.calls).toEqual([[3], [4]]);
     expect(hold.wait).not.toHaveBeenCalled();
   });
 
@@ -136,7 +137,7 @@ const fullSnapshot: EvaluationSnapshot = {
 
 describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   it("T27/T28 excludes a class-H whole subtree from scoring without deleting or re-parenting it", () => {
-    const judged = excludeHiddenSubtrees(fullSnapshot, ["hidden"]);
+    const judged = projectJudgedStanding(fullSnapshot, ["root", "sibling"]).snapshot;
     expect(judged.nodes.map((node) => node.nodeId)).toEqual(["root", "sibling"]);
     expect(judged.arrows.map((arrow) => arrow.arrowId)).toEqual(["a:sibling"]);
     expect(judged.arrowOrder).toEqual(["a:sibling"]);
@@ -196,7 +197,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
-    expect(CONDITION_MARKS).toHaveLength(27);
+    expect(CONDITION_MARKS).toHaveLength(28);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));
@@ -206,6 +207,13 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
         liftPath: null, servedRootRule: null, callSiteKey: "JUDGE:review:node:h", plannedLegCount: null,
         terminalTransportOutcome: "FAILED", hiddenStrength: null, hiddenScoreThreshold: null,
         hiddenScoreThresholdSourceRef: null, affectedNodeIds: ["node:h"], excludedFromServedNumber: true
+      },
+      {
+        mark: "DERIVED-STANDING-UNREVIEWED", scope: "node", subjectRef: "node:d", reason: "test-layer",
+        liftPath: null, servedRootRule: null, callSiteKey: "JUDGE:review:node:d", plannedLegCount: null,
+        terminalTransportOutcome: "FAILED", hiddenStrength: null, hiddenScoreThreshold: null,
+        hiddenScoreThresholdSourceRef: null, affectedNodeIds: ["node:d"], excludedFromServedNumber: false,
+        judgedBasisCount: 1
       },
       {
         mark: "HIDDEN-LOW-SCORE", scope: "node", subjectRef: "node:l", reason: "test-layer",
@@ -220,7 +228,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
         hiddenScoreThresholdSourceRef: null, affectedNodeIds: ["node:surviving-parent"], excludedFromServedNumber: null
       }
     ];
-    expect(() => assertRequiredConditionMarkRecords(CONDITION_MARKS.slice(-3), records)).not.toThrow();
+    expect(() => assertRequiredConditionMarkRecords(CONDITION_MARKS.slice(-4), records)).not.toThrow();
     expect(() => assertRequiredConditionMarkRecords(["HIDDEN-UNJUDGEABLE"], [])).toThrowError(
       expect.objectContaining({ code: "CONDITION_MARK_RECORD_REQUIRED" })
     );
@@ -264,7 +272,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T33 computes the served root from the judged graph, not the merely-labelled full graph", () => {
-    const judged = evaluate(excludeHiddenSubtrees(fullSnapshot, ["hidden"]));
+    const judged = evaluate(projectJudgedStanding(fullSnapshot, ["root", "sibling"]).snapshot);
     const expected = evaluate({
       ...fullSnapshot,
       nodes: fullSnapshot.nodes.filter((node) => ["root", "sibling"].includes(node.nodeId)),

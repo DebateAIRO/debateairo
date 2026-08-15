@@ -20,7 +20,7 @@ describe("S09 register authorities", () => {
       panelSize: 2, depth: 1, judgeMaxAttempts: 3, organMaxAttempts: 3,
       maxRecompose: 2, maxCooldownHoldsPerRun: 2, finalRetryAttempts: 1,
       branchingFactor: 2, compositionSegmentCap: 2, fixedOrgansPerComposition: 4
-    })).toMatchObject({ kind: "COMPUTED_STRUCTURAL_CEILING", max_model_attempts: 74, panel_size: 2, depth: 1 });
+    })).toMatchObject({ kind: "COMPUTED_STRUCTURAL_CEILING", max_model_attempts: 88, panel_size: 2, depth: 1 });
   });
 
   it("reads DR-182 discovery freshness and the one-attempt bound", async () => {

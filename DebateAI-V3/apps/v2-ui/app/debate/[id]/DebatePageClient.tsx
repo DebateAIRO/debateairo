@@ -27,6 +27,7 @@ import {
   liveDebateDetail
 } from "@/lib/v3/adapter";
 import { buildAnswerExport } from "@/lib/v3/answerExport";
+import { projectCanvasCensus } from "@/lib/v3/census";
 import {
   measureDebateHeaderCollapse,
   observeDebateHeaderFit,
@@ -744,6 +745,7 @@ export default function DebatePageClient({
     [answer, ledgerDigest, ledgerError, live]
   );
   const v3NodeById = useMemo(() => (answer === null ? null : contractNodesById(answer)), [answer]);
+  const canvasCensus = useMemo(() => answer === null ? null : projectCanvasCensus(answer), [answer]);
   const synthesisRaw = synthesisDraft?.raw || "";
   const strongestPro =
     debate?.synthesis?.strongest_pro || partialJsonField(synthesisRaw, "strongest_pro") || partialJsonField(synthesisRaw, "title") || "";
@@ -1329,7 +1331,13 @@ export default function DebatePageClient({
                 scoreFilterNodeIds={scoreAwareFilterNodeIds}
                 v3NodesById={v3NodeById}
                 lowStrengthThreshold={lowStrengthThreshold}
-                meta={{ claims: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
+                meta={{
+                  claims: canvasCensus?.claims ?? countClaims(debate.tree),
+                  depth: treeDepth(debate.tree),
+                  judged: canvasCensus?.judged ?? 0,
+                  derivedStanding: canvasCensus?.derivedStanding ?? 0,
+                  setAside: canvasCensus?.setAside ?? 0
+                }}
                 canvasRef={(el) => {
                   canvasElRef.current = el;
                 }}

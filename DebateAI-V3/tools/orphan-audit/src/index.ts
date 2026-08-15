@@ -161,7 +161,8 @@ export async function auditS14TypeGraph(): Promise<{
 const productionEntryPointFiles = [
   "apps/api/src/main.ts",
   "apps/runner/src/main.ts",
-  "apps/scheduler/src/cli.ts"
+  "apps/scheduler/src/cli.ts",
+  "acceptance/review-catch-up.ts"
 ] as const;
 
 type CallableDeclaration = {
@@ -597,7 +598,8 @@ export async function auditOrphans(): Promise<{
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
       "apps/scheduler:job:reaper (stub; invocation throws SCAFFOLD_ONLY)",
-      "apps/scheduler:job:settlement-watch"
+      "apps/scheduler:job:settlement-watch",
+      "acceptance:job:review-catch-up"
     ],
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },

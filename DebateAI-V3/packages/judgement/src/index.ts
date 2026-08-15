@@ -275,6 +275,13 @@ export interface RecordReducedJudgementInput extends RecordJudgementInput {
   readonly disagreement: Readonly<Record<string, unknown>>;
 }
 
+export interface UnreviewedNode {
+  readonly nodeId: string;
+  readonly statement: string;
+  readonly authorMaker: string;
+  readonly authorRawArtifactRef: string;
+}
+
 export class JudgementRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -360,5 +367,70 @@ export class JudgementRepository {
       [runId, authorMaker]
     );
     return result.rows[0]?.reviewer_maker ?? null;
+  }
+
+  /** DR-184: ledger.node_review is the authoritative judged-basis source. */
+  async readReviewedNodeIds(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT node_id::text
+       FROM ledger.node_review
+       WHERE run_id=$1
+       ORDER BY at_seq`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /** DR-184 catch-up work is recomputed from append-only ground truth. */
+  async readUnreviewedNodes(runId: string): Promise<readonly UnreviewedNode[]> {
+    const result = await this.pool.query<{
+      node_id: string;
+      claim_text: string;
+      maker: string;
+      raw_artifact_id: string;
+    }>(
+      `SELECT node.node_id::text, node.claim_text, artifact.maker,
+              artifact.raw_artifact_id::text
+       FROM core.node AS node
+       JOIN ledger.reduced_judgement AS judgement ON judgement.node_id=node.node_id
+       JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id=judgement.raw_artifact_ref
+       LEFT JOIN ledger.node_review AS review ON review.node_id=node.node_id
+       WHERE node.run_id=$1 AND node.generation_status <> 'stale'
+         AND review.node_id IS NULL
+       ORDER BY node.created_at_seq, node.node_id`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      nodeId: row.node_id,
+      statement: row.claim_text,
+      authorMaker: row.maker,
+      authorRawArtifactRef: row.raw_artifact_id
+    })));
+  }
+
+  async readJudgementLineage(runId: string): Promise<Readonly<Record<string, {
+    readonly reducedJudgementRef: string;
+    readonly provenanceRef: string;
+    readonly wayOfKnowing: WayOfKnowing;
+  }>>> {
+    const result = await this.pool.query<{
+      node_id: string;
+      reduced_judgement_id: string;
+      raw_artifact_ref: string;
+      way_of_knowing: WayOfKnowing;
+    }>(
+      `SELECT DISTINCT ON (judgement.node_id) judgement.node_id::text,
+              judgement.reduced_judgement_id::text, judgement.raw_artifact_ref::text,
+              judgement.way_of_knowing
+       FROM ledger.reduced_judgement AS judgement
+       WHERE judgement.run_id=$1
+       ORDER BY judgement.node_id, judgement.at_seq DESC`,
+      [runId]
+    );
+    return Object.freeze(Object.fromEntries(result.rows.map((row) => [row.node_id, Object.freeze({
+      reducedJudgementRef: row.reduced_judgement_id,
+      provenanceRef: row.raw_artifact_ref,
+      wayOfKnowing: row.way_of_knowing
+    })])));
   }
 }

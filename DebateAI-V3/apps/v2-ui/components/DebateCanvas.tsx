@@ -76,7 +76,7 @@ type DebateCanvasProps = CanvasCallbacks & {
    */
   v3NodesById?: ReadonlyMap<string, ContractNode> | null;
   lowStrengthThreshold?: number;
-  meta: { claims: number; depth: number; decomposer?: string };
+  meta: { claims: number; depth: number; judged: number; derivedStanding: number; setAside: number; decomposer?: string };
   canvasRef?: (el: HTMLDivElement | null) => void;
 };
 
@@ -143,14 +143,17 @@ export function DebateCanvas({
       layoutHeight={layout.height}
       canvasRef={canvasRef}
       stickyControl={
-        <label className="canvasStickyToggle">
-          <input
-            type="checkbox"
-            checked={showSetAsidePaths}
-            onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
-          />
-          Show set-aside paths
-        </label>
+        <div className="canvasStickyControl">
+          <span>{meta.claims} claims across {meta.depth} levels · {meta.judged} judged · {meta.derivedStanding} standing on their arguments · {meta.setAside} set aside</span>
+          <label className="canvasStickyToggle">
+            <input
+              type="checkbox"
+              checked={showSetAsidePaths}
+              onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
+            />
+            Show set-aside paths
+          </label>
+        </div>
       }
     >
       <svg className="canvasLinks" width={layout.width} height={layout.height} aria-hidden>
@@ -202,7 +205,7 @@ type CanvasCardProps = CanvasCallbacks & {
   scoreFilterMatch: boolean;
   v3NodesById?: ReadonlyMap<string, ContractNode> | null;
   lowStrengthThreshold?: number;
-  meta: { claims: number; depth: number; decomposer?: string };
+  meta: { claims: number; depth: number; judged: number; derivedStanding: number; setAside: number; decomposer?: string };
   registerRef: (el: HTMLDivElement | null) => void;
 };
 

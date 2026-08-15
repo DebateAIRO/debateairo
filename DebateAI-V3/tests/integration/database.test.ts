@@ -25,16 +25,18 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   createPostgresProviderGateway,
-  excludeHiddenSubtrees,
+  projectJudgedStanding,
+  reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
 import { evaluate } from "@debateai/propagation";
-import { ServeRepository } from "@debateai/serve";
+import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import { buildApi, PostgresAskApplication, type AskApplication } from "@debateai/api";
 import { HOME_PAGE_SIZE } from "../../apps/v2-ui/lib/serverApi.js";
+import { projectCanvasCensus } from "../../apps/v2-ui/lib/v3/census.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -158,23 +160,59 @@ type ProviderDoubleResponse = string | Readonly<{ status: number; body?: string 
 async function startProviderDouble(contents: readonly ProviderDoubleResponse[]): Promise<{
   endpoint: string; calls(): number; stop(): Promise<void>;
 }> {
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
+    if (typeof content !== "string") return "GENERAL";
+    try {
+      const value = JSON.parse(content) as Record<string, unknown>;
+      if ("statement" in value) return "JUDGE";
+      if ("outcome" in value) return "REVIEW";
+      if ("segments" in value) return "COMPOSE";
+      if ("conforms" in value) return "CONFORMANCE";
+      if ("pass" in value) return "R9";
+    } catch { /* malformed fixtures retain FIFO semantics */ }
+    return "GENERAL";
+  };
+  const classified = contents.map((content, index) => {
+    let kind = classifyContent(content);
+    if (kind === "GENERAL" && typeof content !== "string") {
+      for (let cursor = index + 1; cursor < contents.length && kind === "GENERAL"; cursor += 1) {
+        kind = classifyContent(contents[cursor]!);
+      }
+      if (kind === "GENERAL" && index > 0) kind = classifyContent(contents[index - 1]!);
+    }
+    return { content, kind };
+  });
+  const pending = [...classified];
   let calls = 0;
   const server: Server = createServer((request, response) => {
-    request.resume();
-    const content = contents[calls++];
-    if (content === undefined) {
-      response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "unexpected test call" }));
-      return;
-    }
-    if (typeof content !== "string") {
-      response.writeHead(content.status, { "content-type": "application/json" })
-        .end(content.body ?? JSON.stringify({ error: "test-layer transport failure" }));
-      return;
-    }
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
-      id: `completion-test-${calls}`, model: "test-layer/model",
-      choices: [{ message: { content } }]
-    }));
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const body = Buffer.concat(chunks).toString("utf8");
+      const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
+        : body.includes("\"statement\": non-empty string") ? "JUDGE"
+          : body.includes("{conforms,findings}") ? "CONFORMANCE"
+            : body.includes("{pass}") ? "R9"
+              : body.includes("segments") && body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
+      const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
+      const content = selected?.content;
+      calls += 1;
+      if (content === undefined) {
+        response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "unexpected test call" }));
+        return;
+      }
+      if (typeof content !== "string") {
+        response.writeHead(content.status, { "content-type": "application/json" })
+          .end(content.body ?? JSON.stringify({ error: "test-layer transport failure" }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+        id: `completion-test-${calls}`, model: "test-layer/model",
+        choices: [{ message: { content } }]
+      }));
+    });
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -291,6 +329,87 @@ afterAll(async () => {
 });
 
 describe("BUG-01 content-rejection retry accounting", () => {
+  it("DR-184 C-2 crosses the real provider boundary after the in-run review key is exhausted", async () => {
+    const question = `dr184-c2-real-boundary-${randomUUID()}`;
+    const { runId, workItemId } = await createRunnerWork(question);
+    const contractHash = "contract:dr184-c2-real-boundary";
+    const nodeId = "node:dr184-c2-real-boundary";
+    const invocationId = "invocation:dr184-c2-real-boundary";
+    const inRunKey = `JUDGE:review:${nodeId}`;
+    const expectedCatchUpKey = `JUDGE:review:catch-up:${invocationId}:${nodeId}`;
+    const provider = await startProviderDouble([
+      { status: 503 }, { status: 503 }, { status: 503 },
+      reviewDouble("agree", "The catch-up crossed the real relay boundary.")
+    ]);
+    try {
+      const gateway = createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer"
+      });
+      const request = {
+        runId, subjectItemId: workItemId, role: "JUDGE" as const, lane: "served" as const,
+        bound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 5_000 },
+        contractHash, providerRef: "provider:test-layer:reviewer",
+        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+      };
+
+      await expect(gateway.call({ ...request, callSiteKey: inRunKey }))
+        .rejects.toMatchObject({ attempts: 3 });
+      expect(provider.calls()).toBe(3);
+      await expect(gateway.call({ ...request, callSiteKey: inRunKey }))
+        .rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+      expect(provider.calls()).toBe(3);
+
+      const catchUpKey = reviewCatchUpCallSiteKey(invocationId, nodeId);
+      await expect(gateway.call({ ...request, callSiteKey: catchUpKey })).resolves.toMatchObject({
+        content: expect.stringContaining("catch-up crossed")
+      });
+      expect(provider.calls()).toBe(4);
+      expect(await new LedgerRepository(database.pool).countModelAttempts({
+        runId, workItemId, contractHash, callSiteKey: inRunKey
+      })).toBe(3);
+      expect(await new LedgerRepository(database.pool).countModelAttempts({
+        runId, workItemId, contractHash, callSiteKey: expectedCatchUpKey
+      })).toBe(1);
+      expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(4);
+    } finally {
+      await provider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId, workItemId, reason: "TEST_LAYER:DR184_C2_COMPLETE"
+      });
+    }
+
+    const ceilingQuestion = `dr184-c2-pinned-ceiling-${randomUUID()}`;
+    const ceilingRunId = await createRun(ceilingQuestion, 2);
+    const ceilingWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId: ceilingRunId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${ceilingQuestion}`
+    });
+    const ceilingProvider = await startProviderDouble([{ status: 503 }, { status: 503 }]);
+    try {
+      const ceilingGateway = createPostgresProviderGateway(database.pool, {
+        endpoint: ceilingProvider.endpoint, model: "test-layer/model", maker: "test-layer:reviewer"
+      });
+      const ceilingRequest = {
+        runId: ceilingRunId, subjectItemId: ceilingWorkItemId,
+        callSiteKey: "JUDGE:review:ceiling-seed", role: "JUDGE" as const, lane: "served" as const,
+        bound: { maxAttempts: 2, tokenCeiling: 256, deadlineMs: 5_000 },
+        contractHash, providerRef: "provider:test-layer:reviewer",
+        packet: { messages: [{ role: "user" as const, content: "Review an existing debate node" }] }
+      };
+      await expect(ceilingGateway.call(ceilingRequest)).rejects.toMatchObject({ attempts: 2 });
+      expect(ceilingProvider.calls()).toBe(2);
+      await expect(ceilingGateway.call({
+        ...ceilingRequest,
+        callSiteKey: `JUDGE:review:catch-up:${invocationId}:ceiling-node`
+      })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+      expect(ceilingProvider.calls()).toBe(2);
+    } finally {
+      await ceilingProvider.stop();
+      await new WorkItemRepository(database.pool).recordTerminalFailure({
+        runId: ceilingRunId, workItemId: ceilingWorkItemId, reason: "TEST_LAYER:DR184_C2_CEILING_COMPLETE"
+      });
+    }
+  });
+
   it("T11/T13 charges every rejected attempt while terminal execution counts only the accepted attempt", async () => {
     const question = `bug01-accounting-${randomUUID()}`;
     const { runId, workItemId } = await createRunnerWork(question);
@@ -1781,18 +1900,28 @@ describe("apps/runner — legal command lifecycle", () => {
       { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
     ] });
     const primary = await startProviderDouble([
-      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary hidden-frame position ${index + 1}`)),
+      judgementDouble("Primary hidden-frame position 1"),
       reviewDouble("agree", "Primary review 1"),
+      judgementDouble("Primary hidden-frame position 2"),
+      judgementDouble("Primary hidden-frame position 3"),
       { status: 503 }, { status: 503 },
-      reviewDouble("agree", "Primary review 3"), reviewDouble("agree", "Primary review 4"),
+      reviewDouble("agree", "Primary review 3"),
+      judgementDouble("Primary hidden-frame position 4"),
+      reviewDouble("agree", "Primary review 4"),
       composition,
       JSON.stringify({ conforms: true, findings: [] }),
       JSON.stringify({ conforms: true, findings: [] }),
       JSON.stringify({ pass: true })
     ]);
     const secondary = await startProviderDouble([
-      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary hidden-frame position ${index + 1}`)),
-      ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Secondary review ${index + 1}`))
+      judgementDouble("Secondary hidden-frame position 1"),
+      reviewDouble("dispute", "Secondary review 1"),
+      judgementDouble("Secondary hidden-frame position 2"),
+      judgementDouble("Secondary hidden-frame position 3"),
+      reviewDouble("dispute", "Secondary review 2"),
+      reviewDouble("dispute", "Secondary review 3"),
+      judgementDouble("Secondary hidden-frame position 4"),
+      reviewDouble("dispute", "Secondary review 4")
     ]);
     try {
       const question = `resil01-class-h-${randomUUID()}`;
@@ -1850,6 +1979,133 @@ describe("apps/runner — legal command lifecycle", () => {
         final_strength: null,
         condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
       });
+      // DR-184 C-3/T16/T17: a superseding write keeps v1 byte-identical and
+      // threads the computed version through answer, marks and served number.
+      const serveRepository = new ServeRepository(database.pool);
+      const source = await serveRepository.readReviewCatchUpSource(runId);
+      const v1Before = await database.pool.query<{ payload: unknown }>(
+        `SELECT jsonb_build_object(
+           'answer', (SELECT to_jsonb(a) FROM serve.answer a WHERE a.answer_id=$1 AND a.answer_version=1),
+           'marks', (SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY m.at_seq),'[]'::jsonb)
+                     FROM serve.condition_mark m WHERE m.answer_id=$1 AND m.answer_version=1),
+           'numbers', (SELECT coalesce(jsonb_agg(to_jsonb(n) ORDER BY n.served_number_id),'[]'::jsonb)
+                       FROM serve.served_number n WHERE n.answer_id=$1 AND n.answer_version=1)
+         ) AS payload`, [source.answerId]
+      );
+      const records = source.answer.condition_mark_records.map((record): ConditionMarkRecord => ({
+        mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope, subjectRef: record.subject_ref,
+        reason: record.reason, liftPath: record.lift_path, servedRootRule: record.served_root_rule,
+        affectedNodeIds: record.affected_node_ids, callSiteKey: record.call_site_key,
+        plannedLegCount: record.planned_leg_count,
+        terminalTransportOutcome: record.terminal_transport_outcome,
+        hiddenStrength: record.hidden_strength, hiddenScoreThreshold: record.hidden_score_threshold,
+        hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
+        excludedFromServedNumber: record.excluded_from_served_number,
+        judgedBasisCount: record.judged_basis_count
+      }));
+      const v2 = await serveRepository.persist({
+        runId, workItemId, factBundleVersion: source.factBundleVersion,
+        factBundleContentHash: createHash("sha256").update(JSON.stringify(source.factBundle)).digest("hex"),
+        factBundle: source.factBundle,
+        result: {
+          terminal: source.answer.terminal, answerForm: source.answer.answer_form,
+          factBundle: source.factBundle, gateTrace: [], conditionMarks: source.answer.condition_marks,
+          conformance: [], coverageMode: "NOT_RUN", segments: [],
+          compositionBudget: { tier: "low", bound: 1, registerRowKey: "test", registerVersion: 1, sourceRef: "test" },
+          confidenceBand: source.answer.confidence_band,
+          bandCeiling: source.answer.band_ceiling === null ? null : {
+            label: source.answer.band_ceiling.label, basis: source.answer.band_ceiling.basis,
+            registerRowKey: source.answer.band_ceiling.register_row_key,
+            registerVersion: source.answer.band_ceiling.register_version,
+            sourceRef: source.answer.band_ceiling.source_ref,
+            liftPath: source.answer.band_ceiling.lift_path
+          },
+          projections: { reversalPoint: source.answer.reversal_point,
+            buildsOnPrevious: source.factBundle.buildsOnPrevious,
+            memoryDisclosure: source.factBundle.memoryDisclosure }
+        } as never,
+        segments: source.answer.composed_text.map((segment) => ({
+          segmentId: segment.segment_id, text: segment.text, loadBearing: segment.load_bearing,
+          assertedNodeRefs: [], servedNumberRefs: segment.served_number_refs
+        })),
+        compositionRawArtifactRef: null, compositionAttempt: 0, conformanceRawArtifactRefs: [],
+        conditionMarkRecords: records,
+        servedNumber: source.servedNumber === null ? null : {
+          numberRef: source.servedNumber.numberRef, value: source.servedNumber.value,
+          numberKind: source.servedNumber.numberKind, sourceRef: source.servedNumber.sourceRef,
+          producer: source.servedNumber.producer, replayHandle: source.servedNumber.replayHandle,
+          propagationRunId: source.servedNumber.propagationRunId
+        },
+        supersedes: { answerId: source.answerId }
+      });
+      expect(v2).toMatchObject({ answerId: source.answerId, answerVersion: 2 });
+      const versionRows = await database.pool.query<{ table_name: string; answer_version: number }>(
+        `SELECT 'answer' AS table_name, answer_version FROM serve.answer WHERE answer_id=$1 AND answer_version=2
+         UNION ALL SELECT 'mark', answer_version FROM serve.condition_mark WHERE answer_id=$1 AND answer_version=2
+         UNION ALL SELECT 'number', answer_version FROM serve.served_number WHERE answer_id=$1 AND answer_version=2`,
+        [source.answerId]
+      );
+      expect(new Set(versionRows.rows.map((row) => row.answer_version))).toEqual(new Set([2]));
+      expect(new Set(versionRows.rows.map((row) => row.table_name))).toEqual(new Set(["answer", "mark", "number"]));
+      const referencedRows = await database.pool.query<{
+        answer_version: number; composed_text_id: string | null; conformance_record_id: string | null;
+      }>(
+        `SELECT answer_version, composed_text_id, conformance_record_id
+         FROM serve.answer WHERE answer_id=$1 AND answer_version IN (1,2)
+         ORDER BY answer_version`,
+        [source.answerId]
+      );
+      expect(referencedRows.rows[1]?.composed_text_id).toBe(referencedRows.rows[0]?.composed_text_id);
+      expect(referencedRows.rows[1]?.conformance_record_id).toBe(referencedRows.rows[0]?.conformance_record_id);
+      const v1After = await database.pool.query<{ payload: unknown }>(
+        `SELECT jsonb_build_object(
+           'answer', (SELECT to_jsonb(a) FROM serve.answer a WHERE a.answer_id=$1 AND a.answer_version=1),
+           'marks', (SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY m.at_seq),'[]'::jsonb)
+                     FROM serve.condition_mark m WHERE m.answer_id=$1 AND m.answer_version=1),
+           'numbers', (SELECT coalesce(jsonb_agg(to_jsonb(n) ORDER BY n.served_number_id),'[]'::jsonb)
+                       FROM serve.served_number n WHERE n.answer_id=$1 AND n.answer_version=1)
+         ) AS payload`, [source.answerId]
+      );
+      expect(v1After.rows[0]?.payload).toEqual(v1Before.rows[0]?.payload);
+      expect((await serveRepository.readAnswerProjection(source.answerId, `asker:${question}`))?.answer_version).toBe(2);
+      expect((await serveRepository.readAnswerProjection(source.answerId, `asker:${question}`, 1))?.answer_version).toBe(1);
+      const ddlClient = await database.pool.connect();
+      try {
+        await ddlClient.query("BEGIN");
+        await expect(ddlClient.query(
+          `INSERT INTO serve.condition_mark (
+             answer_id, answer_version, mark, scope, subject_ref, reason,
+             call_site_key, terminal_transport_outcome, excluded_from_served_number,
+             judged_basis_count, at_seq
+           ) VALUES ($1,2,'DERIVED-STANDING-UNREVIEWED','node',$2,'ddl-positive',
+             'JUDGE:review:test','FAILED',false,1,ledger.allocate_sequence())`,
+          [source.answerId, hiddenNodeId]
+        )).resolves.toBeDefined();
+        await ddlClient.query("SAVEPOINT invalid_d_missing_count");
+        await expect(ddlClient.query(
+          `INSERT INTO serve.condition_mark (
+             answer_id, answer_version, mark, scope, subject_ref, reason,
+             call_site_key, terminal_transport_outcome, excluded_from_served_number,
+             judged_basis_count, at_seq
+           ) VALUES ($1,2,'DERIVED-STANDING-UNREVIEWED','node',$2,'ddl-negative',
+             'JUDGE:review:test','FAILED',false,NULL,ledger.allocate_sequence())`,
+          [source.answerId, hiddenNodeId]
+        )).rejects.toThrow();
+        await ddlClient.query("ROLLBACK TO SAVEPOINT invalid_d_missing_count");
+        await ddlClient.query("SAVEPOINT invalid_non_d_count");
+        await expect(ddlClient.query(
+          `INSERT INTO serve.condition_mark (
+             answer_id, answer_version, mark, scope, subject_ref, reason,
+             judged_basis_count, at_seq
+           ) VALUES ($1,2,'UNAUTHORED-BRANCH-HALTED','node',$2,'ddl-negative',
+             1,ledger.allocate_sequence())`,
+          [source.answerId, hiddenNodeId]
+        )).rejects.toThrow();
+        await ddlClient.query("ROLLBACK TO SAVEPOINT invalid_non_d_count");
+      } finally {
+        await ddlClient.query("ROLLBACK");
+        ddlClient.release();
+      }
       const storedNodes = await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM core.node WHERE run_id=$1", [runId]
       );
@@ -1858,12 +2114,13 @@ describe("apps/runner — legal command lifecycle", () => {
       const targetNodeIds = [...new Set(storedSnapshot.arrows
         .filter((arrow) => arrow.targetKind === "NODE")
         .map((arrow) => arrow.targetNodeId!))];
-      const judged = evaluate(excludeHiddenSubtrees({
+      const reviewedNodeIds = await new JudgementRepository(database.pool).readReviewedNodeIds(runId);
+      const judged = evaluate(projectJudgedStanding({
         ...storedSnapshot,
         operatorResolutions: targetNodeIds.map((parentNodeId) => ({
           parentNodeId, operator: "accumulate" as const, suppliedBy: "deployment" as const
         }))
-      }, [hiddenNodeId]));
+      }, reviewedNodeIds).snapshot);
       const servedNode = answer?.nodes.find((node) => node.node_id !== hiddenNodeId && node.final_strength !== null);
       expect(servedNode?.final_strength?.value).toBe(
         judged.strengths.find((row) => row.nodeId === servedNode?.node_id)?.strength
@@ -1874,7 +2131,7 @@ describe("apps/runner — legal command lifecycle", () => {
     }
   });
 
-  it("RESIL-01 rev2 R1 serves the surviving maker when the preferred root's cross-maker review dies", async () => {
+  it("DR-184 C-5 serves a class-D root when its own review dies but judged arguments remain", async () => {
     const scenario = await executeResil01Scenario({
       label: "resil01-r1-served-review-dead",
       primary: [
@@ -1894,15 +2151,16 @@ describe("apps/runner — legal command lifecycle", () => {
 
     expect(scenario.error).toBeNull();
     expect(scenario.result?.kind).toBe("COMPLETED");
-    const hidden = scenario.answer?.condition_mark_records.find((record) => record.mark === "HIDDEN-UNJUDGEABLE");
+    const derived = scenario.answer?.condition_mark_records.find((record) => record.mark === "DERIVED-STANDING-UNREVIEWED");
     const selection = scenario.answer?.condition_mark_records.find((record) => record.mark === "UNSERVED-MAKER-POSITION");
-    expect(hidden?.affected_node_ids).toHaveLength(1);
-    expect(selection?.subject_ref).not.toBe(hidden?.affected_node_ids[0]);
+    expect(derived).toMatchObject({ excluded_from_served_number: false, judged_basis_count: expect.any(Number) });
+    expect(derived?.affected_node_ids).toHaveLength(1);
     expect(scenario.answer?.nodes.find((node) => node.node_id === selection?.subject_ref)?.final_strength)
       .not.toBeNull();
+    expect(scenario.answer?.condition_marks).toContain("DERIVED-STANDING-UNREVIEWED");
   });
 
-  it("RESIL-01 rev2 R1 reports the review cause when every maker root is class H", async () => {
+  it("DR-184 C-5 replaces the old all-roots review death when both roots have judged arguments", async () => {
     const scenario = await executeResil01Scenario({
       label: "resil01-r1-no-served-root",
       primary: [
@@ -1921,9 +2179,12 @@ describe("apps/runner — legal command lifecycle", () => {
       ]
     });
 
-    expect(scenario.result).toBeNull();
-    expect(scenario.error).toMatchObject({ code: "NO_SERVABLE_MAKER_POSITION_AFTER_REVIEW" });
-    expect(scenario.error).not.toMatchObject({ code: "EMPTY_PROPAGATION" });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.answer?.condition_marks).toContain("DERIVED-STANDING-UNREVIEWED");
+    expect(scenario.answer?.condition_mark_records.filter(
+      (record) => record.mark === "DERIVED-STANDING-UNREVIEWED"
+    ).length).toBeGreaterThanOrEqual(2);
   });
 
   it("RESIL-01 rev2 R2 keeps a healthy tau-0.30 graph servable and makes class L presentation-only", async () => {
@@ -1949,6 +2210,10 @@ describe("apps/runner — legal command lifecycle", () => {
     expect(lowRecords.length).toBeGreaterThan(0);
     expect(lowRecords.every((record) => record.excluded_from_served_number === false)).toBe(true);
     expect(scenario.answer?.nodes.some((node) => node.final_strength !== null)).toBe(true);
+    if (scenario.answer === null) throw new Error("TEST_EXPECTED_REAL_ANSWER_PROJECTION");
+    const census = projectCanvasCensus(scenario.answer);
+    expect(census).toEqual({ claims: 8, judged: 8, derivedStanding: 0, setAside: 0 });
+    expect(census.judged + census.derivedStanding + census.setAside).toBe(census.claims);
   });
 
   it("RESIL-01 rev2 R2 keeps a hidden low-scoring attack in the served-number evaluation", async () => {

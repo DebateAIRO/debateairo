@@ -179,10 +179,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
   const reviews = input.panelSize === 1 ? 0 : authored;
   const fixedSites = input.maxRecompose * input.fixedOrgansPerComposition;
-  const finalRetryTotal = input.maxCooldownHoldsPerRun * input.finalRetryAttempts;
-  const maxModelAttempts = (authored + reviews) * input.judgeMaxAttempts
-    + fixedSites * input.organMaxAttempts
-    + finalRetryTotal;
+  const maxModelAttempts = (authored + reviews) * (input.judgeMaxAttempts + input.finalRetryAttempts)
+    + fixedSites * input.organMaxAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
@@ -191,7 +189,7 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     per_site_attempts: Object.freeze({ judge: input.judgeMaxAttempts, organ: input.organMaxAttempts }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-181-v1",
+    formula_version: "DR-184-v2",
     bounds_source_ref: "engine-exports+register"
   });
 }
