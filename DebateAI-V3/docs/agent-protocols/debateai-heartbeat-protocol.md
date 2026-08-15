@@ -311,6 +311,16 @@ cockpit and along a model-family boundary.
 - Writes: a `verdict` field and, on pass, the human-review routing decision.
 - The Router consumes the verdict; the Router never re-performs verification, and
   the Verifier never re-dispatches.
+- **Board serving + ticket format (V order, 2026-08-15):** the Kanban board is
+  served on **port 9119 — always 9119, never overridden in missions** (`hermes
+  dashboard`), so every agent and human always knows where the board lives. Every
+  ticket carries its assigned model in SQUARE BRACKETS at the start of the ticket
+  title — e.g. `[codex@gpt-5.6-sol] eval-04-tagger`, `[hermes] stage verdict
+  PROG-05`; unassigned tickets carry `[unassigned]`. The bracket tag is updated on
+  every (re)assignment and must agree with the mission's `loop_ownership` map and
+  the model-law roster; the assignee column duplicates it, but the title tag is
+  the human-readable law. Board-crafting and board-fix packets must instruct the
+  Verifier accordingly.
 - Write-permission set: `verdict`, `human_review` routing, and the verdict markers
   `HERMES STAGE REVIEW PASS`, `HERMES STAGE REVIEW CHANGES REQUESTED`,
   `HERMES CHANGES REQUESTED`, `HERMES DONE`, `HERMES BLOCKED`,
