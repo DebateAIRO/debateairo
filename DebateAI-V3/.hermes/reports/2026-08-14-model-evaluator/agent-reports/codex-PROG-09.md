@@ -140,6 +140,40 @@ run is GREEN.
 
 ## Exact verification
 
+Continuation verification after the known client hang (same session, same
+commit `9650a00afbdb4e810903dbb2eb7bc2255aea331b`):
+
+```text
+pnpm exec vitest run --maxWorkers=1 \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts \
+  tests/integration/evaluator-consumer-database.test.ts
+Test Files  3 passed (3)
+Tests       27 passed (27)
+
+pnpm exec vitest run --maxWorkers=1 \
+  tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-harvest-rework.test.ts \
+  tests/integration/evaluator-addon-database.test.ts \
+  tests/integration/evaluator-profiles-database.test.ts \
+  tests/integration/evaluator-profiles-rework.test.ts \
+  tests/unit/evaluator-tagger.test.ts \
+  tests/unit/evaluator-harvest.test.ts \
+  tests/unit/evaluator-addon.test.ts \
+  tests/unit/evaluator-profiles.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts
+Test Files  10 passed (10)
+Tests       74 passed (74)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+```
+
+The differential run includes the persisted FR-0.6 AC5 byte-identical panel and
+`agent_count` proof, null-run isolation, harvest and settlement reconciliation,
+add-on bounds/concurrency, profile/rank persistence, and zero production callers
+while evaluator dispatch remains UNBOUND.
+
 ```text
 pnpm generate:contract && pnpm typecheck
 PASS (tsc --noEmit)
