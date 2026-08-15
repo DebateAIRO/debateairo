@@ -1542,3 +1542,23 @@ supersedes | status`.
   confounding (the deferred larger seam) → DR-171+DR-175 consult before
   any ticket. | V watched 57% of a masterpiece sit in the dark | the
   review-completion consult | — | ACTIVE
+
+| DR-184-A | 2026-08-15 | V ("if the pros and cons get a judgement, their
+  ancestor should have a grade/score/judgement as well. because its
+  through virtue of arguments that a hypothesis gains or loses power") |
+  **THE VIRTUE-OF-ARGUMENTS PRINCIPLE — ancestors derive standing from
+  judged descendants.** V resolves the subtree-visibility question before
+  it was asked: an ancestor whose pros and cons ARE judged is not a black
+  hole — it carries a DERIVED grade computed from its judged arguments
+  (which is the propagation model's own arithmetic, now extended to
+  standing and visibility). Concretely: (1) a node with judged
+  descendants SERVES with a derived score, its own missing cross-review
+  disclosed as a mark on the node — never as a veil over the lineage;
+  (2) subtree hiding contracts to nodes with NO judged basis at all
+  (own review absent AND no judged descendants); (3) DR-165(3) is
+  reconciled, not waived: the ancestor serves on its judged arguments'
+  authority, not its own unjudged assertion — the distinction is carried
+  on the mark. A hypothesis gains or loses power through the virtue of
+  its arguments — the founding sentence of the scoring layer, now law. |
+  V ruled the chain-of-custody question from first principles | the
+  DR-184 consult binds to this | — | ACTIVE
