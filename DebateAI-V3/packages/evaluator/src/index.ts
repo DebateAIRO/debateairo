@@ -12,6 +12,7 @@ import {
 
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
+export const EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY = "evaluatorJudgeAddonPolicy" as const;
 export const EVALUATOR_PROVIDER_REF = "provider:evaluator-vllm" as const;
 export const EVALUATOR_MAKER = "maker:evaluator-local-vllm" as const;
 export const EVALUATOR_ADAPTER_KIND = "vllm-openai-compatible-http" as const;
@@ -287,6 +288,557 @@ export function createBlindEvaluationSample(input: {
     grade: input.grade,
     reasons: Object.freeze([...input.reasons])
   });
+}
+
+export const ADDON_PIPELINE_VERSION = 1 as const;
+export const ADDON_METRIC = "judging.blind-grade.v1" as const;
+export const ADDON_MAX_PROVIDER_ATTEMPTS = 2 as const;
+export const ADDON_MAX_RUN_ATTEMPTS = 3 as const;
+
+const judgeAddonPolicyValueSchema = z.object({
+  kind: z.literal("EVALUATOR_JUDGE_ADDON_POLICY"),
+  collectionState: z.literal("COLLECT_ONLY"),
+  everyNthRun: z.number().int().min(1).max(10_000),
+  maxAttempts: z.number().int().min(1).max(ADDON_MAX_PROVIDER_ATTEMPTS),
+  tokenCeiling: z.number().int().positive(),
+  deadlineMs: z.number().int().positive(),
+  derivationVersion: z.number().int().positive()
+}).strict();
+
+export interface EvaluatorJudgeAddonPolicy {
+  readonly rowKey: typeof EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY;
+  readonly registerVersion: number;
+  readonly sourceRef: string;
+  readonly value: z.infer<typeof judgeAddonPolicyValueSchema>;
+}
+
+export async function readEvaluatorJudgeAddonPolicy(
+  pool: Pool,
+  registerVersion: number
+): Promise<EvaluatorJudgeAddonPolicy | null> {
+  assertPositiveRegisterVersion(registerVersion);
+  const result = await pool.query<{ value_json: unknown; source_ref: string }>(
+    `SELECT value_json, source_ref FROM register.register_row
+     WHERE register_version=$1 AND row_key=$2`,
+    [registerVersion, EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY]
+  );
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  const parsed = judgeAddonPolicyValueSchema.safeParse(row.value_json);
+  if (!parsed.success || row.source_ref.trim() === "") {
+    throw new TypedDomainError(
+      "EVALUATOR_ADDON_POLICY_INVALID",
+      `${EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY}@${registerVersion}`
+    );
+  }
+  return Object.freeze({
+    rowKey: EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY,
+    registerVersion,
+    sourceRef: row.source_ref,
+    value: Object.freeze(parsed.data)
+  });
+}
+
+export function shouldSampleEvaluatorAddon(runOrdinal: number, everyNthRun: number): boolean {
+  if (!Number.isInteger(runOrdinal) || runOrdinal < 1) {
+    throw new TypeError("EVALUATOR_ADDON_RUN_ORDINAL_INVALID");
+  }
+  if (!Number.isInteger(everyNthRun) || everyNthRun < 1) {
+    throw new TypeError("EVALUATOR_ADDON_SAMPLE_INTERVAL_INVALID");
+  }
+  return runOrdinal % everyNthRun === 0;
+}
+
+export interface EvaluatorAddonCandidate {
+  readonly runId: string;
+  readonly runOrdinal: number;
+  readonly domainId: string | null;
+  readonly reducedJudgementId: string;
+  readonly gradedRawArtifactRef: string;
+  readonly gradedProvider: string;
+  readonly gradedModelId: string;
+  readonly gradedModelVersion: string;
+  readonly gradedMaker: string;
+  readonly questionExcerpt: string;
+  readonly taskExcerpt: string;
+  readonly grade: string;
+  readonly reasons: readonly string[];
+}
+
+export type EvaluatorAddonCandidateResult = EvaluatorAddonCandidate
+  | "ALREADY_GRADED"
+  | "RETRY_LIMIT_REACHED"
+  | "HARVEST_REQUIRED"
+  | "NO_JUDGEMENT";
+
+export interface AddonPipelineEventInput {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly state: "STARTED" | "SUCCEEDED" | "FAILED" | "SKIPPED";
+  readonly reason: string;
+  readonly inputHash: string;
+}
+
+export interface EvaluatorAddonObservationInput {
+  readonly runId: string;
+  readonly provider: string;
+  readonly modelId: string;
+  readonly modelVersion: string;
+  readonly domainId: string | null;
+  readonly step: "JUDGING";
+  readonly metric: typeof ADDON_METRIC;
+  readonly value: number;
+  readonly outcomeJson: Readonly<{ verdict: string; reasons: readonly string[] }>;
+  readonly truthBasis: "BLIND_ADDON";
+  readonly sourceKind: "BLIND_JUDGE_GRADE";
+  readonly sourceRef: string;
+  readonly sourceRawArtifactRef: string;
+  readonly gradedRawArtifactRef: string;
+  readonly graderRawArtifactRef: string;
+  readonly gradedMaker: string;
+  readonly graderMaker: string;
+  readonly derivationVersion: number;
+  readonly provenanceJson: Readonly<Record<string, unknown>>;
+  readonly observedAt: Date;
+}
+
+export interface EvaluatorAddonRepository {
+  withRunLock<T>(
+    runId: string,
+    work: (client?: PoolClient) => Promise<T>
+  ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }>;
+  loadCandidate(runId: string, client?: PoolClient): Promise<EvaluatorAddonCandidateResult>;
+  recordPipelineEvent(input: AddonPipelineEventInput, client?: PoolClient): Promise<string>;
+  insertObservation(input: EvaluatorAddonObservationInput, client?: PoolClient): Promise<string>;
+}
+
+const addonGradeSchema = z.object({
+  score: z.number().min(0).max(1),
+  verdict: z.enum(["UPHOLD", "REVISE", "UNASSESSABLE"]),
+  reasons: z.array(z.string().trim().min(1)).min(1)
+}).strict();
+
+function parseAddonGrade(content: string): z.infer<typeof addonGradeSchema> {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(content);
+  } catch {
+    throw new TypedDomainError("EVALUATOR_ADDON_OUTPUT_INVALID", "Add-on output is not JSON");
+  }
+  const parsed = addonGradeSchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new TypedDomainError("EVALUATOR_ADDON_OUTPUT_INVALID", "Add-on output violates its contract");
+  }
+  return parsed.data;
+}
+
+function addonInputHash(
+  runId: string,
+  candidate: EvaluatorAddonCandidate | null,
+  policy: EvaluatorJudgeAddonPolicy | null
+): string {
+  return createHash("sha256").update(JSON.stringify({
+    run_id: runId,
+    reduced_judgement_id: candidate?.reducedJudgementId ?? null,
+    policy: policy === null ? null : {
+      register_version: policy.registerVersion,
+      source_ref: policy.sourceRef,
+      value: policy.value
+    }
+  })).digest("hex");
+}
+
+export type EvaluatorJudgeAddonResult =
+  | { readonly state: "GRADED"; readonly observationId: string }
+  | {
+      readonly state: "SKIPPED";
+      readonly reason: "ADDON_POLICY_UNAVAILABLE" | "ADDON_POLICY_INVALID"
+        | "ADDON_ALREADY_GRADED" | "ADDON_RETRY_LIMIT_REACHED"
+        | "ADDON_HARVEST_REQUIRED" | "ADDON_NO_JUDGEMENT"
+        | "ADDON_NOT_SAMPLED" | "ADDON_DIFFERENT_MAKER_UNAVAILABLE"
+        | "ADDON_PROVIDER_ISOLATION_FAILED" | "ADDON_FAMILY_REGISTER_VERSION_MISMATCH"
+        | "ADDON_PASS_IN_FLIGHT";
+    }
+  | {
+      readonly state: "FAILED";
+      readonly reason: "ADDON_PREFLIGHT_FAILED" | "ADDON_PROVIDER_FAILED"
+        | "ADDON_PROVIDER_TIMED_OUT" | "ADDON_CONTENT_REFUSED" | "ADDON_EXECUTION_FAILED";
+    };
+
+export async function runEvaluatorJudgeAddon(input: {
+  readonly runId: string;
+  readonly family: EvaluatorProviderFamilyRow;
+  readonly deployment: {
+    readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  };
+  readonly policy: EvaluatorJudgeAddonPolicy | null;
+  readonly provider: ProviderGateway;
+  readonly repository: EvaluatorAddonRepository;
+  readonly observedAt?: Date;
+}): Promise<EvaluatorJudgeAddonResult> {
+  const attemptId = randomUUID();
+  const observedAt = input.observedAt ?? new Date();
+  try {
+    requireNonblank(input.runId, "EVALUATOR_ADDON_RUN_ID_INVALID");
+    if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_ADDON_TIME_INVALID");
+  } catch {
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
+
+  let inputHash = addonInputHash(input.runId, null, input.policy);
+  const recordTerminalEvent = async (
+    state: "SUCCEEDED" | "FAILED" | "SKIPPED",
+    reason: string,
+    client?: PoolClient
+  ): Promise<void> => {
+    try {
+      await input.repository.recordPipelineEvent({
+        runId: input.runId, attemptId, state, reason, inputHash
+      }, client);
+    } catch {
+      // Add-on receipts are best effort and never change product-run behavior.
+    }
+  };
+
+  const parsedPolicy = input.policy === null
+    ? null
+    : judgeAddonPolicyValueSchema.safeParse(input.policy.value);
+  if (input.policy !== null && (!parsedPolicy?.success || input.policy.sourceRef.trim() === "")) {
+    await recordTerminalEvent("SKIPPED", "ADDON_POLICY_INVALID");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
+  }
+  if (input.policy === null) {
+    await recordTerminalEvent("SKIPPED", "ADDON_POLICY_UNAVAILABLE");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_UNAVAILABLE" });
+  }
+  const policy = input.policy;
+  try {
+    assertEvaluatorProviderIsolation(input.family, input.deployment);
+  } catch {
+    await recordTerminalEvent("SKIPPED", "ADDON_PROVIDER_ISOLATION_FAILED");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
+  }
+
+  const lockedResult = await input.repository.withRunLock(input.runId, async (client) => {
+  let candidateResult: EvaluatorAddonCandidateResult;
+  try {
+    candidateResult = await input.repository.loadCandidate(input.runId, client);
+  } catch {
+    await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED", client);
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
+  const candidate = typeof candidateResult === "string" ? null : candidateResult;
+  inputHash = addonInputHash(input.runId, candidate, policy);
+  if (candidateResult === "ALREADY_GRADED") {
+    await recordTerminalEvent("SKIPPED", "ADDON_ALREADY_GRADED", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_ALREADY_GRADED" });
+  }
+  if (candidateResult === "RETRY_LIMIT_REACHED") {
+    await recordTerminalEvent("SKIPPED", "ADDON_RETRY_LIMIT_REACHED", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_RETRY_LIMIT_REACHED" });
+  }
+  if (candidateResult === "HARVEST_REQUIRED") {
+    await recordTerminalEvent("SKIPPED", "ADDON_HARVEST_REQUIRED", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_HARVEST_REQUIRED" });
+  }
+  if (candidateResult === "NO_JUDGEMENT") {
+    await recordTerminalEvent("SKIPPED", "ADDON_NO_JUDGEMENT", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_NO_JUDGEMENT" });
+  }
+  if (!shouldSampleEvaluatorAddon(candidateResult.runOrdinal, policy.value.everyNthRun)) {
+    await recordTerminalEvent("SKIPPED", "ADDON_NOT_SAMPLED", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_NOT_SAMPLED" });
+  }
+  if (candidateResult.gradedMaker === input.family.value.maker) {
+    await recordTerminalEvent("SKIPPED", "ADDON_DIFFERENT_MAKER_UNAVAILABLE", client);
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_DIFFERENT_MAKER_UNAVAILABLE" });
+  }
+
+  try {
+    await input.repository.recordPipelineEvent({
+      runId: input.runId, attemptId, state: "STARTED", reason: "BLIND_JUDGE_GRADE_STARTED", inputHash
+    }, client);
+  } catch {
+    await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED", client);
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
+
+  const blinded = createBlindEvaluationSample({
+    sampleId: `opaque:${createHash("sha256").update(`${input.runId}:${candidateResult.reducedJudgementId}`)
+      .digest("hex").slice(0, 24)}`,
+    questionExcerpt: candidateResult.questionExcerpt,
+    taskExcerpt: candidateResult.taskExcerpt,
+    grade: candidateResult.grade,
+    reasons: candidateResult.reasons
+  });
+  let stage: "PROVIDER_CALL" | "EXECUTION" = "PROVIDER_CALL";
+  try {
+    const packet = {
+      messages: [
+        {
+          role: "system" as const,
+          content: "Grade the supplied anonymous judge output. Return strict JSON only with score in [0,1], verdict UPHOLD, REVISE, or UNASSESSABLE, and one or more non-empty reasons. Do not infer authorship."
+        },
+        { role: "user" as const, content: JSON.stringify(blinded) }
+      ]
+    };
+    const response = await input.provider.call({
+      runId: null,
+      subjectItemId: `evaluator:addon-attempt:${attemptId}`,
+      callSiteKey: "evaluator.grade-judge-output.v1",
+      role: "JUDGE",
+      lane: "evaluator",
+      bound: {
+        maxAttempts: policy.value.maxAttempts,
+        tokenCeiling: policy.value.tokenCeiling,
+        deadlineMs: policy.value.deadlineMs
+      },
+      contractHash: createHash("sha256").update("evaluator-blind-judge-grade/v1").digest("hex"),
+      providerRef: input.family.value.providerRef,
+      packet,
+      buildRepairPacket: ({ parseError }) => ({
+        messages: [...packet.messages, {
+          role: "user",
+          content: `The response violated the anonymous grading JSON contract (${parseError}). Return corrected strict JSON only.`
+        }]
+      }),
+      classifyContent: (content) => {
+        const parsed = addonGradeSchema.safeParse((() => {
+          try { return JSON.parse(content); } catch { return null; }
+        })());
+        return parsed.success
+          ? { parseStatus: "PARSED", parseError: null }
+          : { parseStatus: "SCHEMA_FAILED", parseError: "EVALUATOR_ADDON_OUTPUT_INVALID" };
+      }
+    });
+    stage = "EXECUTION";
+    if (response.maker !== input.family.value.maker
+      || response.maker === candidateResult.gradedMaker) {
+      await recordTerminalEvent("SKIPPED", "ADDON_DIFFERENT_MAKER_UNAVAILABLE", client);
+      return Object.freeze({ state: "SKIPPED", reason: "ADDON_DIFFERENT_MAKER_UNAVAILABLE" });
+    }
+    const grade = parseAddonGrade(response.content);
+    const observationId = await input.repository.insertObservation({
+      runId: input.runId,
+      provider: candidateResult.gradedProvider,
+      modelId: candidateResult.gradedModelId,
+      modelVersion: candidateResult.gradedModelVersion,
+      domainId: candidateResult.domainId,
+      step: "JUDGING",
+      metric: ADDON_METRIC,
+      value: grade.score,
+      outcomeJson: Object.freeze({ verdict: grade.verdict, reasons: Object.freeze([...grade.reasons]) }),
+      truthBasis: "BLIND_ADDON",
+      sourceKind: "BLIND_JUDGE_GRADE",
+      sourceRef: candidateResult.reducedJudgementId,
+      sourceRawArtifactRef: candidateResult.gradedRawArtifactRef,
+      gradedRawArtifactRef: candidateResult.gradedRawArtifactRef,
+      graderRawArtifactRef: response.rawArtifactRef,
+      gradedMaker: candidateResult.gradedMaker,
+      graderMaker: response.maker,
+      derivationVersion: policy.value.derivationVersion,
+      provenanceJson: Object.freeze({
+        source: "evaluator.blind_judge_grade",
+        policy_row_key: policy.rowKey,
+        policy_register_version: policy.registerVersion,
+        policy_source_ref: policy.sourceRef,
+        grader_ledger_entry_ref: response.ledgerEntryRef
+      }),
+      observedAt: new Date(observedAt)
+    }, client);
+    await recordTerminalEvent("SUCCEEDED", "BLIND_JUDGE_GRADE_SUCCEEDED", client);
+    return Object.freeze({ state: "GRADED", observationId });
+  } catch (error) {
+    const reason: Extract<EvaluatorJudgeAddonResult, { state: "FAILED" }>["reason"] =
+      error instanceof ProviderCallFailedError && error.lastOutcome === "TIMED_OUT"
+        ? "ADDON_PROVIDER_TIMED_OUT"
+        : error instanceof ProviderContentUnacceptedError
+          || (error instanceof TypedDomainError && error.code === "EVALUATOR_ADDON_OUTPUT_INVALID")
+          ? "ADDON_CONTENT_REFUSED"
+          : stage === "PROVIDER_CALL" ? "ADDON_PROVIDER_FAILED" : "ADDON_EXECUTION_FAILED";
+    await recordTerminalEvent("FAILED", reason, client);
+    return Object.freeze({ state: "FAILED", reason });
+  }
+  });
+  if (!lockedResult.acquired) {
+    await recordTerminalEvent("SKIPPED", "ADDON_PASS_IN_FLIGHT");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_PASS_IN_FLIGHT" });
+  }
+  return lockedResult.value;
+}
+
+function extractBlindJudgementReasons(rawText: string): readonly string[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(rawText);
+  } catch {
+    return Object.freeze([]);
+  }
+  const parsed = z.object({
+    restatement_text: z.string().trim().min(1).optional(),
+    steelman: z.object({ summary: z.string().trim().min(1) }).passthrough().optional(),
+    critic: z.object({ summary: z.string().trim().min(1) }).passthrough().optional()
+  }).passthrough().safeParse(value);
+  if (!parsed.success) return Object.freeze([]);
+  return Object.freeze([
+    parsed.data.restatement_text,
+    parsed.data.steelman?.summary,
+    parsed.data.critic?.summary
+  ].filter((reason): reason is string => reason !== undefined));
+}
+
+export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async withRunLock<T>(
+    runId: string,
+    work: (client?: PoolClient) => Promise<T>
+  ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }> {
+    const client = await this.pool.connect();
+    const lockKey = `evaluator-addon:${runId}`;
+    let acquired = false;
+    try {
+      const lock = await client.query<{ acquired: boolean }>(
+        "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+        [lockKey]
+      );
+      acquired = lock.rows[0]?.acquired === true;
+      if (!acquired) return Object.freeze({ acquired: false as const });
+      return Object.freeze({ acquired: true as const, value: await work(client) });
+    } finally {
+      if (!acquired) {
+        client.release();
+      } else {
+        try {
+          const unlock = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [lockKey]
+          );
+          if (unlock.rows[0]?.unlocked !== true) {
+            throw new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED");
+          }
+          client.release();
+        } catch (error) {
+          client.release(error instanceof Error
+            ? error
+            : new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED"));
+          throw error;
+        }
+      }
+    }
+  }
+
+  async loadCandidate(runId: string, client?: PoolClient): Promise<EvaluatorAddonCandidateResult> {
+    const database = client ?? this.pool;
+    const existing = await database.query(`
+      SELECT 1 FROM evaluator.observation
+      WHERE run_id=$1 AND source_kind='BLIND_JUDGE_GRADE' LIMIT 1
+    `, [runId]);
+    if (existing.rowCount !== 0) return "ALREADY_GRADED";
+    const attempts = await database.query<{ attempt_count: string }>(`
+      SELECT count(DISTINCT attempt_id)::text AS attempt_count
+      FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' AND pipeline_version=$2 AND state='STARTED'
+    `, [runId, ADDON_PIPELINE_VERSION]);
+    if (Number(attempts.rows[0]?.attempt_count ?? 0) >= ADDON_MAX_RUN_ATTEMPTS) {
+      return "RETRY_LIMIT_REACHED";
+    }
+    const harvested = await database.query(`
+      SELECT 1 FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='HARVEST' AND state='SUCCEEDED' LIMIT 1
+    `, [runId]);
+    if (harvested.rowCount === 0) return "HARVEST_REQUIRED";
+    const result = await database.query<{
+      run_id: string; run_ordinal: number; domain_id: string | null;
+      reduced_judgement_id: string; raw_artifact_ref: string; provider: string;
+      model_id: string; model_version: string; maker: string; question_line: string;
+      claim_text: string; tau: number; number_kind: string; raw_text: string;
+    }>(`
+      SELECT run.run_id,
+        (SELECT count(*)::int FROM core.run AS preceding
+         WHERE preceding.created_at_seq <= run.created_at_seq) AS run_ordinal,
+        domain.domain_id, judgement.reduced_judgement_id, judgement.raw_artifact_ref,
+        artifact.provider, artifact.model_id, artifact.model_version, artifact.maker,
+        run.question_line, node.claim_text, judgement.tau, judgement.number_kind,
+        artifact.raw_text
+      FROM core.run AS run
+      JOIN ledger.reduced_judgement AS judgement ON judgement.run_id=run.run_id
+      JOIN core.node AS node ON node.node_id=judgement.node_id AND node.run_id=run.run_id
+      JOIN ledger.raw_artifact AS artifact
+        ON artifact.raw_artifact_id=judgement.raw_artifact_ref AND artifact.run_id=run.run_id
+      LEFT JOIN evaluator.question_domain AS domain ON domain.run_id=run.run_id
+      WHERE run.run_id=$1 AND artifact.model_version IS NOT NULL
+        AND length(btrim(artifact.model_version)) > 0
+      ORDER BY judgement.at_seq, judgement.reduced_judgement_id
+      LIMIT 1
+    `, [runId]);
+    const row = result.rows[0];
+    if (row === undefined) return "NO_JUDGEMENT";
+    return Object.freeze({
+      runId: row.run_id,
+      runOrdinal: Number(row.run_ordinal),
+      domainId: row.domain_id,
+      reducedJudgementId: row.reduced_judgement_id,
+      gradedRawArtifactRef: row.raw_artifact_ref,
+      gradedProvider: row.provider,
+      gradedModelId: row.model_id,
+      gradedModelVersion: row.model_version,
+      gradedMaker: row.maker,
+      questionExcerpt: row.question_line,
+      taskExcerpt: row.claim_text,
+      grade: `${Number(row.tau)} (${row.number_kind})`,
+      reasons: extractBlindJudgementReasons(row.raw_text)
+    });
+  }
+
+  async recordPipelineEvent(input: AddonPipelineEventInput, client?: PoolClient): Promise<string> {
+    const insert = async (writeClient: PoolClient): Promise<string> => {
+      const result = await writeClient.query<{ pipeline_event_id: string }>(`
+        INSERT INTO evaluator.pipeline_event (
+          run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
+        ) VALUES ($1,'ADDON',$2,$3,$4,$5,$6,$7) RETURNING pipeline_event_id
+      `, [input.runId, ADDON_PIPELINE_VERSION, input.attemptId, input.state, input.reason,
+        input.inputHash, await allocateSequence(writeClient)]);
+      return result.rows[0]!.pipeline_event_id;
+    };
+    return client === undefined ? withWriteTransaction(this.pool, insert) : insert(client);
+  }
+
+  async insertObservation(input: EvaluatorAddonObservationInput, client?: PoolClient): Promise<string> {
+    if (input.gradedMaker === input.graderMaker) {
+      throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", input.gradedMaker);
+    }
+    const insert = async (writeClient: PoolClient): Promise<string> => {
+      const result = await writeClient.query<{ observation_id: string }>(`
+        INSERT INTO evaluator.observation (
+          run_id, provider, model_id, model_version, domain_id, step, metric,
+          value, outcome_json, truth_basis, source_kind, source_ref,
+          source_raw_artifact_ref, answer_outcome_id, graded_raw_artifact_ref,
+          grader_raw_artifact_ref, derivation_version, supersedes_observation_id,
+          provenance_json, observed_at, at_seq
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,NULL,$14,$15,$16,NULL,$17::jsonb,$18,$19)
+        ON CONFLICT DO NOTHING RETURNING observation_id
+      `, [
+        input.runId, input.provider, input.modelId, input.modelVersion, input.domainId,
+        input.step, input.metric, input.value, JSON.stringify(input.outcomeJson), input.truthBasis,
+        input.sourceKind, input.sourceRef, input.sourceRawArtifactRef, input.gradedRawArtifactRef,
+        input.graderRawArtifactRef, input.derivationVersion, JSON.stringify(input.provenanceJson),
+        input.observedAt, await allocateSequence(writeClient)
+      ]);
+      const observationId = result.rows[0]?.observation_id;
+      if (observationId === undefined) {
+        const existing = await writeClient.query<{ observation_id: string }>(`
+          SELECT observation_id FROM evaluator.observation
+          WHERE run_id=$1 AND source_kind='BLIND_JUDGE_GRADE' AND source_ref=$2
+            AND derivation_version=$3 LIMIT 1
+        `, [input.runId, input.sourceRef, input.derivationVersion]);
+        if (existing.rows[0] === undefined) throw new Error("EVALUATOR_ADDON_OBSERVATION_CONFLICT");
+        return existing.rows[0].observation_id;
+      }
+      return observationId;
+    };
+    return client === undefined ? withWriteTransaction(this.pool, insert) : insert(client);
+  }
 }
 
 export const DOMAIN_GUARDRAIL_VERSION = 1 as const;

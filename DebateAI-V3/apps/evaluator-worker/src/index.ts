@@ -1,14 +1,19 @@
 import type { Pool } from "pg";
+import { createHash, randomUUID } from "node:crypto";
 import type { CallBound, ProviderGateway } from "@debateai/providers";
 import {
   assertEvaluatorProviderIsolation,
   DomainRegistryRepository,
   EvaluatorCatalogRepository,
   EvaluatorHarvestRepository,
+  PostgresEvaluatorAddonRepository,
   HARVEST_PIPELINE_VERSION,
   probeEvaluatorVllmCatalog,
+  readEvaluatorJudgeAddonPolicy,
   reconcileEvaluatorMetering,
+  runEvaluatorJudgeAddon,
   runEvaluatorQuestionTagger,
+  type EvaluatorJudgeAddonResult,
   type EvaluatorHarvestResult,
   type EvaluatorMeteringReconciliationResult,
   type EvaluatorQuestionTagResult,
@@ -69,6 +74,67 @@ export async function runEvaluatorTagReconciliation(input: {
   readonly provenanceRef: string;
 }): Promise<EvaluatorQuestionTagResult> {
   return runPersistedQuestionTag({ ...input, basis: "BACKFILL" });
+}
+
+export async function runEvaluatorJudgeGradingAddon(input: {
+  readonly pool: Pool;
+  readonly runId: string;
+  readonly family: EvaluatorProviderFamilyRow;
+  readonly deployment: {
+    readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  };
+  readonly provider: ProviderGateway;
+  readonly observedAt?: Date;
+}): Promise<EvaluatorJudgeAddonResult> {
+  if (input.runId.trim() === "") throw new TypeError("EVALUATOR_ADDON_RUN_ID_INVALID");
+  if (input.observedAt !== undefined && !Number.isFinite(input.observedAt.getTime())) {
+    throw new TypeError("EVALUATOR_ADDON_TIME_INVALID");
+  }
+  const run = await input.pool.query<{ register_version: string | number }>(
+    "SELECT register_version FROM core.run WHERE run_id=$1",
+    [input.runId]
+  );
+  if (run.rows[0] === undefined) throw new TypeError("EVALUATOR_ADDON_RUN_UNRESOLVED");
+  const repository = new PostgresEvaluatorAddonRepository(input.pool);
+  const registerVersion = Number(run.rows[0]?.register_version);
+  const recordPreflightReceipt = async (state: "FAILED" | "SKIPPED", reason: string): Promise<void> => {
+    const attemptId = randomUUID();
+    const inputHash = createHash("sha256").update(JSON.stringify({
+      run_id: input.runId,
+      register_version: Number.isFinite(registerVersion) ? registerVersion : null,
+      family_register_version: input.family.registerVersion,
+      reason
+    })).digest("hex");
+    try {
+      await repository.recordPipelineEvent({ runId: input.runId, attemptId, state, reason, inputHash });
+    } catch {
+      // The worker remains best effort; a receipt-store outage must not affect the product run.
+    }
+  };
+  if (!Number.isInteger(registerVersion) || registerVersion < 1) {
+    await recordPreflightReceipt("FAILED", "ADDON_PREFLIGHT_FAILED");
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
+  if (input.family.registerVersion !== registerVersion) {
+    await recordPreflightReceipt("SKIPPED", "ADDON_FAMILY_REGISTER_VERSION_MISMATCH");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_FAMILY_REGISTER_VERSION_MISMATCH" });
+  }
+  let policy;
+  try {
+    policy = await readEvaluatorJudgeAddonPolicy(input.pool, registerVersion);
+  } catch {
+    await recordPreflightReceipt("SKIPPED", "ADDON_POLICY_INVALID");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
+  }
+  return runEvaluatorJudgeAddon({
+    runId: input.runId,
+    family: input.family,
+    deployment: input.deployment,
+    policy,
+    provider: input.provider,
+    repository,
+    ...(input.observedAt === undefined ? {} : { observedAt: input.observedAt })
+  });
 }
 
 export interface EvaluatorTerminalHarvestWorkerResult {
