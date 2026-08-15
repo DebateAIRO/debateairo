@@ -297,7 +297,7 @@ describe("0023 evaluator foundation migration", () => {
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
-      "consumer_output", "consumer_selection", "domain", "domain_admission",
+      "consumer_output", "consumer_refresh_receipt", "consumer_selection", "domain", "domain_admission",
       "model_call_usage", "observation", "pipeline_event", "profile_cell",
       "question_domain", "rank_snapshot", "relative_cost_cell", "shadow_decision",
       "vllm_catalog_model", "vllm_probe"
@@ -308,7 +308,7 @@ describe("0023 evaluator foundation migration", () => {
       WHERE trigger_schema='evaluator' AND event_manipulation IN ('UPDATE','DELETE')
         AND trigger_name='reject_mutation'
     `);
-    expect(Number(triggers.rows[0]!.count)).toBe(28);
+    expect(Number(triggers.rows[0]!.count)).toBe(30);
   });
 
   it("keeps consensus observations outside settlement and rejects mutation", async () => {

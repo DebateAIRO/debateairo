@@ -10,6 +10,9 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 
+export * from "./consumer.js";
+export * from "./consumer-postgres.js";
+
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
 export const EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY = "evaluatorJudgeAddonPolicy" as const;

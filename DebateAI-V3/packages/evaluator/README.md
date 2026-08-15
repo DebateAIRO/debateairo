@@ -16,6 +16,8 @@ Direct worker writes are limited to evaluator-owned `domain`,
 `domain_admission`, `question_domain`, `pipeline_event`, `observation`,
 `profile_cell`, `rank_snapshot`, `model_call_usage`, `relative_cost_cell`,
 `shadow_decision`, `vllm_probe`, `vllm_catalog_model`, and `consumer_output`.
+Consumer refreshes additionally write only their evaluator-owned
+`consumer_refresh_receipt` audit rows.
 The evaluator API role may insert only `consumer_selection`. Normal provider
 gateway calls separately retain their existing narrow ledger write authority.
 Tagger calls use evaluator-scoped attempt ids and a null ledger `run_id`; the
@@ -27,7 +29,8 @@ No evaluator role can write product `core`, `serve`, `memory`, settlement
 `scorecard`, or routing/session-assignment rows.
 
 Every evaluator table has the shared append-only `reject_mutation` trigger and
-explicit grants in `migrations/0023_evaluator_foundation.sql`. Domain and step
+explicit grants in the evaluator migrations (foundation 0023 and consumer
+receipt extension 0028). Domain and step
 land only on evaluator-owned columns. Consensus/process observations never land
 in `scorecard.answer_outcome`; that table remains settlement-owned.
 
@@ -178,3 +181,33 @@ database guard compatible with the required null-run grader artifact while
 still requiring the graded artifact to belong to the product run and refusing
 equal makers. The add-on stays collect-only and has no dispatch or routing read
 path.
+
+## Consumer reader
+
+`runEvaluatorConsumerRefresh` is the single interpretation path over evaluator
+profile cells and rank snapshots. The repository chooses the latest catalog
+selection, groups deterministic numeric aggregates by exact target identity and
+domain, and builds opaque target/sample references. Prompt bytes contain no
+target provider, model id, version, maker, artifact id, lineage, or provenance.
+The model may return only a plain-language bias-pattern name, a per-domain
+capability summary, and flags for allowlisted opaque adjacent-domain refs;
+numeric, routing, unknown, duplicated, or malformed fields are refused.
+
+Both on-demand and post-aggregate worker entry points use null-run evaluator
+calls with their own hard two-attempt provider bound. A short transaction uses
+`pg_try_advisory_xact_lock` only to append a STARTED claim; no database client or
+lock spans the provider call. Concurrent losers receive durable in-flight
+receipts, and failed refreshes stop after two consumer-owned invocations for the
+same selection/target/domain/prompt/snapshot key. Provider isolation is asserted
+again immediately before every call.
+
+Successful language output is append-only in `evaluator.consumer_output`, keyed
+by prompt version and aggregate snapshot hash. Migration 0028 adds append-only
+global refresh receipts because consumer aggregation has no honest product
+`run_id`; preflight, STARTED, success, failure, retry-limit, current-output, and
+in-flight outcomes therefore never borrow product counters or fabricate a run.
+The repository validates that the generated artifact is null-run, from the
+selected local consumer model and pinned evaluator maker. It has no write path
+to profile cells, ranks, relative cost, shadow decisions, selection, binding, or
+live dispatch, including when the selected consumer interprets its own
+code-computed row.

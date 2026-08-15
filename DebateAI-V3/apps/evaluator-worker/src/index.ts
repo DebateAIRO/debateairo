@@ -7,13 +7,16 @@ import {
   EvaluatorCatalogRepository,
   EvaluatorHarvestRepository,
   PostgresEvaluatorAddonRepository,
+  PostgresEvaluatorConsumerRepository,
   HARVEST_PIPELINE_VERSION,
   probeEvaluatorVllmCatalog,
   readEvaluatorJudgeAddonPolicy,
   reconcileEvaluatorMetering,
   runEvaluatorJudgeAddon,
+  runEvaluatorConsumerRefresh,
   runEvaluatorQuestionTagger,
   type EvaluatorJudgeAddonResult,
+  type EvaluatorConsumerRefreshResult,
   type EvaluatorHarvestResult,
   type EvaluatorMeteringReconciliationResult,
   type EvaluatorQuestionTagResult,
@@ -46,6 +49,37 @@ export async function runEvaluatorCatalogProbe(
   const probe = await probeEvaluatorVllmCatalog(family, fetchImplementation);
   const probeId = await new EvaluatorCatalogRepository(pool).record(family, probe);
   return Object.freeze({ probeId, state: probe.state });
+}
+
+interface EvaluatorConsumerWorkerInput {
+  readonly pool: Pool;
+  readonly family: EvaluatorProviderFamilyRow;
+  readonly deployment: {
+    readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  };
+  readonly provider: ProviderGateway;
+  readonly bound: CallBound;
+  readonly observedAt?: Date;
+}
+
+export async function runOnDemandEvaluatorConsumerRefresh(
+  input: EvaluatorConsumerWorkerInput
+): Promise<EvaluatorConsumerRefreshResult> {
+  return runEvaluatorConsumerRefresh({
+    ...input,
+    trigger: "ON_DEMAND",
+    repository: new PostgresEvaluatorConsumerRepository(input.pool)
+  });
+}
+
+export async function runPostAggregateEvaluatorConsumerRefresh(
+  input: EvaluatorConsumerWorkerInput & { readonly aggregateAsOf: Date }
+): Promise<EvaluatorConsumerRefreshResult> {
+  return runEvaluatorConsumerRefresh({
+    ...input,
+    trigger: "POST_AGGREGATE",
+    repository: new PostgresEvaluatorConsumerRepository(input.pool)
+  });
 }
 
 export async function runAskTimeEvaluatorTag(input: {
