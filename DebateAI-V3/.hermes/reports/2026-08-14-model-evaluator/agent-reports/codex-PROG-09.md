@@ -5,8 +5,9 @@ WORKER CLAIM:
 - ticket: PROG-09 / 09-consumer-reader
 - worker CLI session id: goal `01a005d5-c684-7d10-b28e-6a732921004a`
 - branch/worktree: `codex/eval-09-consumer` / `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-09-consumer`
-- assignment type: first_pass
-- comments read through: not ticketed; goal packet and issue read 2026-08-15
+- assignment type: rework_round_1
+- comments read through: `PROG-09-opus-review-1.md` and
+  `PROG-09-opus2-review-1.md`, both read through EOF on 2026-08-15
 - board mutation: prohibited and not performed
 
 ## Outcome
@@ -19,6 +20,14 @@ WORKER CLAIM:
   target provider, model id, model version, maker, raw-artifact id, lineage, and
   provenance. Anonymous sample DTOs expose only question/task excerpts, grade,
   and selected reason strings.
+- Rework routes every grading-adjacent sample through the exported shared
+  `createBlindEvaluationSample` choke point. Both excerpts are UTF-8-safe and
+  capped at 4096 bytes there, before add-on or consumer prompt assembly.
+- The consumer database fixture now assigns real domains and harvests four real
+  terminal runs through `EvaluatorHarvestRepository`. The four-way sample join,
+  exact model/domain bucket, three-sample cap, opaque id derivation, nonempty
+  persisted refs, and identity-free request body execute against PostgreSQL and
+  a real local HTTP server through `OpenAICompatibleProviderGateway`.
 - Every provider call has `runId: null`, an evaluator subject item, evaluator
   lane/call site, and a consumer-owned maximum of two provider attempts. The
   selected catalog model and pinned evaluator maker are re-authorized before
@@ -29,11 +38,18 @@ WORKER CLAIM:
   never fabricated for aggregate refresh. Preflight, claim, success, failure,
   current, in-flight, and retry-limit outcomes are typed and append-only.
 - Claim arbitration uses `pg_try_advisory_xact_lock` only in a short transaction.
-  No database client or advisory lock spans the provider call; three concurrent
-  refreshes produced one call and two typed in-flight skips.
+  No database client or advisory lock spans the provider call; 24 concurrent
+  refreshes produced one call and 23 typed in-flight skips, then the pool
+  answered a fresh query.
 - The selected consumer can interpret its own row, but that row remains a
-  code-computed profile/rank input. Malformed, numeric, routing, identity-mismatched,
-  or hostile model output cannot write `consumer_output` or any numeric table.
+  code-computed profile/rank input. Numeric/routing injection is now a
+  `TypedDomainError` with code and receipt `SELF_ROUTING_FORBIDDEN`, distinct
+  from malformed JSON's `CONSUMER_CONTENT_REFUSED`; neither can write
+  `consumer_output` or any numeric table.
+- Sample reads share the aggregate `as_of` ceiling, null-domain cells produce an
+  explicit null-domain job instead of disappearing, a sibling failure makes the
+  batch state honestly `FAILED`, and artifact authorization uses the threaded
+  pinned family identity while retaining its typed receipt.
 - No BOUND state, live routing/dispatch reader, API key, cloud endpoint, board
   mutation, push, merge, or sibling seat-share/allocator change was introduced.
 
@@ -43,18 +59,47 @@ WORKER CLAIM:
 - `apps/evaluator-worker/src/index.ts`
 - `migrations/0028_evaluator_consumer_refresh.sql`
 - `packages/evaluator/README.md`
+- `packages/evaluator/src/blind-sample.ts`
 - `packages/evaluator/src/consumer.ts`
 - `packages/evaluator/src/consumer-postgres.ts`
 - `packages/evaluator/src/index.ts`
 - `tests/integration/evaluator-consumer-database.test.ts`
 - `tests/integration/evaluator-database.test.ts`
 - `tests/unit/evaluator-consumer.test.ts`
+- `tests/unit/evaluator-foundation.test.ts`
 
 Allowed-scope evidence: all changes are consumer-reader implementation,
 consumer-specific persistence/documentation/tests, or the evaluator foundation
 inventory assertion updated for the new table. No lane-10 allocator file changed.
 
 ## RED -> GREEN evidence
+
+Rework RED was independently reproduced by both review seats against commit
+`4f0356a04881313f5fa8508294761be416a0460d`: the shared helper had no consumer
+call site, the real observation tables were empty in the consumer fixture, and
+a 200 KB claim produced a 203,464-byte request. The rework regressions encode
+those exact boundaries through real harvest and HTTP paths.
+
+Rework GREEN focused verification:
+
+```text
+pnpm exec vitest run tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts
+Test Files  2 passed (2)
+Tests       21 passed (21)
+
+pnpm exec vitest run tests/integration/evaluator-consumer-database.test.ts
+Test Files  1 passed (1)
+Tests       6 passed (6)
+```
+
+The populated-sample test proves a three-item cap from four harvested rows,
+opaque sample refs, a 4096-byte UTF-8 excerpt, no authorship sent over HTTP, and
+nonempty `blinded_sample_refs`. Its snapshot/null-domain case proves the
+`aggregateAsOf` observation ceiling and retention of a null-domain aggregate.
+The concurrency case runs 24 refreshes above pool max.
+
+Original implementation evidence follows.
 
 RED after the new consumer contract tests were written first:
 
@@ -107,7 +152,7 @@ blocking: []
 
 pnpm test -- --maxWorkers=1
 Test Files  98 passed (98)
-Tests       706 passed (706)
+Tests       711 passed (711)
 
 pnpm exec vitest run --maxWorkers=1 tests/integration/evaluator-database.test.ts
 Test Files  1 passed (1)
@@ -134,13 +179,13 @@ isolation, selector-unbound, and evaluator panel-membership differentials.
   after claim and before its terminal receipt, that exact snapshot stays
   in-flight rather than risking duplicate model work; operational stale-claim
   recovery is not invented in this lane.
-- Domain names and question/task excerpts are allowed semantic input. Structured
+- Domain names and bounded question/task excerpts are allowed semantic input. Structured
   identity and joinable lineage are excluded; no claim is made that natural text
   can never mention a person's or system's name.
 - Consumer language remains collect-only. Ticket 11 may expose it in the dev
   menu, but this lane adds no product dispatch or binding consumer.
 
-Comments read through: not ticketed; packet and issue remain the latest authority
-as of the handoff on 2026-08-15.
+Comments read through: both round-1 peer reviews remain the latest review
+authority as of this handoff on 2026-08-15.
 
 READY FOR PEER REVIEW: codex/eval-09-consumer

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
+import { createBlindEvaluationSample } from "./blind-sample.js";
 import {
   CONSUMER_PROMPT_VERSION,
   type EvaluatorConsumerClaim,
@@ -144,8 +146,9 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       JOIN core.node AS node ON node.node_id=judgement.node_id
       JOIN core.run AS run ON run.run_id=observation.run_id
       WHERE observation.source_kind='REDUCED_JUDGEMENT'
+        AND ($1::timestamptz IS NULL OR observation.observed_at <= $1)
       ORDER BY observation.at_seq DESC,observation.observation_id
-    `);
+    `, [input.aggregateAsOf]);
     const samplesByModelDomain = new Map<string, EvaluatorConsumerJob["blindedSamples"]>();
     for (const row of samples.rows) {
       const key = modelDomainKey({
@@ -156,7 +159,7 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       });
       const current = samplesByModelDomain.get(key) ?? [];
       if (current.length >= 3) continue;
-      samplesByModelDomain.set(key, Object.freeze([...current, Object.freeze({
+      samplesByModelDomain.set(key, Object.freeze([...current, createBlindEvaluationSample({
         sampleId: `opaque:sample-${sha256(row.observation_id).slice(0, 24)}`,
         questionExcerpt: row.question_line,
         taskExcerpt: row.claim_text,
@@ -179,7 +182,7 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       };
       const key = modelKey(identity);
       const current = identities.get(key) ?? { ...identity, domainIds: new Set<string | null>() };
-      if (row.domain_id !== null) current.domainIds.add(row.domain_id);
+      current.domainIds.add(row.domain_id);
       identities.set(key, current);
     }
 
@@ -374,10 +377,17 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       const artifact = await client.query<{ raw_artifact_id: string }>(`
         SELECT raw_artifact_id FROM ledger.raw_artifact
         WHERE raw_artifact_id=$1 AND run_id IS NULL
-          AND provider_ref='provider:evaluator-vllm'
-          AND maker='maker:evaluator-local-vllm' AND model_id=$2
-      `, [input.generatedRawArtifactRef,input.job.consumerModelId]);
-      if (artifact.rows[0] === undefined) throw new TypeError("CONSUMER_AUTHORIZATION_FAILED");
+          AND provider_ref=$2 AND maker=$3 AND model_id=$4
+      `, [
+        input.generatedRawArtifactRef,input.family.value.providerRef,
+        input.family.value.maker,input.job.consumerModelId
+      ]);
+      if (artifact.rows[0] === undefined) {
+        throw new TypedDomainError(
+          "CONSUMER_AUTHORIZATION_FAILED",
+          "CONSUMER_AUTHORIZATION_FAILED: generated artifact does not match the selected family"
+        );
+      }
       const inserted = await client.query<{ consumer_output_id: string }>(`
         INSERT INTO evaluator.consumer_output (
           consumer_selection_id,target_provider,target_model_id,target_model_version,

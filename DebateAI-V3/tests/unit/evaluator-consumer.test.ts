@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway } from "@debateai/providers";
 import {
   CONSUMER_MAX_PROVIDER_ATTEMPTS,
@@ -202,6 +203,18 @@ describe("evaluator consumer reader", () => {
     })).resolves.toMatchObject({ state: "FAILED", failures: 1 });
     expect(records.outputs).toHaveLength(0);
     expect(records.receipts).toEqual([
+      expect.objectContaining({ state: "FAILED", reason: "SELF_ROUTING_FORBIDDEN" })
+    ]);
+  });
+
+  it("distinguishes malformed JSON from typed self-routing refusal", async () => {
+    const records = repository();
+    await expect(runEvaluatorConsumerRefresh({
+      ...baseInput,
+      provider: provider("{not-json"),
+      repository: records
+    })).resolves.toMatchObject({ state: "FAILED", failures: 1 });
+    expect(records.receipts).toEqual([
       expect.objectContaining({ state: "FAILED", reason: "CONSUMER_CONTENT_REFUSED" })
     ]);
   });
@@ -316,5 +329,48 @@ describe("evaluator consumer reader", () => {
       repository: retryLimited
     })).resolves.toMatchObject({ state: "SKIPPED", retryLimited: 1 });
     expect(gateway.call).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed batch when a current sibling accompanies a failed job", async () => {
+    const sibling = { ...job, domain: null };
+    const records = repository({
+      listJobs: vi.fn(async () => [job, sibling]),
+      claimJob: vi.fn(async (candidate, input) => candidate.domain === null
+        ? {
+            state: "CLAIMED" as const,
+            attemptId: input.attemptId,
+            attemptOrdinal: 1,
+            receiptId: "receipt:started"
+          }
+        : { state: "ALREADY_CURRENT" as const, receiptId: "receipt:current" })
+    });
+    await expect(runEvaluatorConsumerRefresh({
+      ...baseInput,
+      provider: provider("{not-json"),
+      repository: records
+    })).resolves.toMatchObject({ state: "FAILED", outputsCurrent: 1, failures: 1 });
+  });
+
+  it("preserves typed artifact authorization failures in terminal receipts", async () => {
+    const records = repository({
+      persistOutput: vi.fn(async () => {
+        throw new TypedDomainError(
+          "CONSUMER_AUTHORIZATION_FAILED",
+          "CONSUMER_AUTHORIZATION_FAILED: fixture"
+        );
+      })
+    });
+    await expect(runEvaluatorConsumerRefresh({
+      ...baseInput,
+      provider: provider({
+        bias_pattern_name: "Valid",
+        capability_summary: "Valid summary.",
+        adjacent_domain_flags: []
+      }),
+      repository: records
+    })).resolves.toMatchObject({ state: "FAILED", failures: 1 });
+    expect(records.receipts).toEqual([
+      expect.objectContaining({ state: "FAILED", reason: "CONSUMER_AUTHORIZATION_FAILED" })
+    ]);
   });
 });

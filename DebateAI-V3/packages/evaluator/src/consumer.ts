@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
+import { TypedDomainError } from "@debateai/kernel";
 import type { CallBound, PromptPacket, ProviderGateway } from "@debateai/providers";
 import {
   ProviderCallFailedError,
@@ -118,6 +119,7 @@ export interface EvaluatorConsumerRepository {
   recordTerminalReceipt(input: EvaluatorConsumerReceiptInput): Promise<string>;
   persistOutput(input: {
     readonly job: EvaluatorConsumerJob;
+    readonly family: EvaluatorConsumerFamily;
     readonly promptVersion: number;
     readonly aggregateSnapshotHash: string;
     readonly aggregateRefs: readonly string[];
@@ -144,6 +146,15 @@ const consumerOutputSchema = z.object({
 }).strict();
 
 type ConsumerOutput = z.infer<typeof consumerOutputSchema>;
+
+const selfRoutingKey = /(?:^|_)(?:numeric|ordinal|rank|route|routing|score|weight)(?:_|$)/i;
+
+function containsSelfRoutingField(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsSelfRoutingField);
+  if (value === null || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, nested]) => selfRoutingKey.test(key)
+    || containsSelfRoutingField(nested));
+}
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
@@ -211,16 +222,26 @@ function parseConsumerOutput(content: string, job: EvaluatorConsumerJob): Consum
   try {
     decoded = JSON.parse(content);
   } catch {
-    throw new TypeError("CONSUMER_CONTENT_REFUSED");
+    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: malformed JSON");
+  }
+  if (containsSelfRoutingField(decoded)) {
+    throw new TypedDomainError(
+      "SELF_ROUTING_FORBIDDEN",
+      "SELF_ROUTING_FORBIDDEN: evaluator interpretation may not supply numeric or routing fields"
+    );
   }
   const parsed = consumerOutputSchema.safeParse(decoded);
-  if (!parsed.success) throw new TypeError("CONSUMER_CONTENT_REFUSED");
+  if (!parsed.success) {
+    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: schema mismatch");
+  }
   const allowed = new Set(job.adjacentDomains.map((domain) => domain.domainRef));
   if (parsed.data.adjacent_domain_flags.some((flag) => !allowed.has(flag.domain_ref))) {
-    throw new TypeError("CONSUMER_CONTENT_REFUSED");
+    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: unknown domain");
   }
   const refs = parsed.data.adjacent_domain_flags.map((flag) => flag.domain_ref);
-  if (new Set(refs).size !== refs.length) throw new TypeError("CONSUMER_CONTENT_REFUSED");
+  if (new Set(refs).size !== refs.length) {
+    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: duplicate domain");
+  }
   return parsed.data;
 }
 
@@ -440,8 +461,11 @@ export async function runEvaluatorConsumerRefresh(input: {
           try {
             parseConsumerOutput(content, job);
             return { parseStatus: "PARSED", parseError: null };
-          } catch {
-            return { parseStatus: "SCHEMA_FAILED", parseError: "CONSUMER_CONTENT_REFUSED" };
+          } catch (error) {
+            return {
+              parseStatus: "SCHEMA_FAILED",
+              parseError: error instanceof TypedDomainError ? error.code : "CONSUMER_CONTENT_REFUSED"
+            };
           }
         },
         buildRepairPacket: ({ parseError }) => Object.freeze({ messages: Object.freeze([
@@ -462,6 +486,7 @@ export async function runEvaluatorConsumerRefresh(input: {
       const interpretation = parseConsumerOutput(response.content, job);
       const persisted = await input.repository.persistOutput({
         job,
+        family: input.family,
         promptVersion: CONSUMER_PROMPT_VERSION,
         aggregateSnapshotHash: snapshotHash,
         aggregateRefs: aggregateRefs(job),
@@ -483,9 +508,15 @@ export async function runEvaluatorConsumerRefresh(input: {
       if (persisted.inserted) outputsInserted += 1;
       else outputsCurrent += 1;
     } catch (error) {
-      const reason = error instanceof ProviderContentUnacceptedError
-        || (error instanceof TypeError && error.message === "CONSUMER_CONTENT_REFUSED")
-        ? "CONSUMER_CONTENT_REFUSED"
+      const reason = (error instanceof ProviderContentUnacceptedError
+          && error.lastParseError === "SELF_ROUTING_FORBIDDEN")
+        || (error instanceof TypedDomainError && error.code === "SELF_ROUTING_FORBIDDEN")
+        ? "SELF_ROUTING_FORBIDDEN"
+        : error instanceof ProviderContentUnacceptedError
+          || (error instanceof TypedDomainError && error.code === "CONSUMER_CONTENT_REFUSED")
+          ? "CONSUMER_CONTENT_REFUSED"
+          : error instanceof TypedDomainError && error.code === "CONSUMER_AUTHORIZATION_FAILED"
+            ? "CONSUMER_AUTHORIZATION_FAILED"
         : error instanceof ProviderCallFailedError && error.lastOutcome === "TIMED_OUT"
           ? "CONSUMER_PROVIDER_TIMED_OUT"
           : error instanceof ProviderCallFailedError
@@ -498,7 +529,7 @@ export async function runEvaluatorConsumerRefresh(input: {
     }
   }
 
-  const state = failures > 0 && outputsInserted + outputsCurrent === 0
+  const state = failures > 0
     ? "FAILED" as const
     : outputsInserted + outputsCurrent === 0
       ? "SKIPPED" as const

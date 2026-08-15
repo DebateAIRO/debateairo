@@ -123,6 +123,11 @@ performance observations. Model versions that are absent are skipped rather
 than collapsed into maker-level identity, with a typed
 `MODEL_IDENTITY_INCOMPLETE` pipeline receipt.
 
+Blinded grading samples are constructed only by the shared allowlist helper.
+Question and task excerpts are UTF-8-safe and capped at 4096 bytes each before
+they can enter a consumer prompt; source identity and artifact lineage are not
+members of the returned DTO.
+
 The projector is deterministic and provider-free. An advisory run lock, durable
 STARTED/SUCCEEDED/FAILED receipts, and the observation natural key make
 reconciliation idempotent. STARTED and its terminal receipt hash the same frozen
@@ -189,6 +194,9 @@ profile cells and rank snapshots. The repository chooses the latest catalog
 selection, groups deterministic numeric aggregates by exact target identity and
 domain, and builds opaque target/sample references. Prompt bytes contain no
 target provider, model id, version, maker, artifact id, lineage, or provenance.
+Relative-cost cells are intentionally absent from the prompt until their
+upstream derivation is populated; this reader does not synthesize missing cost
+evidence.
 The model may return only a plain-language bias-pattern name, a per-domain
 capability summary, and flags for allowlisted opaque adjacent-domain refs;
 numeric, routing, unknown, duplicated, or malformed fields are refused.
