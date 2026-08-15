@@ -6,6 +6,7 @@ import {
   ADDON_MAX_PROVIDER_ATTEMPTS,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
+  PostgresEvaluatorAddonRepository,
   shouldSampleEvaluatorAddon,
   runEvaluatorJudgeAddon,
   type EvaluatorAddonRepository,
@@ -53,7 +54,7 @@ function repository(overrides: Partial<EvaluatorAddonRepository> = {}): Evaluato
   return {
     events,
     observations,
-    withRunLock: async (_runId, work) => work(),
+    withRunLock: async (_runId, work) => ({ acquired: true, value: await work() }),
     loadCandidate: vi.fn(async () => ({
       runId: "run:addon",
       runOrdinal: 12,
@@ -269,5 +270,23 @@ describe("judge-grading evaluator add-on", () => {
       provider: provider()
     })).rejects.toThrow("EVALUATOR_ADDON_RUN_ID_INVALID");
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("destroys the checked-out client when advisory unlock throws", async () => {
+    const unlockError = new Error("unlock failed");
+    const release = vi.fn();
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ acquired: true }] })
+        .mockRejectedValueOnce(unlockError),
+      release
+    };
+    const pool = { connect: vi.fn(async () => client) } as unknown as Pool;
+
+    await expect(new PostgresEvaluatorAddonRepository(pool)
+      .withRunLock("run:addon", async () => "completed"))
+      .rejects.toBe(unlockError);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledWith(unlockError);
   });
 });

@@ -156,9 +156,11 @@ A family/register mismatch is recoverable by retrying with the matching family.
 An absent policy records an explicit `ADDON_POLICY_UNAVAILABLE` skip. Each
 invocation can make exactly one gateway call, with `runId: null`, an
 `evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. A
-session-level advisory lock serializes the per-run candidate check and provider
-pass, so concurrent invocations share the same one-call ceiling. The product
-run's attempt accounting is never used as a retry bound.
+non-blocking session advisory lock guards the per-run candidate/provider pass;
+same-run losers record `ADDON_PASS_IN_FLIGHT`, while the winner performs every
+repository operation on the lock-owning client. This preserves the one-call
+ceiling without nested pool checkout or pool starvation. The product run's
+attempt accounting is never used as a retry bound.
 
 The repository requires a successful HARVEST receipt, selects at most one
 reduced judgement deterministically, and creates a fresh allowlist-only blind

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate } from "@debateai/db";
 import type { ProviderGateway } from "@debateai/providers";
@@ -422,22 +423,71 @@ describe("persisted judge-grading add-on", () => {
     expect(versionedGateway.call).toHaveBeenCalledTimes(1);
   });
 
-  it("serializes six concurrent invocations to one shared provider call", async () => {
+  it("keeps twelve same-run invocations above pool max bounded to one provider call", async () => {
     const registerVersion = 7005;
     const fixture = await seedGradableRun({ registerVersion });
     const gateway = successfulGateway(fixture.differentGraderArtifact, 40);
+    const pool = new Pool({
+      connectionString: database.connectionString,
+      max: 10,
+      connectionTimeoutMillis: 250
+    });
     const input = {
-      pool: database.pool,
+      pool,
       runId: fixture.runId,
       family: evaluatorFamily(registerVersion),
       deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
       provider: gateway
     };
-    const results = await Promise.all(Array.from({ length: 6 }, () =>
-      runEvaluatorJudgeGradingAddon(input)));
+    let results: Awaited<ReturnType<typeof runEvaluatorJudgeGradingAddon>>[];
+    try {
+      results = await Promise.all(Array.from({ length: 12 }, () =>
+        runEvaluatorJudgeGradingAddon(input)));
+      await expect(pool.query("SELECT 1 AS recovered")).resolves.toMatchObject({ rowCount: 1 });
+    } finally {
+      await pool.end();
+    }
     expect(gateway.call).toHaveBeenCalledTimes(1);
     expect(results.filter((result) => result.state === "GRADED")).toHaveLength(1);
     expect(results.filter((result) =>
-      result.state === "SKIPPED" && result.reason === "ADDON_ALREADY_GRADED")).toHaveLength(5);
+      result.state === "SKIPPED" && result.reason === "ADDON_PASS_IN_FLIGHT")).toHaveLength(11);
+    const inFlightReceipts = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' AND state='SKIPPED'
+        AND reason='ADDON_PASS_IN_FLIGHT'
+    `, [fixture.runId]);
+    expect(inFlightReceipts.rows[0]!.count).toBe("11");
+  }, 15_000);
+
+  it("completes twelve distinct-run passes above pool max and leaves the pool usable", async () => {
+    const registerVersion = 7006;
+    const fixtures: Awaited<ReturnType<typeof seedGradableRun>>[] = [];
+    for (let index = 0; index < 12; index += 1) {
+      fixtures.push(await seedGradableRun({ registerVersion }));
+    }
+    const gateways = fixtures.map((fixture) => successfulGateway(fixture.differentGraderArtifact, 40));
+    const pool = new Pool({
+      connectionString: database.connectionString,
+      max: 10,
+      connectionTimeoutMillis: 250
+    });
+    let results: Awaited<ReturnType<typeof runEvaluatorJudgeGradingAddon>>[];
+    try {
+      results = await Promise.all(fixtures.map((fixture, index) =>
+        runEvaluatorJudgeGradingAddon({
+          pool,
+          runId: fixture.runId,
+          family: evaluatorFamily(registerVersion),
+          deployment: {
+            configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }]
+          },
+          provider: gateways[index]!
+        })));
+      await expect(pool.query("SELECT 1 AS recovered")).resolves.toMatchObject({ rowCount: 1 });
+    } finally {
+      await pool.end();
+    }
+    expect(results.filter((result) => result.state === "GRADED")).toHaveLength(12);
+    expect(gateways.reduce((count, gateway) => count + gateway.call.mock.calls.length, 0)).toBe(12);
   });
 });
