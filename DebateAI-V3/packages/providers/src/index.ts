@@ -2,9 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 
-export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE"] as const;
+export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
-export type Lane = "served" | "uniform-panel" | "critic-exempt";
+export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator";
 
 export interface CallBound {
   readonly maxAttempts: number;

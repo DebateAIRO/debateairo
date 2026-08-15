@@ -18,6 +18,11 @@ Direct worker writes are limited to evaluator-owned `domain`,
 `shadow_decision`, `vllm_probe`, `vllm_catalog_model`, and `consumer_output`.
 The evaluator API role may insert only `consumer_selection`. Normal provider
 gateway calls separately retain their existing narrow ledger write authority.
+Tagger calls use evaluator-scoped attempt ids and a null ledger `run_id`; the
+product run is correlated only by evaluator-owned admission, assignment, and
+pipeline rows. Consequently tag attempts cannot consume a product cost
+envelope, enter its execution digest, or participate in product liveness
+partitions.
 No evaluator role can write product `core`, `serve`, `memory`, settlement
 `scorecard`, or routing/session-assignment rows.
 
@@ -51,7 +56,9 @@ locks, then re-reads the registry before deciding and inserting. The registry
 lock also prevents two differently spelled near duplicates from racing. A grown
 row requires
 provider/model/version, source run, raw tagger artifact, guardrail version, and
-provenance. Registry and admission history remain append-only.
+provenance. The source run is evaluator-owned correlation metadata; the tagger
+artifact itself remains null-run evaluator evidence. Registry and admission
+history remain append-only.
 
 Question domains land only in `evaluator.question_domain`. The `run_id` and
 `domain_admission_id` uniqueness constraints make assignment singular; a
@@ -59,10 +66,29 @@ backfill is a first insert for an untagged run, never an update. The repository
 also verifies that the link references a successful admission for the same run
 and domain. Nothing in this path writes `memory.question_key`.
 
-The proposed starter seed lives at
-`migrations/pending/0024_evaluator_domain_seed.sql`. Its 26 names are V-approved,
-but it remains deliberately outside the migration runner's top-level numeric
-file scan pending integration. The `seed_data` block contains canonical names
+The V-approved starter seed lives at
+`migrations/0024_evaluator_domain_seed.sql` and is included in the migration
+runner's top-level numeric scan. The `seed_data` block contains canonical names
 only; SQL derives normalized names, and the scratch-migration test checks each
-one against `normalizeDomainName`. Replacing the starter list therefore changes
-only canonical values in `seed_data`.
+one against `normalizeDomainName`.
+
+## Ask-time tagger and reconciliation
+
+`runEvaluatorQuestionTagger` is the collect-only classifier boundary. It reads
+the raw question and current registry, re-runs
+`assertEvaluatorProviderIsolation` before the observed provider-call boundary,
+and accepts only strict JSON decisions: `SELECT_EXISTING`, `PROPOSE_NEW`, or
+`REFUSED`. Existing ids receive their own admission receipt; proposals pass
+through deterministic registry admission; refusal and blank proposals receive
+typed `REFUSED` receipts, including unresolved existing-domain ids. Re-delivery
+of an already-tagged run short-circuits before another model call or admission
+receipt. Only successful admissions insert the singular
+`evaluator.question_domain` link.
+
+`apps/evaluator-worker` exposes ask-time and reconciliation entry points over a
+persisted `core.run`. Provider failure, timeout, isolation refusal, invalid
+content, and admission refusal all produce typed pipeline receipts and leave the
+run untagged. A later reconciliation uses the same classifier with assignment
+basis `BACKFILL`; it inserts the evaluator-owned link and never updates
+`memory.question_key`. No evaluator tag result is read by panel discovery,
+routing, or dispatch while binding remains `UNBOUND`.

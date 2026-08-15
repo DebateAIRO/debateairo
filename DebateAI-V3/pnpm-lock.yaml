@@ -162,6 +162,9 @@ importers:
       '@debateai/evaluator':
         specifier: workspace:*
         version: link:../../packages/evaluator
+      '@debateai/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       pg:
         specifier: 8.22.0
         version: 8.22.0
@@ -397,6 +400,9 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@debateai/providers':
+        specifier: workspace:*
+        version: link:../providers
       pg:
         specifier: 8.22.0
         version: 8.22.0
