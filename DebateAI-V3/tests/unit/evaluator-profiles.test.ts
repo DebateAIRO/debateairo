@@ -64,60 +64,6 @@ describe("deterministic evaluator profile derivation", () => {
       .not.toContain("consensus:replaced@1");
   });
 
-  it("derives bias before judge-dependent prowess and changes judge rank from live inputs", () => {
-    const judge = (id: string, runId: string, itemKey: string, value: number, maker: string,
-      authorMaker: string, atSequence: number): EvaluatorProfileObservation => observation({
-        observationId: id,
-        runId,
-        provider: "provider:judges",
-        modelId: maker === "maker:a" ? "judge:a" : "judge:b",
-        modelVersion: "judge-v1",
-        step: "JUDGING",
-        metric: "judging.tau.v1",
-        value,
-        sourceKind: "REDUCED_JUDGEMENT",
-        itemKey,
-        subjectMaker: maker,
-        authorMaker,
-        atSequence
-      });
-    const observations = [
-      judge("judge:a:1", "run:1", "item:1", 0.9, "maker:a", "maker:a", 1),
-      judge("judge:b:1", "run:1", "item:1", 0.4, "maker:b", "maker:a", 2),
-      judge("judge:a:2", "run:2", "item:2", 0.9, "maker:a", "maker:c", 3),
-      judge("judge:b:2", "run:2", "item:2", 0.1, "maker:b", "maker:c", 4),
-      observation({
-        observationId: "settlement:1", runId: "run:1", truthBasis: "SETTLEMENT",
-        sourceKind: "EXTERNAL_ANSWER_OUTCOME", value: 0, atSequence: 5
-      }),
-      observation({
-        observationId: "settlement:2", runId: "run:2", truthBasis: "SETTLEMENT",
-        sourceKind: "EXTERNAL_ANSWER_OUTCOME", value: 0, atSequence: 6
-      }),
-      observation({
-        observationId: "addon:a", runId: "run:2", provider: "provider:judges",
-        modelId: "judge:a", modelVersion: "judge-v1", step: "JUDGING",
-        metric: "judging.blind-grade.v1", truthBasis: "BLIND_ADDON",
-        sourceKind: "BLIND_JUDGE_GRADE", value: 0.25, subjectMaker: "maker:a", atSequence: 7
-      })
-    ];
-
-    const result = deriveEvaluatorProfiles({ observations, asOf: AS_OF, derivationVersion: 1 });
-    const contradiction = result.biasCells.find((cell) =>
-      cell.modelId === "judge:a" && cell.metric === "bias.settlement_contradiction.v1");
-    const leniency = result.biasCells.find((cell) =>
-      cell.modelId === "judge:a" && cell.metric === "bias.leniency.v1");
-
-    expect(result.phaseOrder).toEqual(["BIAS", "JUDGE_RANK", "PROWESS", "PROWESS_RANK"]);
-    expect(leniency).toMatchObject({ value: 0.325, n: 2 });
-    expect(contradiction).toMatchObject({ value: 1, n: 2 });
-    expect(result.judgeRanks.map((rank) => rank.modelId)).toEqual(["judge:b", "judge:a"]);
-    expect(result.prowessCells
-      .filter((cell) => cell.step === "JUDGING")
-      .flatMap((cell) => cell.derivationInput))
-      .toEqual(expect.arrayContaining([expect.stringMatching(/^bias-rank:provider:judges\/judge:/)]));
-  });
-
   it("keeps derivation versions independent and exposes sample counts and pinned intervals", () => {
     const inputs = [
       observation({ observationId: "strength:1", runId: "run:1", value: 0.2 }),

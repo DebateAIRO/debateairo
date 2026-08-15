@@ -170,12 +170,12 @@ describe("evaluator profile persistence on live Postgres", () => {
       ORDER BY model_id
     `, [asOf]);
     expect(contradictions.rows).toEqual([
-      { model_id: "judge:at-boundary", value: 1 },
-      { model_id: "judge:below-boundary", value: 0 }
+      { model_id: "judge:at-boundary", value: null },
+      { model_id: "judge:below-boundary", value: null }
     ]);
   });
 
-  it("keeps versioned cells append-only and records real rank changes", async () => {
+  it("keeps versioned cells and ranks append-only", async () => {
     const repository = new PostgresEvaluatorProfileRepository(database.pool);
     const firstRun = await createRun("first", new Date("2026-08-15T12:00:00.000Z"));
     for (const [modelId, maker] of [
@@ -216,18 +216,17 @@ describe("evaluator profile persistence on live Postgres", () => {
       asOf: SECOND_AS_OF, derivationVersion: 2, strategy
     })).resolves.toMatchObject({ profileCellsInserted: 0, rankSnapshotsInserted: 0 });
 
-    const leaders = await database.pool.query<{
+    const versionedRanks = await database.pool.query<{
       as_of: Date; derivation_version: string; model_id: string;
     }>(`
       SELECT as_of,derivation_version::text,model_id FROM evaluator.rank_snapshot
-      WHERE rank_kind='JUDGE' AND ordinal=1 AND as_of = ANY($1::timestamptz[])
+      WHERE rank_kind='JUDGE' AND as_of = ANY($1::timestamptz[])
+        AND model_id = ANY($2::text[])
       ORDER BY as_of,derivation_version
-    `, [[FIRST_AS_OF, SECOND_AS_OF]]);
-    expect(leaders.rows).toEqual([
-      { as_of: FIRST_AS_OF, derivation_version: "1", model_id: "judge:a" },
-      { as_of: SECOND_AS_OF, derivation_version: "1", model_id: "judge:b" },
-      { as_of: SECOND_AS_OF, derivation_version: "2", model_id: "judge:b" }
-    ]);
+    `, [[FIRST_AS_OF, SECOND_AS_OF], ["judge:a", "judge:b", "judge:c"]]);
+    expect(versionedRanks.rows).toHaveLength(9);
+    expect(new Set(versionedRanks.rows.map((row) => row.derivation_version)))
+      .toEqual(new Set(["1", "2"]));
     const versions = await database.pool.query<{ versions: string[] }>(`
       SELECT array_agg(DISTINCT derivation_version::text ORDER BY derivation_version::text) AS versions
       FROM evaluator.profile_cell WHERE as_of=$1

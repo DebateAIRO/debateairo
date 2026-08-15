@@ -1,18 +1,19 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const productionEntrypoints = [
-  "apps/api/src/index.ts",
-  "apps/runner/src/index.ts",
-  "apps/scheduler/src/index.ts",
-  "apps/evaluator-worker/src/index.ts"
-];
+function productionSources(directory: string): readonly string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return productionSources(path);
+    return entry.isFile() && /\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name) ? [path] : [];
+  });
+}
 
 describe("evaluator judge selector dark launch", () => {
   it("has zero production callers while evaluator dispatch is UNBOUND", () => {
-    const callers = productionEntrypoints.filter((path) =>
-      readFileSync(join(process.cwd(), path), "utf8").includes("selectJudgesByBiasRank("));
+    const callers = productionSources(join(process.cwd(), "apps")).filter((path) =>
+      readFileSync(path, "utf8").includes("selectJudgesByBiasRank("));
 
     expect(callers).toEqual([]);
   });

@@ -2231,6 +2231,7 @@ export interface EvaluatorDerivedRank {
   readonly modelVersion: string;
   readonly domainId: string | null;
   readonly step: "AUTHORING" | "JUDGING" | "REVIEWING";
+  readonly metric: string;
   readonly ordinal: number;
   readonly score: number;
   readonly n: number;
@@ -2274,21 +2275,15 @@ function arithmeticMean(values: readonly number[]): number {
   return stableNumber(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-function median(values: readonly number[]): number {
-  const ordered = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(ordered.length / 2);
-  return ordered.length % 2 === 0
-    ? stableNumber((ordered[middle - 1]! + ordered[middle]!) / 2)
-    : ordered[middle]!;
-}
-
 function boundedMeanInterval(
   value: number,
   n: number,
   lowerBound: number,
   upperBound: number
 ): readonly [number, number] {
-  const radius = Math.sqrt(Math.log(40) / (2 * n));
+  // Two-sided Hoeffding interval at alpha=0.05. The range multiplier is
+  // material for signed metrics whose support is [-1,1], rather than [0,1].
+  const radius = (upperBound - lowerBound) * Math.sqrt(Math.log(40) / (2 * n));
   return Object.freeze([
     stableNumber(Math.max(lowerBound, value - radius)),
     stableNumber(Math.min(upperBound, value + radius))
@@ -2401,23 +2396,19 @@ export function deriveEvaluatorProfiles(input: {
   }
   const active = activeProfileObservations(input.observations, input.asOf);
   const judgements = active.filter((row) => row.sourceKind === "REDUCED_JUDGEMENT"
-    && row.value !== null && row.itemKey !== null);
-  const itemGrades = new Map<string, number[]>();
+    && row.value !== null);
+  const runJudgements = new Map<string, Map<string, EvaluatorProfileObservation[]>>();
   for (const row of judgements) {
-    const key = JSON.stringify([row.runId, row.itemKey]);
-    const values = itemGrades.get(key) ?? [];
-    values.push(row.value!);
-    itemGrades.set(key, values);
+    const identities = runJudgements.get(row.runId) ?? new Map<string, EvaluatorProfileObservation[]>();
+    const key = profileIdentityKey(row);
+    identities.set(key, [...(identities.get(key) ?? []), row]);
+    runJudgements.set(row.runId, identities);
   }
-  const latestSettlementByRun = new Map<string, EvaluatorProfileObservation>();
-  for (const row of active.filter((candidate) => candidate.sourceKind === "EXTERNAL_ANSWER_OUTCOME"
-    && candidate.value !== null)) {
-    const prior = latestSettlementByRun.get(row.runId);
-    if (prior === undefined || prior.atSequence < row.atSequence) latestSettlementByRun.set(row.runId, row);
-  }
+  const settlements = active.filter((candidate) => candidate.sourceKind === "EXTERNAL_ANSWER_OUTCOME"
+    && candidate.value !== null);
   const judgeIdentities = new Map<string, ProfileIdentity>();
   for (const row of active.filter((candidate) => candidate.sourceKind === "REDUCED_JUDGEMENT"
-    || candidate.sourceKind === "BLIND_JUDGE_GRADE")) {
+    || candidate.sourceKind === "BLIND_JUDGE_GRADE" || candidate.sourceKind === "NODE_REVIEW")) {
     judgeIdentities.set(profileIdentityKey(row), {
       provider: row.provider, modelId: row.modelId, modelVersion: row.modelVersion
     });
@@ -2425,27 +2416,56 @@ export function deriveEvaluatorProfiles(input: {
   const biasCells: EvaluatorDerivedProfileCell[] = [];
   for (const identity of [...judgeIdentities.values()].sort(compareProfileIdentity)) {
     const identityJudgements = judgements.filter((row) => profileIdentityKey(row) === profileIdentityKey(identity));
-    const leniencyValues = identityJudgements.map((row) => row.value! - median(itemGrades.get(
-      JSON.stringify([row.runId, row.itemKey]))!));
+    // The runner emits one reduced judgement per node. Leniency therefore uses
+    // one independent sample per run: this identity's run mean minus the mean
+    // of the other identities' run means. A one-identity run is uninformative.
+    const identityRuns = new Set(identityJudgements.map((row) => row.runId));
+    const leniencySamples = [...identityRuns].flatMap((runId) => {
+      const byIdentity = runJudgements.get(runId)!;
+      const own = byIdentity.get(profileIdentityKey(identity)) ?? [];
+      const panelMeans = [...byIdentity.entries()]
+        .filter(([key]) => key !== profileIdentityKey(identity))
+        .map(([, rows]) => arithmeticMean(rows.map((row) => row.value!)));
+      if (own.length === 0 || panelMeans.length === 0) return [];
+      return [{
+        value: stableNumber(arithmeticMean(own.map((row) => row.value!)) - arithmeticMean(panelMeans)),
+        rows: [...own, ...[...byIdentity.entries()]
+          .filter(([key]) => key !== profileIdentityKey(identity)).flatMap(([, rows]) => rows)]
+      }];
+    });
+    const leniencyValues = leniencySamples.map((sample) => sample.value);
     biasCells.push(makeProfileCell({
       identity, domainId: null, step: "JUDGING", metric: BIAS_LENIENCY_METRIC,
       asOf: input.asOf, values: leniencyValues,
       counts: { consensus: leniencyValues.length, settlement: 0, addon: 0 },
       basis: "MEASURED_PROCESS", derivationVersion,
-      derivationInput: identityJudgements.map((row) => `${row.observationId}@${row.atSequence}`),
+      derivationInput: [
+        "formula:bias.leniency.v1=identity-run-mean-minus-other-identities-run-mean",
+        ...leniencySamples.flatMap((sample) => sample.rows)
+          .map((row) => `${row.observationId}@${row.atSequence}`)
+      ],
       intervalBounds: [-1, 1]
     }));
-    const contradicted = identityJudgements.flatMap((row) => {
-      const settlement = latestSettlementByRun.get(row.runId);
-      return settlement === undefined ? [] : [Number((row.value! >= 0.5) !== (settlement.value! >= 0.5))];
+    // Each settlement event is one denominator sample. It is linked only to
+    // judgements from the same run and exact model identity. A mean tau of
+    // exactly 0.5 is neutral and excluded; >0.5 is positive and <0.5 negative.
+    const contradictionSamples = settlements.flatMap((settlement) => {
+      if (profileIdentityKey(settlement) !== profileIdentityKey(identity)) return [];
+      const rows = runJudgements.get(settlement.runId)?.get(profileIdentityKey(identity)) ?? [];
+      if (rows.length === 0) return [];
+      const judgementMean = arithmeticMean(rows.map((row) => row.value!));
+      if (judgementMean === 0.5) return [];
+      return [{
+        value: Number((judgementMean > 0.5) !== (settlement.value! >= 0.5)),
+        rows: [...rows, settlement]
+      }];
     });
-    const contradictionInput = identityJudgements.flatMap((row) => {
-      const settlement = latestSettlementByRun.get(row.runId);
-      return settlement === undefined ? [] : [
-        `${row.observationId}@${row.atSequence}`,
-        `${settlement.observationId}@${settlement.atSequence}`
-      ];
-    });
+    const contradicted = contradictionSamples.map((sample) => sample.value);
+    const contradictionInput = [
+      "formula:bias.settlement_contradiction.v1=per-settlement-event;threshold:tau>0.5;neutral:tau=0.5",
+      ...contradictionSamples.flatMap((sample) => sample.rows)
+        .map((row) => `${row.observationId}@${row.atSequence}`)
+    ];
     biasCells.push(makeProfileCell({
       identity, domainId: null, step: "JUDGING", metric: BIAS_SETTLEMENT_CONTRADICTION_METRIC,
       asOf: input.asOf, values: contradicted,
@@ -2453,21 +2473,31 @@ export function deriveEvaluatorProfiles(input: {
       basis: "MEASURED_OUTCOME", derivationVersion, derivationInput: contradictionInput,
       intervalBounds: [0, 1]
     }));
-    const sameLineage = identityJudgements.filter((row) => row.subjectMaker !== null
-      && row.authorMaker !== null && row.subjectMaker === row.authorMaker);
-    const otherLineage = identityJudgements.filter((row) => row.subjectMaker !== null
-      && row.authorMaker !== null && row.subjectMaker !== row.authorMaker);
-    const lineageValues = sameLineage.length === 0 || otherLineage.length === 0 ? []
-      : [arithmeticMean(sameLineage.map((row) => row.value!))
-        - arithmeticMean(otherLineage.map((row) => row.value!))];
+    const identityReviews = active.filter((row) => row.sourceKind === "NODE_REVIEW"
+      && profileIdentityKey(row) === profileIdentityKey(identity)
+      && row.authorMaker !== null && numericProwessValue(row) !== null);
+    const reviewByAuthorLineage = new Map<string, EvaluatorProfileObservation[]>();
+    for (const review of identityReviews) {
+      reviewByAuthorLineage.set(review.authorMaker!, [
+        ...(reviewByAuthorLineage.get(review.authorMaker!) ?? []), review
+      ]);
+    }
+    const lineageMeans = [...reviewByAuthorLineage.values()]
+      .map((rows) => arithmeticMean(rows.map((row) => numericProwessValue(row)!)));
+    const lineageValues = lineageMeans.length < 2 ? [] : lineageMeans.map((value, index) => {
+      const otherMeans = lineageMeans.filter((_, otherIndex) => otherIndex !== index);
+      return stableNumber(Math.abs(value - arithmeticMean(otherMeans)));
+    });
     biasCells.push(makeProfileCell({
       identity, domainId: null, step: "JUDGING", metric: BIAS_LINEAGE_FAVORITISM_METRIC,
       asOf: input.asOf, values: lineageValues,
       counts: { consensus: lineageValues.length, settlement: 0, addon: 0 },
       basis: "MEASURED_PROCESS", derivationVersion,
-      derivationInput: [...sameLineage, ...otherLineage]
-        .map((row) => `${row.observationId}@${row.atSequence}`),
-      intervalBounds: [-1, 1]
+      derivationInput: [
+        "formula:bias.lineage_favoritism_residue.v1=mean-absolute-author-lineage-vs-other-lineages",
+        ...identityReviews.map((row) => `${row.observationId}@${row.atSequence}`)
+      ],
+      intervalBounds: [0, 1]
     }));
     const addon = active.filter((row) => row.sourceKind === "BLIND_JUDGE_GRADE"
       && row.value !== null && profileIdentityKey(row) === profileIdentityKey(identity));
@@ -2500,6 +2530,7 @@ export function deriveEvaluatorProfiles(input: {
     || compareProfileIdentity(left.identity, right.identity));
   const judgeRanks: EvaluatorDerivedRank[] = judgeRankDrafts.map((rank, index) => Object.freeze({
     rankKind: "JUDGE" as const, ...rank.identity, domainId: null, step: "JUDGING" as const,
+    metric: "bias.composite-rank.v1",
     ordinal: index + 1, score: rank.score, n: rank.n,
     intervalLower: null, intervalUpper: null,
     sourceCellKeys: Object.freeze(rank.sourceCellKeys), derivationVersion, asOf: new Date(input.asOf)
@@ -2546,39 +2577,27 @@ export function deriveEvaluatorProfiles(input: {
 
   const prowessRankGroups = new Map<string, EvaluatorDerivedProfileCell[]>();
   for (const cell of prowessCells.filter((candidate) => candidate.value !== null)) {
-    const key = JSON.stringify([cell.domainId, cell.step]);
+    const key = JSON.stringify([cell.domainId, cell.step, cell.metric]);
     const cells = prowessRankGroups.get(key) ?? [];
     cells.push(cell);
     prowessRankGroups.set(key, cells);
   }
-  const metricPriority = (metric: string): number => [
-    "prowess.settlement-outcome.v1", "prowess.blind-judge-grade.v1",
-    "prowess.review-outcome.v1", "prowess.consensus-strength.v1", "prowess.judging-tau.v1"
-  ].indexOf(metric);
   const prowessRanks: EvaluatorDerivedRank[] = [];
   for (const cells of prowessRankGroups.values()) {
-    const byIdentity = new Map<string, EvaluatorDerivedProfileCell[]>();
-    for (const cell of cells) {
-      const identityCells = byIdentity.get(profileIdentityKey(cell)) ?? [];
-      identityCells.push(cell);
-      byIdentity.set(profileIdentityKey(cell), identityCells);
-    }
-    const selected = [...byIdentity.values()].map((identityCells) => [...identityCells]
-      .sort((left, right) => metricPriority(left.metric) - metricPriority(right.metric)
-        || left.metric.localeCompare(right.metric))[0]!)
+    const selected = [...cells]
       .sort((left, right) => right.value! - left.value! || right.n - left.n
         || compareProfileIdentity(left, right));
     selected.forEach((cell, index) => prowessRanks.push(Object.freeze({
       rankKind: "PROWESS", provider: cell.provider, modelId: cell.modelId,
-      modelVersion: cell.modelVersion, domainId: cell.domainId, step: cell.step,
+      modelVersion: cell.modelVersion, domainId: cell.domainId, step: cell.step, metric: cell.metric,
       ordinal: index + 1, score: cell.value!, n: cell.n,
       intervalLower: cell.intervalLower, intervalUpper: cell.intervalUpper,
       sourceCellKeys: Object.freeze([profileCellKey(cell)]), derivationVersion,
       asOf: new Date(input.asOf)
     })));
   }
-  prowessRanks.sort((left, right) => JSON.stringify([left.domainId, left.step, left.ordinal])
-    .localeCompare(JSON.stringify([right.domainId, right.step, right.ordinal])));
+  prowessRanks.sort((left, right) => JSON.stringify([left.domainId, left.step, left.metric, left.ordinal])
+    .localeCompare(JSON.stringify([right.domainId, right.step, right.metric, right.ordinal])));
   return Object.freeze({
     biasCells: Object.freeze(biasCells), prowessCells: Object.freeze(prowessCells),
     judgeRanks: Object.freeze(judgeRanks), prowessRanks: Object.freeze(prowessRanks),
@@ -2708,11 +2727,16 @@ export class PostgresEvaluatorProfileRepository {
              observation.outcome_json->>'outcome' AS outcome,
              observation.truth_basis,observation.source_kind,observation.source_ref,
              observation.supersedes_observation_id,
-             COALESCE(observation.provenance_json->>'item_key',judgement.node_id::text)
+             COALESCE(
+               observation.provenance_json->>'item_key',judgement.node_id::text,review.node_id::text
+             )
                AS item_key,
              COALESCE(observation.provenance_json->>'subject_maker',subject_artifact.maker)
                AS subject_maker,
-             COALESCE(observation.provenance_json->>'author_maker',author_artifact.maker)
+             COALESCE(
+               observation.provenance_json->>'author_maker',review_author_artifact.maker,
+               judged_author_artifact.maker
+             )
                AS author_maker,
              observation.observed_at,observation.at_seq::text AS at_seq
       FROM evaluator.observation AS observation
@@ -2720,10 +2744,15 @@ export class PostgresEvaluatorProfileRepository {
         ON observation.source_kind='REDUCED_JUDGEMENT'
        AND judgement.reduced_judgement_id::text=observation.source_ref
       LEFT JOIN core.node AS judged_node ON judged_node.node_id=judgement.node_id
+      LEFT JOIN ledger.node_review AS review
+        ON observation.source_kind='NODE_REVIEW'
+       AND review.node_review_id::text=observation.source_ref
       LEFT JOIN ledger.raw_artifact AS subject_artifact
         ON subject_artifact.raw_artifact_id=observation.source_raw_artifact_ref
-      LEFT JOIN ledger.raw_artifact AS author_artifact
-        ON author_artifact.raw_artifact_id=judged_node.provenance_ref
+      LEFT JOIN ledger.raw_artifact AS judged_author_artifact
+        ON judged_author_artifact.raw_artifact_id=judged_node.provenance_ref
+      LEFT JOIN ledger.raw_artifact AS review_author_artifact
+        ON review_author_artifact.raw_artifact_id=review.author_raw_artifact_ref
       WHERE observation.observed_at <= $1
       ORDER BY observation.at_seq,observation.observation_id
     `, [asOf]);
@@ -2775,8 +2804,8 @@ export class PostgresEvaluatorProfileRepository {
     ]);
     let profileCellId = inserted.rows[0]?.profile_cell_id;
     if (profileCellId === undefined) {
-      const existing = await client.query<{ profile_cell_id: string }>(`
-        SELECT profile_cell_id FROM evaluator.profile_cell
+      const existing = await client.query<{ profile_cell_id: string; derivation_hash: string }>(`
+        SELECT profile_cell_id,derivation_hash FROM evaluator.profile_cell
         WHERE provider=$1 AND model_id=$2 AND model_version=$3
           AND domain_id IS NOT DISTINCT FROM $4 AND step=$5 AND metric=$6
           AND as_of=$7 AND derivation_version=$8
@@ -2784,7 +2813,20 @@ export class PostgresEvaluatorProfileRepository {
         cell.provider, cell.modelId, cell.modelVersion, cell.domainId, cell.step,
         cell.metric, cell.asOf, cell.derivationVersion
       ]);
-      profileCellId = existing.rows[0]!.profile_cell_id;
+      const prior = existing.rows[0];
+      if (prior === undefined) {
+        throw new TypedDomainError(
+          "EVALUATOR_PROFILE_DERIVATION_CONFLICT",
+          "EVALUATOR_PROFILE_DERIVATION_CONFLICT: natural key collision was not resolvable"
+        );
+      }
+      if (prior.derivation_hash !== cell.derivationHash) {
+        throw new TypedDomainError(
+          "EVALUATOR_PROFILE_DERIVATION_CONFLICT",
+          `EVALUATOR_PROFILE_DERIVATION_CONFLICT: changed input for ${profileCellKey(cell)}`
+        );
+      }
+      profileCellId = prior.profile_cell_id;
     }
     return Object.freeze({
       profileCellId,
@@ -2807,22 +2849,53 @@ export class PostgresEvaluatorProfileRepository {
       source_profile_cell_ids: sourceProfileCellIds,
       derivation_version: rank.derivationVersion,
       rank_kind: rank.rankKind,
-      ordinal: rank.ordinal
+      provider: rank.provider,
+      model_id: rank.modelId,
+      model_version: rank.modelVersion,
+      domain_id: rank.domainId,
+      step: rank.step,
+      metric: rank.metric,
+      ordinal: rank.ordinal,
+      score: rank.score,
+      n: rank.n,
+      interval_lower: rank.intervalLower,
+      interval_upper: rank.intervalUpper
     });
-    const result = await client.query(`
+    const result = await client.query<{ rank_snapshot_id: string }>(`
       INSERT INTO evaluator.rank_snapshot (
-        rank_kind,provider,model_id,model_version,domain_id,step,ordinal,score,n,
+        rank_kind,provider,model_id,model_version,domain_id,step,metric,ordinal,score,n,
         interval_lower,interval_upper,source_profile_cell_ids,source_hash,
         derivation_version,as_of,at_seq
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16)
-      ON CONFLICT DO NOTHING
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17)
+      ON CONFLICT DO NOTHING RETURNING rank_snapshot_id
     `, [
       rank.rankKind, rank.provider, rank.modelId, rank.modelVersion, rank.domainId,
-      rank.step, rank.ordinal, rank.score, rank.n, rank.intervalLower, rank.intervalUpper,
+      rank.step, rank.metric, rank.ordinal, rank.score, rank.n, rank.intervalLower, rank.intervalUpper,
       JSON.stringify(sourceProfileCellIds), sourceHash, rank.derivationVersion,
       rank.asOf, await allocateSequence(client)
     ]);
-    return result.rowCount ?? 0;
+    if ((result.rowCount ?? 0) !== 0) return result.rowCount ?? 0;
+    const existing = await client.query<{ source_hash: string }>(`
+      SELECT source_hash FROM evaluator.rank_snapshot
+      WHERE rank_kind=$1 AND domain_id IS NOT DISTINCT FROM $2 AND step=$3 AND metric=$4
+        AND as_of=$5 AND derivation_version=$6
+        AND (
+          ordinal=$7 OR (
+            provider=$8 AND model_id=$9 AND model_version=$10
+          )
+        )
+      LIMIT 1
+    `, [
+      rank.rankKind, rank.domainId, rank.step, rank.metric, rank.asOf,
+      rank.derivationVersion, rank.ordinal, rank.provider, rank.modelId, rank.modelVersion
+    ]);
+    if (existing.rows[0]?.source_hash !== sourceHash) {
+      throw new TypedDomainError(
+        "EVALUATOR_RANK_DERIVATION_CONFLICT",
+        `EVALUATOR_RANK_DERIVATION_CONFLICT: changed rank input for ${rank.metric}`
+      );
+    }
+    return 0;
   }
 }
 
