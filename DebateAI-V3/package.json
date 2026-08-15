@@ -24,6 +24,7 @@
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
+    "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
     "replay:ceremony": "tsx apps/replay/src/cli.ts"
   },
   "dependencies": {

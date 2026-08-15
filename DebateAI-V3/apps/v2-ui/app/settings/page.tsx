@@ -6,6 +6,10 @@ import { AuthGate } from "@/components/AuthGate";
 import { modelMeta } from "@/lib/models";
 import type { SettingsView } from "@/lib/v3/adapter";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { EvaluatorDevMenu } from "@/components/EvaluatorDevMenu";
+
+const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
+  && process.env.NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED === "true";
 
 /**
  * UI-01 (DR-145): V2's settings screen, kept whole, reading V3's deployment
@@ -170,6 +174,8 @@ function SettingsScreen({ token }: { token: string }) {
             />
           </div>
         ) : null}
+
+        {EVALUATOR_DEV_MENU_ENABLED ? <EvaluatorDevMenu token={token} /> : null}
 
         <div className="formActions">
           <button

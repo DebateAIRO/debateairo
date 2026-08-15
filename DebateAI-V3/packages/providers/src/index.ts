@@ -2,9 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 
-export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE"] as const;
+export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
-export type Lane = "served" | "uniform-panel" | "critic-exempt";
+export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator";
 
 export interface CallBound {
   readonly maxAttempts: number;
@@ -121,7 +121,7 @@ export interface RawArtifactInput {
   readonly maker: string;
   readonly modelVersion: string | null;
   readonly rawText: string;
-  readonly metadata: Readonly<Record<string, string | number | boolean | null>>;
+  readonly metadata: Readonly<Record<string, unknown>>;
   readonly parseStatus: "PARSED" | "UNPARSED" | "PARSE_FAILED" | "SCHEMA_FAILED";
   readonly parseError?: string | null;
   readonly inputHash: string;
@@ -156,9 +156,17 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
 }
 
+const usageSchema = z.object({
+  prompt_tokens: z.number().int().nonnegative().optional(),
+  completion_tokens: z.number().int().nonnegative().optional(),
+  total_tokens: z.number().int().nonnegative().optional(),
+  x_cost_usd: z.number().nonnegative().optional()
+}).passthrough();
+
 const responseSchema = z.object({
   id: z.string().min(1),
   model: z.string().min(1),
+  usage: usageSchema.nullable().optional(),
   choices: z.array(z.object({
     message: z.object({ content: z.string() })
   })).min(1)
@@ -231,6 +239,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           decoded = null;
         }
         const candidate = z.object({ id: z.string(), model: z.string() }).passthrough().safeParse(decoded);
+        const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
+          .passthrough().safeParse(decoded);
         const strict = responseSchema.safeParse(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         let classifiedContent: ContentClassification | {
@@ -260,7 +270,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           maker: this.#options.maker,
           modelVersion: candidate.success ? candidate.data.model : null,
           rawText,
-          metadata: { status: response.status, attempt },
+          metadata: {
+            status: response.status,
+            attempt,
+            usage: observedUsage.success ? observedUsage.data.usage ?? null : null
+          },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,
           inputHash,

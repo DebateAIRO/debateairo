@@ -237,6 +237,8 @@ export async function createAcceptanceRuntime(input: {
         runId: event.runId,
         kind: event.kind,
         value: {
+          // The DB repository persists this payload as JSON; its legacy union is
+          // intentionally narrower than the runner's DR-184 halt vocabulary.
           state: event.state,
           call_site_key: event.callSiteKey,
           parent_node_ref: event.parentNodeId,

@@ -756,6 +756,29 @@ export interface PersistServeInput {
     readonly replayHandle: string;
     readonly propagationRunId: string;
   } | null;
+  /** DR-184: append a new immutable version of an already-served answer. */
+  readonly supersedes?: { readonly answerId: string };
+}
+
+export interface ReviewCatchUpSource {
+  readonly askerId: string;
+  readonly answerId: string;
+  readonly answerVersion: number;
+  readonly workItemId: string;
+  readonly answer: Answer;
+  readonly factBundle: FactBundle;
+  readonly factBundleContentHash: string;
+  readonly factBundleVersion: number;
+  readonly servedNumber: {
+    readonly nodeId: string;
+    readonly numberRef: string;
+    readonly value: number;
+    readonly numberKind: string;
+    readonly sourceRef: string;
+    readonly producer: string;
+    readonly replayHandle: string;
+    readonly propagationRunId: string;
+  } | null;
 }
 
 export interface MemoryQuestionRegistration {
@@ -769,7 +792,7 @@ export interface MemoryQuestionRegistration {
 }
 
 export interface ConditionMarkRecord {
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -783,6 +806,7 @@ export interface ConditionMarkRecord {
   readonly hiddenScoreThreshold?: number | null;
   readonly hiddenScoreThresholdSourceRef?: string | null;
   readonly excludedFromServedNumber?: boolean | null;
+  readonly judgedBasisCount?: number | null;
 }
 
 const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
@@ -794,6 +818,7 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
   "HIDDEN-UNJUDGEABLE",
+  "DERIVED-STANDING-UNREVIEWED",
   "HIDDEN-LOW-SCORE",
   "UNAUTHORED-BRANCH-HALTED"
 ] as const);
@@ -827,6 +852,17 @@ export function assertRequiredConditionMarkRecords(
       || record.hiddenScoreThresholdSourceRef == null || record.excludedFromServedNumber !== false
     )) {
       throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class L requires strength, threshold provenance, and presentation-only status");
+    }
+    if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
+      record.callSiteKey == null || record.terminalTransportOutcome == null
+      || record.excludedFromServedNumber !== false
+      || record.judgedBasisCount == null || !Number.isInteger(record.judgedBasisCount)
+      || record.judgedBasisCount < 1
+    )) {
+      throw new TypedDomainError(
+        "DERIVED_STANDING_RECORD_INVALID",
+        "Class D requires failed-review provenance, presentation inclusion, and a positive judged basis count"
+      );
     }
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
       record.callSiteKey == null || record.plannedLegCount == null || record.terminalTransportOutcome == null
@@ -909,20 +945,21 @@ export class ServeRepository {
     });
   }
 
-  async persist(input: PersistServeInput): Promise<{ readonly answerId: string; readonly servedNumberId: string | null }> {
+  async persist(input: PersistServeInput): Promise<{ readonly answerId: string; readonly answerVersion: number; readonly servedNumberId: string | null }> {
     if (input.result.terminal === "BLOCKED") {
       throw new TypedDomainError(
         "BLOCKED_TERMINAL_RETIRED",
         "DR-130 routes pre-compose blocking gates to COMPONENTS_ONLY with DEFECT"
       );
     }
-    if (input.compositionRawArtifactRef === null && compositionEvidenceRequired(input.result)) {
+    if (input.supersedes === undefined
+      && input.compositionRawArtifactRef === null && compositionEvidenceRequired(input.result)) {
       throw new TypedDomainError(
         "MISSING_COMPOSITION_ARTIFACT",
         "Only a pre-composition terminal may omit composition evidence"
       );
     }
-    if (input.compositionRawArtifactRef === null && (
+    if (input.supersedes === undefined && input.compositionRawArtifactRef === null && (
       input.compositionAttempt !== 0
       || input.segments.length !== 0
       || input.conformanceRawArtifactRefs.length !== 0
@@ -949,6 +986,38 @@ export class ServeRepository {
       reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
     });
     return withWriteTransaction(this.pool, async (client) => {
+      const prior = input.supersedes === undefined ? null : await client.query<{
+        answer_id: string;
+        answer_version: number;
+        run_id: string;
+        work_item_id: string;
+        composed_text_id: string | null;
+        conformance_record_id: string | null;
+        serve_state: "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
+        verdict_state: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+        verdict_unavailable: { readonly reason_ref: string } | null;
+      }>(
+        `SELECT answer_id, answer_version, run_id, work_item_id,
+                composed_text_id, conformance_record_id, serve_state,
+                verdict_state, verdict_unavailable
+         FROM serve.answer
+         WHERE answer_id=$1
+         ORDER BY answer_version DESC
+         LIMIT 1`,
+        [input.supersedes?.answerId]
+      );
+      const priorAnswer = prior?.rows[0];
+      if (input.supersedes !== undefined && priorAnswer === undefined) {
+        throw new TypedDomainError("SUPERSEDED_ANSWER_NOT_FOUND", input.supersedes.answerId);
+      }
+      if (priorAnswer !== undefined && (
+        priorAnswer.run_id !== input.runId || priorAnswer.work_item_id !== input.workItemId
+      )) {
+        throw new TypedDomainError("SUPERSEDED_ANSWER_IDENTITY_MISMATCH", input.supersedes!.answerId);
+      }
+      const answerVersion = priorAnswer === undefined
+        ? input.factBundleVersion
+        : priorAnswer.answer_version + 1;
       const facts = await client.query<{ fact_bundle_id: string }>(
         `INSERT INTO serve.fact_bundle (
           run_id, facts, residual_objections, content_hash, version
@@ -958,11 +1027,11 @@ export class ServeRepository {
           JSON.stringify(input.factBundle.facts),
           JSON.stringify(input.factBundle.residualObjections),
           input.factBundleContentHash,
-          input.factBundleVersion
+          answerVersion
         ]
       );
       const factBundleId = facts.rows[0]!.fact_bundle_id;
-      const composed = input.compositionRawArtifactRef === null ? null : await client.query<{ composed_text_id: string }>(
+      const composed = priorAnswer !== undefined || input.compositionRawArtifactRef === null ? null : await client.query<{ composed_text_id: string }>(
         `INSERT INTO serve.composed_text (
           fact_bundle_id, segments, raw_artifact_ref, attempt
         ) VALUES ($1,$2::jsonb,$3,$4) RETURNING composed_text_id`,
@@ -973,8 +1042,8 @@ export class ServeRepository {
           served_number_refs: segment.servedNumberRefs
         }))), input.compositionRawArtifactRef, input.compositionAttempt]
       );
-      const composedTextId = composed?.rows[0]!.composed_text_id ?? null;
-      const conformance = composedTextId === null ? null : await client.query<{ conformance_record_id: string }>(
+      const composedTextId = priorAnswer?.composed_text_id ?? composed?.rows[0]!.composed_text_id ?? null;
+      const conformance = priorAnswer !== undefined || composedTextId === null ? null : await client.query<{ conformance_record_id: string }>(
         `INSERT INTO serve.conformance_record (
           composed_text_id, segment_results, coverage_mode,
           raw_artifact_refs, sealed_at_seq
@@ -988,31 +1057,34 @@ export class ServeRepository {
           await allocateSequence(client)
         ]
       );
-      const serveState = input.result.terminal === "COMPONENTS_ONLY"
+      const serveState = priorAnswer?.serve_state ?? (input.result.terminal === "COMPONENTS_ONLY"
         ? "COMPONENTS_ONLY"
-        : input.compositionAttempt > 1 ? "RECOMPOSED_ONCE" : "COMPOSED";
+        : input.compositionAttempt > 1 ? "RECOMPOSED_ONCE" : "COMPOSED");
       const servedNumberEventAtSeq = input.servedNumber === null ? null : await allocateSequence(client);
       const answerSealedAtSeq = await allocateSequence(client);
+      const conformanceRecordId = priorAnswer?.conformance_record_id
+        ?? conformance?.rows[0]!.conformance_record_id ?? null;
       const answer = await client.query<{ answer_id: string }>(
         `INSERT INTO serve.answer (
-          answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
+          answer_id, answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
           answer_form, condition_marks, fact_bundle_id, composed_text_id,
           conformance_record_id, sealed_at_seq, confidence_band, band_ceiling,
           reversal_point, builds_on_previous, badges, verdict_unavailable, memory_disclosure
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13,$14::jsonb,$15,$16::jsonb,$17::jsonb,$18::jsonb,$19::jsonb)
+        ) VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18::jsonb,$19::jsonb,$20::jsonb)
         RETURNING answer_id`,
         [
-          input.factBundleVersion,
+          priorAnswer?.answer_id ?? null,
+          answerVersion,
           input.runId,
           input.workItemId,
           input.result.terminal,
           serveState,
-          verdict.verdictState,
+          priorAnswer === undefined ? verdict.verdictState : priorAnswer.verdict_state,
           JSON.stringify(input.result.answerForm),
           JSON.stringify(input.result.conditionMarks),
           factBundleId,
           composedTextId,
-          conformance?.rows[0]!.conformance_record_id ?? null,
+          conformanceRecordId,
           answerSealedAtSeq,
           input.result.confidenceBand,
           input.result.bandCeiling === null ? null : JSON.stringify({
@@ -1029,7 +1101,11 @@ export class ServeRepository {
             answer_ref: input.result.projections.buildsOnPrevious.answerRef
           }),
           JSON.stringify(input.factBundle.badges),
-          verdict.unavailable === null
+          priorAnswer !== undefined
+            ? priorAnswer.verdict_unavailable === null
+              ? null
+              : JSON.stringify(priorAnswer.verdict_unavailable)
+            : verdict.unavailable === null
             ? null
             : JSON.stringify({ reason_ref: verdict.unavailable.reasonRef }),
           input.result.projections.memoryDisclosure === null
@@ -1042,12 +1118,13 @@ export class ServeRepository {
           `INSERT INTO serve.condition_mark (
              answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule,
              call_site_key, planned_leg_count, terminal_transport_outcome, hidden_strength,
-             hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+             hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number,
+             judged_basis_count, at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
-            input.factBundleVersion,
+            answerVersion,
             record.mark,
             record.scope,
             record.subjectRef,
@@ -1061,6 +1138,7 @@ export class ServeRepository {
             record.hiddenScoreThreshold ?? null,
             record.hiddenScoreThresholdSourceRef ?? null,
             record.excludedFromServedNumber ?? null,
+            record.judgedBasisCount ?? null,
             await allocateSequence(client)
           ]
         );
@@ -1086,7 +1164,7 @@ export class ServeRepository {
           input.servedNumber.replayHandle,
           input.servedNumber.propagationRunId,
           answer.rows[0]!.answer_id,
-          input.factBundleVersion,
+          answerVersion,
           input.servedNumber.numberRef
         ]
       );
@@ -1095,15 +1173,112 @@ export class ServeRepository {
          VALUES ($1,'PRESENT',NULL,$2)`,
         [servedNumber.rows[0]!.served_number_id, servedNumberEventAtSeq]
       );
-      await client.query(
-        `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
-         VALUES ($1,$2,'TERMINAL',$3::jsonb)`,
-        [input.runId, await allocateSequence(client), JSON.stringify(input.result.terminal)]
-      );
+      if (priorAnswer === undefined) {
+        await client.query(
+          `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+           VALUES ($1,$2,'TERMINAL',$3::jsonb)`,
+          [input.runId, await allocateSequence(client), JSON.stringify(input.result.terminal)]
+        );
+      }
       return {
         answerId: answer.rows[0]!.answer_id,
+        answerVersion,
         servedNumberId: servedNumber?.rows[0]!.served_number_id ?? null
       };
+    });
+  }
+
+  async readReviewCatchUpDisclosedNodeIds(
+    answerId: string,
+    answerVersion: number
+  ): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT DISTINCT link.node_id::text
+       FROM serve.condition_mark AS mark
+       JOIN serve.condition_mark_node AS link ON link.condition_mark_id=mark.condition_mark_id
+       WHERE mark.answer_id=$1 AND mark.answer_version=$2
+         AND mark.mark IN ('HIDDEN-UNJUDGEABLE','DERIVED-STANDING-UNREVIEWED')
+       ORDER BY link.node_id::text`,
+      [answerId, answerVersion]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {
+    const head = await this.pool.query<{
+      asker_id: string;
+      answer_id: string;
+      answer_version: number;
+      work_item_id: string;
+      facts: string[];
+      residual_objections: string[];
+      content_hash: string;
+      fact_bundle_version: number;
+      badges: string[];
+      condition_marks: string[];
+      reversal_point: string;
+      builds_on_previous: FactBundle["buildsOnPrevious"];
+      memory_disclosure: MemoryDisclosure | null;
+      node_id: string | null;
+      number_ref: string | null;
+      value: number | null;
+      number_kind: string | null;
+      source_ref: string | null;
+      producer: string | null;
+      replay_handle: string | null;
+      propagation_run_id: string | null;
+    }>(
+      `SELECT run.asker_id, answer.answer_id::text, answer.answer_version,
+              answer.work_item_id::text, facts.facts, facts.residual_objections,
+              facts.content_hash, facts.version AS fact_bundle_version,
+              answer.badges, answer.condition_marks, answer.reversal_point,
+              answer.builds_on_previous, answer.memory_disclosure,
+              node.node_id::text, number.number_ref, number.value,
+              number.number_kind, number.source_ref, number.producer, number.replay_handle,
+              number.provenance_ref::text AS propagation_run_id
+       FROM serve.answer AS answer
+       JOIN core.run AS run ON run.run_id=answer.run_id
+       JOIN serve.fact_bundle AS facts ON facts.fact_bundle_id=answer.fact_bundle_id
+       LEFT JOIN serve.served_number AS number
+         ON number.answer_id=answer.answer_id AND number.answer_version=answer.answer_version
+       LEFT JOIN core.node AS node
+         ON node.run_id=answer.run_id AND node.provenance_ref::text=number.source_ref
+       WHERE answer.run_id=$1
+       ORDER BY answer.answer_version DESC
+       LIMIT 1`,
+      [runId]
+    );
+    const row = head.rows[0];
+    if (row === undefined) throw new TypedDomainError("CATCH_UP_ANSWER_NOT_FOUND", runId);
+    const answer = await this.readAnswerProjection(row.answer_id, row.asker_id, Number(row.answer_version));
+    if (answer === null) throw new TypedDomainError("CATCH_UP_ANSWER_NOT_FOUND", runId);
+    return Object.freeze({
+      askerId: row.asker_id,
+      answerId: row.answer_id,
+      answerVersion: Number(row.answer_version),
+      workItemId: row.work_item_id,
+      answer,
+      factBundle: Object.freeze({
+        facts: Object.freeze([...row.facts]),
+        residualObjections: Object.freeze([...row.residual_objections]),
+        badges: Object.freeze([...row.badges]),
+        conditionMarks: Object.freeze([...row.condition_marks]),
+        reversalPoint: row.reversal_point,
+        buildsOnPrevious: Object.freeze({ ...row.builds_on_previous }),
+        memoryDisclosure: row.memory_disclosure
+      }),
+      factBundleContentHash: row.content_hash,
+      factBundleVersion: Number(row.fact_bundle_version),
+      servedNumber: row.value === null || row.node_id === null ? null : Object.freeze({
+        nodeId: row.node_id,
+        numberRef: row.number_ref!,
+        value: Number(row.value),
+        numberKind: row.number_kind!,
+        sourceRef: row.source_ref!,
+        producer: row.producer!,
+        replayHandle: row.replay_handle!,
+        propagationRunId: row.propagation_run_id!
+      })
     });
   }
 
@@ -1269,12 +1444,13 @@ export class ServeRepository {
       hidden_score_threshold: number | null;
       hidden_score_threshold_source_ref: string | null;
       excluded_from_served_number: boolean | null;
+      judged_basis_count: number | null;
       affected_node_ids: string[];
     }>(
       `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule,
               call_site_key, planned_leg_count, terminal_transport_outcome,
               hidden_strength, hidden_score_threshold, hidden_score_threshold_source_ref,
-              excluded_from_served_number,
+              excluded_from_served_number, judged_basis_count,
               ARRAY(SELECT link.node_id::text FROM serve.condition_mark_node AS link
                     WHERE link.condition_mark_id=serve.condition_mark.condition_mark_id
                     ORDER BY link.node_id) AS affected_node_ids
@@ -1344,6 +1520,7 @@ export class ServeRepository {
         hidden_score_threshold: record.hidden_score_threshold === null ? null : Number(record.hidden_score_threshold),
         hidden_score_threshold_source_ref: record.hidden_score_threshold_source_ref,
         excluded_from_served_number: record.excluded_from_served_number,
+        judged_basis_count: record.judged_basis_count,
         affected_node_ids: record.affected_node_ids
       })),
       reversal_point: row.reversal_point,

@@ -1,0 +1,1134 @@
+=== PROG-05 rework1 launch Sat Aug 15 12:33:28 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a004ab-761c-7830-b95b-f5174554c61a
+--------
+user
+/goal REWORK ROUND 1 of your eval-05-harvest lane (same goal, same session, same worktree). BOTH peer reviews returned REWORK, converging on two defects and adding two more. Read both fully: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-05-opus-review-1.md and PROG-05-opus2-review-1.md. BLOCKER 1 (both reviewers, reviewer B proved it on live embedded Postgres): late settlements are structurally unharvestable — harvestTerminalRun returns ALREADY_HARVESTED before reading the snapshot, so an answer_outcome arriving AFTER first harvest (i.e. every real external settlement, which by definition postdates terminality) is never projected; supersedes_observation_id and the validate_observation_supersession trigger have no writer, and the settlement metric cannot satisfy that trigger's same-metric rule. Redesign: settlement arrival must trigger a supersession pass that projects settlement-fed observations superseding the consensus-fed ones per Architecture sections 1.5, 5.2, 3.4 — lane 07's settlement_count and prowess.outcome.v1 depend on it. BLOCKER 2 (reviewer A, empirically confirmed): the metering poison pill — readObservedUsage returns non-null for payloads assertObservedUsage rejects (usage {}, unknown-keys-only, total != prompt+completion); the throw escapes reconcileEvaluatorMetering which both worker entry points call FIRST and unguarded, and the pending-calls query is global with the row staying pending — ONE malformed artifact anywhere in ledger blocks harvest for every run permanently. FR-0.5 demands UNMETERED, not an exception: malformed usage becomes an UNMETERED row with a typed receipt, never a throw, and per-row failure never blocks other rows or harvest itself. BLOCKER 3 (reviewer A): the zero-provider-call merge gate is argued, not asserted — add the test asserting ledger.raw_artifact and ledger.ledger_entry MODEL_CALL counts are unchanged across harvest so a future provider call fails the suite. BLOCKER 4 (reviewer B): absent model version drops evidence with NO receipt — implement the MODEL_IDENTITY_INCOMPLETE skip receipt (section 3.4), and make receipts capable of recording FAILED (STARTED and SUCCEEDED currently commit in one transaction, so no FAILED receipt can ever exist — section 3.3). Reproduce-first on all four: failing tests demonstrating each defect (late-settlement re-harvest projecting nothing; poisoned artifact blocking an unrelated run's harvest; no test failing on an injected provider call; version-less artifact leaving no receipt) before the fixes, then green. Address the cheap non-blockers from both reviews where quick; document the rest in your self-report. Run focused tests + repository typecheck, commit on your branch, update your self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-05-harvest
+=== codex exited Sat Aug 15 13:11:49 EEST 2026 ===
+=== PROG-05 rework1 continuation Sat Aug 15 13:11:52 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a004ab-761c-7830-b95b-f5174554c61a
+--------
+user
+/goal CONTINUATION of your eval-05-harvest rework (same goal, same session). Your previous turn committed 720303d fix(evaluator): reconcile late settlements safely, then hung idle; the client was terminated (known CLI hang — work is safe). Briefly state what you completed vs the four-blocker rework brief (late-settlement supersession, poison-pill→UNMETERED, asserted zero-provider-call gate, MODEL_IDENTITY_INCOMPLETE + FAILED receipts), then finish anything remaining: run the focused tests AND repository typecheck and show results, commit anything uncommitted, update your self-report at /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md, then print exactly: READY FOR PEER REVIEW: codex/eval-05-harvest
+codex
+Using the heartbeat-protocol skill to resume the same rework lane safely. Commit `720303d` already closes all four blockers: late settlements now supersede consensus observations; malformed usage becomes UNMETERED without blocking harvest; the zero-provider-call gate asserts raw-artifact and MODEL_CALL counts and proves its sentinel; and missing model versions plus failed harvests leave typed durable receipts. I’ll verify the saved state, rerun the requested gates, refresh the self-report with current evidence, and commit only if anything remains uncommitted.
+  → Verify branch, commit, worktree, and self-report state after client termination
+  • Run focused rework tests and repository typecheck
+  • Update self-report, commit any lane changes, and return at peer-review handoff
+exec
+/bin/zsh -lc "sed -n '1,260p' .agents/skills/heartbeat-protocol/SKILL.md; git branch --show-current; git log -2 --oneline --decorate; git status --short; tail -n 110 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+ succeeded in 0ms:
+---
+name: heartbeat-protocol
+description: Codex node contract for DebateAI-V3's comment-driven Kanban Heartbeat protocol and Graph Spine v2. Use when Codex is assigned implementation, rework, or independent peer review on a DebateAI-V3 ticket and must follow typed-state, authorization, worktree, evidence, review, and compaction rules.
+version: 3.1.0
+spine_version: 3.0.0
+---
+<!-- Provenance: mirror of .codex/skills/heartbeat-protocol/SKILL.md; edit the .codex file canonically and keep this copy synchronized. -->
+
+# Codex Heartbeat Protocol
+
+## Read order
+
+1. This `SKILL.md`.
+2. `docs/agent-protocols/debateai-heartbeat-protocol.md`.
+3. `docs/agent-protocols/codex-heartbeat-adapter.md`.
+4. The assigned Kanban ticket's typed state block, body, declared upstream artifacts, and every comment in chronological order.
+
+The repo currently has no root `AGENTS.md`. This is a recorded repository gap,
+not permission to invent its contents. If a root `AGENTS.md` is later added, read
+it before this contract and obey the normal instruction-precedence rules.
+
+The Graph Spine is normative. Treat typed ticket state as canonical and apply the
+latest applicable authorized Hermes/human comment for the current
+`authority_epoch`. Never route from status alone.
+
+## Role
+
+```text
+Codex GPT-5.6 Sol = sole implementation worker under the current model law
+Peer reviewer       = different read-only agent/session
+Claude-Router       = routing authority; dispatches from typed state, does no content work
+Hermes-Verifier     = evidence reviewer, board custodian, human-review router, Done/Blocked authority
+V                    = human product/acceptance and important-operation authority
+```
+
+Use one managed Codex CLI PTY per implementation ticket. A new ticket gets a new
+terminal. Rework resumes the original ticket/session. Coordinate subagents only
+inside the assigned contract, with non-overlapping files/hunks; the ticket worker
+still owns the handoff and continuity.
+
+## On launch or wakeup
+
+Before branch creation, subagents, edits, tests, or handoff:
+
+1. Read the sources in the stated order.
+2. Fetch only the assigned ticket and declared upstream artifacts; never list the board.
+3. Record `comments read through: <latest id/timestamp>`.
+4. Determine from typed state and comments whether the work is first pass, peer-review correction, Hermes rework, human rework, reviewer mode, or waiting.
+5. Confirm `[Codex]`, `owner.agent: codex`, original/rework owner, session ID, `authority_epoch`, `rework_round`, branch/worktree, dependencies, file contract, verification, and human gate.
+6. Continue this session's active `working` ticket before claiming anything new.
+7. Claim a `ready` ticket only under the latest applicable `HERMES AUTHORIZED NEXT`, or when named in a current `HERMES AUTHORIZED ROUTE` for the epoch.
+8. Post `WORKER CLAIM` before edits and set `owner.session` to this CLI session.
+9. Repeat the comment scan before every edit phase, heartbeat, review request, status transition, and handoff.
+
+Require fresh authorization after an `authority_epoch` change, a new risk signal,
+or an important operation. Do not infer authorization from an old route.
+
+## First-pass flow
+
+```text
+WORKER CLAIM
+→ RED → GREEN → REFACTOR
+→ exact focused checks
+→ READY FOR PEER REVIEW
+→ stop editing
+```
+
+Include in `READY FOR PEER REVIEW`: CLI session ID; ticket; branch/worktree and
+commit if any; changed files; RED/GREEN evidence; exact checks and outputs;
+allowed-file evidence; risks; and the latest comment cursor.
+
+The first-pass worker does not post `READY FOR HERMES REVIEW`. A separate
+read-only reviewer evaluates the work. On reviewer RED, the same worker fixes the
+findings and requests peer re-review. On reviewer GREEN, the reviewer posts
+`PEER REVIEW APPROVED` and `READY FOR HERMES REVIEW`. Hermes then performs its
+own non-delegable review; reviewer GREEN never substitutes for Hermes review.
+
+## Post-dialogue checkpoint compaction
+
+After every durable Codex coding, review, or correction handoff, and after any
+substantive Hermes↔Codex dialogue, leave the same PTY open and idle. Hermes first
+verifies that artifacts/diffs, checks, comments, decisions, unresolved findings,
+and the next gate are durable, then sends exactly:
+
+```text
+/compact
+```
+
+Do not add preservation arguments unless the installed Codex version documents
+them. Hermes waits for completion and prompt return, then records
+`CODEX COMPACTION CHECKPOINT` before parking the terminal or proceeding:
+
+```text
+READY FOR PEER REVIEW → compact worker PTY → peer review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+If substantive dialogue follows a checkpoint, compact again at the next stable
+handoff. Never compact while work, tests, or generation are in flight. Do not exit
+merely because the conversation became chatty.
+
+## Peer-review correction flow
+
+When a reviewer posts `PEER REVIEW CHANGES REQUESTED`:
+
+1. Resume the same worker/session and read all new comments.
+2. Acknowledge and address every finding; preserve unresolved earlier findings unless explicitly superseded.
+3. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
+4. Post `READY FOR PEER REVIEW` again and stop editing.
+
+The reviewer never writes the fix.
+
+## Hermes/human correction flow
+
+When the ticket returns with `HERMES CHANGES REQUESTED` or
+`HUMAN REVIEW CHANGES REQUESTED`:
+
+1. Resume the exact original Codex session.
+2. Read every comment after the prior handoff, including supersessions.
+3. Post `REWORK ACKNOWLEDGED`, naming the triggering comment and each finding.
+4. Reproduce RED where applicable, make the smallest GREEN fix, and run focused verification.
+5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes, addressing findings one by one.
+6. Request peer re-review only when Hermes explicitly says `peer re-review required: yes`.
+7. Repeat in the same session if the ticket returns again.
+
+If the original session is unavailable, post `CODEX BLOCKED` with blocker type
+`session_continuity`. Do not create a replacement without
+`WORKER CONTINUITY OVERRIDE`.
+
+## Reviewer mode
+
+Enter reviewer mode only when explicitly assigned in a separate read-only
+session:
+
+- Read the full ticket, typed state, all comments, upstream artifacts, and `READY FOR PEER REVIEW` evidence.
+- Verify worker/session identity, inspect the diff, and independently run justified checks.
+- Never edit reviewed files or review work authored by this same CLI session.
+- Post `PEER REVIEW CHANGES REQUESTED` on RED.
+- Post `PEER REVIEW APPROVED`, then `READY FOR HERMES REVIEW`, on GREEN.
+
+## State reads and writes
+
+```text
+reads:        { contract, status, rework_round, authority_epoch, worktree, comments_read_through }
+writes:       { status, worktree, evidence refs, comments_read_through, wakes_since_transition }
+claim-only:   { owner.session = this CLI session }
+never writes: { risk_tier, authority_epoch, owner.agent }
+```
+
+Move `status` only among worker-legal values. A `CODEX BLOCKED` marker requests
+the mapped `waiting_*`, `changes_requested`, or `failed_tooling` transition from
+the spine; ticket status is never a bare `blocked`.
+
+## Worktree and file contract
+
+- Use only the ticket-declared branch/worktree and allowed files.
+- Create or mutate a worktree lane only after the current epoch's approved H6 lane-plan row.
+- Keep one writer per file/hunk; parallel lanes must not overlap.
+- Honor the spine's heavy-work semaphore; serialize heavy builds/tests when capacity is uncertain.
+- Treat commit, push, merge, release, branch/worktree operations, destructive Git, and destructive filesystem operations as V-gated important operations.
+- Never cross into another ticket's files without an authorized route and updated contract.
+
+## Required markers
+
+Recognize the full marker union in the Graph Spine and adapter, including:
+
+```text
+WORKER CLAIM
+CODEX HEARTBEAT
+CODEX BLOCKED
+CODEX COMPACTION CHECKPOINT
+COMPACTION BLOCKED
+READY FOR PEER REVIEW
+PEER REVIEW CHANGES REQUESTED
+PEER REVIEW APPROVED
+READY FOR HERMES REVIEW
+HERMES CHANGES REQUESTED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
+READY FOR HUMAN REVIEW
+HUMAN REVIEW PASSED
+HUMAN REVIEW CHANGES REQUESTED
+REWORK ACKNOWLEDGED
+REWORK READY FOR HERMES REVIEW
+WORKER CONTINUITY OVERRIDE
+HERMES DONE
+HERMES BLOCKED
+V DECISIONS PACKET
+V STEERING REQUIRED
+AUTHORITY EPOCH
+HERMES LIVENESS REQUESTED
+READY FOR EXTERNAL REVIEW
+EXTERNAL REVIEW PASSED
+EXTERNAL REVIEW CHANGES REQUESTED
+REWORK ROUND
+```
+
+Include the latest `comments read through` cursor in every outgoing marker.
+
+## Stop conditions
+
+Post `CODEX BLOCKED` with the mapped status and stop when ownership or routing is
+contradictory; continuity is lost; a dependency is missing; forbidden files are
+required; architecture or product direction is required; an important operation
+lacks approval; secrets/private data are at risk; verification is impossible; or
+review independence cannot be established.
+
+## Non-negotiables
+
+- Use GPT-5.6 Sol.
+- Work only the assigned `[Codex]` ticket and file contract.
+- Do not create, split, or reroute tickets; list the board; or infer the mission graph.
+- Never mark Done or self-integrate.
+- Never push/merge without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
+- The reviewer never writes the fix; the worker never self-approves first-pass work.
+- Hermes's own evidence review remains mandatory after reviewer GREEN.
+- Follow every durable coding/review/rework handoff with verified same-terminal `/compact` before parking or review.
+codex/eval-05-harvest
+720303d (HEAD -> codex/eval-05-harvest) fix(evaluator): reconcile late settlements safely
+50b1a17 feat(evaluator): harvest terminal run artifacts
+
+## RED → GREEN evidence
+
+- RED tooling: the first focused test command failed because the worktree had no
+  installed `vitest`; `pnpm install --frozen-lockfile` restored the exact locked
+  workspace dependencies.
+- RED behavioral fixture 1: the PostgreSQL harvest test failed with
+  `root node structure is inconsistent`; the fixture was corrected to preserve
+  the graph's single-root law.
+- RED behavioral fixture 2: the child then failed `node_structure_shape`; its
+  required positive sibling ordinal/materialized path was corrected.
+- GREEN: the focused PostgreSQL test then passed and the full evaluator database
+  suite passed 20/20.
+
+## Verification
+
+- `pnpm exec vitest run tests/unit/evaluator-foundation.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-harvest.test.ts`
+  — 4 files, 28 tests passed.
+- `pnpm exec vitest run tests/integration/evaluator-database.test.ts`
+  — 1 file, 20 tests passed, including nullable-domain, evaluator exclusion,
+  worker metering, idempotency, Q59 separation, and FR-0.6 AC5 differential.
+- `pnpm lint` — architecture audit checked 27 edge rows with no violations;
+  source audit reported no blockers.
+- `pnpm generate:contract && pnpm typecheck` — passed.
+- `pnpm test` — full repository suite passed (exit 0).
+- `bash tests/render-templates.sh && bash tests/lint-templates.sh` from the outer
+  harness — passed.
+- `git diff --check` — passed.
+
+## Scope and safety
+
+- No provider call added.
+- No API key or secret added.
+- No `BOUND` state added.
+- No product dispatch, routing, gateway, settlement, or non-evaluator behavior
+  changed.
+- No board mutation and no push performed.
+- Mission comments cursor: not ticketed in this offline goal packet.
+
+READY FOR PEER REVIEW
+
+## Rework round 1
+
+Peer-review rework is implemented in local commit
+`720303d` (`fix(evaluator): reconcile late settlements safely`), on top of the
+original lane commit `50b1a17`. Nothing was pushed and no board state was
+mutated.
+
+### Blockers closed
+
+1. Late accepted settlements now cause the batch worker to revisit an already
+   harvested terminal run. Consensus node-strength and settlement observations
+   share `prowess.outcome.v1`; the settlement row sets
+   `supersedes_observation_id` to the matching append-only consensus row. The
+   pass remains idempotent and returns `SETTLEMENTS_RECONCILED` only when it
+   inserts new settlement evidence.
+2. Empty, unknown-key-only, and internally inconsistent observed usage now
+   produce typed `UNMETERED` `model_call_usage` rows. Reconciliation isolates
+   each pending row, and both worker entry points treat a whole metering failure
+   as non-blocking for harvest.
+3. The zero-provider-call gate now snapshots both `ledger.raw_artifact` count
+   and `ledger.ledger_entry` MODEL_CALL count. The test first injects provider
+   evidence and proves the assertion rejects, then proves real harvest leaves
+   both counts unchanged.
+4. Version-less referenced artifacts emit a SKIPPED
+   `MODEL_IDENTITY_INCOMPLETE:<raw_artifact_id>` pipeline receipt. STARTED is
+   committed before observation writes; a failed observation transaction emits
+   a separately committed FAILED/`TERMINAL_HARVEST_FAILED` receipt.
+
+### Reproduce-first evidence
+
+Before the fixes, the new embedded-PostgreSQL regressions demonstrated:
+
+- late re-harvest returned `ALREADY_HARVESTED` and projected no settlement;
+- a total-token mismatch threw `MODEL_CALL_USAGE_TOTAL_MISMATCH` before an
+  unrelated run could harvest;
+- a version-less source left no identity-incomplete receipt;
+- a forced observation-trigger failure rolled back all receipts.
+
+The provider-evidence sentinel was separately proven non-vacuous by deliberately
+inserting a raw artifact plus MODEL_CALL row and observing the assertion reject.
+After implementation, all five rework tests pass.
+
+### Quick non-blockers addressed
+
+- Terminal batch selection defaults to a 100-run cap.
+- Metering handles both the ledger-entry and raw-artifact uniqueness constraints
+  and cannot dereference a missing conflict fallback row.
+- The local-vLLM runtime-class assumption is documented at the classification
+  point.
+- Relative-cost first-write-per-window semantics are documented.
+
+Deferred for their owning/follow-on lanes: hardening evaluator exclusion beyond
+the mandatory attempt-id/call-site evidence; bounding the still-global metering
+scan; defining an unknown-identity cost bucket; register-governing harvest
+metric literals; reading `serve.answer` where a later consumer needs it; and a
+dedicated crash-simulation test of the observation natural key (the settlement
+reconciliation and existing receipt replay tests cover production idempotency).
+
+### Rework verification
+
+- Focused evaluator unit + embedded-PostgreSQL suites: 3 files / 30 tests passed.
+- `pnpm test`: full repository suite passed (exit 0).
+- `pnpm run lint`: 27 architecture edges, zero violations; source audit zero
+  blockers.
+- `pnpm run generate:contract && pnpm run typecheck`: passed.
+- Outer `bash tests/render-templates.sh && bash tests/lint-templates.sh`: passed.
+- `git diff --check`: passed.
+
+READY FOR PEER REVIEW
+
+The saved branch is correct and clean at 720303d; the external self-report already contains the four-blocker rework record. Running fresh verification now.
+  ✓ Verify branch, commit, worktree, and self-report state after client termination
+  → Run focused rework tests and repository typecheck
+  • Update self-report, commit any lane changes, and return at peer-review handoff
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts && pnpm run typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+ succeeded in 5519ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-x7kLXj/data ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-x7kLXj/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.879 EEST [46996] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.881 EEST [46996] LOG:  listening on IPv6 address "::1", port 65312
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.881 EEST [46996] LOG:  listening on IPv4 address "127.0.0.1", port 65312
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.881 EEST [46996] LOG:  listening on Unix socket "/tmp/.s.PGSQL.65312"
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.884 EEST [47002] LOG:  database system was shut down at 2026-08-15 13:12:20 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:20.886 EEST [46996] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:21.148 EEST [47007] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:21.157 EEST [47007] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation
+[S00 DB embedded] 2026-08-15 13:12:21.198 EEST [47007] ERROR:  append-only or immutable table observation rejects UPDATE
+2026-08-15 13:12:21.198 EEST [47007] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 13:12:21.198 EEST [47007] STATEMENT:  UPDATE evaluator.observation SET value=0.5 WHERE observation_id=$1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 13:12:21.259 EEST [47008] ERROR:  duplicate key value violates unique constraint "question_domain_run_id_key"
+2026-08-15 13:12:21.259 EEST [47008] DETAIL:  Key (run_id)=(4d4a5eb5-f3cc-41a4-9d51-9caf9a421fe9) already exists.
+2026-08-15 13:12:21.259 EEST [47008] STATEMENT:  
+	        INSERT INTO evaluator.question_domain (
+	          run_id, domain_id, assignment_basis, domain_admission_id,
+	          tagger_raw_artifact_ref, assigned_at, at_seq
+	        ) VALUES ($1,$2,$3,$4,$5,statement_timestamp(),$6)
+	        RETURNING question_domain_id
+	      
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 13:12:21.260 EEST [47008] ERROR:  append-only or immutable table question_domain rejects UPDATE
+2026-08-15 13:12:21.260 EEST [47008] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 13:12:21.260 EEST [47008] STATEMENT:  UPDATE evaluator.question_domain SET domain_id=domain_id WHERE run_id=$1
+
+
+ ✓ tests/integration/evaluator-database.test.ts > terminal evaluator harvest > harvests once with nullable domain, excludes evaluator attempts, meters in the worker, and leaves Q59 untouched 34ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > projects usage and versioned relative cost into both evaluator metering tables 3ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > creates every evaluator table under append-only mutation guards 2ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation 21ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > grants the API only evaluator reads plus consumer selection inserts 1ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > persists a typed REFUSED receipt for a blank proposal 4ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a direct existing-domain id selection 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a REFUSED receipt when SELECT_EXISTING names an unresolved domain id 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > tags through the evaluator landing without mutating memory.question_key 7ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > keeps a container-down ask untagged and reconciles it later 7ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records exact, rejected near-duplicate, and grown admission decisions 15ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only 23ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-jC4WvI/data ... ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > serializes concurrent near-duplicate proposals into one grown domain 25ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-jC4WvI/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.889 EEST [47023] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.891 EEST [47023] LOG:  listening on IPv6 address "::1", port 65318
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.891 EEST [47023] LOG:  listening on IPv4 address "127.0.0.1", port 65318
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.891 EEST [47023] LOG:  listening on Unix socket "/tmp/.s.PGSQL.65318"
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.894 EEST [47029] LOG:  database system was shut down at 2026-08-15 13:12:21 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:21.896 EEST [47023] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.170 EEST [47034] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.179 EEST [47034] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.207 EEST [47023] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.207 EEST [47023] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.208 EEST [47023] LOG:  background worker "logical replication launcher" (PID 47032) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.209 EEST [47027] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.209 EEST [47027] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.265 EEST [47027] LOG:  checkpoint complete: wrote 1337 buffers (8.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.021 s, total=0.056 s; sync files=767, longest=0.001 s, average=0.001 s; distance=9110 kB, estimate=9110 kB; lsn=0/206CCE0, redo lsn=0/206CCE0
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 13:12:22.269 EEST [47023] LOG:  database system is shut down
+
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission 1026ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > returns typed UNTAGGED when the persisted run cannot be resolved 1ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > tags and leaves an already-served answer readable at the product envelope ceiling 37ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > reconciles after an ask-time provider failure without exhausting the evaluator attempt tuple 12ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > does not fire product liveness when evaluator tags span model versions 12ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > keeps the asker-visible execution digest byte-identical with tagging off versus on 7ms
+ ✓ tests/integration/evaluator-database.test.ts > FR-0.6 AC5 persisted panel-isolation differential > persists byte-identical product membership and agent_count with evaluator healthy versus absent 55ms
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.453 EEST [46996] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.453 EEST [46996] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.454 EEST [46996] LOG:  background worker "logical replication launcher" (PID 47005) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.455 EEST [47000] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.455 EEST [47000] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.517 EEST [47000] LOG:  checkpoint complete: wrote 1486 buffers (9.1%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.039 s, sync=0.023 s, total=0.062 s; sync files=769, longest=0.001 s, average=0.001 s; distance=9310 kB, estimate=9310 kB; lsn=0/209E9E0, redo lsn=0/209E9E0
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 13:12:22.521 EEST [46996] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ECRock/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] running bootstrap script ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ECRock/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.452 EEST [47053] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.454 EEST [47053] LOG:  listening on IPv6 address "::1", port 65324
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.454 EEST [47053] LOG:  listening on IPv4 address "127.0.0.1", port 65324
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.455 EEST [47053] LOG:  listening on Unix socket "/tmp/.s.PGSQL.65324"
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.458 EEST [47059] LOG:  database system was shut down at 2026-08-15 13:12:23 EEST
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.460 EEST [47053] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.722 EEST [47064] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.735 EEST [47064] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > keeps STARTED and FAILED receipts durable when an observation write fails
+[S00 DB embedded] 2026-08-15 13:12:23.811 EEST [47064] ERROR:  PROG05_FORCED_OBSERVATION_FAILURE
+2026-08-15 13:12:23.811 EEST [47064] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_rework_test() line 2 at RAISE
+2026-08-15 13:12:23.811 EEST [47064] STATEMENT:  
+	            INSERT INTO evaluator.observation (
+	              run_id, provider, model_id, model_version, domain_id, step, metric,
+	              value, outcome_json, truth_basis, source_kind, source_ref,
+	              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+	              supersedes_observation_id, provenance_json, observed_at, at_seq
+	            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+	            ON CONFLICT DO NOTHING
+	          
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.814 EEST [47053] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.814 EEST [47053] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.815 EEST [47053] LOG:  background worker "logical replication launcher" (PID 47062) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.817 EEST [47057] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.817 EEST [47057] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > revisits an already-harvested run and supersedes consensus when settlement arrives later 32ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > records malformed observed usage as UNMETERED and still harvests an unrelated run 12ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > proves the zero-provider-call assertion detects injected evidence and passes for harvest 11ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > records MODEL_IDENTITY_INCOMPLETE for skipped source evidence 9ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > keeps STARTED and FAILED receipts durable when an observation write fails 13ms
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.872 EEST [47057] LOG:  checkpoint complete: wrote 1428 buffers (8.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.035 s, sync=0.020 s, total=0.056 s; sync files=766, longest=0.001 s, average=0.001 s; distance=9134 kB, estimate=9134 kB; lsn=0/2072AF8, redo lsn=0/2072AF8
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 13:12:23.876 EEST [47053] LOG:  database system is shut down
+
+
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > projects authoring, judging, and reviewing observations with nullable authoritative domain 1ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > excludes evaluator call sites by attempt id even when the artifact is null-run-scoped 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > uses question_domain input as authoritative instead of pipeline receipts 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > marks accepted external outcomes as settlement-fed without manufacturing Q59 rows 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > is byte-for-byte deterministic for the same snapshot 1ms
+
+ Test Files  3 passed (3)
+      Tests  30 passed (30)
+   Start at  13:12:19
+   Duration  4.43s (transform 235ms, setup 0ms, import 818ms, tests 3.38s, environment 0ms)
+
+$ tsc --noEmit
+
+codex
+Fresh verification is green: the focused evaluator suites passed 3 files / 30 tests, including all five rework regressions on embedded PostgreSQL, and repository `tsc --noEmit` passed. The lane worktree stayed clean, so there is no additional code commit to make; I’m appending this post-restart evidence to the required external self-report.
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..ebf21014826dd52649dc6996d4f5f437e3dcecce
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -93,6 +93,19 @@
+ 
+ READY FOR PEER REVIEW
+ 
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
++
+ ## Rework round 1
+ 
+ Peer-review rework is implemented in local commit
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..ebf21014826dd52649dc6996d4f5f437e3dcecce
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -93,6 +93,19 @@
+ 
+ READY FOR PEER REVIEW
+ 
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
++
+ ## Rework round 1
+ 
+ Peer-review rework is implemented in local commit
+
+exec
+/bin/zsh -lc "git status --short; git log -1 --format='%H %s'; grep -n \"Continuation verification\\|Rework round 1\\|READY FOR PEER REVIEW\" /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md; tail -n 35 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+ succeeded in 0ms:
+720303d7f8ef9d939d19dd06fa22016ebc4d9d92 fix(evaluator): reconcile late settlements safely
+94:READY FOR PEER REVIEW
+96:## Continuation verification after client restart
+107:READY FOR PEER REVIEW
+109:## Rework round 1
+177:READY FOR PEER REVIEW
+  unrelated run could harvest;
+- a version-less source left no identity-incomplete receipt;
+- a forced observation-trigger failure rolled back all receipts.
+
+The provider-evidence sentinel was separately proven non-vacuous by deliberately
+inserting a raw artifact plus MODEL_CALL row and observing the assertion reject.
+After implementation, all five rework tests pass.
+
+### Quick non-blockers addressed
+
+- Terminal batch selection defaults to a 100-run cap.
+- Metering handles both the ledger-entry and raw-artifact uniqueness constraints
+  and cannot dereference a missing conflict fallback row.
+- The local-vLLM runtime-class assumption is documented at the classification
+  point.
+- Relative-cost first-write-per-window semantics are documented.
+
+Deferred for their owning/follow-on lanes: hardening evaluator exclusion beyond
+the mandatory attempt-id/call-site evidence; bounding the still-global metering
+scan; defining an unknown-identity cost bucket; register-governing harvest
+metric literals; reading `serve.answer` where a later consumer needs it; and a
+dedicated crash-simulation test of the observation natural key (the settlement
+reconciliation and existing receipt replay tests cover production idempotency).
+
+### Rework verification
+
+- Focused evaluator unit + embedded-PostgreSQL suites: 3 files / 30 tests passed.
+- `pnpm test`: full repository suite passed (exit 0).
+- `pnpm run lint`: 27 architecture edges, zero violations; source audit zero
+  blockers.
+- `pnpm run generate:contract && pnpm run typecheck`: passed.
+- Outer `bash tests/render-templates.sh && bash tests/lint-templates.sh`: passed.
+- `git diff --check`: passed.
+
+READY FOR PEER REVIEW
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..ebf21014826dd52649dc6996d4f5f437e3dcecce
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -93,6 +93,19 @@
+ 
+ READY FOR PEER REVIEW
+ 
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
++
+ ## Rework round 1
+ 
+ Peer-review rework is implemented in local commit
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..0f46acbf3642aad3d17b74527703e73562f9b2ab
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -162,3 +162,16 @@
+ - `git diff --check`: passed.
+ 
+ READY FOR PEER REVIEW
++
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..0f46acbf3642aad3d17b74527703e73562f9b2ab
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -162,3 +162,16 @@
+ - `git diff --check`: passed.
+ 
+ READY FOR PEER REVIEW
++
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
+
+exec
+/bin/zsh -lc "git status --short; git diff --check; git log -1 --format='%H %s'; tail -n 24 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-05-harvest/DebateAI-V3
+ succeeded in 0ms:
+720303d7f8ef9d939d19dd06fa22016ebc4d9d92 fix(evaluator): reconcile late settlements safely
+### Rework verification
+
+- Focused evaluator unit + embedded-PostgreSQL suites: 3 files / 30 tests passed.
+- `pnpm test`: full repository suite passed (exit 0).
+- `pnpm run lint`: 27 architecture edges, zero violations; source audit zero
+  blockers.
+- `pnpm run generate:contract && pnpm run typecheck`: passed.
+- Outer `bash tests/render-templates.sh && bash tests/lint-templates.sh`: passed.
+- `git diff --check`: passed.
+
+READY FOR PEER REVIEW
+
+## Continuation verification after client restart
+
+The prior client termination left the lane safe and complete: branch
+`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
+No additional code or commit was required.
+
+- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
+  — 3 files / 30 tests passed, including all five four-blocker rework
+  regressions on embedded PostgreSQL.
+- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
+
+READY FOR PEER REVIEW
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..0f46acbf3642aad3d17b74527703e73562f9b2ab
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -162,3 +162,16 @@
+ - `git diff --check`: passed.
+ 
+ READY FOR PEER REVIEW
++
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
+
+Continuation audit complete: the lane is clean at 720303d, focused tests passed 30/30, repository typecheck passed, and the required external self-report now records the post-restart verification. No uncommitted lane changes existed, so no additional commit was needed.
+  ✓ Verify branch, commit, worktree, and self-report state after client termination
+  ✓ Run focused rework tests and repository typecheck
+  ✓ Update self-report, commit any lane changes, and return at peer-review handoff
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..0f46acbf3642aad3d17b74527703e73562f9b2ab
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -162,3 +162,16 @@
+ - `git diff --check`: passed.
+ 
+ READY FOR PEER REVIEW
++
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
+
+codex
+READY FOR PEER REVIEW: codex/eval-05-harvest
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+index 3c78ed23ca661497ca75c0dda6c8ede0cc8a0336..0f46acbf3642aad3d17b74527703e73562f9b2ab
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-05.md
+@@ -162,3 +162,16 @@
+ - `git diff --check`: passed.
+ 
+ READY FOR PEER REVIEW
++
++## Continuation verification after client restart
++
++The prior client termination left the lane safe and complete: branch
++`codex/eval-05-harvest` is clean at `720303d7f8ef9d939d19dd06fa22016ebc4d9d92`.
++No additional code or commit was required.
++
++- `pnpm exec vitest run tests/unit/evaluator-harvest.test.ts tests/integration/evaluator-harvest-rework.test.ts tests/integration/evaluator-database.test.ts`
++  — 3 files / 30 tests passed, including all five four-blocker rework
++  regressions on embedded PostgreSQL.
++- `pnpm run typecheck` — passed (`tsc --noEmit`, exit 0).
++
++READY FOR PEER REVIEW
+
+tokens used
+569,340
+READY FOR PEER REVIEW: codex/eval-05-harvest
+=== codex exited Sat Aug 15 13:13:10 EEST 2026 ===

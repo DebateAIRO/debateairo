@@ -1,0 +1,964 @@
+=== PROG-11 rework1 launch Sat Aug 15 19:24:33 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00622-8fcc-7441-bec4-064c0137cb79
+--------
+user
+/goal REWORK ROUND 1 of your eval-11-devmenu lane (same goal, same session, same worktree). Reviewer A returned REWORK (4 hygiene blockers — your behavior verified sound by both seats); reviewer B returned PASS naming the same top items as non-blocking. Read both: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-11-opus-review-1.md and PROG-11-opus2-review-1.md. B1: dev-menu.ts duplicates the canonical dispatch-binding resolver verbatim — import readEvaluatorDispatchBinding from the package instead (drift hazard on the exact dark-launch value the display must report truthfully). B2: replace the hardcoded pipeline_version=1 and >=3 literals with the shared HARVEST_PIPELINE_VERSION and HARVEST_MAX_CONSECUTIVE_FAILURES constants (export/move them so the worker and the display share one source of truth — the display must track the worker's actual exclusion rule). B3: the no-bind-control test is a four-phrase regex over one file — replace with the structural version reviewer A prescribed: route enumeration (assert the exact route set, no binding/dispatch routes) plus a jsdom render asserting the exact interactive-control set (reviewer B's DOM enumeration pattern: exactly the two Select buttons). B4: migration 0029 grants SELECT on shadow_decision to the api role with no reader — either drop the grant (and unpin the test) or add the legitimate status-view reader for shadow decisions (display-only); pick one and say why in the self-report. Reproduce-first where meaningful (the regex test's blindness: show a fake bind button passing the old test, failing the new). Run focused tests + differentials + darkness guard + typecheck, commit, update self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-11-devmenu
+=== codex exited Sat Aug 15 19:58:02 EEST 2026 ===
+=== PROG-11 rework1 continuation Sat Aug 15 19:58:05 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00622-8fcc-7441-bec4-064c0137cb79
+--------
+user
+/goal CONTINUATION of your eval-11-devmenu rework (same goal, same session). Your previous turn committed c88dce1 fix(evaluator): harden dev menu invariants, then hung idle; the client was terminated (known CLI hang — work is safe). Briefly state what you completed vs the four-item rework brief (shared resolver import, shared constants, structural no-bind test with the fake-button RED proof, 0029 grant decision), then finish anything remaining: run focused tests + darkness guard + typecheck and show results; commit anything uncommitted; update your self-report at /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md; then print exactly: READY FOR PEER REVIEW: codex/eval-11-devmenu
+codex
+I’m resuming the same `heartbeat-protocol` worker session after the client hang. The four-item rework is already implemented in `c88dce1`: canonical shared binding resolver, shared harvest constants plus one parked-run CTE, structural Fastify/DOM no-bind guards with the temporary fake-button PASS→RED proof, and removal of the unused 0029 `shadow_decision` grant on least-privilege grounds. I’ll now re-verify the current lane, append fresh evidence to the self-report, and commit only if the worktree contains genuine uncommitted changes.
+exec
+/bin/zsh -lc "sed -n '1,240p' .agents/skills/heartbeat-protocol/SKILL.md && git status --short && git branch --show-current && git rev-parse HEAD && tail -n 80 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+ succeeded in 0ms:
+---
+name: heartbeat-protocol
+description: Codex node contract for DebateAI-V3's comment-driven Kanban Heartbeat protocol and Graph Spine v2. Use when Codex is assigned implementation, rework, or independent peer review on a DebateAI-V3 ticket and must follow typed-state, authorization, worktree, evidence, review, and compaction rules.
+version: 3.1.0
+spine_version: 3.0.0
+---
+<!-- Provenance: mirror of .codex/skills/heartbeat-protocol/SKILL.md; edit the .codex file canonically and keep this copy synchronized. -->
+
+# Codex Heartbeat Protocol
+
+## Read order
+
+1. This `SKILL.md`.
+2. `docs/agent-protocols/debateai-heartbeat-protocol.md`.
+3. `docs/agent-protocols/codex-heartbeat-adapter.md`.
+4. The assigned Kanban ticket's typed state block, body, declared upstream artifacts, and every comment in chronological order.
+
+The repo currently has no root `AGENTS.md`. This is a recorded repository gap,
+not permission to invent its contents. If a root `AGENTS.md` is later added, read
+it before this contract and obey the normal instruction-precedence rules.
+
+The Graph Spine is normative. Treat typed ticket state as canonical and apply the
+latest applicable authorized Hermes/human comment for the current
+`authority_epoch`. Never route from status alone.
+
+## Role
+
+```text
+Codex GPT-5.6 Sol = sole implementation worker under the current model law
+Peer reviewer       = different read-only agent/session
+Claude-Router       = routing authority; dispatches from typed state, does no content work
+Hermes-Verifier     = evidence reviewer, board custodian, human-review router, Done/Blocked authority
+V                    = human product/acceptance and important-operation authority
+```
+
+Use one managed Codex CLI PTY per implementation ticket. A new ticket gets a new
+terminal. Rework resumes the original ticket/session. Coordinate subagents only
+inside the assigned contract, with non-overlapping files/hunks; the ticket worker
+still owns the handoff and continuity.
+
+## On launch or wakeup
+
+Before branch creation, subagents, edits, tests, or handoff:
+
+1. Read the sources in the stated order.
+2. Fetch only the assigned ticket and declared upstream artifacts; never list the board.
+3. Record `comments read through: <latest id/timestamp>`.
+4. Determine from typed state and comments whether the work is first pass, peer-review correction, Hermes rework, human rework, reviewer mode, or waiting.
+5. Confirm `[Codex]`, `owner.agent: codex`, original/rework owner, session ID, `authority_epoch`, `rework_round`, branch/worktree, dependencies, file contract, verification, and human gate.
+6. Continue this session's active `working` ticket before claiming anything new.
+7. Claim a `ready` ticket only under the latest applicable `HERMES AUTHORIZED NEXT`, or when named in a current `HERMES AUTHORIZED ROUTE` for the epoch.
+8. Post `WORKER CLAIM` before edits and set `owner.session` to this CLI session.
+9. Repeat the comment scan before every edit phase, heartbeat, review request, status transition, and handoff.
+
+Require fresh authorization after an `authority_epoch` change, a new risk signal,
+or an important operation. Do not infer authorization from an old route.
+
+## First-pass flow
+
+```text
+WORKER CLAIM
+→ RED → GREEN → REFACTOR
+→ exact focused checks
+→ READY FOR PEER REVIEW
+→ stop editing
+```
+
+Include in `READY FOR PEER REVIEW`: CLI session ID; ticket; branch/worktree and
+commit if any; changed files; RED/GREEN evidence; exact checks and outputs;
+allowed-file evidence; risks; and the latest comment cursor.
+
+The first-pass worker does not post `READY FOR HERMES REVIEW`. A separate
+read-only reviewer evaluates the work. On reviewer RED, the same worker fixes the
+findings and requests peer re-review. On reviewer GREEN, the reviewer posts
+`PEER REVIEW APPROVED` and `READY FOR HERMES REVIEW`. Hermes then performs its
+own non-delegable review; reviewer GREEN never substitutes for Hermes review.
+
+## Post-dialogue checkpoint compaction
+
+After every durable Codex coding, review, or correction handoff, and after any
+substantive Hermes↔Codex dialogue, leave the same PTY open and idle. Hermes first
+verifies that artifacts/diffs, checks, comments, decisions, unresolved findings,
+and the next gate are durable, then sends exactly:
+
+```text
+/compact
+```
+
+Do not add preservation arguments unless the installed Codex version documents
+them. Hermes waits for completion and prompt return, then records
+`CODEX COMPACTION CHECKPOINT` before parking the terminal or proceeding:
+
+```text
+READY FOR PEER REVIEW → compact worker PTY → peer review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+If substantive dialogue follows a checkpoint, compact again at the next stable
+handoff. Never compact while work, tests, or generation are in flight. Do not exit
+merely because the conversation became chatty.
+
+## Peer-review correction flow
+
+When a reviewer posts `PEER REVIEW CHANGES REQUESTED`:
+
+1. Resume the same worker/session and read all new comments.
+2. Acknowledge and address every finding; preserve unresolved earlier findings unless explicitly superseded.
+3. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
+4. Post `READY FOR PEER REVIEW` again and stop editing.
+
+The reviewer never writes the fix.
+
+## Hermes/human correction flow
+
+When the ticket returns with `HERMES CHANGES REQUESTED` or
+`HUMAN REVIEW CHANGES REQUESTED`:
+
+1. Resume the exact original Codex session.
+2. Read every comment after the prior handoff, including supersessions.
+3. Post `REWORK ACKNOWLEDGED`, naming the triggering comment and each finding.
+4. Reproduce RED where applicable, make the smallest GREEN fix, and run focused verification.
+5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes, addressing findings one by one.
+6. Request peer re-review only when Hermes explicitly says `peer re-review required: yes`.
+7. Repeat in the same session if the ticket returns again.
+
+If the original session is unavailable, post `CODEX BLOCKED` with blocker type
+`session_continuity`. Do not create a replacement without
+`WORKER CONTINUITY OVERRIDE`.
+
+## Reviewer mode
+
+Enter reviewer mode only when explicitly assigned in a separate read-only
+session:
+
+- Read the full ticket, typed state, all comments, upstream artifacts, and `READY FOR PEER REVIEW` evidence.
+- Verify worker/session identity, inspect the diff, and independently run justified checks.
+- Never edit reviewed files or review work authored by this same CLI session.
+- Post `PEER REVIEW CHANGES REQUESTED` on RED.
+- Post `PEER REVIEW APPROVED`, then `READY FOR HERMES REVIEW`, on GREEN.
+
+## State reads and writes
+
+```text
+reads:        { contract, status, rework_round, authority_epoch, worktree, comments_read_through }
+writes:       { status, worktree, evidence refs, comments_read_through, wakes_since_transition }
+claim-only:   { owner.session = this CLI session }
+never writes: { risk_tier, authority_epoch, owner.agent }
+```
+
+Move `status` only among worker-legal values. A `CODEX BLOCKED` marker requests
+the mapped `waiting_*`, `changes_requested`, or `failed_tooling` transition from
+the spine; ticket status is never a bare `blocked`.
+
+## Worktree and file contract
+
+- Use only the ticket-declared branch/worktree and allowed files.
+- Create or mutate a worktree lane only after the current epoch's approved H6 lane-plan row.
+- Keep one writer per file/hunk; parallel lanes must not overlap.
+- Honor the spine's heavy-work semaphore; serialize heavy builds/tests when capacity is uncertain.
+- Treat commit, push, merge, release, branch/worktree operations, destructive Git, and destructive filesystem operations as V-gated important operations.
+- Never cross into another ticket's files without an authorized route and updated contract.
+
+## Required markers
+
+Recognize the full marker union in the Graph Spine and adapter, including:
+
+```text
+WORKER CLAIM
+CODEX HEARTBEAT
+CODEX BLOCKED
+CODEX COMPACTION CHECKPOINT
+COMPACTION BLOCKED
+READY FOR PEER REVIEW
+PEER REVIEW CHANGES REQUESTED
+PEER REVIEW APPROVED
+READY FOR HERMES REVIEW
+HERMES CHANGES REQUESTED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
+READY FOR HUMAN REVIEW
+HUMAN REVIEW PASSED
+HUMAN REVIEW CHANGES REQUESTED
+REWORK ACKNOWLEDGED
+REWORK READY FOR HERMES REVIEW
+WORKER CONTINUITY OVERRIDE
+HERMES DONE
+HERMES BLOCKED
+V DECISIONS PACKET
+V STEERING REQUIRED
+AUTHORITY EPOCH
+HERMES LIVENESS REQUESTED
+READY FOR EXTERNAL REVIEW
+EXTERNAL REVIEW PASSED
+EXTERNAL REVIEW CHANGES REQUESTED
+REWORK ROUND
+```
+
+Include the latest `comments read through` cursor in every outgoing marker.
+
+## Stop conditions
+
+Post `CODEX BLOCKED` with the mapped status and stop when ownership or routing is
+contradictory; continuity is lost; a dependency is missing; forbidden files are
+required; architecture or product direction is required; an important operation
+lacks approval; secrets/private data are at risk; verification is impossible; or
+review independence cannot be established.
+
+## Non-negotiables
+
+- Use GPT-5.6 Sol.
+- Work only the assigned `[Codex]` ticket and file contract.
+- Do not create, split, or reroute tickets; list the board; or infer the mission graph.
+- Never mark Done or self-integrate.
+- Never push/merge without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
+- The reviewer never writes the fix; the worker never self-approves first-pass work.
+- Hermes's own evidence review remains mandatory after reviewer GREEN.
+- Follow every durable coding/review/rework handoff with verified same-terminal `/compact` before parking or review.
+codex/eval-11-devmenu
+c88dce14d4929818b46d9472caf7e7ebce330c8c
+   regex test passed all 3 tests despite that control. With the same temporary
+   button present, the new jsdom enumeration failed exactly as intended:
+   expected `[BUTTON:Select, BUTTON:Select]`, received
+   `[BUTTON:Activate, BUTTON:Select, BUTTON:Select]`. The temporary button was
+   then removed. The committed tests enumerate the exact Fastify dev-evaluator
+   route subtree (`GET/HEAD /v1/dev/evaluator` and
+   `POST /v1/dev/evaluator/consumer-selection`, with no binding/dispatch route)
+   and the exact rendered interactive-control set (the two `Select` buttons).
+   The old lexical absence assertion was removed.
+4. **B4 resolved by dropping the grant.** Migration 0029 no longer grants
+   `SELECT` on `evaluator.shadow_decision`, and the integration test now asserts
+   that permission is absent. This is the least-privilege choice because the
+   ticket requires the existing register-backed dark-launch status projection,
+   not a shadow-decision listing; adding an otherwise unrequested reader solely
+   to justify a privilege would expand the prototype without product value.
+
+### Rework verification
+
+```text
+pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
+  tests/unit/evaluator-dev-menu-api.test.ts \
+  tests/unit/evaluator-dev-menu-ui.test.ts \
+  tests/integration/evaluator-dev-menu-database.test.ts \
+  tests/unit/evaluator-foundation.test.ts --reporter=verbose
+Test Files 5 passed (5)
+Tests      22 passed (22)
+
+pnpm exec vitest run tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-seat-share-database.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot
+Test Files 3 passed (3)
+Tests      22 passed (22)
+
+pnpm exec vitest run --reporter=dot
+Test Files 104 passed (104)
+Tests      730 passed (730)
+
+pnpm run typecheck
+PASS
+
+pnpm --filter dialectical-engine-v2ui typecheck
+PASS
+
+pnpm --filter dialectical-engine-v2ui test
+tests 27; pass 27; fail 0
+
+pnpm run audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm run audit:source
+blocking: []
+
+pnpm run audit:text-bytes
+REPOSITORY_TEXT_CONTROL_BYTES=0
+
+pnpm run audit:orphans
+PASS (no new blocking entry)
+
+bash tests/render-templates.sh
+PASS
+
+bash tests/lint-templates.sh
+PASS
+
+git diff --check
+PASS
+```
+
+The focused real-PostgreSQL test verifies the parked-run projection after the
+single-CTE refactor and verifies that the API role does not receive
+`shadow_decision SELECT`. The differential run includes byte-identical product
+membership/agent-count behavior, narrow evaluator grants, the UNBOUND
+seat-share receipt, and zero selector/allocator/shadow-dispatch production call
+sites.
+
+Comments read through: reviewer A and reviewer B review 1 through EOF on
+2026-08-15. All four round-1 findings are resolved; no earlier finding remains
+open.
+
+READY FOR PEER REVIEW: codex/eval-11-devmenu
+
+codex
+The lane is clean at `c88dce1`, so there is nothing uncommitted to commit. I’m re-running the exact focused suite first; this includes real PostgreSQL, canonical binding behavior, exact route enumeration, and exact rendered control enumeration.
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx tests/unit/evaluator-dev-menu-api.test.ts tests/unit/evaluator-dev-menu-ui.test.ts tests/integration/evaluator-dev-menu-database.test.ts tests/unit/evaluator-foundation.test.ts --reporter=verbose' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+ succeeded in 3001ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded]   LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-TuTmAo/data ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-TuTmAo/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.137 EEST [51052] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.139 EEST [51052] LOG:  listening on IPv6 address "::1", port 59933
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.139 EEST [51052] LOG:  listening on IPv4 address "127.0.0.1", port 59933
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.140 EEST [51052] LOG:  listening on Unix socket "/tmp/.s.PGSQL.59933"
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.143 EEST [51058] LOG:  database system was shut down at 2026-08-15 19:58:32 EEST
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.145 EEST [51052] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.403 EEST [51063] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.424 EEST [51063] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.466 EEST [51052] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.466 EEST [51052] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.468 EEST [51052] LOG:  background worker "logical replication launcher" (PID 51061) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.468 EEST [51056] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.468 EEST [51056] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.530 EEST [51056] LOG:  checkpoint complete: wrote 1400 buffers (8.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.041 s, sync=0.020 s, total=0.062 s; sync files=775, longest=0.001 s, average=0.001 s; distance=9216 kB, estimate=9216 kB; lsn=0/2087370, redo lsn=0/2087370
+
+
+stdout | tests/integration/evaluator-dev-menu-database.test.ts
+[S00 DB embedded] 2026-08-15 19:58:32.534 EEST [51052] LOG:  database system is shut down
+
+
+ ✓ tests/integration/evaluator-dev-menu-database.test.ts > evaluator dev-menu projections > shows real catalog, grown/starter provenance, harvested rows, profile ranks, parked receipts, and UNBOUND state 23ms
+ ✓ tests/integration/evaluator-dev-menu-database.test.ts > evaluator dev-menu projections > persists only a model from the latest successful catalog probe with a pinned selection clock 5ms
+ ✓ tests/integration/evaluator-dev-menu-database.test.ts > evaluator dev-menu projections > returns an explicit unavailable catalog and refuses stale selection when the container is down 3ms
+ ✓ tests/integration/evaluator-dev-menu-database.test.ts > evaluator dev-menu projections > grants the dev-menu API role only the evaluator read surfaces and selection write 2ms
+ ✓ tests/unit/evaluator-dev-menu-api.test.ts > dev-only evaluator API > refuses to enable the surface in a production composition 3ms
+ ✓ tests/unit/evaluator-dev-menu-api.test.ts > dev-only evaluator API > does not register the surface in a normal API composition 42ms
+ ✓ tests/unit/evaluator-dev-menu-api.test.ts > dev-only evaluator API > registers exactly the read and consumer-selection routes under the dev evaluator surface 3ms
+ ✓ tests/unit/evaluator-dev-menu-api.test.ts > dev-only evaluator API > authenticates the gated read and maps the sole write to the resolved developer identity 6ms
+ ✓ tests/render/evaluator-dev-menu-controls.test.tsx > evaluator dev-menu controls > renders exactly the two catalog selection controls 26ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > normalizes observed external spend without treating larger local token volume as paid cost 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > keeps paid spend UNKNOWN when any metered call lacks observed cost 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > scaffolds the evaluator worker as a separate composition root 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > reads the pinned purpose-specific local family and refuses panel collisions 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > rejects remote evaluator endpoints 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > defaults dispatch influence to UNBOUND when the row is absent or malformed 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > enumerates vLLM models without authorization and fails closed on absence 15ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > classifies evaluator catalog deadline expiry 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > refuses an isolated-family collision before catalog collection or persistence 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > constructs an allowlist-only blind DTO 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > bounds blind sample excerpts by UTF-8 bytes without splitting characters 1ms
+ ✓ tests/unit/evaluator-dev-menu-ui.test.ts > V3 evaluator dev menu > is omitted from the normal settings and ask flow unless the explicit dev gate is enabled 1ms
+ ✓ tests/unit/evaluator-dev-menu-ui.test.ts > V3 evaluator dev menu > shows the catalog unavailable state, domains, harvested rows, profiles, and parked receipts 0ms
+
+ Test Files  5 passed (5)
+      Tests  22 passed (22)
+   Start at  19:58:31
+   Duration  2.63s (transform 228ms, setup 0ms, import 710ms, tests 1.16s, environment 367ms)
+
+
+codex
+Fresh focused verification is green: 5 files / 22 tests, including the real-database projection/grant checks and both structural no-bind guards. I’m running the darkness guard and both repository/UI typechecks now.
+exec
+/bin/zsh -lc 'pnpm run typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+exec
+/bin/zsh -lc 'pnpm --filter dialectical-engine-v2ui typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+ succeeded in 576ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+
+ ✓ tests/architecture/evaluator-selector-unbound.test.ts > evaluator selectors dark launch > has zero callers in every workspace source root while evaluator dispatch is UNBOUND 28ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:58:43
+   Duration  174ms (transform 12ms, setup 0ms, import 24ms, tests 29ms, environment 0ms)
+
+
+ succeeded in 721ms:
+$ tsc --noEmit
+
+ succeeded in 1048ms:
+$ tsc --noEmit -p tsconfig.json
+
+codex
+All requested reruns are green: focused 22/22, darkness guard 1/1 with zero production callers, repository typecheck exit 0, and v2-ui typecheck exit 0. The lane is still clean at `c88dce1`; I’m appending this continuation evidence to the external self-report, with no additional commit needed.
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+index 6d8a651e9521639f1b6f81a0dc1b8e1b86695d89..c8177730d331b2022749d10a37c4ded26c08ce65
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+@@ -149,6 +149,56 @@
+ 
+ READY FOR PEER REVIEW: codex/eval-11-devmenu
+ 
++## Continuation after client termination
++
++The original worker/session resumed after the known CLI hang. The designated
++worktree was clean on `codex/eval-11-devmenu` at
++`c88dce14d4929818b46d9472caf7e7ebce330c8c`; the committed rework was intact,
++so there was no uncommitted implementation change to commit.
++
++The four-item rework remains complete:
++
++1. The dev menu consumes the package's canonical
++   `readEvaluatorDispatchBinding` from the shared dispatch-binding module.
++2. The worker and display consume shared `HARVEST_PIPELINE_VERSION` and
++   `HARVEST_MAX_CONSECUTIVE_FAILURES`; the display predicate exists once in a
++   single CTE.
++3. The lexical no-bind assertion was replaced by exact Fastify route-tree and
++   jsdom interactive-control enumeration. The earlier durable RED proof remains:
++   a temporary `Activate` button passed the old regex, then failed the new DOM
++   test with three controls instead of exactly two `Select` buttons.
++4. Migration 0029 does not grant `shadow_decision SELECT`; the integration test
++   asserts its absence. Least privilege was chosen because no legitimate reader
++   exists in this display.
++
++Fresh continuation verification on 2026-08-15:
++
++```text
++pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
++  tests/unit/evaluator-dev-menu-api.test.ts \
++  tests/unit/evaluator-dev-menu-ui.test.ts \
++  tests/integration/evaluator-dev-menu-database.test.ts \
++  tests/unit/evaluator-foundation.test.ts --reporter=verbose
++Test Files 5 passed (5)
++Tests      22 passed (22)
++
++pnpm exec vitest run \
++  tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose
++Test Files 1 passed (1)
++Tests      1 passed (1)
++
++pnpm run typecheck
++PASS (exit 0)
++
++pnpm --filter dialectical-engine-v2ui typecheck
++PASS (exit 0)
++```
++
++Comments read through: the continuation request and both round-1 reviewer
++artifacts through EOF on 2026-08-15. No rework finding remains open.
++
++READY FOR PEER REVIEW: codex/eval-11-devmenu
++
+ ## Rework round 1 acknowledgement
+ 
+ REWORK ACKNOWLEDGED: reviewer A review 1 at
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+index 6d8a651e9521639f1b6f81a0dc1b8e1b86695d89..c8177730d331b2022749d10a37c4ded26c08ce65
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+@@ -149,6 +149,56 @@
+ 
+ READY FOR PEER REVIEW: codex/eval-11-devmenu
+ 
++## Continuation after client termination
++
++The original worker/session resumed after the known CLI hang. The designated
++worktree was clean on `codex/eval-11-devmenu` at
++`c88dce14d4929818b46d9472caf7e7ebce330c8c`; the committed rework was intact,
++so there was no uncommitted implementation change to commit.
++
++The four-item rework remains complete:
++
++1. The dev menu consumes the package's canonical
++   `readEvaluatorDispatchBinding` from the shared dispatch-binding module.
++2. The worker and display consume shared `HARVEST_PIPELINE_VERSION` and
++   `HARVEST_MAX_CONSECUTIVE_FAILURES`; the display predicate exists once in a
++   single CTE.
++3. The lexical no-bind assertion was replaced by exact Fastify route-tree and
++   jsdom interactive-control enumeration. The earlier durable RED proof remains:
++   a temporary `Activate` button passed the old regex, then failed the new DOM
++   test with three controls instead of exactly two `Select` buttons.
++4. Migration 0029 does not grant `shadow_decision SELECT`; the integration test
++   asserts its absence. Least privilege was chosen because no legitimate reader
++   exists in this display.
++
++Fresh continuation verification on 2026-08-15:
++
++```text
++pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
++  tests/unit/evaluator-dev-menu-api.test.ts \
++  tests/unit/evaluator-dev-menu-ui.test.ts \
++  tests/integration/evaluator-dev-menu-database.test.ts \
++  tests/unit/evaluator-foundation.test.ts --reporter=verbose
++Test Files 5 passed (5)
++Tests      22 passed (22)
++
++pnpm exec vitest run \
++  tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose
++Test Files 1 passed (1)
++Tests      1 passed (1)
++
++pnpm run typecheck
++PASS (exit 0)
++
++pnpm --filter dialectical-engine-v2ui typecheck
++PASS (exit 0)
++```
++
++Comments read through: the continuation request and both round-1 reviewer
++artifacts through EOF on 2026-08-15. No rework finding remains open.
++
++READY FOR PEER REVIEW: codex/eval-11-devmenu
++
+ ## Rework round 1 acknowledgement
+ 
+ REWORK ACKNOWLEDGED: reviewer A review 1 at
+
+exec
+/bin/zsh -lc 'git status --short && git branch --show-current && git rev-parse HEAD && tail -n 90 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+ succeeded in 0ms:
+codex/eval-11-devmenu
+c88dce14d4929818b46d9472caf7e7ebce330c8c
+   and are consumed directly by `dev-menu.ts`. The duplicate resolver and
+   literal row key were removed.
+2. **B2 resolved.** `HARVEST_PIPELINE_VERSION` and
+   `HARVEST_MAX_CONSECUTIVE_FAILURES` now live in
+   `packages/evaluator/src/harvest-constants.ts`. The evaluator package exports
+   both; the worker consumes and re-exports the shared threshold, while the dev
+   menu binds both values as SQL parameters. The duplicated parked/receipt SQL
+   became one CTE and therefore contains the exclusion predicate once.
+3. **B3 resolved with reproduction.** A temporary `Activate` button was added
+   solely to demonstrate the old test's blind spot. The unchanged four-phrase
+   regex test passed all 3 tests despite that control. With the same temporary
+   button present, the new jsdom enumeration failed exactly as intended:
+   expected `[BUTTON:Select, BUTTON:Select]`, received
+   `[BUTTON:Activate, BUTTON:Select, BUTTON:Select]`. The temporary button was
+   then removed. The committed tests enumerate the exact Fastify dev-evaluator
+   route subtree (`GET/HEAD /v1/dev/evaluator` and
+   `POST /v1/dev/evaluator/consumer-selection`, with no binding/dispatch route)
+   and the exact rendered interactive-control set (the two `Select` buttons).
+   The old lexical absence assertion was removed.
+4. **B4 resolved by dropping the grant.** Migration 0029 no longer grants
+   `SELECT` on `evaluator.shadow_decision`, and the integration test now asserts
+   that permission is absent. This is the least-privilege choice because the
+   ticket requires the existing register-backed dark-launch status projection,
+   not a shadow-decision listing; adding an otherwise unrequested reader solely
+   to justify a privilege would expand the prototype without product value.
+
+### Rework verification
+
+```text
+pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
+  tests/unit/evaluator-dev-menu-api.test.ts \
+  tests/unit/evaluator-dev-menu-ui.test.ts \
+  tests/integration/evaluator-dev-menu-database.test.ts \
+  tests/unit/evaluator-foundation.test.ts --reporter=verbose
+Test Files 5 passed (5)
+Tests      22 passed (22)
+
+pnpm exec vitest run tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-seat-share-database.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot
+Test Files 3 passed (3)
+Tests      22 passed (22)
+
+pnpm exec vitest run --reporter=dot
+Test Files 104 passed (104)
+Tests      730 passed (730)
+
+pnpm run typecheck
+PASS
+
+pnpm --filter dialectical-engine-v2ui typecheck
+PASS
+
+pnpm --filter dialectical-engine-v2ui test
+tests 27; pass 27; fail 0
+
+pnpm run audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm run audit:source
+blocking: []
+
+pnpm run audit:text-bytes
+REPOSITORY_TEXT_CONTROL_BYTES=0
+
+pnpm run audit:orphans
+PASS (no new blocking entry)
+
+bash tests/render-templates.sh
+PASS
+
+bash tests/lint-templates.sh
+PASS
+
+git diff --check
+PASS
+```
+
+The focused real-PostgreSQL test verifies the parked-run projection after the
+single-CTE refactor and verifies that the API role does not receive
+`shadow_decision SELECT`. The differential run includes byte-identical product
+membership/agent-count behavior, narrow evaluator grants, the UNBOUND
+seat-share receipt, and zero selector/allocator/shadow-dispatch production call
+sites.
+
+Comments read through: reviewer A and reviewer B review 1 through EOF on
+2026-08-15. All four round-1 findings are resolved; no earlier finding remains
+open.
+
+READY FOR PEER REVIEW: codex/eval-11-devmenu
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+index 6d8a651e9521639f1b6f81a0dc1b8e1b86695d89..c8177730d331b2022749d10a37c4ded26c08ce65
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+@@ -149,6 +149,56 @@
+ 
+ READY FOR PEER REVIEW: codex/eval-11-devmenu
+ 
++## Continuation after client termination
++
++The original worker/session resumed after the known CLI hang. The designated
++worktree was clean on `codex/eval-11-devmenu` at
++`c88dce14d4929818b46d9472caf7e7ebce330c8c`; the committed rework was intact,
++so there was no uncommitted implementation change to commit.
++
++The four-item rework remains complete:
++
++1. The dev menu consumes the package's canonical
++   `readEvaluatorDispatchBinding` from the shared dispatch-binding module.
++2. The worker and display consume shared `HARVEST_PIPELINE_VERSION` and
++   `HARVEST_MAX_CONSECUTIVE_FAILURES`; the display predicate exists once in a
++   single CTE.
++3. The lexical no-bind assertion was replaced by exact Fastify route-tree and
++   jsdom interactive-control enumeration. The earlier durable RED proof remains:
++   a temporary `Activate` button passed the old regex, then failed the new DOM
++   test with three controls instead of exactly two `Select` buttons.
++4. Migration 0029 does not grant `shadow_decision SELECT`; the integration test
++   asserts its absence. Least privilege was chosen because no legitimate reader
++   exists in this display.
++
++Fresh continuation verification on 2026-08-15:
++
++```text
++pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
++  tests/unit/evaluator-dev-menu-api.test.ts \
++  tests/unit/evaluator-dev-menu-ui.test.ts \
++  tests/integration/evaluator-dev-menu-database.test.ts \
++  tests/unit/evaluator-foundation.test.ts --reporter=verbose
++Test Files 5 passed (5)
++Tests      22 passed (22)
++
++pnpm exec vitest run \
++  tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose
++Test Files 1 passed (1)
++Tests      1 passed (1)
++
++pnpm run typecheck
++PASS (exit 0)
++
++pnpm --filter dialectical-engine-v2ui typecheck
++PASS (exit 0)
++```
++
++Comments read through: the continuation request and both round-1 reviewer
++artifacts through EOF on 2026-08-15. No rework finding remains open.
++
++READY FOR PEER REVIEW: codex/eval-11-devmenu
++
+ ## Rework round 1 acknowledgement
+ 
+ REWORK ACKNOWLEDGED: reviewer A review 1 at
+
+exec
+/bin/zsh -lc "grep -n \"Continuation after client termination\\|Rework round 1 acknowledgement\\|Rework round 1 completion\\|READY FOR PEER REVIEW\" /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-11-devmenu/DebateAI-V3
+ succeeded in 0ms:
+1:# READY FOR PEER REVIEW — PROG-11 evaluator dev menu
+150:READY FOR PEER REVIEW: codex/eval-11-devmenu
+152:## Continuation after client termination
+200:READY FOR PEER REVIEW: codex/eval-11-devmenu
+202:## Rework round 1 acknowledgement
+227:## Rework round 1 completion
+327:READY FOR PEER REVIEW: codex/eval-11-devmenu
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+index 6d8a651e9521639f1b6f81a0dc1b8e1b86695d89..c8177730d331b2022749d10a37c4ded26c08ce65
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+@@ -149,6 +149,56 @@
+ 
+ READY FOR PEER REVIEW: codex/eval-11-devmenu
+ 
++## Continuation after client termination
++
++The original worker/session resumed after the known CLI hang. The designated
++worktree was clean on `codex/eval-11-devmenu` at
++`c88dce14d4929818b46d9472caf7e7ebce330c8c`; the committed rework was intact,
++so there was no uncommitted implementation change to commit.
++
++The four-item rework remains complete:
++
++1. The dev menu consumes the package's canonical
++   `readEvaluatorDispatchBinding` from the shared dispatch-binding module.
++2. The worker and display consume shared `HARVEST_PIPELINE_VERSION` and
++   `HARVEST_MAX_CONSECUTIVE_FAILURES`; the display predicate exists once in a
++   single CTE.
++3. The lexical no-bind assertion was replaced by exact Fastify route-tree and
++   jsdom interactive-control enumeration. The earlier durable RED proof remains:
++   a temporary `Activate` button passed the old regex, then failed the new DOM
++   test with three controls instead of exactly two `Select` buttons.
++4. Migration 0029 does not grant `shadow_decision SELECT`; the integration test
++   asserts its absence. Least privilege was chosen because no legitimate reader
++   exists in this display.
++
++Fresh continuation verification on 2026-08-15:
++
++```text
++pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
++  tests/unit/evaluator-dev-menu-api.test.ts \
++  tests/unit/evaluator-dev-menu-ui.test.ts \
++  tests/integration/evaluator-dev-menu-database.test.ts \
++  tests/unit/evaluator-foundation.test.ts --reporter=verbose
++Test Files 5 passed (5)
++Tests      22 passed (22)
++
++pnpm exec vitest run \
++  tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose
++Test Files 1 passed (1)
++Tests      1 passed (1)
++
++pnpm run typecheck
++PASS (exit 0)
++
++pnpm --filter dialectical-engine-v2ui typecheck
++PASS (exit 0)
++```
++
++Comments read through: the continuation request and both round-1 reviewer
++artifacts through EOF on 2026-08-15. No rework finding remains open.
++
++READY FOR PEER REVIEW: codex/eval-11-devmenu
++
+ ## Rework round 1 acknowledgement
+ 
+ REWORK ACKNOWLEDGED: reviewer A review 1 at
+
+codex
+READY FOR PEER REVIEW: codex/eval-11-devmenu
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+index 6d8a651e9521639f1b6f81a0dc1b8e1b86695d89..c8177730d331b2022749d10a37c4ded26c08ce65
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-11.md
+@@ -149,6 +149,56 @@
+ 
+ READY FOR PEER REVIEW: codex/eval-11-devmenu
+ 
++## Continuation after client termination
++
++The original worker/session resumed after the known CLI hang. The designated
++worktree was clean on `codex/eval-11-devmenu` at
++`c88dce14d4929818b46d9472caf7e7ebce330c8c`; the committed rework was intact,
++so there was no uncommitted implementation change to commit.
++
++The four-item rework remains complete:
++
++1. The dev menu consumes the package's canonical
++   `readEvaluatorDispatchBinding` from the shared dispatch-binding module.
++2. The worker and display consume shared `HARVEST_PIPELINE_VERSION` and
++   `HARVEST_MAX_CONSECUTIVE_FAILURES`; the display predicate exists once in a
++   single CTE.
++3. The lexical no-bind assertion was replaced by exact Fastify route-tree and
++   jsdom interactive-control enumeration. The earlier durable RED proof remains:
++   a temporary `Activate` button passed the old regex, then failed the new DOM
++   test with three controls instead of exactly two `Select` buttons.
++4. Migration 0029 does not grant `shadow_decision SELECT`; the integration test
++   asserts its absence. Least privilege was chosen because no legitimate reader
++   exists in this display.
++
++Fresh continuation verification on 2026-08-15:
++
++```text
++pnpm exec vitest run tests/render/evaluator-dev-menu-controls.test.tsx \
++  tests/unit/evaluator-dev-menu-api.test.ts \
++  tests/unit/evaluator-dev-menu-ui.test.ts \
++  tests/integration/evaluator-dev-menu-database.test.ts \
++  tests/unit/evaluator-foundation.test.ts --reporter=verbose
++Test Files 5 passed (5)
++Tests      22 passed (22)
++
++pnpm exec vitest run \
++  tests/architecture/evaluator-selector-unbound.test.ts --reporter=verbose
++Test Files 1 passed (1)
++Tests      1 passed (1)
++
++pnpm run typecheck
++PASS (exit 0)
++
++pnpm --filter dialectical-engine-v2ui typecheck
++PASS (exit 0)
++```
++
++Comments read through: the continuation request and both round-1 reviewer
++artifacts through EOF on 2026-08-15. No rework finding remains open.
++
++READY FOR PEER REVIEW: codex/eval-11-devmenu
++
+ ## Rework round 1 acknowledgement
+ 
+ REWORK ACKNOWLEDGED: reviewer A review 1 at
+
+tokens used
+573,721
+READY FOR PEER REVIEW: codex/eval-11-devmenu
+=== codex exited Sat Aug 15 19:59:30 EEST 2026 ===

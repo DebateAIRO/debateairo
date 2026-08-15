@@ -292,7 +292,7 @@ export interface RunLoadingProjection {
 }
 
 export interface RunLifecycleEventValue {
-  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "EXPANSION_HALTED";
+  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED";
   readonly call_site_key: string;
   readonly parent_node_ref: string | null;
   readonly hold_ms: number;

@@ -15,6 +15,17 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
     provenance_ref: `prov:${source}`,
     replay_handle: `replay:${source}`
   });
+  const review = (outcome: "agree" | "dispute", reviewer: string) => ({
+    outcome,
+    reasons: [`${reviewer} recorded a cross-maker test-layer review.`],
+    provenance_ref: `artifact:review:${reviewer}`,
+    reviewer_lineage: {
+      maker: reviewer,
+      model_id: `model:${reviewer}`,
+      transport: "openai-compatible-http",
+      provider_ref: `provider:${reviewer}`
+    }
+  });
   return AnswerSchema.parse({
     answer_id: "answer:fair-test",
     answer_version: 1,
@@ -47,7 +58,7 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
           transport: "openai-compatible-http",
           provider_ref: "provider:openai"
         },
-        review: null,
+        review: review("agree", "Reviewer-B"),
         locator: null,
         stranger_restatement: { check_status: "PASS" },
         defeater_refs: ["node:defeater"],
@@ -66,7 +77,7 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
         final_strength: labeled(0.55, "propagation:final:defeater"),
         provenance_ref: "prov:node:defeater",
         maker_lineage: null,
-        review: null,
+        review: review("dispute", "Reviewer-A"),
         locator: null,
         stranger_restatement: { check_status: "PASS" },
         defeater_refs: [],

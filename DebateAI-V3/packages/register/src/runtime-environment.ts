@@ -32,12 +32,23 @@ const hatchetShape = {
 } as const;
 
 export function loadApiEnvironment() {
-  return parseEnvironment({
+  const environment = parseEnvironment({
     DATABASE_URL: z.string().url(), API_HOST: z.string().min(1), API_PORT: positiveInteger,
     STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: positiveInteger,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
+    NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+    EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
+    EVALUATOR_DEV_MENU_DATABASE_URL: z.string().url().optional(),
     ...hatchetShape
   });
+  if (environment.EVALUATOR_DEV_MENU_ENABLED === "true"
+    && environment.EVALUATOR_DEV_MENU_DATABASE_URL === undefined) {
+    throw new TypeError("EVALUATOR_DEV_MENU_DATABASE_URL_REQUIRED");
+  }
+  if (environment.EVALUATOR_DEV_MENU_ENABLED === "true" && environment.NODE_ENV === "production") {
+    throw new TypeError("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
+  }
+  return environment;
 }
 
 export function loadRunnerEnvironment() {

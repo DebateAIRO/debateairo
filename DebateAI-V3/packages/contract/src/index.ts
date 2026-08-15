@@ -386,6 +386,7 @@ export const AnswerSchema = z.object({
     hidden_score_threshold: z.number().min(0).max(1).nullable().default(null),
     hidden_score_threshold_source_ref: z.string().min(1).nullable().default(null),
     excluded_from_served_number: z.boolean().nullable().default(null),
+    judged_basis_count: z.number().int().positive().nullable().default(null),
     affected_node_ids: z.array(z.string().min(1)).default([])
   }).strict().superRefine((record, context) => {
     if (record.mark === "HIDDEN-UNJUDGEABLE" && (
@@ -397,6 +398,11 @@ export const AnswerSchema = z.object({
       || record.hidden_score_threshold_source_ref === null
       || record.excluded_from_served_number !== false || record.affected_node_ids.length === 0
     )) context.addIssue({ code: "custom", message: "Class L requires threshold provenance, presentation-only status, and affected hidden nodes" });
+    if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
+      record.call_site_key === null || record.terminal_transport_outcome === null
+      || record.excluded_from_served_number !== false
+      || record.judged_basis_count === null || record.affected_node_ids.length === 0
+    )) context.addIssue({ code: "custom", message: "Class D requires failed-review provenance and a positive judged basis" });
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
       record.call_site_key === null || record.planned_leg_count === null
       || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0

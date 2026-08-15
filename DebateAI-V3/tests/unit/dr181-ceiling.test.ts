@@ -20,7 +20,7 @@ describe("DR-181 computed structural tripwire", () => {
         const authored = panelSize + expansion.length + exchange.length;
         const reviews = panelSize === 1 ? 0 : authored;
         const fixedSites = 2 * RUNNER_FIXED_ORGANS_PER_COMPOSITION;
-        const independentWorstCase = (authored + reviews) * 3 + fixedSites * 3 + 2;
+        const independentWorstCase = (authored + reviews) * (3 + 1) + fixedSites * 3;
         const basis = computeStructuralCeilingBasis({
           panelSize,
           depth,

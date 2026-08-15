@@ -71,6 +71,7 @@ import {
   type CompositionBudgetResolution,
   type ConditionMarkRecord,
   type FactBundle,
+  type ServeGateResult,
   type ServeNode
 } from "@debateai/serve";
 import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
@@ -146,7 +147,7 @@ export interface RunDeathPolicy {
 
 export interface HoldProgressEvent {
   readonly kind: "node.retrying" | "ledger.could_not_do";
-  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "EXPANSION_HALTED";
+  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED";
   readonly runId: string;
   readonly callSiteKey: string;
   readonly parentNodeId: string | null;
@@ -197,28 +198,44 @@ export async function withCooldownRetry<T>(input: {
       terminalTransportOutcome: error.lastOutcome,
       lastLedgerEntryRef: error.lastLedgerEntryRef
     });
-    if (input.failureScope === "EXPANSION") {
-      await input.hold.record({
-        kind: "ledger.could_not_do",
-        state: "EXPANSION_HALTED",
-        runId: input.runId,
-        callSiteKey: input.callSiteKey,
-        parentNodeId: input.parentNodeId,
-        holdMs: input.policy.cooldownMs,
-        holdUntil: null,
-        attemptsSpent,
-        transportOutcome: error.lastOutcome,
-        plannedLegCount: input.plannedLegCount
-      });
-    }
+    await input.hold.record({
+      kind: "ledger.could_not_do",
+      state: input.failureScope === "EXPANSION"
+        ? "EXPANSION_HALTED"
+        : input.failureScope === "REVIEW" ? "REVIEW_HALTED" : "MAKER_POSITION_HALTED",
+      runId: input.runId,
+      callSiteKey: input.callSiteKey,
+      parentNodeId: input.parentNodeId,
+      holdMs: input.policy.cooldownMs,
+      holdUntil: null,
+      attemptsSpent,
+      transportOutcome: error.lastOutcome,
+      plannedLegCount: input.plannedLegCount
+    });
     return { kind: "HALTED" as const, record };
+  };
+  const finalAttempt = async (error: ProviderCallFailedError) => {
+    try {
+      return {
+        kind: "AUTHORED" as const,
+        value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
+      };
+    } catch (retryError) {
+      if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
+      return halted(retryError, error.attempts + retryError.attempts);
+    }
   };
   try {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
     if (!(error instanceof ProviderCallFailedError)) throw error;
+    // DR-186(8): review gets every ruled provider attempt plus the final
+    // attempt, but never holds the in-run loading page open.
+    if (input.failureScope === "REVIEW") return finalAttempt(error);
     const holds = await input.hold.countCooldownHolds(input.runId);
-    if (holds >= input.policy.maxCooldownHoldsPerRun) return halted(error, error.attempts);
+    // DR-184/C-1: the run-wide cap bounds waiting only. It must never eat the
+    // final attempt that the structural ceiling provisions at every site.
+    if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
     const holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
     await input.hold.record({
       kind: "node.retrying",
@@ -245,35 +262,11 @@ export async function withCooldownRetry<T>(input: {
       transportOutcome: error.lastOutcome,
       plannedLegCount: input.plannedLegCount
     });
-    try {
-      return {
-        kind: "AUTHORED",
-        value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
-      };
-    } catch (retryError) {
-      if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
-      return halted(retryError, error.attempts + retryError.attempts);
-    }
+    return finalAttempt(error);
   }
 }
 
-/** DR-174-A: remove a hidden node and every descendant as one subtree. */
-export function excludeHiddenSubtrees(
-  snapshot: EvaluationSnapshot,
-  hiddenNodeIds: readonly string[]
-): EvaluationSnapshot {
-  const excluded = new Set(hiddenNodeIds);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const node of snapshot.nodes) {
-      if (node.parentNodeId !== null && node.parentNodeId !== undefined
-        && excluded.has(node.parentNodeId) && !excluded.has(node.nodeId)) {
-        excluded.add(node.nodeId);
-        changed = true;
-      }
-    }
-  }
+function snapshotWithoutNodes(snapshot: EvaluationSnapshot, excluded: ReadonlySet<string>): EvaluationSnapshot {
   let arrows = snapshot.arrows.filter((arrow) =>
     !excluded.has(arrow.sourceNodeId)
     && !(arrow.targetKind === "NODE" && arrow.targetNodeId !== null && excluded.has(arrow.targetNodeId))
@@ -293,6 +286,499 @@ export function excludeHiddenSubtrees(
     operatorResolutions: Object.freeze(snapshot.operatorResolutions.filter((row) => !excluded.has(row.parentNodeId))),
     clusterRecords: snapshot.clusterRecords
   });
+}
+
+/**
+ * DR-184-A / DR-186: project the append-only graph onto nodes with a judged
+ * basis. A basis may arrive through a reviewed descendant or through a
+ * reviewed source on an incoming arrow (including an EDGE-targeted arrow).
+ * The fixed point carries the distinct reviewed nodes behind each standing
+ * claim, so every class-D record has a real, non-zero basis count.
+ */
+export function projectJudgedStanding(
+  snapshot: EvaluationSnapshot,
+  reviewedNodeIds: readonly string[]
+): {
+  readonly snapshot: EvaluationSnapshot;
+  readonly hiddenNodeIds: readonly string[];
+  readonly derivedStandingNodeIds: readonly string[];
+  readonly judgedBasisCounts: Readonly<Record<string, number>>;
+} {
+  const nodeIds = new Set(snapshot.nodes.map((node) => node.nodeId));
+  const reviewed = new Set(reviewedNodeIds.filter((nodeId) => nodeIds.has(nodeId)));
+  const basisByNode = new Map(snapshot.nodes.map((node) => [
+    node.nodeId,
+    new Set(reviewed.has(node.nodeId) ? [node.nodeId] : [])
+  ] as const));
+  const childrenByParent = new Map<string, string[]>();
+  for (const node of snapshot.nodes) {
+    if (node.parentNodeId === null || node.parentNodeId === undefined) continue;
+    const children = childrenByParent.get(node.parentNodeId) ?? [];
+    children.push(node.nodeId);
+    childrenByParent.set(node.parentNodeId, children);
+  }
+  const arrowById = new Map(snapshot.arrows.map((arrow) => [arrow.arrowId, arrow] as const));
+  const resolvedTarget = new Map<string, string | null>();
+  const resolveTargetNode = (arrowId: string, visiting = new Set<string>()): string | null => {
+    if (resolvedTarget.has(arrowId)) return resolvedTarget.get(arrowId)!;
+    if (visiting.has(arrowId)) return null;
+    const arrow = arrowById.get(arrowId);
+    if (arrow === undefined) return null;
+    visiting.add(arrowId);
+    const target = arrow.targetKind === "NODE"
+      ? arrow.targetNodeId
+      : arrow.targetEdgeId === null ? null : resolveTargetNode(arrow.targetEdgeId, visiting);
+    visiting.delete(arrowId);
+    resolvedTarget.set(arrowId, target);
+    return target;
+  };
+  const incomingByTarget = new Map<string, string[]>();
+  for (const arrow of snapshot.arrows) {
+    const targetNodeId = resolveTargetNode(arrow.arrowId);
+    if (targetNodeId === null) continue;
+    const sources = incomingByTarget.get(targetNodeId) ?? [];
+    sources.push(arrow.sourceNodeId);
+    incomingByTarget.set(targetNodeId, sources);
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const node of snapshot.nodes) {
+      const basis = basisByNode.get(node.nodeId)!;
+      const contributors = [
+        ...(childrenByParent.get(node.nodeId) ?? []),
+        ...(incomingByTarget.get(node.nodeId) ?? [])
+      ];
+      for (const contributor of contributors) {
+        for (const reviewedNodeId of basisByNode.get(contributor) ?? []) {
+          if (basis.has(reviewedNodeId)) continue;
+          basis.add(reviewedNodeId);
+          changed = true;
+        }
+      }
+    }
+  }
+  const hiddenNodeIds = snapshot.nodes
+    .filter((node) => basisByNode.get(node.nodeId)!.size === 0)
+    .map((node) => node.nodeId);
+  const derivedStandingNodeIds = snapshot.nodes
+    .filter((node) => !reviewed.has(node.nodeId) && basisByNode.get(node.nodeId)!.size > 0)
+    .map((node) => node.nodeId);
+  return Object.freeze({
+    snapshot: snapshotWithoutNodes(snapshot, new Set(hiddenNodeIds)),
+    hiddenNodeIds: Object.freeze(hiddenNodeIds),
+    derivedStandingNodeIds: Object.freeze(derivedStandingNodeIds),
+    judgedBasisCounts: Object.freeze(Object.fromEntries(
+      derivedStandingNodeIds.map((nodeId) => [nodeId, basisByNode.get(nodeId)!.size])
+    ))
+  });
+}
+
+export type ReviewCatchUpRefusal =
+  | "CATCH_UP_DISCLOSURE_MISMATCH"
+  | "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE"
+  | "CATCH_UP_WOULD_DOWNGRADE"
+  | "CATCH_UP_NUMBER_WOULD_MOVE";
+
+export interface ReviewCatchUpNode {
+  readonly nodeId: string;
+  readonly statement: string;
+  readonly authorMaker: string;
+  readonly authorRawArtifactRef: string;
+}
+
+export interface ReviewCatchUpReviewer {
+  readonly maker: string;
+  readonly providerRef: string;
+  review(input: {
+    readonly runId: string;
+    readonly subjectItemId: string;
+    readonly callSiteKey: string;
+    readonly questionLine: string;
+    readonly statement: string;
+    readonly authorMaker: string;
+    readonly providerRef: string;
+    readonly contractHash: string;
+    readonly bound: CallBound;
+  }): Promise<{
+    readonly outcome: "agree" | "dispute" | "cannot-assess";
+    readonly reasons: readonly string[];
+    readonly provenanceRef: string;
+  }>;
+}
+
+export interface ReviewCatchUpVersionCandidate {
+  readonly terminalBefore: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
+  readonly terminalAfter: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
+  readonly numberBefore: number | null;
+  readonly numberAfter: number | null;
+  readonly nowVisible: number;
+  readonly stillSetAside: number;
+  persist(): Promise<{ readonly answerVersion: number }>;
+}
+
+export interface ReviewCatchUpDependencies {
+  /** The composition root probes these pinned members before any model spend. */
+  probePinnedPanel(
+    pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[]
+  ): Promise<readonly ReviewCatchUpReviewer[]>;
+  readUnreviewedNodes(runId: string): Promise<readonly ReviewCatchUpNode[]>;
+  readDisclosedNodeIds(answerId: string, answerVersion: number): Promise<readonly string[]>;
+  readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null>;
+  recordNodeReview(input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly authorRawArtifactRef: string;
+    readonly reviewRawArtifactRef: string;
+    readonly outcome: "agree" | "dispute" | "cannot-assess";
+    readonly reasons: readonly string[];
+  }): Promise<string>;
+  countRunModelAttempts(runId: string): Promise<number>;
+  readPinnedMaximumAttempts(runId: string): Promise<number>;
+  prepareVersion(input: {
+    readonly runId: string;
+    readonly answerId: string;
+    readonly fromVersion: number;
+  }): Promise<ReviewCatchUpVersionCandidate>;
+}
+
+export interface ReviewCatchUpReport {
+  readonly runId: string;
+  readonly answerId: string;
+  readonly fromVersion: number;
+  readonly toVersion: number | null;
+  readonly examined: number;
+  readonly reviewed: number;
+  readonly stillUnreviewed: number;
+  readonly nowVisible: number;
+  readonly stillSetAside: number;
+  readonly attemptsSpent: number;
+  readonly envelopeRemaining: number;
+  readonly refusal: ReviewCatchUpRefusal | null;
+}
+
+/**
+ * C-2: retain the original work item as subjectItemId, retain the ruled JUDGE
+ * bound, and isolate cumulative per-call-site accounting by invocation. The
+ * run id remains unchanged, so the pinned run-wide ceiling still applies.
+ */
+export function reviewCatchUpCallSiteKey(invocationId: string, nodeId: string): string {
+  return `JUDGE:review:catch-up:${invocationId}:${nodeId}`;
+}
+
+const terminalRank = Object.freeze({ BLOCKED: 0, COMPONENTS_ONLY: 1, DOWNGRADED: 2, SERVED: 3 });
+
+export async function runReviewCatchUp(input: {
+  readonly runId: string;
+  readonly answerId: string;
+  readonly fromVersion: number;
+  readonly workItemId: string;
+  readonly questionLine: string;
+  readonly invocationId: string;
+  readonly pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[];
+  readonly judgeBound: CallBound;
+  readonly judgeContractHash: string;
+  readonly runDeathPolicy: RunDeathPolicy;
+  readonly hold: HoldRecorder;
+  readonly dependencies: ReviewCatchUpDependencies;
+}): Promise<ReviewCatchUpReport> {
+  const beforeAttempts = await input.dependencies.countRunModelAttempts(input.runId);
+  const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
+  const reviewers = await input.dependencies.probePinnedPanel(input.pinnedPanel);
+  const work = await input.dependencies.readUnreviewedNodes(input.runId);
+  const disclosed = await input.dependencies.readDisclosedNodeIds(input.answerId, input.fromVersion);
+  const sameSet = work.length === disclosed.length
+    && work.every((node) => disclosed.includes(node.nodeId));
+  const base = {
+    runId: input.runId,
+    answerId: input.answerId,
+    fromVersion: input.fromVersion,
+    examined: work.length
+  } as const;
+  const reportWithoutVersion = async (
+    refusal: ReviewCatchUpRefusal,
+    reviewed: number,
+    stillUnreviewed: number
+  ): Promise<ReviewCatchUpReport> => {
+    const afterAttempts = await input.dependencies.countRunModelAttempts(input.runId);
+    return Object.freeze({
+      ...base, toVersion: null, reviewed, stillUnreviewed,
+      nowVisible: 0, stillSetAside: stillUnreviewed,
+      attemptsSpent: afterAttempts - beforeAttempts,
+      envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal
+    });
+  };
+  if (!sameSet) return reportWithoutVersion("CATCH_UP_DISCLOSURE_MISMATCH", 0, work.length);
+  if (work.some((node) => !reviewers.some((reviewer) => reviewer.maker !== node.authorMaker))) {
+    return reportWithoutVersion("DIFFERENT_MAKER_REVIEWER_UNAVAILABLE", 0, work.length);
+  }
+  let reviewed = 0;
+  for (const node of work) {
+    const latestReviewerMaker = await input.dependencies.readLatestReviewerMaker(input.runId, node.authorMaker);
+    const reviewer = selectDifferentMakerReviewer(node.authorMaker, reviewers, latestReviewerMaker);
+    const callSiteKey = reviewCatchUpCallSiteKey(input.invocationId, node.nodeId);
+    const outcome = await withCooldownRetry({
+      runId: input.runId,
+      callSiteKey,
+      parentNodeId: node.nodeId,
+      plannedLegCount: 1,
+      baseMaxAttempts: input.judgeBound.maxAttempts,
+      failureScope: "REVIEW",
+      policy: input.runDeathPolicy,
+      hold: input.hold,
+      attempt: (maxAttempts) => reviewer.review({
+        runId: input.runId,
+        subjectItemId: input.workItemId,
+        callSiteKey,
+        questionLine: input.questionLine,
+        statement: node.statement,
+        authorMaker: node.authorMaker,
+        providerRef: reviewer.providerRef,
+        contractHash: input.judgeContractHash,
+        bound: { ...input.judgeBound, maxAttempts }
+      })
+    });
+    if (outcome.kind === "HALTED") continue;
+    await input.dependencies.recordNodeReview({
+      runId: input.runId,
+      nodeId: node.nodeId,
+      authorRawArtifactRef: node.authorRawArtifactRef,
+      reviewRawArtifactRef: outcome.value.provenanceRef,
+      outcome: outcome.value.outcome,
+      reasons: outcome.value.reasons
+    });
+    reviewed += 1;
+  }
+  if (reviewed === 0) {
+    const afterAttempts = await input.dependencies.countRunModelAttempts(input.runId);
+    return Object.freeze({
+      ...base, toVersion: null, reviewed: 0, stillUnreviewed: work.length,
+      nowVisible: 0, stillSetAside: work.length,
+      attemptsSpent: afterAttempts - beforeAttempts,
+      envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal: null
+    });
+  }
+  const candidate = await input.dependencies.prepareVersion({
+    runId: input.runId, answerId: input.answerId, fromVersion: input.fromVersion
+  });
+  if (terminalRank[candidate.terminalAfter] < terminalRank[candidate.terminalBefore]) {
+    return reportWithoutVersion("CATCH_UP_WOULD_DOWNGRADE", reviewed, work.length - reviewed);
+  }
+  // C-9/VROW-8: this refusal is deliberately load-bearing. Measured edge
+  // magnitudes may make it fire; removing it silently changes a served number.
+  if (!Object.is(candidate.numberAfter, candidate.numberBefore)) {
+    return reportWithoutVersion("CATCH_UP_NUMBER_WOULD_MOVE", reviewed, work.length - reviewed);
+  }
+  const persisted = await candidate.persist();
+  const afterAttempts = await input.dependencies.countRunModelAttempts(input.runId);
+  return Object.freeze({
+    ...base, toVersion: persisted.answerVersion, reviewed,
+    stillUnreviewed: work.length - reviewed,
+    nowVisible: candidate.nowVisible, stillSetAside: candidate.stillSetAside,
+    attemptsSpent: afterAttempts - beforeAttempts,
+    envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal: null
+  });
+}
+
+export function createPostgresReviewCatchUpDependencies(input: {
+  readonly pool: Pool;
+  readonly reviewers: readonly {
+    readonly maker: string;
+    readonly providerRef: string;
+    probe(): Promise<boolean>;
+    readonly judge: Judge;
+  }[];
+  readonly scoringOperator: ScoringOperatorRegisterInput;
+  readonly propagationContractHash: string;
+  readonly propagationNumberKind: string;
+  readonly propagationProducer: string;
+  readonly judgementSelectionRule: Readonly<Record<string, unknown>>;
+  readonly compositionBudget: CompositionBudgetResolution;
+}): ReviewCatchUpDependencies {
+  const judgements = new JudgementRepository(input.pool);
+  const graph = new GraphRepository(input.pool);
+  const ledger = new LedgerRepository(input.pool);
+  const serve = new ServeRepository(input.pool);
+  const budget = new BudgetRepository(input.pool);
+  const resolveSnapshot = async (runId: string): Promise<EvaluationSnapshot> => {
+    const materialised = await graph.materialiseSnapshot(runId);
+    const targets = [...new Set(materialised.arrows.flatMap((arrow) =>
+      arrow.targetKind === "NODE" && arrow.targetNodeId !== null ? [arrow.targetNodeId] : []
+    ))];
+    if (targets.length === 0) return materialised;
+    const operator = resolveScoringOperator({
+      parent: {}, run: {}, deployment: { scoringOperator: input.scoringOperator.deploymentRowValue }
+    });
+    return Object.freeze({
+      ...materialised,
+      operatorResolutions: Object.freeze(targets.map((parentNodeId) => Object.freeze({
+        parentNodeId, operator: operator.value, suppliedBy: operator.suppliedBy
+      })))
+    });
+  };
+  const dependencies: ReviewCatchUpDependencies = {
+    probePinnedPanel: async (pinnedPanel) => {
+      const pinnedRefs = new Set(pinnedPanel.map((member) => member.providerRef));
+      const candidates = input.reviewers.filter((reviewer) => pinnedRefs.has(reviewer.providerRef));
+      const health = await Promise.all(candidates.map(async (reviewer) => ({ reviewer, healthy: await reviewer.probe() })));
+      return Object.freeze(health.filter(({ healthy }) => healthy).map(({ reviewer }) => Object.freeze({
+        maker: reviewer.maker,
+        providerRef: reviewer.providerRef,
+        review: reviewer.judge.review.bind(reviewer.judge)
+      })));
+    },
+    readUnreviewedNodes: (runId) => judgements.readUnreviewedNodes(runId),
+    readDisclosedNodeIds: (answerId, answerVersion) =>
+      serve.readReviewCatchUpDisclosedNodeIds(answerId, answerVersion),
+    readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
+    recordNodeReview: (record) => judgements.recordNodeReview(record),
+    countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
+    readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
+    prepareVersion: async ({ runId, answerId, fromVersion }) => {
+      const source = await serve.readReviewCatchUpSource(runId);
+      if (source.answerId !== answerId || source.answerVersion !== fromVersion) {
+        throw new TypedDomainError("CATCH_UP_SOURCE_VERSION_CHANGED", `${answerId}@${fromVersion}`);
+      }
+      const fullSnapshot = await resolveSnapshot(runId);
+      const standing = projectJudgedStanding(fullSnapshot, await judgements.readReviewedNodeIds(runId));
+      const propagation = evaluate(standing.snapshot);
+      const lineage = await judgements.readJudgementLineage(runId);
+      const propagationRunId = await ledger.recordPropagation({
+        runId,
+        inputHash: hash(standing.snapshot),
+        contractHash: input.propagationContractHash,
+        graphFingerprint: hash(propagation.graphFingerprintMaterial),
+        arrowOrder: propagation.arrowOrder,
+        clusterRecords: propagation.clusterRecords,
+        operatorResolutions: propagation.operatorResolutions,
+        transmissionReductions: propagation.transmissionReductions,
+        liftRecords: propagation.liftRecords,
+        judgementSelectionRule: input.judgementSelectionRule,
+        sensitivityRecords: propagation.sensitivityRecords,
+        strengths: propagation.strengths.map((strength) => {
+          const own = lineage[strength.nodeId];
+          if (own === undefined) throw new TypedDomainError("STRENGTH_LINEAGE_UNRESOLVED", strength.nodeId);
+          return {
+            ...strength,
+            reducedJudgementRef: own.reducedJudgementRef,
+            numberKind: input.propagationNumberKind,
+            sourceRef: own.provenanceRef,
+            producer: input.propagationProducer,
+            replayHandle: `replay:${runId}:${strength.nodeId}`,
+            wayOfKnowing: own.wayOfKnowing
+          };
+        })
+      });
+      const oldReviewRecords = new Map(source.answer.condition_mark_records
+        .filter((record) => record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED")
+        .map((record) => [record.subject_ref, record] as const));
+      const preservedRecords: ConditionMarkRecord[] = source.answer.condition_mark_records
+        .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED")
+        .map((record) => ({
+          mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope,
+          subjectRef: record.subject_ref, reason: record.reason, liftPath: record.lift_path,
+          servedRootRule: record.served_root_rule, affectedNodeIds: record.affected_node_ids,
+          callSiteKey: record.call_site_key, plannedLegCount: record.planned_leg_count,
+          terminalTransportOutcome: record.terminal_transport_outcome,
+          hiddenStrength: record.hidden_strength,
+          hiddenScoreThreshold: record.hidden_score_threshold,
+          hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
+          excludedFromServedNumber: record.excluded_from_served_number,
+          judgedBasisCount: record.judged_basis_count
+        }));
+      const transportFields = (nodeId: string) => {
+        const old = oldReviewRecords.get(nodeId);
+        if (old?.call_site_key === null || old?.terminal_transport_outcome === null || old === undefined) {
+          throw new TypedDomainError("CATCH_UP_DISCLOSURE_MISMATCH", nodeId);
+        }
+        return { callSiteKey: old.call_site_key, terminalTransportOutcome: old.terminal_transport_outcome } as const;
+      };
+      const reviewRecords: ConditionMarkRecord[] = [
+        ...standing.hiddenNodeIds.map((nodeId) => ({
+          mark: "HIDDEN-UNJUDGEABLE" as const, scope: "node" as const, subjectRef: nodeId,
+          reason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",
+          liftPath: "Restore a valid cross-maker review", servedRootRule: null,
+          affectedNodeIds: Object.freeze([nodeId]), ...transportFields(nodeId),
+          excludedFromServedNumber: true
+        })),
+        ...standing.derivedStandingNodeIds.map((nodeId) => ({
+          mark: "DERIVED-STANDING-UNREVIEWED" as const, scope: "node" as const, subjectRef: nodeId,
+          reason: "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion",
+          liftPath: "Restore a valid cross-maker review", servedRootRule: null,
+          affectedNodeIds: Object.freeze([nodeId]), ...transportFields(nodeId),
+          excludedFromServedNumber: false, judgedBasisCount: standing.judgedBasisCounts[nodeId]!
+        }))
+      ];
+      const records = Object.freeze([...preservedRecords, ...reviewRecords]);
+      const conditionMarks = Object.freeze([...new Set([
+        ...source.answer.condition_marks.filter((mark) =>
+          mark !== "HIDDEN-UNJUDGEABLE" && mark !== "DERIVED-STANDING-UNREVIEWED"),
+        ...(standing.hiddenNodeIds.length === 0 ? [] : ["HIDDEN-UNJUDGEABLE"]),
+        ...(standing.derivedStandingNodeIds.length === 0 ? [] : ["DERIVED-STANDING-UNREVIEWED"])
+      ])]);
+      const currentNumber = source.servedNumber;
+      const nextStrength = currentNumber === null ? null
+        : propagation.strengths.find((row) => row.nodeId === currentNumber.nodeId)?.strength ?? null;
+      const result = {
+        terminal: source.answer.terminal,
+        answerForm: source.answer.answer_form as ServeGateResult["answerForm"],
+        factBundle: { ...source.factBundle, conditionMarks },
+        gateTrace: Object.freeze([]),
+        conditionMarks,
+        conformance: Object.freeze([]),
+        coverageMode: "NOT_RUN" as const,
+        segments: Object.freeze([]),
+        compositionBudget: input.compositionBudget,
+        confidenceBand: source.answer.confidence_band,
+        bandCeiling: source.answer.band_ceiling === null ? null : {
+          label: source.answer.band_ceiling.label,
+          basis: source.answer.band_ceiling.basis,
+          registerRowKey: source.answer.band_ceiling.register_row_key,
+          registerVersion: source.answer.band_ceiling.register_version,
+          sourceRef: source.answer.band_ceiling.source_ref,
+          liftPath: source.answer.band_ceiling.lift_path
+        },
+        projections: {
+          reversalPoint: source.answer.reversal_point,
+          buildsOnPrevious: source.factBundle.buildsOnPrevious,
+          memoryDisclosure: source.factBundle.memoryDisclosure
+        }
+      } as const;
+      return Object.freeze({
+        terminalBefore: source.answer.terminal,
+        terminalAfter: result.terminal,
+        numberBefore: currentNumber?.value ?? null,
+        numberAfter: nextStrength,
+        nowVisible: standing.snapshot.nodes.length,
+        stillSetAside: standing.hiddenNodeIds.length,
+        persist: async () => serve.persist({
+          runId, workItemId: source.workItemId,
+          factBundleVersion: source.factBundleVersion,
+          factBundleContentHash: hash(result.factBundle),
+          factBundle: result.factBundle,
+          result,
+          segments: source.answer.composed_text.map((segment) => ({
+            segmentId: segment.segment_id, text: segment.text,
+            loadBearing: segment.load_bearing, assertedNodeRefs: Object.freeze([]),
+            servedNumberRefs: segment.served_number_refs
+          })),
+          compositionRawArtifactRef: null,
+          compositionAttempt: 0,
+          conformanceRawArtifactRefs: Object.freeze([]),
+          conditionMarkRecords: records,
+          servedNumber: currentNumber === null || nextStrength === null ? null : {
+            numberRef: currentNumber.numberRef, value: nextStrength,
+            numberKind: currentNumber.numberKind, sourceRef: currentNumber.sourceRef,
+            producer: currentNumber.producer,
+            replayHandle: `replay:${runId}:${currentNumber.nodeId}:catch-up`,
+            propagationRunId
+          },
+          supersedes: { answerId }
+        })
+      });
+    }
+  };
+  return Object.freeze(dependencies);
 }
 
 export interface WalkingSkeletonSettings {
@@ -800,20 +1286,20 @@ export class WalkingSkeletonRunner {
           terminalTransportOutcome: preflight.outcome,
           lastLedgerEntryRef: preflight.ledgerEntryRef
         });
-        if (input.failureScope === "EXPANSION") {
-          await hold.record({
-            kind: "ledger.could_not_do",
-            state: "EXPANSION_HALTED",
-            runId: run.runId,
-            callSiteKey: input.callSiteKey,
-            parentNodeId: input.parentNodeId,
-            holdMs: policy.cooldownMs,
-            holdUntil: null,
-            attemptsSpent: this.settings.judgeBound.maxAttempts + policy.finalRetryAttempts,
-            transportOutcome: preflight.outcome,
-            plannedLegCount: input.plannedLegCount
-          });
-        }
+        await hold.record({
+          kind: "ledger.could_not_do",
+          state: input.failureScope === "EXPANSION"
+            ? "EXPANSION_HALTED"
+            : input.failureScope === "REVIEW" ? "REVIEW_HALTED" : "MAKER_POSITION_HALTED",
+          runId: run.runId,
+          callSiteKey: input.callSiteKey,
+          parentNodeId: input.parentNodeId,
+          holdMs: policy.cooldownMs,
+          holdUntil: null,
+          attemptsSpent: this.settings.judgeBound.maxAttempts + policy.finalRetryAttempts,
+          transportOutcome: preflight.outcome,
+          plannedLegCount: input.plannedLegCount
+        });
         return { kind: "HALTED", record };
       }
       return withCooldownRetry({
@@ -1251,6 +1737,64 @@ export class WalkingSkeletonRunner {
       authoredNodes.set(makerIndex, additionalRoot.value);
     }
 
+    // DR-184/C-10: reviews are interleaved at round boundaries. Coverage is
+    // invariant; reviewer assignment may change because rotation observes the
+    // latest landed review, and that behaviour change is deliberately declared.
+    const reviewScheduledNodeIds = new Set<string>();
+    const reviewPendingAuthoredNodes = async (): Promise<void> => {
+      if (effectiveMakerCount <= 1) return;
+      for (const authoredNode of authoredNodes.values()) {
+        if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
+        reviewScheduledNodeIds.add(authoredNode.nodeId);
+        const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
+        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
+        try {
+          const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+          const reviewAttempt = await cooldownAttempt({
+            callSiteKey,
+            parentNodeId: authoredNode.nodeId,
+            plannedLegCount: 1,
+            failureScope: "REVIEW",
+            attempt: (maxAttempts) => reviewer.judge.review({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey,
+              questionLine: run.questionLine,
+              statement: authoredNode.statement,
+              authorMaker: authoredNode.maker,
+              providerRef: reviewer.providerRef,
+              contractHash: this.settings.judgeContractHash,
+              bound: { ...this.settings.judgeBound, maxAttempts }
+            })
+          });
+          if (reviewAttempt.kind === "HALTED") {
+            hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: reviewAttempt.record });
+            continue;
+          }
+          const review = reviewAttempt.value;
+          await this.#judgements.recordNodeReview({
+            runId: run.runId,
+            nodeId: authoredNode.nodeId,
+            authorRawArtifactRef: authoredNode.provenanceRef,
+            reviewRawArtifactRef: review.provenanceRef,
+            outcome: review.outcome,
+            reasons: review.reasons
+          });
+        } catch (error) {
+          if (error instanceof TypedDomainError && [
+            "RUN_COST_ENVELOPE_EXHAUSTED",
+            "CALL_BUDGET_EXHAUSTED",
+            "PRODUCER_GRADING_FORBIDDEN"
+          ].includes(error.code)) throw error;
+          throw new TypedDomainError(
+            "NODE_REVIEW_UNAVAILABLE",
+            `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
+          );
+        }
+      }
+    };
+    await reviewPendingAuthoredNodes();
+
     // PRO-01 × PANEL-01: each independently authored root owns its own B3-B
     // breadth-first pro/con tree, with real per-node maker lineage.
     const expansionPlan = effectiveMakerCount > 1
@@ -1264,7 +1808,12 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...indices]);
     };
+    let activeExpansionRound = expansionPlan[0]?.round ?? null;
     for (const leg of expansionPlan) {
+      if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
+        await reviewPendingAuthoredNodes();
+        activeExpansionRound = leg.round;
+      }
       if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)) continue;
       const parent = authoredNodes.get(leg.parentIndex);
       if (parent === undefined) {
@@ -1305,6 +1854,7 @@ export class WalkingSkeletonRunner {
       }
       authoredNodes.set(leg.childIndex, authored.value);
     }
+    await reviewPendingAuthoredNodes();
 
     // DR-154(2) generalized proposal: each maker authors one ordered response
     // per other maker root. Each real response node defends its own root and
@@ -1347,63 +1897,7 @@ export class WalkingSkeletonRunner {
         authoredNodes.set(nextIndex, authored.value);
       }
     }
-
-    // XREV-01 / DR-148(4): every authored node in a multi-maker run is
-    // reviewed by any configured maker other than its author. The selection
-    // rule is N-generic; today's M=2 roster is only configuration. A failed or
-    // invalid review call leaves the append-only review resource absent and
-    // makes the run unservable; envelope refusal is likewise never swallowed.
-    if (effectiveMakerCount > 1) {
-      for (const authoredNode of authoredNodes.values()) {
-        const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
-        try {
-          const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
-          const reviewAttempt = await cooldownAttempt({
-            callSiteKey,
-            parentNodeId: authoredNode.nodeId,
-            plannedLegCount: 1,
-            failureScope: "REVIEW",
-            attempt: (maxAttempts) => reviewer.judge.review({
-              runId: run.runId,
-              subjectItemId: claimed.workItemId,
-              callSiteKey,
-              questionLine: run.questionLine,
-              statement: authoredNode.statement,
-              authorMaker: authoredNode.maker,
-              providerRef: reviewer.providerRef,
-              contractHash: this.settings.judgeContractHash,
-              bound: { ...this.settings.judgeBound, maxAttempts }
-            })
-          });
-          if (reviewAttempt.kind === "HALTED") {
-            hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: reviewAttempt.record });
-            continue;
-          }
-          const review = reviewAttempt.value;
-          await this.#judgements.recordNodeReview({
-            runId: run.runId,
-            nodeId: authoredNode.nodeId,
-            authorRawArtifactRef: authoredNode.provenanceRef,
-            reviewRawArtifactRef: review.provenanceRef,
-            outcome: review.outcome,
-            reasons: review.reasons
-          });
-        } catch (error) {
-          if (error instanceof TypedDomainError && [
-            "RUN_COST_ENVELOPE_EXHAUSTED",
-            "CALL_BUDGET_EXHAUSTED",
-            "PRODUCER_GRADING_FORBIDDEN"
-          ].includes(error.code)) throw error;
-          // DR-165(3): the record remains honestly absent, but the authored
-          // opinion is unservable. Never turn a failed call into cannot-assess.
-          throw new TypedDomainError(
-            "NODE_REVIEW_UNAVAILABLE",
-            `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
-          );
-        }
-      }
-    }
+    await reviewPendingAuthoredNodes();
 
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
@@ -1440,8 +1934,13 @@ export class WalkingSkeletonRunner {
         })))
       });
     }
-    const classHNodeIds = hiddenReviewRecords.map((row) => row.nodeId);
-    snapshot = excludeHiddenSubtrees(snapshot, classHNodeIds);
+    const reviewedNodeIds = effectiveMakerCount <= 1
+      ? materialised.nodes.map((node) => node.nodeId)
+      : await this.#judgements.readReviewedNodeIds(run.runId);
+    const standing = projectJudgedStanding(snapshot, reviewedNodeIds);
+    snapshot = standing.snapshot;
+    const classHNodeIds = new Set(standing.hiddenNodeIds);
+    const classDNodeIds = new Set(standing.derivedStandingNodeIds);
     const propagationStartedAt = new Date();
     const propagation = evaluate(snapshot);
     const threshold = this.settings.hiddenNodeScoreThreshold;
@@ -1516,9 +2015,26 @@ export class WalkingSkeletonRunner {
     const monoMakerConditionMarks = effectiveMakerCount === 1
       ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
       : [] as const;
+    const classHReviewRecords = hiddenReviewRecords.filter(({ nodeId }) => classHNodeIds.has(nodeId));
+    const classDReviewRecords = hiddenReviewRecords.filter(({ nodeId }) => classDNodeIds.has(nodeId));
+    const classHSubtree = (rootNodeId: string): readonly string[] => {
+      const affected = new Set([rootNodeId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const node of materialised.nodes) {
+          if (node.parentNodeId === null || node.parentNodeId === undefined
+            || !affected.has(node.parentNodeId) || affected.has(node.nodeId)) continue;
+          affected.add(node.nodeId);
+          changed = true;
+        }
+      }
+      return Object.freeze([...affected].filter((nodeId) => classHNodeIds.has(nodeId)));
+    };
     const hiddenConditionMarks = Object.freeze([
       ...(absentAtClaim.length > 0 ? ["CRITIQUE-UNAVAILABLE" as const] : []),
-      ...(hiddenReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
+      ...(classHReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
+      ...(classDReviewRecords.length > 0 ? ["DERIVED-STANDING-UNREVIEWED" as const] : []),
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
       ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : [])
     ]);
@@ -1579,11 +2095,27 @@ export class WalkingSkeletonRunner {
         servedRootRule: null,
         affectedNodeIds: Object.freeze([servedRoot.nodeId])
       })]),
-      ...hiddenReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
+      ...classHReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
         mark: "HIDDEN-UNJUDGEABLE",
         scope: "node",
         subjectRef: nodeId,
         reason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",
+        liftPath: "Restore a valid cross-maker review",
+        servedRootRule: null,
+        affectedNodeIds: classHSubtree(nodeId),
+        callSiteKey: record.callSiteKey,
+        plannedLegCount: null,
+        terminalTransportOutcome: record.terminalTransportOutcome,
+        hiddenStrength: null,
+        hiddenScoreThreshold: null,
+        hiddenScoreThresholdSourceRef: null,
+        excludedFromServedNumber: true
+      })),
+      ...classDReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
+        mark: "DERIVED-STANDING-UNREVIEWED",
+        scope: "node",
+        subjectRef: nodeId,
+        reason: "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion",
         liftPath: "Restore a valid cross-maker review",
         servedRootRule: null,
         affectedNodeIds: Object.freeze([nodeId]),
@@ -1593,7 +2125,8 @@ export class WalkingSkeletonRunner {
         hiddenStrength: null,
         hiddenScoreThreshold: null,
         hiddenScoreThresholdSourceRef: null,
-        excludedFromServedNumber: true
+        excludedFromServedNumber: false,
+        judgedBasisCount: standing.judgedBasisCounts[nodeId]!
       })),
       ...lowScoreRows.map((row): ConditionMarkRecord => Object.freeze({
         mark: "HIDDEN-LOW-SCORE",

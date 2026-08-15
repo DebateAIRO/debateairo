@@ -16,8 +16,12 @@ const envelope = (overrides = {}) => JSON.stringify({
   thought: "redacted",
   usage: { input_tokens: 1, output_tokens: 1 },
   num_turns: 1,
-  total_cost_usd: 0.00001,
-  modelUsage: { [REPORTED_MODEL]: { input_tokens: 1, output_tokens: 1 } },
+  total_cost_usd: process.env.FAKE_GROK_COST_ABSENT === "1" ? undefined : 0.00001,
+  modelUsage: {
+    [REPORTED_MODEL]: process.env.FAKE_GROK_MODEL_USAGE_NON_OBJECT === "1"
+      ? "usage unavailable"
+      : { input_tokens: 1, output_tokens: 1 }
+  },
   ...overrides
 });
 

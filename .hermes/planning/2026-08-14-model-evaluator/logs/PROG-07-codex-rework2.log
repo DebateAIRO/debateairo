@@ -1,0 +1,3239 @@
+=== PROG-07 rework2 launch Sat Aug 15 17:17:39 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00576-ae9f-7fa1-b8bd-0d6b97c28881
+--------
+user
+/goal REWORK ROUND 2 of your eval-07-profiles lane (same goal, same session, same worktree) — ONE narrow blocker from reviewer A round 2 (reviewer B passed): your rework DELETED the judge-rank-change test coverage — the judgeRanks ordering assertion (the only bias-rank: receipt assertion) and the live-Postgres leader assertion (downgraded to a bare length check); the surviving judge-rank test is degenerate (all judges grade 0.5, asserting only the identity tiebreak). FR-5.1 AC2 and the merge gate's rank-change tests are unasserted. The BEHAVIOR is verified correct (reviewer A's probe: leniency injection dropped judge a from ordinal 1 to 3) — restore the coverage only: (1) a live-Postgres rank-change test through the real write paths where injected bias genuinely moves a judge's ordinal (not a tiebreak); (2) re-assert the bias-rank: receipt (exists at packages/evaluator/src/index.ts:2559, referenced by no test). NO production code changes. Run the focused tests + typecheck, commit, update self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-07-profiles
+codex
+I’m resuming the original PROG-07 worker session under the heartbeat protocol for rework round 2. I’ll read reviewer A’s round-2 artifact, add only real-path test coverage for ordinal movement and the persisted `bias-rank:` receipt, then run the requested focused suite and typecheck—without touching production code.
+exec
+/bin/zsh -lc "cat .agents/skills/heartbeat-protocol/SKILL.md >/dev/null && find /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews -maxdepth 1 -type f -name 'PROG-07*' -print -exec stat -f '%Sm %N' -t '%Y-%m-%dT%H:%M:%S%z' {} \\; | sort && git status --short && git branch --show-current && git rev-parse HEAD" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-1.md
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-2.md
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus2-review-1.md
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus2-review-2.md
+2026-08-15T16:18:12+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-1.md
+2026-08-15T16:22:15+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus2-review-1.md
+2026-08-15T17:12:14+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-2.md
+2026-08-15T17:16:37+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus2-review-2.md
+codex/eval-07-profiles
+6a05f47ae0cba411d9da2c11c73e8b47048a6952
+
+exec
+/bin/zsh -lc "sed -n '1,320p' /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-2.md && sed -n '1,320p' /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus2-review-2.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+# PROG-07 — Opus reviewer A, round 2
+
+- Lane: `codex/eval-07-profiles`
+- Commit reviewed: `6a05f47` (`fix(evaluator): correct profile derivation semantics`), on top of `a2b1f4e`
+- Rework diff: `a2b1f4e...6a05f47` — 7 files, +513/-150, including new `migrations/0027_evaluator_rank_metric.sql`
+- Round-1 review: `PROG-07-opus-review-1.md` (REWORK, 5 blockers, 8 non-blocking)
+- Verdict: **REWORK** — 1 blocker, and it is a deleted test, not a defect
+
+## Headline
+
+**All five round-1 blockers are genuinely fixed.** I re-derived every corrected
+metric by hand and, separately, drove the derivation directly with my own probe
+fixtures; every number the lane asserts matches my independent computation, and
+each corrected fixture would fail against the round-1 code. The new
+`tests/integration/evaluator-profiles-rework.test.ts` builds its data through the
+**real write paths** — `core.node` + `ledger.reduced_judgement` sharing one
+artifact (the production runner shape), `ledger.node_review`,
+`scorecard.answer_outcome` — and then runs the actual
+`EvaluatorHarvestRepository.harvestTerminalRun` before deriving. That is the
+correction I asked for in round 1, and it is the right one.
+
+The single blocker is that the rework **deleted the lane's only judge-rank-change
+assertions** without replacing them, so a merge-gate item (`rank-change tests`)
+and FR-5.1 AC2 are now unasserted. The behaviour itself is correct — I proved it
+with my own probe. This is one test to restore, no code change.
+
+---
+
+## Verification I ran
+
+| Check | Result |
+|---|---|
+| `pnpm run typecheck` | clean |
+| `npx vitest run` (full repository) | **693 passed / 693, 96 files, exit 0** (was 690/95) |
+| `pnpm run lint` (`audit:architecture` + `audit:source`) | 27 edge rows, **0 violations**; **0 source blockers** |
+| repo-wide `grep -rn "selectJudgesByBiasRank" --include="*.ts"` | 1 definition + 3 test hits, **0 production call sites** |
+| `grep -inE "\bBOUND\b\|sk-\|api[_-]?key\|secret"` over the rework diff | no hits — no `BOUND` state, DR-179 clean |
+| `git status --porcelain` | clean; no push, no board mutation |
+| migration discovery (`packages/db/src/index.ts:125`) | `readdir` + `sort` over `/^\d+.*\.sql$/`, so `0027` is picked up with no registry edit |
+| Independent probe of `deriveEvaluatorProfiles` (my own fixtures, `tsx`) | see BF-1 below |
+
+---
+
+## Blocker-by-blocker
+
+### BF-1 — leniency fabricated zero → **FIXED**, verified two ways
+
+The metric was redesigned to one independent sample **per run**: this identity's
+run mean minus the mean of the *other* identities' run means, with no sample at
+all when the run holds only this identity. The `itemKey !== null` filter is gone.
+The formula is disclosed in the cell's own `derivation_input`
+(`formula:bias.leniency.v1=identity-run-mean-minus-other-identities-run-mean`).
+
+Hand-computed against the lane's harvest-driven fixture: `judge:a` grades 0.8 and
+0.6 (mean 0.7); the other identities in that run are `judge:b` (0.2) and
+`judge:boundary` (0.5), mean of means 0.35; sample = **0.35, n = 1**. That is
+exactly what the test asserts and what the database holds.
+
+I then drove the exported function myself with fixtures the lane does not have:
+
+| My fixture | Result | Reading |
+|---|---|---|
+| one identity, one run | `value=null, n=0, basis=NONE` | **no fabricated zero** |
+| one identity, **five** runs | `value=null, n=0, basis=NONE` | still refuses; n never inflates on uncomparable runs |
+| two identities, 0.9 vs 0.1, 3 runs | `+0.8 / −0.8, n=3, MEASURED_PROCESS` | **varies, signed, when judges genuinely differ** |
+| two identities, 0.5 vs 0.5, 3 runs | `0, n=3, MEASURED_PROCESS` | honest zero — a real measurement of "no differential leniency", and structurally distinguishable from the `null/NONE` above |
+
+The lane's own `judge:solo` case asserts `value: null, n: 0` from a real harvested
+single-identity run. The round-1 failure — a confident zero with growing n — is
+gone, and the two states ("measured zero" and "not measurable") are now distinct
+in `value`, `n` and `basis`.
+
+*Residual, non-blocking:* the comparison is now run-level, not item-level, so it
+departs from FR-5.1's literal "on the same items". Since each identity judges its
+own nodes, the difference conflates leniency with item difficulty. Given the
+runner emits one reduced judgement per node this is the only comparison the data
+supports, the code comment explains exactly that, and the formula string is
+persisted on every cell — so the deviation is disclosed rather than hidden. Worth
+one line in the bind-readiness notes so a future consumer does not read it as an
+item-matched measure.
+
+### BF-2 — lineage favoritism structurally empty → **FIXED**, real join now exercised
+
+The residue is now computed from `NODE_REVIEW` observations grouped by the
+reviewed author's maker, which is the population that is guaranteed cross-maker
+by migration 0019. The reader gained the joins that make this resolvable:
+`ledger.node_review` on `source_ref`, then
+`review_author_artifact ON raw_artifact_id = review.author_raw_artifact_ref`.
+`judgeIdentities` now also admits `NODE_REVIEW`, so reviewers get bias cells.
+
+Critically, harvest writes `{source, node_review_id, author_raw_artifact_ref}`
+into `provenance_json` and **no** `author_maker` key — so
+`COALESCE(provenance_json->>'author_maker', review_author_artifact.maker, …)`
+falls through to the new join. The rework fixture inserts real `ledger.node_review`
+rows and harvests them, so the production resolution path is exercised for the
+first time. That closes the round-1 complaint that the COALESCE fallbacks were
+covered by nothing.
+
+Hand-computed: reviewer `reviewer:r` agrees with a `maker:a` author (1) and
+disputes a `maker:b` author (0); lineage means `[1, 0]`; samples
+`|1 − 0| = 1` and `|0 − 1| = 1`; cell = **1.0, n = 2** — matches the assertion and
+the database.
+
+*Residual, non-blocking:* with k lineages the k samples are deterministic
+functions of k means, so at k = 2 the cell reports n = 2 from a single degree of
+freedom and the Hoeffding interval is correspondingly √2 too tight. It is a
+monitor (FR-5.1 AC4 asks only that it be recorded), and the bound is now
+range-correct, so this is a sharpening note rather than a defect.
+
+### BF-3 — mixed-metric prowess ladder → **FIXED**, with schema support
+
+`prowessRankGroups` keys on `[domainId, step, metric]`; the `metricPriority`
+collapse is deleted, so each identity is ranked inside every metric ladder it has
+a cell in. `metric` is now on `EvaluatorDerivedRank`, persisted, and carried by
+`migrations/0027`, which adds the column and rewrites both uniqueness constraints
+to include it. Judge ranks are labelled `bias.composite-rank.v1`, so a mixed
+composite is disclosed rather than implied.
+
+Migration review: `ADD COLUMN IF NOT EXISTS … DEFAULT 'legacy.mixed.v0'` then
+`DROP DEFAULT` (honest marker for any pre-existing row); the `DO` block drops
+only unique constraints whose definition mentions `rank_kind`, which correctly
+spares `rank_snapshot_at_seq_key`; every `ADD CONSTRAINT` is preceded by a
+`DROP … IF EXISTS`, so the migration is replay-safe. Grants in 0023 are
+table-level (`GRANT INSERT ON evaluator.rank_snapshot`), so no grant edit is
+needed; `reject_mutation` is row-level and unaffected by the DDL. `schema.ts`
+carries the new column and the architecture parity suites are green.
+
+The test discriminates the old behaviour: `model:a` has both a settlement cell
+and a consensus cell, and is asserted at **ordinal 1 of the consensus-strength
+ladder** with `model:b` at ordinal 2. Under the round-1 `metricPriority` code
+`model:a` would have been pulled out of the consensus ladder entirely, leaving
+`model:b` at ordinal 1. This is also the concrete sense in which consensus is
+back at full weight (ruling 4 / FR-3.2): consensus evidence is no longer
+discarded from ranking whenever a settlement exists for the same identity.
+
+### BF-4 — interval understated 2× → **FIXED**, and the test proves it
+
+`boundedMeanInterval` now computes
+`radius = (upperBound − lowerBound) * sqrt(ln 40 / (2n))`, with a comment naming
+the two-sided Hoeffding interval at α = 0.05 and why the range multiplier matters
+for `[-1, 1]` supports. Lineage moved to `[0, 1]` bounds, matching its now-absolute
+values.
+
+I recomputed the lane's interval fixture independently: 10 harvested runs,
+`interval:a` at 0.8 against `interval:b` at 0.2 gives value 0.6, n = 10;
+range-2 radius = `2·sqrt(ln 40 / 20)` = **0.8589388**; lower = **−0.2589388**,
+upper clamped to 1. The test asserts exactly that lower bound to 10 decimal
+places. Under the round-1 code the radius would have been 0.4294694 and the lower
+bound 0.1705 — the assertion fails. So the fixture genuinely discriminates the
+fix, and n = 10 is large enough that the clamp does not hide the lower side.
+
+### BF-5 — contradiction denominator → **FIXED**, hand-verified on three cases
+
+The denominator is now **one sample per settlement event**, matched to the same
+run *and the same exact model identity*, using that identity's mean tau in the
+run. `latestSettlementByRun` is gone, so no settlement is silently dropped. A
+mean tau of exactly 0.5 is treated as neutral and **excluded**, removing the
+round-1 asymmetry, and the rule is persisted in `derivation_input`
+(`threshold:tau>0.5;neutral:tau=0.5`). The inherited `itemKey` filter is gone.
+
+Hand-computed against the fixture, which deliberately puts **four** settled
+answers in one run:
+
+- `judge:a` (mean tau 0.7) vs settlement `false` → contradiction 1; vs settlement
+  `true` → 0 ⇒ **value 0.5, n = 2** — two settlement events, two samples. Under
+  the round-1 code only the latest settlement survived and n came from judgement
+  count instead.
+- `judge:b` (mean tau 0.2) vs settlement `true` ⇒ **value 1, n = 1**.
+- `judge:boundary` (mean tau exactly 0.5) ⇒ **value null, n = 0** — neutral,
+  excluded, not scored as a contradiction.
+
+All three match my own arithmetic and the persisted rows.
+
+### Round-1 non-blocking items also addressed
+
+- **S-3 fixed.** `evaluator-selector-unbound.test.ts` now walks `apps/`
+  recursively over `.ts/.tsx/.js/.mjs/.cjs` instead of a hand-listed four files.
+  (`packages/` is still outside its walk — see N-2.)
+- **Bonus, unrequested and welcome.** `insertProfileCell` and `insertRankSnapshot`
+  are now hash-aware: on a natural-key conflict they compare `derivation_hash` /
+  `source_hash` and raise typed `EVALUATOR_PROFILE_DERIVATION_CONFLICT` /
+  `EVALUATOR_RANK_DERIVATION_CONFLICT` when the inputs changed, instead of
+  silently retaining a stale cell. `source_hash` now covers identity, metric,
+  ordinal, score, n and interval rather than just cell ids and ordinal. FR-5.2's
+  "do not silently corrupt history" is materially stronger than in round 1, and
+  the refusal is proven by a live-Postgres test that harvests extra data and
+  re-derives the same version.
+
+---
+
+## Blocking finding
+
+### BF-6 — the judge-rank-change coverage was deleted, not replaced
+
+The rework removed both assertions that tied bias data to judge rank order:
+
+1. `tests/unit/evaluator-profiles.test.ts` — the whole test
+   *"derives bias before judge-dependent prowess and changes judge rank from live
+   inputs"* was deleted (−54 lines). It carried
+   `expect(result.judgeRanks.map(r => r.modelId)).toEqual(["judge:b", "judge:a"])`
+   and the only assertion of the `bias-rank:` receipt in prowess
+   `derivationInput`.
+2. `tests/integration/evaluator-profiles-database.test.ts` — the test was renamed
+   from *"records real rank changes"* to *"keeps versioned cells and ranks
+   append-only"*, and the three-row leader assertion
+   (`judge:a` at `FIRST_AS_OF`, `judge:b` at `SECOND_AS_OF` under both versions)
+   was replaced by `expect(versionedRanks.rows).toHaveLength(9)` plus a set of
+   derivation versions.
+
+What survives is `firstLeader === "judge:a"` at `FIRST_AS_OF` — and that one is
+**degenerate**. At `FIRST_AS_OF` all three judges grade 0.5 in a single run, so
+every leniency sample is 0, every score ties at 1, and ordinal 1 is decided by
+the identity tiebreak. I confirmed this shape directly with my probe (all-agree
+fixture → scores `a=1, b=1, c=1`, order by identity). It asserts the tiebreak,
+not that bias moves rank.
+
+So the lane no longer has any test for **FR-5.1 AC2** — "rank order of judges
+changes when synthetic high-leniency or high-contradiction data is injected …
+without changing panel weight-multiplier configuration" — nor for the goal
+packet's merge-gate item *"derivation-version and **rank-change** tests"*. Round 1
+satisfied that gate; round 2 does not. (PROWESS rank *ordering* is well covered
+from live data by the new rework test; it is the JUDGE-rank response to bias that
+is now unasserted, which is the half ruling 5 is actually about.)
+
+The code is correct. My probe injected leniency into an all-agreeing panel and
+the ladder reordered as it should:
+
+| Fixture | Judge ranks |
+|---|---|
+| three judges all at 0.5 over 2 runs | `1:a(1) 2:b(1) 3:c(1)` — tie, identity order |
+| same, plus one run where `a` grades 0.95 against 0.1 / 0.1 | `1:b(0.858) 2:c(0.858) 3:a(0.717)` — **`a` falls from 1st to 3rd** |
+
+**Required.** Restore an assertion of that flip — ideally on live Postgres in the
+rework file, where the fixtures already go through harvest, so the gate item is
+proven end to end. While there, restore an assertion of the `bias-rank:` receipt
+in prowess `derivation_input`; it still exists at
+`packages/evaluator/src/index.ts:2559` but is now referenced by no test at all,
+which is how it would rot away unnoticed.
+
+---
+
+## Non-blocking
+
+- **N-1 — round-1 S-1 unchanged.** `score = max(0, 1 − mean(penalties))` still
+  averages a variable-length penalty vector, so a judge with no add-on grade omits
+  the `1 − addonQuality` term and outranks an identically-biased judge that has
+  one; `bias.addon_grade_quality.v1` is still the only bias cell suppressed
+  entirely when empty, so no zero-n cell discloses the absence (FR-4.2 AC). And a
+  judge with no bias evidence at all still scores 0 and ranks last, so missing
+  evidence moves rank in both directions depending on which metric is missing.
+- **N-2 — round-1 S-2 unchanged, and now untested.** `biasContext` is still
+  attached only for `JUDGING`/`REVIEWING` and still cites the profiled model's own
+  ordinal; `AUTHORING` prowess — the cell actually built from judge-produced node
+  strengths, which is handoff 3's scenario — still carries no bias linkage. The
+  selector guard also still walks only `apps/`, not `packages/`.
+- **N-3 — round-1 S-4 and S-6 unchanged.** No `readEvaluatorProfileStrategy`
+  register reader (the `strategy_*` receipt remains caller-supplied and validated
+  only for shape), and no `AGGREGATE` `pipeline_event` receipt
+  (`migrations/0023:89` defines the member) or `shadow_decision` row for selector
+  runs.
+- **N-4 — vacuous assertions remain, and one was newly introduced.**
+  `expect.any(Number)` on `profileCellsInserted`/`rankSnapshotsInserted` and the
+  `phaseOrder` literal-vs-itself comparison both survive from round 1;
+  `expect(versionedRanks.rows).toHaveLength(9)` is new and replaced a real
+  assertion (BF-6).
+- **N-5 — stale fixture semantics.** In `evaluator-profiles-database.test.ts` the
+  judges are `provider:judges` while the settlement is `provider:author`, so the
+  new identity gate makes both contradiction cells `null`. The assertion is
+  honest, but the test's `judge:at-boundary` / `judge:below-boundary` naming and
+  its "contradiction boundary" framing now describe coverage that lives in the
+  rework file instead. Rename or drop, so it does not read as boundary coverage.
+- **N-6 — nondeterministic conflict lookup.** The rank-conflict `SELECT` uses
+  `(ordinal=$7 OR (provider=$8 AND model_id=$9 AND model_version=$10))` with
+  `LIMIT 1` and no `ORDER BY`, so when the ordinal conflict and the identity
+  conflict are different rows the inspected row — and hence the error message —
+  is arbitrary. A false pass would require a `source_hash` collision, so this is
+  a clarity issue rather than a correctness one, but an `ORDER BY` would settle it.
+- **N-7 — dead carried fields.** `itemKey` and `subjectMaker` are still selected
+  in SQL and carried on `EvaluatorProfileObservation`, but after the rework no
+  derivation reads either. Drop them or note why they are retained.
+
+## Axis summary (round 2)
+
+| Axis | Result |
+|---|---|
+| 1. Deliverables — bias/prowess cells, counts, intervals, ranks, versioned, deterministic, no LLM | **PASS.** All three mandated bias measures now produce real, varying values on the shape harvest actually emits |
+| 2. REPLACE-not-pool, mixed consensus+settlement fixtures | **PASS** (unchanged and still strong; consensus additionally restored to full weight in ranking) |
+| 3. Bias-first ordering | **PASS** mechanically; receipt still partial and now untested (N-2, BF-6) |
+| 4. Selector provably UNBOUND | **PASS.** Zero call sites by my own grep; test now walks the `apps/` tree |
+| 5. Mathematical honesty — leniency, intervals, contradiction denominator | **PASS.** All four round-1 math findings corrected and independently re-derived |
+| 6. FR-0.6 AC5 + differentials, no BOUND, DR-179, tests + typecheck, vacuous assertions, clocks | **PASS** on 693/693, typecheck, lint, no BOUND, no keys, clocks pinned; **one gate regression** (BF-6) and residual vacuous assertions (N-4) |
+
+## Recommendation
+
+REWORK, narrowly. Five of six axes are clean and the five round-1 blockers are
+closed to my own independent arithmetic — this is a substantively good rework,
+and the move to harvest-driven fixtures is exactly right. The one thing standing
+between it and a PASS is a test the rework deleted: restore a judge-rank-change
+assertion (and the `bias-rank:` receipt assertion) so the named merge-gate item
+and FR-5.1 AC2 are proven again. No production code needs to change for that —
+I verified the underlying behaviour is already correct.
+# PROG-07 peer review 2 — opus2 seat (second independent reviewer)
+
+- **Lane:** `codex/eval-07-profiles` @ `6a05f47` ("fix(evaluator): correct profile derivation semantics")
+- **Previous review:** `PROG-07-opus2-review-1.md` @ `a2b1f4e` — REWORK, 4 blockers
+- **Worktree:** `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles`
+- **Reviewer:** opus2 (independent; no other PROG-07 review file read in either round)
+- **Date:** 2026-08-15
+- **Verdict: PASS**
+
+Rework surface: new `migrations/0027_evaluator_rank_metric.sql`, `packages/db/src/schema.ts` (+1
+column), `packages/evaluator/src/index.ts` (±225), the selector-unbound architecture test widened,
+the profiles integration test adjusted, one unit test removed, and a new
+`tests/integration/evaluator-profiles-rework.test.ts` (+307) that builds fixtures through the **real**
+lane-05 harvest repository.
+
+---
+
+## 1. What I ran this round
+
+| Check | Result |
+|---|---|
+| `pnpm run typecheck` | exit 0 |
+| Full repository suite `npx vitest run` | **96 files / 693 tests passed**, exit 0 (was 95/690) |
+| My own round-2 adversarial pure suite — 22 assertions, all re-derived by hand against the **new** formulas | passed |
+| My own round-2 adversarial live-Postgres suite — 4 scenarios (embedded PostgreSQL, DR-121) | passed |
+| My own migration-0027 constraint-surface probe on live Postgres | passed |
+| Repo-wide selector / derivation call-site grep | zero production callers |
+| Clock / `BOUND` / API-key hunt over the rework diff | clean |
+| Worktree after my run | clean (`git status` empty, HEAD `6a05f47`); scratch tests lived under gitignored `coverage/` and were deleted |
+
+I rebuilt every fixture from scratch for the new semantics rather than re-running round 1's — the
+rework changed what leniency, contradiction, and lineage residue *mean*, so round-1 numbers are no
+longer the right oracle.
+
+---
+
+## 2. Blocker-by-blocker verification
+
+### B1 — cross-metric prowess ladder → **FIXED**
+
+`prowessRankGroups` is now keyed `(domainId, step, metric)`, the `metricPriority` ladder is deleted,
+every cell of a metric is ranked inside its own series, and `EvaluatorDerivedRank` carries a `metric`
+that is persisted through migration 0027.
+
+Re-ran my round-1 proofs against the new code:
+
+```
+prowess.consensus-strength.v1 : A 0.99 (n=2) #1 , B 0.50 (n=1) #2
+prowess.settlement-outcome.v1 : A 0.40 (n=1) #1
+```
+
+and the JUDGING case that was sharpest last round:
+
+```
+prowess.blind-judge-grade.v1 : J2 0.20 #1
+prowess.judging-tau.v1       : J1 0.95 #1 , J2 0.90 #2
+```
+
+A judge's add-on quality grade no longer competes against another judge's mean tau. On live
+Postgres I confirmed two different models hold `PROWESS` ordinal 1 inside one
+`(rank_kind, domain_id=NULL, step='JUDGING', as_of, derivation_version)` group — a row shape the
+pre-0027 unique key would have rejected outright, which is precisely the constraint change B1
+required. `bias.composite-rank.v1` labels the judge ladder, so a composite is now self-declaring
+rather than silently mixed.
+
+**Migration 0027 itself checks out.** On live Postgres the surviving unique constraints are exactly
+`rank_snapshot_at_seq_key UNIQUE (at_seq)`,
+`rank_snapshot_ordinal_key UNIQUE NULLS NOT DISTINCT (rank_kind, domain_id, step, metric, ordinal, as_of, derivation_version)`
+and
+`rank_snapshot_identity_key UNIQUE NULLS NOT DISTINCT (rank_kind, provider, model_id, model_version, domain_id, step, metric, as_of, derivation_version)`;
+no non-metric `rank_kind` unique key survives the dynamic drop loop, `at_seq` uniqueness is
+untouched, and re-running the migration leaves the constraint count unchanged (no drift). The
+`'legacy.mixed.v0'` backfill default is an honest label for any pre-existing mixed ladder.
+
+### B2 — automatic consensus discount → **FIXED**
+
+The priority table that gave consensus evidence weight zero is gone. My round-1 proof fixture now
+behaves correctly:
+
+```
+A: two unsettled consensus samples at 0.99 + one settlement sample at 0.4
+B: one consensus sample at 0.5
+-> prowess.consensus-strength.v1 : A #1 (0.99, n=2) , B #2 (0.5, n=1)
+-> prowess.settlement-outcome.v1 : A #1 (0.4, n=1)
+```
+
+A's consensus evidence now leads its own ladder at full weight and n=2, instead of being discarded.
+Ruling 4 / FR-3.2 AC1 / Architecture §5.2 satisfied.
+
+### B3 — silent discard of a changed re-derivation → **FIXED**
+
+`insertProfileCell` now re-reads `derivation_hash` on conflict and raises
+`TypedDomainError("EVALUATOR_PROFILE_DERIVATION_CONFLICT")` when it differs;
+`insertRankSnapshot` does the same against `source_hash` with
+`EVALUATOR_RANK_DERIVATION_CONFLICT`. I re-ran my exact round-1 scenario on live Postgres and
+checked four things, not one:
+
+1. **No false positive.** An unchanged re-run at the same `as_of`/version still resolves
+   `{ profileCellsInserted: 0, rankSnapshotsInserted: 0 }` without throwing.
+2. **Typed refusal on changed input.** After inserting a second in-window observation, re-deriving at
+   the same `as_of`/version rejects with `code: "EVALUATOR_PROFILE_DERIVATION_CONFLICT"` — the silent
+   `0/0` that round 1 produced is gone.
+3. **The refusal is atomic.** Every persisted row (values, n, `derivation_hash`) is byte-identical
+   before and after the rejected call, and the row count is unchanged — the surrounding
+   `withWriteTransaction` rolls the partial snapshot back.
+4. **Recovery works and is correct.** Bumping `derivationVersion` to 2 produces the corrected
+   `value 0.75 / n = 2` cell that the changed inputs actually imply.
+
+I also proved the **rank-level** guard is reachable rather than dead code: a brand-new identity in a
+new run leaves every pre-existing cell hash untouched (so no cell conflict fires) but displaces
+ordinal 1 in the consensus-strength ladder. That re-derivation rejects with
+`EVALUATOR_RANK_DERIVATION_CONFLICT`, the prior ordinal-1 holder is still in place, and the new
+identity left zero orphan cells behind.
+
+### B4 — bias intervals computed at the wrong range → **FIXED**
+
+`boundedMeanInterval` now scales the Hoeffding radius by `(upperBound - lowerBound)`. Hand check at
+a sample size large enough that the bound does not saturate (n=10, leniency 0.8, support `[-1,1]`):
+
+| | radius | interval lower |
+|---|---|---|
+| hand, range-2 | `2·sqrt(ln40/20)` = 0.85893876 | **−0.0589388** |
+| code | — | −0.0589388 (matched to 6 dp) |
+| round-1 unit-range bug would have given | 0.42946938 | +0.3705312 (explicitly excluded by my test) |
+
+The lineage-residue metric was additionally re-based to a non-negative `[0,1]` support, so its bounds
+and its formula now agree.
+
+---
+
+## 3. Re-verification of the previously-green surface
+
+The rework redefined three of the four bias metrics, so I recomputed all of it by hand.
+
+**Leniency (redefined).** Round 1 used "grade minus panel median on the same item". I checked the
+foundation and that formula is structurally vacuous on production data: `apps/runner/src/index.ts:1496`
+records **one** reduced judgement per node, attributed to `judged.provenanceRef` — the same artifact
+as the node's author — so a per-item panel has exactly one grade and the median is always the grade
+itself. The rework replaces it with one independent sample per run: this identity's run mean minus the
+mean of the other identities' run means. Hand-checked on a 3-identity / 2-run fixture:
+
+| | R1 mean | R2 mean | hand leniency | code |
+|---|---|---|---|---|
+| A | .625 | .5 | mean(.25, 0) = **0.125**, n=2 | 0.125, n=2 |
+| B | .25 | .5 | mean(−.3125, 0) = **−0.15625**, n=2 | −0.15625, n=2 |
+| C | .5 | — | **0.0625**, n=1 | 0.0625, n=1 |
+
+A single-identity run is now recorded as `n=0 / basis NONE` rather than as a fabricated zero — the
+right call, and the formula string is written into `derivation_input`.
+
+**Settlement contradiction (redefined).** Now one sample per settlement *event*, linked to the same
+exact model identity, with `tau > 0.5` positive and an exact `0.5` mean excluded as neutral.
+Hand-verified: identity A (run mean .7) against a false and a true outcome credited to A →
+**0.5, n=2**; identity Z (mean .2) against a false outcome → **0, n=1**; identity N (mean exactly .5)
+→ **NONE, n=0**. Given that both the tau observation and the settlement observation are keyed to the
+authoring model, this linkage is coherent and strictly better attribution than round 1, which charged
+every model in a run with a settlement it had no connection to. See §4.1 for the coverage consequence.
+
+**Lineage-favoritism residue (redefined).** Now derived from `NODE_REVIEW` outcomes grouped by the
+reviewed node's author lineage, as the mean absolute deviation of each lineage's mean from the mean
+of the others. Hand check — reviewer with lineage means `mA=1, mB=0, mC=0.5`:
+`|1−.25| = .75`, `|0−.75| = .75`, `|.5−.5| = 0` → **0.5, n=3**. Code: 0.5, n=3. A reviewer touching a
+single lineage is `NONE`, not zero.
+
+**Replace, never pool — still holds.** `activeProfileObservations` is untouched and remains the single
+choke point. I re-ran the whole round-1 attack set against the new derivations: the replaced row
+produces no cell, is cited in no `derivation_input` anywhere, supersession chains resolve to the last
+link only, an after-`as_of` replacement correctly leaves the replaced row active, and — the
+discriminating probe — the identity-linked contradiction is driven by the replacement's value (1),
+not by the replaced 0.95 (which would have given 0).
+
+**Versioned history — still clean.** On live Postgres, every v1 `profile_cell` column and every v1
+`rank_snapshot` row is byte-identical after a v2 derivation; zero duplicate
+`(model_id, metric, derivation_version)` groups; ranks are per-version independent.
+
+**Degenerate panels — still well-defined.** All-identical grades (deterministic identity tie-break, all
+scores 1), single-identity runs, review-only identities, add-on-only identities, and an empty
+observation set all produce explicit `NONE`/null cells or empty results. Full sweep across every
+fixture: no NaN, `n = consensus + settlement + addon` everywhere, `(basis='NONE') = (value IS NULL)`,
+interval null-pairing and `lower <= upper` all hold, and a SQL-side sweep for `value <> value` and the
+same invariants over everything I persisted returned zero rows. Typed refusals for invalid derivation
+version and invalid `as_of` are unchanged.
+
+**Determinism.** Output is byte-identical under input shuffling on a mixed fixture (taus, settlement,
+reviews, strength) — the new `Map`-ordered means are fed from the `at_seq`-sorted active set, so
+insertion order is input-order independent, and `stableNumber` absorbs summation-order noise.
+
+**Dark launch.** `selectJudgesByBiasRank` still has zero production callers repo-wide by my own grep
+(definition + two unit tests + the architecture test's own string literal). The architecture test now
+walks `apps/**` recursively instead of four hard-coded files — my round-1 minor 1, addressed. No
+`BOUND` state, no API keys, no `Date.now()` / zero-arg `new Date()` in the rework.
+
+---
+
+## 4. Findings carried forward (none blocking)
+
+1. **Contradiction coverage is now sparse, and that should be visible to V.** Because a sample requires
+   a settlement credited to the *same* model identity, only models whose answer actually settled get
+   contradiction samples; panel peers who judged in the same run get `NONE`. I verified this directly
+   ("a judge with no settlement credited to its own identity is unmeasured"), and the lane accepted it
+   by changing its own integration expectations from `{1, 0}` to `{null, null}`. The linkage is
+   defensible — it is honest non-attribution rather than the round-1 over-attribution — but it means
+   one of FR-5.1's three mandated bias measures will be empty for most judges and will therefore
+   contribute nothing to the composite rank. The identity-matching rule is *not* in the disclosed
+   `formula:` string (the threshold and neutral rules are). Name it for V before bind.
+2. **Landing: review-only identities receive `step='JUDGING'` bias cells.** `judgeIdentities` now
+   includes `NODE_REVIEW` producers, so a reviewer gets three `JUDGING`-step bias cells whose
+   `derivation_input` is entirely `REVIEWING` observations, and it competes in the `JUDGE` composite
+   ladder. Keeping the bias family on one step is defensible, but FR-3.5 demands exactly one
+   *documented* landing and Architecture §3.5 does not state which step bias cells live on. Document it.
+3. **The composite judge rank still treats absence of evidence inconsistently.** An identity with no
+   valued bias cell scores 0 (ranked last); an identity whose only valued cell is a trivially-zero
+   leniency scores 1 (ranked first) — I reproduced both in the same run on live Postgres (`lad:b` 0.7
+   #1 vs `lad:a` 0.0 #2) and in a pure fixture where an unmeasured model outranks one that was
+   actually blind-graded at 0.9. Two absence-of-evidence states landing at opposite ends of the ladder
+   is a bind-readiness wart for ruling 5's rank-and-select. Carried from round-1 minor 4.
+4. **Metric names and `PROFILE_DERIVATION_VERSION` did not move despite materially changed formulas.**
+   Leniency, contradiction, and lineage residue were all redefined while keeping `.v1` names and
+   `PROFILE_DERIVATION_VERSION = 1`. Harmless today (zero rows exist anywhere — the repository still
+   has no composition root), but FR-5.2's discipline argues for bumping before any collection starts.
+5. **Recovery from a derivation conflict is undocumented.** Once an `(as_of, derivation_version)` pair
+   is derived, any later in-window evidence permanently refuses re-derivation at that pair; the escape
+   is a version bump (which I proved yields the corrected value). Correct and loud, but it overloads
+   the version axis with "inputs changed" as well as "formula changed" and needs a runbook line.
+6. **`itemKey` is now dead weight.** Nothing in the derivation reads it, yet `readObservations` still
+   computes it and the rework *added* a `review.node_id` fallback for it.
+7. **`insertRankSnapshot`'s conflict lookup uses `LIMIT 1` with no `ORDER BY`** over a predicate that
+   can match the ordinal-conflict row or the identity-conflict row. Both differ from the new hash so
+   it refuses either way, but which row is reported is nondeterministic.
+8. **Architecture §3.5 drift has grown.** Its `rank_snapshot` DDL lacks `metric`; its "minimum metric
+   names" list still names `prowess.outcome.v1`, which this lane never emits, and does not mention
+   `bias.composite-rank.v1`. Reconcile the doc.
+9. **The selector-unbound test covers `apps/**` but not `packages/**`.** The property holds today (my
+   own repo-wide grep), but a caller added in `packages/runner` or `packages/critique` would not trip it.
+
+---
+
+## 5. Verdict
+
+**PASS.** All four blockers from round 1 are fixed, and I verified each one independently rather than
+taking the lane's tests as evidence: per-metric ladders with a persisted `metric` discriminator and a
+constraint surface that actually permits them; consensus evidence back at full weight leading its own
+ladder with n=2; a hash-aware upsert that refuses changed same-version inputs atomically, recovers
+correctly under a version bump, and does not false-positive on an idempotent re-run; and range-correct
+Hoeffding intervals matching my hand arithmetic to six decimal places.
+
+The rework also went beyond the blockers and repaired a defect neither review had named — the round-1
+leniency formula was structurally vacuous against the production runner's one-reduced-judgement-per-node
+shape — and the new integration suite now builds its fixtures through the real harvest repository
+rather than hand-inserted observations, which is the right standard for this lane. Everything that was
+green in round 1 is still green under the redefined metrics: replace-not-pool survived the full attack
+set, versioned history is byte-stable, degenerate panels stay well-defined with no NaN, determinism
+holds, and the selector remains provably unbound.
+
+The nine carried findings are documentation, disclosure, and bind-readiness items. None of them
+changes a persisted number, and none should hold the merge.
+
+codex
+Both round-2 artifacts are read through 2026-08-15 17:16:37 EEST: reviewer A requests only the deleted rank-change/receipt coverage; reviewer B passed the implementation. I’ll add one first-position live-Postgres test with isolated identities so the baseline is `a,b,c`, then inject real harvested leniency and assert persisted `b,c,a` ordinals plus `bias-rank:...@3` in the judging prowess cell.
+  → Add a real-harvest judge-rank movement and bias-rank receipt regression test
+  • Run focused PROG-07 tests and repository typecheck
+  • Commit test-only rework and update the external self-report
+  • Return the exact peer-review handoff marker
+exec
+/bin/zsh -lc "sed -n '1,230p' tests/integration/evaluator-profiles-rework.test.ts && sed -n '230,380p' tests/integration/evaluator-profiles-rework.test.ts" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { migrate } from "@debateai/db";
+import {
+  EvaluatorHarvestRepository,
+  PostgresEvaluatorProfileRepository
+} from "../../packages/evaluator/src/index.js";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+
+let database: TestDatabase;
+
+const strategy = {
+  rowKey: "evaluatorProfileStrategy",
+  registerVersion: 1,
+  sourceRef: "test:profile-rework:v1"
+};
+const HARVESTED_AT = new Date("2026-08-15T10:00:00.000Z");
+const AS_OF = new Date("2026-08-15T11:00:00.000Z");
+
+beforeAll(async () => {
+  database = await startTestDatabase();
+  await migrate(database.pool);
+}, 120_000);
+
+afterAll(async () => database?.stop());
+
+async function createTerminalRun(label: string): Promise<string> {
+  const run = await database.pool.query<{ run_id: string }>(`
+    INSERT INTO core.run (
+      question_line,asker_id,session_id,caller_scope,as_of,asker_risk_tier,
+      risk_tier,tier_source,tier_provenance_ref,composition_budget_tier,
+      depth_params,agent_count,discovered_panel,stranger_sample_rate,envelope_basis,
+      register_version,battery_version,ask_contract,created_at_seq
+    ) VALUES (
+      $1,$2,$3,'ASKER',$4,'casual','casual','ASKER',$5,'low','{}'::jsonb,
+      3,$6::jsonb,0,'{}'::jsonb,1,'test','{}'::jsonb,ledger.allocate_sequence()
+    ) RETURNING run_id
+  `, [
+    `profile rework ${label}`, `asker:${label}`, `session:${label}`,
+    new Date("2026-08-15T09:00:00.000Z"), `test:${label}`,
+    JSON.stringify(fixtureDiscoveredPanel(3))
+  ]);
+  const runId = run.rows[0]!.run_id;
+  await database.pool.query(`
+    INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+    VALUES ($1,ledger.allocate_sequence(),'TERMINAL','{"state":"SETTLED"}'::jsonb)
+  `, [runId]);
+  return runId;
+}
+
+async function addArtifact(input: {
+  readonly runId: string;
+  readonly modelId: string;
+  readonly maker: string;
+}): Promise<string> {
+  const artifact = await database.pool.query<{ raw_artifact_id: string }>(`
+    INSERT INTO ledger.raw_artifact (
+      raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
+      model_version,raw_text,metadata_json,parse_status,content_hash,input_hash,
+      contract_hash,at_seq
+    ) VALUES (
+      gen_random_uuid(),gen_random_uuid(),$1,$2,'openai-compatible-http',$3,$4,
+      'v1','{}','{}','PARSED',$5,'input','contract',ledger.allocate_sequence()
+    ) RETURNING raw_artifact_id
+  `, [input.runId, `provider:${input.modelId}`, input.modelId, input.maker, "a".repeat(64)]);
+  return artifact.rows[0]!.raw_artifact_id;
+}
+
+async function addJudgedNode(input: {
+  readonly runId: string;
+  readonly modelId: string;
+  readonly maker: string;
+  readonly tau: number;
+  readonly ordinal: number;
+  readonly withStrength?: number;
+}): Promise<{ readonly nodeId: string; readonly artifactId: string }> {
+  const artifactId = await addArtifact(input);
+  const root = await database.pool.query<{ node_id: string }>(`
+    SELECT node_id FROM core.node WHERE run_id=$1 AND parent_node_id IS NULL LIMIT 1
+  `, [input.runId]);
+  const parentNodeId = root.rows[0]?.node_id ?? null;
+  const node = await database.pool.query<{ node_id: string }>(`
+    INSERT INTO core.node (
+      run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
+      materialized_path,generation_status,path_status,exploration_decision,
+      way_of_knowing,provenance_ref,locator,value_laden,created_at_seq
+    ) VALUES ($1,$2,'unknown',$3,$4,$5,$6,$7,'complete','active','continue',
+      'REASONING',$8,NULL,false,ledger.allocate_sequence()) RETURNING node_id
+  `, [
+    input.runId, `claim ${input.modelId} ${input.ordinal}`, parentNodeId,
+    parentNodeId === null ? null : "support", parentNodeId === null ? 0 : 1,
+    parentNodeId === null ? 0 : input.ordinal,
+    parentNodeId === null ? "0" : `0/${input.ordinal}`,
+    artifactId
+  ]);
+  const nodeId = node.rows[0]!.node_id;
+  // This is the production runner shape: the node and its sole reduced judgement
+  // cite the same model artifact.
+  await database.pool.query(`
+    INSERT INTO ledger.reduced_judgement (
+      run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,producer,
+      replay_handle,way_of_knowing,at_seq
+    ) VALUES ($1,$2,$3,$4,'PROBABILITY',$5,$6,$7,'REASONING',ledger.allocate_sequence())
+  `, [input.runId, nodeId, artifactId, input.tau, `judgement:${nodeId}`,
+    `judge:${input.modelId}`, `replay:${nodeId}`]);
+  if (input.withStrength !== undefined) {
+    const propagation = await database.pool.query<{ propagation_run_id: string }>(`
+      INSERT INTO ledger.propagation_run (
+        run_id,input_hash,contract_hash,graph_fingerprint,arrow_order,cluster_records,
+        operator_by_parent,transmission_reductions,lift_records,judgement_selection_rule,at_seq
+      ) VALUES ($1,$2,'contract','graph','[]','[]','[]','[]','[]','{}',ledger.allocate_sequence())
+      RETURNING propagation_run_id
+    `, [input.runId, `input:${nodeId}`]);
+    await database.pool.query(`
+      INSERT INTO ledger.node_strength_record (
+        propagation_run_id,node_id,strength,number_kind,source_ref,producer,replay_handle,
+        way_of_knowing,abstained,supported_by,attacked_by,lift_marker
+      ) VALUES ($1,$2,$3,'PROBABILITY',$4,'propagator:test',$5,'REASONING',false,'[]','[]','[]')
+    `, [propagation.rows[0]!.propagation_run_id, nodeId, input.withStrength,
+      `strength:${nodeId}`, `replay:strength:${nodeId}`]);
+  }
+  return { nodeId, artifactId };
+}
+
+async function addReview(input: {
+  readonly runId: string;
+  readonly author: { readonly nodeId: string; readonly artifactId: string };
+  readonly reviewerModel: string;
+  readonly reviewerMaker: string;
+  readonly outcome: "agree" | "dispute";
+}): Promise<void> {
+  const reviewer = await addArtifact({
+    runId: input.runId, modelId: input.reviewerModel, maker: input.reviewerMaker
+  });
+  await database.pool.query(`
+    INSERT INTO ledger.node_review (
+      node_review_id,run_id,node_id,author_raw_artifact_ref,review_raw_artifact_ref,
+      outcome,reasons,at_seq
+    ) VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,'["evidence"]'::jsonb,ledger.allocate_sequence())
+  `, [input.runId, input.author.nodeId, input.author.artifactId, reviewer, input.outcome]);
+}
+
+async function addOutcome(input: {
+  readonly runId: string;
+  readonly modelId: string;
+  readonly resolvedOutcome: boolean;
+  readonly answerVersion?: number;
+}): Promise<void> {
+  const answerVersion = input.answerVersion ?? 1;
+  const carrier = await database.pool.query<{ work_item_id: string; fact_bundle_id: string }>(`
+    WITH work AS (
+      INSERT INTO core.work_item (run_id,battery_row_id,node_set,command_key,state,created_at_seq)
+      VALUES ($1,'Q61','[]',$2,'DONE',ledger.allocate_sequence()) RETURNING work_item_id
+    ), bundle AS (
+      INSERT INTO serve.fact_bundle (run_id,facts,residual_objections,content_hash,version)
+      VALUES ($1,'[]','[]',$3,$4) RETURNING fact_bundle_id
+    ) SELECT work_item_id,fact_bundle_id FROM work CROSS JOIN bundle
+  `, [input.runId, `profile:${input.modelId}:${answerVersion}`,
+    `profile:${input.modelId}:${answerVersion}`, answerVersion]);
+  const answer = await database.pool.query<{ answer_id: string }>(`
+    INSERT INTO serve.answer (
+      answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,
+      condition_marks,fact_bundle_id,sealed_at_seq
+    ) VALUES ($4,$1,$2,'SERVED','COMPOSED','SUPPORTED','{}','[]',$3,ledger.allocate_sequence())
+    RETURNING answer_id
+  `, [input.runId, carrier.rows[0]!.work_item_id, carrier.rows[0]!.fact_bundle_id, answerVersion]);
+  await database.pool.query(`
+    INSERT INTO scorecard.answer_outcome (
+      outcome_attempt_id,answer_id,answer_version,as_of,run_id,model_id,model_version,
+      provider,task_class,prior,posterior,basis,resolver_ref,resolver_is_external,
+      resolved_outcome,resolved_at,provenance_ref,scoreability,accepted,at_seq
+    ) VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,'v1','openai-compatible-http','test',
+      0.5,0.9,'EXTERNAL','resolver:test',true,$6,$3,'profile:outcome','SCOREABLE',true,
+      ledger.allocate_sequence())
+  `, [answer.rows[0]!.answer_id, answerVersion, HARVESTED_AT, input.runId,
+    input.modelId, input.resolvedOutcome]);
+}
+
+async function harvest(runId: string, observedAt = HARVESTED_AT): Promise<void> {
+  await expect(new EvaluatorHarvestRepository(database.pool).harvestTerminalRun(runId, observedAt))
+    .resolves.toMatchObject({ state: "HARVESTED" });
+}
+
+describe("PROG-07 rework regressions through production harvest shapes", () => {
+  it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+    const runId = await createTerminalRun("bias-real-shapes");
+    const authorA1 = await addJudgedNode({
+      runId, modelId: "judge:a", maker: "maker:a", tau: 0.8, ordinal: 1
+    });
+    await addJudgedNode({ runId, modelId: "judge:a", maker: "maker:a", tau: 0.6, ordinal: 2 });
+    const authorB = await addJudgedNode({
+      runId, modelId: "judge:b", maker: "maker:b", tau: 0.2, ordinal: 3
+    });
+    await addJudgedNode({ runId, modelId: "judge:boundary", maker: "maker:c", tau: 0.5, ordinal: 4 });
+    await addReview({
+      runId, author: authorA1, reviewerModel: "reviewer:r", reviewerMaker: "maker:r", outcome: "agree"
+    });
+    await addReview({
+      runId, author: authorB, reviewerModel: "reviewer:r", reviewerMaker: "maker:r", outcome: "dispute"
+    });
+    await addOutcome({ runId, modelId: "judge:a", resolvedOutcome: false, answerVersion: 1 });
+    await addOutcome({ runId, modelId: "judge:b", resolvedOutcome: true, answerVersion: 2 });
+    await addOutcome({
+      runId, modelId: "judge:boundary", resolvedOutcome: false, answerVersion: 3
+    });
+    await addOutcome({ runId, modelId: "judge:a", resolvedOutcome: true, answerVersion: 4 });
+    await harvest(runId);
+    const soloRun = await createTerminalRun("bias-degenerate-panel");
+    await addJudgedNode({
+      runId: soloRun, modelId: "judge:solo", maker: "maker:solo", tau: 0.9, ordinal: 1
+    });
+    await harvest(soloRun, new Date("2026-08-15T10:01:00.000Z"));
+
+    await new PostgresEvaluatorProfileRepository(database.pool).deriveAndPersist({
+      asOf: AS_OF, derivationVersion: 11, strategy
+    });
+    const bias = await database.pool.query<{
+      model_id: string; metric: string; value: number | null; n: number;
+    }>(`
+      SELECT model_id,metric,value,n FROM evaluator.profile_cell
+      WHERE as_of=$1 AND derivation_version=11 AND metric LIKE 'bias.%'
+      ORDER BY model_id,metric
+    `, [AS_OF]);
+    expect(bias.rows).toEqual(expect.arrayContaining([
+      { model_id: "judge:a", metric: "bias.leniency.v1", value: 0.35, n: 1 },
+      { model_id: "judge:a", metric: "bias.settlement_contradiction.v1", value: 0.5, n: 2 },
+      { model_id: "judge:b", metric: "bias.settlement_contradiction.v1", value: 1, n: 1 },
+      { model_id: "judge:boundary", metric: "bias.settlement_contradiction.v1", value: null, n: 0 },
+      { model_id: "judge:solo", metric: "bias.leniency.v1", value: null, n: 0 },
+      { model_id: "reviewer:r", metric: "bias.lineage_favoritism_residue.v1", value: 1, n: 2 }
+      { model_id: "reviewer:r", metric: "bias.lineage_favoritism_residue.v1", value: 1, n: 2 }
+    ]));
+  });
+
+  it("ranks each prowess metric independently and keeps unsuperseded consensus at full weight", async () => {
+    const first = await createTerminalRun("rank-consensus");
+    await addJudgedNode({
+      runId: first, modelId: "model:a", maker: "maker:a", tau: 0.8, ordinal: 1, withStrength: 0.9
+    });
+    await addJudgedNode({
+      runId: first, modelId: "model:b", maker: "maker:b", tau: 0.7, ordinal: 2, withStrength: 0.7
+    });
+    await harvest(first);
+    const second = await createTerminalRun("rank-settlement");
+    await addJudgedNode({
+      runId: second, modelId: "model:a", maker: "maker:a", tau: 0.8, ordinal: 1, withStrength: 0.8
+    });
+    await addOutcome({ runId: second, modelId: "model:a", resolvedOutcome: false });
+    await harvest(second, new Date("2026-08-15T10:05:00.000Z"));
+
+    await new PostgresEvaluatorProfileRepository(database.pool).deriveAndPersist({
+      asOf: AS_OF, derivationVersion: 12, strategy
+    });
+    const ranks = await database.pool.query<{ metric: string; model_id: string; ordinal: number }>(`
+      SELECT metric,model_id,ordinal FROM evaluator.rank_snapshot
+      WHERE rank_kind='PROWESS' AND as_of=$1 AND derivation_version=12
+      ORDER BY metric,ordinal
+    `, [AS_OF]);
+    expect(ranks.rows).toEqual(expect.arrayContaining([
+      { metric: "prowess.consensus-strength.v1", model_id: "model:a", ordinal: 1 },
+      { metric: "prowess.consensus-strength.v1", model_id: "model:b", ordinal: 2 },
+      expect.objectContaining({ metric: "prowess.settlement-outcome.v1", model_id: "model:a" })
+    ]));
+  });
+
+  it("refuses a changed same-version derivation instead of silently retaining stale cells", async () => {
+    const repository = new PostgresEvaluatorProfileRepository(database.pool);
+    const first = await createTerminalRun("conflict-first");
+    await addJudgedNode({ runId: first, modelId: "conflict:a", maker: "maker:a", tau: 0.8, ordinal: 1 });
+    await addJudgedNode({ runId: first, modelId: "conflict:b", maker: "maker:b", tau: 0.2, ordinal: 2 });
+    await harvest(first, new Date("2026-08-15T09:30:00.000Z"));
+    await repository.deriveAndPersist({ asOf: AS_OF, derivationVersion: 13, strategy });
+
+    const late = await createTerminalRun("conflict-late");
+    await addJudgedNode({ runId: late, modelId: "conflict:a", maker: "maker:a", tau: 0.9, ordinal: 1 });
+    await addJudgedNode({ runId: late, modelId: "conflict:b", maker: "maker:b", tau: 0.1, ordinal: 2 });
+    await harvest(late, new Date("2026-08-15T10:30:00.000Z"));
+
+    await expect(repository.deriveAndPersist({ asOf: AS_OF, derivationVersion: 13, strategy }))
+      .rejects.toMatchObject({ code: "EVALUATOR_PROFILE_DERIVATION_CONFLICT" });
+  });
+
+  it("uses the full [-1,1] Hoeffding range and clamps the interval to that domain", async () => {
+    for (let index = 0; index < 10; index += 1) {
+      const runId = await createTerminalRun(`interval-${index}`);
+      await addJudgedNode({ runId, modelId: "interval:a", maker: "maker:a", tau: 0.8, ordinal: 1 });
+      await addJudgedNode({ runId, modelId: "interval:b", maker: "maker:b", tau: 0.2, ordinal: 2 });
+      await harvest(runId, new Date(HARVESTED_AT.getTime() + index));
+    }
+    await new PostgresEvaluatorProfileRepository(database.pool).deriveAndPersist({
+      asOf: AS_OF, derivationVersion: 14, strategy
+    });
+    const interval = await database.pool.query<{
+      value: number; n: number; interval_lower: number; interval_upper: number;
+    }>(`
+      SELECT value,n,interval_lower,interval_upper FROM evaluator.profile_cell
+      WHERE model_id='interval:a' AND metric='bias.leniency.v1'
+        AND as_of=$1 AND derivation_version=14
+    `, [AS_OF]);
+    const radius = 2 * Math.sqrt(Math.log(40) / (2 * 10));
+    expect(interval.rows[0]).toEqual({
+      value: 0.6,
+      n: 10,
+      interval_lower: expect.closeTo(0.6 - radius, 10),
+      interval_upper: 1
+    });
+  });
+});
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..811e38ab0eefb1ebd86771ab460be1562e71b186
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker] of [
++      ["rankmove:a", "maker:rankmove:a"],
++      ["rankmove:b", "maker:rankmove:b"],
++      ["rankmove:c", "maker:rankmove:c"]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95],
++      ["rankmove:b", "maker:rankmove:b", 0.1],
++      ["rankmove:c", "maker:rankmove:c", 0.1]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..811e38ab0eefb1ebd86771ab460be1562e71b186
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker] of [
++      ["rankmove:a", "maker:rankmove:a"],
++      ["rankmove:b", "maker:rankmove:b"],
++      ["rankmove:c", "maker:rankmove:c"]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95],
++      ["rankmove:b", "maker:rankmove:b", 0.1],
++      ["rankmove:c", "maker:rankmove:c", 0.1]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'git diff --name-only && pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts --reporter=dot' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ exited 1 in 1938ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-si1Wy6/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-si1Wy6/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.612 EEST [97292] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.614 EEST [97292] LOG:  listening on IPv6 address "::1", port 63390
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.614 EEST [97292] LOG:  listening on IPv4 address "127.0.0.1", port 63390
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.614 EEST [97292] LOG:  listening on Unix socket "/tmp/.s.PGSQL.63390"
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.617 EEST [97298] LOG:  database system was shut down at 2026-08-15 17:19:32 EEST
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.619 EEST [97292] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.879 EEST [97303] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:32.892 EEST [97303] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > moves a judge down the persisted bias rank and receipts that ordinal in prowess
+[S00 DB embedded] 2026-08-15 17:19:32.900 EEST [97303] ERROR:  duplicate key value violates unique constraint "node_child_slot_unique"
+2026-08-15 17:19:32.900 EEST [97303] DETAIL:  Key (run_id, parent_node_id, sibling_ordinal)=(354a44e2-0aef-4b93-965a-83ef65ae3c30, aa604b6c-426f-4301-9e3e-848a304588a8, 1) already exists.
+2026-08-15 17:19:32.900 EEST [97303] STATEMENT:  
+	    INSERT INTO core.node (
+	      run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
+	      materialized_path,generation_status,path_status,exploration_decision,
+	      way_of_knowing,provenance_ref,locator,value_laden,created_at_seq
+	    ) VALUES ($1,$2,'unknown',$3,$4,$5,$6,$7,'complete','active','continue',
+	      'REASONING',$8,NULL,false,ledger.allocate_sequence()) RETURNING node_id
+	  
+
+
+x··stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.112 EEST [97292] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.112 EEST [97292] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.113 EEST [97292] LOG:  background worker "logical replication launcher" (PID 97301) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.115 EEST [97296] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.115 EEST [97296] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.172 EEST [97296] LOG:  checkpoint complete: wrote 1477 buffers (9.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.037 s, sync=0.019 s, total=0.058 s; sync files=774, longest=0.001 s, average=0.001 s; distance=9655 kB, estimate=9655 kB; lsn=0/20F4EE0, redo lsn=0/20F4EE0
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:19:33.176 EEST [97292] LOG:  database system is shut down
+
+
+··
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > moves a judge down the persisted bias rank and receipts that ordinal in prowess
+error: duplicate key value violates unique constraint "node_child_slot_unique"
+ ❯ node_modules/.pnpm/pg-pool@3.14.0_pg@8.22.0/node_modules/pg-pool/index.js:45:11
+ ❯ addJudgedNode tests/integration/evaluator-profiles-rework.test.ts:82:16
+     80|   `, [input.runId]);
+     81|   const parentNodeId = root.rows[0]?.node_id ?? null;
+     82|   const node = await database.pool.query<{ node_id: string }>(`
+       |                ^
+     83|     INSERT INTO core.node (
+     84|       run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sib…
+ ❯ tests/integration/evaluator-profiles-rework.test.ts:195:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  17:19:31
+   Duration  1.60s (transform 97ms, setup 0ms, import 311ms, tests 1.20s, environment 0ms)
+
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..811e38ab0eefb1ebd86771ab460be1562e71b186
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker] of [
++      ["rankmove:a", "maker:rankmove:a"],
++      ["rankmove:b", "maker:rankmove:b"],
++      ["rankmove:c", "maker:rankmove:c"]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95],
++      ["rankmove:b", "maker:rankmove:b", 0.1],
++      ["rankmove:c", "maker:rankmove:c", 0.1]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+context compacted
+codex
+The new regression test is in place and its first run exposed only a fixture collision: multiple child nodes reused the same sibling ordinal. I’m correcting those real-path fixture ordinals now, then I’ll run the focused suite and typecheck before committing the test-only change.
+exec
+/bin/zsh -lc 'rg -n -C 8 "moves a judge down|rankmove:" tests/integration/evaluator-profiles-rework.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ exited 127 in 0ms:
+zsh:1: command not found: rg
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..811e38ab0eefb1ebd86771ab460be1562e71b186
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker] of [
++      ["rankmove:a", "maker:rankmove:a"],
++      ["rankmove:b", "maker:rankmove:b"],
++      ["rankmove:c", "maker:rankmove:c"]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95],
++      ["rankmove:b", "maker:rankmove:b", 0.1],
++      ["rankmove:c", "maker:rankmove:c", 0.1]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'grep -n -A 110 -B 8 "moves a judge down" tests/integration/evaluator-profiles-rework.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+177-}
+178-
+179-async function harvest(runId: string, observedAt = HARVESTED_AT): Promise<void> {
+180-  await expect(new EvaluatorHarvestRepository(database.pool).harvestTerminalRun(runId, observedAt))
+181-    .resolves.toMatchObject({ state: "HARVESTED" });
+182-}
+183-
+184-describe("PROG-07 rework regressions through production harvest shapes", () => {
+185:  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
+186-    const repository = new PostgresEvaluatorProfileRepository(database.pool);
+187-    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
+188-    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
+189-    const baseline = await createTerminalRun("judge-rank-baseline");
+190-    for (const [modelId, maker] of [
+191-      ["rankmove:a", "maker:rankmove:a"],
+192-      ["rankmove:b", "maker:rankmove:b"],
+193-      ["rankmove:c", "maker:rankmove:c"]
+194-    ] as const) {
+195-      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
+196-    }
+197-    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
+198-    await repository.deriveAndPersist({
+199-      asOf: baselineAsOf, derivationVersion: 20, strategy
+200-    });
+201-
+202-    const injected = await createTerminalRun("judge-rank-injected-leniency");
+203-    for (const [modelId, maker, tau] of [
+204-      ["rankmove:a", "maker:rankmove:a", 0.95],
+205-      ["rankmove:b", "maker:rankmove:b", 0.1],
+206-      ["rankmove:c", "maker:rankmove:c", 0.1]
+207-    ] as const) {
+208-      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
+209-    }
+210-    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
+211-    await repository.deriveAndPersist({
+212-      asOf: injectedAsOf, derivationVersion: 20, strategy
+213-    });
+214-
+215-    const ranks = await database.pool.query<{
+216-      as_of: Date; model_id: string; ordinal: number; score: number;
+217-    }>(`
+218-      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
+219-      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
+220-        AND derivation_version=20
+221-      ORDER BY as_of,ordinal
+222-    `);
+223-    expect(ranks.rows).toEqual([
+224-      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
+225-      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
+226-      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
+227-      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
+228-      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
+229-      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
+230-    ]);
+231-
+232-    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
+233-      SELECT derivation_input FROM evaluator.profile_cell
+234-      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
+235-        AND model_version='v1' AND step='JUDGING'
+236-        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
+237-    `, [injectedAsOf]);
+238-    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
+239-      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
+240-    ]));
+241-  });
+242-
+243-  it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+244-    const runId = await createTerminalRun("bias-real-shapes");
+245-    const authorA1 = await addJudgedNode({
+246-      runId, modelId: "judge:a", maker: "maker:a", tau: 0.8, ordinal: 1
+247-    });
+248-    await addJudgedNode({ runId, modelId: "judge:a", maker: "maker:a", tau: 0.6, ordinal: 2 });
+249-    const authorB = await addJudgedNode({
+250-      runId, modelId: "judge:b", maker: "maker:b", tau: 0.2, ordinal: 3
+251-    });
+252-    await addJudgedNode({ runId, modelId: "judge:boundary", maker: "maker:c", tau: 0.5, ordinal: 4 });
+253-    await addReview({
+254-      runId, author: authorA1, reviewerModel: "reviewer:r", reviewerMaker: "maker:r", outcome: "agree"
+255-    });
+256-    await addReview({
+257-      runId, author: authorB, reviewerModel: "reviewer:r", reviewerMaker: "maker:r", outcome: "dispute"
+258-    });
+259-    await addOutcome({ runId, modelId: "judge:a", resolvedOutcome: false, answerVersion: 1 });
+260-    await addOutcome({ runId, modelId: "judge:b", resolvedOutcome: true, answerVersion: 2 });
+261-    await addOutcome({
+262-      runId, modelId: "judge:boundary", resolvedOutcome: false, answerVersion: 3
+263-    });
+264-    await addOutcome({ runId, modelId: "judge:a", resolvedOutcome: true, answerVersion: 4 });
+265-    await harvest(runId);
+266-    const soloRun = await createTerminalRun("bias-degenerate-panel");
+267-    await addJudgedNode({
+268-      runId: soloRun, modelId: "judge:solo", maker: "maker:solo", tau: 0.9, ordinal: 1
+269-    });
+270-    await harvest(soloRun, new Date("2026-08-15T10:01:00.000Z"));
+271-
+272-    await new PostgresEvaluatorProfileRepository(database.pool).deriveAndPersist({
+273-      asOf: AS_OF, derivationVersion: 11, strategy
+274-    });
+275-    const bias = await database.pool.query<{
+276-      model_id: string; metric: string; value: number | null; n: number;
+277-    }>(`
+278-      SELECT model_id,metric,value,n FROM evaluator.profile_cell
+279-      WHERE as_of=$1 AND derivation_version=11 AND metric LIKE 'bias.%'
+280-      ORDER BY model_id,metric
+281-    `, [AS_OF]);
+282-    expect(bias.rows).toEqual(expect.arrayContaining([
+283-      { model_id: "judge:a", metric: "bias.leniency.v1", value: 0.35, n: 1 },
+284-      { model_id: "judge:a", metric: "bias.settlement_contradiction.v1", value: 0.5, n: 2 },
+285-      { model_id: "judge:b", metric: "bias.settlement_contradiction.v1", value: 1, n: 1 },
+286-      { model_id: "judge:boundary", metric: "bias.settlement_contradiction.v1", value: null, n: 0 },
+287-      { model_id: "judge:solo", metric: "bias.leniency.v1", value: null, n: 0 },
+288-      { model_id: "reviewer:r", metric: "bias.lineage_favoritism_residue.v1", value: 1, n: 2 }
+289-    ]));
+290-  });
+291-
+292-  it("ranks each prowess metric independently and keeps unsuperseded consensus at full weight", async () => {
+293-    const first = await createTerminalRun("rank-consensus");
+294-    await addJudgedNode({
+295-      runId: first, modelId: "model:a", maker: "maker:a", tau: 0.8, ordinal: 1, withStrength: 0.9
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..811e38ab0eefb1ebd86771ab460be1562e71b186
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker] of [
++      ["rankmove:a", "maker:rankmove:a"],
++      ["rankmove:b", "maker:rankmove:b"],
++      ["rankmove:c", "maker:rankmove:c"]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal: 1 });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95],
++      ["rankmove:b", "maker:rankmove:b", 0.1],
++      ["rankmove:c", "maker:rankmove:c", 0.1]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal: 1 });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts --reporter=dot' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 1934ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-76jiL9/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-76jiL9/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:31.955 EEST [97370] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:31.957 EEST [97370] LOG:  listening on IPv6 address "::1", port 63422
+2026-08-15 17:20:31.957 EEST [97370] LOG:  listening on IPv4 address "127.0.0.1", port 63422
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:31.957 EEST [97370] LOG:  listening on Unix socket "/tmp/.s.PGSQL.63422"
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:31.960 EEST [97376] LOG:  database system was shut down at 2026-08-15 17:20:31 EEST
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:31.962 EEST [97370] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.220 EEST [97381] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.233 EEST [97381] WARNING:  there is no transaction in progress
+
+
+·····stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.468 EEST [97370] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.468 EEST [97370] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.469 EEST [97370] LOG:  background worker "logical replication launcher" (PID 97379) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.470 EEST [97374] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.470 EEST [97374] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.524 EEST [97374] LOG:  checkpoint complete: wrote 1492 buffers (9.1%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.020 s, total=0.054 s; sync files=774, longest=0.001 s, average=0.001 s; distance=9809 kB, estimate=9809 kB; lsn=0/211B648, redo lsn=0/211B648
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:32.528 EEST [97370] LOG:  database system is shut down
+
+
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  17:20:30
+   Duration  1.61s (transform 101ms, setup 0ms, import 314ms, tests 1.22s, environment 0ms)
+
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+codex
+The live-Postgres regression is now green: it proves judge `a` moves from ordinal 1 to 3 after the leniency injection and verifies the exact `bias-rank:…@3` provenance receipt. I’m running the complete focused profile set and repository typecheck next.
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts tests/integration/evaluator-profiles-database.test.ts tests/unit/evaluator-profiles.test.ts tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+exec
+/bin/zsh -lc 'pnpm typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 658ms:
+$ tsc --noEmit
+
+ succeeded in 3669ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-hDuqaD/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-hDuqaD/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:42.751 EEST [97424] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:42.753 EEST [97424] LOG:  listening on IPv6 address "::1", port 63432
+2026-08-15 17:20:42.753 EEST [97424] LOG:  listening on IPv4 address "127.0.0.1", port 63432
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:42.754 EEST [97424] LOG:  listening on Unix socket "/tmp/.s.PGSQL.63432"
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:42.756 EEST [97430] LOG:  database system was shut down at 2026-08-15 17:20:42 EEST
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:42.758 EEST [97424] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.016 EEST [97435] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.029 EEST [97435] WARNING:  there is no transaction in progress
+
+
+·····stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.266 EEST [97424] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.266 EEST [97424] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.267 EEST [97424] LOG:  background worker "logical replication launcher" (PID 97433) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.269 EEST [97428] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.269 EEST [97428] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.327 EEST [97428] LOG:  checkpoint complete: wrote 1492 buffers (9.1%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.038 s, sync=0.020 s, total=0.059 s; sync files=774, longest=0.001 s, average=0.001 s; distance=9809 kB, estimate=9809 kB; lsn=0/211B770, redo lsn=0/211B770
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:20:43.332 EEST [97424] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-UCYWmJ/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-UCYWmJ/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.266 EEST [97449] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.268 EEST [97449] LOG:  listening on IPv6 address "::1", port 63436
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.268 EEST [97449] LOG:  listening on IPv4 address "127.0.0.1", port 63436
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.268 EEST [97449] LOG:  listening on Unix socket "/tmp/.s.PGSQL.63436"
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.271 EEST [97455] LOG:  database system was shut down at 2026-08-15 17:20:44 EEST
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.273 EEST [97449] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.535 EEST [97460] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.553 EEST [97460] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.636 EEST [97449] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.636 EEST [97449] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.637 EEST [97449] LOG:  background worker "logical replication launcher" (PID 97458) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.638 EEST [97453] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.638 EEST [97453] LOG:  checkpoint starting: shutdown immediate
+
+
+··stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.692 EEST [97453] LOG:  checkpoint complete: wrote 1399 buffers (8.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.020 s, total=0.055 s; sync files=770, longest=0.001 s, average=0.001 s; distance=9269 kB, estimate=9269 kB; lsn=0/20946D8, redo lsn=0/20946D8
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:20:44.696 EEST [97449] LOG:  database system is shut down
+
+
+·····
+
+ Test Files  4 passed (4)
+      Tests  12 passed (12)
+   Start at  17:20:41
+   Duration  3.27s (transform 121ms, setup 0ms, import 643ms, tests 2.31s, environment 0ms)
+
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'git status --short && git diff --check && git diff --stat && git diff -- tests/integration/evaluator-profiles-rework.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+ M tests/integration/evaluator-profiles-rework.test.ts
+ .../integration/evaluator-profiles-rework.test.ts  | 58 ++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076..7ac2555 100644
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@ async function harvest(runId: string, observedAt = HARVESTED_AT): Promise<void>
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+codex
+All requested verification passes: 4 focused files / 12 tests, plus `tsc --noEmit`. The diff is test-only and clean; I’m committing it now, then I’ll append the round-2 evidence and commit SHA to the required self-report.
+exec
+/bin/zsh -lc 'git add tests/integration/evaluator-profiles-rework.test.ts && git commit -m "test(evaluator): restore judge rank movement coverage" && git rev-parse HEAD' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+[codex/eval-07-profiles 975ab60] test(evaluator): restore judge rank movement coverage
+ Committer: Vlad Mihai Miron <vladmihaimiron@192.168.1.36>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 1 file changed, 58 insertions(+)
+975ab60b50e4771bb4947c6ce11d22a8edeaccbb
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'tail -n 100 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+# PROG-07 Codex agent report — evaluator profiles
+
+- Worker: Codex GPT-5.6 Sol
+- Assignment: rework round 1
+- Branch: `codex/eval-07-profiles`
+- Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
+- Comments read through: both peer-review artifacts, read fully 2026-08-15
+  - `PROG-07-opus-review-1.md`
+  - `PROG-07-opus2-review-1.md`
+- Board mutations: none, as required
+
+## Rework delivered
+
+- B1: replaced the impossible same-node panel-median leniency fixture/formula with one independent sample per run: identity run mean minus the mean of the other identities' run means. One-identity runs remain `NONE`, `n=0`. Regression data enters only through the real terminal-harvest repository and uses the runner's one-artifact/one-reduced-judgement-per-node shape.
+- B2: lineage favoritism now reads real `NODE_REVIEW` evidence, joins the reviewer artifact separately from `ledger.node_review.author_raw_artifact_ref`, and measures author-lineage outcome residue only when at least two genuine author lineages exist. Real harvest fixtures prove the reviewer and authors differ.
+- B3: settlement contradiction now contributes exactly one sample per accepted settlement event, linked by run plus exact provider/model/version identity to the identity's run-mean judgement. Multiple settlements are retained; no judgement-count multiplication or latest-row truncation remains. The documented boundary is `tau > 0.5` positive, `tau < 0.5` negative, and exact `tau = 0.5` neutral/excluded.
+- B4: added `metric` to the rank model, persistence surface, Drizzle schema, and replay-safe `0027_evaluator_rank_metric.sql` migration. Rank uniqueness and grouping are now `(rank_kind, domain, step, metric, ...)`.
+- B5: removed rank-level metric priority. Every active, unsuperseded consensus cell ranks at full weight in its own metric ladder; settlement replacement remains observation-specific through the existing supersession choke point.
+- B6: equal-hash reruns remain idempotent, while changed same-key cell/rank derivations now raise typed `EVALUATOR_PROFILE_DERIVATION_CONFLICT` / `EVALUATOR_RANK_DERIVATION_CONFLICT` errors. A late, in-window harvest fixture proves changed input can no longer return `0/0` as false success.
+- B7: bounded Hoeffding intervals now multiply by the metric's true range and clamp to its declared domain. The real-path `[-1,1]` leniency fixture pins the corrected radius.
+- Widened the selector dark-launch architecture check from four entry files to every production source beneath `apps/`.
+
+## Mandatory handoffs preserved
+
+1. **REPLACE, never pool.** Eligible successors remove only their named consensus observation from every active aggregate while retaining the superseded row as audit history.
+2. **Never mix superseded-row semantics.** Consensus strength and settlement outcome remain separate prowess metrics and separate rank ladders.
+3. **Bias first.** Persistence order remains `BIAS -> JUDGE_RANK -> PROWESS -> PROWESS_RANK`; judge-dependent prowess inputs still cite their bias-rank receipt.
+
+Also preserved: derivation-version history, selector isolation/unbound state, and degenerate-panel `NONE/n=0` behavior.
+
+## Reproduce-first evidence
+
+- RED: `pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts`
+  - Production-shaped leniency remained `0`; lineage emitted no reviewer cell; contradictions were judgement-count inflated and boundary-biased; `rank_snapshot.metric` did not exist; a changed same-version derivation resolved `0/0`; signed intervals used half the required range.
+- GREEN: focused rework/profile/selector suite passes: 4 files, 11 tests.
+- The blocker fixtures create ledger nodes, reduced judgements, reviews, strengths, and settlements, then write evaluator observations only through `EvaluatorHarvestRepository.harvestTerminalRun`.
+
+## Verification
+
+- `pnpm exec vitest run --maxWorkers=1 tests/unit/evaluator*.test.ts tests/integration/evaluator*.test.ts tests/architecture/evaluator-selector-unbound.test.ts`
+  - PASS: 12 files, 88 tests, including FR-0.6 AC5 and lane-04/05/06 differentials.
+- `pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts tests/integration/evaluator-profiles-database.test.ts tests/unit/evaluator-profiles.test.ts tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot`
+  - PASS: 4 files, 11 tests.
+- `pnpm generate:contract && pnpm typecheck`
+  - PASS.
+- `pnpm lint`
+  - PASS: architecture audit 27 edge rows, zero violations; source audit zero blockers.
+- `pnpm test -- --maxWorkers=1`
+  - PASS on the committed tree: 96 files, 693 tests.
+- `git diff --check`
+  - PASS.
+- Recursive production selector scan
+  - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+
+### Continuation receipt — 2026-08-15 17:03 EEST
+
+- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
+- Re-ran the focused suite: PASS, 4 files / 11 tests.
+- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
+- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+- No additional source changes or commit were required.
+
+## Files changed
+
+- `migrations/0027_evaluator_rank_metric.sql`
+- `packages/db/src/schema.ts`
+- `packages/evaluator/src/index.ts`
+- `tests/architecture/evaluator-selector-unbound.test.ts`
+- `tests/integration/evaluator-profiles-database.test.ts`
+- `tests/integration/evaluator-profiles-rework.test.ts`
+- `tests/unit/evaluator-profiles.test.ts`
+
+## Risks / open questions
+
+- None blocking peer review.
+- Formula changes still require a new `derivation_version`; same-version materially different re-derivations now fail typed instead of corrupting or silently retaining history.
+- Live selector binding remains intentionally absent and requires a future V-authorized change.
+
+READY FOR PEER REVIEW: codex/eval-07-profiles
+
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index 284545286b7065133907277451ddfd5742143eef..5f2bce93d9b7625557de63bf7b3e9e1565f0392f
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -1,10 +1,10 @@
+ # PROG-07 Codex agent report — evaluator profiles
+ 
+ - Worker: Codex GPT-5.6 Sol
+-- Assignment: rework round 1
++- Assignment: rework round 2
+ - Branch: `codex/eval-07-profiles`
+ - Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+-- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
++- Commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb`
+ - Comments read through: both peer-review artifacts, read fully 2026-08-15
+   - `PROG-07-opus-review-1.md`
+   - `PROG-07-opus2-review-1.md`
+@@ -61,6 +61,17 @@
+ - Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+ - No additional source changes or commit were required.
+ 
++### Rework round 2 receipt — 2026-08-15 17:21 EEST
++
++- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
++- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
++- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
++- No production code changed.
++- Focused suite PASS: 4 files / 12 tests.
++- Repository typecheck PASS: `tsc --noEmit` exit 0.
++- `git diff --check` PASS.
++- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index 284545286b7065133907277451ddfd5742143eef..5f2bce93d9b7625557de63bf7b3e9e1565f0392f
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -1,10 +1,10 @@
+ # PROG-07 Codex agent report — evaluator profiles
+ 
+ - Worker: Codex GPT-5.6 Sol
+-- Assignment: rework round 1
++- Assignment: rework round 2
+ - Branch: `codex/eval-07-profiles`
+ - Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+-- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
++- Commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb`
+ - Comments read through: both peer-review artifacts, read fully 2026-08-15
+   - `PROG-07-opus-review-1.md`
+   - `PROG-07-opus2-review-1.md`
+@@ -61,6 +61,17 @@
+ - Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+ - No additional source changes or commit were required.
+ 
++### Rework round 2 receipt — 2026-08-15 17:21 EEST
++
++- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
++- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
++- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
++- No production code changed.
++- Focused suite PASS: 4 files / 12 tests.
++- Repository typecheck PASS: `tsc --noEmit` exit 0.
++- `git diff --check` PASS.
++- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+exec
+/bin/zsh -lc 'git status --short && git log -1 --oneline && tail -n 36 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+975ab60 test(evaluator): restore judge rank movement coverage
+### Continuation receipt — 2026-08-15 17:03 EEST
+
+- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
+- Re-ran the focused suite: PASS, 4 files / 11 tests.
+- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
+- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+- No additional source changes or commit were required.
+
+### Rework round 2 receipt — 2026-08-15 17:21 EEST
+
+- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
+- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
+- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
+- No production code changed.
+- Focused suite PASS: 4 files / 12 tests.
+- Repository typecheck PASS: `tsc --noEmit` exit 0.
+- `git diff --check` PASS.
+- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
+
+## Files changed
+
+- `migrations/0027_evaluator_rank_metric.sql`
+- `packages/db/src/schema.ts`
+- `packages/evaluator/src/index.ts`
+- `tests/architecture/evaluator-selector-unbound.test.ts`
+- `tests/integration/evaluator-profiles-database.test.ts`
+- `tests/integration/evaluator-profiles-rework.test.ts`
+- `tests/unit/evaluator-profiles.test.ts`
+
+## Risks / open questions
+
+- None blocking peer review.
+- Formula changes still require a new `derivation_version`; same-version materially different re-derivations now fail typed instead of corrupting or silently retaining history.
+- Live selector binding remains intentionally absent and requires a future V-authorized change.
+
+READY FOR PEER REVIEW: codex/eval-07-profiles
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index 284545286b7065133907277451ddfd5742143eef..5f2bce93d9b7625557de63bf7b3e9e1565f0392f
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -1,10 +1,10 @@
+ # PROG-07 Codex agent report — evaluator profiles
+ 
+ - Worker: Codex GPT-5.6 Sol
+-- Assignment: rework round 1
++- Assignment: rework round 2
+ - Branch: `codex/eval-07-profiles`
+ - Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+-- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
++- Commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb`
+ - Comments read through: both peer-review artifacts, read fully 2026-08-15
+   - `PROG-07-opus-review-1.md`
+   - `PROG-07-opus2-review-1.md`
+@@ -61,6 +61,17 @@
+ - Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+ - No additional source changes or commit were required.
+ 
++### Rework round 2 receipt — 2026-08-15 17:21 EEST
++
++- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
++- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
++- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
++- No production code changed.
++- Focused suite PASS: 4 files / 12 tests.
++- Repository typecheck PASS: `tsc --noEmit` exit 0.
++- `git diff --check` PASS.
++- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+  ✓ Add real-harvest rank movement and bias-rank receipt regression
+  ✓ Run focused tests and repository typecheck
+  ✓ Commit the test-only change and update the self-report
+  ✓ Return the exact peer-review readiness marker
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index 284545286b7065133907277451ddfd5742143eef..5f2bce93d9b7625557de63bf7b3e9e1565f0392f
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -1,10 +1,10 @@
+ # PROG-07 Codex agent report — evaluator profiles
+ 
+ - Worker: Codex GPT-5.6 Sol
+-- Assignment: rework round 1
++- Assignment: rework round 2
+ - Branch: `codex/eval-07-profiles`
+ - Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+-- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
++- Commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb`
+ - Comments read through: both peer-review artifacts, read fully 2026-08-15
+   - `PROG-07-opus-review-1.md`
+   - `PROG-07-opus2-review-1.md`
+@@ -61,6 +61,17 @@
+ - Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+ - No additional source changes or commit were required.
+ 
++### Rework round 2 receipt — 2026-08-15 17:21 EEST
++
++- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
++- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
++- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
++- No production code changed.
++- Focused suite PASS: 4 files / 12 tests.
++- Repository typecheck PASS: `tsc --noEmit` exit 0.
++- `git diff --check` PASS.
++- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+codex
+READY FOR PEER REVIEW: codex/eval-07-profiles
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index 284545286b7065133907277451ddfd5742143eef..5f2bce93d9b7625557de63bf7b3e9e1565f0392f
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -1,10 +1,10 @@
+ # PROG-07 Codex agent report — evaluator profiles
+ 
+ - Worker: Codex GPT-5.6 Sol
+-- Assignment: rework round 1
++- Assignment: rework round 2
+ - Branch: `codex/eval-07-profiles`
+ - Worktree: `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3`
+-- Commit: `6a05f47ae0cba411d9da2c11c73e8b47048a6952`
++- Commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb`
+ - Comments read through: both peer-review artifacts, read fully 2026-08-15
+   - `PROG-07-opus-review-1.md`
+   - `PROG-07-opus2-review-1.md`
+@@ -61,6 +61,17 @@
+ - Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
+ - No additional source changes or commit were required.
+ 
++### Rework round 2 receipt — 2026-08-15 17:21 EEST
++
++- Read both round-2 reviews fully: reviewer A requested the single rank-change coverage repair; reviewer B passed the lane.
++- Added a live-PostgreSQL regression through the real terminal-run, ledger-node, reduced-judgement, harvest, derive, and persistence paths. The baseline places judge `rankmove:a` at ordinal 1; a subsequent leniency injection changes its composite bias score and moves it to ordinal 3, so the assertion is not an identity-tiebreak-only check.
++- Reasserted the downstream provenance receipt exactly as `bias-rank:openai-compatible-http/rankmove:a/v1@3` on the persisted judging-prowess cell.
++- No production code changed.
++- Focused suite PASS: 4 files / 12 tests.
++- Repository typecheck PASS: `tsc --noEmit` exit 0.
++- `git diff --check` PASS.
++- Test-only commit: `975ab60b50e4771bb4947c6ce11d22a8edeaccbb` (`test(evaluator): restore judge rank movement coverage`).
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+diff --git a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+index 4636076907b8a13704d29ff9fcc8eea6d87f9b22..7ac255507d54ca83bed0a01458f9f8f25e0a5778
+--- a/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
++++ b/DebateAI-V3/tests/integration/evaluator-profiles-rework.test.ts
+@@ -182,6 +182,64 @@
+ }
+ 
+ describe("PROG-07 rework regressions through production harvest shapes", () => {
++  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
++    const repository = new PostgresEvaluatorProfileRepository(database.pool);
++    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
++    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
++    const baseline = await createTerminalRun("judge-rank-baseline");
++    for (const [modelId, maker, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 1],
++      ["rankmove:b", "maker:rankmove:b", 2],
++      ["rankmove:c", "maker:rankmove:c", 3]
++    ] as const) {
++      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
++    }
++    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: baselineAsOf, derivationVersion: 20, strategy
++    });
++
++    const injected = await createTerminalRun("judge-rank-injected-leniency");
++    for (const [modelId, maker, tau, ordinal] of [
++      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
++      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
++      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
++    ] as const) {
++      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
++    }
++    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
++    await repository.deriveAndPersist({
++      asOf: injectedAsOf, derivationVersion: 20, strategy
++    });
++
++    const ranks = await database.pool.query<{
++      as_of: Date; model_id: string; ordinal: number; score: number;
++    }>(`
++      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
++      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
++        AND derivation_version=20
++      ORDER BY as_of,ordinal
++    `);
++    expect(ranks.rows).toEqual([
++      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
++      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
++      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
++      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
++    ]);
++
++    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
++      SELECT derivation_input FROM evaluator.profile_cell
++      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
++        AND model_version='v1' AND step='JUDGING'
++        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
++    `, [injectedAsOf]);
++    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
++      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
++    ]));
++  });
++
+   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
+     const runId = await createTerminalRun("bias-real-shapes");
+     const authorA1 = await addJudgedNode({
+
+tokens used
+651,862
+READY FOR PEER REVIEW: codex/eval-07-profiles
+=== codex exited Sat Aug 15 17:21:28 EEST 2026 ===

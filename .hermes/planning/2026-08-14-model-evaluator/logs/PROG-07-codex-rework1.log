@@ -1,0 +1,1519 @@
+=== PROG-07 rework1 launch Sat Aug 15 16:23:30 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00576-ae9f-7fa1-b8bd-0d6b97c28881
+--------
+user
+/goal REWORK ROUND 1 of your eval-07-profiles lane (same goal, same session, same worktree). BOTH peer reviews returned REWORK. Read both fully: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-07-opus-review-1.md and PROG-07-opus2-review-1.md. Seven distinct blockers; your replace-not-pool, versioning, bias-first ordering, selector isolation, and degenerate-panel handling all passed — preserve them. B1: bias.leniency.v1 is a fabricated zero — the runner writes ONE reduced_judgement per node, so per-node median([v])=v and leniency is identically 0 with fake tightening confidence; your fixtures hand-wrote multi-judge-per-node shapes harvest cannot emit. Redesign leniency against data that actually exists (e.g. judge-vs-panel across the add-on pass's blind grades of the same judged material, or per-run judge-mean vs panel-mean — derive from REAL harvest/add-on shapes, and build fixtures ONLY through the real harvest/add-on write paths). B2: bias.lineage_favoritism_residue.v1 is structurally always empty (subject_maker and author_maker resolve to the same artifact; otherLineage never populates; the COALESCE fallbacks untested) — fix the join so subject and author genuinely differ, with real-path fixtures. B3: settlement-contradiction denominator pairs every judgement with one run-level settlement — correlated-sample n inflation, silent drop of all but the last settlement, and an undocumented asymmetric >=0.5 threshold; fix denominator semantics and document the threshold. B4 (both seats): prowessRankGroups keys on (domainId, step) WITHOUT metric — incompatible metrics ranked in one ladder; add metric to the rank key and the rank_snapshot schema surface. B5: metricPriority zero-weights consensus evidence once any settlement cell exists — this violates V's ruling 4 (consensus counts at FULL weight where nothing settles); settlement replaces consensus ONLY for the same observation via supersession, never wholesale at rank level. B6: ON CONFLICT DO NOTHING on a key excluding derivation_hash silently discards materially different re-derivations (proven: second in-window judgement, same as_of/version, insert count 0, stale cell kept); a changed derivation_input/hash must produce a new row or a typed refusal — never silence; fix the test that asserts 0/0 as success. B7 (both seats): Hoeffding half-width uses range 1 on [-1,1] metrics — intervals understated 2x; use the true range per metric and clamp to the metric's domain. Reproduce-first on every blocker: failing tests via REAL write paths (no hand-written observation shapes), then green. Run focused tests + repository typecheck + the differential suites, commit, update self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-07-profiles
+=== codex exited Sat Aug 15 17:02:53 EEST 2026 ===
+=== PROG-07 rework1 continuation Sat Aug 15 17:02:56 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00576-ae9f-7fa1-b8bd-0d6b97c28881
+--------
+user
+/goal CONTINUATION of your eval-07-profiles rework (same goal, same session). Your previous turn committed 6a05f47 fix(evaluator): correct profile derivation semantics, then hung idle; the client was terminated (known CLI hang — work is safe). Briefly state what you completed vs the seven-blocker rework brief (B1 leniency redesign on real data, B2 favoritism join fix, B3 contradiction denominator, B4 metric in rank key, B5 consensus full weight restored, B6 hash-aware upsert, B7 honest intervals), then finish anything remaining: run the focused tests, the differential suites, AND repository typecheck and show results; commit anything uncommitted; update your self-report at /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md; then print exactly: READY FOR PEER REVIEW: codex/eval-07-profiles
+codex
+I’m resuming the same PROG-07 worker session under the heartbeat protocol. The committed rework covers all seven findings: B1 real run-panel leniency, B2 genuine reviewer/author lineage joins, B3 event-level settlement denominator, B4 metric-scoped rank keys, B5 full-weight unsuperseded consensus ladders, B6 typed hash-conflict refusal, and B7 true-range clamped intervals. I’m re-running the requested evidence on the committed tree, then I’ll refresh the self-report and return the exact handoff marker.
+exec
+/bin/zsh -lc 'cat .agents/skills/heartbeat-protocol/SKILL.md >/dev/null && git status --short && git branch --show-current && git rev-parse HEAD' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+codex/eval-07-profiles
+6a05f47ae0cba411d9da2c11c73e8b47048a6952
+
+  → Re-run focused PROG-07 profile and selector tests
+  • Run evaluator differential suites and repository typecheck
+  • Commit any remaining work and refresh the external self-report
+  • Return the exact peer-review handoff marker
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts tests/integration/evaluator-profiles-database.test.ts tests/unit/evaluator-profiles.test.ts tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 3563ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded]   LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-K7kw98/data ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-K7kw98/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.445 EEST [93773] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.447 EEST [93773] LOG:  listening on IPv6 address "::1", port 62388
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.447 EEST [93773] LOG:  listening on IPv4 address "127.0.0.1", port 62388
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.447 EEST [93773] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62388"
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.450 EEST [93779] LOG:  database system was shut down at 2026-08-15 17:03:25 EEST
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.452 EEST [93773] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.718 EEST [93784] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.731 EEST [93784] WARNING:  there is no transaction in progress
+
+
+··stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.931 EEST [93773] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.931 EEST [93773] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.932 EEST [93773] LOG:  background worker "logical replication launcher" (PID 93782) exited with exit code 1
+
+
+··stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.934 EEST [93777] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.934 EEST [93777] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.992 EEST [93777] LOG:  checkpoint complete: wrote 1475 buffers (9.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.039 s, sync=0.019 s, total=0.059 s; sync files=773, longest=0.001 s, average=0.001 s; distance=9639 kB, estimate=9639 kB; lsn=0/20F1120, redo lsn=0/20F1120
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:25.997 EEST [93773] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-rh5ZHV/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-rh5ZHV/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.932 EEST [93798] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.934 EEST [93798] LOG:  listening on IPv6 address "::1", port 62391
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.934 EEST [93798] LOG:  listening on IPv4 address "127.0.0.1", port 62391
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.934 EEST [93798] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62391"
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.937 EEST [93804] LOG:  database system was shut down at 2026-08-15 17:03:26 EEST
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:26.939 EEST [93798] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.201 EEST [93809] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.215 EEST [93809] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.299 EEST [93798] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.299 EEST [93798] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.300 EEST [93798] LOG:  background worker "logical replication launcher" (PID 93807) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.301 EEST [93802] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.301 EEST [93802] LOG:  checkpoint starting: shutdown immediate
+
+
+··stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.356 EEST [93802] LOG:  checkpoint complete: wrote 1399 buffers (8.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.034 s, sync=0.020 s, total=0.055 s; sync files=770, longest=0.001 s, average=0.001 s; distance=9269 kB, estimate=9269 kB; lsn=0/20946D8, redo lsn=0/20946D8
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:27.360 EEST [93798] LOG:  database system is shut down
+
+
+·····
+
+ Test Files  4 passed (4)
+      Tests  11 passed (11)
+   Start at  17:03:24
+   Duration  3.20s (transform 106ms, setup 0ms, import 588ms, tests 2.30s, environment 0ms)
+
+
+codex
+Focused verification is green: 4 files, 11 tests. That includes the real-harvest B1–B7 regressions, live PostgreSQL persistence/versioning, and recursive proof that the selector has no production callers. Next is the lane-04/05/06 evaluator differential sweep, followed by repository typecheck.
+  ✓ Re-run focused PROG-07 profile and selector tests
+  → Run evaluator differential suites and repository typecheck
+  • Commit any remaining work and refresh the external self-report
+  • Return the exact peer-review handoff marker
+exec
+/bin/zsh -lc 'pnpm exec vitest run --maxWorkers=1 tests/unit/evaluator*.test.ts tests/integration/evaluator*.test.ts tests/architecture/evaluator-selector-unbound.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 9986ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-3FHzkv/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-3FHzkv/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.613 EEST [93836] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.615 EEST [93836] LOG:  listening on IPv6 address "::1", port 62400
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.615 EEST [93836] LOG:  listening on IPv4 address "127.0.0.1", port 62400
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.615 EEST [93836] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62400"
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.618 EEST [93842] LOG:  database system was shut down at 2026-08-15 17:03:40 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.621 EEST [93836] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.882 EEST [93847] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:40.895 EEST [93847] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation
+[S00 DB embedded] 2026-08-15 17:03:40.934 EEST [93847] ERROR:  append-only or immutable table observation rejects UPDATE
+2026-08-15 17:03:40.934 EEST [93847] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 17:03:40.934 EEST [93847] STATEMENT:  UPDATE evaluator.observation SET value=0.5 WHERE observation_id=$1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 17:03:40.995 EEST [93848] ERROR:  duplicate key value violates unique constraint "question_domain_run_id_key"
+2026-08-15 17:03:40.995 EEST [93848] DETAIL:  Key (run_id)=(da54cbce-9189-4a8c-9653-7ed0837f741e) already exists.
+2026-08-15 17:03:40.995 EEST [93848] STATEMENT:  
+	        INSERT INTO evaluator.question_domain (
+	          run_id, domain_id, assignment_basis, domain_admission_id,
+	          tagger_raw_artifact_ref, assigned_at, at_seq
+	        ) VALUES ($1,$2,$3,$4,$5,statement_timestamp(),$6)
+	        RETURNING question_domain_id
+	      
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 17:03:40.995 EEST [93848] ERROR:  append-only or immutable table question_domain rejects UPDATE
+2026-08-15 17:03:40.995 EEST [93848] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 17:03:40.995 EEST [93848] STATEMENT:  UPDATE evaluator.question_domain SET domain_id=domain_id WHERE run_id=$1
+
+
+ ✓ tests/integration/evaluator-database.test.ts > terminal evaluator harvest > harvests once with nullable domain, excludes evaluator attempts, meters in the worker, and leaves Q59 untouched 32ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > projects usage and versioned relative cost into both evaluator metering tables 3ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > creates every evaluator table under append-only mutation guards 2ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation 21ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > grants the API only evaluator reads plus consumer selection inserts 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > persists a typed REFUSED receipt for a blank proposal 4ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a direct existing-domain id selection 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a REFUSED receipt when SELECT_EXISTING names an unresolved domain id 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > tags through the evaluator landing without mutating memory.question_key 7ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > keeps a container-down ask untagged and reconciles it later 7ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records exact, rejected near-duplicate, and grown admission decisions 15ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only 22ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-yFVIej/data ... ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > serializes concurrent near-duplicate proposals into one grown domain 24ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-yFVIej/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.599 EEST [93863] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.601 EEST [93863] LOG:  listening on IPv6 address "::1", port 62406
+2026-08-15 17:03:41.601 EEST [93863] LOG:  listening on IPv4 address "127.0.0.1", port 62406
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.601 EEST [93863] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62406"
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.604 EEST [93869] LOG:  database system was shut down at 2026-08-15 17:03:41 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.606 EEST [93863] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.858 EEST [93874] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.876 EEST [93874] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.902 EEST [93863] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.902 EEST [93863] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.903 EEST [93863] LOG:  background worker "logical replication launcher" (PID 93872) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.903 EEST [93867] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.903 EEST [93867] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.955 EEST [93867] LOG:  checkpoint complete: wrote 1340 buffers (8.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.032 s, sync=0.019 s, total=0.052 s; sync files=769, longest=0.001 s, average=0.001 s; distance=9148 kB, estimate=9148 kB; lsn=0/20761C0, redo lsn=0/20761C0
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 17:03:41.959 EEST [93863] LOG:  database system is shut down
+
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission 980ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > returns typed UNTAGGED when the persisted run cannot be resolved 1ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > tags and leaves an already-served answer readable at the product envelope ceiling 37ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > reconciles after an ask-time provider failure without exhausting the evaluator attempt tuple 12ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > does not fire product liveness when evaluator tags span model versions 12ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > keeps the asker-visible execution digest byte-identical with tagging off versus on 8ms
+ ✓ tests/integration/evaluator-database.test.ts > FR-0.6 AC5 persisted panel-isolation differential > persists byte-identical product membership and agent_count with evaluator healthy versus absent 56ms
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.144 EEST [93836] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.144 EEST [93836] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.145 EEST [93836] LOG:  background worker "logical replication launcher" (PID 93845) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.146 EEST [93840] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.146 EEST [93840] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.206 EEST [93840] LOG:  checkpoint complete: wrote 1490 buffers (9.1%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.035 s, sync=0.024 s, total=0.060 s; sync files=771, longest=0.001 s, average=0.001 s; distance=9347 kB, estimate=9347 kB; lsn=0/20A7E70, redo lsn=0/20A7E70
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:42.210 EEST [93836] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-lqHNJE/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-lqHNJE/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.146 EEST [93889] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.147 EEST [93889] LOG:  listening on IPv6 address "::1", port 62410
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.147 EEST [93889] LOG:  listening on IPv4 address "127.0.0.1", port 62410
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.148 EEST [93889] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62410"
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.151 EEST [93895] LOG:  database system was shut down at 2026-08-15 17:03:43 EEST
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.153 EEST [93889] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.451 EEST [93900] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.463 EEST [93900] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts > judge-grading add-on database maker guard > rejects a null-run grader artifact whose maker equals the graded judge maker
+[S00 DB embedded] 2026-08-15 17:03:43.469 EEST [93900] ERROR:  PRODUCER_GRADING_FORBIDDEN: run 309b5653-43d6-4e38-bd66-0dddbc6501fc graded maker:judge grader maker:judge
+2026-08-15 17:03:43.469 EEST [93900] CONTEXT:  PL/pgSQL function evaluator.reject_same_maker_addon() line 21 at RAISE
+2026-08-15 17:03:43.469 EEST [93900] STATEMENT:  
+	    INSERT INTO evaluator.observation (
+	      run_id, provider, model_id, model_version, domain_id, step, metric,
+	      value, outcome_json, truth_basis, source_kind, source_ref,
+	      source_raw_artifact_ref, answer_outcome_id, graded_raw_artifact_ref,
+	      grader_raw_artifact_ref, derivation_version, supersedes_observation_id,
+	      provenance_json, observed_at, at_seq
+	    ) VALUES (
+	      $1,'openai-compatible-http','model:judge','judge-v1',NULL,'JUDGING',
+	      'judging.blind-grade.v1',0.8,'{"verdict":"UPHOLD"}'::jsonb,
+	      'BLIND_ADDON','BLIND_JUDGE_GRADE',$4,$2,NULL,$2,$3,1,NULL,
+	      '{}'::jsonb,now(),ledger.allocate_sequence()
+	    )
+	  
+
+
+ ✓ tests/integration/evaluator-addon-database.test.ts > judge-grading add-on database maker guard > accepts a null-run evaluator grader artifact from a different maker 4ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > judge-grading add-on database maker guard > rejects a null-run grader artifact whose maker equals the graded judge maker 2ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > runs only after harvest and persists one blind add-on observation 33ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > enforces the SQL-backed cross-invocation ceiling after three real failed passes 12ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > does not burn run attempts during a deployment isolation fault 9ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > persists invalid-policy and family-version preflight receipts and permits recovery 9ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > keeps twelve same-run invocations above pool max bounded to one provider call 82ms
+ ✓ tests/integration/evaluator-addon-database.test.ts > persisted judge-grading add-on > completes twelve distinct-run passes above pool max and leaves the pool usable 141ms
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.756 EEST [93889] LOG:  received fast shutdown request
+2026-08-15 17:03:43.757 EEST [93889] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.758 EEST [93889] LOG:  background worker "logical replication launcher" (PID 93898) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.758 EEST [93893] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.759 EEST [93893] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.809 EEST [93893] LOG:  checkpoint complete: wrote 1385 buffers (8.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.030 s, sync=0.019 s, total=0.051 s; sync files=772, longest=0.001 s, average=0.001 s; distance=9298 kB, estimate=9298 kB; lsn=0/209BD88, redo lsn=0/209BD88
+
+
+stdout | tests/integration/evaluator-addon-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:43.814 EEST [93889] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-SX7pWe/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-SX7pWe/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:44.742 EEST [93944] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:44.746 EEST [93944] LOG:  listening on IPv6 address "::1", port 62435
+2026-08-15 17:03:44.746 EEST [93944] LOG:  listening on IPv4 address "127.0.0.1", port 62435
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:44.746 EEST [93944] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62435"
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:44.749 EEST [93950] LOG:  database system was shut down at 2026-08-15 17:03:44 EEST
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:44.752 EEST [93944] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.009 EEST [93955] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.022 EEST [93955] WARNING:  there is no transaction in progress
+
+
+ ✓ tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions 60ms
+ ✓ tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > ranks each prowess metric independently and keeps unsuperseded consensus at full weight 38ms
+ ✓ tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > refuses a changed same-version derivation instead of silently retaining stale cells 32ms
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.218 EEST [93944] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.218 EEST [93944] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.219 EEST [93944] LOG:  background worker "logical replication launcher" (PID 93953) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.221 EEST [93948] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.221 EEST [93948] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/evaluator-profiles-rework.test.ts > PROG-07 rework regressions through production harvest shapes > uses the full [-1,1] Hoeffding range and clamps the interval to that domain 65ms
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.280 EEST [93948] LOG:  checkpoint complete: wrote 1475 buffers (9.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.039 s, sync=0.020 s, total=0.060 s; sync files=773, longest=0.001 s, average=0.001 s; distance=9640 kB, estimate=9640 kB; lsn=0/20F1268, redo lsn=0/20F1268
+
+
+stdout | tests/integration/evaluator-profiles-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:45.285 EEST [93944] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-eGps0e/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-eGps0e/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.219 EEST [93969] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.221 EEST [93969] LOG:  listening on IPv6 address "::1", port 62439
+2026-08-15 17:03:46.221 EEST [93969] LOG:  listening on IPv4 address "127.0.0.1", port 62439
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.222 EEST [93969] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62439"
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.225 EEST [93975] LOG:  database system was shut down at 2026-08-15 17:03:46 EEST
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.227 EEST [93969] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.488 EEST [93980] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.501 EEST [93980] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > isolates a poisoned run, harvests a later healthy run, and bounds poison retries
+[S00 DB embedded] 2026-08-15 17:03:46.602 EEST [93980] ERROR:  PROG05_BATCH_POISON
+2026-08-15 17:03:46.602 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_batch_poison() line 4 at RAISE
+2026-08-15 17:03:46.602 EEST [93980] STATEMENT:  
+	            INSERT INTO evaluator.observation (
+	              run_id, provider, model_id, model_version, domain_id, step, metric,
+	              value, outcome_json, truth_basis, source_kind, source_ref,
+	              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+	              supersedes_observation_id, provenance_json, observed_at, at_seq
+	            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+	            ON CONFLICT DO NOTHING
+	          
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > isolates a poisoned run, harvests a later healthy run, and bounds poison retries
+[S00 DB embedded] 2026-08-15 17:03:46.613 EEST [93980] ERROR:  PROG05_BATCH_POISON
+2026-08-15 17:03:46.613 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_batch_poison() line 4 at RAISE
+2026-08-15 17:03:46.613 EEST [93980] STATEMENT:  
+	            INSERT INTO evaluator.observation (
+	              run_id, provider, model_id, model_version, domain_id, step, metric,
+	              value, outcome_json, truth_basis, source_kind, source_ref,
+	              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+	              supersedes_observation_id, provenance_json, observed_at, at_seq
+	            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+	            ON CONFLICT DO NOTHING
+	          
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > isolates a poisoned run, harvests a later healthy run, and bounds poison retries
+[S00 DB embedded] 2026-08-15 17:03:46.620 EEST [93980] ERROR:  PROG05_BATCH_POISON
+2026-08-15 17:03:46.620 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_batch_poison() line 4 at RAISE
+2026-08-15 17:03:46.620 EEST [93980] STATEMENT:  
+	            INSERT INTO evaluator.observation (
+	              run_id, provider, model_id, model_version, domain_id, step, metric,
+	              value, outcome_json, truth_basis, source_kind, source_ref,
+	              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+	              supersedes_observation_id, provenance_json, observed_at, at_seq
+	            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+	            ON CONFLICT DO NOTHING
+	          
+
+
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > revisits an already-harvested run and supersedes a backdated late settlement 29ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > harvests a run whose backdated settlement already exists on the first pass 11ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > keeps a second settlement auditable and receipts its unavailable supersession 12ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > records malformed observed usage as UNMETERED and still harvests an unrelated run 13ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > reports an outer metering failure without fabricating a failed-call count 4ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > proves the zero-provider-call assertion detects injected evidence and passes for harvest 10ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > records MODEL_IDENTITY_INCOMPLETE for skipped source evidence 8ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > isolates a poisoned run, harvests a later healthy run, and bounds poison retries 36ms
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > parks a phase-1 failure after three attempts without starving a healthy run
+[S00 DB embedded] 2026-08-15 17:03:46.638 EEST [93980] ERROR:  PROG05_PREPARE_POISON
+2026-08-15 17:03:46.638 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_prepare_poison() line 4 at RAISE
+2026-08-15 17:03:46.638 EEST [93980] STATEMENT:  
+	      INSERT INTO evaluator.pipeline_event (
+	        run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
+	      ) VALUES ($1,'HARVEST',$2,$3,$4,$5,$6,$7)
+	    
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > parks a phase-1 failure after three attempts without starving a healthy run
+[S00 DB embedded] 2026-08-15 17:03:46.649 EEST [93980] ERROR:  PROG05_PREPARE_POISON
+2026-08-15 17:03:46.649 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_prepare_poison() line 4 at RAISE
+2026-08-15 17:03:46.649 EEST [93980] STATEMENT:  
+	      INSERT INTO evaluator.pipeline_event (
+	        run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
+	      ) VALUES ($1,'HARVEST',$2,$3,$4,$5,$6,$7)
+	    
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > parks a phase-1 failure after three attempts without starving a healthy run
+[S00 DB embedded] 2026-08-15 17:03:46.657 EEST [93980] ERROR:  PROG05_PREPARE_POISON
+2026-08-15 17:03:46.657 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_prepare_poison() line 4 at RAISE
+2026-08-15 17:03:46.657 EEST [93980] STATEMENT:  
+	      INSERT INTO evaluator.pipeline_event (
+	        run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
+	      ) VALUES ($1,'HARVEST',$2,$3,$4,$5,$6,$7)
+	    
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > keeps STARTED and FAILED receipts durable when an observation write fails
+[S00 DB embedded] 2026-08-15 17:03:46.669 EEST [93980] ERROR:  PROG05_FORCED_OBSERVATION_FAILURE
+2026-08-15 17:03:46.669 EEST [93980] CONTEXT:  PL/pgSQL function evaluator.fail_prog05_rework_test() line 2 at RAISE
+2026-08-15 17:03:46.669 EEST [93980] STATEMENT:  
+	            INSERT INTO evaluator.observation (
+	              run_id, provider, model_id, model_version, domain_id, step, metric,
+	              value, outcome_json, truth_basis, source_kind, source_ref,
+	              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+	              supersedes_observation_id, provenance_json, observed_at, at_seq
+	            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+	            ON CONFLICT DO NOTHING
+	          
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.671 EEST [93969] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.671 EEST [93969] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.672 EEST [93969] LOG:  background worker "logical replication launcher" (PID 93978) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.673 EEST [93973] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.673 EEST [93973] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > parks a phase-1 failure after three attempts without starving a healthy run 38ms
+ ✓ tests/integration/evaluator-harvest-rework.test.ts > PROG-05 rework regressions > keeps STARTED and FAILED receipts durable when an observation write fails 7ms
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.730 EEST [93973] LOG:  checkpoint complete: wrote 1433 buffers (8.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.032 s, sync=0.024 s, total=0.057 s; sync files=769, longest=0.002 s, average=0.001 s; distance=9255 kB, estimate=9255 kB; lsn=0/20910A0, redo lsn=0/20910A0
+
+
+stdout | tests/integration/evaluator-harvest-rework.test.ts
+[S00 DB embedded] 2026-08-15 17:03:46.734 EEST [93969] LOG:  database system is shut down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-aTbKAK/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-aTbKAK/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.673 EEST [93994] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.675 EEST [93994] LOG:  listening on IPv6 address "::1", port 62443
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.675 EEST [93994] LOG:  listening on IPv4 address "127.0.0.1", port 62443
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.676 EEST [93994] LOG:  listening on Unix socket "/tmp/.s.PGSQL.62443"
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.679 EEST [94000] LOG:  database system was shut down at 2026-08-15 17:03:47 EEST
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.681 EEST [93994] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.937 EEST [94005] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:47.949 EEST [94005] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.033 EEST [93994] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.033 EEST [93994] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.034 EEST [93994] LOG:  background worker "logical replication launcher" (PID 94003) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.035 EEST [93998] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.035 EEST [93998] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/evaluator-profiles-database.test.ts > evaluator profile persistence on live Postgres > exercises replace-not-pool and the contradiction boundary through the real database path 26ms
+ ✓ tests/integration/evaluator-profiles-database.test.ts > evaluator profile persistence on live Postgres > keeps versioned cells and ranks append-only 57ms
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.088 EEST [93998] LOG:  checkpoint complete: wrote 1399 buffers (8.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.032 s, sync=0.020 s, total=0.053 s; sync files=770, longest=0.001 s, average=0.001 s; distance=9269 kB, estimate=9269 kB; lsn=0/20946D8, redo lsn=0/20946D8
+
+
+stdout | tests/integration/evaluator-profiles-database.test.ts
+[S00 DB embedded] 2026-08-15 17:03:48.092 EEST [93994] LOG:  database system is shut down
+
+
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > normalizes observed external spend without treating larger local token volume as paid cost 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > keeps paid spend UNKNOWN when any metered call lacks observed cost 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > scaffolds the evaluator worker as a separate composition root 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > reads the pinned purpose-specific local family and refuses panel collisions 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > rejects remote evaluator endpoints 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > defaults dispatch influence to UNBOUND when the row is absent or malformed 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > enumerates vLLM models without authorization and fails closed on absence 15ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > classifies evaluator catalog deadline expiry 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > refuses an isolated-family collision before catalog collection or persistence 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > constructs an allowlist-only blind DTO 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > normalizes Unicode, case, and whitespace deterministically 1ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > matches exact normalized names and rejects near duplicates 9ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > admits genuinely new labels and rejects labels outside fixed bounds 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > returns candidates in stable similarity/name/id order 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > exposes the approved 0024 seed to the migration runner scan 1ms
+ ✓ tests/unit/evaluator-profiles.test.ts > deterministic evaluator profile derivation > replaces superseded consensus evidence and never mixes strength with settlement semantics 10ms
+ ✓ tests/unit/evaluator-profiles.test.ts > deterministic evaluator profile derivation > keeps derivation versions independent and exposes sample counts and pinned intervals 1ms
+ ✓ tests/unit/evaluator-profiles.test.ts > isolated unbound judge selector > rank-and-selects only healthy eligible makers without weight multipliers 0ms
+ ✓ tests/unit/evaluator-profiles.test.ts > isolated unbound judge selector > rejects self-routing inputs 0ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > uses a deterministic every-Nth collect-only sampling policy 1ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > makes one null-run evaluator-scoped blinded call and writes a JUDGING observation 4ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > enforces the hard retry ceiling even when policy configuration asks for more 1ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > refuses a same-maker grader in code before any provider call 1ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > asserts evaluator provider isolation immediately before the only model call 0ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > skips non-sampled and already-observed runs without a model call 0ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > stops cross-invocation retries at the evaluator-owned run ceiling 0ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > classifies deployment isolation refusal consistently as a non-counted skip 0ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > validates worker caller input before entering the repository failure boundary 1ms
+ ✓ tests/unit/evaluator-addon.test.ts > judge-grading evaluator add-on > destroys the checked-out client when advisory unlock throws 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > selects an existing domain id and persists only the evaluator landing 4ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > routes a genuinely new proposal through deterministic admission guardrails 1ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > records a model refusal and returns untagged without assigning a domain 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > degrades container failure to a typed untagged result 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > records a typed timeout result instead of collapsing it into a generic provider failure 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > returns typed UNTAGGED when repository preflight fails 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > short-circuits an already-tagged retry without another provider call or admission 1ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > re-asserts provider isolation before the observed vLLM call boundary 0ms
+ ✓ tests/architecture/evaluator-selector-unbound.test.ts > evaluator judge selector dark launch > has zero production callers while evaluator dispatch is UNBOUND 6ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > projects authoring, judging, and reviewing observations with nullable authoritative domain 1ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > excludes evaluator call sites by attempt id even when the artifact is null-run-scoped 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > uses question_domain input as authoritative instead of pipeline receipts 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > marks accepted external outcomes as settlement-fed without manufacturing Q59 rows 1ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > uses one consensus row once when multiple settlements target the same model 0ms
+ ✓ tests/unit/evaluator-harvest.test.ts > deterministic evaluator harvest projector > is byte-for-byte deterministic for the same snapshot 0ms
+
+ Test Files  12 passed (12)
+      Tests  88 passed (88)
+   Start at  17:03:39
+   Duration  9.67s (transform 292ms, setup 0ms, import 1.74s, tests 7.01s, environment 1ms)
+
+
+exec
+/bin/zsh -lc 'pnpm typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 620ms:
+$ tsc --noEmit
+
+codex
+The differential sweep is green: 12 files, 88 tests, covering FR-0.6 AC5 plus the lane-04 tagger, lane-05 harvest/reconciliation, lane-06 add-on, and PROG-07 profile paths. Repository typecheck also passes (`tsc --noEmit`, exit 0). The worktree remains clean at commit `6a05f47`; only the required external report needs its continuation receipt refreshed.
+exec
+/bin/zsh -lc 'git status --short && tail -45 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+3. **Bias first.** Persistence order remains `BIAS -> JUDGE_RANK -> PROWESS -> PROWESS_RANK`; judge-dependent prowess inputs still cite their bias-rank receipt.
+
+Also preserved: derivation-version history, selector isolation/unbound state, and degenerate-panel `NONE/n=0` behavior.
+
+## Reproduce-first evidence
+
+- RED: `pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts`
+  - Production-shaped leniency remained `0`; lineage emitted no reviewer cell; contradictions were judgement-count inflated and boundary-biased; `rank_snapshot.metric` did not exist; a changed same-version derivation resolved `0/0`; signed intervals used half the required range.
+- GREEN: focused rework/profile/selector suite passes: 4 files, 11 tests.
+- The blocker fixtures create ledger nodes, reduced judgements, reviews, strengths, and settlements, then write evaluator observations only through `EvaluatorHarvestRepository.harvestTerminalRun`.
+
+## Verification
+
+- `pnpm exec vitest run --maxWorkers=1 tests/unit/evaluator*.test.ts tests/integration/evaluator*.test.ts tests/architecture/evaluator-selector-unbound.test.ts`
+  - PASS: 12 files, 88 tests, including FR-0.6 AC5 and lane-04/05/06 differentials.
+- `pnpm exec vitest run tests/integration/evaluator-profiles-rework.test.ts tests/integration/evaluator-profiles-database.test.ts tests/unit/evaluator-profiles.test.ts tests/architecture/evaluator-selector-unbound.test.ts --reporter=dot`
+  - PASS: 4 files, 11 tests.
+- `pnpm generate:contract && pnpm typecheck`
+  - PASS.
+- `pnpm lint`
+  - PASS: architecture audit 27 edge rows, zero violations; source audit zero blockers.
+- `pnpm test -- --maxWorkers=1`
+  - PASS on the committed tree: 96 files, 693 tests.
+- `git diff --check`
+  - PASS.
+- Recursive production selector scan
+  - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+
+## Files changed
+
+- `migrations/0027_evaluator_rank_metric.sql`
+- `packages/db/src/schema.ts`
+- `packages/evaluator/src/index.ts`
+- `tests/architecture/evaluator-selector-unbound.test.ts`
+- `tests/integration/evaluator-profiles-database.test.ts`
+- `tests/integration/evaluator-profiles-rework.test.ts`
+- `tests/unit/evaluator-profiles.test.ts`
+
+## Risks / open questions
+
+- None blocking peer review.
+- Formula changes still require a new `derivation_version`; same-version materially different re-derivations now fail typed instead of corrupting or silently retaining history.
+- Live selector binding remains intentionally absent and requires a future V-authorized change.
+
+READY FOR PEER REVIEW: codex/eval-07-profiles
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index adccc4b07ee9ceea45599fb5e8a725aaf9f80396..284545286b7065133907277451ddfd5742143eef
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -53,6 +53,14 @@
+ - Recursive production selector scan
+   - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+ 
++### Continuation receipt — 2026-08-15 17:03 EEST
++
++- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
++- Re-ran the focused suite: PASS, 4 files / 11 tests.
++- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
++- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
++- No additional source changes or commit were required.
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index adccc4b07ee9ceea45599fb5e8a725aaf9f80396..284545286b7065133907277451ddfd5742143eef
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -53,6 +53,14 @@
+ - Recursive production selector scan
+   - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+ 
++### Continuation receipt — 2026-08-15 17:03 EEST
++
++- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
++- Re-ran the focused suite: PASS, 4 files / 11 tests.
++- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
++- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
++- No additional source changes or commit were required.
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+
+exec
+/bin/zsh -lc 'git status --short && git rev-parse HEAD && tail -18 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-07-profiles/DebateAI-V3
+ succeeded in 0ms:
+6a05f47ae0cba411d9da2c11c73e8b47048a6952
+
+## Files changed
+
+- `migrations/0027_evaluator_rank_metric.sql`
+- `packages/db/src/schema.ts`
+- `packages/evaluator/src/index.ts`
+- `tests/architecture/evaluator-selector-unbound.test.ts`
+- `tests/integration/evaluator-profiles-database.test.ts`
+- `tests/integration/evaluator-profiles-rework.test.ts`
+- `tests/unit/evaluator-profiles.test.ts`
+
+## Risks / open questions
+
+- None blocking peer review.
+- Formula changes still require a new `derivation_version`; same-version materially different re-derivations now fail typed instead of corrupting or silently retaining history.
+- Live selector binding remains intentionally absent and requires a future V-authorized change.
+
+READY FOR PEER REVIEW: codex/eval-07-profiles
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index adccc4b07ee9ceea45599fb5e8a725aaf9f80396..284545286b7065133907277451ddfd5742143eef
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -53,6 +53,14 @@
+ - Recursive production selector scan
+   - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+ 
++### Continuation receipt — 2026-08-15 17:03 EEST
++
++- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
++- Re-ran the focused suite: PASS, 4 files / 11 tests.
++- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
++- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
++- No additional source changes or commit were required.
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+
+Committed rework was intact; focused tests, evaluator differentials, and repository typecheck all passed. The worktree is clean and the external self-report now includes the continuation receipt.
+  ✓ Re-run focused PROG-07 profile and selector tests
+  ✓ Run evaluator differential suites and repository typecheck
+  ✓ Commit any remaining work and refresh the external self-report
+  ✓ Return the exact peer-review handoff marker
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index adccc4b07ee9ceea45599fb5e8a725aaf9f80396..284545286b7065133907277451ddfd5742143eef
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -53,6 +53,14 @@
+ - Recursive production selector scan
+   - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+ 
++### Continuation receipt — 2026-08-15 17:03 EEST
++
++- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
++- Re-ran the focused suite: PASS, 4 files / 11 tests.
++- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
++- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
++- No additional source changes or commit were required.
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+
+codex
+READY FOR PEER REVIEW: codex/eval-07-profiles
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+index adccc4b07ee9ceea45599fb5e8a725aaf9f80396..284545286b7065133907277451ddfd5742143eef
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-07.md
+@@ -53,6 +53,14 @@
+ - Recursive production selector scan
+   - PASS: zero `selectJudgesByBiasRank(` call sites beneath `apps/`.
+ 
++### Continuation receipt — 2026-08-15 17:03 EEST
++
++- Recovered the original session after the known idle CLI termination; committed work was intact at `6a05f47ae0cba411d9da2c11c73e8b47048a6952` and the worktree was clean.
++- Re-ran the focused suite: PASS, 4 files / 11 tests.
++- Re-ran the evaluator differential sweep: PASS, 12 files / 88 tests.
++- Re-ran repository typecheck: PASS, `tsc --noEmit` exit 0.
++- No additional source changes or commit were required.
++
+ ## Files changed
+ 
+ - `migrations/0027_evaluator_rank_metric.sql`
+
+tokens used
+595,939
+READY FOR PEER REVIEW: codex/eval-07-profiles
+=== codex exited Sat Aug 15 17:04:34 EEST 2026 ===

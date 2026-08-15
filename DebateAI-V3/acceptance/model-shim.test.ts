@@ -33,7 +33,7 @@ describe("ACC-01 model shim", () => {
       })
     ].join("\n"), fakeSessionsRoot);
 
-    expect(completion).toEqual({ content: "OK", model: "gpt-5.6-sol" });
+    expect(completion).toEqual({ content: "OK", model: "gpt-5.6-sol", usage: null });
   });
 
   it("maps an OpenAI request to codex exec, closes stdin, strips the prompt echo, and reports true lineage", async () => {
@@ -55,8 +55,10 @@ describe("ACC-01 model shim", () => {
       model: string;
       maker: string;
       choices: readonly { message: { content: string } }[];
+      usage: null;
     };
     expect(completion).toMatchObject({ model: "gpt-5.6-sol", maker: "OpenAI" });
+    expect(completion.usage).toBeNull();
     const relayed = JSON.parse(completion.choices[0]!.message.content) as {
       prompt: string;
       arguments: readonly string[];

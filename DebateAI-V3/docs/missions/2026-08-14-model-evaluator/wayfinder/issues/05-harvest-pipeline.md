@@ -4,6 +4,12 @@ Type: task
 Status: open
 Blocked by: 04
 
+## Programming-stage note
+
+- `serve.answer` remains unread by harvest. Architecture §5.2 names it as an input,
+  but this lane derives no additional observation from it; the reader is explicitly
+  deferred rather than silently claimed as implemented.
+
 ## Question
 
 Build the harvest (charting rulings 9 + 10): after each run, fold the artifacts runs

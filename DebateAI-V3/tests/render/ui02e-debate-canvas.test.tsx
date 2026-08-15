@@ -48,7 +48,7 @@ function renderedCanvas(): string {
       expanded={new Set()}
       selectedNodeId={null}
       v3NodesById={contractNodesById(answer)}
-      meta={{ claims: 3, depth: 1 }}
+      meta={{ claims: 3, depth: 1, judged: 1, derivedStanding: 1, setAside: 1 }}
       onOpenNode={noop}
       onChallengeNode={noop}
       onToggleExpand={noop}
@@ -66,6 +66,10 @@ function renderedCard(html: string, nodeId: string): string {
 }
 
 describe("UI-02e renders the real DebateCanvas gate surface", () => {
+  it("DR-184 T28 renders the immutable four-term standing census in the sticky control", () => {
+    const html = renderedCanvas();
+    expect(html).toContain("3 claims across 1 levels · 1 judged · 1 standing on their arguments · 1 set aside");
+  });
   it("pins maker identity at both the empty-state and contentful-card call sites", () => {
     const html = renderedCanvas();
 

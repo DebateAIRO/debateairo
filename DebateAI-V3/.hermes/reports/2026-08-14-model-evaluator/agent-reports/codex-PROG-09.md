@@ -1,0 +1,326 @@
+# READY FOR PEER REVIEW — PROG-09 consumer reader
+
+WORKER CLAIM:
+- agent: Codex GPT-5.6 Sol
+- ticket: PROG-09 / 09-consumer-reader
+- worker CLI session id: goal `01a005d5-c684-7d10-b28e-6a732921004a`
+- branch/worktree: `codex/eval-09-consumer` / `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-09-consumer`
+- assignment type: rework_round_1
+- comments read through: `PROG-09-opus-review-1.md` and
+  `PROG-09-opus2-review-1.md`, both read through EOF on 2026-08-15
+- board mutation: prohibited and not performed
+
+## Outcome
+
+- Added the one local-vLLM consumer interpreter over lane-07 profile cells and
+  rank snapshots. Deterministic numeric values are read-only inputs; the strict
+  output contract admits only a plain-language bias-pattern name, a per-domain
+  capability summary, and allowlisted adjacent-domain flags.
+- Prompt targets and samples use opaque refs. Captured prompt bytes omit the
+  target provider, model id, model version, maker, raw-artifact id, lineage, and
+  provenance. Anonymous sample DTOs expose only question/task excerpts, grade,
+  and selected reason strings.
+- Rework routes every grading-adjacent sample through the exported shared
+  `createBlindEvaluationSample` choke point. Both excerpts are UTF-8-safe and
+  capped at 4096 bytes there, before add-on or consumer prompt assembly.
+- The consumer database fixture now assigns real domains and harvests four real
+  terminal runs through `EvaluatorHarvestRepository`. The four-way sample join,
+  exact model/domain bucket, three-sample cap, opaque id derivation, nonempty
+  persisted refs, and identity-free request body execute against PostgreSQL and
+  a real local HTTP server through `OpenAICompatibleProviderGateway`.
+- Every provider call has `runId: null`, an evaluator subject item, evaluator
+  lane/call site, and a consumer-owned maximum of two provider attempts. The
+  selected catalog model and pinned evaluator maker are re-authorized before
+  persistence, and provider isolation is asserted immediately before each call.
+- Added on-demand and post-aggregate worker entry points. Outputs are append-only
+  and versioned by prompt version plus aggregate snapshot hash.
+- Added migration 0028 for global consumer-refresh receipts. A product run id is
+  never fabricated for aggregate refresh. Preflight, claim, success, failure,
+  current, in-flight, and retry-limit outcomes are typed and append-only.
+- Claim arbitration uses `pg_try_advisory_xact_lock` only in a short transaction.
+  No database client or advisory lock spans the provider call; 24 concurrent
+  refreshes produced one call and 23 typed in-flight skips, then the pool
+  answered a fresh query.
+- The selected consumer can interpret its own row, but that row remains a
+  code-computed profile/rank input. Numeric/routing injection is now a
+  `TypedDomainError` with code and receipt `SELF_ROUTING_FORBIDDEN`, distinct
+  from malformed JSON's `CONSUMER_CONTENT_REFUSED`; neither can write
+  `consumer_output` or any numeric table.
+- Sample reads share the aggregate `as_of` ceiling, null-domain cells produce an
+  explicit null-domain job instead of disappearing, a sibling failure makes the
+  batch state honestly `FAILED`, and artifact authorization uses the threaded
+  pinned family identity while retaining its typed receipt.
+- No BOUND state, live routing/dispatch reader, API key, cloud endpoint, board
+  mutation, push, merge, or sibling seat-share/allocator change was introduced.
+
+## Changed files
+
+- `.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-09.md`
+- `apps/evaluator-worker/src/index.ts`
+- `migrations/0028_evaluator_consumer_refresh.sql`
+- `packages/evaluator/README.md`
+- `packages/evaluator/src/blind-sample.ts`
+- `packages/evaluator/src/consumer.ts`
+- `packages/evaluator/src/consumer-postgres.ts`
+- `packages/evaluator/src/index.ts`
+- `tests/integration/evaluator-consumer-database.test.ts`
+- `tests/integration/evaluator-database.test.ts`
+- `tests/unit/evaluator-consumer.test.ts`
+- `tests/unit/evaluator-foundation.test.ts`
+
+Allowed-scope evidence: all changes are consumer-reader implementation,
+consumer-specific persistence/documentation/tests, or the evaluator foundation
+inventory assertion updated for the new table. No lane-10 allocator file changed.
+
+## RED -> GREEN evidence
+
+Rework RED was independently reproduced by both review seats against commit
+`4f0356a04881313f5fa8508294761be416a0460d`: the shared helper had no consumer
+call site, the real observation tables were empty in the consumer fixture, and
+a 200 KB claim produced a 203,464-byte request. The rework regressions encode
+those exact boundaries through real harvest and HTTP paths.
+
+Rework GREEN focused verification:
+
+```text
+pnpm exec vitest run tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts
+Test Files  2 passed (2)
+Tests       21 passed (21)
+
+pnpm exec vitest run tests/integration/evaluator-consumer-database.test.ts
+Test Files  1 passed (1)
+Tests       6 passed (6)
+```
+
+The populated-sample test proves a three-item cap from four harvested rows,
+opaque sample refs, a 4096-byte UTF-8 excerpt, no authorship sent over HTTP, and
+nonempty `blinded_sample_refs`. Its snapshot/null-domain case proves the
+`aggregateAsOf` observation ceiling and retention of a null-domain aggregate.
+The concurrency case runs 24 refreshes above pool max.
+
+Original implementation evidence follows.
+
+RED after the new consumer contract tests were written first:
+
+```text
+pnpm exec vitest run tests/unit/evaluator-consumer.test.ts
+Test Files  1 failed (1)
+Tests       6 failed (6)
+Representative failures:
+  buildEvaluatorConsumerPrompt is not a function
+  runEvaluatorConsumerRefresh is not a function
+```
+
+The preceding worktree dependency check first reported `vitest` unlinked. An
+offline frozen install reused 387 packages from the existing content-addressable
+store, downloaded zero packages, and changed no lockfile. The behavioral RED
+above was then captured.
+
+GREEN focused consumer verification:
+
+```text
+pnpm exec vitest run tests/unit/evaluator-consumer.test.ts \
+  tests/integration/evaluator-consumer-database.test.ts
+Test Files  2 passed (2)
+Tests       11 passed (11)
+```
+
+After adding the selected-model authorization case, the unit suite is 7/7 and
+the consumer total is 12 tests. The real PostgreSQL path proves versioned writes,
+on-demand idempotency, post-aggregate refresh, append-only guards, hostile-output
+refusal with no corruption, retry ordinal 1 -> 2, null-run artifact authorization,
+own-model numeric ownership, and concurrent in-flight behavior.
+
+The first evaluator regression run exposed one expected inventory assertion:
+`consumer_refresh_receipt` was new but absent from the exact evaluator-table
+list. Updating that assertion and trigger count produced 20/20 GREEN in
+`tests/integration/evaluator-database.test.ts`; the subsequent full repository
+run is GREEN.
+
+## Exact verification
+
+Continuation verification after the known client hang (same session, same
+commit `9650a00afbdb4e810903dbb2eb7bc2255aea331b`):
+
+```text
+pnpm exec vitest run --maxWorkers=1 \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts \
+  tests/integration/evaluator-consumer-database.test.ts
+Test Files  3 passed (3)
+Tests       27 passed (27)
+
+pnpm exec vitest run --maxWorkers=1 \
+  tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-harvest-rework.test.ts \
+  tests/integration/evaluator-addon-database.test.ts \
+  tests/integration/evaluator-profiles-database.test.ts \
+  tests/integration/evaluator-profiles-rework.test.ts \
+  tests/unit/evaluator-tagger.test.ts \
+  tests/unit/evaluator-harvest.test.ts \
+  tests/unit/evaluator-addon.test.ts \
+  tests/unit/evaluator-profiles.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts
+Test Files  10 passed (10)
+Tests       74 passed (74)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+```
+
+The differential run includes the persisted FR-0.6 AC5 byte-identical panel and
+`agent_count` proof, null-run isolation, harvest and settlement reconciliation,
+add-on bounds/concurrency, profile/rank persistence, and zero production callers
+while evaluator dispatch remains UNBOUND.
+
+```text
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm run audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm run audit:source
+blocking: []
+
+pnpm test -- --maxWorkers=1
+Test Files  98 passed (98)
+Tests       711 passed (711)
+
+pnpm exec vitest run --maxWorkers=1 tests/integration/evaluator-database.test.ts
+Test Files  1 passed (1)
+Tests       20 passed (20)
+Includes FR-0.6 AC5 byte-identical panel membership and agent_count differential.
+
+bash tests/render-templates.sh
+PASS — templates rendered
+
+bash tests/lint-templates.sh
+PASS
+
+git diff --check
+PASS
+```
+
+The full suite includes the lane-04 tagger, lane-05 harvest, lane-06 add-on,
+lane-07 profile/rank, null-run isolation, settlement/Q59 separation, provider
+isolation, selector-unbound, and evaluator panel-membership differentials.
+
+## Risks and review focus
+
+- Refresh STARTED receipts are intentionally durable. If a worker process dies
+  after claim and before its terminal receipt, that exact snapshot stays
+  in-flight rather than risking duplicate model work; operational stale-claim
+  recovery is not invented in this lane.
+- Domain names and bounded question/task excerpts are allowed semantic input. Structured
+  identity and joinable lineage are excluded; no claim is made that natural text
+  can never mention a person's or system's name.
+- Consumer language remains collect-only. Ticket 11 may expose it in the dev
+  menu, but this lane adds no product dispatch or binding consumer.
+
+Comments read through: both round-1 peer reviews remain the latest review
+authority as of this handoff on 2026-08-15.
+
+READY FOR PEER REVIEW: codex/eval-09-consumer
+
+
+---
+
+# CONTINUATION APPENDIX (post-hang verification pass)
+
+# READY FOR PEER REVIEW — PROG-09 consumer reader
+
+WORKER CLAIM:
+- agent: Codex GPT-5.6 Sol
+- ticket: PROG-09 / 09-consumer-reader
+- worker CLI session id: goal `01a005d5-c684-7d10-b28e-6a732921004a`
+- branch/worktree: `codex/eval-09-consumer` / `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-09-consumer`
+- assignment type: rework_round_1 continuation
+- implementation commits: `4f0356a04881313f5fa8508294761be416a0460d`, `9650a00afbdb4e810903dbb2eb7bc2255aea331b`
+- comments read through: `PROG-09-opus-review-1.md` and `PROG-09-opus2-review-1.md`, both through EOF on 2026-08-15
+- board mutation: prohibited and not performed
+
+## Rework findings closed
+
+- B1: consumer sample construction now routes through the shared exported
+  `createBlindEvaluationSample` helper, preserving one allowlist/blinding choke
+  point for grading-adjacent DTOs.
+- B2: the PostgreSQL fixture assigns domains and writes four terminal product
+  runs through `EvaluatorHarvestRepository`; the real join, exact model/domain
+  bucket, three-sample cap, opaque ids, and nonempty `blinded_sample_refs` run
+  against the database. A real local HTTP server captures a populated request
+  whose prompt messages omit structured target/source authorship.
+- B3: question/task excerpts are UTF-8-safe and capped at 4096 bytes in the
+  shared helper. The database test includes a 240 KB Unicode claim and verifies
+  the on-wire excerpt is exactly bounded without replacement characters.
+- B4: numeric/routing injection raises typed `SELF_ROUTING_FORBIDDEN`, distinct
+  from malformed JSON's `CONSUMER_CONTENT_REFUSED`, and both terminal receipts
+  are covered.
+- B5: the advisory-lock regression runs 24 concurrent refreshes, observes one
+  provider call plus 23 typed in-flight skips, and proves the pool remains usable.
+- Follow-ups: sample reads honor `aggregateAsOf`; null-domain aggregates become
+  explicit jobs; sibling failures make the batch state `FAILED`; artifact
+  authorization uses the threaded pinned family and preserves its typed receipt.
+
+Verified invariants remain intact: every consumer call has `runId: null`, uses
+consumer-owned bounded retries, rechecks provider isolation immediately before
+the call, versions output by prompt/snapshot hash, keeps numeric profile/rank
+tables code-owned, writes append-only receipts, and adds no BOUND/routing reader.
+
+## Continuation verification after client termination
+
+```text
+pnpm exec vitest run --maxWorkers=1 \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts \
+  tests/integration/evaluator-consumer-database.test.ts
+Test Files  3 passed (3)
+Tests       27 passed (27)
+
+pnpm exec vitest run --maxWorkers=1 \
+  tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-harvest-rework.test.ts \
+  tests/integration/evaluator-addon-database.test.ts \
+  tests/integration/evaluator-profiles-database.test.ts \
+  tests/integration/evaluator-profiles-rework.test.ts \
+  tests/unit/evaluator-tagger.test.ts \
+  tests/unit/evaluator-harvest.test.ts \
+  tests/unit/evaluator-addon.test.ts \
+  tests/unit/evaluator-profiles.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts
+Test Files  10 passed (10)
+Tests       74 passed (74)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+```
+
+The differential set includes FR-0.6 AC5 byte-identical panel membership and
+`agent_count`, tagger/product isolation, harvest and settlement reconciliation,
+add-on bounds/concurrency, profile/rank persistence, and selector UNBOUND.
+
+Earlier full verification on the same rework commit remains:
+
+```text
+pnpm test -- --maxWorkers=1
+Test Files  98 passed (98)
+Tests       711 passed (711)
+
+pnpm run audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm run audit:source
+blocking: []
+
+bash tests/render-templates.sh
+PASS
+
+bash tests/lint-templates.sh
+PASS
+```
+
+No push, merge, board mutation, BOUND state, provider credential, cloud endpoint,
+or lane-10 seat-share/allocator change was introduced.
+
+READY FOR PEER REVIEW: codex/eval-09-consumer

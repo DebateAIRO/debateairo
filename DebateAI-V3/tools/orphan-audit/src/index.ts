@@ -27,7 +27,7 @@ const rows: readonly Row[] = [
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
-  ["apps/api", "apps/api", ["contract", "kernel", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator"]],
   ["apps/runner", "apps/runner", ["kernel", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
@@ -161,7 +161,8 @@ export async function auditS14TypeGraph(): Promise<{
 const productionEntryPointFiles = [
   "apps/api/src/main.ts",
   "apps/runner/src/main.ts",
-  "apps/scheduler/src/cli.ts"
+  "apps/scheduler/src/cli.ts",
+  "acceptance/review-catch-up.ts"
 ] as const;
 
 type CallableDeclaration = {
@@ -597,7 +598,8 @@ export async function auditOrphans(): Promise<{
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
       "apps/scheduler:job:reaper (stub; invocation throws SCAFFOLD_ONLY)",
-      "apps/scheduler:job:settlement-watch"
+      "apps/scheduler:job:settlement-watch",
+      "acceptance:job:review-catch-up"
     ],
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },

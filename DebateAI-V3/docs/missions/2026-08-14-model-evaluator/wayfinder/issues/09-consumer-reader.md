@@ -1,8 +1,17 @@
 # 09 — Consumer reader: the one LLM that uses the data
 
 Type: task
-Status: open
+Status: done
 Blocked by: 07
+
+Tier-6A release: ticket 07 is Hermes-stage approved. This lane may proceed in
+parallel with ticket 10.
+
+Hermes stage approval: PROG-09 is approved after round-1 REWORK and round-2
+dual PASS. Follow-up (non-blocking): the shared blind-sample helper's new
+4096-byte excerpt cap also truncates lane-06 add-on grading material. Add an
+explicit truncation marker so grading-adjacent prompts do not present a clipped
+excerpt as complete text.
 
 ## Question
 
