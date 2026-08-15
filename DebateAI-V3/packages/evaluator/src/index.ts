@@ -2301,6 +2301,17 @@ function compareProfileIdentity(left: ProfileIdentity, right: ProfileIdentity): 
   return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
 }
 
+function compareCodePointStrings(left: string, right: string): number {
+  const leftCodePoints = Array.from(left, (character) => character.codePointAt(0)!);
+  const rightCodePoints = Array.from(right, (character) => character.codePointAt(0)!);
+  const sharedLength = Math.min(leftCodePoints.length, rightCodePoints.length);
+  for (let index = 0; index < sharedLength; index += 1) {
+    const difference = leftCodePoints[index]! - rightCodePoints[index]!;
+    if (difference !== 0) return difference;
+  }
+  return leftCodePoints.length - rightCodePoints.length;
+}
+
 function makeProfileCell(input: {
   readonly identity: ProfileIdentity;
   readonly domainId: string | null;
@@ -2750,7 +2761,7 @@ function seatShareInputReceipt(input: EvaluatorSeatShareInput): Readonly<Record<
       prowess_ordinal: candidate.prowessOrdinal,
       relative_cost: candidate.relativeCost,
       cost_comparability: candidate.costComparability
-    })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))),
+    })).sort((left, right) => compareCodePointStrings(JSON.stringify(left), JSON.stringify(right)))),
     policy: Object.freeze({
       row_key: input.policy.rowKey,
       register_version: input.policy.registerVersion,
@@ -2768,7 +2779,7 @@ function seatShareInputReceipt(input: EvaluatorSeatShareInput): Readonly<Record<
         provider: identity.provider,
         model_id: identity.modelId,
         model_version: identity.modelVersion
-      })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))))
+      })).sort((left, right) => compareCodePointStrings(JSON.stringify(left), JSON.stringify(right))))
   });
 }
 

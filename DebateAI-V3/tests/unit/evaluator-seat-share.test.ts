@@ -69,6 +69,52 @@ describe("deterministic evaluator seat-share allocator", () => {
       .toEqual([{ modelId: "best", seatCount: 8 }, { modelId: "runner", seatCount: 2 }]);
   });
 
+  it("preserves the runner-up when its positive quota rounds to zero", () => {
+    const result = allocateEvaluatorSeatShare({
+      requestedSeatCount: 2,
+      riskTier: "high-stakes",
+      depth: 3,
+      candidates: [candidate("best", 1, 0.8), candidate("runner", 2, 0.2)],
+      policy: {
+        ...policy,
+        shares: { ...policy.shares, premium: { best: 0.9, runnerUp: 0.1, residual: 0 } }
+      },
+      numericInputProducerIdentities: []
+    });
+
+    expect(result.allocations.map(({ modelId, seatCount }) => ({ modelId, seatCount })))
+      .toEqual([{ modelId: "best", seatCount: 1 }, { modelId: "runner", seatCount: 1 }]);
+  });
+
+  it("refuses M=0 and filters unhealthy candidates before allocation", () => {
+    expect(() => allocateEvaluatorSeatShare({
+      requestedSeatCount: 2,
+      riskTier: "standard",
+      depth: 1,
+      candidates: [{ ...candidate("unhealthy-only", 1, 0.1), healthy: false }],
+      policy,
+      numericInputProducerIdentities: []
+    })).toThrow("NO_ELIGIBLE_MODEL");
+
+    const filtered = allocateEvaluatorSeatShare({
+      requestedSeatCount: 10,
+      riskTier: "standard",
+      depth: 1,
+      candidates: [
+        candidate("healthy-best", 1, 0.9),
+        { ...candidate("unhealthy-runner", 2, 0.4), healthy: false },
+        candidate("healthy-third", 3, 0.1)
+      ],
+      policy,
+      numericInputProducerIdentities: []
+    });
+    expect(filtered.allocations.map(({ modelId, seatCount }) => ({ modelId, seatCount })))
+      .toEqual([
+        { modelId: "healthy-best", seatCount: 7 },
+        { modelId: "healthy-third", seatCount: 3 }
+      ]);
+  });
+
   it("uses rank-three residual seats for M=3 and lets cheaper-best override both tiers", () => {
     const normal = allocateEvaluatorSeatShare({
       requestedSeatCount: 10,

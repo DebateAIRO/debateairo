@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate } from "@debateai/db";
 import {
   PostgresEvaluatorSeatShareRepository,
@@ -64,6 +64,23 @@ describe("seat-share shadow decisions on live PostgreSQL", () => {
     expect(repeated.shadowDecisionId).toBe(first.shadowDecisionId);
     expect(repeated.inserted).toBe(false);
 
+    const localeCompare = vi.spyOn(String.prototype, "localeCompare").mockImplementation(function (
+      this: string,
+      other: string
+    ) {
+      return this < other ? 1 : this > other ? -1 : 0;
+    });
+    try {
+      const differentLocale = await repository.computeAndPersistShadowDecision({
+        runId: run.rows[0]!.run_id,
+        input
+      });
+      expect(differentLocale.shadowDecisionId).toBe(first.shadowDecisionId);
+      expect(differentLocale.inserted).toBe(false);
+    } finally {
+      localeCompare.mockRestore();
+    }
+
     const receipt = await database.pool.query<{
       run_id: string; kind: string; binding_state: string; formula_version: string;
       not_consumed_reason: string; input_json: unknown; output_json: unknown;
@@ -82,9 +99,21 @@ describe("seat-share shadow decisions on live PostgreSQL", () => {
     }]);
     expect(first.decision.allocations.reduce((sum, allocation) => sum + allocation.seatCount, 0)).toBe(10);
 
-    const routingWrites = await database.pool.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM scorecard.routing_decision WHERE session_id='session:seat-share'`
-    );
-    expect(routingWrites.rows[0]!.count).toBe("0");
+    const workerPrivileges = await database.pool.query<{
+      routing_insert: boolean;
+      assignment_insert: boolean;
+    }>(`
+      SELECT
+        has_table_privilege(
+          'debateai_evaluator_worker', 'scorecard.routing_decision', 'INSERT'
+        ) AS routing_insert,
+        has_table_privilege(
+          'debateai_evaluator_worker', 'scorecard.session_assignment', 'INSERT'
+        ) AS assignment_insert
+    `);
+    expect(workerPrivileges.rows).toEqual([{
+      routing_insert: false,
+      assignment_insert: false
+    }]);
   });
 });

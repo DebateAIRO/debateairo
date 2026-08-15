@@ -17,9 +17,17 @@ separate architecture change and V ratification.
 - [ ] Confirm M=1 assigns every requested seat to the sole eligible identity.
 - [ ] Confirm M=2 uses deterministic largest-remainder rounding over best and
   runner-up, preserving one runner-up seat when its share is positive and at
-  least two seats exist.
+  least two seats exist. In particular, a two-seat premium request with a
+  positive runner-up share is forced to a 1/1 tie, even when its raw rounded
+  allocation would be 2/0.
 - [ ] Confirm M>=3 divides residual share among ranks 3+ by descending
   reciprocal-rank weights and deterministic largest-remainder rounding.
+- [ ] Require every approved share vector to be monotonic by rank
+  (`best >= runnerUp >= residual`); a residual share above runner-up can starve
+  rank 2 while assigning lower ranks.
+- [ ] Explicitly approve M=2 residual handling: with no residual candidates,
+  the residual share is silently reabsorbed by normalization into best and
+  runner-up rather than retained or refused.
 - [ ] Confirm a better-ranked model that is comparably cheaper selects the
   cheaper-best vector for both normal and premium requests.
 - [ ] Confirm ties resolve by prowess ordinal, comparable lower relative cost,
@@ -36,13 +44,17 @@ separate architecture change and V ratification.
   register before any bind (PROG-04 F3); evaluator vLLM remains outside
   `configuredProviderSet` and cannot change panel membership, `agent_count`, or
   structural-ceiling `envelopeBasis` (FR-0.6 AC5).
+- [ ] Add and bind a validated register reader for
+  `evaluatorSeatSharePolicy`; the dark allocator currently accepts a
+  caller-supplied policy receipt and does not resolve the row itself.
 - [ ] Any future provider gateway uses a separate pool or the lock-owning client;
   it never checks out from the evaluator repository pool while a per-run client
   is held (Seat-B N5). The dark allocator itself constructs no gateway.
 - [ ] Self-routing and existing maker/lineage guards remain preconditions.
 - [ ] A live-source audit finds only the explicitly approved bound adapter; until
-  then, apps contain zero callers of `allocateEvaluatorSeatShare` and
-  `computeAndPersistShadowDecision`.
+  then, `apps/`, `packages/`, `web/`, `tools/`, and `acceptance/` contain zero
+  callers of `allocateEvaluatorSeatShare` and `computeAndPersistShadowDecision`
+  outside the evaluator definition.
 - [ ] Shadow receipts remain `UNBOUND`, append-only, idempotent, inspectable, and
   structurally unable to write `scorecard.routing_decision` or
   `scorecard.session_assignment`.
@@ -57,7 +69,8 @@ separate architecture change and V ratification.
 2. Bias context attaches only to JUDGING/REVIEWING prowess and cites the
    profiled model's ordinal; AUTHORING has no judge-bias link. PROG-07's selector
    guard walked only `apps/**`; PROG-10 expands the shared dark-launch guard to
-   peer `packages/**` while excluding only the evaluator definition file.
+   every workspace source root (`apps/**`, `packages/**`, `web/**`, `tools/**`,
+   and `acceptance/**`) while excluding only the evaluator definition file.
 3. Profile strategy receipts remain caller-supplied; there is no register reader,
    AGGREGATE pipeline event, or judge-selector shadow receipt.
 4. Some profile database assertions remain cosmetic/vacuous
