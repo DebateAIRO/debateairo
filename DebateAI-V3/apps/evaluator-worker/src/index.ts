@@ -81,7 +81,7 @@ export async function runEvaluatorTerminalHarvest(input: {
   readonly meteringWindow: RelativeCostDerivationWindow;
   readonly observedAt?: Date;
 }): Promise<EvaluatorTerminalHarvestWorkerResult> {
-  const metering = await reconcileEvaluatorMetering(input.pool, input.meteringWindow);
+  const metering = await reconcileMeteringBestEffort(input.pool, input.meteringWindow);
   const harvest = await new EvaluatorHarvestRepository(input.pool)
     .harvestTerminalRun(input.runId, input.observedAt);
   return Object.freeze({ metering, harvest });
@@ -91,25 +91,50 @@ export async function reconcileEvaluatorTerminalRuns(input: {
   readonly pool: Pool;
   readonly meteringWindow: RelativeCostDerivationWindow;
   readonly observedAt?: Date;
+  readonly limit?: number;
 }): Promise<readonly EvaluatorHarvestResult[]> {
-  await reconcileEvaluatorMetering(input.pool, input.meteringWindow);
+  await reconcileMeteringBestEffort(input.pool, input.meteringWindow);
+  const limit = input.limit ?? 100;
+  if (!Number.isInteger(limit) || limit <= 0) throw new TypeError("EVALUATOR_HARVEST_LIMIT_INVALID");
   const terminal = await input.pool.query<{ run_id: string }>(`
     SELECT DISTINCT event.run_id
     FROM core.run_progress_event AS event
     WHERE event.kind='TERMINAL'
-      AND NOT EXISTS (
-        SELECT 1 FROM evaluator.pipeline_event AS harvest
-        WHERE harvest.run_id=event.run_id AND harvest.pipeline='HARVEST'
-          AND harvest.pipeline_version=$1 AND harvest.state='SUCCEEDED'
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM evaluator.pipeline_event AS harvest
+          WHERE harvest.run_id=event.run_id AND harvest.pipeline='HARVEST'
+            AND harvest.pipeline_version=$1 AND harvest.state='SUCCEEDED'
+        )
+        OR EXISTS (
+          SELECT 1 FROM scorecard.answer_outcome AS outcome
+          WHERE outcome.run_id=event.run_id AND outcome.accepted
+            AND NOT EXISTS (
+              SELECT 1 FROM evaluator.observation AS observation
+              WHERE observation.answer_outcome_id=outcome.answer_outcome_id
+            )
+        )
       )
     ORDER BY event.run_id
-  `, [HARVEST_PIPELINE_VERSION]);
+    LIMIT $2
+  `, [HARVEST_PIPELINE_VERSION, limit]);
   const repository = new EvaluatorHarvestRepository(input.pool);
   const results: EvaluatorHarvestResult[] = [];
   for (const row of terminal.rows) {
     results.push(await repository.harvestTerminalRun(row.run_id, input.observedAt));
   }
   return Object.freeze(results);
+}
+
+async function reconcileMeteringBestEffort(
+  pool: Pool,
+  window: RelativeCostDerivationWindow
+): Promise<EvaluatorMeteringReconciliationResult> {
+  try {
+    return await reconcileEvaluatorMetering(pool, window);
+  } catch {
+    return Object.freeze({ callsProjected: 0, callsFailed: 1, relativeCostCellsDerived: 0 });
+  }
 }
 
 async function runPersistedQuestionTag(input: {

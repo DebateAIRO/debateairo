@@ -101,8 +101,11 @@ an absent row deliberately produces observations with `domain_id = NULL`.
 Authored nodes and strengths become `AUTHORING` observations, reduced
 judgements become `JUDGING` observations, cross-maker node reviews become
 `REVIEWING` observations, and accepted real-world outcomes become
-settlement-fed `AUTHORING` observations. Consensus and settlement truth bases
-are explicit evaluator-owned values; harvest never inserts into or mutates
+settlement-fed `AUTHORING` observations. A settlement reconciliation revisits
+already-harvested terminal runs, writes `prowess.outcome.v1` with
+`supersedes_observation_id` pointing at the earlier consensus strength row, and
+keeps that earlier row append-only. Consensus and settlement truth bases are
+explicit evaluator-owned values; harvest never inserts into or mutates
 `scorecard.answer_outcome`.
 
 Artifact identity comes from each source table's explicit artifact reference.
@@ -110,12 +113,18 @@ Call-site classification correlates `ledger.ledger_entry` to
 `ledger.raw_artifact` by `attempt_id`, including evaluator artifacts whose
 `run_id` is null. Any `evaluator.` call-site attempt is excluded from model
 performance observations. Model versions that are absent are skipped rather
-than collapsed into maker-level identity.
+than collapsed into maker-level identity, with a typed
+`MODEL_IDENTITY_INCOMPLETE` pipeline receipt.
 
 The projector is deterministic and provider-free. An advisory run lock, a
-versioned successful HARVEST receipt, and the observation natural key make
-reconciliation idempotent. The worker entry points also reconcile completed
+durable STARTED/SUCCEEDED/FAILED receipts, and the observation natural key make
+reconciliation idempotent. Batch reconciliation is capped at 100 terminal runs
+by default and also selects previously harvested runs with an unprojected
+accepted settlement. The worker entry points also reconcile completed
 model calls into `model_call_usage`, reading observed usage from persisted raw
-artifact metadata, then derive and persist versioned relative-cost cells.
+artifact metadata. Empty, unknown, or internally inconsistent usage is recorded
+as `UNMETERED`; one row failure cannot block other calls or terminal harvest.
+Relative-cost cells are first-write snapshots for each identity, window, and
+derivation version; use a new window or derivation version for a later snapshot.
 Evaluator calls remain visible as cost while remaining excluded from harvested
 performance evidence. No metering write occurs in the product gateway path.

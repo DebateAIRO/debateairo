@@ -73,7 +73,8 @@ const snapshot: EvaluatorHarvestSnapshot = {
     numberKind: "PROBABILITY",
     producer: "propagator"
   }],
-  settlements: []
+  settlements: [],
+  priorConsensusOutcomes: []
 };
 
 describe("deterministic evaluator harvest projector", () => {
@@ -110,6 +111,14 @@ describe("deterministic evaluator harvest projector", () => {
         modelVersion: "v1",
         resolvedOutcome: true,
         resolvedAt: new Date("2026-08-15T11:00:00.000Z")
+      }],
+      priorConsensusOutcomes: [{
+        observationId: "observation:consensus",
+        provider: "openai-compatible-http",
+        modelId: "author-model",
+        modelVersion: "v1",
+        domainId: null,
+        metric: "prowess.outcome.v1"
       }]
     });
     const settlement = rows.find((row) => row.sourceKind === "EXTERNAL_ANSWER_OUTCOME");
@@ -118,7 +127,8 @@ describe("deterministic evaluator harvest projector", () => {
       truthBasis: "SETTLEMENT",
       answerOutcomeId: "outcome:1",
       step: "AUTHORING",
-      value: 1
+      value: 1,
+      supersedesObservationId: "observation:consensus"
     });
   });
 

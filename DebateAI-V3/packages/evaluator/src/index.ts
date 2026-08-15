@@ -1091,6 +1091,14 @@ export interface EvaluatorHarvestSnapshot {
     readonly resolvedOutcome: boolean;
     readonly resolvedAt: Date;
   }[];
+  readonly priorConsensusOutcomes: readonly {
+    readonly observationId: string;
+    readonly provider: string;
+    readonly modelId: string;
+    readonly modelVersion: string;
+    readonly domainId: string | null;
+    readonly metric: string;
+  }[];
 }
 
 export interface EvaluatorObservationCandidate {
@@ -1109,6 +1117,7 @@ export interface EvaluatorObservationCandidate {
   readonly sourceRef: string;
   readonly sourceRawArtifactRef: string | null;
   readonly answerOutcomeId: string | null;
+  readonly supersedesObservationId: string | null;
   readonly provenanceJson: Readonly<Record<string, unknown>>;
   readonly observedAt: Date;
 }
@@ -1142,6 +1151,7 @@ export function projectEvaluatorObservations(
     domainId: snapshot.domainId,
     truthBasis: "CONSENSUS" as const,
     answerOutcomeId: null,
+    supersedesObservationId: null,
     observedAt: new Date(snapshot.observedAt)
   });
 
@@ -1165,7 +1175,7 @@ export function projectEvaluatorObservations(
     const artifact = node === undefined ? undefined : artifacts.get(node.rawArtifactRef);
     if (artifact === undefined) continue;
     rows.push(Object.freeze({
-      ...base(artifact), step: "AUTHORING", metric: "authoring.strength.v1",
+      ...base(artifact), step: "AUTHORING", metric: "prowess.outcome.v1",
       value: strength.strength,
       outcomeJson: Object.freeze({ number_kind: strength.numberKind, producer: strength.producer }),
       sourceKind: "NODE_STRENGTH",
@@ -1207,7 +1217,15 @@ export function projectEvaluatorObservations(
       })
     }));
   }
+  const availableConsensus = [...snapshot.priorConsensusOutcomes];
   for (const settlement of snapshot.settlements) {
+    const priorIndex = availableConsensus.findIndex((prior) =>
+      prior.provider === settlement.provider
+      && prior.modelId === settlement.modelId
+      && prior.modelVersion === settlement.modelVersion
+      && prior.domainId === snapshot.domainId
+      && prior.metric === "prowess.outcome.v1");
+    const prior = priorIndex < 0 ? undefined : availableConsensus.splice(priorIndex, 1)[0];
     rows.push(Object.freeze({
       runId: snapshot.runId,
       provider: settlement.provider,
@@ -1215,7 +1233,7 @@ export function projectEvaluatorObservations(
       modelVersion: settlement.modelVersion,
       domainId: snapshot.domainId,
       step: "AUTHORING",
-      metric: "authoring.external_outcome.v1",
+      metric: "prowess.outcome.v1",
       value: settlement.resolvedOutcome ? 1 : 0,
       outcomeJson: Object.freeze({ resolved_outcome: settlement.resolvedOutcome }),
       truthBasis: "SETTLEMENT",
@@ -1223,6 +1241,7 @@ export function projectEvaluatorObservations(
       sourceRef: settlement.answerOutcomeId,
       sourceRawArtifactRef: null,
       answerOutcomeId: settlement.answerOutcomeId,
+      supersedesObservationId: prior?.observationId ?? null,
       provenanceJson: Object.freeze({
         source: "scorecard.answer_outcome",
         answer_outcome_id: settlement.answerOutcomeId
@@ -1235,8 +1254,23 @@ export function projectEvaluatorObservations(
 
 export type EvaluatorHarvestResult =
   | { readonly state: "HARVESTED"; readonly runId: string; readonly observationsInserted: number }
+  | { readonly state: "SETTLEMENTS_RECONCILED"; readonly runId: string; readonly observationsInserted: number }
   | { readonly state: "ALREADY_HARVESTED"; readonly runId: string }
   | { readonly state: "NOT_TERMINAL"; readonly runId: string };
+
+function harvestInputHash(snapshot: EvaluatorHarvestSnapshot): string {
+  const candidates = projectEvaluatorObservations(snapshot);
+  return createHash("sha256").update(JSON.stringify({
+    run_id: snapshot.runId,
+    domain_id: snapshot.domainId,
+    observations: candidates.map((row) => ({
+      provider: row.provider, model_id: row.modelId, model_version: row.modelVersion,
+      step: row.step, metric: row.metric, source_kind: row.sourceKind,
+      source_ref: row.sourceRef, truth_basis: row.truthBasis,
+      supersedes_observation_id: row.supersedesObservationId
+    }))
+  })).digest("hex");
+}
 
 export class EvaluatorHarvestRepository {
   constructor(private readonly pool: Pool) {}
@@ -1244,63 +1278,124 @@ export class EvaluatorHarvestRepository {
   async harvestTerminalRun(runId: string, observedAt: Date = new Date()): Promise<EvaluatorHarvestResult> {
     requireNonblank(runId, "EVALUATOR_HARVEST_RUN_ID_INVALID");
     if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_HARVEST_TIME_INVALID");
-    return withWriteTransaction(this.pool, async (client) => {
+    const attemptId = randomUUID();
+    const prepared = await withWriteTransaction(this.pool, async (client) => {
       await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
       const terminal = await client.query(
         "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1",
         [runId]
       );
       if (terminal.rowCount === 0) return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
-      const prior = await client.query(
-        `SELECT 1 FROM evaluator.pipeline_event
-         WHERE run_id=$1 AND pipeline='HARVEST' AND pipeline_version=$2 AND state='SUCCEEDED'
-         LIMIT 1`,
-        [runId, HARVEST_PIPELINE_VERSION]
-      );
-      if (prior.rowCount !== 0) return Object.freeze({ state: "ALREADY_HARVESTED" as const, runId });
-
       const snapshot = await this.readSnapshot(client, runId, observedAt);
-      const candidates = projectEvaluatorObservations(snapshot);
-      const inputHash = createHash("sha256").update(JSON.stringify({
-        run_id: runId,
-        domain_id: snapshot.domainId,
-        observations: candidates.map((row) => ({
-          provider: row.provider, model_id: row.modelId, model_version: row.modelVersion,
-          step: row.step, metric: row.metric, source_kind: row.sourceKind,
-          source_ref: row.sourceRef, truth_basis: row.truthBasis
-        }))
-      })).digest("hex");
-      const attemptId = randomUUID();
+      const inputHash = harvestInputHash(snapshot);
       await this.recordPipelineEvent(client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash);
-      let inserted = 0;
-      for (const row of candidates) {
-        const result = await client.query(`
-          INSERT INTO evaluator.observation (
-            run_id, provider, model_id, model_version, domain_id, step, metric,
-            value, outcome_json, truth_basis, source_kind, source_ref,
-            source_raw_artifact_ref, answer_outcome_id, derivation_version,
-            provenance_json, observed_at, at_seq
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18)
-          ON CONFLICT DO NOTHING
-        `, [
-          row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.step,
-          row.metric, row.value, row.outcomeJson === null ? null : JSON.stringify(row.outcomeJson),
-          row.truthBasis, row.sourceKind, row.sourceRef, row.sourceRawArtifactRef,
-          row.answerOutcomeId, HARVEST_DERIVATION_VERSION, JSON.stringify(row.provenanceJson),
-          row.observedAt, await allocateSequence(client)
-        ]);
-        inserted += result.rowCount ?? 0;
-      }
-      await this.recordPipelineEvent(client, runId, attemptId, "SUCCEEDED", "TERMINAL_HARVEST_SUCCEEDED", inputHash);
-      return Object.freeze({ state: "HARVESTED" as const, runId, observationsInserted: inserted });
+      return Object.freeze({ state: "PREPARED" as const, inputHash });
     });
+    if (prepared.state === "NOT_TERMINAL") return prepared;
+
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
+        const prior = await client.query(
+          `SELECT 1 FROM evaluator.pipeline_event
+           WHERE run_id=$1 AND pipeline='HARVEST' AND pipeline_version=$2 AND state='SUCCEEDED'
+           LIMIT 1`,
+          [runId, HARVEST_PIPELINE_VERSION]
+        );
+        const alreadyHarvested = prior.rowCount !== 0;
+        const snapshot = await this.readSnapshot(client, runId, observedAt);
+        const candidates = projectEvaluatorObservations(snapshot)
+          .filter((row) => !alreadyHarvested || row.truthBasis === "SETTLEMENT");
+
+        if (!alreadyHarvested) {
+          const excludedAttempts = new Set(snapshot.modelCalls
+            .filter((call) => call.callSiteKey.startsWith("evaluator."))
+            .map((call) => call.attemptId));
+          for (const artifact of snapshot.rawArtifacts) {
+            if (!excludedAttempts.has(artifact.attemptId)
+              && (artifact.modelVersion === null || artifact.modelVersion.trim() === "")) {
+              await this.recordPipelineEvent(
+                client, runId, attemptId, "SKIPPED",
+                `MODEL_IDENTITY_INCOMPLETE:${artifact.rawArtifactId}`, prepared.inputHash
+              );
+            }
+          }
+        }
+
+        let inserted = 0;
+        const orderedCandidates = [
+          ...candidates.filter((row) => row.truthBasis !== "SETTLEMENT"),
+          ...candidates.filter((row) => row.truthBasis === "SETTLEMENT")
+        ];
+        for (const row of orderedCandidates) {
+          let supersedesObservationId = row.supersedesObservationId;
+          if (row.truthBasis === "SETTLEMENT" && supersedesObservationId === null) {
+            const availablePrior = await client.query<{ observation_id: string }>(`
+              SELECT prior.observation_id
+              FROM evaluator.observation AS prior
+              WHERE prior.run_id=$1 AND prior.provider=$2 AND prior.model_id=$3
+                AND prior.model_version=$4 AND prior.domain_id IS NOT DISTINCT FROM $5
+                AND prior.step='AUTHORING' AND prior.metric=$6
+                AND prior.truth_basis='CONSENSUS' AND prior.source_kind='NODE_STRENGTH'
+                AND NOT EXISTS (
+                  SELECT 1 FROM evaluator.observation AS successor
+                  WHERE successor.supersedes_observation_id=prior.observation_id
+                )
+              ORDER BY prior.observation_id LIMIT 1
+            `, [row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.metric]);
+            supersedesObservationId = availablePrior.rows[0]?.observation_id ?? null;
+          }
+          const result = await client.query(`
+            INSERT INTO evaluator.observation (
+              run_id, provider, model_id, model_version, domain_id, step, metric,
+              value, outcome_json, truth_basis, source_kind, source_ref,
+              source_raw_artifact_ref, answer_outcome_id, derivation_version,
+              supersedes_observation_id, provenance_json, observed_at, at_seq
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+            ON CONFLICT DO NOTHING
+          `, [
+            row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.step,
+            row.metric, row.value, row.outcomeJson === null ? null : JSON.stringify(row.outcomeJson),
+            row.truthBasis, row.sourceKind, row.sourceRef, row.sourceRawArtifactRef,
+            row.answerOutcomeId, HARVEST_DERIVATION_VERSION, supersedesObservationId,
+            JSON.stringify(row.provenanceJson), row.observedAt, await allocateSequence(client)
+          ]);
+          inserted += result.rowCount ?? 0;
+        }
+        if (alreadyHarvested) {
+          await this.recordPipelineEvent(
+            client, runId, attemptId, "SKIPPED",
+            inserted > 0 ? "SETTLEMENT_RECONCILIATION_SUCCEEDED" : "NO_NEW_SETTLEMENTS",
+            prepared.inputHash
+          );
+          return inserted > 0
+            ? Object.freeze({ state: "SETTLEMENTS_RECONCILED" as const, runId, observationsInserted: inserted })
+            : Object.freeze({ state: "ALREADY_HARVESTED" as const, runId });
+        }
+        await this.recordPipelineEvent(
+          client, runId, attemptId, "SUCCEEDED", "TERMINAL_HARVEST_SUCCEEDED", prepared.inputHash
+        );
+        return Object.freeze({ state: "HARVESTED" as const, runId, observationsInserted: inserted });
+      });
+    } catch (error) {
+      try {
+        await withWriteTransaction(this.pool, async (client) => {
+          await this.recordPipelineEvent(
+            client, runId, attemptId, "FAILED", "TERMINAL_HARVEST_FAILED", prepared.inputHash
+          );
+        });
+      } catch {
+        // Preserve the harvesting failure; receipt persistence is best-effort if the database itself is unavailable.
+      }
+      throw error;
+    }
   }
 
   private async recordPipelineEvent(
     client: PoolClient,
     runId: string,
     attemptId: string,
-    state: "STARTED" | "SUCCEEDED",
+    state: "STARTED" | "SUCCEEDED" | "FAILED" | "SKIPPED",
     reason: string,
     inputHash: string
   ): Promise<void> {
@@ -1380,6 +1475,20 @@ export class EvaluatorHarvestRepository {
       SELECT answer_outcome_id, provider, model_id, model_version, resolved_outcome, resolved_at
       FROM scorecard.answer_outcome WHERE run_id=$1 AND accepted ORDER BY answer_outcome_id
     `, [runId]);
+    const priorConsensus = await client.query<{
+      observation_id: string; provider: string; model_id: string; model_version: string;
+      domain_id: string | null; metric: string;
+    }>(`
+      SELECT observation_id,provider,model_id,model_version,domain_id,metric
+      FROM evaluator.observation AS prior
+      WHERE prior.run_id=$1 AND prior.step='AUTHORING' AND prior.truth_basis='CONSENSUS'
+        AND prior.source_kind='NODE_STRENGTH' AND prior.metric='prowess.outcome.v1'
+        AND NOT EXISTS (
+          SELECT 1 FROM evaluator.observation AS successor
+          WHERE successor.supersedes_observation_id=prior.observation_id
+        )
+      ORDER BY provider,model_id,model_version,domain_id,observation_id
+    `, [runId]);
     return Object.freeze({
       runId,
       domainId: domain.rows[0]?.domain_id ?? null,
@@ -1411,6 +1520,10 @@ export class EvaluatorHarvestRepository {
         answerOutcomeId: row.answer_outcome_id, provider: row.provider, modelId: row.model_id,
         modelVersion: row.model_version, resolvedOutcome: row.resolved_outcome,
         resolvedAt: new Date(row.resolved_at)
+      }))),
+      priorConsensusOutcomes: Object.freeze(priorConsensus.rows.map((row) => Object.freeze({
+        observationId: row.observation_id, provider: row.provider, modelId: row.model_id,
+        modelVersion: row.model_version, domainId: row.domain_id, metric: row.metric
       })))
     });
   }
@@ -1469,7 +1582,7 @@ export class EvaluatorMeteringRepository {
           completion_tokens, total_tokens, reported_vendor_amount,
           reported_vendor_unit, raw_usage, capture_version, at_seq
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16)
-        ON CONFLICT (ledger_entry_id) DO NOTHING
+        ON CONFLICT DO NOTHING
         RETURNING model_call_usage_id
       `, [
         input.ledgerEntryId,
@@ -1492,10 +1605,13 @@ export class EvaluatorMeteringRepository {
       const insertedId = inserted.rows[0]?.model_call_usage_id;
       if (insertedId !== undefined) return insertedId;
       const existing = await client.query<{ model_call_usage_id: string }>(
-        "SELECT model_call_usage_id FROM evaluator.model_call_usage WHERE ledger_entry_id=$1",
-        [input.ledgerEntryId]
+        `SELECT model_call_usage_id FROM evaluator.model_call_usage
+         WHERE ledger_entry_id=$1 OR raw_artifact_id=$2 LIMIT 1`,
+        [input.ledgerEntryId, input.rawArtifactId]
       );
-      return existing.rows[0]!.model_call_usage_id;
+      const existingId = existing.rows[0]?.model_call_usage_id;
+      if (existingId === undefined) throw new TypeError("MODEL_CALL_USAGE_WRITE_FAILED");
+      return existingId;
     });
   }
 
@@ -1680,6 +1796,7 @@ export function deriveRelativeCostCellsV1(
 
 export interface EvaluatorMeteringReconciliationResult {
   readonly callsProjected: number;
+  readonly callsFailed: number;
   readonly relativeCostCellsDerived: number;
 }
 
@@ -1692,12 +1809,18 @@ function readObservedUsage(metadata: unknown): ObservedModelCallUsage | null {
   }).nullable().optional() }).passthrough().safeParse(metadata);
   if (!parsed.success || parsed.data.usage === undefined || parsed.data.usage === null) return null;
   const usage = parsed.data.usage;
-  return Object.freeze({
+  const observed = Object.freeze({
     ...(usage.prompt_tokens === undefined ? {} : { prompt_tokens: usage.prompt_tokens }),
     ...(usage.completion_tokens === undefined ? {} : { completion_tokens: usage.completion_tokens }),
     ...(usage.total_tokens === undefined ? {} : { total_tokens: usage.total_tokens }),
     ...(usage.x_cost_usd === undefined ? {} : { x_cost_usd: usage.x_cost_usd })
   });
+  try {
+    assertObservedUsage(observed);
+    return observed;
+  } catch {
+    return null;
+  }
 }
 
 export async function reconcileEvaluatorMetering(
@@ -1722,6 +1845,7 @@ export async function reconcileEvaluatorMetering(
     JOIN ledger.raw_artifact AS artifact ON artifact.attempt_id=entry.attempt_id
     LEFT JOIN evaluator.model_call_usage AS projected
       ON projected.ledger_entry_id=entry.ledger_entry_id
+      OR projected.raw_artifact_id=artifact.raw_artifact_id
     WHERE entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
       AND entry.call_site_key IS NOT NULL
       AND artifact.model_version IS NOT NULL AND length(btrim(artifact.model_version)) > 0
@@ -1729,17 +1853,25 @@ export async function reconcileEvaluatorMetering(
     ORDER BY entry.sequence, artifact.at_seq
   `);
   const repository = new EvaluatorMeteringRepository(pool);
+  let callsProjected = 0;
+  let callsFailed = 0;
   for (const row of pending.rows) {
-    await repository.recordCall({
-      ledgerEntryId: row.ledger_entry_id,
-      rawArtifactId: row.raw_artifact_id,
-      provider: row.provider,
-      modelId: row.model_id,
-      modelVersion: row.model_version,
-      callSiteKey: row.call_site_key,
-      runtimeClass: row.provider_ref === EVALUATOR_PROVIDER_REF ? "LOCAL_VLLM" : "PAID_REMOTE",
-      usage: readObservedUsage(row.metadata_json)
-    });
+    try {
+      await repository.recordCall({
+        ledgerEntryId: row.ledger_entry_id,
+        rawArtifactId: row.raw_artifact_id,
+        provider: row.provider,
+        modelId: row.model_id,
+        modelVersion: row.model_version,
+        callSiteKey: row.call_site_key,
+        // The evaluator provider is the only registered local runtime in this dark-launch slice.
+        runtimeClass: row.provider_ref === EVALUATOR_PROVIDER_REF ? "LOCAL_VLLM" : "PAID_REMOTE",
+        usage: readObservedUsage(row.metadata_json)
+      });
+      callsProjected += 1;
+    } catch {
+      callsFailed += 1;
+    }
   }
   const usageRows = await pool.query<{
     provider: string;
@@ -1763,5 +1895,5 @@ export async function reconcileEvaluatorMetering(
     usage: row.raw_usage === null ? null : readObservedUsage({ usage: row.raw_usage })
   })), window);
   await repository.recordRelativeCostCells(cells);
-  return Object.freeze({ callsProjected: pending.rows.length, relativeCostCellsDerived: cells.length });
+  return Object.freeze({ callsProjected, callsFailed, relativeCostCellsDerived: cells.length });
 }
