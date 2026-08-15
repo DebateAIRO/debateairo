@@ -322,7 +322,7 @@ function isValidDomainName(canonicalName: string): boolean {
   const normalizedName = normalizeDomainName(canonicalName);
   if (normalizedName.length < 2 || normalizedName.length > DOMAIN_NAME_MAX_LENGTH) return false;
   if (normalizedName.split(" ").length > DOMAIN_NAME_MAX_WORDS) return false;
-  return /^[\p{L}\p{N}]+(?:[ &'’-][\p{L}\p{N}]+)*$/u.test(normalizedName);
+  return /^[\p{L}\p{N}]+(?:(?: +| *& *| *- *|['’])[\p{L}\p{N}]+)*$/u.test(normalizedName);
 }
 
 function levenshteinDistance(left: string, right: string): number {

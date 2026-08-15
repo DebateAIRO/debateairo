@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest, Session } from "@debateai/contract";
@@ -6,7 +8,8 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   DomainRegistryRepository,
   EVALUATOR_MAKER,
-  EVALUATOR_PROVIDER_REF
+  EVALUATOR_PROVIDER_REF,
+  normalizeDomainName
 } from "../../packages/evaluator/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
@@ -210,10 +213,59 @@ describe("domain registry repository", () => {
     `);
     expect(count.rows[0]!.count).toBe("1");
   });
+
+  it("applies pending 0024 and matches every approved starter name through admission", async () => {
+    const scratch = await startTestDatabase();
+    try {
+      await migrate(scratch.pool);
+      const seedSql = await readFile(
+        new URL("../../migrations/pending/0024_evaluator_domain_seed.sql", import.meta.url),
+        "utf8"
+      );
+      await scratch.pool.query(seedSql);
+      const seeded = await scratch.pool.query<{
+        canonical_name: string;
+        normalized_name: string;
+        origin: string;
+      }>(`
+        SELECT canonical_name, normalized_name, origin
+        FROM evaluator.domain
+        WHERE provenance_ref='mission:model-evaluator:V-approved-starter-list'
+        ORDER BY canonical_name
+      `);
+      expect(seeded.rows).toHaveLength(26);
+      expect(new Set(seeded.rows.map((row) => row.origin))).toEqual(new Set(["STARTER"]));
+      expect(seeded.rows.map((row) => row.normalized_name)).toEqual(
+        seeded.rows.map((row) => normalizeDomainName(row.canonical_name))
+      );
+
+      const repository = new DomainRegistryRepository(scratch.pool);
+      const runId = await insertEvaluatorRun("approved starter-list round trip", scratch.pool);
+      const decisions = [];
+      for (const row of seeded.rows) {
+        const admission = await repository.admitProposal({
+          runId,
+          proposedName: row.canonical_name,
+          provider: "provider:test",
+          modelId: "model:test",
+          modelVersion: "v1",
+          rawArtifactRef: null,
+          provenanceRef: `test:starter-roundtrip:${row.normalized_name}`
+        });
+        decisions.push({ name: row.canonical_name, decision: admission.decision });
+      }
+      expect(decisions).toEqual(seeded.rows.map((row) => ({
+        name: row.canonical_name,
+        decision: "MATCHED_EXISTING"
+      })));
+    } finally {
+      await scratch.stop();
+    }
+  });
 });
 
-async function insertEvaluatorRun(questionLine: string): Promise<string> {
-  const result = await database.pool.query<{ run_id: string }>(`
+async function insertEvaluatorRun(questionLine: string, pool: Pool = database.pool): Promise<string> {
+  const result = await pool.query<{ run_id: string }>(`
     INSERT INTO core.run (
       question_line, asker_id, session_id, caller_scope, as_of, asker_risk_tier,
       risk_tier, tier_source, tier_provenance_ref, composition_budget_tier,

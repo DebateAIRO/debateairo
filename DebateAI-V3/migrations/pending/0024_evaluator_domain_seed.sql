@@ -1,36 +1,36 @@
--- PENDING V APPROVAL — DO NOT APPLY OR MOVE INTO migrations/ UNTIL V APPROVES.
+-- V-APPROVED LIST — PENDING INTEGRATION; DO NOT MOVE INTO migrations/ HERE.
 -- The migration runner scans only top-level migrations/*.sql, so this draft is
--- intentionally unwired. After approval, only the seed_data VALUES block below
--- is replaced with V's final list; the insertion contract stays unchanged.
+-- intentionally unwired. Future list replacement changes only the canonical
+-- names in seed_data; normalized_name is derived by the insertion contract.
 
-WITH seed_data(canonical_name, normalized_name) AS (
+WITH seed_data(canonical_name) AS (
   VALUES
-    ('Agriculture & Food', 'agriculture & food'),
-    ('Arts & Culture', 'arts & culture'),
-    ('Business & Management', 'business & management'),
-    ('Computing & Software', 'computing & software'),
-    ('Economics', 'economics'),
-    ('Education', 'education'),
-    ('Engineering', 'engineering'),
-    ('Environment & Climate', 'environment & climate'),
-    ('Ethics & Philosophy', 'ethics & philosophy'),
-    ('Finance & Investing', 'finance & investing'),
-    ('Geography', 'geography'),
-    ('Government & Public Policy', 'government & public policy'),
-    ('Health & Medicine', 'health & medicine'),
-    ('History', 'history'),
-    ('Law & Justice', 'law & justice'),
-    ('Linguistics & Languages', 'linguistics & languages'),
-    ('Mathematics', 'mathematics'),
-    ('Media & Communication', 'media & communication'),
-    ('Natural Sciences', 'natural sciences'),
-    ('Politics & Elections', 'politics & elections'),
-    ('Psychology', 'psychology'),
-    ('Religion & Spirituality', 'religion & spirituality'),
-    ('Security & Defense', 'security & defense'),
-    ('Society & Demographics', 'society & demographics'),
-    ('Sports & Recreation', 'sports & recreation'),
-    ('Technology & Innovation', 'technology & innovation')
+    ('Agriculture & Food'),
+    ('Arts & Culture'),
+    ('Business & Management'),
+    ('Computing & Software'),
+    ('Economics'),
+    ('Education'),
+    ('Engineering'),
+    ('Environment & Climate'),
+    ('Ethics & Philosophy'),
+    ('Finance & Investing'),
+    ('Geography'),
+    ('Government & Public Policy'),
+    ('Health & Medicine'),
+    ('History'),
+    ('Law & Justice'),
+    ('Linguistics & Languages'),
+    ('Mathematics'),
+    ('Media & Communication'),
+    ('Natural Sciences'),
+    ('Politics & Elections'),
+    ('Psychology'),
+    ('Religion & Spirituality'),
+    ('Security & Defense'),
+    ('Society & Demographics'),
+    ('Sports & Recreation'),
+    ('Technology & Innovation')
 )
 INSERT INTO evaluator.domain (
   canonical_name,
@@ -43,11 +43,11 @@ INSERT INTO evaluator.domain (
 )
 SELECT
   canonical_name,
-  normalized_name,
+  lower(btrim(regexp_replace(normalize(canonical_name, NFKC), '\s+', ' ', 'g'))),
   'STARTER',
   1,
   'mission:model-evaluator:V-approved-starter-list',
   statement_timestamp(),
   ledger.allocate_sequence()
 FROM seed_data
-ORDER BY normalized_name;
+ORDER BY canonical_name;

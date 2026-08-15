@@ -27,6 +27,10 @@ describe("evaluator domain admission guardrails", () => {
       domainId: null,
       candidates: [{ domainId: "domain:software" }]
     });
+    expect(evaluateDomainProposal("Health & Medicine", domains)).toMatchObject({
+      decision: "MATCHED_EXISTING",
+      domainId: "domain:health"
+    });
   });
 
   it("admits genuinely new labels and rejects labels outside fixed bounds", () => {
@@ -35,7 +39,11 @@ describe("evaluator domain admission guardrails", () => {
       normalizedName: "climate science",
       domainId: null
     });
-    for (const invalid of ["", "a", "one two three four five six seven", "health!!!", "x".repeat(81)]) {
+    expect(evaluateDomainProposal("Children's Health", [])).toMatchObject({ decision: "ADMITTED_NEW" });
+    expect(evaluateDomainProposal("Pre-trial Law", [])).toMatchObject({ decision: "ADMITTED_NEW" });
+    for (const invalid of [
+      "", "a", "one two three four five six seven", "health!!!", "Health && Medicine", "x".repeat(81)
+    ]) {
       expect(evaluateDomainProposal(invalid, domains)).toMatchObject({
         decision: "REJECTED_INVALID",
         domainId: null
@@ -50,7 +58,7 @@ describe("evaluator domain admission guardrails", () => {
     );
   });
 
-  it("keeps the provisional 0024 seed visibly pending and outside the runner scan", async () => {
+  it("keeps the approved 0024 seed pending integration and outside the runner scan", async () => {
     const topLevelMigrations = (await readdir(new URL("../../migrations/", import.meta.url)))
       .filter((name) => /^\d+.*\.sql$/.test(name));
     expect(topLevelMigrations).not.toContain("0024_evaluator_domain_seed.sql");
@@ -58,7 +66,8 @@ describe("evaluator domain admission guardrails", () => {
       new URL("../../migrations/pending/0024_evaluator_domain_seed.sql", import.meta.url),
       "utf8"
     );
-    expect(pending).toMatch(/^-- PENDING V APPROVAL/);
+    expect(pending).toMatch(/^-- V-APPROVED LIST — PENDING INTEGRATION/);
     expect(pending).toContain("mission:model-evaluator:V-approved-starter-list");
+    expect(pending).toContain("WITH seed_data(canonical_name) AS");
   });
 });
