@@ -130,12 +130,12 @@ function defaultCodexSessionsRoot(): string {
 export async function parseCodexCompletion(
   stdout: string,
   sessionsRoot = defaultCodexSessionsRoot()
-): Promise<{ readonly content: string; readonly model: string }> {
+): Promise<{ readonly content: string; readonly model: string; readonly usage: null }> {
   const parsed = parseCodexStdout(stdout);
   const matches = await findRollouts(sessionsRoot, parsed.threadId);
   if (matches.length !== 1) throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_UNRESOLVED");
   const model = parseCodexRolloutModel(await readFile(matches[0]!, "utf8"), parsed.threadId);
-  return Object.freeze({ content: parsed.content, model });
+  return Object.freeze({ content: parsed.content, model, usage: null });
 }
 
 function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {

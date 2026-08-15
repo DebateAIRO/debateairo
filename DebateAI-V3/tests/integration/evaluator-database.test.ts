@@ -9,7 +9,9 @@ import {
   DomainRegistryRepository,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
-  normalizeDomainName
+  normalizeDomainName,
+  EvaluatorMeteringRepository,
+  deriveRelativeCostCellsV1
 } from "../../packages/evaluator/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
@@ -26,6 +28,83 @@ afterAll(async () => {
 });
 
 describe("0023 evaluator foundation migration", () => {
+  it("projects usage and versioned relative cost into both evaluator metering tables", async () => {
+    const artifactId = "00000000-0000-4000-8000-000000000801";
+    const attemptId = "00000000-0000-4000-8000-000000000802";
+    await database.pool.query(`
+      INSERT INTO ledger.raw_artifact (
+        raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
+        maker, model_version, raw_text, metadata_json, parse_status, content_hash,
+        input_hash, contract_hash, at_seq
+      ) VALUES ($1,$2,NULL,'provider:test','openai-compatible-http','model:test',
+        'maker:test','v1','{}','{}','PARSED',$3,'input','contract',ledger.allocate_sequence())
+    `, [artifactId, attemptId, "a".repeat(64)]);
+    const entries = await database.pool.query<{ ledger_entry_id: string }>(`
+      INSERT INTO ledger.ledger_entry (
+        sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
+        stance_at_action, outcome, actor_ref, input_hash, contract_hash,
+        raw_artifact_ref, started_at, finished_at
+      ) VALUES
+        (ledger.allocate_sequence(),NULL,$1,'MODEL_CALL','test:metered','node:metered',
+          'UNASSIGNED','OK','provider:test','input','contract',$2,now(),now()),
+        (ledger.allocate_sequence(),NULL,NULL,'MODEL_CALL','test:unmetered','node:unmetered',
+          'UNASSIGNED','OK','provider:test','input','contract',NULL,now(),now())
+      RETURNING ledger_entry_id
+    `, [attemptId, artifactId]);
+    const repository = new EvaluatorMeteringRepository(database.pool);
+    await repository.recordCall({
+      ledgerEntryId: entries.rows[0]!.ledger_entry_id, rawArtifactId: artifactId,
+      provider: "xai", modelId: "grok", modelVersion: "v1", callSiteKey: "test:metered",
+      runtimeClass: "PAID_REMOTE", usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, x_cost_usd: 0.01 }
+    });
+    await repository.recordCall({
+      ledgerEntryId: entries.rows[1]!.ledger_entry_id, rawArtifactId: null,
+      provider: "openai", modelId: "codex", modelVersion: "v1", callSiteKey: "test:unmetered",
+      runtimeClass: "PAID_REMOTE", usage: null
+    });
+    const rows = await database.pool.query(`
+      SELECT metering_status, prompt_tokens::int, completion_tokens::int,
+             total_tokens::int, reported_vendor_amount, reported_vendor_unit, raw_usage
+      FROM evaluator.model_call_usage WHERE call_site_key LIKE 'test:%' ORDER BY call_site_key
+    `);
+    expect(rows.rows).toEqual([
+      expect.objectContaining({ metering_status: "METERED", prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, reported_vendor_amount: 0.01, reported_vendor_unit: "USD" }),
+      { metering_status: "UNMETERED", prompt_tokens: null, completion_tokens: null, total_tokens: null, reported_vendor_amount: null, reported_vendor_unit: null, raw_usage: null }
+    ]);
+
+    const relativeCells = deriveRelativeCostCellsV1([
+      { provider: "xai", modelId: "grok", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { x_cost_usd: 0.01 } }
+    ], {
+      windowStart: new Date("2026-08-14T10:00:00.000Z"),
+      windowEnd: new Date("2026-08-14T11:00:00.000Z"),
+      asOf: new Date("2026-08-14T11:05:00.000Z")
+    });
+    await repository.recordRelativeCostCells(relativeCells);
+    const persistedRelative = await database.pool.query(`
+      SELECT provider, model_id, model_version, window_start, window_end,
+             relative_cost, comparability, metered_call_count, unmetered_call_count,
+             source_unit_totals, normalization_basis, derivation_version::int,
+             derivation_input, derivation_hash, as_of
+      FROM evaluator.relative_cost_cell WHERE model_id='grok'
+    `);
+    expect(persistedRelative.rows).toEqual([{
+      provider: "xai",
+      model_id: "grok",
+      model_version: "v1",
+      window_start: relativeCells[0]!.windowStart,
+      window_end: relativeCells[0]!.windowEnd,
+      relative_cost: 1,
+      comparability: "COMPARABLE",
+      metered_call_count: 1,
+      unmetered_call_count: 0,
+      source_unit_totals: { tokens: 0, usd: 0.01 },
+      normalization_basis: "relative-external-spend/v1",
+      derivation_version: 1,
+      derivation_input: relativeCells[0]!.derivationInput,
+      derivation_hash: relativeCells[0]!.derivationHash,
+      as_of: relativeCells[0]!.asOf
+    }]);
+  });
   it("creates every evaluator table under append-only mutation guards", async () => {
     const tables = await database.pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables

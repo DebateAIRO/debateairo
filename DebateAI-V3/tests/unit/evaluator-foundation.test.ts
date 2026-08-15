@@ -8,6 +8,7 @@ import {
   EVALUATOR_PROVIDER_REF,
   assertEvaluatorProviderIsolation,
   createBlindEvaluationSample,
+  deriveRelativeCostCellsV1,
   probeEvaluatorVllmCatalog,
   readEvaluatorDispatchBinding,
   readEvaluatorProviderFamily
@@ -35,6 +36,42 @@ const familyValue = {
 } as const;
 
 describe("Evaluator foundation", () => {
+  it("normalizes observed external spend without treating larger local token volume as paid cost", () => {
+    const windowStart = new Date("2026-08-14T10:00:00.000Z");
+    const windowEnd = new Date("2026-08-14T11:00:00.000Z");
+    const asOf = new Date("2026-08-14T11:05:00.000Z");
+    const cells = deriveRelativeCostCellsV1([
+      { provider: "vllm", modelId: "local", modelVersion: "v1", runtimeClass: "LOCAL_VLLM", usage: { total_tokens: 50_000 } },
+      { provider: "xai", modelId: "grok", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { total_tokens: 10, x_cost_usd: 0.02 } },
+      { provider: "anthropic", modelId: "claude", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: null }
+    ], { windowStart, windowEnd, asOf });
+    expect(cells).toEqual([
+      expect.objectContaining({
+        modelId: "local", relativeCost: 0, comparability: "COMPARABLE", meteredCallCount: 1,
+        sourceUnitTotals: { tokens: 50_000, usd: 0 }, windowStart, windowEnd, asOf,
+        derivationVersion: 1, derivationInput: expect.any(Array), derivationHash: expect.stringMatching(/^[0-9a-f]{64}$/)
+      }),
+      expect.objectContaining({ modelId: "grok", relativeCost: 1, comparability: "COMPARABLE", meteredCallCount: 1 }),
+      expect.objectContaining({ modelId: "claude", relativeCost: null, comparability: "UNKNOWN", unmeteredCallCount: 1 })
+    ]);
+  });
+
+  it("keeps paid spend UNKNOWN when any metered call lacks observed cost", () => {
+    const cells = deriveRelativeCostCellsV1([
+      { provider: "remote", modelId: "mixed", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { total_tokens: 10, x_cost_usd: 0.02 } },
+      { provider: "remote", modelId: "mixed", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { total_tokens: 20 } }
+    ], {
+      windowStart: new Date("2026-08-14T10:00:00.000Z"),
+      windowEnd: new Date("2026-08-14T11:00:00.000Z"),
+      asOf: new Date("2026-08-14T11:05:00.000Z")
+    });
+    expect(cells[0]).toMatchObject({
+      relativeCost: null,
+      comparability: "UNKNOWN",
+      meteredCallCount: 2,
+      sourceUnitTotals: { tokens: 30, usd: 0.02 }
+    });
+  });
   it("scaffolds the evaluator worker as a separate composition root", () => {
     expect(EVALUATOR_TASK_FAMILIES).toEqual([
       "evaluator.tag-question",

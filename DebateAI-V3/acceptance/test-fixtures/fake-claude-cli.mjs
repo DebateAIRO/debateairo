@@ -17,8 +17,12 @@ function envelope(overrides) {
     duration_api_ms: 100,
     num_turns: 1,
     session_id: "00000000-0000-0000-0000-000000000000",
-    total_cost_usd: 0,
-    modelUsage: { [REPORTED_MODEL]: { output_tokens: 5 } },
+    total_cost_usd: process.env.FAKE_CLAUDE_COST_ABSENT === "1" ? undefined : 0,
+    modelUsage: {
+      [REPORTED_MODEL]: process.env.FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT === "1"
+        ? "usage unavailable"
+        : { output_tokens: 5 }
+    },
     subtype: "success",
     result: "",
     type: "result",

@@ -28,6 +28,37 @@ afterEach(async () => {
 });
 
 describe("GROK-01 Grok Build CLI relay", () => {
+  it("keeps serving observed token usage when the CLI envelope omits cost", async () => {
+    process.env.FAKE_GROK_COST_ABSENT = "1";
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Cost absent.");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        model: "grok-fake-cli-model",
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+      });
+    } finally {
+      delete process.env.FAKE_GROK_COST_ABSENT;
+    }
+  });
+
+  it("degrades to usage null when cost is absent and modelUsage is non-object", async () => {
+    process.env.FAKE_GROK_COST_ABSENT = "1";
+    process.env.FAKE_GROK_MODEL_USAGE_NON_OBJECT = "1";
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Telemetry unavailable.");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        model: "grok-fake-cli-model",
+        usage: null
+      });
+    } finally {
+      delete process.env.FAKE_GROK_COST_ABSENT;
+      delete process.env.FAKE_GROK_MODEL_USAGE_NON_OBJECT;
+    }
+  });
   it("replays the redacted real Grok Build 1.0.0 text/modelUsage envelope", async () => {
     process.env.FAKE_GROK_CAPTURED_ENVELOPE = "1";
     try {
@@ -39,7 +70,8 @@ describe("GROK-01 Grok Build CLI relay", () => {
       await expect(response.json()).resolves.toMatchObject({
         model: "grok-4.6-build",
         maker: "xAI",
-        choices: [{ message: { content: "OK" } }]
+        choices: [{ message: { content: "OK" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, x_cost_usd: 0.00001 }
       });
     } finally {
       delete process.env.FAKE_GROK_CAPTURED_ENVELOPE;

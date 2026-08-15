@@ -44,10 +44,16 @@ export const CLAUDE_HANDSHAKE_PROMPT =
 const envelopeSchema = z.object({
   is_error: z.boolean(),
   result: z.string(),
+  total_cost_usd: z.number().nonnegative().optional(),
   modelUsage: z.record(z.string(), z.unknown())
 }).passthrough();
 
-function parseClaudeEnvelope(stdout: string): { readonly content: string; readonly model: string } {
+const observedTokenUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional()
+}).passthrough();
+
+function parseClaudeEnvelope(stdout: string) {
   let decoded: unknown;
   try {
     decoded = JSON.parse(stdout);
@@ -64,7 +70,23 @@ function parseClaudeEnvelope(stdout: string): { readonly content: string; readon
   if (reportedModels.length !== 1 || model === undefined) {
     throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
   }
-  return { content, model };
+  const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
+  const inputTokens = observed.success ? observed.data.input_tokens : undefined;
+  const outputTokens = observed.success ? observed.data.output_tokens : undefined;
+  const costUsd = envelope.data.total_cost_usd;
+  const usage = {
+    ...(inputTokens === undefined ? {} : { promptTokens: inputTokens }),
+    ...(outputTokens === undefined ? {} : { completionTokens: outputTokens }),
+    ...(inputTokens === undefined || outputTokens === undefined
+      ? {}
+      : { totalTokens: inputTokens + outputTokens }),
+    ...(costUsd === undefined ? {} : { costUsd })
+  };
+  return Object.freeze({
+    content,
+    model,
+    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
+  });
 }
 
 const claudeAdapter: CliRelayAdapter = {

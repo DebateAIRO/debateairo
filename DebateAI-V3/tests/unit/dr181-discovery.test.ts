@@ -19,7 +19,7 @@ const adapter: CliRelayAdapter = {
       || typeof decoded.model !== "string" || decoded.model.trim() === "") {
       throw new CliRelayFailure("FAILED", "FIXTURE_CLI_MODEL_UNRESOLVED");
     }
-    return { content: decoded.content, model: decoded.model };
+    return { content: decoded.content, model: decoded.model, usage: null };
   }
 };
 
