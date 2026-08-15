@@ -852,6 +852,7 @@ export const evaluatorRankSnapshot = evaluator.table("rank_snapshot", {
   modelVersion: text("model_version").notNull(),
   domainId: uuid("domain_id").references(() => evaluatorDomain.domainId),
   step: text("step").notNull(),
+  metric: text("metric").notNull(),
   ordinal: integer("ordinal").notNull(),
   score: doublePrecision("score").notNull(),
   n: integer("n").notNull(),
