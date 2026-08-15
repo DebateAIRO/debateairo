@@ -92,3 +92,30 @@ run untagged. A later reconciliation uses the same classifier with assignment
 basis `BACKFILL`; it inserts the evaluator-owned link and never updates
 `memory.question_key`. No evaluator tag result is read by panel discovery,
 routing, or dispatch while binding remains `UNBOUND`.
+
+## Terminal harvest and metering reconciliation
+
+`EvaluatorHarvestRepository` accepts only runs with a durable `TERMINAL`
+progress event. It reads the singular `evaluator.question_domain` row directly;
+an absent row deliberately produces observations with `domain_id = NULL`.
+Authored nodes and strengths become `AUTHORING` observations, reduced
+judgements become `JUDGING` observations, cross-maker node reviews become
+`REVIEWING` observations, and accepted real-world outcomes become
+settlement-fed `AUTHORING` observations. Consensus and settlement truth bases
+are explicit evaluator-owned values; harvest never inserts into or mutates
+`scorecard.answer_outcome`.
+
+Artifact identity comes from each source table's explicit artifact reference.
+Call-site classification correlates `ledger.ledger_entry` to
+`ledger.raw_artifact` by `attempt_id`, including evaluator artifacts whose
+`run_id` is null. Any `evaluator.` call-site attempt is excluded from model
+performance observations. Model versions that are absent are skipped rather
+than collapsed into maker-level identity.
+
+The projector is deterministic and provider-free. An advisory run lock, a
+versioned successful HARVEST receipt, and the observation natural key make
+reconciliation idempotent. The worker entry points also reconcile completed
+model calls into `model_call_usage`, reading observed usage from persisted raw
+artifact metadata, then derive and persist versioned relative-cost cells.
+Evaluator calls remain visible as cost while remaining excluded from harvested
+performance evidence. No metering write occurs in the product gateway path.

@@ -1,0 +1,128 @@
+import { describe, expect, it } from "vitest";
+import {
+  projectEvaluatorObservations,
+  type EvaluatorHarvestSnapshot
+} from "../../packages/evaluator/src/index.js";
+
+const snapshot: EvaluatorHarvestSnapshot = {
+  runId: "run:harvest",
+  domainId: null,
+  observedAt: new Date("2026-08-15T10:00:00.000Z"),
+  rawArtifacts: [
+    {
+      rawArtifactId: "artifact:author",
+      attemptId: "attempt:author",
+      provider: "openai-compatible-http",
+      modelId: "author-model",
+      modelVersion: "v1"
+    },
+    {
+      rawArtifactId: "artifact:reviewer",
+      attemptId: "attempt:reviewer",
+      provider: "openai-compatible-http",
+      modelId: "reviewer-model",
+      modelVersion: "v2"
+    },
+    {
+      rawArtifactId: "artifact:evaluator",
+      attemptId: "attempt:evaluator",
+      provider: "openai-compatible-http",
+      modelId: "evaluator-model",
+      modelVersion: "v3"
+    }
+  ],
+  modelCalls: [
+    { attemptId: "attempt:author", callSiteKey: "runner.author.v1" },
+    { attemptId: "attempt:reviewer", callSiteKey: "runner.review.v1" },
+    { attemptId: "attempt:evaluator", callSiteKey: "evaluator.tag-question.v1" }
+  ],
+  authoredNodes: [
+    {
+      nodeId: "node:author",
+      rawArtifactRef: "artifact:author",
+      generationStatus: "GENERATED",
+      pathStatus: "ACTIVE",
+      claimType: "CLAIM"
+    },
+    {
+      nodeId: "node:evaluator",
+      rawArtifactRef: "artifact:evaluator",
+      generationStatus: "GENERATED",
+      pathStatus: "ACTIVE",
+      claimType: "CLAIM"
+    }
+  ],
+  reviews: [{
+    nodeReviewId: "review:1",
+    authorRawArtifactRef: "artifact:author",
+    reviewRawArtifactRef: "artifact:reviewer",
+    outcome: "PASS",
+    reasons: ["sound"]
+  }],
+  judgements: [{
+    reducedJudgementId: "judgement:1",
+    rawArtifactRef: "artifact:reviewer",
+    tau: 0.75,
+    numberKind: "PROBABILITY",
+    producer: "judge"
+  }],
+  strengths: [{
+    propagationRunId: "propagation:1",
+    nodeId: "node:author",
+    strength: 0.8,
+    numberKind: "PROBABILITY",
+    producer: "propagator"
+  }],
+  settlements: []
+};
+
+describe("deterministic evaluator harvest projector", () => {
+  it("projects authoring, judging, and reviewing observations with nullable authoritative domain", () => {
+    const rows = projectEvaluatorObservations(snapshot);
+
+    expect(rows.map((row) => row.step).sort()).toEqual([
+      "AUTHORING", "AUTHORING", "JUDGING", "REVIEWING"
+    ]);
+    expect(rows.every((row) => row.domainId === null)).toBe(true);
+    expect(rows.every((row) => row.truthBasis === "CONSENSUS")).toBe(true);
+  });
+
+  it("excludes evaluator call sites by attempt id even when the artifact is null-run-scoped", () => {
+    const rows = projectEvaluatorObservations(snapshot);
+
+    expect(rows.some((row) => row.modelId === "evaluator-model")).toBe(false);
+    expect(rows.some((row) => row.sourceRawArtifactRef === "artifact:evaluator")).toBe(false);
+  });
+
+  it("uses question_domain input as authoritative instead of pipeline receipts", () => {
+    const rows = projectEvaluatorObservations({ ...snapshot, domainId: "domain:authoritative" });
+
+    expect(rows.every((row) => row.domainId === "domain:authoritative")).toBe(true);
+  });
+
+  it("marks accepted external outcomes as settlement-fed without manufacturing Q59 rows", () => {
+    const rows = projectEvaluatorObservations({
+      ...snapshot,
+      settlements: [{
+        answerOutcomeId: "outcome:1",
+        provider: "openai-compatible-http",
+        modelId: "author-model",
+        modelVersion: "v1",
+        resolvedOutcome: true,
+        resolvedAt: new Date("2026-08-15T11:00:00.000Z")
+      }]
+    });
+    const settlement = rows.find((row) => row.sourceKind === "EXTERNAL_ANSWER_OUTCOME");
+
+    expect(settlement).toMatchObject({
+      truthBasis: "SETTLEMENT",
+      answerOutcomeId: "outcome:1",
+      step: "AUTHORING",
+      value: 1
+    });
+  });
+
+  it("is byte-for-byte deterministic for the same snapshot", () => {
+    expect(projectEvaluatorObservations(snapshot)).toEqual(projectEvaluatorObservations(snapshot));
+  });
+});

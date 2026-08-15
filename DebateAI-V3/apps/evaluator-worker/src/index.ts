@@ -4,10 +4,16 @@ import {
   assertEvaluatorProviderIsolation,
   DomainRegistryRepository,
   EvaluatorCatalogRepository,
+  EvaluatorHarvestRepository,
+  HARVEST_PIPELINE_VERSION,
   probeEvaluatorVllmCatalog,
+  reconcileEvaluatorMetering,
   runEvaluatorQuestionTagger,
+  type EvaluatorHarvestResult,
+  type EvaluatorMeteringReconciliationResult,
   type EvaluatorQuestionTagResult,
-  type EvaluatorProviderFamilyRow
+  type EvaluatorProviderFamilyRow,
+  type RelativeCostDerivationWindow
 } from "@debateai/evaluator";
 
 export const EVALUATOR_TASK_FAMILIES = Object.freeze([
@@ -62,6 +68,48 @@ export async function runEvaluatorTagReconciliation(input: {
   readonly provenanceRef: string;
 }): Promise<EvaluatorQuestionTagResult> {
   return runPersistedQuestionTag({ ...input, basis: "BACKFILL" });
+}
+
+export interface EvaluatorTerminalHarvestWorkerResult {
+  readonly metering: EvaluatorMeteringReconciliationResult;
+  readonly harvest: EvaluatorHarvestResult;
+}
+
+export async function runEvaluatorTerminalHarvest(input: {
+  readonly pool: Pool;
+  readonly runId: string;
+  readonly meteringWindow: RelativeCostDerivationWindow;
+  readonly observedAt?: Date;
+}): Promise<EvaluatorTerminalHarvestWorkerResult> {
+  const metering = await reconcileEvaluatorMetering(input.pool, input.meteringWindow);
+  const harvest = await new EvaluatorHarvestRepository(input.pool)
+    .harvestTerminalRun(input.runId, input.observedAt);
+  return Object.freeze({ metering, harvest });
+}
+
+export async function reconcileEvaluatorTerminalRuns(input: {
+  readonly pool: Pool;
+  readonly meteringWindow: RelativeCostDerivationWindow;
+  readonly observedAt?: Date;
+}): Promise<readonly EvaluatorHarvestResult[]> {
+  await reconcileEvaluatorMetering(input.pool, input.meteringWindow);
+  const terminal = await input.pool.query<{ run_id: string }>(`
+    SELECT DISTINCT event.run_id
+    FROM core.run_progress_event AS event
+    WHERE event.kind='TERMINAL'
+      AND NOT EXISTS (
+        SELECT 1 FROM evaluator.pipeline_event AS harvest
+        WHERE harvest.run_id=event.run_id AND harvest.pipeline='HARVEST'
+          AND harvest.pipeline_version=$1 AND harvest.state='SUCCEEDED'
+      )
+    ORDER BY event.run_id
+  `, [HARVEST_PIPELINE_VERSION]);
+  const repository = new EvaluatorHarvestRepository(input.pool);
+  const results: EvaluatorHarvestResult[] = [];
+  for (const row of terminal.rows) {
+    results.push(await repository.harvestTerminalRun(row.run_id, input.observedAt));
+  }
+  return Object.freeze(results);
 }
 
 async function runPersistedQuestionTag(input: {

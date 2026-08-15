@@ -21,7 +21,8 @@ import { LivenessRepository } from "@debateai/liveness";
 import { BudgetRepository } from "@debateai/budget";
 import {
   runAskTimeEvaluatorTag,
-  runEvaluatorTagReconciliation
+  runEvaluatorTagReconciliation,
+  runEvaluatorTerminalHarvest
 } from "../../apps/evaluator-worker/src/index.js";
 
 let database: TestDatabase;
@@ -62,6 +63,153 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await database.stop();
+});
+
+describe("terminal evaluator harvest", () => {
+  it("harvests once with nullable domain, excludes evaluator attempts, meters in the worker, and leaves Q59 untouched", async () => {
+    const run = await database.pool.query<{ run_id: string }>(`
+      INSERT INTO core.run (
+        question_line, asker_id, session_id, caller_scope, as_of, asker_risk_tier,
+        risk_tier, tier_source, tier_provenance_ref, composition_budget_tier,
+        depth_params, agent_count, discovered_panel, stranger_sample_rate,
+        envelope_basis, register_version, battery_version, ask_contract, created_at_seq
+      ) VALUES (
+        'harvest integration', 'asker:harvest', 'session:harvest', 'ASKER', now(), 'casual',
+        'casual', 'ASKER', 'test:harvest', 'low', '{}'::jsonb, 2, $1::jsonb, 0,
+        '{}'::jsonb, 1, 'test', '{}'::jsonb, ledger.allocate_sequence()
+      ) RETURNING run_id
+    `, [JSON.stringify(fixtureDiscoveredPanel(2))]);
+    const runId = run.rows[0]!.run_id;
+    const authorArtifact = "00000000-0000-4000-8000-000000000901";
+    const reviewerArtifact = "00000000-0000-4000-8000-000000000902";
+    const evaluatorArtifact = "00000000-0000-4000-8000-000000000903";
+    const authorAttempt = "00000000-0000-4000-8000-000000000911";
+    const reviewerAttempt = "00000000-0000-4000-8000-000000000912";
+    const evaluatorAttempt = "00000000-0000-4000-8000-000000000913";
+    await database.pool.query(`
+      INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+      VALUES ($1, ledger.allocate_sequence(), 'TERMINAL', '{"state":"SETTLED"}'::jsonb)
+    `, [runId]);
+    await database.pool.query(`
+      INSERT INTO ledger.raw_artifact (
+        raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
+        maker, model_version, raw_text, metadata_json, parse_status, content_hash,
+        input_hash, contract_hash, at_seq
+      ) VALUES
+        ($1,$4,$7,'provider:author','openai-compatible-http','model:author',
+          'maker:author','v1','author','{"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5,"x_cost_usd":0.01}}','PARSED',$8,'input','contract',ledger.allocate_sequence()),
+        ($2,$5,$7,'provider:reviewer','openai-compatible-http','model:reviewer',
+          'maker:reviewer','v2','review','{"usage":{"total_tokens":4,"x_cost_usd":0.02}}','PARSED',$8,'input','contract',ledger.allocate_sequence()),
+        ($3,$6,NULL,$9,'openai-compatible-http','model:evaluator',
+          $10,'v3','tag','{"usage":{"total_tokens":8}}','PARSED',$8,'input','contract',ledger.allocate_sequence())
+    `, [
+      authorArtifact, reviewerArtifact, evaluatorArtifact,
+      authorAttempt, reviewerAttempt, evaluatorAttempt, runId, "b".repeat(64),
+      EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER
+    ]);
+    const entries = await database.pool.query<{ ledger_entry_id: string }>(`
+      INSERT INTO ledger.ledger_entry (
+        sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
+        stance_at_action, outcome, actor_ref, input_hash, contract_hash,
+        raw_artifact_ref, started_at, finished_at
+      ) VALUES
+        (ledger.allocate_sequence(),$1,$2,'MODEL_CALL','runner.author.v1','node:author',
+          'UNASSIGNED','OK','provider:author','input','contract',$5,$8,$9),
+        (ledger.allocate_sequence(),$1,$3,'MODEL_CALL','runner.review.v1','node:review',
+          'UNASSIGNED','OK','provider:reviewer','input','contract',$6,$8,$9),
+        (ledger.allocate_sequence(),NULL,$4,'MODEL_CALL','evaluator.tag-question.v1','tag:attempt',
+          'UNASSIGNED','OK',$10,'input','contract',$7,$8,$9)
+      RETURNING ledger_entry_id
+    `, [
+      runId, authorAttempt, reviewerAttempt, evaluatorAttempt,
+      authorArtifact, reviewerArtifact, evaluatorArtifact,
+      new Date("2026-08-15T08:00:00.000Z"), new Date("2026-08-15T08:00:01.000Z"),
+      EVALUATOR_PROVIDER_REF
+    ]);
+    expect(entries.rows).toHaveLength(3);
+    const authorNodeRow = await database.pool.query<{ node_id: string }>(`
+      INSERT INTO core.node (
+        run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
+        materialized_path, generation_status, path_status, exploration_decision,
+        way_of_knowing, provenance_ref, locator, value_laden, created_at_seq
+      ) VALUES ($1,'product claim','unknown',NULL,NULL,0,0,'0','complete','active','continue',
+          'REASONING',$2,NULL,false,ledger.allocate_sequence())
+      RETURNING node_id
+    `, [runId, authorArtifact]);
+    const authorNode = authorNodeRow.rows[0]!.node_id;
+    await database.pool.query(`
+      INSERT INTO core.node (
+        run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
+        materialized_path, generation_status, path_status, exploration_decision,
+        way_of_knowing, provenance_ref, locator, value_laden, created_at_seq
+      ) VALUES ($1,'evaluator-only claim','unknown',$2,'support',1,1,'0/1',
+        'complete','active','continue','REASONING',$3,NULL,false,ledger.allocate_sequence())
+    `, [runId, authorNode, evaluatorArtifact]);
+    await database.pool.query(`
+      INSERT INTO ledger.node_review (
+        node_review_id, run_id, node_id, author_raw_artifact_ref,
+        review_raw_artifact_ref, outcome, reasons, at_seq
+      ) VALUES (gen_random_uuid(),$1,$2,$3,$4,'agree','["sound"]'::jsonb,ledger.allocate_sequence())
+    `, [runId, authorNode, authorArtifact, reviewerArtifact]);
+    await database.pool.query(`
+      INSERT INTO ledger.reduced_judgement (
+        run_id, node_id, raw_artifact_ref, tau, number_kind, source_ref,
+        producer, replay_handle, way_of_knowing, at_seq
+      ) VALUES ($1,$2,$3,0.75,'PROBABILITY','judgement:test','judge:test',
+        'replay:test','REASONING',ledger.allocate_sequence())
+    `, [runId, authorNode, reviewerArtifact]);
+    const q59Before = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM scorecard.answer_outcome WHERE run_id=$1",
+      [runId]
+    );
+    const workerInput = {
+      pool: database.pool,
+      runId,
+      meteringWindow: {
+        windowStart: new Date("2026-08-15T00:00:00.000Z"),
+        windowEnd: new Date("2026-08-16T00:00:00.000Z"),
+        asOf: new Date("2026-08-16T00:00:01.000Z")
+      },
+      observedAt: new Date("2026-08-15T09:00:00.000Z")
+    };
+
+    await expect(runEvaluatorTerminalHarvest(workerInput)).resolves.toMatchObject({
+      harvest: { state: "HARVESTED", observationsInserted: 3 },
+      metering: { callsProjected: expect.any(Number) }
+    });
+    const observations = await database.pool.query<{
+      domain_id: string | null; step: string; model_id: string; truth_basis: string;
+    }>(`
+      SELECT domain_id, step, model_id, truth_basis
+      FROM evaluator.observation WHERE run_id=$1 ORDER BY step, model_id
+    `, [runId]);
+    expect(observations.rows).toEqual([
+      { domain_id: null, step: "AUTHORING", model_id: "model:author", truth_basis: "CONSENSUS" },
+      { domain_id: null, step: "JUDGING", model_id: "model:reviewer", truth_basis: "CONSENSUS" },
+      { domain_id: null, step: "REVIEWING", model_id: "model:reviewer", truth_basis: "CONSENSUS" }
+    ]);
+    expect(observations.rows.some((row) => row.model_id === "model:evaluator")).toBe(false);
+    const metered = await database.pool.query<{ model_id: string }>(`
+      SELECT model_id FROM evaluator.model_call_usage
+      WHERE ledger_entry_id = ANY($1::uuid[]) ORDER BY model_id
+    `, [entries.rows.map((row) => row.ledger_entry_id)]);
+    expect(metered.rows.map((row) => row.model_id)).toEqual([
+      "model:author", "model:evaluator", "model:reviewer"
+    ]);
+    await expect(runEvaluatorTerminalHarvest(workerInput)).resolves.toMatchObject({
+      harvest: { state: "ALREADY_HARVESTED" }
+    });
+    const duplicateCheck = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM evaluator.observation WHERE run_id=$1",
+      [runId]
+    );
+    expect(Number(duplicateCheck.rows[0]!.count)).toBe(3);
+    const q59After = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM scorecard.answer_outcome WHERE run_id=$1",
+      [runId]
+    );
+    expect(q59After.rows[0]!.count).toBe(q59Before.rows[0]!.count);
+  });
 });
 
 describe("0023 evaluator foundation migration", () => {
