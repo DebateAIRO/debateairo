@@ -1607,3 +1607,24 @@ supersedes | status`.
   jsonb key-order artifacts). Single use; register-versioning remains the
   proper future mechanism (intake seed). | the checksum outlived its
   source lawfully | the catch-up ceremony | — | ACTIVE
+
+| DR-188 | 2026-08-15 | V ("database deletion should never happen on either
+  DEV, or MAIN. because our app will be hosted one day, and users will
+  need to use it, and having their debates deleted after an update would
+  surely crack things up") | **THE DATA-PRESERVATION LAW.** User debate
+  data survives every update, on every environment, forever. Consequences:
+  (1) migrations must remain additive/data-preserving (0021 and 0025
+  already were — this becomes LAW, not habit); (2) the backup-then-reseed
+  ceremony is recognized as ACCEPTANCE-ERA DEBT — its trigger (the
+  register conflict guard forcing datadir swaps on computed-hash drift) is
+  the single mechanism that ever displaces data, and the harness mission's
+  register-versioning work is ELEVATED by this ruling from nice-to-have to
+  mandatory: a lawful in-place path for register evolution so no update
+  ever again requires moving a datadir; (3) no datadir is ever DELETED —
+  archives are permanent until V personally disposes of them (the full
+  .pgdata-backup chain stands); (4) the archived truth-pursuit debate
+  (.pgdata-debate-091b7663-awaiting-rebaseline) is V's research corpus —
+  revival per DEBATE-REVIVAL-091b7663.md, and readable TODAY via direct
+  SQL on a side port without any re-baseline. | V named the hosted future's
+  hardest requirement | the harness mission inherits it as law | — |
+  ACTIVE
