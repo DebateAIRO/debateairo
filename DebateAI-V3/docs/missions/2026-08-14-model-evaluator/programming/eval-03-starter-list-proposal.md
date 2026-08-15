@@ -1,9 +1,9 @@
 # V STARTER-LIST PROPOSAL PACKET — evaluator domains
 
-Status: **PROVISIONAL — PENDING V APPROVAL**  
+Status: **V APPROVED AS WRITTEN — 2026-08-15**  
 Mission lane: `PROG-03` / `codex/eval-03-domains`  
-Decision requested: approve this 26-domain starter list as written, or return
-specific additions/removals/renames before migration 0024 is wired.
+Decision recorded: V approved this 26-domain starter list as written; migration
+0024 remains pending integration wiring.
 
 The list favors stable, broad subject areas that ordinary questions can match
 without forcing early registry growth. Guardrails normalize Unicode/case/space,

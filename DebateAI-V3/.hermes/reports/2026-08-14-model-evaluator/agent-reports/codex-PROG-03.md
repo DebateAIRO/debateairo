@@ -99,3 +99,85 @@ top-level migration directory. Replacing V's final names changes only the
 `seed_data` values. No push was performed.
 
 READY FOR PEER REVIEW: codex/eval-03-domains
+
+---
+
+## Rework round 1 — Opus binding review
+
+Status: READY FOR PEER REVIEW  
+Triggering review:
+`docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md`  
+Rework commit: `d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`  
+Comments read through: complete Opus review 1, 2026-08-15  
+V decision: 26-name starter list approved as written
+
+### Binding findings addressed
+
+- **B1:** widened the structured separator grammar to accept whitespace,
+  ampersands and hyphens with optional surrounding whitespace, plus straight and
+  curly apostrophes. Malformed repeated ampersands remain invalid.
+- **B2:** added an end-to-end regression that provisions a separate scratch
+  embedded PostgreSQL instance, migrates through 0023, applies the real
+  `migrations/pending/0024_evaluator_domain_seed.sql`, and submits every one of
+  the 26 seeded canonical names through `DomainRegistryRepository.admitProposal`.
+  Every decision must be `MATCHED_EXISTING`.
+- **N2:** reduced `seed_data` to canonical names only. Migration SQL now derives
+  `normalized_name` with NFKC, whitespace folding, trimming, and lowercase. The
+  scratch test asserts each stored value equals `normalizeDomainName` before it
+  exercises admission, so replacing the list changes only canonical seed data.
+- Updated the proposal packet to record V approval. Migration 0024 remains
+  outside the top-level runner scan pending integration; no migration wiring was
+  added in this lane.
+
+The review's non-blocking N1 surface (`REFUSED` and direct existing-domain-id
+selection) remains explicitly assigned to downstream lane 04 as the reviewer
+noted; this rework did not expand the current lane contract.
+
+### Reproduce-first evidence
+
+Required regression written before production/migration changes:
+
+```text
+pnpm vitest run tests/integration/evaluator-database.test.ts \
+  -t "applies pending 0024"
+Test Files  1 failed (1)
+Tests       1 failed | 7 skipped (8)
+Received: REJECTED_INVALID for all 18 ampersand-bearing approved names
+Expected: MATCHED_EXISTING for all 26 names
+```
+
+The first harness attempt correctly exposed a pre-existing fixture collision in
+the shared integration schema (`mathematics` unique key). The test was then
+isolated in a fresh scratch database without changing production code, producing
+the binding 18-invalid/8-matched RED above.
+
+### Rework GREEN evidence
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm audit:source
+blocking: []
+
+pnpm test
+Test Files  84 passed (84)
+Tests       605 passed (605)
+
+git diff --check
+PASS
+```
+
+No API key, BOUND state, product behavior change, migration-runner wiring, board
+mutation, push, or merge was introduced.
+
+READY FOR PEER REVIEW: codex/eval-03-domains

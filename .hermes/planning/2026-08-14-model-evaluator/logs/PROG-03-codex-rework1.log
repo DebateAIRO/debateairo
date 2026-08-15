@@ -1,0 +1,14 @@
+=== PROG-03 rework1 launch Sat Aug 15 09:31:50 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a001d2-7041-7480-b14b-c1f7b6040163
+--------
+user
+/goal REWORK ROUND 1 of your eval-03-domains lane (same goal, same session, same worktree). The Opus peer review returned REWORK with a critical finding; the Grok review PASSed but was cut short by a provider outage, so treat the Opus review as the binding round-1 input. Read it fully: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md. Core blocker: your isValidDomainName regex permits only ONE separator character between alphanumeric runs, so the space-ampersand-space separator fails and 18 of your own 26 proposed starter names are REJECTED_INVALID by your own guardrail (verified end-to-end: REJECTED_INVALID 18, MATCHED_EXISTING 8) — and since validity is checked before exact-name match with no select-existing entry point, those names become permanently unmatchable. V has APPROVED the 26-name list AS WRITTEN, so the code must accept exactly those names. Reproduce-first is mandatory: FIRST write the failing test that proposes every one of the 26 seeded names post-seed and asserts each returns MATCHED_EXISTING (RED with the current regex), then fix the validator to accept multi-character separators like space-ampersand-space (and the apostrophe/hyphen cases already intended), re-derive the hand-typed normalized_name seed values from the canonical normalizer instead of hand-typing them, and make the list-swap claim true. Also close the review's test-honesty gaps: a test that actually applies migration 0024 from pending/ in a scratch schema and exercises admission against the seeded rows. Keep all other delivered code unchanged. Run focused tests + repository typecheck, commit on your branch, update your self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-03-domains

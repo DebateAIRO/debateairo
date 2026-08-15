@@ -1562,3 +1562,15 @@ supersedes | status`.
   its arguments — the founding sentence of the scoring layer, now law. |
   V ruled the chain-of-custody question from first principles | the
   DR-184 consult binds to this | — | ACTIVE
+
+| DR-185 | 2026-08-15 | V (options card, custom answer: "We do it Claude
+  only") | **SINGLE-USE EXCEPTION — CLAUDE-ONLY AUTHORIZATION FOR THE
+  DR-184 PLAN.** Grok's usage balance exhausted (402) parks the DR-171
+  authorization seat; V rules the review-completion plan is authorized by
+  an independent Opus lens instead — THIS PLAN ONLY, not a roster change.
+  Honest limitation recorded: architect and authorizer share a lineage
+  (the DR-175 echo-chamber shape); mitigation: a separate context-free
+  session with an explicitly adversarial refute-first brief, and the
+  V-rows card will disclose that both perspectives are same-house. DR-171
+  proper resumes the moment Grok's seat is funded. | the third house ran
+  out of credit mid-verdict | DR-184 authorization | — | ACTIVE
