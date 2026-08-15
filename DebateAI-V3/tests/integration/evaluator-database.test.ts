@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
@@ -17,6 +16,35 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 
 let database: TestDatabase;
+
+const APPROVED_STARTER_DOMAINS = [
+  "Agriculture & Food",
+  "Arts & Culture",
+  "Business & Management",
+  "Computing & Software",
+  "Economics",
+  "Education",
+  "Engineering",
+  "Environment & Climate",
+  "Ethics & Philosophy",
+  "Finance & Investing",
+  "Geography",
+  "Government & Public Policy",
+  "Health & Medicine",
+  "History",
+  "Law & Justice",
+  "Linguistics & Languages",
+  "Mathematics",
+  "Media & Communication",
+  "Natural Sciences",
+  "Politics & Elections",
+  "Psychology",
+  "Religion & Spirituality",
+  "Security & Defense",
+  "Society & Demographics",
+  "Sports & Recreation",
+  "Technology & Innovation"
+] as const;
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -219,7 +247,12 @@ describe("domain registry repository", () => {
     });
     expect(grown).toMatchObject({ decision: "ADMITTED_NEW" });
     const persisted = await repository.listDomains();
-    expect(persisted.map((row) => [row.normalizedName, row.origin])).toEqual([
+    expect(persisted.filter((row) =>
+      row.provenanceRef === "mission:model-evaluator:V-approved-starter-list"
+    ).map((row) => row.canonicalName)).toEqual(APPROVED_STARTER_DOMAINS);
+    expect(persisted.filter((row) =>
+      row.provenanceRef !== "mission:model-evaluator:V-approved-starter-list"
+    ).map((row) => [row.normalizedName, row.origin])).toEqual([
       ["climate science", "GROWN"],
       ["software engineering", "STARTER"]
     ]);
@@ -228,7 +261,12 @@ describe("domain registry repository", () => {
   it("backfills the dedicated question link once and keeps domain identity append-only", async () => {
     const runId = await insertEvaluatorRun("domain backfill landing");
     const repository = new DomainRegistryRepository(database.pool);
-    const domain = await insertStarterDomain("Mathematics", "test:starter:mathematics");
+    const domain = (await repository.listDomains()).find((row) => row.canonicalName === "Mathematics");
+    if (domain === undefined) throw new Error("Expected migrated Mathematics starter domain");
+    expect(domain).toMatchObject({
+      origin: "STARTER",
+      provenanceRef: "mission:model-evaluator:V-approved-starter-list"
+    });
     const admission = await repository.admitProposal({
       runId,
       proposedName: "Mathematics",
@@ -293,15 +331,10 @@ describe("domain registry repository", () => {
     expect(count.rows[0]!.count).toBe("1");
   });
 
-  it("applies pending 0024 and matches every approved starter name through admission", async () => {
+  it("applies 0024 via migrate and matches every approved starter name through admission", async () => {
     const scratch = await startTestDatabase();
     try {
       await migrate(scratch.pool);
-      const seedSql = await readFile(
-        new URL("../../migrations/pending/0024_evaluator_domain_seed.sql", import.meta.url),
-        "utf8"
-      );
-      await scratch.pool.query(seedSql);
       const seeded = await scratch.pool.query<{
         canonical_name: string;
         normalized_name: string;
@@ -312,8 +345,10 @@ describe("domain registry repository", () => {
         WHERE provenance_ref='mission:model-evaluator:V-approved-starter-list'
         ORDER BY canonical_name
       `);
-      expect(seeded.rows).toHaveLength(26);
-      expect(new Set(seeded.rows.map((row) => row.origin))).toEqual(new Set(["STARTER"]));
+      expect(seeded.rows.map((row) => row.canonical_name)).toEqual(APPROVED_STARTER_DOMAINS);
+      expect(seeded.rows.map((row) => row.origin)).toEqual(
+        APPROVED_STARTER_DOMAINS.map(() => "STARTER")
+      );
       expect(seeded.rows.map((row) => row.normalized_name)).toEqual(
         seeded.rows.map((row) => normalizeDomainName(row.canonical_name))
       );

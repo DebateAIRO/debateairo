@@ -58,16 +58,15 @@ describe("evaluator domain admission guardrails", () => {
     );
   });
 
-  it("keeps the approved 0024 seed pending integration and outside the runner scan", async () => {
+  it("exposes the approved 0024 seed to the migration runner scan", async () => {
     const topLevelMigrations = (await readdir(new URL("../../migrations/", import.meta.url)))
       .filter((name) => /^\d+.*\.sql$/.test(name));
-    expect(topLevelMigrations).not.toContain("0024_evaluator_domain_seed.sql");
-    const pending = await readFile(
-      new URL("../../migrations/pending/0024_evaluator_domain_seed.sql", import.meta.url),
+    expect(topLevelMigrations).toContain("0024_evaluator_domain_seed.sql");
+    const migration = await readFile(
+      new URL("../../migrations/0024_evaluator_domain_seed.sql", import.meta.url),
       "utf8"
     );
-    expect(pending).toMatch(/^-- V-APPROVED LIST — PENDING INTEGRATION/);
-    expect(pending).toContain("mission:model-evaluator:V-approved-starter-list");
-    expect(pending).toContain("WITH seed_data(canonical_name) AS");
+    expect(migration).toContain("mission:model-evaluator:V-approved-starter-list");
+    expect(migration).toContain("WITH seed_data(canonical_name) AS");
   });
 });
