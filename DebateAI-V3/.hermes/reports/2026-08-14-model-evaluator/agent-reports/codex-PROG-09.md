@@ -223,3 +223,104 @@ Comments read through: both round-1 peer reviews remain the latest review
 authority as of this handoff on 2026-08-15.
 
 READY FOR PEER REVIEW: codex/eval-09-consumer
+
+
+---
+
+# CONTINUATION APPENDIX (post-hang verification pass)
+
+# READY FOR PEER REVIEW — PROG-09 consumer reader
+
+WORKER CLAIM:
+- agent: Codex GPT-5.6 Sol
+- ticket: PROG-09 / 09-consumer-reader
+- worker CLI session id: goal `01a005d5-c684-7d10-b28e-6a732921004a`
+- branch/worktree: `codex/eval-09-consumer` / `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-09-consumer`
+- assignment type: rework_round_1 continuation
+- implementation commits: `4f0356a04881313f5fa8508294761be416a0460d`, `9650a00afbdb4e810903dbb2eb7bc2255aea331b`
+- comments read through: `PROG-09-opus-review-1.md` and `PROG-09-opus2-review-1.md`, both through EOF on 2026-08-15
+- board mutation: prohibited and not performed
+
+## Rework findings closed
+
+- B1: consumer sample construction now routes through the shared exported
+  `createBlindEvaluationSample` helper, preserving one allowlist/blinding choke
+  point for grading-adjacent DTOs.
+- B2: the PostgreSQL fixture assigns domains and writes four terminal product
+  runs through `EvaluatorHarvestRepository`; the real join, exact model/domain
+  bucket, three-sample cap, opaque ids, and nonempty `blinded_sample_refs` run
+  against the database. A real local HTTP server captures a populated request
+  whose prompt messages omit structured target/source authorship.
+- B3: question/task excerpts are UTF-8-safe and capped at 4096 bytes in the
+  shared helper. The database test includes a 240 KB Unicode claim and verifies
+  the on-wire excerpt is exactly bounded without replacement characters.
+- B4: numeric/routing injection raises typed `SELF_ROUTING_FORBIDDEN`, distinct
+  from malformed JSON's `CONSUMER_CONTENT_REFUSED`, and both terminal receipts
+  are covered.
+- B5: the advisory-lock regression runs 24 concurrent refreshes, observes one
+  provider call plus 23 typed in-flight skips, and proves the pool remains usable.
+- Follow-ups: sample reads honor `aggregateAsOf`; null-domain aggregates become
+  explicit jobs; sibling failures make the batch state `FAILED`; artifact
+  authorization uses the threaded pinned family and preserves its typed receipt.
+
+Verified invariants remain intact: every consumer call has `runId: null`, uses
+consumer-owned bounded retries, rechecks provider isolation immediately before
+the call, versions output by prompt/snapshot hash, keeps numeric profile/rank
+tables code-owned, writes append-only receipts, and adds no BOUND/routing reader.
+
+## Continuation verification after client termination
+
+```text
+pnpm exec vitest run --maxWorkers=1 \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/unit/evaluator-consumer.test.ts \
+  tests/integration/evaluator-consumer-database.test.ts
+Test Files  3 passed (3)
+Tests       27 passed (27)
+
+pnpm exec vitest run --maxWorkers=1 \
+  tests/integration/evaluator-database.test.ts \
+  tests/integration/evaluator-harvest-rework.test.ts \
+  tests/integration/evaluator-addon-database.test.ts \
+  tests/integration/evaluator-profiles-database.test.ts \
+  tests/integration/evaluator-profiles-rework.test.ts \
+  tests/unit/evaluator-tagger.test.ts \
+  tests/unit/evaluator-harvest.test.ts \
+  tests/unit/evaluator-addon.test.ts \
+  tests/unit/evaluator-profiles.test.ts \
+  tests/architecture/evaluator-selector-unbound.test.ts
+Test Files  10 passed (10)
+Tests       74 passed (74)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+```
+
+The differential set includes FR-0.6 AC5 byte-identical panel membership and
+`agent_count`, tagger/product isolation, harvest and settlement reconciliation,
+add-on bounds/concurrency, profile/rank persistence, and selector UNBOUND.
+
+Earlier full verification on the same rework commit remains:
+
+```text
+pnpm test -- --maxWorkers=1
+Test Files  98 passed (98)
+Tests       711 passed (711)
+
+pnpm run audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm run audit:source
+blocking: []
+
+bash tests/render-templates.sh
+PASS
+
+bash tests/lint-templates.sh
+PASS
+```
+
+No push, merge, board mutation, BOUND state, provider credential, cloud endpoint,
+or lane-10 seat-share/allocator change was introduced.
+
+READY FOR PEER REVIEW: codex/eval-09-consumer
