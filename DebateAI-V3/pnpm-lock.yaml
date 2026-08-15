@@ -129,6 +129,9 @@ importers:
       '@debateai/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@debateai/evaluator':
+        specifier: workspace:*
+        version: link:../../packages/evaluator
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel

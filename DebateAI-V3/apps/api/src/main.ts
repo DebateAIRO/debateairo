@@ -21,6 +21,7 @@ import {
   PostgresAskApplication,
   preserveSubmittedTierSource
 } from "./index.js";
+import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 
 const environment = loadApiEnvironment();
 const pool = createPool(environment.DATABASE_URL);
@@ -78,5 +79,14 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     return preserveSubmittedTierSource(resolved, askerTierSource);
   }
 });
-const api = buildApi({ application });
+const evaluatorDevMenu = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
+  ? new PostgresEvaluatorDevMenuRepository(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
+  : undefined;
+const api = buildApi({
+  application,
+  ...(evaluatorDevMenu === undefined ? {} : {
+    evaluatorDevMenu,
+    evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
+  })
+});
 await api.listen({ host: environment.API_HOST, port: environment.API_PORT });

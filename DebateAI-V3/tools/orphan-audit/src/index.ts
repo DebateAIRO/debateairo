@@ -27,7 +27,7 @@ const rows: readonly Row[] = [
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
-  ["apps/api", "apps/api", ["contract", "kernel", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator"]],
   ["apps/runner", "apps/runner", ["kernel", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
