@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import type { CallBound, ProviderGateway } from "@debateai/providers";
 
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
@@ -304,7 +305,7 @@ export interface DomainSimilarityCandidate {
 }
 
 export type DomainProposalEvaluation = {
-  readonly decision: "ADMITTED_NEW" | "MATCHED_EXISTING" | "REJECTED_NEAR_DUPLICATE" | "REJECTED_INVALID";
+  readonly decision: "ADMITTED_NEW" | "MATCHED_EXISTING" | "REJECTED_NEAR_DUPLICATE" | "REJECTED_INVALID" | "REFUSED";
   readonly normalizedName: string;
   readonly domainId: string | null;
   readonly candidates: readonly DomainSimilarityCandidate[];
@@ -424,12 +425,83 @@ export interface AdmitDomainProposalInput {
   readonly provenanceRef: string;
 }
 
+export interface AdmitExistingDomainSelectionInput extends Omit<AdmitDomainProposalInput, "proposedName"> {
+  readonly domainId: string;
+}
+
+export interface RecordDomainRefusalInput extends AdmitDomainProposalInput {
+  readonly reason: string;
+}
+
 export interface DomainAdmissionResult extends DomainProposalEvaluation {
   readonly domainAdmissionId: string;
 }
 
 function requireNonblank(value: string, code: string): void {
   if (value.trim() === "") throw new TypedDomainError(code, `${code}: value must be nonblank`);
+}
+
+function validateAdmissionIdentity(input: Omit<AdmitDomainProposalInput, "proposedName">): void {
+  for (const [value, code] of [
+    [input.runId, "EVALUATOR_DOMAIN_RUN_ID_INVALID"],
+    [input.provider, "EVALUATOR_DOMAIN_PROVIDER_INVALID"],
+    [input.modelId, "EVALUATOR_DOMAIN_MODEL_ID_INVALID"],
+    [input.modelVersion, "EVALUATOR_DOMAIN_MODEL_VERSION_INVALID"],
+    [input.provenanceRef, "EVALUATOR_DOMAIN_PROVENANCE_INVALID"]
+  ] as const) requireNonblank(value, code);
+}
+
+async function assertAdmissionArtifact(
+  client: PoolClient,
+  input: Omit<AdmitDomainProposalInput, "proposedName" | "provenanceRef">
+): Promise<void> {
+  if (input.rawArtifactRef === null) return;
+  const artifact = await client.query<{
+    run_id: string | null;
+    provider: string;
+    model_id: string;
+    model_version: string | null;
+  }>(`
+    SELECT run_id, provider, model_id, model_version
+    FROM ledger.raw_artifact WHERE raw_artifact_id=$1
+  `, [input.rawArtifactRef]);
+  const artifactRow = artifact.rows[0];
+  if (artifactRow === undefined || artifactRow.run_id !== input.runId
+    || artifactRow.provider !== input.provider || artifactRow.model_id !== input.modelId
+    || artifactRow.model_version !== input.modelVersion) {
+    throw new TypedDomainError(
+      "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH",
+      "Domain proposal identity must match its source run and raw artifact"
+    );
+  }
+}
+
+async function insertDomainAdmission(
+  client: PoolClient,
+  input: {
+    readonly runId: string;
+    readonly proposedName: string;
+    readonly normalizedName: string;
+    readonly decision: DomainProposalEvaluation["decision"];
+    readonly domainId: string | null;
+    readonly candidates: readonly DomainSimilarityCandidate[];
+    readonly rawArtifactRef: string | null;
+    readonly reason: string;
+  }
+): Promise<string> {
+  const admission = await client.query<{ domain_admission_id: string }>(`
+    INSERT INTO evaluator.domain_admission (
+      run_id, proposed_name, normalized_name, decision, domain_id,
+      candidate_similarities, guardrail_version, tagger_raw_artifact_ref,
+      reason, at_seq
+    ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10)
+    RETURNING domain_admission_id
+  `, [
+    input.runId, input.proposedName, input.normalizedName, input.decision,
+    input.domainId, JSON.stringify(input.candidates), DOMAIN_GUARDRAIL_VERSION,
+    input.rawArtifactRef, input.reason, await allocateSequence(client)
+  ]);
+  return admission.rows[0]!.domain_admission_id;
 }
 
 async function readDomains(client: Pool | PoolClient): Promise<readonly EvaluatorDomain[]> {
@@ -464,16 +536,32 @@ export class DomainRegistryRepository {
   }
 
   async admitProposal(input: AdmitDomainProposalInput): Promise<DomainAdmissionResult> {
-    for (const [value, code] of [
-      [input.runId, "EVALUATOR_DOMAIN_RUN_ID_INVALID"],
-      [input.provider, "EVALUATOR_DOMAIN_PROVIDER_INVALID"],
-      [input.modelId, "EVALUATOR_DOMAIN_MODEL_ID_INVALID"],
-      [input.modelVersion, "EVALUATOR_DOMAIN_MODEL_VERSION_INVALID"],
-      [input.provenanceRef, "EVALUATOR_DOMAIN_PROVENANCE_INVALID"]
-    ] as const) requireNonblank(value, code);
+    validateAdmissionIdentity(input);
     const canonicalName = canonicalizeDomainName(input.proposedName);
     const normalizedName = normalizeDomainName(canonicalName);
     return withWriteTransaction(this.pool, async (client) => {
+      if (canonicalName === "") {
+        await assertAdmissionArtifact(client, input);
+        const reason = "EVALUATOR_DOMAIN_PROPOSAL_BLANK";
+        const domainAdmissionId = await insertDomainAdmission(client, {
+          runId: input.runId,
+          proposedName: input.proposedName,
+          normalizedName,
+          decision: "REFUSED",
+          domainId: null,
+          candidates: Object.freeze([]),
+          rawArtifactRef: input.rawArtifactRef,
+          reason
+        });
+        return Object.freeze({
+          decision: "REFUSED" as const,
+          normalizedName,
+          domainId: null,
+          candidates: Object.freeze([]),
+          reason,
+          domainAdmissionId
+        });
+      }
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         ["evaluator-domain-registry"]
@@ -482,26 +570,7 @@ export class DomainRegistryRepository {
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         [`evaluator-domain:${normalizedName}`]
       );
-      if (input.rawArtifactRef !== null) {
-        const artifact = await client.query<{
-          run_id: string | null;
-          provider: string;
-          model_id: string;
-          model_version: string | null;
-        }>(`
-          SELECT run_id, provider, model_id, model_version
-          FROM ledger.raw_artifact WHERE raw_artifact_id=$1
-        `, [input.rawArtifactRef]);
-        const artifactRow = artifact.rows[0];
-        if (artifactRow === undefined || artifactRow.run_id !== input.runId
-          || artifactRow.provider !== input.provider || artifactRow.model_id !== input.modelId
-          || artifactRow.model_version !== input.modelVersion) {
-          throw new TypedDomainError(
-            "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH",
-            "Domain proposal identity must match its source run and raw artifact"
-          );
-        }
-      }
+      await assertAdmissionArtifact(client, input);
       const evaluation = evaluateDomainProposal(canonicalName, await readDomains(client));
       let domainId = evaluation.domainId;
       if (evaluation.decision === "ADMITTED_NEW") {
@@ -526,22 +595,94 @@ export class DomainRegistryRepository {
         ]);
         domainId = inserted.rows[0]!.domain_id;
       }
-      const admission = await client.query<{ domain_admission_id: string }>(`
-        INSERT INTO evaluator.domain_admission (
-          run_id, proposed_name, normalized_name, decision, domain_id,
-          candidate_similarities, guardrail_version, tagger_raw_artifact_ref,
-          reason, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10)
-        RETURNING domain_admission_id
-      `, [
-        input.runId, input.proposedName, evaluation.normalizedName, evaluation.decision,
-        domainId, JSON.stringify(evaluation.candidates), DOMAIN_GUARDRAIL_VERSION,
-        input.rawArtifactRef, evaluation.reason, await allocateSequence(client)
-      ]);
+      const domainAdmissionId = await insertDomainAdmission(client, {
+        runId: input.runId,
+        proposedName: input.proposedName,
+        normalizedName: evaluation.normalizedName,
+        decision: evaluation.decision,
+        domainId,
+        candidates: evaluation.candidates,
+        rawArtifactRef: input.rawArtifactRef,
+        reason: evaluation.reason
+      });
       return Object.freeze({
         ...evaluation,
         domainId,
-        domainAdmissionId: admission.rows[0]!.domain_admission_id
+        domainAdmissionId
+      });
+    });
+  }
+
+  async admitExistingDomainSelection(input: AdmitExistingDomainSelectionInput): Promise<DomainAdmissionResult> {
+    validateAdmissionIdentity(input);
+    requireNonblank(input.domainId, "EVALUATOR_DOMAIN_ID_INVALID");
+    return withWriteTransaction(this.pool, async (client) => {
+      await assertAdmissionArtifact(client, input);
+      const selected = await client.query<{
+        domain_id: string;
+        canonical_name: string;
+        normalized_name: string;
+      }>(`
+        SELECT domain_id, canonical_name, normalized_name
+        FROM evaluator.domain WHERE domain_id=$1
+      `, [input.domainId]);
+      const row = selected.rows[0];
+      if (row === undefined) {
+        throw new TypedDomainError(
+          "EVALUATOR_DOMAIN_SELECTION_UNRESOLVED",
+          `Selected evaluator domain does not exist: ${input.domainId}`
+        );
+      }
+      const candidates = Object.freeze([Object.freeze({
+        domainId: row.domain_id,
+        normalizedName: row.normalized_name,
+        similarity: 1
+      })]);
+      const reason = "The tagger selected an existing domain id";
+      const domainAdmissionId = await insertDomainAdmission(client, {
+        runId: input.runId,
+        proposedName: row.canonical_name,
+        normalizedName: row.normalized_name,
+        decision: "MATCHED_EXISTING",
+        domainId: row.domain_id,
+        candidates,
+        rawArtifactRef: input.rawArtifactRef,
+        reason
+      });
+      return Object.freeze({
+        decision: "MATCHED_EXISTING" as const,
+        normalizedName: row.normalized_name,
+        domainId: row.domain_id,
+        candidates,
+        reason,
+        domainAdmissionId
+      });
+    });
+  }
+
+  async recordRefusal(input: RecordDomainRefusalInput): Promise<DomainAdmissionResult> {
+    validateAdmissionIdentity(input);
+    requireNonblank(input.reason, "EVALUATOR_DOMAIN_REFUSAL_REASON_INVALID");
+    return withWriteTransaction(this.pool, async (client) => {
+      await assertAdmissionArtifact(client, input);
+      const normalizedName = normalizeDomainName(input.proposedName);
+      const domainAdmissionId = await insertDomainAdmission(client, {
+        runId: input.runId,
+        proposedName: input.proposedName,
+        normalizedName,
+        decision: "REFUSED",
+        domainId: null,
+        candidates: Object.freeze([]),
+        rawArtifactRef: input.rawArtifactRef,
+        reason: input.reason
+      });
+      return Object.freeze({
+        decision: "REFUSED" as const,
+        normalizedName,
+        domainId: null,
+        candidates: Object.freeze([]),
+        reason: input.reason,
+        domainAdmissionId
       });
     });
   }
@@ -614,6 +755,221 @@ export class DomainRegistryRepository {
       assignmentBasis: row.assignment_basis,
       domainAdmissionId: row.domain_admission_id
     });
+  }
+
+  async recordTagPipelineEvent(input: TagPipelineEventInput): Promise<string> {
+    requireNonblank(input.runId, "EVALUATOR_TAG_RUN_ID_INVALID");
+    requireNonblank(input.reason, "EVALUATOR_TAG_EVENT_REASON_INVALID");
+    requireNonblank(input.inputHash, "EVALUATOR_TAG_INPUT_HASH_INVALID");
+    return withWriteTransaction(this.pool, async (client) => {
+      const inserted = await client.query<{ pipeline_event_id: string }>(`
+        INSERT INTO evaluator.pipeline_event (
+          run_id, pipeline, pipeline_version, attempt_id, state,
+          reason, input_hash, at_seq
+        ) VALUES ($1,'TAG',$2,$3,$4,$5,$6,$7)
+        RETURNING pipeline_event_id
+      `, [
+        input.runId, TAGGER_PIPELINE_VERSION, input.attemptId, input.state,
+        input.reason, input.inputHash, await allocateSequence(client)
+      ]);
+      return inserted.rows[0]!.pipeline_event_id;
+    });
+  }
+}
+
+export const TAGGER_PIPELINE_VERSION = 1 as const;
+
+export interface TagPipelineEventInput {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly state: "STARTED" | "SUCCEEDED" | "FAILED" | "SKIPPED";
+  readonly reason: string;
+  readonly inputHash: string;
+}
+
+export interface EvaluatorTagRepository {
+  listDomains(): Promise<readonly EvaluatorDomain[]>;
+  admitProposal(input: AdmitDomainProposalInput): Promise<DomainAdmissionResult>;
+  admitExistingDomainSelection(input: AdmitExistingDomainSelectionInput): Promise<DomainAdmissionResult>;
+  recordRefusal(input: RecordDomainRefusalInput): Promise<DomainAdmissionResult>;
+  assignQuestionDomain(input: {
+    readonly runId: string;
+    readonly domainId: string;
+    readonly domainAdmissionId: string;
+    readonly basis: "TAGGER" | "BACKFILL";
+    readonly rawArtifactRef: string | null;
+  }): Promise<string>;
+  recordTagPipelineEvent(input: TagPipelineEventInput): Promise<string>;
+}
+
+const taggerDecisionSchema = z.discriminatedUnion("decision", [
+  z.object({
+    decision: z.literal("SELECT_EXISTING"),
+    domain_id: z.string().trim().min(1)
+  }).strict(),
+  z.object({
+    decision: z.literal("PROPOSE_NEW"),
+    proposed_name: z.string()
+  }).strict(),
+  z.object({
+    decision: z.literal("REFUSED"),
+    reason: z.string().trim().min(1)
+  }).strict()
+]);
+
+function parseTaggerDecision(content: string): z.infer<typeof taggerDecisionSchema> {
+  return taggerDecisionSchema.parse(JSON.parse(content));
+}
+
+function taggerInputHash(runId: string, rawQuestion: string, domains: readonly EvaluatorDomain[]): string {
+  return createHash("sha256").update(JSON.stringify({
+    runId,
+    rawQuestion,
+    domains: domains.map(({ domainId, canonicalName }) => ({ domainId, canonicalName }))
+  })).digest("hex");
+}
+
+export type EvaluatorQuestionTagResult =
+  | {
+      readonly state: "TAGGED";
+      readonly domainId: string;
+      readonly domainAdmissionId: string;
+      readonly questionDomainId: string;
+    }
+  | {
+      readonly state: "UNTAGGED";
+      readonly reason: "TAGGER_REFUSED" | "TAGGER_ADMISSION_REFUSED"
+        | "TAGGER_PROVIDER_FAILED" | "TAGGER_PROVIDER_ISOLATION_FAILED"
+        | "TAGGER_EXECUTION_FAILED";
+    };
+
+export async function runEvaluatorQuestionTagger(input: {
+  readonly runId: string;
+  readonly rawQuestion: string;
+  readonly family: EvaluatorProviderFamilyRow;
+  readonly deployment: {
+    readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  };
+  readonly provider: ProviderGateway;
+  readonly repository: EvaluatorTagRepository;
+  readonly bound: CallBound;
+  readonly basis: "TAGGER" | "BACKFILL";
+  readonly provenanceRef: string;
+}): Promise<EvaluatorQuestionTagResult> {
+  requireNonblank(input.runId, "EVALUATOR_TAG_RUN_ID_INVALID");
+  requireNonblank(input.rawQuestion, "EVALUATOR_TAG_QUESTION_INVALID");
+  requireNonblank(input.provenanceRef, "EVALUATOR_TAG_PROVENANCE_INVALID");
+  const attemptId = randomUUID();
+  const domains = await input.repository.listDomains();
+  const inputHash = taggerInputHash(input.runId, input.rawQuestion, domains);
+  await input.repository.recordTagPipelineEvent({
+    runId: input.runId,
+    attemptId,
+    state: "STARTED",
+    reason: input.basis === "TAGGER" ? "ASK_TIME_TAG_STARTED" : "TAG_RECONCILIATION_STARTED",
+    inputHash
+  });
+  try {
+    assertEvaluatorProviderIsolation(input.family, input.deployment);
+  } catch {
+    await input.repository.recordTagPipelineEvent({
+      runId: input.runId, attemptId, state: "FAILED",
+      reason: "TAGGER_PROVIDER_ISOLATION_FAILED", inputHash
+    });
+    return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_ISOLATION_FAILED" });
+  }
+
+  let stage: "PROVIDER_CALL" | "EXECUTION" = "PROVIDER_CALL";
+  try {
+    const response = await input.provider.call({
+      runId: input.runId,
+      subjectItemId: `evaluator:tag:${input.runId}`,
+      callSiteKey: "evaluator.tag-question.v1",
+      role: "JUDGE",
+      lane: "critic-exempt",
+      bound: input.bound,
+      contractHash: createHash("sha256").update("evaluator-domain-tagger/v1").digest("hex"),
+      providerRef: input.family.value.providerRef,
+      packet: {
+        messages: [
+          {
+            role: "system",
+            content: "Classify the raw question. Return strict JSON only: SELECT_EXISTING with domain_id, PROPOSE_NEW with proposed_name, or REFUSED with reason. Never invent an existing domain id."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              raw_question: input.rawQuestion,
+              domains: domains.map(({ domainId, canonicalName }) => ({
+                domain_id: domainId,
+                canonical_name: canonicalName
+              }))
+            })
+          }
+        ]
+      },
+      classifyContent: (content) => {
+        const parsed = taggerDecisionSchema.safeParse((() => {
+          try { return JSON.parse(content); } catch { return null; }
+        })());
+        return parsed.success
+          ? { parseStatus: "PARSED", parseError: null }
+          : { parseStatus: "SCHEMA_FAILED", parseError: "EVALUATOR_TAGGER_OUTPUT_INVALID" };
+      }
+    });
+    stage = "EXECUTION";
+    if (response.maker !== input.family.value.maker) {
+      throw new TypedDomainError("EVALUATOR_TAGGER_MAKER_MISMATCH", response.maker);
+    }
+    const decision = parseTaggerDecision(response.content);
+    const identity = {
+      runId: input.runId,
+      provider: response.provider,
+      modelId: response.model,
+      modelVersion: response.modelVersion,
+      rawArtifactRef: response.rawArtifactRef,
+      provenanceRef: input.provenanceRef
+    };
+    if (decision.decision === "REFUSED") {
+      await input.repository.recordRefusal({ ...identity, proposedName: "", reason: decision.reason });
+      await input.repository.recordTagPipelineEvent({
+        runId: input.runId, attemptId, state: "SKIPPED", reason: "TAGGER_REFUSED", inputHash
+      });
+      return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_REFUSED" });
+    }
+    const admission = decision.decision === "SELECT_EXISTING"
+      ? await input.repository.admitExistingDomainSelection({ ...identity, domainId: decision.domain_id })
+      : await input.repository.admitProposal({ ...identity, proposedName: decision.proposed_name });
+    if (admission.domainId === null
+      || !["ADMITTED_NEW", "MATCHED_EXISTING"].includes(admission.decision)) {
+      await input.repository.recordTagPipelineEvent({
+        runId: input.runId, attemptId, state: "SKIPPED",
+        reason: `TAGGER_ADMISSION_${admission.decision}`, inputHash
+      });
+      return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_ADMISSION_REFUSED" });
+    }
+    const questionDomainId = await input.repository.assignQuestionDomain({
+      runId: input.runId,
+      domainId: admission.domainId,
+      domainAdmissionId: admission.domainAdmissionId,
+      basis: input.basis,
+      rawArtifactRef: response.rawArtifactRef
+    });
+    await input.repository.recordTagPipelineEvent({
+      runId: input.runId, attemptId, state: "SUCCEEDED", reason: "TAGGER_DOMAIN_ASSIGNED", inputHash
+    });
+    return Object.freeze({
+      state: "TAGGED",
+      domainId: admission.domainId,
+      domainAdmissionId: admission.domainAdmissionId,
+      questionDomainId
+    });
+  } catch {
+    const reason = stage === "PROVIDER_CALL" ? "TAGGER_PROVIDER_FAILED" : "TAGGER_EXECUTION_FAILED";
+    await input.repository.recordTagPipelineEvent({
+      runId: input.runId, attemptId, state: "FAILED", reason, inputHash
+    });
+    return Object.freeze({ state: "UNTAGGED", reason });
   }
 }
 export const METERING_CAPTURE_VERSION = 1 as const;

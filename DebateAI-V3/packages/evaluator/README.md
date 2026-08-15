@@ -59,10 +59,27 @@ backfill is a first insert for an untagged run, never an update. The repository
 also verifies that the link references a successful admission for the same run
 and domain. Nothing in this path writes `memory.question_key`.
 
-The proposed starter seed lives at
-`migrations/pending/0024_evaluator_domain_seed.sql`. Its 26 names are V-approved,
-but it remains deliberately outside the migration runner's top-level numeric
-file scan pending integration. The `seed_data` block contains canonical names
+The V-approved starter seed lives at
+`migrations/0024_evaluator_domain_seed.sql` and is included in the migration
+runner's top-level numeric scan. The `seed_data` block contains canonical names
 only; SQL derives normalized names, and the scratch-migration test checks each
-one against `normalizeDomainName`. Replacing the starter list therefore changes
-only canonical values in `seed_data`.
+one against `normalizeDomainName`.
+
+## Ask-time tagger and reconciliation
+
+`runEvaluatorQuestionTagger` is the collect-only classifier boundary. It reads
+the raw question and current registry, re-runs
+`assertEvaluatorProviderIsolation` before the observed provider-call boundary,
+and accepts only strict JSON decisions: `SELECT_EXISTING`, `PROPOSE_NEW`, or
+`REFUSED`. Existing ids receive their own admission receipt; proposals pass
+through deterministic registry admission; refusal and blank proposals receive
+typed `REFUSED` receipts. Only successful admissions insert the singular
+`evaluator.question_domain` link.
+
+`apps/evaluator-worker` exposes ask-time and reconciliation entry points over a
+persisted `core.run`. Provider failure, timeout, isolation refusal, invalid
+content, and admission refusal all produce typed pipeline receipts and leave the
+run untagged. A later reconciliation uses the same classifier with assignment
+basis `BACKFILL`; it inserts the evaluator-owned link and never updates
+`memory.question_key`. No evaluator tag result is read by panel discovery,
+routing, or dispatch while binding remains `UNBOUND`.

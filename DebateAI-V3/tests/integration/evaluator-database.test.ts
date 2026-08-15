@@ -10,10 +10,15 @@ import {
   EVALUATOR_PROVIDER_REF,
   normalizeDomainName,
   EvaluatorMeteringRepository,
-  deriveRelativeCostCellsV1
+  deriveRelativeCostCellsV1,
+  runEvaluatorQuestionTagger
 } from "../../packages/evaluator/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import {
+  runAskTimeEvaluatorTag,
+  runEvaluatorTagReconciliation
+} from "../../apps/evaluator-worker/src/index.js";
 
 let database: TestDatabase;
 
@@ -211,6 +216,154 @@ describe("0023 evaluator foundation migration", () => {
 });
 
 describe("domain registry repository", () => {
+  it("persists a typed REFUSED receipt for a blank proposal", async () => {
+    const runId = await insertEvaluatorRun("blank proposal receipt");
+    const repository = new DomainRegistryRepository(database.pool);
+
+    const result = await repository.admitProposal({
+      runId,
+      proposedName: "   ",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: null,
+      provenanceRef: "test:proposal:blank"
+    });
+
+    expect(result).toMatchObject({ decision: "REFUSED", domainId: null });
+    const receipt = await database.pool.query<{
+      proposed_name: string;
+      normalized_name: string;
+      decision: string;
+      reason: string;
+    }>(`SELECT proposed_name, normalized_name, decision, reason
+        FROM evaluator.domain_admission WHERE domain_admission_id=$1`, [result.domainAdmissionId]);
+    expect(receipt.rows).toEqual([{
+      proposed_name: "   ",
+      normalized_name: "",
+      decision: "REFUSED",
+      reason: "EVALUATOR_DOMAIN_PROPOSAL_BLANK"
+    }]);
+  });
+
+  it("records a direct existing-domain id selection", async () => {
+    const runId = await insertEvaluatorRun("existing domain id selection");
+    const repository = new DomainRegistryRepository(database.pool);
+    const domain = (await repository.listDomains()).find((row) => row.canonicalName === "Mathematics");
+    if (domain === undefined) throw new Error("Expected migrated Mathematics starter domain");
+
+    const result = await repository.admitExistingDomainSelection({
+      runId,
+      domainId: domain.domainId,
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: null,
+      provenanceRef: "test:selection:math"
+    });
+
+    expect(result).toMatchObject({ decision: "MATCHED_EXISTING", domainId: domain.domainId });
+  });
+
+  it("tags through the evaluator landing without mutating memory.question_key", async () => {
+    const runId = await insertEvaluatorRun("memory no-op tagger");
+    await database.pool.query(`
+      INSERT INTO memory.question_key (
+        run_id, canonical_question_text, caller_scope, asker_scope,
+        settlement_act, question_type, declared_field, normalized_binding,
+        frozen_terms, frozen_query_set_hash, as_of, policy_version,
+        key_version, at_seq
+      ) VALUES ($1,'memory no-op tagger','ASKER','asker:evaluator-domain',
+        NULL,NULL,NULL,'{}'::jsonb,'[]'::jsonb,NULL,now(),1,1,ledger.allocate_sequence())
+    `, [runId]);
+    const before = await database.pool.query(
+      "SELECT * FROM memory.question_key WHERE run_id=$1",
+      [runId]
+    );
+    const domain = (await new DomainRegistryRepository(database.pool).listDomains())
+      .find((row) => row.canonicalName === "Mathematics");
+    if (domain === undefined) throw new Error("Expected migrated Mathematics starter domain");
+    const artifactRef = await insertTaggerRawArtifact(runId);
+
+    await expect(runEvaluatorQuestionTagger({
+      runId,
+      rawQuestion: "memory no-op tagger",
+      family: {
+        rowKey: "evaluatorProviderFamily",
+        registerVersion: 1,
+        sourceRef: "register:test:evaluator-family",
+        value: {
+          kind: "EVALUATOR_PROVIDER_FAMILY",
+          providerRef: EVALUATOR_PROVIDER_REF,
+          adapterKind: "vllm-openai-compatible-http",
+          maker: EVALUATOR_MAKER,
+          chatBaseUrl: "http://vllm:8000/v1",
+          modelsPath: "/models",
+          deadlineMs: 250,
+          source: "LOCAL_CONTAINER_NO_AUTH"
+        }
+      },
+      deployment: { configuredProviders: [] },
+      provider: { call: async () => ({
+        rawArtifactRef: artifactRef,
+        ledgerEntryRef: "ledger:test:tagger",
+        content: JSON.stringify({ decision: "SELECT_EXISTING", domain_id: domain.domainId }),
+        provider: "openai-compatible-http",
+        model: "local/evaluator",
+        maker: EVALUATOR_MAKER,
+        modelVersion: "local/evaluator"
+      }) },
+      repository: new DomainRegistryRepository(database.pool),
+      bound: { maxAttempts: 1, tokenCeiling: 128, deadlineMs: 250 },
+      basis: "TAGGER",
+      provenanceRef: "test:tagger:memory-no-op"
+    })).resolves.toMatchObject({ state: "TAGGED", domainId: domain.domainId });
+
+    const after = await database.pool.query(
+      "SELECT * FROM memory.question_key WHERE run_id=$1",
+      [runId]
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("keeps a container-down ask untagged and reconciles it later", async () => {
+    const runId = await insertEvaluatorRun("reconcile evaluator tag later");
+    const domain = (await new DomainRegistryRepository(database.pool).listDomains())
+      .find((row) => row.canonicalName === "Mathematics");
+    if (domain === undefined) throw new Error("Expected migrated Mathematics starter domain");
+    const family = evaluatorFamilyFixture();
+    const common = {
+      pool: database.pool,
+      runId,
+      family,
+      deployment: { configuredProviders: [] },
+      bound: { maxAttempts: 1, tokenCeiling: 128, deadlineMs: 25 },
+      provenanceRef: "test:tagger:reconciliation"
+    } as const;
+
+    await expect(runAskTimeEvaluatorTag({
+      ...common,
+      provider: { call: async () => { throw new Error("container down"); } }
+    })).resolves.toEqual({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_FAILED" });
+    await expect(new DomainRegistryRepository(database.pool).readQuestionDomain(runId)).resolves.toBeNull();
+
+    const artifactRef = await insertTaggerRawArtifact(runId);
+    await expect(runEvaluatorTagReconciliation({
+      ...common,
+      provider: { call: async () => ({
+        rawArtifactRef: artifactRef,
+        ledgerEntryRef: "ledger:test:reconciled-tagger",
+        content: JSON.stringify({ decision: "SELECT_EXISTING", domain_id: domain.domainId }),
+        provider: "openai-compatible-http",
+        model: "local/evaluator",
+        maker: EVALUATOR_MAKER,
+        modelVersion: "local/evaluator"
+      }) }
+    })).resolves.toMatchObject({ state: "TAGGED", domainId: domain.domainId });
+    await expect(new DomainRegistryRepository(database.pool).readQuestionDomain(runId))
+      .resolves.toMatchObject({ assignmentBasis: "BACKFILL", domainId: domain.domainId });
+  });
+
   it("records exact, rejected near-duplicate, and grown admission decisions", async () => {
     const runId = await insertEvaluatorRun("domain admission decisions");
     const repository = new DomainRegistryRepository(database.pool);
@@ -407,6 +560,39 @@ async function insertRawArtifact(runId: string, callSite: string): Promise<strin
     ) RETURNING raw_artifact_id
   `, [runId, callSite]);
   return result.rows[0]!.raw_artifact_id;
+}
+
+async function insertTaggerRawArtifact(runId: string): Promise<string> {
+  const result = await database.pool.query<{ raw_artifact_id: string }>(`
+    INSERT INTO ledger.raw_artifact (
+      raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
+      maker, model_version, raw_text, metadata_json, parse_status, input_hash,
+      contract_hash, content_hash, at_seq
+    ) VALUES (
+      gen_random_uuid(), gen_random_uuid(), $1, $2, 'openai-compatible-http',
+      'local/evaluator', $3, 'local/evaluator', '{}', '{}'::jsonb, 'PARSED',
+      repeat('b', 64), repeat('c', 64), repeat('a', 64), ledger.allocate_sequence()
+    ) RETURNING raw_artifact_id
+  `, [runId, EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER]);
+  return result.rows[0]!.raw_artifact_id;
+}
+
+function evaluatorFamilyFixture() {
+  return {
+    rowKey: "evaluatorProviderFamily" as const,
+    registerVersion: 1,
+    sourceRef: "register:test:evaluator-family",
+    value: {
+      kind: "EVALUATOR_PROVIDER_FAMILY" as const,
+      providerRef: EVALUATOR_PROVIDER_REF,
+      adapterKind: "vllm-openai-compatible-http" as const,
+      maker: EVALUATOR_MAKER,
+      chatBaseUrl: "http://vllm:8000/v1",
+      modelsPath: "/models",
+      deadlineMs: 250,
+      source: "LOCAL_CONTAINER_NO_AUTH" as const
+    }
+  };
 }
 
 async function insertStarterDomain(canonicalName: string, provenanceRef: string): Promise<{
