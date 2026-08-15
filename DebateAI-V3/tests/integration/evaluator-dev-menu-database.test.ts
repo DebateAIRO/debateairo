@@ -183,9 +183,9 @@ describe("evaluator dev-menu projections", () => {
     expect(privileges.rows).toEqual(expect.arrayContaining([
       { table_name: "pipeline_event", privilege_type: "SELECT" },
       { table_name: "observation", privilege_type: "SELECT" },
-      { table_name: "shadow_decision", privilege_type: "SELECT" },
       { table_name: "consumer_selection", privilege_type: "INSERT" }
     ]));
+    expect(privileges.rows).not.toContainEqual({ table_name: "shadow_decision", privilege_type: "SELECT" });
     expect(privileges.rows).not.toContainEqual({ table_name: "pipeline_event", privilege_type: "INSERT" });
     expect(privileges.rows).not.toContainEqual({ table_name: "shadow_decision", privilege_type: "INSERT" });
   });

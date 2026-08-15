@@ -10,14 +10,16 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import { createBlindEvaluationSample } from "./blind-sample.js";
+import { HARVEST_PIPELINE_VERSION } from "./harvest-constants.js";
 
 export * from "./blind-sample.js";
 export * from "./consumer.js";
 export * from "./consumer-postgres.js";
 export * from "./dev-menu.js";
+export * from "./dispatch-binding.js";
+export * from "./harvest-constants.js";
 
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
-export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
 export const EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY = "evaluatorJudgeAddonPolicy" as const;
 export const EVALUATOR_SEAT_SHARE_POLICY_ROW_KEY = "evaluatorSeatSharePolicy" as const;
 export const EVALUATOR_PROVIDER_REF = "provider:evaluator-vllm" as const;
@@ -115,46 +117,6 @@ export function assertEvaluatorProviderIsolation(
       `${family.value.maker} must not enter configured panel makers`
     );
   }
-}
-
-export interface EvaluatorDispatchBinding {
-  readonly state: "UNBOUND";
-  readonly reason: "ROW_ABSENT" | "ROW_INVALID" | "EXPLICIT_UNBOUND";
-  readonly registerVersion: number;
-  readonly sourceRef: string | null;
-}
-
-export async function readEvaluatorDispatchBinding(
-  pool: Pool,
-  registerVersion: number
-): Promise<EvaluatorDispatchBinding> {
-  assertPositiveRegisterVersion(registerVersion);
-  const result = await pool.query<{ value_json: unknown; source_ref: string }>(
-    `SELECT value_json, source_ref FROM register.register_row
-     WHERE register_version=$1 AND row_key=$2`,
-    [registerVersion, EVALUATOR_DISPATCH_BINDING_ROW_KEY]
-  );
-  const row = result.rows[0];
-  if (row === undefined) {
-    return Object.freeze({ state: "UNBOUND", reason: "ROW_ABSENT", registerVersion, sourceRef: null });
-  }
-  const parsed = z.object({
-    kind: z.literal("EVALUATOR_DISPATCH_BINDING"),
-    state: z.literal("UNBOUND")
-  }).strict().safeParse(row.value_json);
-  return parsed.success && row.source_ref.trim() !== ""
-    ? Object.freeze({
-        state: "UNBOUND" as const,
-        reason: "EXPLICIT_UNBOUND" as const,
-        registerVersion,
-        sourceRef: row.source_ref
-      })
-    : Object.freeze({
-        state: "UNBOUND" as const,
-        reason: "ROW_INVALID" as const,
-        registerVersion,
-        sourceRef: row.source_ref.trim() === "" ? null : row.source_ref
-      });
 }
 
 export interface EvaluatorCatalogModel {
@@ -1561,7 +1523,6 @@ export async function runEvaluatorQuestionTagger(input: {
   }
 }
 
-export const HARVEST_PIPELINE_VERSION = 1 as const;
 export const HARVEST_DERIVATION_VERSION = 1 as const;
 
 export interface EvaluatorHarvestArtifact {

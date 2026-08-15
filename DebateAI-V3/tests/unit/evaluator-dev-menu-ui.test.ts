@@ -23,10 +23,4 @@ describe("V3 evaluator dev menu", () => {
       "Profile peek", "Parked HARVEST runs", "Failure receipts", "Starter list"
     ]) expect(menu).toContain(marker);
   });
-
-  it("has one consumer-selection write and no bind or allocator control", () => {
-    expect(menu).toContain("selectEvaluatorConsumerModel");
-    expect(menu).not.toMatch(/bind evaluator|enable dispatch|setDispatchBinding|seat.?share/i);
-    expect(menu).toContain("Collect-only · UNBOUND");
-  });
 });

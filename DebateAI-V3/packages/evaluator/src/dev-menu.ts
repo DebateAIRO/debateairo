@@ -1,39 +1,16 @@
 import type { Pool } from "pg";
-import { z } from "zod";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import {
+  readEvaluatorDispatchBinding,
+  type EvaluatorDispatchBinding
+} from "./dispatch-binding.js";
+import {
+  HARVEST_MAX_CONSECUTIVE_FAILURES,
+  HARVEST_PIPELINE_VERSION
+} from "./harvest-constants.js";
 
 type EvaluatorStep = "AUTHORING" | "JUDGING" | "REVIEWING";
-
-type EvaluatorDispatchBinding = Readonly<{
-  state: "UNBOUND";
-  reason: "ROW_ABSENT" | "ROW_INVALID" | "EXPLICIT_UNBOUND";
-  registerVersion: number;
-  sourceRef: string | null;
-}>;
-
-async function readDispatchBinding(pool: Pool, registerVersion: number): Promise<EvaluatorDispatchBinding> {
-  const result = await pool.query<{ value_json: unknown; source_ref: string }>(`
-    SELECT value_json,source_ref FROM register.register_row
-    WHERE register_version=$1 AND row_key='evaluatorDispatchBinding'
-  `, [registerVersion]);
-  const row = result.rows[0];
-  if (row === undefined) {
-    return Object.freeze({ state: "UNBOUND", reason: "ROW_ABSENT", registerVersion, sourceRef: null });
-  }
-  const parsed = z.object({
-    kind: z.literal("EVALUATOR_DISPATCH_BINDING"),
-    state: z.literal("UNBOUND")
-  }).strict().safeParse(row.value_json);
-  return parsed.success && row.source_ref.trim() !== ""
-    ? Object.freeze({ state: "UNBOUND", reason: "EXPLICIT_UNBOUND", registerVersion, sourceRef: row.source_ref })
-    : Object.freeze({
-        state: "UNBOUND",
-        reason: "ROW_INVALID",
-        registerVersion,
-        sourceRef: row.source_ref.trim() === "" ? null : row.source_ref
-      });
-}
 
 export interface EvaluatorDevMenuView {
   readonly catalog: {
@@ -96,7 +73,7 @@ export class PostgresEvaluatorDevMenuRepository {
     if (!Number.isInteger(registerVersion) || registerVersion < 1) {
       throw new TypeError("EVALUATOR_REGISTER_VERSION_INVALID");
     }
-    const [probe, selection, binding, observationCount, domains, profiles, parked, receipts] = await Promise.all([
+    const [probe, selection, binding, observationCount, domains, profiles, parkedReceipts] = await Promise.all([
       this.pool.query<{
         vllm_probe_id: string; state: "AVAILABLE" | "UNAVAILABLE"; failure_code: string | null;
       }>(`
@@ -109,7 +86,7 @@ export class PostgresEvaluatorDevMenuRepository {
         SELECT consumer_selection_id,model_id,selected_at
         FROM evaluator.consumer_selection ORDER BY at_seq DESC LIMIT 1
       `),
-      readDispatchBinding(this.pool, registerVersion),
+      readEvaluatorDispatchBinding(this.pool, registerVersion),
       this.pool.query<{ count: string }>("SELECT count(*)::text AS count FROM evaluator.observation"),
       this.pool.query<{
         domain_id: string; canonical_name: string; origin: "STARTER" | "GROWN";
@@ -149,32 +126,31 @@ export class PostgresEvaluatorDevMenuRepository {
           latest.domain_id NULLS FIRST,latest.step,latest.metric
         LIMIT 24
       `),
-      this.pool.query<{ run_id: string; consecutive_failures: string }>(`
-        SELECT failed.run_id,count(*)::text AS consecutive_failures
-        FROM evaluator.pipeline_event AS failed
-        WHERE failed.pipeline='HARVEST' AND failed.pipeline_version=1 AND failed.state='FAILED'
-          AND failed.at_seq > COALESCE((
-            SELECT max(completed.at_seq) FROM evaluator.pipeline_event AS completed
-            WHERE completed.run_id=failed.run_id AND completed.pipeline='HARVEST'
-              AND completed.pipeline_version=1 AND completed.state IN ('SUCCEEDED','SKIPPED')
-          ),0)
-        GROUP BY failed.run_id
-        HAVING count(*) >= 3
-        ORDER BY failed.run_id
-      `),
       this.pool.query<{
-        run_id: string; attempt_id: string; state: "FAILED"; reason: string; at_seq: string;
+        run_id: string; consecutive_failures: string; attempt_id: string;
+        state: "FAILED"; reason: string; at_seq: string;
       }>(`
-        SELECT failed.run_id,failed.attempt_id,failed.state,failed.reason,failed.at_seq
-        FROM evaluator.pipeline_event AS failed
-        WHERE failed.pipeline='HARVEST' AND failed.pipeline_version=1 AND failed.state='FAILED'
-          AND failed.at_seq > COALESCE((
-            SELECT max(completed.at_seq) FROM evaluator.pipeline_event AS completed
-            WHERE completed.run_id=failed.run_id AND completed.pipeline='HARVEST'
-              AND completed.pipeline_version=1 AND completed.state IN ('SUCCEEDED','SKIPPED')
-          ),0)
+        WITH failed_since_completion AS (
+          SELECT failed.run_id,failed.attempt_id,failed.state,failed.reason,failed.at_seq
+          FROM evaluator.pipeline_event AS failed
+          WHERE failed.pipeline='HARVEST' AND failed.pipeline_version=$1 AND failed.state='FAILED'
+            AND failed.at_seq > COALESCE((
+              SELECT max(completed.at_seq) FROM evaluator.pipeline_event AS completed
+              WHERE completed.run_id=failed.run_id AND completed.pipeline='HARVEST'
+                AND completed.pipeline_version=$1 AND completed.state IN ('SUCCEEDED','SKIPPED')
+            ),0)
+        ), parked AS (
+          SELECT run_id,count(*)::text AS consecutive_failures
+          FROM failed_since_completion
+          GROUP BY run_id
+          HAVING count(*) >= $2
+        )
+        SELECT failed.run_id,parked.consecutive_failures,failed.attempt_id,
+          failed.state,failed.reason,failed.at_seq
+        FROM parked
+        JOIN failed_since_completion AS failed USING (run_id)
         ORDER BY failed.run_id,failed.at_seq
-      `)
+      `, [HARVEST_PIPELINE_VERSION, HARVEST_MAX_CONSECUTIVE_FAILURES])
     ]);
 
     const latestProbe = probe.rows[0];
@@ -187,15 +163,21 @@ export class PostgresEvaluatorDevMenuRepository {
       models = Object.freeze(catalog.rows.map((row) => Object.freeze({ modelId: row.model_id })));
     }
     const selected = selection.rows[0];
-    const receiptsByRun = new Map<string, EvaluatorDevMenuView["parkedRuns"][number]["receipts"]>();
-    for (const receipt of receipts.rows) {
-      const current = receiptsByRun.get(receipt.run_id) ?? Object.freeze([]);
-      receiptsByRun.set(receipt.run_id, Object.freeze([...current, Object.freeze({
-        state: receipt.state,
-        reason: receipt.reason,
-        attemptId: receipt.attempt_id,
-        atSequence: Number(receipt.at_seq)
-      })]));
+    const parkedByRun = new Map<string, {
+      readonly consecutiveFailures: number;
+      readonly receipts: EvaluatorDevMenuView["parkedRuns"][number]["receipts"];
+    }>();
+    for (const receipt of parkedReceipts.rows) {
+      const current = parkedByRun.get(receipt.run_id)?.receipts ?? Object.freeze([]);
+      parkedByRun.set(receipt.run_id, Object.freeze({
+        consecutiveFailures: Number(receipt.consecutive_failures),
+        receipts: Object.freeze([...current, Object.freeze({
+          state: receipt.state,
+          reason: receipt.reason,
+          attemptId: receipt.attempt_id,
+          atSequence: Number(receipt.at_seq)
+        })])
+      }));
     }
 
     return Object.freeze({
@@ -234,10 +216,10 @@ export class PostgresEvaluatorDevMenuRepository {
         derivationVersion: Number(row.derivation_version),
         rank: row.ordinal
       }))),
-      parkedRuns: Object.freeze(parked.rows.map((row) => Object.freeze({
-        runId: row.run_id,
-        consecutiveFailures: Number(row.consecutive_failures),
-        receipts: receiptsByRun.get(row.run_id) ?? Object.freeze([])
+      parkedRuns: Object.freeze(Array.from(parkedByRun, ([runId, parked]) => Object.freeze({
+        runId,
+        consecutiveFailures: parked.consecutiveFailures,
+        receipts: parked.receipts
       })))
     });
   }

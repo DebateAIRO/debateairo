@@ -48,6 +48,30 @@ describe("dev-only evaluator API", () => {
     await api.close();
   });
 
+  it("registers exactly the read and consumer-selection routes under the dev evaluator surface", async () => {
+    const evaluatorDevMenu: EvaluatorDevMenuApplication = {
+      readView: vi.fn(async () => view),
+      selectConsumerModel: vi.fn()
+    };
+    const api = buildApi({
+      application: askApplication(),
+      evaluatorDevMenu,
+      evaluatorDevMenuRegisterVersion: 1
+    });
+
+    const routes = api.printRoutes({ commonPrefix: false });
+    const start = routes.indexOf("├── /v1/dev/evaluator");
+    const end = routes.indexOf("├── /v1/asks", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(routes.slice(start, end)).toBe(
+      "├── /v1/dev/evaluator (GET, HEAD)\n" +
+      "│   └── /consumer-selection (POST)\n"
+    );
+
+    await api.close();
+  });
+
   it("authenticates the gated read and maps the sole write to the resolved developer identity", async () => {
     const selectConsumerModel = vi.fn(async () => ({
       consumerSelectionId: "selection:test", modelId: "consumer:alpha", selectedAt: new Date("2026-08-15T14:00:00.000Z")

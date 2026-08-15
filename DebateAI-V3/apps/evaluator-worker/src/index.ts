@@ -8,6 +8,7 @@ import {
   EvaluatorHarvestRepository,
   PostgresEvaluatorAddonRepository,
   PostgresEvaluatorConsumerRepository,
+  HARVEST_MAX_CONSECUTIVE_FAILURES,
   HARVEST_PIPELINE_VERSION,
   probeEvaluatorVllmCatalog,
   readEvaluatorJudgeAddonPolicy,
@@ -32,7 +33,7 @@ export const EVALUATOR_TASK_FAMILIES = Object.freeze([
   "evaluator.derive-profiles",
   "evaluator.refresh-consumer-output"
 ] as const);
-export const HARVEST_MAX_CONSECUTIVE_FAILURES = 3 as const;
+export { HARVEST_MAX_CONSECUTIVE_FAILURES } from "@debateai/evaluator";
 
 export async function runEvaluatorCatalogProbe(
   pool: Pool,

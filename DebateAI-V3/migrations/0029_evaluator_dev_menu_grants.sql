@@ -9,7 +9,6 @@ GRANT SELECT ON
   evaluator.observation,
   evaluator.profile_cell,
   evaluator.rank_snapshot,
-  evaluator.shadow_decision,
   evaluator.vllm_probe,
   evaluator.vllm_catalog_model,
   evaluator.consumer_selection
