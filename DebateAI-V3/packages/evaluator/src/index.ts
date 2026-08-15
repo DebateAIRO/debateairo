@@ -1290,24 +1290,25 @@ export class EvaluatorHarvestRepository {
   constructor(private readonly pool: Pool) {}
 
   async harvestTerminalRun(runId: string, observedAt: Date = new Date()): Promise<EvaluatorHarvestResult> {
-    requireNonblank(runId, "EVALUATOR_HARVEST_RUN_ID_INVALID");
-    if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_HARVEST_TIME_INVALID");
     const attemptId = randomUUID();
-    const prepared = await withWriteTransaction(this.pool, async (client) => {
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
-      const terminal = await client.query(
-        "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1",
-        [runId]
-      );
-      if (terminal.rowCount === 0) return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
-      const snapshot = await this.readSnapshot(client, runId, observedAt);
-      const inputHash = harvestInputHash(snapshot);
-      await this.recordPipelineEvent(client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash);
-      return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
-    });
-    if (prepared.state === "NOT_TERMINAL") return prepared;
-
+    let inputHash: string | undefined;
     try {
+      requireNonblank(runId, "EVALUATOR_HARVEST_RUN_ID_INVALID");
+      if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_HARVEST_TIME_INVALID");
+      const prepared = await withWriteTransaction(this.pool, async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
+        const terminal = await client.query(
+          "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1",
+          [runId]
+        );
+        if (terminal.rowCount === 0) return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
+        const snapshot = await this.readSnapshot(client, runId, observedAt);
+        inputHash = harvestInputHash(snapshot);
+        await this.recordPipelineEvent(client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash);
+        return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
+      });
+      if (prepared.state === "NOT_TERMINAL") return prepared;
+
       return await withWriteTransaction(this.pool, async (client) => {
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
         const prior = await client.query(
@@ -1462,10 +1463,17 @@ export class EvaluatorHarvestRepository {
         return Object.freeze({ state: "HARVESTED" as const, runId, observationsInserted: inserted });
       });
     } catch (error) {
+      const failureInputHash = inputHash ?? createHash("sha256").update(JSON.stringify({
+        run_id: runId,
+        observed_at: observedAt instanceof Date && Number.isFinite(observedAt.getTime())
+          ? observedAt.toISOString()
+          : null,
+        failure_phase: "PREPARE"
+      })).digest("hex");
       try {
         await withWriteTransaction(this.pool, async (client) => {
           await this.recordPipelineEvent(
-            client, runId, attemptId, "FAILED", "TERMINAL_HARVEST_FAILED", prepared.inputHash
+            client, runId, attemptId, "FAILED", "TERMINAL_HARVEST_FAILED", failureInputHash
           );
         });
       } catch {

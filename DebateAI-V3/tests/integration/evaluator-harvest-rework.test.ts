@@ -451,6 +451,60 @@ describe("PROG-05 rework regressions", () => {
     }
   });
 
+  it("parks a phase-1 failure after three attempts without starving a healthy run", async () => {
+    const runIds = [
+      await createTerminalRun("prepare-order-a"),
+      await createTerminalRun("prepare-order-b")
+    ].sort();
+    const [poisonRunId, healthyRunId] = runIds as [string, string];
+    for (const [runId, suffix] of [[poisonRunId, "prepare-poison"], [healthyRunId, "prepare-healthy"]] as const) {
+      const artifact = await addArtifactCall({
+        runId, callSiteKey: `runner.${suffix}.v1`, providerRef: `provider:${suffix}`,
+        modelId: `model:${suffix}`, modelVersion: "v1", maker: `maker:${suffix}`, usage: null
+      });
+      await addRootNode(runId, artifact.artifactId);
+    }
+    await database.pool.query(`
+      CREATE FUNCTION evaluator.fail_prog05_prepare_poison() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.run_id = '${poisonRunId}'::uuid AND NEW.state = 'STARTED' THEN
+          RAISE EXCEPTION 'PROG05_PREPARE_POISON';
+        END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER fail_prog05_prepare_poison BEFORE INSERT ON evaluator.pipeline_event
+      FOR EACH ROW EXECUTE FUNCTION evaluator.fail_prog05_prepare_poison();
+    `);
+    try {
+      const firstResults = await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      expect(firstResults).toEqual(expect.arrayContaining([
+        { state: "FAILED", runId: poisonRunId, reason: "TERMINAL_HARVEST_FAILED" },
+        expect.objectContaining({ state: "HARVESTED", runId: healthyRunId })
+      ]));
+
+      await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      const fourthResults = await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      expect(fourthResults.some((result) => result.runId === poisonRunId)).toBe(false);
+      const failures = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM evaluator.pipeline_event
+        WHERE run_id=$1 AND state='FAILED' AND reason='TERMINAL_HARVEST_FAILED'
+      `, [poisonRunId]);
+      expect(failures.rows[0]!.count).toBe("3");
+    } finally {
+      await database.pool.query("DROP TRIGGER fail_prog05_prepare_poison ON evaluator.pipeline_event");
+      await database.pool.query("DROP FUNCTION evaluator.fail_prog05_prepare_poison()");
+    }
+  });
+
   it("keeps STARTED and FAILED receipts durable when an observation write fails", async () => {
     const runId = await createTerminalRun("failed-receipt");
     const author = await addArtifactCall({
