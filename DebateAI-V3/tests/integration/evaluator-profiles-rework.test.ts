@@ -182,6 +182,64 @@ async function harvest(runId: string, observedAt = HARVESTED_AT): Promise<void> 
 }
 
 describe("PROG-07 rework regressions through production harvest shapes", () => {
+  it("moves a judge down the persisted bias rank and receipts that ordinal in prowess", async () => {
+    const repository = new PostgresEvaluatorProfileRepository(database.pool);
+    const baselineAsOf = new Date("2026-08-15T09:45:00.000Z");
+    const injectedAsOf = new Date("2026-08-15T10:45:00.000Z");
+    const baseline = await createTerminalRun("judge-rank-baseline");
+    for (const [modelId, maker, ordinal] of [
+      ["rankmove:a", "maker:rankmove:a", 1],
+      ["rankmove:b", "maker:rankmove:b", 2],
+      ["rankmove:c", "maker:rankmove:c", 3]
+    ] as const) {
+      await addJudgedNode({ runId: baseline, modelId, maker, tau: 0.5, ordinal });
+    }
+    await harvest(baseline, new Date("2026-08-15T09:30:00.000Z"));
+    await repository.deriveAndPersist({
+      asOf: baselineAsOf, derivationVersion: 20, strategy
+    });
+
+    const injected = await createTerminalRun("judge-rank-injected-leniency");
+    for (const [modelId, maker, tau, ordinal] of [
+      ["rankmove:a", "maker:rankmove:a", 0.95, 1],
+      ["rankmove:b", "maker:rankmove:b", 0.1, 2],
+      ["rankmove:c", "maker:rankmove:c", 0.1, 3]
+    ] as const) {
+      await addJudgedNode({ runId: injected, modelId, maker, tau, ordinal });
+    }
+    await harvest(injected, new Date("2026-08-15T10:30:00.000Z"));
+    await repository.deriveAndPersist({
+      asOf: injectedAsOf, derivationVersion: 20, strategy
+    });
+
+    const ranks = await database.pool.query<{
+      as_of: Date; model_id: string; ordinal: number; score: number;
+    }>(`
+      SELECT as_of,model_id,ordinal,score FROM evaluator.rank_snapshot
+      WHERE rank_kind='JUDGE' AND metric='bias.composite-rank.v1'
+        AND derivation_version=20
+      ORDER BY as_of,ordinal
+    `);
+    expect(ranks.rows).toEqual([
+      { as_of: baselineAsOf, model_id: "rankmove:a", ordinal: 1, score: 1 },
+      { as_of: baselineAsOf, model_id: "rankmove:b", ordinal: 2, score: 1 },
+      { as_of: baselineAsOf, model_id: "rankmove:c", ordinal: 3, score: 1 },
+      { as_of: injectedAsOf, model_id: "rankmove:b", ordinal: 1, score: 0.7875 },
+      { as_of: injectedAsOf, model_id: "rankmove:c", ordinal: 2, score: 0.7875 },
+      { as_of: injectedAsOf, model_id: "rankmove:a", ordinal: 3, score: 0.575 }
+    ]);
+
+    const receipt = await database.pool.query<{ derivation_input: string[] }>(`
+      SELECT derivation_input FROM evaluator.profile_cell
+      WHERE provider='openai-compatible-http' AND model_id='rankmove:a'
+        AND model_version='v1' AND step='JUDGING'
+        AND metric='prowess.judging-tau.v1' AND as_of=$1 AND derivation_version=20
+    `, [injectedAsOf]);
+    expect(receipt.rows[0]!.derivation_input).toEqual(expect.arrayContaining([
+      "bias-rank:openai-compatible-http/rankmove:a/v1@3"
+    ]));
+  });
+
   it("derives non-degenerate run-panel leniency, review lineage residue, and event-level contradictions", async () => {
     const runId = await createTerminalRun("bias-real-shapes");
     const authorA1 = await addJudgedNode({
