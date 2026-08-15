@@ -15,6 +15,9 @@ const meteringWindow = {
   windowEnd: new Date("2026-08-16T00:00:00.000Z"),
   asOf: new Date("2026-08-16T00:00:01.000Z")
 };
+const SETTLED_AT = new Date("2026-08-15T07:00:00.000Z");
+const HARVESTED_AT = new Date("2026-08-15T09:00:00.000Z");
+const RECONCILED_AT = new Date("2026-08-15T10:00:00.000Z");
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -121,7 +124,11 @@ async function addExternalOutcome(input: {
   readonly provider: string;
   readonly modelId: string;
   readonly modelVersion: string;
+  readonly resolvedAt: Date;
+  readonly outcomeKey?: string;
+  readonly answerVersion?: number;
 }): Promise<string> {
+  const answerVersion = input.answerVersion ?? 1;
   const carriers = await database.pool.query<{ work_item_id: string; fact_bundle_id: string }>(`
     WITH work AS (
       INSERT INTO core.work_item (
@@ -130,28 +137,33 @@ async function addExternalOutcome(input: {
       RETURNING work_item_id
     ), bundle AS (
       INSERT INTO serve.fact_bundle (run_id,facts,residual_objections,content_hash,version)
-      VALUES ($1,'[]','[]',$3,1) RETURNING fact_bundle_id
+      VALUES ($1,'[]','[]',$3,$4) RETURNING fact_bundle_id
     ) SELECT work_item_id,fact_bundle_id FROM work CROSS JOIN bundle
-  `, [input.runId, `settlement:${input.runId}`, `hash:${input.runId}`]);
+  `, [
+    input.runId,
+    `${input.outcomeKey ?? "settlement"}:${input.runId}`,
+    `hash:${input.outcomeKey ?? "settlement"}:${input.runId}`,
+    answerVersion
+  ]);
   const answer = await database.pool.query<{ answer_id: string }>(`
     INSERT INTO serve.answer (
       answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,
       condition_marks,fact_bundle_id,sealed_at_seq
-    ) VALUES (1,$1,$2,'SERVED','COMPOSED','SUPPORTED','{}','[]',$3,ledger.allocate_sequence())
+    ) VALUES ($4,$1,$2,'SERVED','COMPOSED','SUPPORTED','{}','[]',$3,ledger.allocate_sequence())
     RETURNING answer_id
-  `, [input.runId, carriers.rows[0]!.work_item_id, carriers.rows[0]!.fact_bundle_id]);
+  `, [input.runId, carriers.rows[0]!.work_item_id, carriers.rows[0]!.fact_bundle_id, answerVersion]);
   const outcome = await database.pool.query<{ answer_outcome_id: string }>(`
     INSERT INTO scorecard.answer_outcome (
       outcome_attempt_id,answer_id,answer_version,as_of,run_id,model_id,model_version,
       provider,task_class,prior,posterior,basis,resolver_ref,resolver_is_external,
       resolved_outcome,resolved_at,provenance_ref,scoreability,accepted,at_seq
     ) VALUES (
-      gen_random_uuid(),$1,1,$2,$3,$4,$5,$6,'test',0.5,0.9,'EXTERNAL',
+      gen_random_uuid(),$1,$7,$2,$3,$4,$5,$6,'test',0.5,0.9,'EXTERNAL',
       'resolver:test',true,true,$2,'settlement:test','SCOREABLE',true,ledger.allocate_sequence()
     ) RETURNING answer_outcome_id
   `, [
-    answer.rows[0]!.answer_id, new Date("2026-08-15T12:00:00.000Z"), input.runId,
-    input.modelId, input.modelVersion, input.provider
+    answer.rows[0]!.answer_id, input.resolvedAt, input.runId,
+    input.modelId, input.modelVersion, input.provider, answerVersion
   ]);
   return outcome.rows[0]!.answer_outcome_id;
 }
@@ -171,7 +183,7 @@ async function expectNoProviderEvidenceDuring(action: () => Promise<unknown>): P
 }
 
 describe("PROG-05 rework regressions", () => {
-  it("revisits an already-harvested run and supersedes consensus when settlement arrives later", async () => {
+  it("revisits an already-harvested run and supersedes a backdated late settlement", async () => {
     const runId = await createTerminalRun("late-settlement");
     const author = await addArtifactCall({
       runId, callSiteKey: "runner.author.v1", providerRef: "provider:author",
@@ -179,7 +191,9 @@ describe("PROG-05 rework regressions", () => {
       usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3, x_cost_usd: 0.01 }
     });
     await addStrength(runId, await addRootNode(runId, author.artifactId));
-    await runEvaluatorTerminalHarvest({ pool: database.pool, runId, meteringWindow });
+    await runEvaluatorTerminalHarvest({
+      pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+    });
     const consensus = await database.pool.query<{ observation_id: string; metric: string }>(`
       SELECT observation_id,metric FROM evaluator.observation
       WHERE run_id=$1 AND truth_basis='CONSENSUS' AND source_kind='NODE_STRENGTH'
@@ -187,30 +201,105 @@ describe("PROG-05 rework regressions", () => {
     expect(consensus.rows).toHaveLength(1);
 
     const answerOutcomeId = await addExternalOutcome({
-      runId, provider: "openai-compatible-http", modelId: "model:author", modelVersion: "v1"
+      runId, provider: "openai-compatible-http", modelId: "model:author", modelVersion: "v1",
+      resolvedAt: SETTLED_AT
     });
     const q59Before = await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM scorecard.answer_outcome WHERE run_id=$1", [runId]
     );
-    await expect(reconcileEvaluatorTerminalRuns({ pool: database.pool, meteringWindow }))
+    await expect(reconcileEvaluatorTerminalRuns({
+      pool: database.pool, meteringWindow, observedAt: RECONCILED_AT
+    }))
       .resolves.toEqual([
         expect.objectContaining({ state: "SETTLEMENTS_RECONCILED", observationsInserted: 1 })
       ]);
     const settlement = await database.pool.query<{
       answer_outcome_id: string; supersedes_observation_id: string; metric: string;
+      observed_at: Date; provenance_json: { resolved_at: string };
     }>(`
-      SELECT answer_outcome_id,supersedes_observation_id,metric
+      SELECT answer_outcome_id,supersedes_observation_id,metric,observed_at,provenance_json
       FROM evaluator.observation WHERE run_id=$1 AND truth_basis='SETTLEMENT'
     `, [runId]);
     expect(settlement.rows).toEqual([{
       answer_outcome_id: answerOutcomeId,
       supersedes_observation_id: consensus.rows[0]!.observation_id,
-      metric: consensus.rows[0]!.metric
+      metric: consensus.rows[0]!.metric,
+      observed_at: RECONCILED_AT,
+      provenance_json: expect.objectContaining({ resolved_at: SETTLED_AT.toISOString() })
     }]);
     const q59After = await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM scorecard.answer_outcome WHERE run_id=$1", [runId]
     );
     expect(q59After.rows[0]!.count).toBe(q59Before.rows[0]!.count);
+  });
+
+  it("harvests a run whose backdated settlement already exists on the first pass", async () => {
+    const runId = await createTerminalRun("pre-harvest-settlement");
+    const author = await addArtifactCall({
+      runId, callSiteKey: "runner.author.v1", providerRef: "provider:pre-settled",
+      modelId: "model:pre-settled", modelVersion: "v1", maker: "maker:pre-settled", usage: null
+    });
+    await addStrength(runId, await addRootNode(runId, author.artifactId));
+    const answerOutcomeId = await addExternalOutcome({
+      runId, provider: "openai-compatible-http", modelId: "model:pre-settled",
+      modelVersion: "v1", resolvedAt: SETTLED_AT
+    });
+
+    await expect(runEvaluatorTerminalHarvest({
+      pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+    })).resolves.toMatchObject({ harvest: { state: "HARVESTED", observationsInserted: 3 } });
+    const rows = await database.pool.query<{
+      truth_basis: string; answer_outcome_id: string | null;
+      supersedes_observation_id: string | null; observed_at: Date;
+    }>(`
+      SELECT truth_basis,answer_outcome_id,supersedes_observation_id,observed_at
+      FROM evaluator.observation WHERE run_id=$1 AND metric='prowess.outcome.v1'
+      ORDER BY truth_basis
+    `, [runId]);
+    expect(rows.rows).toHaveLength(2);
+    const consensus = rows.rows.find((row) => row.truth_basis === "CONSENSUS")!;
+    const settlement = rows.rows.find((row) => row.truth_basis === "SETTLEMENT")!;
+    expect(settlement).toMatchObject({
+      answer_outcome_id: answerOutcomeId,
+      supersedes_observation_id: expect.any(String),
+      observed_at: HARVESTED_AT
+    });
+    expect(settlement.supersedes_observation_id).toBeTruthy();
+    expect(settlement.observed_at.getTime()).toBeGreaterThanOrEqual(consensus.observed_at.getTime());
+  });
+
+  it("keeps a second settlement auditable and receipts its unavailable supersession", async () => {
+    const runId = await createTerminalRun("two-settlements");
+    const author = await addArtifactCall({
+      runId, callSiteKey: "runner.author.v1", providerRef: "provider:two-settlements",
+      modelId: "model:two-settlements", modelVersion: "v1",
+      maker: "maker:two-settlements", usage: null
+    });
+    await addStrength(runId, await addRootNode(runId, author.artifactId));
+    for (const [outcomeKey, resolvedAt, answerVersion] of [
+      ["first", SETTLED_AT, 1],
+      ["second", new Date("2026-08-15T08:00:00.000Z"), 2]
+    ] as const) {
+      await addExternalOutcome({
+        runId, provider: "openai-compatible-http", modelId: "model:two-settlements",
+        modelVersion: "v1", resolvedAt, outcomeKey, answerVersion
+      });
+    }
+
+    await expect(runEvaluatorTerminalHarvest({
+      pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+    })).resolves.toMatchObject({ harvest: { state: "HARVESTED", observationsInserted: 4 } });
+    const settlementLinks = await database.pool.query<{ supersedes_observation_id: string | null }>(`
+      SELECT supersedes_observation_id FROM evaluator.observation
+      WHERE run_id=$1 AND truth_basis='SETTLEMENT' ORDER BY source_ref
+    `, [runId]);
+    expect(settlementLinks.rows).toHaveLength(2);
+    expect(settlementLinks.rows.filter((row) => row.supersedes_observation_id !== null)).toHaveLength(1);
+    const receipts = await database.pool.query<{ reason: string }>(`
+      SELECT reason FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND reason LIKE 'SUPERSESSION_PRIOR_UNAVAILABLE:%'
+    `, [runId]);
+    expect(receipts.rows).toHaveLength(1);
   });
 
   it("records malformed observed usage as UNMETERED and still harvests an unrelated run", async () => {
@@ -231,7 +320,9 @@ describe("PROG-05 rework regressions", () => {
     });
     const runId = await createTerminalRun("poison-resistant");
 
-    await expect(runEvaluatorTerminalHarvest({ pool: database.pool, runId, meteringWindow }))
+    await expect(runEvaluatorTerminalHarvest({
+      pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+    }))
       .resolves.toMatchObject({ harvest: { state: "HARVESTED" } });
     const usage = await database.pool.query<{ metering_status: string; raw_usage: unknown }>(`
       SELECT metering_status,raw_usage FROM evaluator.model_call_usage
@@ -244,6 +335,28 @@ describe("PROG-05 rework regressions", () => {
     ]);
   });
 
+  it("reports an outer metering failure without fabricating a failed-call count", async () => {
+    const runId = await createTerminalRun("metering-outer-failure");
+    const result = await runEvaluatorTerminalHarvest({
+      pool: database.pool,
+      runId,
+      observedAt: HARVESTED_AT,
+      meteringWindow: {
+        windowStart: new Date("2026-08-16T00:00:00.000Z"),
+        windowEnd: new Date("2026-08-15T00:00:00.000Z"),
+        asOf: new Date("2026-08-16T00:00:01.000Z")
+      }
+    });
+
+    expect(result.metering).toEqual({
+      callsProjected: 0,
+      callsFailed: 0,
+      relativeCostCellsDerived: 0,
+      failureReason: "METERING_RECONCILIATION_FAILED"
+    });
+    expect(result.harvest).toMatchObject({ state: "HARVESTED", runId });
+  });
+
   it("proves the zero-provider-call assertion detects injected evidence and passes for harvest", async () => {
     await expect(expectNoProviderEvidenceDuring(async () => {
       await addArtifactCall({
@@ -253,7 +366,9 @@ describe("PROG-05 rework regressions", () => {
     })).rejects.toThrow();
     const runId = await createTerminalRun("zero-provider-call");
     await expectNoProviderEvidenceDuring(async () => {
-      await runEvaluatorTerminalHarvest({ pool: database.pool, runId, meteringWindow });
+      await runEvaluatorTerminalHarvest({
+        pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+      });
     });
   });
 
@@ -265,7 +380,9 @@ describe("PROG-05 rework regressions", () => {
     });
     await addRootNode(runId, versionless.artifactId);
 
-    await runEvaluatorTerminalHarvest({ pool: database.pool, runId, meteringWindow });
+    await runEvaluatorTerminalHarvest({
+      pool: database.pool, runId, meteringWindow, observedAt: HARVESTED_AT
+    });
     const receipts = await database.pool.query<{ state: string; reason: string }>(`
       SELECT state,reason FROM evaluator.pipeline_event
       WHERE run_id=$1 AND reason LIKE 'MODEL_IDENTITY_INCOMPLETE%'
@@ -274,6 +391,64 @@ describe("PROG-05 rework regressions", () => {
       state: "SKIPPED",
       reason: `MODEL_IDENTITY_INCOMPLETE:${versionless.artifactId}`
     }]);
+  });
+
+  it("isolates a poisoned run, harvests a later healthy run, and bounds poison retries", async () => {
+    const runIds = [
+      await createTerminalRun("batch-order-a"),
+      await createTerminalRun("batch-order-b")
+    ].sort();
+    const [poisonRunId, healthyRunId] = runIds as [string, string];
+    for (const [runId, suffix] of [[poisonRunId, "poison"], [healthyRunId, "healthy"]] as const) {
+      const artifact = await addArtifactCall({
+        runId, callSiteKey: `runner.${suffix}.v1`, providerRef: `provider:${suffix}`,
+        modelId: `model:${suffix}`, modelVersion: "v1", maker: `maker:${suffix}`, usage: null
+      });
+      await addRootNode(runId, artifact.artifactId);
+    }
+    await database.pool.query(`
+      CREATE FUNCTION evaluator.fail_prog05_batch_poison() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.run_id = '${poisonRunId}'::uuid THEN
+          RAISE EXCEPTION 'PROG05_BATCH_POISON';
+        END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER fail_prog05_batch_poison BEFORE INSERT ON evaluator.observation
+      FOR EACH ROW EXECUTE FUNCTION evaluator.fail_prog05_batch_poison();
+    `);
+    try {
+      const firstResults = await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      expect(firstResults).toEqual(expect.arrayContaining([
+        { state: "FAILED", runId: poisonRunId, reason: "TERMINAL_HARVEST_FAILED" },
+        expect.objectContaining({ state: "HARVESTED", runId: healthyRunId })
+      ]));
+      const healthy = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM evaluator.observation WHERE run_id=$1", [healthyRunId]
+      );
+      expect(healthy.rows[0]!.count).toBe("1");
+
+      await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      const fourthResults = await reconcileEvaluatorTerminalRuns({
+        pool: database.pool, meteringWindow, observedAt: HARVESTED_AT
+      });
+      expect(fourthResults.some((result) => result.runId === poisonRunId)).toBe(false);
+      const failures = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM evaluator.pipeline_event
+        WHERE run_id=$1 AND state='FAILED' AND reason='TERMINAL_HARVEST_FAILED'
+      `, [poisonRunId]);
+      expect(failures.rows[0]!.count).toBe("3");
+    } finally {
+      await database.pool.query("DROP TRIGGER fail_prog05_batch_poison ON evaluator.observation");
+      await database.pool.query("DROP FUNCTION evaluator.fail_prog05_batch_poison()");
+    }
   });
 
   it("keeps STARTED and FAILED receipts durable when an observation write fails", async () => {
@@ -290,7 +465,8 @@ describe("PROG-05 rework regressions", () => {
       FOR EACH ROW EXECUTE FUNCTION evaluator.fail_prog05_rework_test();
     `);
     try {
-      await expect(new EvaluatorHarvestRepository(database.pool).harvestTerminalRun(runId))
+      await expect(new EvaluatorHarvestRepository(database.pool)
+        .harvestTerminalRun(runId, HARVESTED_AT))
         .rejects.toThrow(/PROG05_FORCED_OBSERVATION_FAILURE/);
       const receipts = await database.pool.query<{ state: string; reason: string }>(`
         SELECT state,reason FROM evaluator.pipeline_event WHERE run_id=$1 ORDER BY at_seq

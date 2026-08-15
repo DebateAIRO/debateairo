@@ -1098,6 +1098,7 @@ export interface EvaluatorHarvestSnapshot {
     readonly modelVersion: string;
     readonly domainId: string | null;
     readonly metric: string;
+    readonly observedAt: Date;
   }[];
 }
 
@@ -1226,6 +1227,11 @@ export function projectEvaluatorObservations(
       && prior.domainId === snapshot.domainId
       && prior.metric === "prowess.outcome.v1");
     const prior = priorIndex < 0 ? undefined : availableConsensus.splice(priorIndex, 1)[0];
+    const settlementObservedAt = new Date(Math.max(
+      snapshot.observedAt.getTime(),
+      prior?.observedAt.getTime() ?? Number.NEGATIVE_INFINITY
+    ));
+    const resolvedAt = settlement.resolvedAt.toISOString();
     rows.push(Object.freeze({
       runId: snapshot.runId,
       provider: settlement.provider,
@@ -1235,7 +1241,10 @@ export function projectEvaluatorObservations(
       step: "AUTHORING",
       metric: "prowess.outcome.v1",
       value: settlement.resolvedOutcome ? 1 : 0,
-      outcomeJson: Object.freeze({ resolved_outcome: settlement.resolvedOutcome }),
+      outcomeJson: Object.freeze({
+        resolved_outcome: settlement.resolvedOutcome,
+        resolved_at: resolvedAt
+      }),
       truthBasis: "SETTLEMENT",
       sourceKind: "EXTERNAL_ANSWER_OUTCOME",
       sourceRef: settlement.answerOutcomeId,
@@ -1244,9 +1253,10 @@ export function projectEvaluatorObservations(
       supersedesObservationId: prior?.observationId ?? null,
       provenanceJson: Object.freeze({
         source: "scorecard.answer_outcome",
-        answer_outcome_id: settlement.answerOutcomeId
+        answer_outcome_id: settlement.answerOutcomeId,
+        resolved_at: resolvedAt
       }),
-      observedAt: new Date(settlement.resolvedAt)
+      observedAt: settlementObservedAt
     }));
   }
   return Object.freeze(rows.sort(compareObservation));
@@ -1267,7 +1277,11 @@ function harvestInputHash(snapshot: EvaluatorHarvestSnapshot): string {
       provider: row.provider, model_id: row.modelId, model_version: row.modelVersion,
       step: row.step, metric: row.metric, source_kind: row.sourceKind,
       source_ref: row.sourceRef, truth_basis: row.truthBasis,
-      supersedes_observation_id: row.supersedesObservationId
+      supersedes_observation_id: row.supersedesObservationId,
+      value: row.value,
+      outcome_json: row.outcomeJson,
+      provenance_json: row.provenanceJson,
+      observed_at: row.observedAt.toISOString()
     }))
   })).digest("hex");
 }
@@ -1289,7 +1303,7 @@ export class EvaluatorHarvestRepository {
       const snapshot = await this.readSnapshot(client, runId, observedAt);
       const inputHash = harvestInputHash(snapshot);
       await this.recordPipelineEvent(client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash);
-      return Object.freeze({ state: "PREPARED" as const, inputHash });
+      return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
     });
     if (prepared.state === "NOT_TERMINAL") return prepared;
 
@@ -1303,7 +1317,7 @@ export class EvaluatorHarvestRepository {
           [runId, HARVEST_PIPELINE_VERSION]
         );
         const alreadyHarvested = prior.rowCount !== 0;
-        const snapshot = await this.readSnapshot(client, runId, observedAt);
+        const snapshot = prepared.snapshot;
         const candidates = projectEvaluatorObservations(snapshot)
           .filter((row) => !alreadyHarvested || row.truthBasis === "SETTLEMENT");
 
@@ -1329,9 +1343,28 @@ export class EvaluatorHarvestRepository {
         ];
         for (const row of orderedCandidates) {
           let supersedesObservationId = row.supersedesObservationId;
+          let observationTime = new Date(row.observedAt);
+          let priorObservedAt: Date | undefined;
+          let supersessionSkipRecorded = false;
+          if (row.truthBasis === "SETTLEMENT" && supersedesObservationId !== null) {
+            const stillAvailable = await client.query<{ observation_id: string; observed_at: Date }>(`
+              SELECT prior.observation_id,prior.observed_at
+              FROM evaluator.observation AS prior
+              WHERE prior.observation_id=$1
+                AND NOT EXISTS (
+                  SELECT 1 FROM evaluator.observation AS successor
+                  WHERE successor.supersedes_observation_id=prior.observation_id
+                )
+            `, [supersedesObservationId]);
+            if (stillAvailable.rows[0] === undefined) {
+              supersedesObservationId = null;
+            } else {
+              priorObservedAt = stillAvailable.rows[0].observed_at;
+            }
+          }
           if (row.truthBasis === "SETTLEMENT" && supersedesObservationId === null) {
-            const availablePrior = await client.query<{ observation_id: string }>(`
-              SELECT prior.observation_id
+            const availablePrior = await client.query<{ observation_id: string; observed_at: Date }>(`
+              SELECT prior.observation_id,prior.observed_at
               FROM evaluator.observation AS prior
               WHERE prior.run_id=$1 AND prior.provider=$2 AND prior.model_id=$3
                 AND prior.model_version=$4 AND prior.domain_id IS NOT DISTINCT FROM $5
@@ -1344,6 +1377,57 @@ export class EvaluatorHarvestRepository {
               ORDER BY prior.observation_id LIMIT 1
             `, [row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.metric]);
             supersedesObservationId = availablePrior.rows[0]?.observation_id ?? null;
+            priorObservedAt = availablePrior.rows[0]?.observed_at;
+          }
+          if (row.truthBasis === "SETTLEMENT" && supersedesObservationId === null) {
+            const unavailablePrior = await client.query(`
+              SELECT 1 FROM evaluator.observation AS prior
+              WHERE prior.run_id=$1 AND prior.provider=$2 AND prior.model_id=$3
+                AND prior.model_version=$4 AND prior.domain_id IS NOT DISTINCT FROM $5
+                AND prior.step='AUTHORING' AND prior.metric=$6
+                AND prior.truth_basis='CONSENSUS' AND prior.source_kind='NODE_STRENGTH'
+              LIMIT 1
+            `, [row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.metric]);
+            if (unavailablePrior.rowCount !== 0 && row.answerOutcomeId !== null) {
+              await this.recordPipelineEvent(
+                client, runId, attemptId, "SKIPPED",
+                `SUPERSESSION_PRIOR_UNAVAILABLE:${row.answerOutcomeId}`, prepared.inputHash
+              );
+              supersessionSkipRecorded = true;
+            }
+          }
+          if (row.truthBasis === "SETTLEMENT" && supersedesObservationId !== null
+            && priorObservedAt !== undefined) {
+            const safeTime = Math.max(observationTime.getTime(), priorObservedAt.getTime());
+            if (!Number.isFinite(safeTime) || safeTime < priorObservedAt.getTime()) {
+              supersedesObservationId = null;
+              if (row.answerOutcomeId !== null) {
+                await this.recordPipelineEvent(
+                  client, runId, attemptId, "SKIPPED",
+                  `SUPERSESSION_ORDER_INVALID:${row.answerOutcomeId}`, prepared.inputHash
+                );
+                supersessionSkipRecorded = true;
+              }
+            } else {
+              observationTime = new Date(safeTime);
+            }
+          }
+          if (row.truthBasis === "SETTLEMENT" && supersedesObservationId === null
+            && !supersessionSkipRecorded && row.answerOutcomeId !== null) {
+            const matchingPrior = await client.query(`
+              SELECT 1 FROM evaluator.observation AS prior
+              WHERE prior.run_id=$1 AND prior.provider=$2 AND prior.model_id=$3
+                AND prior.model_version=$4 AND prior.domain_id IS NOT DISTINCT FROM $5
+                AND prior.step='AUTHORING' AND prior.metric=$6
+                AND prior.truth_basis='CONSENSUS' AND prior.source_kind='NODE_STRENGTH'
+              LIMIT 1
+            `, [row.runId, row.provider, row.modelId, row.modelVersion, row.domainId, row.metric]);
+            if (matchingPrior.rowCount !== 0) {
+              await this.recordPipelineEvent(
+                client, runId, attemptId, "SKIPPED",
+                `SUPERSESSION_PRIOR_UNAVAILABLE:${row.answerOutcomeId}`, prepared.inputHash
+              );
+            }
           }
           const result = await client.query(`
             INSERT INTO evaluator.observation (
@@ -1358,7 +1442,7 @@ export class EvaluatorHarvestRepository {
             row.metric, row.value, row.outcomeJson === null ? null : JSON.stringify(row.outcomeJson),
             row.truthBasis, row.sourceKind, row.sourceRef, row.sourceRawArtifactRef,
             row.answerOutcomeId, HARVEST_DERIVATION_VERSION, supersedesObservationId,
-            JSON.stringify(row.provenanceJson), row.observedAt, await allocateSequence(client)
+            JSON.stringify(row.provenanceJson), observationTime, await allocateSequence(client)
           ]);
           inserted += result.rowCount ?? 0;
         }
@@ -1477,9 +1561,9 @@ export class EvaluatorHarvestRepository {
     `, [runId]);
     const priorConsensus = await client.query<{
       observation_id: string; provider: string; model_id: string; model_version: string;
-      domain_id: string | null; metric: string;
+      domain_id: string | null; metric: string; observed_at: Date;
     }>(`
-      SELECT observation_id,provider,model_id,model_version,domain_id,metric
+      SELECT observation_id,provider,model_id,model_version,domain_id,metric,observed_at
       FROM evaluator.observation AS prior
       WHERE prior.run_id=$1 AND prior.step='AUTHORING' AND prior.truth_basis='CONSENSUS'
         AND prior.source_kind='NODE_STRENGTH' AND prior.metric='prowess.outcome.v1'
@@ -1523,7 +1607,8 @@ export class EvaluatorHarvestRepository {
       }))),
       priorConsensusOutcomes: Object.freeze(priorConsensus.rows.map((row) => Object.freeze({
         observationId: row.observation_id, provider: row.provider, modelId: row.model_id,
-        modelVersion: row.model_version, domainId: row.domain_id, metric: row.metric
+        modelVersion: row.model_version, domainId: row.domain_id, metric: row.metric,
+        observedAt: new Date(row.observed_at)
       })))
     });
   }
@@ -1798,6 +1883,7 @@ export interface EvaluatorMeteringReconciliationResult {
   readonly callsProjected: number;
   readonly callsFailed: number;
   readonly relativeCostCellsDerived: number;
+  readonly failureReason?: "METERING_RECONCILIATION_FAILED";
 }
 
 function readObservedUsage(metadata: unknown): ObservedModelCallUsage | null {

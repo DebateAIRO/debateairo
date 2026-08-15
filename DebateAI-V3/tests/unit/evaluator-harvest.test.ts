@@ -118,7 +118,8 @@ describe("deterministic evaluator harvest projector", () => {
         modelId: "author-model",
         modelVersion: "v1",
         domainId: null,
-        metric: "prowess.outcome.v1"
+        metric: "prowess.outcome.v1",
+        observedAt: new Date("2026-08-15T09:00:00.000Z")
       }]
     });
     const settlement = rows.find((row) => row.sourceKind === "EXTERNAL_ANSWER_OUTCOME");
@@ -130,6 +131,46 @@ describe("deterministic evaluator harvest projector", () => {
       value: 1,
       supersedesObservationId: "observation:consensus"
     });
+  });
+
+  it("uses one consensus row once when multiple settlements target the same model", () => {
+    const rows = projectEvaluatorObservations({
+      ...snapshot,
+      settlements: [
+        {
+          answerOutcomeId: "outcome:1",
+          provider: "openai-compatible-http",
+          modelId: "author-model",
+          modelVersion: "v1",
+          resolvedOutcome: true,
+          resolvedAt: new Date("2026-08-15T07:00:00.000Z")
+        },
+        {
+          answerOutcomeId: "outcome:2",
+          provider: "openai-compatible-http",
+          modelId: "author-model",
+          modelVersion: "v1",
+          resolvedOutcome: false,
+          resolvedAt: new Date("2026-08-15T08:00:00.000Z")
+        }
+      ],
+      priorConsensusOutcomes: [{
+        observationId: "observation:consensus",
+        provider: "openai-compatible-http",
+        modelId: "author-model",
+        modelVersion: "v1",
+        domainId: null,
+        metric: "prowess.outcome.v1",
+        observedAt: new Date("2026-08-15T09:00:00.000Z")
+      }]
+    }).filter((row) => row.truthBasis === "SETTLEMENT");
+
+    expect(rows.map((row) => row.supersedesObservationId)).toEqual([
+      "observation:consensus",
+      null
+    ]);
+    expect(rows.every((row) => row.observedAt.toISOString() === "2026-08-15T10:00:00.000Z"))
+      .toBe(true);
   });
 
   it("is byte-for-byte deterministic for the same snapshot", () => {

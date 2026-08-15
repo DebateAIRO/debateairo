@@ -104,7 +104,11 @@ judgements become `JUDGING` observations, cross-maker node reviews become
 settlement-fed `AUTHORING` observations. A settlement reconciliation revisits
 already-harvested terminal runs, writes `prowess.outcome.v1` with
 `supersedes_observation_id` pointing at the earlier consensus strength row, and
-keeps that earlier row append-only. Consensus and settlement truth bases are
+keeps that earlier row append-only. Its `observed_at` is the order-safe harvest
+clock; the resolver's true `resolved_at` remains in outcome and provenance JSON.
+One consensus row can be superseded once: further accepted settlements remain
+auditable settlement rows with a typed `SUPERSESSION_PRIOR_UNAVAILABLE` receipt
+and no supersession link. Consensus and settlement truth bases are
 explicit evaluator-owned values; harvest never inserts into or mutates
 `scorecard.answer_outcome`.
 
@@ -116,15 +120,24 @@ performance observations. Model versions that are absent are skipped rather
 than collapsed into maker-level identity, with a typed
 `MODEL_IDENTITY_INCOMPLETE` pipeline receipt.
 
-The projector is deterministic and provider-free. An advisory run lock, a
-durable STARTED/SUCCEEDED/FAILED receipts, and the observation natural key make
-reconciliation idempotent. Batch reconciliation is capped at 100 terminal runs
-by default and also selects previously harvested runs with an unprojected
+The projector is deterministic and provider-free. An advisory run lock, durable
+STARTED/SUCCEEDED/FAILED receipts, and the observation natural key make
+reconciliation idempotent. STARTED and its terminal receipt hash the same frozen
+snapshot. Batch reconciliation is capped at 100 terminal runs by default,
+isolates each run failure, stops selecting a run after three consecutive failed
+attempts, and also selects previously harvested runs with an unprojected
 accepted settlement. The worker entry points also reconcile completed
 model calls into `model_call_usage`, reading observed usage from persisted raw
 artifact metadata. Empty, unknown, or internally inconsistent usage is recorded
 as `UNMETERED`; one row failure cannot block other calls or terminal harvest.
 Relative-cost cells are first-write snapshots for each identity, window, and
 derivation version; use a new window or derivation version for a later snapshot.
+An outer metering failure is reported as `METERING_RECONCILIATION_FAILED` without
+fabricating a failed-call count or blocking harvest.
 Evaluator calls remain visible as cost while remaining excluded from harvested
 performance evidence. No metering write occurs in the product gateway path.
+
+Profile aggregation (ticket 07) must treat a settlement row as replacing the
+consensus row named by `supersedes_observation_id`; it must not pool or average
+both values. Rows without a supersession link remain separate auditable
+settlement evidence.

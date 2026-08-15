@@ -24,6 +24,7 @@ export const EVALUATOR_TASK_FAMILIES = Object.freeze([
   "evaluator.derive-profiles",
   "evaluator.refresh-consumer-output"
 ] as const);
+export const HARVEST_MAX_CONSECUTIVE_FAILURES = 3 as const;
 
 export async function runEvaluatorCatalogProbe(
   pool: Pool,
@@ -92,7 +93,10 @@ export async function reconcileEvaluatorTerminalRuns(input: {
   readonly meteringWindow: RelativeCostDerivationWindow;
   readonly observedAt?: Date;
   readonly limit?: number;
-}): Promise<readonly EvaluatorHarvestResult[]> {
+}): Promise<readonly (
+  | EvaluatorHarvestResult
+  | { readonly state: "FAILED"; readonly runId: string; readonly reason: "TERMINAL_HARVEST_FAILED" }
+)[]> {
   await reconcileMeteringBestEffort(input.pool, input.meteringWindow);
   const limit = input.limit ?? 100;
   if (!Number.isInteger(limit) || limit <= 0) throw new TypeError("EVALUATOR_HARVEST_LIMIT_INVALID");
@@ -115,13 +119,36 @@ export async function reconcileEvaluatorTerminalRuns(input: {
             )
         )
       )
+      AND (
+        SELECT count(*)
+        FROM evaluator.pipeline_event AS failed
+        WHERE failed.run_id=event.run_id AND failed.pipeline='HARVEST'
+          AND failed.pipeline_version=$1 AND failed.state='FAILED'
+          AND failed.at_seq > COALESCE((
+            SELECT max(completed.at_seq)
+            FROM evaluator.pipeline_event AS completed
+            WHERE completed.run_id=event.run_id AND completed.pipeline='HARVEST'
+              AND completed.pipeline_version=$1 AND completed.state IN ('SUCCEEDED','SKIPPED')
+          ), 0)
+      ) < $3
     ORDER BY event.run_id
     LIMIT $2
-  `, [HARVEST_PIPELINE_VERSION, limit]);
+  `, [HARVEST_PIPELINE_VERSION, limit, HARVEST_MAX_CONSECUTIVE_FAILURES]);
   const repository = new EvaluatorHarvestRepository(input.pool);
-  const results: EvaluatorHarvestResult[] = [];
+  const results: (
+    | EvaluatorHarvestResult
+    | { readonly state: "FAILED"; readonly runId: string; readonly reason: "TERMINAL_HARVEST_FAILED" }
+  )[] = [];
   for (const row of terminal.rows) {
-    results.push(await repository.harvestTerminalRun(row.run_id, input.observedAt));
+    try {
+      results.push(await repository.harvestTerminalRun(row.run_id, input.observedAt));
+    } catch {
+      results.push(Object.freeze({
+        state: "FAILED" as const,
+        runId: row.run_id,
+        reason: "TERMINAL_HARVEST_FAILED" as const
+      }));
+    }
   }
   return Object.freeze(results);
 }
@@ -133,7 +160,12 @@ async function reconcileMeteringBestEffort(
   try {
     return await reconcileEvaluatorMetering(pool, window);
   } catch {
-    return Object.freeze({ callsProjected: 0, callsFailed: 1, relativeCostCellsDerived: 0 });
+    return Object.freeze({
+      callsProjected: 0,
+      callsFailed: 0,
+      relativeCostCellsDerived: 0,
+      failureReason: "METERING_RECONCILIATION_FAILED" as const
+    });
   }
 }
 
