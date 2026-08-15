@@ -4,7 +4,6 @@ import type { ProviderGateway } from "@debateai/providers";
 import { runEvaluatorJudgeGradingAddon } from "../../apps/evaluator-worker/src/index.js";
 import {
   ADDON_MAX_PROVIDER_ATTEMPTS,
-  ADDON_MAX_RUN_ATTEMPTS,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
   shouldSampleEvaluatorAddon,
@@ -54,6 +53,7 @@ function repository(overrides: Partial<EvaluatorAddonRepository> = {}): Evaluato
   return {
     events,
     observations,
+    withRunLock: async (_runId, work) => work(),
     loadCandidate: vi.fn(async () => ({
       runId: "run:addon",
       runOrdinal: 12,
@@ -233,7 +233,6 @@ describe("judge-grading evaluator add-on", () => {
   });
 
   it("stops cross-invocation retries at the evaluator-owned run ceiling", async () => {
-    expect(ADDON_MAX_RUN_ATTEMPTS).toBe(3);
     const records = repository({
       loadCandidate: vi.fn(async () => "RETRY_LIMIT_REACHED" as const)
     });
@@ -244,6 +243,20 @@ describe("judge-grading evaluator add-on", () => {
       repository: records
     })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_RETRY_LIMIT_REACHED" });
     expect(gateway.call).not.toHaveBeenCalled();
+  });
+
+  it("classifies deployment isolation refusal consistently as a non-counted skip", async () => {
+    const records = repository();
+    const gateway = provider();
+    await expect(runEvaluatorJudgeAddon({
+      ...baseInput,
+      deployment: { configuredProviders: [{ providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER }] },
+      provider: gateway,
+      repository: records
+    })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
+    expect(records.events).toEqual([
+      expect.objectContaining({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" })
+    ]);
   });
 
   it("validates worker caller input before entering the repository failure boundary", async () => {

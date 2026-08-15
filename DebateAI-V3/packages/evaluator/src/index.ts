@@ -292,7 +292,6 @@ export function createBlindEvaluationSample(input: {
 
 export const ADDON_PIPELINE_VERSION = 1 as const;
 export const ADDON_METRIC = "judging.blind-grade.v1" as const;
-export const ADDON_MAX_PROVIDER_CALLS = 1 as const;
 export const ADDON_MAX_PROVIDER_ATTEMPTS = 2 as const;
 export const ADDON_MAX_RUN_ATTEMPTS = 3 as const;
 
@@ -404,6 +403,7 @@ export interface EvaluatorAddonObservationInput {
 }
 
 export interface EvaluatorAddonRepository {
+  withRunLock<T>(runId: string, work: () => Promise<T>): Promise<T>;
   loadCandidate(runId: string): Promise<EvaluatorAddonCandidateResult>;
   recordPipelineEvent(input: AddonPipelineEventInput): Promise<string>;
   insertObservation(input: EvaluatorAddonObservationInput): Promise<string>;
@@ -453,7 +453,7 @@ export type EvaluatorJudgeAddonResult =
         | "ADDON_ALREADY_GRADED" | "ADDON_RETRY_LIMIT_REACHED"
         | "ADDON_HARVEST_REQUIRED" | "ADDON_NO_JUDGEMENT"
         | "ADDON_NOT_SAMPLED" | "ADDON_DIFFERENT_MAKER_UNAVAILABLE"
-        | "ADDON_PROVIDER_ISOLATION_FAILED";
+        | "ADDON_PROVIDER_ISOLATION_FAILED" | "ADDON_FAMILY_REGISTER_VERSION_MISMATCH";
     }
   | {
       readonly state: "FAILED";
@@ -481,21 +481,7 @@ export async function runEvaluatorJudgeAddon(input: {
     return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
   }
 
-  const parsedPolicy = input.policy === null
-    ? null
-    : judgeAddonPolicyValueSchema.safeParse(input.policy.value);
-  if (input.policy !== null && (!parsedPolicy?.success || input.policy.sourceRef.trim() === "")) {
-    return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
-  }
-
-  let candidateResult: EvaluatorAddonCandidateResult;
-  try {
-    candidateResult = await input.repository.loadCandidate(input.runId);
-  } catch {
-    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
-  }
-  const candidate = typeof candidateResult === "string" ? null : candidateResult;
-  const inputHash = addonInputHash(input.runId, candidate, input.policy);
+  let inputHash = addonInputHash(input.runId, null, input.policy);
   const recordTerminalEvent = async (
     state: "SUCCEEDED" | "FAILED" | "SKIPPED",
     reason: string
@@ -509,10 +495,35 @@ export async function runEvaluatorJudgeAddon(input: {
     }
   };
 
+  const parsedPolicy = input.policy === null
+    ? null
+    : judgeAddonPolicyValueSchema.safeParse(input.policy.value);
+  if (input.policy !== null && (!parsedPolicy?.success || input.policy.sourceRef.trim() === "")) {
+    await recordTerminalEvent("SKIPPED", "ADDON_POLICY_INVALID");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
+  }
   if (input.policy === null) {
     await recordTerminalEvent("SKIPPED", "ADDON_POLICY_UNAVAILABLE");
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_POLICY_UNAVAILABLE" });
   }
+  const policy = input.policy;
+  try {
+    assertEvaluatorProviderIsolation(input.family, input.deployment);
+  } catch {
+    await recordTerminalEvent("SKIPPED", "ADDON_PROVIDER_ISOLATION_FAILED");
+    return Object.freeze({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
+  }
+
+  return input.repository.withRunLock(input.runId, async () => {
+  let candidateResult: EvaluatorAddonCandidateResult;
+  try {
+    candidateResult = await input.repository.loadCandidate(input.runId);
+  } catch {
+    await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED");
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
+  const candidate = typeof candidateResult === "string" ? null : candidateResult;
+  inputHash = addonInputHash(input.runId, candidate, policy);
   if (candidateResult === "ALREADY_GRADED") {
     await recordTerminalEvent("SKIPPED", "ADDON_ALREADY_GRADED");
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_ALREADY_GRADED" });
@@ -529,7 +540,7 @@ export async function runEvaluatorJudgeAddon(input: {
     await recordTerminalEvent("SKIPPED", "ADDON_NO_JUDGEMENT");
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_NO_JUDGEMENT" });
   }
-  if (!shouldSampleEvaluatorAddon(candidateResult.runOrdinal, input.policy.value.everyNthRun)) {
+  if (!shouldSampleEvaluatorAddon(candidateResult.runOrdinal, policy.value.everyNthRun)) {
     await recordTerminalEvent("SKIPPED", "ADDON_NOT_SAMPLED");
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_NOT_SAMPLED" });
   }
@@ -538,14 +549,13 @@ export async function runEvaluatorJudgeAddon(input: {
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_DIFFERENT_MAKER_UNAVAILABLE" });
   }
 
-  await input.repository.recordPipelineEvent({
-    runId: input.runId, attemptId, state: "STARTED", reason: "BLIND_JUDGE_GRADE_STARTED", inputHash
-  });
   try {
-    assertEvaluatorProviderIsolation(input.family, input.deployment);
+    await input.repository.recordPipelineEvent({
+      runId: input.runId, attemptId, state: "STARTED", reason: "BLIND_JUDGE_GRADE_STARTED", inputHash
+    });
   } catch {
-    await recordTerminalEvent("FAILED", "ADDON_PROVIDER_ISOLATION_FAILED");
-    return Object.freeze({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
+    await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED");
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
   }
 
   const blinded = createBlindEvaluationSample({
@@ -574,9 +584,9 @@ export async function runEvaluatorJudgeAddon(input: {
       role: "JUDGE",
       lane: "evaluator",
       bound: {
-        maxAttempts: input.policy.value.maxAttempts,
-        tokenCeiling: input.policy.value.tokenCeiling,
-        deadlineMs: input.policy.value.deadlineMs
+        maxAttempts: policy.value.maxAttempts,
+        tokenCeiling: policy.value.tokenCeiling,
+        deadlineMs: policy.value.deadlineMs
       },
       contractHash: createHash("sha256").update("evaluator-blind-judge-grade/v1").digest("hex"),
       providerRef: input.family.value.providerRef,
@@ -621,12 +631,12 @@ export async function runEvaluatorJudgeAddon(input: {
       graderRawArtifactRef: response.rawArtifactRef,
       gradedMaker: candidateResult.gradedMaker,
       graderMaker: response.maker,
-      derivationVersion: input.policy.value.derivationVersion,
+      derivationVersion: policy.value.derivationVersion,
       provenanceJson: Object.freeze({
         source: "evaluator.blind_judge_grade",
-        policy_row_key: input.policy.rowKey,
-        policy_register_version: input.policy.registerVersion,
-        policy_source_ref: input.policy.sourceRef,
+        policy_row_key: policy.rowKey,
+        policy_register_version: policy.registerVersion,
+        policy_source_ref: policy.sourceRef,
         grader_ledger_entry_ref: response.ledgerEntryRef
       }),
       observedAt: new Date(observedAt)
@@ -644,6 +654,7 @@ export async function runEvaluatorJudgeAddon(input: {
     await recordTerminalEvent("FAILED", reason);
     return Object.freeze({ state: "FAILED", reason });
   }
+  });
 }
 
 function extractBlindJudgementReasons(rawText: string): readonly string[] {
@@ -668,6 +679,25 @@ function extractBlindJudgementReasons(rawText: string): readonly string[] {
 
 export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepository {
   constructor(private readonly pool: Pool) {}
+
+  async withRunLock<T>(runId: string, work: () => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    const lockKey = `evaluator-addon:${runId}`;
+    let locked = false;
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+      locked = true;
+      return await work();
+    } finally {
+      try {
+        if (locked) {
+          await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [lockKey]);
+        }
+      } finally {
+        client.release();
+      }
+    }
+  }
 
   async loadCandidate(runId: string): Promise<EvaluatorAddonCandidateResult> {
     const existing = await this.pool.query(`

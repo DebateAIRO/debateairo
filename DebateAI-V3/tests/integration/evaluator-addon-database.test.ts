@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate } from "@debateai/db";
 import type { ProviderGateway } from "@debateai/providers";
 import {
+  PostgresEvaluatorAddonRepository,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
   type EvaluatorProviderFamilyRow
@@ -22,7 +23,7 @@ afterAll(async () => {
   await database.stop();
 });
 
-async function seedRunAndArtifacts(): Promise<{
+async function seedRunAndArtifacts(registerVersion = 1): Promise<{
   readonly runId: string;
   readonly gradedArtifact: string;
   readonly differentGraderArtifact: string;
@@ -37,9 +38,9 @@ async function seedRunAndArtifacts(): Promise<{
     ) VALUES (
       'addon database guard', 'asker:addon', 'session:addon', 'ASKER', now(), 'casual',
       'casual', 'ASKER', 'test:addon', 'low', '{}'::jsonb, 1, $1::jsonb, 0,
-      '{}'::jsonb, 1, 'test', '{}'::jsonb, ledger.allocate_sequence()
+      '{}'::jsonb, $2, 'test', '{}'::jsonb, ledger.allocate_sequence()
     ) RETURNING run_id
-  `, [JSON.stringify(fixtureDiscoveredPanel(1))]);
+  `, [JSON.stringify(fixtureDiscoveredPanel(1)), registerVersion]);
   const runId = run.rows[0]!.run_id;
   const gradedArtifact = randomUUID();
   const differentGraderArtifact = randomUUID();
@@ -58,6 +59,95 @@ async function seedRunAndArtifacts(): Promise<{
         'maker:judge','other-v1','{}','{}','PARSED',$5,'input','contract',ledger.allocate_sequence())
   `, [gradedArtifact, differentGraderArtifact, sameMakerGraderArtifact, runId, "a".repeat(64)]);
   return { runId, gradedArtifact, differentGraderArtifact, sameMakerGraderArtifact };
+}
+
+const validPolicyValue = Object.freeze({
+  kind: "EVALUATOR_JUDGE_ADDON_POLICY" as const,
+  collectionState: "COLLECT_ONLY" as const,
+  everyNthRun: 1,
+  maxAttempts: 2,
+  tokenCeiling: 256,
+  deadlineMs: 250,
+  derivationVersion: 1
+});
+
+function evaluatorFamily(registerVersion: number): EvaluatorProviderFamilyRow {
+  return {
+    rowKey: "evaluatorProviderFamily",
+    registerVersion,
+    sourceRef: `fixture:evaluator-family:${registerVersion}`,
+    value: {
+      kind: "EVALUATOR_PROVIDER_FAMILY",
+      providerRef: EVALUATOR_PROVIDER_REF,
+      adapterKind: "vllm-openai-compatible-http",
+      maker: EVALUATOR_MAKER,
+      chatBaseUrl: "http://vllm:8000/v1",
+      modelsPath: "/models",
+      deadlineMs: 250,
+      source: "LOCAL_CONTAINER_NO_AUTH"
+    }
+  };
+}
+
+async function seedGradableRun(input: {
+  readonly registerVersion: number;
+  readonly policyValue?: unknown;
+}): Promise<Awaited<ReturnType<typeof seedRunAndArtifacts>>> {
+  const fixture = await seedRunAndArtifacts(input.registerVersion);
+  const node = await database.pool.query<{ node_id: string }>(`
+    INSERT INTO core.node (
+      run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
+      materialized_path, generation_status, path_status, exploration_decision,
+      way_of_knowing, provenance_ref, locator, value_laden, created_at_seq
+    ) VALUES ($1,'graded claim','unknown',NULL,NULL,0,0,'0','complete','active','continue',
+      'REASONING',$2,NULL,false,ledger.allocate_sequence()) RETURNING node_id
+  `, [fixture.runId, fixture.gradedArtifact]);
+  await database.pool.query(`
+    INSERT INTO ledger.reduced_judgement (
+      run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,producer,
+      replay_handle,way_of_knowing,at_seq
+    ) VALUES ($1,$2,$3,0.75,'PROBABILITY','judgement:addon','judge:addon',
+      'replay:addon','REASONING',ledger.allocate_sequence())
+  `, [fixture.runId, node.rows[0]!.node_id, fixture.gradedArtifact]);
+  await database.pool.query(`
+    INSERT INTO evaluator.pipeline_event (
+      run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
+    ) VALUES ($1,'HARVEST',1,gen_random_uuid(),'SUCCEEDED','fixture',$2,ledger.allocate_sequence())
+  `, [fixture.runId, "b".repeat(64)]);
+  await database.pool.query(`
+    INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
+    VALUES ($1,'evaluatorJudgeAddonPolicy',$2::jsonb,$3)
+    ON CONFLICT DO NOTHING
+  `, [
+    input.registerVersion,
+    JSON.stringify(input.policyValue ?? validPolicyValue),
+    `fixture:addon-policy:${input.registerVersion}`
+  ]);
+  return fixture;
+}
+
+function successfulGateway(
+  graderRawArtifactRef: string,
+  delayMs = 0
+): ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } {
+  return {
+    call: vi.fn(async () => {
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return {
+        rawArtifactRef: graderRawArtifactRef,
+        ledgerEntryRef: randomUUID(),
+        content: JSON.stringify({
+          score: 0.8,
+          verdict: "UPHOLD",
+          reasons: ["The anonymous grade is supported."]
+        }),
+        provider: "openai-compatible-http" as const,
+        model: "model:evaluator",
+        maker: EVALUATOR_MAKER,
+        modelVersion: "evaluator-v1"
+      };
+    })
+  };
 }
 
 async function insertAddonObservation(input: {
@@ -209,5 +299,145 @@ describe("persisted judge-grading add-on", () => {
       provider: gateway
     })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_ALREADY_GRADED" });
     expect(gateway.call).toHaveBeenCalledTimes(1);
+  });
+
+  it("enforces the SQL-backed cross-invocation ceiling after three real failed passes", async () => {
+    const registerVersion = 7001;
+    const fixture = await seedGradableRun({ registerVersion });
+    const gateway: ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } = {
+      call: vi.fn(async () => { throw new Error("grader unavailable"); })
+    };
+    const input = {
+      pool: database.pool,
+      runId: fixture.runId,
+      family: evaluatorFamily(registerVersion),
+      deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
+      provider: gateway
+    };
+
+    const results = [];
+    for (let invocation = 0; invocation < 4; invocation += 1) {
+      results.push(await runEvaluatorJudgeGradingAddon(input));
+    }
+    expect(results.slice(0, 3)).toEqual([
+      { state: "FAILED", reason: "ADDON_PROVIDER_FAILED" },
+      { state: "FAILED", reason: "ADDON_PROVIDER_FAILED" },
+      { state: "FAILED", reason: "ADDON_PROVIDER_FAILED" }
+    ]);
+    expect(results[3]).toEqual({ state: "SKIPPED", reason: "ADDON_RETRY_LIMIT_REACHED" });
+    expect(gateway.call).toHaveBeenCalledTimes(3);
+    await expect(new PostgresEvaluatorAddonRepository(database.pool).loadCandidate(fixture.runId))
+      .resolves.toBe("RETRY_LIMIT_REACHED");
+    const attempts = await database.pool.query<{ count: string }>(`
+      SELECT count(DISTINCT attempt_id)::text AS count FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' AND state='STARTED'
+    `, [fixture.runId]);
+    expect(attempts.rows[0]!.count).toBe("3");
+  });
+
+  it("does not burn run attempts during a deployment isolation fault", async () => {
+    const registerVersion = 7002;
+    const fixture = await seedGradableRun({ registerVersion });
+    const gateway = successfulGateway(fixture.differentGraderArtifact);
+    const base = {
+      pool: database.pool,
+      runId: fixture.runId,
+      family: evaluatorFamily(registerVersion),
+      provider: gateway
+    };
+    for (let sweep = 0; sweep < 3; sweep += 1) {
+      await expect(runEvaluatorJudgeGradingAddon({
+        ...base,
+        deployment: {
+          configuredProviders: [{ providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER }]
+        }
+      })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
+    }
+    const faultReceipts = await database.pool.query<{ state: string; reason: string }>(`
+      SELECT state,reason FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' ORDER BY at_seq
+    `, [fixture.runId]);
+    expect(faultReceipts.rows).toEqual([
+      { state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" },
+      { state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" },
+      { state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" }
+    ]);
+
+    await expect(runEvaluatorJudgeGradingAddon({
+      ...base,
+      deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] }
+    })).resolves.toMatchObject({ state: "GRADED" });
+    expect(gateway.call).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists invalid-policy and family-version preflight receipts and permits recovery", async () => {
+    const invalidPolicyVersion = 7003;
+    const invalidPolicyRun = await seedGradableRun({
+      registerVersion: invalidPolicyVersion,
+      policyValue: { kind: "INVALID_POLICY" }
+    });
+    const invalidGateway = successfulGateway(invalidPolicyRun.differentGraderArtifact);
+    await expect(runEvaluatorJudgeGradingAddon({
+      pool: database.pool,
+      runId: invalidPolicyRun.runId,
+      family: evaluatorFamily(invalidPolicyVersion),
+      deployment: { configuredProviders: [] },
+      provider: invalidGateway
+    })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
+    const invalidReceipt = await database.pool.query<{ state: string; reason: string }>(`
+      SELECT state,reason FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' ORDER BY at_seq
+    `, [invalidPolicyRun.runId]);
+    expect(invalidReceipt.rows).toEqual([{ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" }]);
+    expect(invalidGateway.call).not.toHaveBeenCalled();
+
+    const runRegisterVersion = 7004;
+    const versionedRun = await seedGradableRun({ registerVersion: runRegisterVersion });
+    const versionedGateway = successfulGateway(versionedRun.differentGraderArtifact);
+    await expect(runEvaluatorJudgeGradingAddon({
+      pool: database.pool,
+      runId: versionedRun.runId,
+      family: evaluatorFamily(runRegisterVersion + 1),
+      deployment: { configuredProviders: [] },
+      provider: versionedGateway
+    })).resolves.toEqual({
+      state: "SKIPPED",
+      reason: "ADDON_FAMILY_REGISTER_VERSION_MISMATCH"
+    });
+    const mismatchReceipt = await database.pool.query<{ state: string; reason: string }>(`
+      SELECT state,reason FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON' ORDER BY at_seq
+    `, [versionedRun.runId]);
+    expect(mismatchReceipt.rows).toEqual([{
+      state: "SKIPPED",
+      reason: "ADDON_FAMILY_REGISTER_VERSION_MISMATCH"
+    }]);
+    await expect(runEvaluatorJudgeGradingAddon({
+      pool: database.pool,
+      runId: versionedRun.runId,
+      family: evaluatorFamily(runRegisterVersion),
+      deployment: { configuredProviders: [] },
+      provider: versionedGateway
+    })).resolves.toMatchObject({ state: "GRADED" });
+    expect(versionedGateway.call).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes six concurrent invocations to one shared provider call", async () => {
+    const registerVersion = 7005;
+    const fixture = await seedGradableRun({ registerVersion });
+    const gateway = successfulGateway(fixture.differentGraderArtifact, 40);
+    const input = {
+      pool: database.pool,
+      runId: fixture.runId,
+      family: evaluatorFamily(registerVersion),
+      deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
+      provider: gateway
+    };
+    const results = await Promise.all(Array.from({ length: 6 }, () =>
+      runEvaluatorJudgeGradingAddon(input)));
+    expect(gateway.call).toHaveBeenCalledTimes(1);
+    expect(results.filter((result) => result.state === "GRADED")).toHaveLength(1);
+    expect(results.filter((result) =>
+      result.state === "SKIPPED" && result.reason === "ADDON_ALREADY_GRADED")).toHaveLength(5);
   });
 });

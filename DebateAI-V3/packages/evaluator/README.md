@@ -149,17 +149,23 @@ settlement evidence.
 the append-only run ordinal (`N=1` is the development/every-run policy), and
 provides the deadline/token bound plus at most two provider attempts. Evaluator
 ADDON receipts independently cap cross-invocation attempts at three per run;
-the product run attempt counter is never consulted. An absent policy records an
-explicit `ADDON_POLICY_UNAVAILABLE` skip. Each invocation can make exactly one gateway call, with `runId: null`, an
-`evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. The
-product run's attempt accounting is never used as a retry bound.
+the product run attempt counter is never consulted. Deployment isolation,
+invalid-policy, and register-version preflights write typed `SKIPPED` receipts
+before `STARTED`, so configuration faults never consume that lifetime budget.
+A family/register mismatch is recoverable by retrying with the matching family.
+An absent policy records an explicit `ADDON_POLICY_UNAVAILABLE` skip. Each
+invocation can make exactly one gateway call, with `runId: null`, an
+`evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. A
+session-level advisory lock serializes the per-run candidate check and provider
+pass, so concurrent invocations share the same one-call ceiling. The product
+run's attempt accounting is never used as a retry bound.
 
 The repository requires a successful HARVEST receipt, selects at most one
 reduced judgement deterministically, and creates a fresh allowlist-only blind
 DTO. The prompt contains only an opaque sample id, question/task excerpts, the
 grade, and explicitly selected reason strings; maker, provider, model, artifact,
-and provenance fields are absent. `assertEvaluatorProviderIsolation` runs at
-the final boundary before the only model call.
+and provenance fields are absent. `assertEvaluatorProviderIsolation` runs as a
+deployment preflight before any attempt is recorded.
 
 Successful grades append `judging.blind-grade.v1` observations with step
 `JUDGING`, truth basis `BLIND_ADDON`, and source kind `BLIND_JUDGE_GRADE`. The
