@@ -57,3 +57,9 @@ no push without V approval.
 - 2026-08-14 ~21:2x: V APPROVED the planning-graph gate ("Approved — release
   programming") after reading Architecture.md and the mission graph. PROGRAMMING
   loop released, starting lane codex/eval-02-foundation.
+- 2026-08-15 morning: GROK OUTAGE (402 Payment Required, Build balance exhausted,
+  first hit mid-verification on PROG-03 review). V ruling: while Grok is down, the
+  second independent reviewer seat is a SEPARATE Claude Opus instance (kept
+  independent of the first), and QA co-ownership falls to Claude reviewers +
+  Hermes verdicts. Grok's cut-short PROG-03 "PASS" is treated as non-binding; the
+  Opus REWORK review is the binding round-1 input for both tier-1 lanes.

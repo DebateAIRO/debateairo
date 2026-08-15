@@ -1574,3 +1574,22 @@ supersedes | status`.
   V-rows card will disclose that both perspectives are same-house. DR-171
   proper resumes the moment Grok's seat is funded. | the third house ran
   out of credit mid-verdict | DR-184 authorization | — | ACTIVE
+
+| DR-186 | 2026-08-15 | V (card: "I confirm, we dont wait for grok. we
+  just Use Claude and Codex" + "Zero in-run review holds") | **THE
+  REVIEW-COMPLETION PACKAGE, ratified.** (1) T-KEEP: a derived-standing
+  node keeps its own tau in the number (alternatives fabricate 0.0 or
+  resurrect the ended run-death). (2) Mark: DERIVED-STANDING-UNREVIEWED.
+  (3) Catch-up reviews use the PINNED panel. (4) Catch-up spends inside
+  the run's PINNED ceiling. (5) The census gains its fourth term (sums to
+  truth). (6) v2 answers REFERENCE v1 conformance. (7) The unmeasurable
+  future is guarded by typed refusal + sentinel. Plus the Claude verdict's
+  eleven binding conditions C-1..C-11 (ceiling arithmetic 1584 with the
+  panel-1 test consequence declared; the catch-up call-budget repair; the
+  incoming-arrow closure extension per V's own "gains or loses power";
+  the declared behavior changes; the disclosure carry). (8) ZERO in-run
+  review holds (the lens's evidence-based position): reviews get full
+  retries + the final attempt, never a wait; the catch-up is the safety
+  net. (9) FLEET SCOPE until Grok's seat is funded: Claude reviews, Codex
+  codes — DR-185's exception extends to this ticket's diamond, disclosed.
+  | V ratified the dual-verdict package | REVCOV-01 | — | ACTIVE
