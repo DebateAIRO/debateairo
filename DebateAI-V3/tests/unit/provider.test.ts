@@ -36,6 +36,27 @@ describe("FX-HR-H1 — one provider interface", () => {
       null
     ]);
   });
+
+  it("preserves observed usage even when the completion response schema is rejected", async () => {
+    const metadata: Record<string, unknown>[] = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1", model: "fixture", maker: "fixture",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "call", model: "fixture", choices: [],
+        usage: { prompt_tokens: 7, completion_tokens: 1, total_tokens: 8 }
+      })),
+      persistRawArtifact: async (artifact) => { metadata.push(artifact.metadata); return artifact.artifactId; },
+      appendLedgerEntry: async () => "ledger:test",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    await expect(gateway.call({
+      runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE",
+      lane: "served", bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
+      contractHash: "contract", providerRef: "provider",
+      packet: { messages: [{ role: "user", content: "x" }] }
+    })).rejects.toThrow("PROVIDER_CALL_FAILED");
+    expect(metadata[0]?.usage).toEqual({ prompt_tokens: 7, completion_tokens: 1, total_tokens: 8 });
+  });
   it("FX-LG-16 persists the contract classifier's parse-vs-schema outcome on the unconditional artifact", async () => {
     let attempt = 0;
     const server = createServer((_request, response) => response.end(JSON.stringify({

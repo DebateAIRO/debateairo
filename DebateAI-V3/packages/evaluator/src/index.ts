@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -357,6 +358,44 @@ export class EvaluatorMeteringRepository {
       return inserted.rows[0]!.model_call_usage_id;
     });
   }
+
+  async recordRelativeCostCells(cells: readonly RelativeCostCellV1[]): Promise<readonly string[]> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const ids: string[] = [];
+      for (const cell of cells) {
+        const sequence = await allocateSequence(client);
+        const inserted = await client.query<{ relative_cost_cell_id: string }>(`
+          INSERT INTO evaluator.relative_cost_cell (
+            provider, model_id, model_version, window_start, window_end,
+            relative_cost, comparability, metered_call_count, unmetered_call_count,
+            source_unit_totals, normalization_basis, derivation_version,
+            derivation_input, derivation_hash, as_of, at_seq
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13::jsonb,$14,$15,$16
+          ) RETURNING relative_cost_cell_id
+        `, [
+          cell.provider,
+          cell.modelId,
+          cell.modelVersion,
+          cell.windowStart,
+          cell.windowEnd,
+          cell.relativeCost,
+          cell.comparability,
+          cell.meteredCallCount,
+          cell.unmeteredCallCount,
+          JSON.stringify(cell.sourceUnitTotals),
+          cell.normalizationBasis,
+          cell.derivationVersion,
+          JSON.stringify(cell.derivationInput),
+          cell.derivationHash,
+          cell.asOf,
+          sequence
+        ]);
+        ids.push(inserted.rows[0]!.relative_cost_cell_id);
+      }
+      return Object.freeze(ids);
+    });
+  }
 }
 
 export interface RelativeCostUsageSample {
@@ -377,11 +416,67 @@ export interface RelativeCostCellV1 {
   readonly unmeteredCallCount: number;
   readonly sourceUnitTotals: Readonly<{ tokens: number; usd: number }>;
   readonly normalizationBasis: typeof RELATIVE_COST_NORMALIZATION_BASIS;
+  readonly windowStart: Date;
+  readonly windowEnd: Date;
+  readonly derivationVersion: typeof RELATIVE_COST_DERIVATION_VERSION;
+  readonly derivationInput: readonly Readonly<Record<string, unknown>>[];
+  readonly derivationHash: string;
+  readonly asOf: Date;
+}
+
+export interface RelativeCostDerivationWindow {
+  readonly windowStart: Date;
+  readonly windowEnd: Date;
+  readonly asOf: Date;
+}
+
+function assertValidDerivationWindow(window: RelativeCostDerivationWindow): void {
+  if (!Number.isFinite(window.windowStart.getTime()) || !Number.isFinite(window.windowEnd.getTime())
+    || !Number.isFinite(window.asOf.getTime())) {
+    throw new TypeError("RELATIVE_COST_WINDOW_INVALID");
+  }
+  if (window.windowEnd.getTime() <= window.windowStart.getTime()) {
+    throw new TypeError("RELATIVE_COST_WINDOW_ORDER_INVALID");
+  }
+}
+
+function canonicalDerivationInput(
+  samples: readonly RelativeCostUsageSample[]
+): readonly Readonly<Record<string, unknown>>[] {
+  return Object.freeze(samples.map((sample) => Object.freeze({
+    provider: sample.provider,
+    model_id: sample.modelId,
+    model_version: sample.modelVersion,
+    runtime_class: sample.runtimeClass,
+    usage: sample.usage === null ? null : Object.freeze({
+      ...(sample.usage.prompt_tokens === undefined ? {} : { prompt_tokens: sample.usage.prompt_tokens }),
+      ...(sample.usage.completion_tokens === undefined ? {} : { completion_tokens: sample.usage.completion_tokens }),
+      ...(sample.usage.total_tokens === undefined ? {} : { total_tokens: sample.usage.total_tokens }),
+      ...(sample.usage.x_cost_usd === undefined ? {} : { x_cost_usd: sample.usage.x_cost_usd })
+    })
+  })).sort((left, right) => {
+    const leftBytes = JSON.stringify(left);
+    const rightBytes = JSON.stringify(right);
+    return leftBytes < rightBytes ? -1 : leftBytes > rightBytes ? 1 : 0;
+  }));
 }
 
 export function deriveRelativeCostCellsV1(
-  samples: readonly RelativeCostUsageSample[]
+  samples: readonly RelativeCostUsageSample[],
+  window: RelativeCostDerivationWindow
 ): readonly RelativeCostCellV1[] {
+  assertValidDerivationWindow(window);
+  for (const sample of samples) {
+    if (sample.usage !== null) assertObservedUsage(sample.usage);
+  }
+  const derivationInput = canonicalDerivationInput(samples);
+  const derivationHash = createHash("sha256").update(JSON.stringify({
+    normalization_basis: RELATIVE_COST_NORMALIZATION_BASIS,
+    derivation_version: RELATIVE_COST_DERIVATION_VERSION,
+    window_start: window.windowStart.toISOString(),
+    window_end: window.windowEnd.toISOString(),
+    derivation_input: derivationInput
+  })).digest("hex");
   const groups = new Map<string, RelativeCostUsageSample[]>();
   for (const sample of samples) {
     const key = JSON.stringify([sample.provider, sample.modelId, sample.modelVersion]);
@@ -389,15 +484,24 @@ export function deriveRelativeCostCellsV1(
   }
   const summaries = [...groups.values()].map((calls) => {
     const first = calls[0]!;
+    if (calls.some((call) => call.runtimeClass !== first.runtimeClass)) {
+      throw new TypeError("RELATIVE_COST_RUNTIME_CLASS_MISMATCH");
+    }
     const metered = calls.filter((call) => call.usage !== null);
     const paidAmounts = metered.flatMap((call) => call.usage?.x_cost_usd === undefined ? [] : [call.usage.x_cost_usd]);
+    const hasCompletePaidSpend = first.runtimeClass === "PAID_REMOTE"
+      && metered.length > 0
+      && paidAmounts.length === metered.length;
     return {
       first,
       meteredCallCount: metered.length,
       unmeteredCallCount: calls.length - metered.length,
-      tokens: metered.reduce((sum, call) => sum + (call.usage?.total_tokens ?? 0), 0),
+      tokens: metered.reduce((sum, call) => sum + (call.usage?.total_tokens
+        ?? (call.usage?.prompt_tokens ?? 0) + (call.usage?.completion_tokens ?? 0)), 0),
       usd: paidAmounts.reduce((sum, amount) => sum + amount, 0),
-      meanPaidUsd: paidAmounts.length === 0 ? null : paidAmounts.reduce((sum, amount) => sum + amount, 0) / paidAmounts.length
+      meanPaidUsd: hasCompletePaidSpend
+        ? paidAmounts.reduce((sum, amount) => sum + amount, 0) / metered.length
+        : null
     };
   });
   const maximumPositiveMean = Math.max(0, ...summaries.flatMap((summary) =>
@@ -420,7 +524,13 @@ export function deriveRelativeCostCellsV1(
       meteredCallCount: summary.meteredCallCount,
       unmeteredCallCount: summary.unmeteredCallCount,
       sourceUnitTotals: Object.freeze({ tokens: summary.tokens, usd: summary.usd }),
-      normalizationBasis: RELATIVE_COST_NORMALIZATION_BASIS
+      normalizationBasis: RELATIVE_COST_NORMALIZATION_BASIS,
+      windowStart: new Date(window.windowStart),
+      windowEnd: new Date(window.windowEnd),
+      derivationVersion: RELATIVE_COST_DERIVATION_VERSION,
+      derivationInput,
+      derivationHash,
+      asOf: new Date(window.asOf)
     });
   }));
 }

@@ -6,7 +6,8 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
-  EvaluatorMeteringRepository
+  EvaluatorMeteringRepository,
+  deriveRelativeCostCellsV1
 } from "../../packages/evaluator/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
@@ -23,7 +24,7 @@ afterAll(async () => {
 });
 
 describe("0023 evaluator foundation migration", () => {
-  it("projects observed and explicitly unmetered calls into evaluator.model_call_usage", async () => {
+  it("projects usage and versioned relative cost into both evaluator metering tables", async () => {
     const artifactId = "00000000-0000-4000-8000-000000000801";
     const attemptId = "00000000-0000-4000-8000-000000000802";
     await database.pool.query(`
@@ -66,6 +67,39 @@ describe("0023 evaluator foundation migration", () => {
       expect.objectContaining({ metering_status: "METERED", prompt_tokens: 3, completion_tokens: 2, total_tokens: 5, reported_vendor_amount: 0.01, reported_vendor_unit: "USD" }),
       { metering_status: "UNMETERED", prompt_tokens: null, completion_tokens: null, total_tokens: null, reported_vendor_amount: null, reported_vendor_unit: null, raw_usage: null }
     ]);
+
+    const relativeCells = deriveRelativeCostCellsV1([
+      { provider: "xai", modelId: "grok", modelVersion: "v1", runtimeClass: "PAID_REMOTE", usage: { x_cost_usd: 0.01 } }
+    ], {
+      windowStart: new Date("2026-08-14T10:00:00.000Z"),
+      windowEnd: new Date("2026-08-14T11:00:00.000Z"),
+      asOf: new Date("2026-08-14T11:05:00.000Z")
+    });
+    await repository.recordRelativeCostCells(relativeCells);
+    const persistedRelative = await database.pool.query(`
+      SELECT provider, model_id, model_version, window_start, window_end,
+             relative_cost, comparability, metered_call_count, unmetered_call_count,
+             source_unit_totals, normalization_basis, derivation_version::int,
+             derivation_input, derivation_hash, as_of
+      FROM evaluator.relative_cost_cell WHERE model_id='grok'
+    `);
+    expect(persistedRelative.rows).toEqual([{
+      provider: "xai",
+      model_id: "grok",
+      model_version: "v1",
+      window_start: relativeCells[0]!.windowStart,
+      window_end: relativeCells[0]!.windowEnd,
+      relative_cost: 1,
+      comparability: "COMPARABLE",
+      metered_call_count: 1,
+      unmetered_call_count: 0,
+      source_unit_totals: { tokens: 0, usd: 0.01 },
+      normalization_basis: "relative-external-spend/v1",
+      derivation_version: 1,
+      derivation_input: relativeCells[0]!.derivationInput,
+      derivation_hash: relativeCells[0]!.derivationHash,
+      as_of: relativeCells[0]!.asOf
+    }]);
   });
   it("creates every evaluator table under append-only mutation guards", async () => {
     const tables = await database.pool.query<{ table_name: string }>(`

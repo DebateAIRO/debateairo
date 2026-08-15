@@ -34,6 +34,37 @@ afterEach(async () => {
 });
 
 describe("FAIR-02 Claude Code CLI relay", () => {
+  it("keeps serving observed token usage when the CLI envelope omits cost", async () => {
+    process.env.FAKE_CLAUDE_COST_ABSENT = "1";
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Cost absent.");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        model: "claude-fake-cli-model",
+        usage: { completion_tokens: 5 }
+      });
+    } finally {
+      delete process.env.FAKE_CLAUDE_COST_ABSENT;
+    }
+  });
+
+  it("degrades to usage null when cost is absent and modelUsage is non-object", async () => {
+    process.env.FAKE_CLAUDE_COST_ABSENT = "1";
+    process.env.FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT = "1";
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Telemetry unavailable.");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        model: "claude-fake-cli-model",
+        usage: null
+      });
+    } finally {
+      delete process.env.FAKE_CLAUDE_COST_ABSENT;
+      delete process.env.FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT;
+    }
+  });
   it("performs a real startup handshake and exposes the CLI-reported model and the Anthropic maker", async () => {
     const relay = await start();
     // DR-115 lineage honesty: the model id comes from the CLI's own JSON

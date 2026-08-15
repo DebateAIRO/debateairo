@@ -44,11 +44,13 @@ export const CLAUDE_HANDSHAKE_PROMPT =
 const envelopeSchema = z.object({
   is_error: z.boolean(),
   result: z.string(),
-  total_cost_usd: z.number().nonnegative(),
-  modelUsage: z.record(z.string(), z.object({
-    input_tokens: z.number().int().nonnegative().optional(),
-    output_tokens: z.number().int().nonnegative().optional()
-  }).passthrough())
+  total_cost_usd: z.number().nonnegative().optional(),
+  modelUsage: z.record(z.string(), z.unknown())
+}).passthrough();
+
+const observedTokenUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional()
 }).passthrough();
 
 function parseClaudeEnvelope(stdout: string) {
@@ -68,19 +70,22 @@ function parseClaudeEnvelope(stdout: string) {
   if (reportedModels.length !== 1 || model === undefined) {
     throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
   }
-  const observed = envelope.data.modelUsage[model]!;
+  const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
+  const inputTokens = observed.success ? observed.data.input_tokens : undefined;
+  const outputTokens = observed.success ? observed.data.output_tokens : undefined;
+  const costUsd = envelope.data.total_cost_usd;
   const usage = {
-    ...(observed.input_tokens === undefined ? {} : { promptTokens: observed.input_tokens }),
-    ...(observed.output_tokens === undefined ? {} : { completionTokens: observed.output_tokens }),
-    ...(observed.input_tokens === undefined || observed.output_tokens === undefined
+    ...(inputTokens === undefined ? {} : { promptTokens: inputTokens }),
+    ...(outputTokens === undefined ? {} : { completionTokens: outputTokens }),
+    ...(inputTokens === undefined || outputTokens === undefined
       ? {}
-      : { totalTokens: observed.input_tokens + observed.output_tokens }),
-    costUsd: envelope.data.total_cost_usd
+      : { totalTokens: inputTokens + outputTokens }),
+    ...(costUsd === undefined ? {} : { costUsd })
   };
   return Object.freeze({
     content,
     model,
-    usage: Object.freeze(usage)
+    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
   });
 }
 
