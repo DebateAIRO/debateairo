@@ -1593,3 +1593,17 @@ supersedes | status`.
   net. (9) FLEET SCOPE until Grok's seat is funded: Claude reviews, Codex
   codes — DR-185's exception extends to this ticket's diamond, disclosed.
   | V ratified the dual-verdict package | REVCOV-01 | — | ACTIVE
+
+| DR-187 | 2026-08-15 | V (card: "Re-baseline the checksum in place") |
+  **ONE-ROW REGISTER RE-BASELINE.** serveContractHash — a drift-detector
+  checksum computed from packages/serve source at seed time, NOT a V-ruled
+  value — is updated in place (owner-level, the runtime remains revoked)
+  to the hash of the serve layer shipped by the dual-greenlit REVCOV-01
+  commit 4caf539. Basis: the guard exists to catch UNAUTHORIZED drift; the
+  drift here is a lawfully reviewed change, and the ruled reseed ceremony
+  would wipe the served three-house debate (091b7663) that the catch-up
+  exists to heal. Canonical-JSON verification confirmed every OTHER
+  register row byte-identical (the quick-diff's seven false positives were
+  jsonb key-order artifacts). Single use; register-versioning remains the
+  proper future mechanism (intake seed). | the checksum outlived its
+  source lawfully | the catch-up ceremony | — | ACTIVE
