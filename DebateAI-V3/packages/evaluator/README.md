@@ -142,6 +142,24 @@ consensus row named by `supersedes_observation_id`; it must not pool or average
 both values. Rows without a supersession link remain separate auditable
 settlement evidence.
 
+## Seat-share allocator (coded dark)
+
+`allocateEvaluatorSeatShare` is a deterministic, policy-parameterized allocator.
+It orders healthy exact model identities by domain prowess ordinal, comparable
+lower relative cost, then code-unit identity. It selects the registered premium,
+normal, or cheaper-best vector; uses largest-remainder rounding; preserves a
+positive runner-up seat when at least two seats exist; and distributes any
+rank-three-and-lower residual by descending reciprocal rank. M=1 receives every
+seat. Counts always sum to the requested seat count, and no dice are drawn.
+
+`PostgresEvaluatorSeatShareRepository.computeAndPersistShadowDecision` may run
+against a real admitted `core.run`, but writes only an append-only
+`evaluator.shadow_decision` with `binding_state='UNBOUND'` and reason
+`FR-8.0_PANEL_SHAPE_AND_V_BIND_REQUIRED`. It does not write routing decisions or
+session assignments. No app or composition root calls either seat-share entry
+point. The current policy vectors are test fixtures and register inputs, not a
+V-ratified live formula; see `BIND-READINESS-seat-share.md`.
+
 ## Blind judge-grading add-on
 
 `runEvaluatorJudgeAddon` is the one-pass post-harvest grader. Its register-owned

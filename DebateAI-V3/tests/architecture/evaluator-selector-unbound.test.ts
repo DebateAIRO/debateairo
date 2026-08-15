@@ -10,10 +10,15 @@ function productionSources(directory: string): readonly string[] {
   });
 }
 
-describe("evaluator judge selector dark launch", () => {
-  it("has zero production callers while evaluator dispatch is UNBOUND", () => {
-    const callers = productionSources(join(process.cwd(), "apps")).filter((path) =>
-      readFileSync(path, "utf8").includes("selectJudgesByBiasRank("));
+describe("evaluator selectors dark launch", () => {
+  it("has zero production callers in apps or peer packages while evaluator dispatch is UNBOUND", () => {
+    const definition = join(process.cwd(), "packages/evaluator/src/index.ts");
+    const callers = [
+      ...productionSources(join(process.cwd(), "apps")),
+      ...productionSources(join(process.cwd(), "packages"))
+    ].filter((path) => path !== definition).filter((path) =>
+      ["selectJudgesByBiasRank(", "allocateEvaluatorSeatShare(", "computeAndPersistShadowDecision("]
+        .some((call) => readFileSync(path, "utf8").includes(call)));
 
     expect(callers).toEqual([]);
   });

@@ -13,6 +13,7 @@ import {
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
 export const EVALUATOR_JUDGE_ADDON_POLICY_ROW_KEY = "evaluatorJudgeAddonPolicy" as const;
+export const EVALUATOR_SEAT_SHARE_POLICY_ROW_KEY = "evaluatorSeatSharePolicy" as const;
 export const EVALUATOR_PROVIDER_REF = "provider:evaluator-vllm" as const;
 export const EVALUATOR_MAKER = "maker:evaluator-local-vllm" as const;
 export const EVALUATOR_ADAPTER_KIND = "vllm-openai-compatible-http" as const;
@@ -2250,7 +2251,7 @@ export interface EvaluatorProfileDerivation {
   readonly phaseOrder: readonly ["BIAS", "JUDGE_RANK", "PROWESS", "PROWESS_RANK"];
 }
 
-interface ProfileIdentity {
+export interface ProfileIdentity {
   readonly provider: string;
   readonly modelId: string;
   readonly modelVersion: string;
@@ -2641,6 +2642,293 @@ export function selectJudgesByBiasRank(input: {
       || compareProfileIdentity(left, right))
     .slice(0, input.seatCount)
     .map((candidate) => Object.freeze({ ...candidate })));
+}
+
+export const SEAT_SHARE_NOT_CONSUMED_REASON = "FR-8.0_PANEL_SHAPE_AND_V_BIND_REQUIRED" as const;
+
+export interface EvaluatorSeatShareCandidate extends ProfileIdentity {
+  readonly maker: string;
+  readonly healthy: boolean;
+  readonly prowessOrdinal: number;
+  readonly relativeCost: number | null;
+  readonly costComparability: "COMPARABLE" | "UNKNOWN";
+}
+
+export interface EvaluatorSeatShareVector {
+  readonly best: number;
+  readonly runnerUp: number;
+  readonly residual: number;
+}
+
+export interface EvaluatorSeatSharePolicy {
+  readonly rowKey: typeof EVALUATOR_SEAT_SHARE_POLICY_ROW_KEY;
+  readonly registerVersion: number;
+  readonly sourceRef: string;
+  readonly formulaVersion: number;
+  readonly premiumMinimumDepth: number;
+  readonly shares: Readonly<{
+    premium: EvaluatorSeatShareVector;
+    normal: EvaluatorSeatShareVector;
+    bestAlsoCheaper: EvaluatorSeatShareVector;
+  }>;
+}
+
+export interface EvaluatorSeatShareInput {
+  readonly requestedSeatCount: number;
+  readonly riskTier: "casual" | "standard" | "high-stakes";
+  readonly depth: number;
+  readonly candidates: readonly EvaluatorSeatShareCandidate[];
+  readonly policy: EvaluatorSeatSharePolicy;
+  readonly numericInputProducerIdentities: readonly ProfileIdentity[];
+}
+
+export interface EvaluatorSeatAllocation extends ProfileIdentity {
+  readonly maker: string;
+  readonly prowessOrdinal: number;
+  readonly relativeCost: number | null;
+  readonly costComparability: "COMPARABLE" | "UNKNOWN";
+  readonly seatCount: number;
+}
+
+export interface EvaluatorSeatShareDecision {
+  readonly formulaVersion: number;
+  readonly selectedVector: "PREMIUM" | "NORMAL" | "BEST_ALSO_CHEAPER";
+  readonly requestedSeatCount: number;
+  readonly allocations: readonly EvaluatorSeatAllocation[];
+}
+
+function assertSeatShareVector(name: string, vector: EvaluatorSeatShareVector): void {
+  const entries = [vector.best, vector.runnerUp, vector.residual];
+  if (entries.some((share) => !Number.isFinite(share) || share < 0)
+    || Math.abs(entries.reduce((sum, share) => sum + share, 0) - 1) > 1e-12) {
+    throw new TypeError(`EVALUATOR_SEAT_SHARE_VECTOR_INVALID:${name}`);
+  }
+}
+
+function compareSeatShareCandidate(
+  left: EvaluatorSeatShareCandidate,
+  right: EvaluatorSeatShareCandidate
+): number {
+  const rankDifference = left.prowessOrdinal - right.prowessOrdinal;
+  if (rankDifference !== 0) return rankDifference;
+  if (left.costComparability === "COMPARABLE" && right.costComparability === "COMPARABLE") {
+    const costDifference = left.relativeCost! - right.relativeCost!;
+    if (costDifference !== 0) return costDifference;
+  }
+  return compareProfileIdentity(left, right);
+}
+
+function largestRemainderSeats(
+  seatCount: number,
+  weights: readonly number[]
+): number[] {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  if (!(totalWeight > 0)) throw new TypeError("EVALUATOR_SEAT_SHARE_WEIGHT_INVALID");
+  const quotas = weights.map((weight) => seatCount * weight / totalWeight);
+  const seats = quotas.map(Math.floor);
+  const unallocated = seatCount - seats.reduce((sum, count) => sum + count, 0);
+  const remainderOrder = quotas.map((quota, index) => ({ index, remainder: quota - Math.floor(quota) }))
+    .sort((left, right) => right.remainder - left.remainder || left.index - right.index);
+  for (let index = 0; index < unallocated; index += 1) {
+    const seatIndex = remainderOrder[index]!.index;
+    seats[seatIndex] = seats[seatIndex]! + 1;
+  }
+  return seats;
+}
+
+function seatShareInputReceipt(input: EvaluatorSeatShareInput): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    requested_seat_count: input.requestedSeatCount,
+    risk_tier: input.riskTier,
+    depth: input.depth,
+    candidates: Object.freeze(input.candidates.map((candidate) => Object.freeze({
+      provider: candidate.provider,
+      model_id: candidate.modelId,
+      model_version: candidate.modelVersion,
+      maker: candidate.maker,
+      healthy: candidate.healthy,
+      prowess_ordinal: candidate.prowessOrdinal,
+      relative_cost: candidate.relativeCost,
+      cost_comparability: candidate.costComparability
+    })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))),
+    policy: Object.freeze({
+      row_key: input.policy.rowKey,
+      register_version: input.policy.registerVersion,
+      source_ref: input.policy.sourceRef,
+      formula_version: input.policy.formulaVersion,
+      premium_minimum_depth: input.policy.premiumMinimumDepth,
+      shares: Object.freeze({
+        premium: Object.freeze({ ...input.policy.shares.premium }),
+        normal: Object.freeze({ ...input.policy.shares.normal }),
+        best_also_cheaper: Object.freeze({ ...input.policy.shares.bestAlsoCheaper })
+      })
+    }),
+    numeric_input_producer_identities: Object.freeze(input.numericInputProducerIdentities
+      .map((identity) => Object.freeze({
+        provider: identity.provider,
+        model_id: identity.modelId,
+        model_version: identity.modelVersion
+      })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))))
+  });
+}
+
+export function allocateEvaluatorSeatShare(
+  input: EvaluatorSeatShareInput
+): EvaluatorSeatShareDecision {
+  if (!Number.isInteger(input.requestedSeatCount) || input.requestedSeatCount < 1) {
+    throw new TypeError("EVALUATOR_SEAT_COUNT_INVALID");
+  }
+  if (!Number.isInteger(input.depth) || input.depth < 0) {
+    throw new TypeError("EVALUATOR_SEAT_SHARE_DEPTH_INVALID");
+  }
+  if (!Number.isInteger(input.policy.formulaVersion) || input.policy.formulaVersion < 1) {
+    throw new TypeError("EVALUATOR_SEAT_SHARE_FORMULA_VERSION_INVALID");
+  }
+  assertPositiveRegisterVersion(input.policy.registerVersion);
+  if (input.policy.rowKey !== EVALUATOR_SEAT_SHARE_POLICY_ROW_KEY
+    || input.policy.sourceRef.trim() === "") {
+    throw new TypeError("EVALUATOR_SEAT_SHARE_POLICY_RECEIPT_INVALID");
+  }
+  if (!Number.isInteger(input.policy.premiumMinimumDepth) || input.policy.premiumMinimumDepth < 0) {
+    throw new TypeError("EVALUATOR_SEAT_SHARE_PREMIUM_DEPTH_INVALID");
+  }
+  assertSeatShareVector("premium", input.policy.shares.premium);
+  assertSeatShareVector("normal", input.policy.shares.normal);
+  assertSeatShareVector("bestAlsoCheaper", input.policy.shares.bestAlsoCheaper);
+  const identities = new Set<string>();
+  for (const candidate of input.candidates) {
+    const identity = profileIdentityKey(candidate);
+    if (identities.has(identity)) throw new TypeError("EVALUATOR_SEAT_SHARE_CANDIDATE_DUPLICATE");
+    identities.add(identity);
+    if (!Number.isInteger(candidate.prowessOrdinal) || candidate.prowessOrdinal < 1) {
+      throw new TypeError("EVALUATOR_SEAT_SHARE_PROWESS_RANK_INVALID");
+    }
+    const comparable = candidate.costComparability === "COMPARABLE";
+    if (comparable !== (candidate.relativeCost !== null)
+      || (candidate.relativeCost !== null
+        && (!Number.isFinite(candidate.relativeCost) || candidate.relativeCost < 0))) {
+      throw new TypeError("EVALUATOR_SEAT_SHARE_RELATIVE_COST_INVALID");
+    }
+  }
+  const producerKeys = new Set(input.numericInputProducerIdentities.map(profileIdentityKey));
+  if (input.candidates.some((candidate) => producerKeys.has(profileIdentityKey(candidate)))) {
+    throw new TypedDomainError(
+      "SELF_ROUTING_FORBIDDEN",
+      "SELF_ROUTING_FORBIDDEN: a seat candidate may not supply numeric inputs that allocate itself"
+    );
+  }
+  const eligible = input.candidates.filter((candidate) => candidate.healthy)
+    .sort(compareSeatShareCandidate);
+  if (eligible.length === 0) throw new TypedDomainError("NO_ELIGIBLE_MODEL", "NO_ELIGIBLE_MODEL");
+  if (eligible.length === 1) {
+    const only = eligible[0]!;
+    return Object.freeze({
+      formulaVersion: input.policy.formulaVersion,
+      selectedVector: "NORMAL",
+      requestedSeatCount: input.requestedSeatCount,
+      allocations: Object.freeze([Object.freeze({
+        provider: only.provider,
+        modelId: only.modelId,
+        modelVersion: only.modelVersion,
+        maker: only.maker,
+        prowessOrdinal: only.prowessOrdinal,
+        relativeCost: only.relativeCost,
+        costComparability: only.costComparability,
+        seatCount: input.requestedSeatCount
+      })])
+    });
+  }
+  const best = eligible[0]!;
+  const runnerUp = eligible[1]!;
+  const bestAlsoCheaper = best.costComparability === "COMPARABLE"
+    && runnerUp.costComparability === "COMPARABLE"
+    && best.relativeCost! < runnerUp.relativeCost!;
+  const premium = input.riskTier === "high-stakes" && input.depth >= input.policy.premiumMinimumDepth;
+  const selectedVector = bestAlsoCheaper ? "BEST_ALSO_CHEAPER" as const
+    : premium ? "PREMIUM" as const : "NORMAL" as const;
+  const vector = bestAlsoCheaper ? input.policy.shares.bestAlsoCheaper
+    : premium ? input.policy.shares.premium : input.policy.shares.normal;
+  const residualCandidates = eligible.slice(2);
+  const residualDenominator = residualCandidates.reduce((sum, _candidate, index) => sum + 1 / (index + 3), 0);
+  const weights = [
+    vector.best,
+    vector.runnerUp,
+    ...residualCandidates.map((_candidate, index) =>
+      residualDenominator === 0 ? 0 : vector.residual * (1 / (index + 3)) / residualDenominator)
+  ];
+  const seats = largestRemainderSeats(input.requestedSeatCount, weights);
+  if (input.requestedSeatCount >= 2 && vector.runnerUp > 0 && seats[1] === 0) {
+    const donor = seats.findIndex((count, index) => index !== 1 && count > 1);
+    if (donor >= 0) {
+      seats[donor] = seats[donor]! - 1;
+      seats[1] = 1;
+    }
+  }
+  const allocations = eligible.map((candidate, index) => Object.freeze({
+    provider: candidate.provider,
+    modelId: candidate.modelId,
+    modelVersion: candidate.modelVersion,
+    maker: candidate.maker,
+    prowessOrdinal: candidate.prowessOrdinal,
+    relativeCost: candidate.relativeCost,
+    costComparability: candidate.costComparability,
+    seatCount: seats[index]!
+  }));
+  return Object.freeze({
+    formulaVersion: input.policy.formulaVersion,
+    selectedVector,
+    requestedSeatCount: input.requestedSeatCount,
+    allocations: Object.freeze(allocations)
+  });
+}
+
+export interface PersistedEvaluatorSeatShareDecision {
+  readonly shadowDecisionId: string;
+  readonly inserted: boolean;
+  readonly inputReceipt: Readonly<Record<string, unknown>>;
+  readonly decision: EvaluatorSeatShareDecision;
+}
+
+export class PostgresEvaluatorSeatShareRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async computeAndPersistShadowDecision(input: {
+    readonly runId: string;
+    readonly input: EvaluatorSeatShareInput;
+  }): Promise<PersistedEvaluatorSeatShareDecision> {
+    const decision = allocateEvaluatorSeatShare(input.input);
+    const inputReceipt = seatShareInputReceipt(input.input);
+    const inputHash = createHash("sha256").update(JSON.stringify(inputReceipt)).digest("hex");
+    return withWriteTransaction(this.pool, async (client) => {
+      const inserted = await client.query<{ shadow_decision_id: string }>(`
+        INSERT INTO evaluator.shadow_decision (
+          run_id,kind,input_json,input_hash,output_json,binding_state,
+          formula_version,not_consumed_reason,at_seq
+        ) VALUES ($1,'SEAT_SHARE',$2::jsonb,$3,$4::jsonb,'UNBOUND',$5,$6,$7)
+        ON CONFLICT (run_id,kind,input_hash,formula_version) DO NOTHING
+        RETURNING shadow_decision_id
+      `, [
+        input.runId,
+        JSON.stringify(inputReceipt),
+        inputHash,
+        JSON.stringify(decision),
+        input.input.policy.formulaVersion,
+        SEAT_SHARE_NOT_CONSUMED_REASON,
+        await allocateSequence(client)
+      ]);
+      const insertedId = inserted.rows[0]?.shadow_decision_id;
+      if (insertedId !== undefined) {
+        return Object.freeze({ shadowDecisionId: insertedId, inserted: true, inputReceipt, decision });
+      }
+      const existing = await client.query<{ shadow_decision_id: string }>(`
+        SELECT shadow_decision_id FROM evaluator.shadow_decision
+        WHERE run_id=$1 AND kind='SEAT_SHARE' AND input_hash=$2 AND formula_version=$3
+      `, [input.runId, inputHash, input.input.policy.formulaVersion]);
+      const shadowDecisionId = existing.rows[0]?.shadow_decision_id;
+      if (shadowDecisionId === undefined) throw new TypeError("EVALUATOR_SHADOW_DECISION_WRITE_FAILED");
+      return Object.freeze({ shadowDecisionId, inserted: false, inputReceipt, decision });
+    });
+  }
 }
 
 export interface EvaluatorProfileStrategyReceipt {
