@@ -32,3 +32,37 @@ the `vllm-openai-compatible-http` adapter, accepts only local HTTP endpoints,
 and sends no authorization secret. Its health/catalog evidence lands only in
 `evaluator.vllm_probe` and `evaluator.vllm_catalog_model`, never
 `core.provider_probe`.
+
+## Domain registry and question landing
+
+`DomainRegistryRepository` is the only runtime writer for grown domains,
+admission receipts, and question-domain links. Guardrail version 1 applies NFKC
+normalization, locale-fixed lowercase and whitespace folding, then enforces a
+2–80 character, at-most-six-word allowlist. Separators may be whitespace,
+ampersands or hyphens with optional surrounding whitespace, or apostrophes. An
+exact normalized name is matched to its existing domain. A proposal with
+normalized edit/token similarity of at
+least `0.8` to any existing name is rejected as a near duplicate; only a label
+below that threshold for every existing name is admitted as grown. Candidate
+evidence is sorted deterministically and persisted on every admission receipt.
+
+Admission takes registry-wide and normalized-proposal advisory transaction
+locks, then re-reads the registry before deciding and inserting. The registry
+lock also prevents two differently spelled near duplicates from racing. A grown
+row requires
+provider/model/version, source run, raw tagger artifact, guardrail version, and
+provenance. Registry and admission history remain append-only.
+
+Question domains land only in `evaluator.question_domain`. The `run_id` and
+`domain_admission_id` uniqueness constraints make assignment singular; a
+backfill is a first insert for an untagged run, never an update. The repository
+also verifies that the link references a successful admission for the same run
+and domain. Nothing in this path writes `memory.question_key`.
+
+The proposed starter seed lives at
+`migrations/pending/0024_evaluator_domain_seed.sql`. Its 26 names are V-approved,
+but it remains deliberately outside the migration runner's top-level numeric
+file scan pending integration. The `seed_data` block contains canonical names
+only; SQL derives normalized names, and the scratch-migration test checks each
+one against `normalizeDomainName`. Replacing the starter list therefore changes
+only canonical values in `seed_data`.
