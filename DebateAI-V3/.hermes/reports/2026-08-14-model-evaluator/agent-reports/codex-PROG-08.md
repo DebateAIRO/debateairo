@@ -79,4 +79,13 @@ No registry/domain files, migrations, skeleton templates, API-key surfaces, or s
 - `raw_usage` stores the normalized observed relay/gateway usage block (including an exact derived `total_tokens` only when both observed components exist), not an untouched vendor envelope; the original bytes remain in `ledger.raw_artifact.raw_text`.
 - No currency/billing UI or manual price table was introduced.
 
-READY FOR PEER REVIEW: codex/eval-08-metering
+## Continuation verification after known CLI hang — 2026-08-15
+
+- Recovered the same clean worktree at commit `05f2a584b07921e8f9ed06281225ac8668029e78`; no uncommitted files required a follow-up commit.
+- Focused provider/evaluator/real-PostgreSQL command → 3 files passed, 24 tests passed.
+- Claude/Grok/Codex relay acceptance command → 3 files passed, 22 tests passed.
+- Repository `pnpm typecheck` → pass with no diagnostics.
+- `git diff --check` → pass; final Git branch remains `codex/eval-08-metering` and is clean.
+- The handoff marker below uses the exact continuation-provided lane string.
+
+READY FOR PEER REVIEW: codex/eval-eval-08-metering

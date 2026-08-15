@@ -181,3 +181,31 @@ No API key, BOUND state, product behavior change, migration-runner wiring, board
 mutation, push, or merge was introduced.
 
 READY FOR PEER REVIEW: codex/eval-03-domains
+
+---
+
+## Continuation verification — 2026-08-15
+
+The resumed lane was clean at rework commit
+`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
+changes to commit. The requested verification was rerun from
+`codex/eval-03-domains` in the assigned worktree.
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
+
+git diff --check
+PASS
+```
+
+Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
+board mutation, BOUND state, API key, or migration-runner wiring was performed.
+
+READY FOR PEER REVIEW: codex/eval-eval-03-domains

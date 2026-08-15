@@ -1,4 +1,19 @@
-# Claude Opus self-report — PROG-08 peer review (round 1)
+# Claude Opus self-report — PROG-08 peer review (rounds 1 and 2)
+
+## Round 2 (current) — lane head `05f2a58`
+
+- Verdict filed: **PASS**. Review at `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-08-opus-review-2.md`.
+- Verified both of my blockers against the rework itself, not against Codex's claims.
+- Blocker 1 resolved: `RelativeCostCellV1` now carries `windowStart/windowEnd/derivationVersion/derivationInput/derivationHash/asOf`; `deriveRelativeCostCellsV1` validates the window (matching the table's `window_end > window_start` CHECK), re-asserts observed usage, refuses mixed runtime classes per group, and hashes sha256 over basis+version+window+canonically sorted input; `recordRelativeCostCells` writes all 16 columns under `withWriteTransaction`. The integration test does a **strict** `toEqual` round-trip of all 15 non-sequence columns out of real PostgreSQL, so every CHECK on that table is exercised by a real write. `RELATIVE_COST_DERIVATION_VERSION` is no longer dead.
+- Blocker 2 resolved, and I proved the accept/reject boundary myself rather than reading the diff: replaying the round-1 vs round-2 schemas over both variant envelopes gives `OLD costAbsent:false / OLD nonObject:false` and `NEW costAbsent:true / NEW nonObject:true`. I also executed the fixtures directly — `FAKE_CLAUDE_COST_ABSENT=1` really emits an envelope with no `total_cost_usd` key and the non-object variant really emits `"modelUsage":{"claude-fake-cli-model":"usage unavailable"}` — so the four new degradation tests are not vacuous. Each of them calls `start()` with the variant active, so the **startup handshake** parses the degraded envelope, which is precisely the boot-refusal mechanism I flagged.
+- Fixture-honesty check: both fixtures were edited, but only with env-gated branches; I diffed the default output by execution and it is byte-identical to round 1, so no previously-green assertion was weakened.
+- Non-blockers 3–5 landed: `sourceUnitTotals` now asserted (`{tokens: 50_000, usd: 0}` on the local cell, plus a `prompt+completion` fallback when `total_tokens` is absent); the mean-spend denominator is `metered.length` but only when every metered call reported USD, else `UNKNOWN` — the honest direction, pinned by a new test; the gateway now parses `usage` off a lenient shape and preserves it even when the strict response schema rejects (`choices: []` test).
+- Non-blockers 8–9 were documented rather than changed, which is what I asked for: the lane report now discloses the `RawArtifactInput.metadata` widening and the `raw_usage` normalization rationale.
+- Ran myself: `pnpm run typecheck` clean; full `npx vitest run` **83 files / 601 tests pass**; relay acceptance **22/22** (was 18); evaluator+provider focused run 24/24 on embedded PostgreSQL with real 0023; `audit:architecture` `{"violations":[]}`; `audit:source` `{"blocking":[]}`; round-2 diff confined to 11 lane files with no migration, registry/domain or sibling-lane edits; worktree clean.
+- Carried forward as non-gating (in review §6): no production caller or worker composition entry for either metering table — the owning lane should be named in the stage verdict since Architecture §7 assigns it to nobody downstream; Architecture §3.6 should record the stricter "UNKNOWN unless every metered call has an observed amount" rule the code now implements; seven refusal branches untested; idempotency undecided for both repository writes (UNIQUE violations surface raw); a provenance comment wanted on the hypothesised fixture variants.
+- Defect worth Hermes' attention: the lane report's final handoff marker reads `READY FOR PEER REVIEW: codex/eval-eval-08-metering` (doubled `eval-`); the branch is `codex/eval-08-metering`.
+- Honest limits unchanged from round 1: no real CLI exercised; 0023 not run under the non-superuser worker role; stack-dependent acceptance suites not run.
+- Writes made: exactly the two files in my packet. No commits, no pushes, no edits inside the lane worktree.
 
 ## Round 1 — lane head `ae14b46` (`codex/eval-08-metering`, base `dev` @ `d0da17e`)
 

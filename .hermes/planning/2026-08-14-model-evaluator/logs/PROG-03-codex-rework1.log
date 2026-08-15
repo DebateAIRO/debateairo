@@ -12,3 +12,1154 @@ session id: 01a001d2-7041-7480-b14b-c1f7b6040163
 --------
 user
 /goal REWORK ROUND 1 of your eval-03-domains lane (same goal, same session, same worktree). The Opus peer review returned REWORK with a critical finding; the Grok review PASSed but was cut short by a provider outage, so treat the Opus review as the binding round-1 input. Read it fully: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md. Core blocker: your isValidDomainName regex permits only ONE separator character between alphanumeric runs, so the space-ampersand-space separator fails and 18 of your own 26 proposed starter names are REJECTED_INVALID by your own guardrail (verified end-to-end: REJECTED_INVALID 18, MATCHED_EXISTING 8) — and since validity is checked before exact-name match with no select-existing entry point, those names become permanently unmatchable. V has APPROVED the 26-name list AS WRITTEN, so the code must accept exactly those names. Reproduce-first is mandatory: FIRST write the failing test that proposes every one of the 26 seeded names post-seed and asserts each returns MATCHED_EXISTING (RED with the current regex), then fix the validator to accept multi-character separators like space-ampersand-space (and the apostrophe/hyphen cases already intended), re-derive the hand-typed normalized_name seed values from the canonical normalizer instead of hand-typing them, and make the list-swap claim true. Also close the review's test-honesty gaps: a test that actually applies migration 0024 from pending/ in a scratch schema and exercises admission against the seeded rows. Keep all other delivered code unchanged. Run focused tests + repository typecheck, commit on your branch, update your self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-03-domains
+=== codex exited Sat Aug 15 10:04:28 EEST 2026 ===
+=== PROG-03 rework1 continuation Sat Aug 15 10:04:31 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a001d2-7041-7480-b14b-c1f7b6040163
+--------
+user
+/goal CONTINUATION of your eval-eval-03-domains rework (same goal, same session). Your previous turn committed the rework fix but then hung idle with no output; the client was terminated (known CLI hang — your work is safe on the branch). Briefly state what you completed and what remains from the rework brief, then finish the remainder: run the focused tests AND repository typecheck (for lane 08 also the relay acceptance tests) and show results; commit anything uncommitted; update your self-report at /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md; then print exactly: READY FOR PEER REVIEW: codex/eval-eval-03-domains
+codex
+Using the heartbeat protocol for this resumed PROG-03 rework. Completed: the validator/seed normalization fix, scratch migration admission test, local commit, and prior report update. Remaining now: re-run focused tests and repository typecheck against the current branch, commit only if anything is uncommitted, refresh the self-report, and emit your exact new handoff marker. Lane 08 relay tests do not apply to this lane.
+exec
+/bin/zsh -lc "sed -n '1,260p' .agents/skills/heartbeat-protocol/SKILL.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 0ms:
+---
+name: heartbeat-protocol
+description: Codex node contract for DebateAI-V3's comment-driven Kanban Heartbeat protocol and Graph Spine v2. Use when Codex is assigned implementation, rework, or independent peer review on a DebateAI-V3 ticket and must follow typed-state, authorization, worktree, evidence, review, and compaction rules.
+version: 3.1.0
+spine_version: 3.0.0
+---
+<!-- Provenance: mirror of .codex/skills/heartbeat-protocol/SKILL.md; edit the .codex file canonically and keep this copy synchronized. -->
+
+# Codex Heartbeat Protocol
+
+## Read order
+
+1. This `SKILL.md`.
+2. `docs/agent-protocols/debateai-heartbeat-protocol.md`.
+3. `docs/agent-protocols/codex-heartbeat-adapter.md`.
+4. The assigned Kanban ticket's typed state block, body, declared upstream artifacts, and every comment in chronological order.
+
+The repo currently has no root `AGENTS.md`. This is a recorded repository gap,
+not permission to invent its contents. If a root `AGENTS.md` is later added, read
+it before this contract and obey the normal instruction-precedence rules.
+
+The Graph Spine is normative. Treat typed ticket state as canonical and apply the
+latest applicable authorized Hermes/human comment for the current
+`authority_epoch`. Never route from status alone.
+
+## Role
+
+```text
+Codex GPT-5.6 Sol = sole implementation worker under the current model law
+Peer reviewer       = different read-only agent/session
+Claude-Router       = routing authority; dispatches from typed state, does no content work
+Hermes-Verifier     = evidence reviewer, board custodian, human-review router, Done/Blocked authority
+V                    = human product/acceptance and important-operation authority
+```
+
+Use one managed Codex CLI PTY per implementation ticket. A new ticket gets a new
+terminal. Rework resumes the original ticket/session. Coordinate subagents only
+inside the assigned contract, with non-overlapping files/hunks; the ticket worker
+still owns the handoff and continuity.
+
+## On launch or wakeup
+
+Before branch creation, subagents, edits, tests, or handoff:
+
+1. Read the sources in the stated order.
+2. Fetch only the assigned ticket and declared upstream artifacts; never list the board.
+3. Record `comments read through: <latest id/timestamp>`.
+4. Determine from typed state and comments whether the work is first pass, peer-review correction, Hermes rework, human rework, reviewer mode, or waiting.
+5. Confirm `[Codex]`, `owner.agent: codex`, original/rework owner, session ID, `authority_epoch`, `rework_round`, branch/worktree, dependencies, file contract, verification, and human gate.
+6. Continue this session's active `working` ticket before claiming anything new.
+7. Claim a `ready` ticket only under the latest applicable `HERMES AUTHORIZED NEXT`, or when named in a current `HERMES AUTHORIZED ROUTE` for the epoch.
+8. Post `WORKER CLAIM` before edits and set `owner.session` to this CLI session.
+9. Repeat the comment scan before every edit phase, heartbeat, review request, status transition, and handoff.
+
+Require fresh authorization after an `authority_epoch` change, a new risk signal,
+or an important operation. Do not infer authorization from an old route.
+
+## First-pass flow
+
+```text
+WORKER CLAIM
+→ RED → GREEN → REFACTOR
+→ exact focused checks
+→ READY FOR PEER REVIEW
+→ stop editing
+```
+
+Include in `READY FOR PEER REVIEW`: CLI session ID; ticket; branch/worktree and
+commit if any; changed files; RED/GREEN evidence; exact checks and outputs;
+allowed-file evidence; risks; and the latest comment cursor.
+
+The first-pass worker does not post `READY FOR HERMES REVIEW`. A separate
+read-only reviewer evaluates the work. On reviewer RED, the same worker fixes the
+findings and requests peer re-review. On reviewer GREEN, the reviewer posts
+`PEER REVIEW APPROVED` and `READY FOR HERMES REVIEW`. Hermes then performs its
+own non-delegable review; reviewer GREEN never substitutes for Hermes review.
+
+## Post-dialogue checkpoint compaction
+
+After every durable Codex coding, review, or correction handoff, and after any
+substantive Hermes↔Codex dialogue, leave the same PTY open and idle. Hermes first
+verifies that artifacts/diffs, checks, comments, decisions, unresolved findings,
+and the next gate are durable, then sends exactly:
+
+```text
+/compact
+```
+
+Do not add preservation arguments unless the installed Codex version documents
+them. Hermes waits for completion and prompt return, then records
+`CODEX COMPACTION CHECKPOINT` before parking the terminal or proceeding:
+
+```text
+READY FOR PEER REVIEW → compact worker PTY → peer review
+reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+```
+
+If substantive dialogue follows a checkpoint, compact again at the next stable
+handoff. Never compact while work, tests, or generation are in flight. Do not exit
+merely because the conversation became chatty.
+
+## Peer-review correction flow
+
+When a reviewer posts `PEER REVIEW CHANGES REQUESTED`:
+
+1. Resume the same worker/session and read all new comments.
+2. Acknowledge and address every finding; preserve unresolved earlier findings unless explicitly superseded.
+3. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
+4. Post `READY FOR PEER REVIEW` again and stop editing.
+
+The reviewer never writes the fix.
+
+## Hermes/human correction flow
+
+When the ticket returns with `HERMES CHANGES REQUESTED` or
+`HUMAN REVIEW CHANGES REQUESTED`:
+
+1. Resume the exact original Codex session.
+2. Read every comment after the prior handoff, including supersessions.
+3. Post `REWORK ACKNOWLEDGED`, naming the triggering comment and each finding.
+4. Reproduce RED where applicable, make the smallest GREEN fix, and run focused verification.
+5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes, addressing findings one by one.
+6. Request peer re-review only when Hermes explicitly says `peer re-review required: yes`.
+7. Repeat in the same session if the ticket returns again.
+
+If the original session is unavailable, post `CODEX BLOCKED` with blocker type
+`session_continuity`. Do not create a replacement without
+`WORKER CONTINUITY OVERRIDE`.
+
+## Reviewer mode
+
+Enter reviewer mode only when explicitly assigned in a separate read-only
+session:
+
+- Read the full ticket, typed state, all comments, upstream artifacts, and `READY FOR PEER REVIEW` evidence.
+- Verify worker/session identity, inspect the diff, and independently run justified checks.
+- Never edit reviewed files or review work authored by this same CLI session.
+- Post `PEER REVIEW CHANGES REQUESTED` on RED.
+- Post `PEER REVIEW APPROVED`, then `READY FOR HERMES REVIEW`, on GREEN.
+
+## State reads and writes
+
+```text
+reads:        { contract, status, rework_round, authority_epoch, worktree, comments_read_through }
+writes:       { status, worktree, evidence refs, comments_read_through, wakes_since_transition }
+claim-only:   { owner.session = this CLI session }
+never writes: { risk_tier, authority_epoch, owner.agent }
+```
+
+Move `status` only among worker-legal values. A `CODEX BLOCKED` marker requests
+the mapped `waiting_*`, `changes_requested`, or `failed_tooling` transition from
+the spine; ticket status is never a bare `blocked`.
+
+## Worktree and file contract
+
+- Use only the ticket-declared branch/worktree and allowed files.
+- Create or mutate a worktree lane only after the current epoch's approved H6 lane-plan row.
+- Keep one writer per file/hunk; parallel lanes must not overlap.
+- Honor the spine's heavy-work semaphore; serialize heavy builds/tests when capacity is uncertain.
+- Treat commit, push, merge, release, branch/worktree operations, destructive Git, and destructive filesystem operations as V-gated important operations.
+- Never cross into another ticket's files without an authorized route and updated contract.
+
+## Required markers
+
+Recognize the full marker union in the Graph Spine and adapter, including:
+
+```text
+WORKER CLAIM
+CODEX HEARTBEAT
+CODEX BLOCKED
+CODEX COMPACTION CHECKPOINT
+COMPACTION BLOCKED
+READY FOR PEER REVIEW
+PEER REVIEW CHANGES REQUESTED
+PEER REVIEW APPROVED
+READY FOR HERMES REVIEW
+HERMES CHANGES REQUESTED
+HERMES AUTHORIZED NEXT
+HERMES AUTHORIZED ROUTE
+READY FOR HUMAN REVIEW
+HUMAN REVIEW PASSED
+HUMAN REVIEW CHANGES REQUESTED
+REWORK ACKNOWLEDGED
+REWORK READY FOR HERMES REVIEW
+WORKER CONTINUITY OVERRIDE
+HERMES DONE
+HERMES BLOCKED
+V DECISIONS PACKET
+V STEERING REQUIRED
+AUTHORITY EPOCH
+HERMES LIVENESS REQUESTED
+READY FOR EXTERNAL REVIEW
+EXTERNAL REVIEW PASSED
+EXTERNAL REVIEW CHANGES REQUESTED
+REWORK ROUND
+```
+
+Include the latest `comments read through` cursor in every outgoing marker.
+
+## Stop conditions
+
+Post `CODEX BLOCKED` with the mapped status and stop when ownership or routing is
+contradictory; continuity is lost; a dependency is missing; forbidden files are
+required; architecture or product direction is required; an important operation
+lacks approval; secrets/private data are at risk; verification is impossible; or
+review independence cannot be established.
+
+## Non-negotiables
+
+- Use GPT-5.6 Sol.
+- Work only the assigned `[Codex]` ticket and file contract.
+- Do not create, split, or reroute tickets; list the board; or infer the mission graph.
+- Never mark Done or self-integrate.
+- Never push/merge without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
+- The reviewer never writes the fix; the worker never self-approves first-pass work.
+- Hermes's own evidence review remains mandatory after reviewer GREEN.
+- Follow every durable coding/review/rework handoff with verified same-terminal `/compact` before parking or review.
+
+exec
+/bin/zsh -lc "git branch --show-current && git status --short && git log -2 --format='%H %s' && printf '%s\\n' '--- SELF-REPORT TAIL ---' && tail -n 120 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md && printf '%s\\n' '--- REVIEW ARTIFACTS ---' && find /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews -maxdepth 1 -type f -name 'PROG-03-*' -print -exec stat -f '%Sm %N' -t '%Y-%m-%dT%H:%M:%S%z' {} \\; | sort" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 0ms:
+codex/eval-03-domains
+d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6 fix(evaluator): accept approved domain names
+a3aa2d896182ef8fae895b85f9700800edafe4e2 feat(evaluator): add deterministic domain registry
+--- SELF-REPORT TAIL ---
+
+Focused coverage includes exact matching, invalid/new/near-duplicate decisions,
+stable candidate ordering, pending-seed runner exclusion, grown provenance,
+append-only mutation rejection, one-time backfill, dedicated-link readback, and
+concurrent near-duplicate serialization.
+
+## Verification
+
+```text
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm audit:source
+blocking: []
+
+pnpm test
+Test Files  84 passed (84)
+Tests       604 passed (604)
+
+git diff --check
+PASS
+```
+
+The skeleton-repo checks named by the outer `AGENTS.md` were inspected but are
+not present in this imported application worktree:
+`tests/render-templates.sh: N/A` and `tests/lint-templates.sh: N/A`.
+
+## Gate and residual risk
+
+The starter seed remains intentionally unapplied and un-routed. V approval of
+the proposed list is still required before integration moves 0024 into the
+top-level migration directory. Replacing V's final names changes only the
+`seed_data` values. No push was performed.
+
+READY FOR PEER REVIEW: codex/eval-03-domains
+
+---
+
+## Rework round 1 — Opus binding review
+
+Status: READY FOR PEER REVIEW  
+Triggering review:
+`docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md`  
+Rework commit: `d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`  
+Comments read through: complete Opus review 1, 2026-08-15  
+V decision: 26-name starter list approved as written
+
+### Binding findings addressed
+
+- **B1:** widened the structured separator grammar to accept whitespace,
+  ampersands and hyphens with optional surrounding whitespace, plus straight and
+  curly apostrophes. Malformed repeated ampersands remain invalid.
+- **B2:** added an end-to-end regression that provisions a separate scratch
+  embedded PostgreSQL instance, migrates through 0023, applies the real
+  `migrations/pending/0024_evaluator_domain_seed.sql`, and submits every one of
+  the 26 seeded canonical names through `DomainRegistryRepository.admitProposal`.
+  Every decision must be `MATCHED_EXISTING`.
+- **N2:** reduced `seed_data` to canonical names only. Migration SQL now derives
+  `normalized_name` with NFKC, whitespace folding, trimming, and lowercase. The
+  scratch test asserts each stored value equals `normalizeDomainName` before it
+  exercises admission, so replacing the list changes only canonical seed data.
+- Updated the proposal packet to record V approval. Migration 0024 remains
+  outside the top-level runner scan pending integration; no migration wiring was
+  added in this lane.
+
+The review's non-blocking N1 surface (`REFUSED` and direct existing-domain-id
+selection) remains explicitly assigned to downstream lane 04 as the reviewer
+noted; this rework did not expand the current lane contract.
+
+### Reproduce-first evidence
+
+Required regression written before production/migration changes:
+
+```text
+pnpm vitest run tests/integration/evaluator-database.test.ts \
+  -t "applies pending 0024"
+Test Files  1 failed (1)
+Tests       1 failed | 7 skipped (8)
+Received: REJECTED_INVALID for all 18 ampersand-bearing approved names
+Expected: MATCHED_EXISTING for all 26 names
+```
+
+The first harness attempt correctly exposed a pre-existing fixture collision in
+the shared integration schema (`mathematics` unique key). The test was then
+isolated in a fresh scratch database without changing production code, producing
+the binding 18-invalid/8-matched RED above.
+
+### Rework GREEN evidence
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm audit:source
+blocking: []
+
+pnpm test
+Test Files  84 passed (84)
+Tests       605 passed (605)
+
+git diff --check
+PASS
+```
+
+No API key, BOUND state, product behavior change, migration-runner wiring, board
+mutation, push, or merge was introduced.
+
+READY FOR PEER REVIEW: codex/eval-03-domains
+--- REVIEW ARTIFACTS ---
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-grok-review-1.md
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md
+2026-08-14T23:03:50+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-grok-review-1.md
+2026-08-14T23:06:53+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md
+
+codex
+The branch is clean at `d2d72a0f…`; no code remains uncommitted. I’m now rerunning the exact PROG-03 focused suite, followed serially by contract generation and repository typecheck.
+exec
+/bin/zsh -lc 'pnpm vitest run tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 3623ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ok4WE6/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ok4WE6/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:13.543 EEST [96355] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:13.546 EEST [96355] LOG:  listening on IPv6 address "::1", port 51214
+2026-08-15 10:05:13.546 EEST [96355] LOG:  listening on IPv4 address "127.0.0.1", port 51214
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:13.547 EEST [96355] LOG:  listening on Unix socket "/tmp/.s.PGSQL.51214"
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:13.550 EEST [96361] LOG:  database system was shut down at 2026-08-15 10:05:13 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:13.553 EEST [96355] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation
+[S00 DB embedded] 2026-08-15 10:05:13.862 EEST [96366] ERROR:  append-only or immutable table observation rejects UPDATE
+2026-08-15 10:05:13.862 EEST [96366] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 10:05:13.862 EEST [96366] STATEMENT:  UPDATE evaluator.observation SET value=0.5 WHERE observation_id=$1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 10:05:13.905 EEST [96369] ERROR:  duplicate key value violates unique constraint "question_domain_run_id_key"
+2026-08-15 10:05:13.905 EEST [96369] DETAIL:  Key (run_id)=(646d7489-f6ff-4ae0-9791-1a92e739d488) already exists.
+2026-08-15 10:05:13.905 EEST [96369] STATEMENT:  
+	        INSERT INTO evaluator.question_domain (
+	          run_id, domain_id, assignment_basis, domain_admission_id,
+	          tagger_raw_artifact_ref, assigned_at, at_seq
+	        ) VALUES ($1,$2,$3,$4,$5,statement_timestamp(),$6)
+	        RETURNING question_domain_id
+	      
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 10:05:13.906 EEST [96369] ERROR:  append-only or immutable table question_domain rejects UPDATE
+2026-08-15 10:05:13.906 EEST [96369] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 10:05:13.906 EEST [96369] STATEMENT:  UPDATE evaluator.question_domain SET domain_id=domain_id WHERE run_id=$1
+
+
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > creates every evaluator table under append-only mutation guards 5ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation 28ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > grants the API only evaluator reads plus consumer selection inserts 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records exact, rejected near-duplicate, and grown admission decisions 11ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only 29ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > serializes concurrent near-duplicate proposals into one grown domain 25ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-BQ0Bvb/data ... ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-BQ0Bvb/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.545 EEST [96384] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.548 EEST [96384] LOG:  listening on IPv6 address "::1", port 51221
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.548 EEST [96384] LOG:  listening on IPv4 address "127.0.0.1", port 51221
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.548 EEST [96384] LOG:  listening on Unix socket "/tmp/.s.PGSQL.51221"
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.551 EEST [96390] LOG:  database system was shut down at 2026-08-15 10:05:14 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.553 EEST [96384] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.868 EEST [96384] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.868 EEST [96384] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.869 EEST [96384] LOG:  background worker "logical replication launcher" (PID 96393) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.870 EEST [96388] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.870 EEST [96388] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.921 EEST [96388] LOG:  checkpoint complete: wrote 1336 buffers (8.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.029 s, sync=0.021 s, total=0.051 s; sync files=767, longest=0.001 s, average=0.001 s; distance=9102 kB, estimate=9102 kB; lsn=0/206AD50, redo lsn=0/206AD50
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 10:05:14.925 EEST [96384] LOG:  database system is shut down
+
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > applies pending 0024 and matches every approved starter name through admission 1036ms
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.045 EEST [96355] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.045 EEST [96355] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.046 EEST [96355] LOG:  background worker "logical replication launcher" (PID 96364) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.048 EEST [96359] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.048 EEST [96359] LOG:  checkpoint starting: shutdown immediate
+
+
+ ✓ tests/integration/evaluator-database.test.ts > FR-0.6 AC5 persisted panel-isolation differential > persists byte-identical product membership and agent_count with evaluator healthy versus absent 59ms
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.115 EEST [96359] LOG:  checkpoint complete: wrote 1418 buffers (8.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.041 s, sync=0.025 s, total=0.068 s; sync files=768, longest=0.001 s, average=0.001 s; distance=9206 kB, estimate=9206 kB; lsn=0/2084A40, redo lsn=0/2084A40
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 10:05:15.120 EEST [96355] LOG:  database system is shut down
+
+
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > scaffolds the evaluator worker as a separate composition root 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > reads the pinned purpose-specific local family and refuses panel collisions 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > rejects remote evaluator endpoints 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > defaults dispatch influence to UNBOUND when the row is absent or malformed 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > enumerates vLLM models without authorization and fails closed on absence 16ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > classifies evaluator catalog deadline expiry 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > refuses an isolated-family collision before catalog collection or persistence 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > constructs an allowlist-only blind DTO 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > normalizes Unicode, case, and whitespace deterministically 1ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > matches exact normalized names and rejects near duplicates 9ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > admits genuinely new labels and rejects labels outside fixed bounds 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > returns candidates in stable similarity/name/id order 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > keeps the approved 0024 seed pending integration and outside the runner scan 1ms
+
+ Test Files  3 passed (3)
+      Tests  21 passed (21)
+   Start at  10:05:12
+   Duration  3.25s (transform 164ms, setup 0ms, import 643ms, tests 2.36s, environment 0ms)
+
+
+codex
+Focused verification is green: 3 files, 21 tests passed, including the scratch application of pending migration 0024 and all 26 approved-name admissions. Running repository contract generation plus typecheck now.
+exec
+/bin/zsh -lc 'pnpm generate:contract && pnpm typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 1133ms:
+$ tsx packages/contract/src/generate.ts
+$ tsc --noEmit
+
+exec
+/bin/zsh -lc "git status --short && git diff --check && git log -1 --format='%H %s' && git -C /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3 status --short -- .hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md docs/missions/2026-08-14-model-evaluator/programming/eval-03-starter-list-proposal.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 0ms:
+d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6 fix(evaluator): accept approved domain names
+
+codex
+Repository typecheck passed (`generate:contract`, then `tsc --noEmit`), and the lane remains clean at `d2d72a0f…`, so there is nothing additional to commit. I’m appending this continuation’s fresh evidence to the authorized main-checkout self-report; that routed report is intentionally outside the lane commit.
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..0e85e6559f2652894ed4df5f5f66dbb6c67ebb20
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -102,6 +102,34 @@
+ 
+ ---
+ 
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
++
++---
++
+ ## Rework round 1 — Opus binding review
+ 
+ Status: READY FOR PEER REVIEW  
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..0e85e6559f2652894ed4df5f5f66dbb6c67ebb20
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -102,6 +102,34 @@
+ 
+ ---
+ 
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
++
++---
++
+ ## Rework round 1 — Opus binding review
+ 
+ Status: READY FOR PEER REVIEW  
+
+exec
+/bin/zsh -lc "tail -n 90 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md && printf '%s\\n' '--- LANE STATUS ---' && git status --short && git diff --check && printf '%s\\n' '--- REPORT STATUS ---' && git -C /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3 status --short -- .hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 0ms:
+git diff --check
+PASS
+```
+
+Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
+board mutation, BOUND state, API key, or migration-runner wiring was performed.
+
+READY FOR PEER REVIEW: codex/eval-eval-03-domains
+
+---
+
+## Rework round 1 — Opus binding review
+
+Status: READY FOR PEER REVIEW  
+Triggering review:
+`docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-03-opus-review-1.md`  
+Rework commit: `d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`  
+Comments read through: complete Opus review 1, 2026-08-15  
+V decision: 26-name starter list approved as written
+
+### Binding findings addressed
+
+- **B1:** widened the structured separator grammar to accept whitespace,
+  ampersands and hyphens with optional surrounding whitespace, plus straight and
+  curly apostrophes. Malformed repeated ampersands remain invalid.
+- **B2:** added an end-to-end regression that provisions a separate scratch
+  embedded PostgreSQL instance, migrates through 0023, applies the real
+  `migrations/pending/0024_evaluator_domain_seed.sql`, and submits every one of
+  the 26 seeded canonical names through `DomainRegistryRepository.admitProposal`.
+  Every decision must be `MATCHED_EXISTING`.
+- **N2:** reduced `seed_data` to canonical names only. Migration SQL now derives
+  `normalized_name` with NFKC, whitespace folding, trimming, and lowercase. The
+  scratch test asserts each stored value equals `normalizeDomainName` before it
+  exercises admission, so replacing the list changes only canonical seed data.
+- Updated the proposal packet to record V approval. Migration 0024 remains
+  outside the top-level runner scan pending integration; no migration wiring was
+  added in this lane.
+
+The review's non-blocking N1 surface (`REFUSED` and direct existing-domain-id
+selection) remains explicitly assigned to downstream lane 04 as the reviewer
+noted; this rework did not expand the current lane contract.
+
+### Reproduce-first evidence
+
+Required regression written before production/migration changes:
+
+```text
+pnpm vitest run tests/integration/evaluator-database.test.ts \
+  -t "applies pending 0024"
+Test Files  1 failed (1)
+Tests       1 failed | 7 skipped (8)
+Received: REJECTED_INVALID for all 18 ampersand-bearing approved names
+Expected: MATCHED_EXISTING for all 26 names
+```
+
+The first harness attempt correctly exposed a pre-existing fixture collision in
+the shared integration schema (`mathematics` unique key). The test was then
+isolated in a fresh scratch database without changing production code, producing
+the binding 18-invalid/8-matched RED above.
+
+### Rework GREEN evidence
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm audit:source
+blocking: []
+
+pnpm test
+Test Files  84 passed (84)
+Tests       605 passed (605)
+
+git diff --check
+PASS
+```
+
+No API key, BOUND state, product behavior change, migration-runner wiring, board
+mutation, push, or merge was introduced.
+
+READY FOR PEER REVIEW: codex/eval-03-domains
+--- LANE STATUS ---
+--- REPORT STATUS ---
+ M .hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..0e85e6559f2652894ed4df5f5f66dbb6c67ebb20
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -102,6 +102,34 @@
+ 
+ ---
+ 
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
++
++---
++
+ ## Rework round 1 — Opus binding review
+ 
+ Status: READY FOR PEER REVIEW  
+
+codex
+The verification entry landed before the existing round-1 section because the report contains repeated handoff markers. I’m correcting that ordering so the report remains chronologically append-only.
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..6bd8d902150a4b53186fa32fc375aa6cab183985
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -181,3 +181,31 @@
+ mutation, push, or merge was introduced.
+ 
+ READY FOR PEER REVIEW: codex/eval-03-domains
++
++---
++
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..6bd8d902150a4b53186fa32fc375aa6cab183985
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -181,3 +181,31 @@
+ mutation, push, or merge was introduced.
+ 
+ READY FOR PEER REVIEW: codex/eval-03-domains
++
++---
++
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
+
+exec
+/bin/zsh -lc "tail -n 70 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md && printf '%s\\n' '--- LANE ---' && git status --short && git diff --check && git log -1 --format='%H %s' && printf '%s\\n' '--- REPORT DIFF CHECK ---' && git -C /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3 diff --check -- .hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-03-domains/DebateAI-V3
+ succeeded in 0ms:
+  -t "applies pending 0024"
+Test Files  1 failed (1)
+Tests       1 failed | 7 skipped (8)
+Received: REJECTED_INVALID for all 18 ampersand-bearing approved names
+Expected: MATCHED_EXISTING for all 26 names
+```
+
+The first harness attempt correctly exposed a pre-existing fixture collision in
+the shared integration schema (`mathematics` unique key). The test was then
+isolated in a fresh scratch database without changing production code, producing
+the binding 18-invalid/8-matched RED above.
+
+### Rework GREEN evidence
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsc --noEmit)
+
+pnpm audit:architecture
+edgeRowsChecked: 27; violations: []
+
+pnpm audit:source
+blocking: []
+
+pnpm test
+Test Files  84 passed (84)
+Tests       605 passed (605)
+
+git diff --check
+PASS
+```
+
+No API key, BOUND state, product behavior change, migration-runner wiring, board
+mutation, push, or merge was introduced.
+
+READY FOR PEER REVIEW: codex/eval-03-domains
+
+---
+
+## Continuation verification — 2026-08-15
+
+The resumed lane was clean at rework commit
+`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
+changes to commit. The requested verification was rerun from
+`codex/eval-03-domains` in the assigned worktree.
+
+```text
+pnpm vitest run tests/unit/evaluator-domains.test.ts \
+  tests/unit/evaluator-foundation.test.ts \
+  tests/integration/evaluator-database.test.ts
+Test Files  3 passed (3)
+Tests       21 passed (21)
+
+pnpm generate:contract && pnpm typecheck
+PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
+
+git diff --check
+PASS
+```
+
+Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
+board mutation, BOUND state, API key, or migration-runner wiring was performed.
+
+READY FOR PEER REVIEW: codex/eval-eval-03-domains
+--- LANE ---
+d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6 fix(evaluator): accept approved domain names
+--- REPORT DIFF CHECK ---
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..6bd8d902150a4b53186fa32fc375aa6cab183985
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -181,3 +181,31 @@
+ mutation, push, or merge was introduced.
+ 
+ READY FOR PEER REVIEW: codex/eval-03-domains
++
++---
++
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
+
+codex
+READY FOR PEER REVIEW: codex/eval-eval-03-domains
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+index 4dd960bd42023f7f659f5c620abad0fcbf3afad7..6bd8d902150a4b53186fa32fc375aa6cab183985
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-03.md
+@@ -181,3 +181,31 @@
+ mutation, push, or merge was introduced.
+ 
+ READY FOR PEER REVIEW: codex/eval-03-domains
++
++---
++
++## Continuation verification — 2026-08-15
++
++The resumed lane was clean at rework commit
++`d2d72a0f104b9dc87d8c0dbb45adfd24d1ee9fc6`; there were no uncommitted lane
++changes to commit. The requested verification was rerun from
++`codex/eval-03-domains` in the assigned worktree.
++
++```text
++pnpm vitest run tests/unit/evaluator-domains.test.ts \
++  tests/unit/evaluator-foundation.test.ts \
++  tests/integration/evaluator-database.test.ts
++Test Files  3 passed (3)
++Tests       21 passed (21)
++
++pnpm generate:contract && pnpm typecheck
++PASS (tsx packages/contract/src/generate.ts; tsc --noEmit)
++
++git diff --check
++PASS
++```
++
++Lane 08 relay acceptance tests are not applicable to PROG-03. No push, merge,
++board mutation, BOUND state, API key, or migration-runner wiring was performed.
++
++READY FOR PEER REVIEW: codex/eval-eval-03-domains
+
+tokens used
+702,683
+READY FOR PEER REVIEW: codex/eval-eval-03-domains
+=== codex exited Sat Aug 15 10:06:44 EEST 2026 ===
