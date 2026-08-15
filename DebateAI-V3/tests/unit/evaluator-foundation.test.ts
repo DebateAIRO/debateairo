@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import {
+  BLIND_SAMPLE_EXCERPT_MAX_BYTES,
   EVALUATOR_MAKER,
   EVALUATOR_PROVIDER_REF,
   assertEvaluatorProviderIsolation,
@@ -209,5 +210,20 @@ describe("Evaluator foundation", () => {
       reasons: ["The conclusion follows."]
     });
     expect(JSON.stringify(sample)).not.toMatch(/maker|provider|model|artifact/i);
+  });
+
+  it("bounds blind sample excerpts by UTF-8 bytes without splitting characters", () => {
+    const sample = createBlindEvaluationSample({
+      sampleId: "opaque:sample-long",
+      questionExcerpt: "q".repeat(200_000),
+      taskExcerpt: "🧭".repeat(60_000),
+      grade: "0.8 (PROBABILITY)",
+      reasons: []
+    });
+    expect(Buffer.byteLength(sample.questionExcerpt, "utf8"))
+      .toBe(BLIND_SAMPLE_EXCERPT_MAX_BYTES);
+    expect(Buffer.byteLength(sample.taskExcerpt, "utf8"))
+      .toBe(BLIND_SAMPLE_EXCERPT_MAX_BYTES);
+    expect(sample.taskExcerpt).not.toContain("�");
   });
 });

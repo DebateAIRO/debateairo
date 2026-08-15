@@ -9,6 +9,11 @@ import {
   type CallBound,
   type ProviderGateway
 } from "@debateai/providers";
+import { createBlindEvaluationSample } from "./blind-sample.js";
+
+export * from "./blind-sample.js";
+export * from "./consumer.js";
+export * from "./consumer-postgres.js";
 
 export const EVALUATOR_PROVIDER_FAMILY_ROW_KEY = "evaluatorProviderFamily" as const;
 export const EVALUATOR_DISPATCH_BINDING_ROW_KEY = "evaluatorDispatchBinding" as const;
@@ -253,42 +258,6 @@ export class EvaluatorCatalogRepository {
       return probeId;
     });
   }
-}
-
-export interface BlindEvaluationSample {
-  readonly sampleId: string;
-  readonly questionExcerpt: string;
-  readonly taskExcerpt: string;
-  readonly grade: string;
-  readonly reasons: readonly string[];
-}
-
-export function createBlindEvaluationSample(input: {
-  readonly sampleId: string;
-  readonly questionExcerpt: string;
-  readonly taskExcerpt: string;
-  readonly grade: string;
-  readonly reasons: readonly string[];
-  readonly [key: string]: unknown;
-}): BlindEvaluationSample {
-  for (const [field, value] of [
-    ["sampleId", input.sampleId],
-    ["questionExcerpt", input.questionExcerpt],
-    ["taskExcerpt", input.taskExcerpt],
-    ["grade", input.grade]
-  ] as const) {
-    if (value.trim() === "") throw new TypeError(`BLIND_SAMPLE_${field.toUpperCase()}_INVALID`);
-  }
-  if (!input.reasons.every((reason) => reason.trim() !== "")) {
-    throw new TypeError("BLIND_SAMPLE_REASONS_INVALID");
-  }
-  return Object.freeze({
-    sampleId: input.sampleId,
-    questionExcerpt: input.questionExcerpt,
-    taskExcerpt: input.taskExcerpt,
-    grade: input.grade,
-    reasons: Object.freeze([...input.reasons])
-  });
 }
 
 export const ADDON_PIPELINE_VERSION = 1 as const;
