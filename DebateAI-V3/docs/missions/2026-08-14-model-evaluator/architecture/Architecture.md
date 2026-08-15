@@ -365,7 +365,7 @@ BEGIN
     FROM ledger.raw_artifact WHERE raw_artifact_id=NEW.grader_raw_artifact_ref;
   IF graded_maker IS NULL OR grader_maker IS NULL
      OR graded_run IS DISTINCT FROM NEW.run_id
-     OR grader_run IS DISTINCT FROM NEW.run_id THEN
+     OR grader_run IS NOT NULL THEN
     RAISE EXCEPTION 'ADDON_GRADING_LINEAGE_UNRESOLVED: run %', NEW.run_id;
   END IF;
   IF graded_maker = grader_maker THEN
@@ -414,6 +414,12 @@ CREATE TRIGGER validate_observation_supersession
 ```
 
 This guard compares `ledger.raw_artifact.maker`, not model id, and is independent of migration 0019's `ledger.node_review` trigger.
+
+**PROG-06 ratified amendment (2026-08-15).** The add-on grader artifact is
+evaluator-scoped and therefore has `ledger.raw_artifact.run_id IS NULL`; only the
+graded judge artifact belongs to `NEW.run_id`. Migration 0026 corrects the trigger
+accordingly. Requiring `grader_run = NEW.run_id` would reject every lawful grader
+artifact produced under the null-run isolation rule.
 
 Model identity is the exact `(provider, model_id, model_version)` triple. No nullable version is collapsed to a maker-level profile. A source artifact without trustworthy model version is skipped with a pipeline receipt such as `MODEL_IDENTITY_INCOMPLETE`; it is not silently merged.
 
@@ -846,7 +852,9 @@ The job:
 2. constructs an allowlist DTO containing only opaque sample id, question/task excerpt, grade/verdict, and reasons needed to grade it;
 3. excludes maker, provider, model, artifact ids, metadata, provenance refs, and other joinable lineage clues;
 4. makes one bounded vLLM grading call;
-5. persists the normal provider artifact/ledger evidence; and
+5. persists the normal provider artifact/ledger evidence with evaluator scope
+   (`ledger.raw_artifact.run_id IS NULL`), while the graded artifact remains scoped
+   to the product run; and
 6. inserts one `BLIND_JUDGE_GRADE` JUDGING observation through the DB maker guard.
 
 The blinding helper builds a new DTO from approved fields; it does not recursively “delete known identity keys” from arbitrary input. The same helper supplies grading-adjacent samples to the consumer reader.

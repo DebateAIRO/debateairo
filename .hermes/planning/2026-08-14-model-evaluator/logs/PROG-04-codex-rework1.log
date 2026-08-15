@@ -1,0 +1,589 @@
+=== PROG-04 rework1 launch Sat Aug 15 11:11:32 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+--------
+user
+/goal REWORK ROUND 1 of your eval-04-tagger lane (same goal, same session, same worktree). Reviewer A returned REWORK; reviewer B returned PASS but independently REPRODUCED the same root defect as a mandatory carry-forward — so treat this as one architectural fix. Read both: /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-04-opus-review-1.md and PROG-04-opus2-review-1.md. ROOT DEFECT: the tagger calls the product ProviderGateway with the PRODUCT run_id, so evaluator tag attempts (1) count against the run's pinned cost envelope via BudgetRepository.countRunModelAttempts and can push a live run to RUN_COST_ENVELOPE_EXHAUSTED — tagging gates serving, violating FR-2.2; (2) make reconcile-later impossible (CALL_BUDGET_EXHAUSTED before the container is reached); (3) surface in the asker-visible serve execution-ledger digest; and (4) fire PROVIDER_MODEL_VERSION liveness revision triggers on the product run when tag calls span a container upgrade (reviewer B reproduced this). REQUIRED FIX: decouple evaluator tag calls from the product run scope entirely — no product run_id on evaluator tag artifacts/ledger entries (evaluator-scoped attempt identity per the Architecture §2 boundary contract), so budget counting, liveness partitioning, and serve digests are untouched by construction. Reproduce-first: write the failing tests FIRST — (a) a run at envelope ceiling still gets tagged and still serves; (b) reconciliation succeeds after an ask-time failure without CALL_BUDGET_EXHAUSTED; (c) two tag calls with different model_version on one run fire NO liveness trigger; (d) the serve execution digest is byte-identical with tagging on vs off — demonstrate RED under the current coupling, then GREEN after the fix. Also address the cheap non-blockers: typed TIMED_OUT receipt instead of bare catch; typed UNTAGGED for pre-try failures; no duplicate admission receipt on retry; receipt for unresolved SELECT_EXISTING; drop or correct the misleading role/lane labels; and state in your self-report the disclosed migration-0025 DDL relaxation for Hermes to ratify or reject. Run focused tests + repository typecheck, commit on your branch, update your self-report, then print exactly: READY FOR PEER REVIEW: codex/eval-04-tagger
+=== codex exited Sat Aug 15 11:48:24 EEST 2026 ===
+=== PROG-04 rework1 continuation Sat Aug 15 11:48:27 EEST 2026 ===
+OpenAI Codex v0.147.0-alpha.6.5
+--------
+workdir: /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+--------
+user
+/goal CONTINUATION of your eval-04-tagger rework (same goal, same session). Your previous turn committed 670ac9a fix(evaluator): isolate tag attempts from product runs, then hung idle; the client was terminated (known CLI hang — work is safe). Briefly state what you completed vs the rework brief (the four RED/GREEN decoupling proofs, the cheap non-blockers, the 0025 disclosure), then finish anything remaining: run the focused tests AND repository typecheck and show results, commit anything uncommitted, update your self-report at /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md, then print exactly: READY FOR PEER REVIEW: codex/eval-04-tagger
+codex
+Completed against the rework brief:
+
+- All four decoupling proofs are GREEN: envelope-ceiling tagging/serving, reconciliation after ask-time failure, zero product liveness triggers across evaluator model versions, and byte-identical serve digests.
+- Cheap carry-forwards are closed: typed timeout and preflight/run-unresolved outcomes, retry short-circuit without duplicate admission, unresolved-selection refusal receipt, invalid-content typing, and corrected classifier/evaluator labels.
+- The self-report explicitly discloses migration 0025’s REFUSED-only DDL relaxation for Hermes to ratify or reject.
+
+I’m now re-validating the clean `670ac9a` handoff with the exact focused suite and repository typecheck, serially per the repository’s heavy-command rule.
+Resume the same rework session after the known CLI hang; verify authoritative state, rerun required gates, refresh the durable report, and return the exact marker.
+  → Confirm branch, commit, worktree cleanliness, and current self-report
+  • Run focused evaluator tests and repository typecheck
+  • Commit any uncommitted work and refresh the self-report with current evidence
+  • Return exact peer-review marker
+exec
+/bin/zsh -lc "git branch --show-current
+git status --porcelain
+git rev-parse HEAD
+git log -2 --oneline
+stat -f '%Sm %N' -t '%Y-%m-%dT%H:%M:%S%z' /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+grep -n -E \"RED.*GREEN|Migration 0025|Focused final|Full final|commit SHA\" /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md" in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+ succeeded in 0ms:
+codex/eval-04-tagger
+670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5
+670ac9a fix(evaluator): isolate tag attempts from product runs
+c15690f feat(evaluator): add non-gating ask-time tagger
+2026-08-15T11:23:14+0300 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+33:## RED → GREEN evidence
+41:- Focused final run: 4 files / 42 tests passed.
+42:- Full final run: 85 files / 628 tests passed.
+57:## Migration 0025 disclosure — Hermes ratification required
+72:- commit SHA: `670ac9a`
+
+  ✓ Confirm branch, commit, worktree cleanliness, and current self-report
+  → Run focused evaluator tests and repository typecheck
+  • Commit any uncommitted work and refresh the self-report with current evidence
+  • Return exact peer-review marker
+exec
+/bin/zsh -lc 'pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+ succeeded in 3752ms:
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ro67Z5/data ... ok
+creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] selecting dynamic shared memory implementation ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-ro67Z5/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.087 EEST [25019] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.089 EEST [25019] LOG:  listening on IPv6 address "::1", port 59287
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.089 EEST [25019] LOG:  listening on IPv4 address "127.0.0.1", port 59287
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.089 EEST [25019] LOG:  listening on Unix socket "/tmp/.s.PGSQL.59287"
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.092 EEST [25025] LOG:  database system was shut down at 2026-08-15 11:49:07 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.094 EEST [25019] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.376 EEST [25034] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:07.385 EEST [25034] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation
+[S00 DB embedded] 2026-08-15 11:49:07.400 EEST [25034] ERROR:  append-only or immutable table observation rejects UPDATE
+2026-08-15 11:49:07.400 EEST [25034] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 11:49:07.400 EEST [25034] STATEMENT:  UPDATE evaluator.observation SET value=0.5 WHERE observation_id=$1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 11:49:07.462 EEST [25035] ERROR:  duplicate key value violates unique constraint "question_domain_run_id_key"
+2026-08-15 11:49:07.462 EEST [25035] DETAIL:  Key (run_id)=(31a4ee92-6caa-4e5c-b684-de971b8d2494) already exists.
+2026-08-15 11:49:07.462 EEST [25035] STATEMENT:  
+	        INSERT INTO evaluator.question_domain (
+	          run_id, domain_id, assignment_basis, domain_admission_id,
+	          tagger_raw_artifact_ref, assigned_at, at_seq
+	        ) VALUES ($1,$2,$3,$4,$5,statement_timestamp(),$6)
+	        RETURNING question_domain_id
+	      
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only
+[S00 DB embedded] 2026-08-15 11:49:07.463 EEST [25035] ERROR:  append-only or immutable table question_domain rejects UPDATE
+2026-08-15 11:49:07.463 EEST [25035] CONTEXT:  PL/pgSQL function core.reject_mutation() line 3 at RAISE
+2026-08-15 11:49:07.463 EEST [25035] STATEMENT:  UPDATE evaluator.question_domain SET domain_id=domain_id WHERE run_id=$1
+
+
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > projects usage and versioned relative cost into both evaluator metering tables 9ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > creates every evaluator table under append-only mutation guards 3ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > keeps consensus observations outside settlement and rejects mutation 23ms
+ ✓ tests/integration/evaluator-database.test.ts > 0023 evaluator foundation migration > grants the API only evaluator reads plus consumer selection inserts 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > persists a typed REFUSED receipt for a blank proposal 4ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a direct existing-domain id selection 2ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records a REFUSED receipt when SELECT_EXISTING names an unresolved domain id 1ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > tags through the evaluator landing without mutating memory.question_key 8ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > keeps a container-down ask untagged and reconciles it later 7ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > records exact, rejected near-duplicate, and grown admission decisions 15ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > backfills the dedicated question link once and keeps domain identity append-only 22ms
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > serializes concurrent near-duplicate proposals into one grown domain 23ms
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB] Testcontainers DEFERRED BY DR-121; starting real embedded PostgreSQL directly
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The files belonging to this database system will be owned by user "vladmihaimiron".
+This user must also own the server process.
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C.UTF-8
+  LC_CTYPE:    C.UTF-8
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C.UTF-8
+  LC_NUMERIC:  C.UTF-8
+  LC_TIME:     C.UTF-8
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-1rbJec/data ... ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] creating subdirectories ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 100
+selecting default "shared_buffers" ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 128MB
+selecting default time zone ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] Europe/Bucharest
+creating configuration files ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+running bootstrap script ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] performing post-bootstrap initialization ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+syncing data to disk ... 
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] ok
+
+Success. You can now start the database server using:
+
+    '/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/pg_ctl' -D /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-s00-postgres-1rbJec/data -l logfile start
+
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.069 EEST [25050] LOG:  starting PostgreSQL 18.4 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.070 EEST [25050] LOG:  listening on IPv6 address "::1", port 59297
+2026-08-15 11:49:08.070 EEST [25050] LOG:  listening on IPv4 address "127.0.0.1", port 59297
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.071 EEST [25050] LOG:  listening on Unix socket "/tmp/.s.PGSQL.59297"
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.074 EEST [25056] LOG:  database system was shut down at 2026-08-15 11:49:08 EEST
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.076 EEST [25050] LOG:  database system is ready to accept connections
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.330 EEST [25061] WARNING:  there is already a transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.340 EEST [25061] WARNING:  there is no transaction in progress
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.367 EEST [25050] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.368 EEST [25050] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.369 EEST [25050] LOG:  background worker "logical replication launcher" (PID 25059) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.369 EEST [25054] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.369 EEST [25054] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.418 EEST [25054] LOG:  checkpoint complete: wrote 1337 buffers (8.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.029 s, sync=0.019 s, total=0.050 s; sync files=767, longest=0.001 s, average=0.001 s; distance=9110 kB, estimate=9110 kB; lsn=0/206CCE0, redo lsn=0/206CCE0
+
+
+stdout | tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission
+[S00 DB embedded] 2026-08-15 11:49:08.422 EEST [25050] LOG:  database system is shut down
+
+
+ ✓ tests/integration/evaluator-database.test.ts > domain registry repository > applies 0024 via migrate and matches every approved starter name through admission 978ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > returns typed UNTAGGED when the persisted run cannot be resolved 1ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > tags and leaves an already-served answer readable at the product envelope ceiling 35ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > reconciles after an ask-time provider failure without exhausting the evaluator attempt tuple 11ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > does not fire product liveness when evaluator tags span model versions 12ms
+ ✓ tests/integration/evaluator-database.test.ts > evaluator tag attempts stay outside the product run boundary > keeps the asker-visible execution digest byte-identical with tagging off versus on 6ms
+ ✓ tests/integration/evaluator-database.test.ts > FR-0.6 AC5 persisted panel-isolation differential > persists byte-identical product membership and agent_count with evaluator healthy versus absent 65ms
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.614 EEST [25019] LOG:  received fast shutdown request
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.614 EEST [25019] LOG:  aborting any active transactions
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.615 EEST [25019] LOG:  background worker "logical replication launcher" (PID 25028) exited with exit code 1
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.616 EEST [25023] LOG:  shutting down
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.616 EEST [25023] LOG:  checkpoint starting: shutdown immediate
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.676 EEST [25023] LOG:  checkpoint complete: wrote 1461 buffers (8.9%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.036 s, sync=0.024 s, total=0.061 s; sync files=769, longest=0.001 s, average=0.001 s; distance=9288 kB, estimate=9288 kB; lsn=0/2099248, redo lsn=0/2099248
+
+
+stdout | tests/integration/evaluator-database.test.ts
+[S00 DB embedded] 2026-08-15 11:49:08.680 EEST [25019] LOG:  database system is shut down
+
+
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > normalizes observed external spend without treating larger local token volume as paid cost 3ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > keeps paid spend UNKNOWN when any metered call lacks observed cost 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > scaffolds the evaluator worker as a separate composition root 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > reads the pinned purpose-specific local family and refuses panel collisions 2ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > rejects remote evaluator endpoints 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > defaults dispatch influence to UNBOUND when the row is absent or malformed 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > enumerates vLLM models without authorization and fails closed on absence 15ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > classifies evaluator catalog deadline expiry 0ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > refuses an isolated-family collision before catalog collection or persistence 1ms
+ ✓ tests/unit/evaluator-foundation.test.ts > Evaluator foundation > constructs an allowlist-only blind DTO 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > normalizes Unicode, case, and whitespace deterministically 1ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > matches exact normalized names and rejects near duplicates 9ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > admits genuinely new labels and rejects labels outside fixed bounds 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > returns candidates in stable similarity/name/id order 0ms
+ ✓ tests/unit/evaluator-domains.test.ts > evaluator domain admission guardrails > exposes the approved 0024 seed to the migration runner scan 1ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > selects an existing domain id and persists only the evaluator landing 4ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > routes a genuinely new proposal through deterministic admission guardrails 1ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > records a model refusal and returns untagged without assigning a domain 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > degrades container failure to a typed untagged result 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > records a typed timeout result instead of collapsing it into a generic provider failure 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > returns typed UNTAGGED when repository preflight fails 0ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > short-circuits an already-tagged retry without another provider call or admission 1ms
+ ✓ tests/unit/evaluator-tagger.test.ts > ask-time evaluator tagger > re-asserts provider isolation before the observed vLLM call boundary 0ms
+
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+   Start at  11:49:05
+   Duration  3.40s (transform 238ms, setup 0ms, import 746ms, tests 2.34s, environment 0ms)
+
+
+codex
+Focused verification is GREEN: 4 files, 42 tests. The regression cases explicitly passed for ceiling-safe serving, reconciliation, liveness isolation, and digest identity. I’m running repository typecheck now.
+exec
+/bin/zsh -lc 'pnpm typecheck' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+ succeeded in 614ms:
+$ tsc --noEmit
+
+apply patch
+patch: completed
+/Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+index 48318c1130d728570d11986596cdb74dfb911ed1..fb6c62fa032be23814a2aa9610231c4ee3757fa4
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+@@ -64,6 +64,16 @@
+ 
+ The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+ 
++## Continuation verification after known CLI hang
++
++The original worker/session resumed on 2026-08-15 with the worktree clean at
++`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
++commit were needed.
++
++- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
++- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
++- Post-check worktree status: clean; rework commit remains `670ac9a`.
++
+ READY FOR PEER REVIEW:
+ - worker: Codex GPT-5.6 Sol
+ - worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+
+  ✓ Confirm branch, commit, worktree cleanliness, and current self-report
+  ✓ Run focused evaluator tests and repository typecheck
+  → Commit any uncommitted work and refresh the self-report with current evidence
+  • Return exact peer-review marker
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+index 48318c1130d728570d11986596cdb74dfb911ed1..fb6c62fa032be23814a2aa9610231c4ee3757fa4
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+@@ -64,6 +64,16 @@
+ 
+ The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+ 
++## Continuation verification after known CLI hang
++
++The original worker/session resumed on 2026-08-15 with the worktree clean at
++`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
++commit were needed.
++
++- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
++- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
++- Post-check worktree status: clean; rework commit remains `670ac9a`.
++
+ READY FOR PEER REVIEW:
+ - worker: Codex GPT-5.6 Sol
+ - worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+
+exec
+/bin/zsh -lc 'git status --porcelain
+git rev-parse HEAD
+git branch --show-current
+tail -38 /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md' in /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger/DebateAI-V3
+ succeeded in 0ms:
+670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5
+codex/eval-04-tagger
+- `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
+- `pnpm run audit:source` — PASS, `blocking: []`.
+- `pnpm run audit:architecture` — PASS, 27 edge rows checked / `violations: []`.
+- `pnpm test` — PASS, 85 files / 628 tests.
+- `git diff --check` — PASS before commit.
+- Branch check — `codex/eval-04-tagger`.
+- DR-179 scoped scan — no API key, authorization header, bearer secret, remote endpoint, or new `BOUND` state introduced. Existing `UNBOUND` declarations remain unchanged.
+- No `skeleton/` file changed; VERSION/CHANGELOG/upgrade-guide rules do not apply. The repository does not contain the skeleton template scripts named by root AGENTS.md.
+
+## Migration 0025 disclosure — Hermes ratification required
+
+The original implementation commit includes `migrations/0025_evaluator_domain_refusal_receipts.sql`. It drops and replay-safely recreates the `domain_admission` proposed-name and normalized-name CHECK constraints so blank values are permitted only when `decision = 'REFUSED'`; every non-REFUSED decision retains the nonblank guarantee. This DDL relaxation is what allows a blank model proposal/refusal to leave the required typed receipt. Rework round 1 did not alter that migration. Hermes must explicitly ratify or reject this relaxation at integration review; rejection requires a different persisted representation for blank refusal receipts before merge.
+
+## Scope and residual risk
+
+Changes are limited to evaluator package/worker/docs/tests plus compile-time provider role/lane vocabulary. No product routing, dispatch, budget, liveness, serving, memory, or settlement implementation was changed. The tagger remains collect-only and `UNBOUND`; no production call-site wiring was added.
+
+The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+
+## Continuation verification after known CLI hang
+
+The original worker/session resumed on 2026-08-15 with the worktree clean at
+`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
+commit were needed.
+
+- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
+- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
+- Post-check worktree status: clean; rework commit remains `670ac9a`.
+
+READY FOR PEER REVIEW:
+- worker: Codex GPT-5.6 Sol
+- worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+- ticket: PROG-04 / eval-04-tagger
+- branch/worktree: `codex/eval-04-tagger` / `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/eval-04-tagger`
+- commit SHA: `670ac9a`
+- reviews read through: both round-1 reviewer reports listed above
+- tests/checks: all exact evidence listed above
+- open decision: Hermes must ratify or reject migration 0025's REFUSED-only DDL relaxation
+
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+index 48318c1130d728570d11986596cdb74dfb911ed1..fb6c62fa032be23814a2aa9610231c4ee3757fa4
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+@@ -64,6 +64,16 @@
+ 
+ The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+ 
++## Continuation verification after known CLI hang
++
++The original worker/session resumed on 2026-08-15 with the worktree clean at
++`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
++commit were needed.
++
++- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
++- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
++- Post-check worktree status: clean; rework commit remains `670ac9a`.
++
+ READY FOR PEER REVIEW:
+ - worker: Codex GPT-5.6 Sol
+ - worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+
+codex
+Continuation verification is complete: focused tests passed (4 files / 42 tests), repository typecheck passed, the worktree is clean at `670ac9a`, and the self-report now records the post-hang rerun. No additional commit was necessary.
+The same-session continuation is fully reverified and durably reported; the worktree had no uncommitted changes, so the existing rework commit remains authoritative.
+  ✓ Confirm branch, commit, worktree cleanliness, and current self-report
+  ✓ Run focused evaluator tests and repository typecheck
+  ✓ Commit any uncommitted work and refresh the self-report with current evidence
+  ✓ Return exact peer-review marker
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+index 48318c1130d728570d11986596cdb74dfb911ed1..fb6c62fa032be23814a2aa9610231c4ee3757fa4
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+@@ -64,6 +64,16 @@
+ 
+ The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+ 
++## Continuation verification after known CLI hang
++
++The original worker/session resumed on 2026-08-15 with the worktree clean at
++`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
++commit were needed.
++
++- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
++- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
++- Post-check worktree status: clean; rework commit remains `670ac9a`.
++
+ READY FOR PEER REVIEW:
+ - worker: Codex GPT-5.6 Sol
+ - worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+
+codex
+READY FOR PEER REVIEW: codex/eval-04-tagger
+diff --git a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+index 48318c1130d728570d11986596cdb74dfb911ed1..fb6c62fa032be23814a2aa9610231c4ee3757fa4
+--- a//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
++++ b//Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3/.hermes/reports/2026-08-14-model-evaluator/agent-reports/codex-PROG-04.md
+@@ -64,6 +64,16 @@
+ 
+ The production composition root still must provide the registered evaluator family, selected local catalog model gateway, deployment maker capability, and registered call bound. Runtime vLLM behavior is covered through the real persistence/provider wrapper with deterministic local fetch doubles; no external model call was made.
+ 
++## Continuation verification after known CLI hang
++
++The original worker/session resumed on 2026-08-15 with the worktree clean at
++`670ac9a8e27ae7f36ccb4a8af8df3dda955f0df5`; no recovery edits or additional
++commit were needed.
++
++- Focused command rerun: `pnpm exec vitest run tests/unit/evaluator-tagger.test.ts tests/unit/evaluator-domains.test.ts tests/unit/evaluator-foundation.test.ts tests/integration/evaluator-database.test.ts` — PASS, 4 files / 42 tests.
++- Repository typecheck rerun: `pnpm typecheck` — PASS, `tsc --noEmit` exit 0.
++- Post-check worktree status: clean; rework commit remains `670ac9a`.
++
+ READY FOR PEER REVIEW:
+ - worker: Codex GPT-5.6 Sol
+ - worker CLI session id: 01a00460-b63c-7492-a546-a3759f8bb9a8
+
+tokens used
+799,306
+READY FOR PEER REVIEW: codex/eval-04-tagger
+=== codex exited Sat Aug 15 11:49:49 EEST 2026 ===

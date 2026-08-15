@@ -1,8 +1,20 @@
 # 07 — Bias metrics + prowess aggregation (deterministic derivation)
 
 Type: task
-Status: open
+Status: done
 Blocked by: 05, 06
+
+Hermes stage approval: `codex/eval-07-profiles` at `975ab60`; repository
+typecheck and all 694 tests passed. Migration 0027, per-metric prowess ranks,
+full-weight consensus evidence, REPLACE-not-pool semantics, and the unbound
+selector were independently verified.
+
+## Programming-stage handoff
+
+- For a settlement observation with `supersedes_observation_id`, REPLACE the named
+  consensus observation; never pool, average, or count both rows as independent
+  evidence. The superseded consensus row remains append-only audit history but is
+  treated as replaced by aggregation/profile derivation.
 
 ## Question
 
