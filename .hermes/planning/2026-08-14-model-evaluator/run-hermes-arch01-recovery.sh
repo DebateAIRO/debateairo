@@ -1,0 +1,6 @@
+#!/bin/zsh
+cd /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3
+LOG=/Users/vladmihaimiron/Documents/DebateAIRO/.hermes/planning/2026-08-14-model-evaluator/logs/ARCH-01-hermes-recovery.log
+echo "=== ARCH-01 recovery converse $(date) ===" | tee -a "$LOG"
+~/.local/bin/hermes --yolo --continue -z "Recovery check on your ARCH-01 goal (model-evaluator architecture): your session ended WITHOUT printing the READY FOR PEER REVIEW marker, and the log shows your final patch to Architecture.md FAILED validation (you used the path prefix 'DebateAI-V3/docs/...' while your cwd was already DebateAI-V3 — the correct relative path is 'docs/missions/2026-08-14-model-evaluator/architecture/Architecture.md'), plus one refused temp-file write. Tell me: (1) what was in that failed final patch and was it substantive; (2) is Architecture.md as it stands on disk complete against the ARCH-01 packet's obligations, including the four carried reviewer notes and the lane plan; (3) is mission-graph.svg final? Then: re-apply the failed patch with the correct relative path if it was substantive, make no other changes, ensure your self-report is filed, and print exactly: READY FOR PEER REVIEW: docs/missions/2026-08-14-model-evaluator/architecture/Architecture.md" 2>&1 | tee -a "$LOG"
+echo "=== hermes exited $(date) ===" | tee -a "$LOG"

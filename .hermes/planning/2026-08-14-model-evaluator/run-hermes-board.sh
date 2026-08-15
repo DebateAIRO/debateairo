@@ -1,0 +1,6 @@
+#!/bin/zsh
+cd /Users/vladmihaimiron/Documents/DebateAIRO/DebateAI-V3
+LOG=/Users/vladmihaimiron/Documents/DebateAIRO/.hermes/planning/2026-08-14-model-evaluator/logs/BOARD-hermes.log
+echo "=== board crafting $(date) ===" | tee -a "$LOG"
+~/.local/bin/hermes --yolo -z "/goal Board custody task (your seat, spine 5.2): craft the Kanban board for mission model-evaluator on your dashboard (port 9119), board slug model-evaluator. Source of truth for lanes: docs/missions/2026-08-14-model-evaluator/architecture/Architecture.md section 7 lane table. Create one ticket per lane (eval-02-foundation through eval-11-devmenu) with tier, scope, hard dependencies, and merge gate in the body. Statuses: eval-02-foundation = in_progress (claimed by codex, lane launched by the orchestrator at V planning-graph-gate approval, recorded 2026-08-14; session id to be appended when codex reports); all others = blocked pending dependencies. Also add a mission header note: V approved the planning-graph gate 2026-08-14; dark-launch law in force; no lane may commit BOUND state. When the board is crafted print exactly: BOARD READY: model-evaluator" 2>&1 | tee -a "$LOG"
+echo "=== hermes exited $(date) ===" | tee -a "$LOG"

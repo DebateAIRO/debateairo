@@ -1506,3 +1506,90 @@ supersedes | status`.
   failure; genuinely mid-run deaths keep DR-174/176 unchanged. Ticket
   DISC-01 binds to the authorized plan + Grok's ten conditions + this row.
   | V ruled the consult's packet | DISC-01 | — | ACTIVE
+
+| DR-183 | 2026-08-14 | V ("its this version of the engine. UI-wise, its
+  still a bit behind V2. But Answers wise? It way surpasses V2") | **V'S
+  QUALITY VERDICT ON THE DISCOVERY-ERA ENGINE.** Delivered while the first
+  three-house depth-5 debate ran: ANSWERS WAY SURPASS V2 — the mission
+  thesis ("I want to see that two models bring better answers than one",
+  DR-162) is affirmed by V's own judgment, now at three models. UI remains
+  A BIT BEHIND V2 — V2 parity work (V earlier: "V2 had the depth part
+  pinned down real good") seeds the UI lane of the next mission. Companion
+  to DR-164's early quality signal; this one lands after depth, discovery,
+  and cross-house review all shipped. | V judged the whole thing, as
+  promised | next-mission UI lane | — | ACTIVE
+
+| DR-184 | 2026-08-15 | V ("only 5 nodes are shown in the UI without the
+  'Show set aside paths'. We need to make it in such a way that the
+  scoring and judges can judge everything") | **REVIEW COVERAGE MUST BE
+  COMPLETABLE — EVERYTHING JUDGED.** Evidence from the first three-house
+  depth-5 run (091b7663): 122 authored nodes, ALL 122 carry their own
+  judge scores, ZERO hidden for low score — but 210 of 262 cross-house
+  review CALLS transport-failed (reviews run LAST, on relays exhausted by
+  ~5h of authoring; review sites received NO cooldown courtesy — the seam
+  the DR-174 architect explicitly deferred as VROW-6-R) → 70 nodes
+  class-H hidden → and because hiding is SUBTREE-wise, judged descendants
+  vanish under unjudged ancestors: the default canvas collapsed to ~5
+  nodes over a 122-node debate. V rules the capability: the system must
+  be able to JUDGE EVERYTHING — (a) in-run: review completion gets the
+  same resilience courtesy as authoring (holds/retry discipline,
+  interleaving with authoring so reviews stop inheriting dead-tired
+  relays); (b) post-serve: a REVIEW CATCH-UP pass re-runs failed reviews
+  on a served answer, judges the hidden, un-hides what passes, and
+  re-propagates the scores — a debate improves after serving. DR-165(3)
+  stands absolute throughout (unjudged still never serves as opinion —
+  the fix is completing judgment, never waiving it). Architecture-
+  confounding (the deferred larger seam) → DR-171+DR-175 consult before
+  any ticket. | V watched 57% of a masterpiece sit in the dark | the
+  review-completion consult | — | ACTIVE
+
+| DR-184-A | 2026-08-15 | V ("if the pros and cons get a judgement, their
+  ancestor should have a grade/score/judgement as well. because its
+  through virtue of arguments that a hypothesis gains or loses power") |
+  **THE VIRTUE-OF-ARGUMENTS PRINCIPLE — ancestors derive standing from
+  judged descendants.** V resolves the subtree-visibility question before
+  it was asked: an ancestor whose pros and cons ARE judged is not a black
+  hole — it carries a DERIVED grade computed from its judged arguments
+  (which is the propagation model's own arithmetic, now extended to
+  standing and visibility). Concretely: (1) a node with judged
+  descendants SERVES with a derived score, its own missing cross-review
+  disclosed as a mark on the node — never as a veil over the lineage;
+  (2) subtree hiding contracts to nodes with NO judged basis at all
+  (own review absent AND no judged descendants); (3) DR-165(3) is
+  reconciled, not waived: the ancestor serves on its judged arguments'
+  authority, not its own unjudged assertion — the distinction is carried
+  on the mark. A hypothesis gains or loses power through the virtue of
+  its arguments — the founding sentence of the scoring layer, now law. |
+  V ruled the chain-of-custody question from first principles | the
+  DR-184 consult binds to this | — | ACTIVE
+
+| DR-185 | 2026-08-15 | V (options card, custom answer: "We do it Claude
+  only") | **SINGLE-USE EXCEPTION — CLAUDE-ONLY AUTHORIZATION FOR THE
+  DR-184 PLAN.** Grok's usage balance exhausted (402) parks the DR-171
+  authorization seat; V rules the review-completion plan is authorized by
+  an independent Opus lens instead — THIS PLAN ONLY, not a roster change.
+  Honest limitation recorded: architect and authorizer share a lineage
+  (the DR-175 echo-chamber shape); mitigation: a separate context-free
+  session with an explicitly adversarial refute-first brief, and the
+  V-rows card will disclose that both perspectives are same-house. DR-171
+  proper resumes the moment Grok's seat is funded. | the third house ran
+  out of credit mid-verdict | DR-184 authorization | — | ACTIVE
+
+| DR-186 | 2026-08-15 | V (card: "I confirm, we dont wait for grok. we
+  just Use Claude and Codex" + "Zero in-run review holds") | **THE
+  REVIEW-COMPLETION PACKAGE, ratified.** (1) T-KEEP: a derived-standing
+  node keeps its own tau in the number (alternatives fabricate 0.0 or
+  resurrect the ended run-death). (2) Mark: DERIVED-STANDING-UNREVIEWED.
+  (3) Catch-up reviews use the PINNED panel. (4) Catch-up spends inside
+  the run's PINNED ceiling. (5) The census gains its fourth term (sums to
+  truth). (6) v2 answers REFERENCE v1 conformance. (7) The unmeasurable
+  future is guarded by typed refusal + sentinel. Plus the Claude verdict's
+  eleven binding conditions C-1..C-11 (ceiling arithmetic 1584 with the
+  panel-1 test consequence declared; the catch-up call-budget repair; the
+  incoming-arrow closure extension per V's own "gains or loses power";
+  the declared behavior changes; the disclosure carry). (8) ZERO in-run
+  review holds (the lens's evidence-based position): reviews get full
+  retries + the final attempt, never a wait; the catch-up is the safety
+  net. (9) FLEET SCOPE until Grok's seat is funded: Claude reviews, Codex
+  codes — DR-185's exception extends to this ticket's diamond, disclosed.
+  | V ratified the dual-verdict package | REVCOV-01 | — | ACTIVE

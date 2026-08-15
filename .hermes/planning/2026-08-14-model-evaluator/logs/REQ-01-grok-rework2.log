@@ -1,0 +1,22 @@
+=== REQ-01 rework2 launch Fri Aug 14 20:39:02 EEST 2026 ===
+DoneStarting rework round 2: reading the plan and C1, then verifying the cited panel-discovery facts.C1 facts confirmed. Applying the narrow FR-0.6 AC and Open question only.## Rework round 2 complete
+
+**C1 verified** against real code: flat `configuredProviderSet` (no purpose field), `resolveDiscoveredPanel` probes that list, `selectDifferentMakerReviewer` uses configured makers, `agent_count = panel length`.
+
+### Changes only
+1. **FR-0.6** — purpose-separated config note + **AC5**: evaluator vLLM must not enter panel discovery; QA requires identical panel membership and `agent_count` when vLLM is configured-and-healthy vs absent (no author/reviewer/structural-ceiling side effect).
+2. **Open question 12** — FR-0.6 ticket ownership (new ticket vs fold into 02) for the orchestrator (NB2-2).
+3. Self-report updated for round 2.
+
+Nothing else rewritten. Docs only.
+
+READY FOR PEER REVIEW: docs/missions/2026-08-14-model-evaluator/requirements/Requirements.mdI'll adversarially verify rework round 2: check C1 citations, the FR-0.6 AC + QA test language, the NB2-2 open question, and that nothing else changed.Spot-checking C1 citations in code and reading the FR-0.6 / Open questions sections in full.C1 facts and the FR-0.6/AC5 + Open question 12 edits check out. Writing the verdict.Not RefutedI'll adversarially verify the rework against C1, the plan, and the changed docs—starting with the review finding, plan, patch, and Requirements.md.I'll verify the rework against C1 and the plan by reading the review, Requirements changes, self-report, and implementer evidence.Next I'll inspect FR-0.6, the self-report, implementer evidence, and whether the edit scope stayed narrow.Patch was empty; reading FR-0.6, self-report, implementer evidence, and C1 citations next.Criteria hold: C1 citations check out, AC5 and OQ12 are present, scope stayed narrow. Writing the verdict.C1 citations and FR-0.6 AC5/Open Q12 check out. Writing the verdict as not refuted.Not RefutedNot RefutedI'll inspect the mission docs and entry points to draft a concise closing summary of what was delivered and how to use it.Checking the plan and final state so the summary matches what was verified.Reworked **Model Evaluator requirements** live at [`docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md`](docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md) (FR-0.6 panel isolation + Open question 12).
+
+- Open that file for peer review and as the build source of truth.
+- Implement FR-0.6 AC5 so evaluator vLLM stays out of panel discovery; QA must match panel membership and `agent_count` with vLLM present vs absent.
+- Orchestrator answers Open question 12 (new ticket vs fold into ticket 02).Reworked **Model Evaluator requirements** live at [`docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md`](docs/missions/2026-08-14-model-evaluator/requirements/Requirements.md) (FR-0.6 panel isolation + Open question 12).
+
+- Open that file for peer review and as the build source of truth.
+- Implement FR-0.6 AC5 so evaluator vLLM stays out of panel discovery; QA must match panel membership and `agent_count` with vLLM present vs absent.
+- Orchestrator answers Open question 12 (new ticket vs fold into ticket 02).
+=== grok exited Fri Aug 14 20:44:01 EEST 2026 ===

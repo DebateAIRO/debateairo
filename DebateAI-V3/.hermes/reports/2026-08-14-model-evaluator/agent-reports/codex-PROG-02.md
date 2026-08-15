@@ -1,0 +1,20 @@
+# Codex PROG-02 self-report
+- Lane: `codex/eval-02-foundation`; all product edits stayed in the assigned worktree.
+- Implemented `@debateai/evaluator`, a separate evaluator-worker root, migration 0023, and matching Drizzle carriers.
+- The migration provides 14 append-only evaluator tables, explicit indexes, and narrow evaluator roles/grants.
+- Pinned local vLLM family resolution forbids remote endpoints, authorization material, and product-panel collisions.
+- Catalog enumeration and persistence remain evaluator-only and never write `core.provider_probe`.
+- Dispatch influence remains explicitly UNBOUND; no live selection or dispatch integration was added.
+- Blind evaluation DTOs are constructed from an allowlist and omit producer/model/artifact identity.
+- Rework RED: deliberately enrolling the evaluator family in `configuredProviderSet` made the new persisted differential fail.
+- The RED showed the healthy run persisted three members including `provider:evaluator-vllm`; the absent run persisted two.
+- Rework GREEN: both arms now resolve via register configuration plus latest product probes, exactly as API startup composes discovery.
+- The same ask persists byte-identical `discovered_panel` membership and equal `agent_count` with evaluator healthy versus absent.
+- The healthy arm retains its family row, AVAILABLE evaluator probe, and healthy evaluator core probe; none enter the run panel.
+- `runEvaluatorCatalogProbe` now invokes provider/maker isolation before collection or persistence, with an observed-boundary test.
+- Added explicit timeout and forbidden-HTTPS tests; restored `IF NOT EXISTS`/trigger-drop migration style.
+- Replaced the vacuous empty outcome-table assertion with proof that evaluator roles lack `answer_outcome` INSERT.
+- GREEN evidence: resumed focused evaluator unit/integration 12/12; repository suite 596/596; typecheck clean.
+- Template render/lint and `git diff --check` pass; no push, board mutation, API key, product-data write, or BOUND state occurred.
+- Deferred non-blockers: policy reader/root dev-dependency wiring, metadata narrowing, HTTP error typing, and fuller Drizzle constraints.
+- Token basis: Codex goal meter reported 453,076 tokens at continuation report refresh; model seat GPT-5.6 Sol.

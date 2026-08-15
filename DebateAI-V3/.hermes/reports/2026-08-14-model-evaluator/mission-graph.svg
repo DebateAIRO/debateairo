@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1480" viewBox="0 0 1800 1480" role="img" aria-labelledby="title desc">
+  <title id="title">Model Evaluator PROGRAMMING mission graph</title>
+  <desc id="desc">Planning-gate, tier, lane, dependency, worktree, merge-order, HITL, and live-integration-blocker graph for tickets 02 through 11.</desc>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#fbbf24"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <style>
+      .title { font: 700 29px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #f8fafc; }
+      .subtitle { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #94a3b8; }
+      .tier { font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #cbd5e1; letter-spacing: 1.5px; }
+      .name { font: 700 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #f8fafc; }
+      .worktree { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #67e8f9; }
+      .body { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #cbd5e1; }
+      .tiny { font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #94a3b8; }
+      .order { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #020617; }
+      .lane { fill: #0f172a; stroke: #34d399; stroke-width: 1.8; rx: 8; filter: url(#shadow); }
+      .foundation { fill: #0f172a; stroke: #a78bfa; stroke-width: 2.2; rx: 8; filter: url(#shadow); }
+      .ui { fill: #0f172a; stroke: #22d3ee; stroke-width: 1.8; rx: 8; filter: url(#shadow); }
+      .gate { fill: #3f2710; stroke: #fbbf24; stroke-width: 2.2; filter: url(#shadow); }
+      .router { fill: #172554; stroke: #60a5fa; stroke-width: 1.8; }
+      .blocked { fill: #3f1220; stroke: #fb7185; stroke-width: 1.8; stroke-dasharray: 7 5; rx: 8; }
+      .tierband { fill: rgba(15,23,42,0.58); stroke: #334155; stroke-width: 1; rx: 10; }
+      .edge { fill: none; stroke: #94a3b8; stroke-width: 2; marker-end: url(#arrow); }
+      .parallel { fill: none; stroke: #22d3ee; stroke-width: 2.2; marker-end: url(#arrowCyan); }
+      .hitl { fill: none; stroke: #fbbf24; stroke-width: 1.8; stroke-dasharray: 7 5; marker-end: url(#arrowAmber); }
+      .blockedge { fill: none; stroke: #fb7185; stroke-width: 1.8; stroke-dasharray: 7 5; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1480" fill="#020617"/>
+  <rect width="1800" height="1480" fill="url(#grid)"/>
+  <rect x="30" y="28" width="1740" height="1424" rx="16" fill="none" stroke="#334155" stroke-width="1.4"/>
+
+  <text x="70" y="80" class="title">MODEL EVALUATOR · PROGRAMMING MISSION GRAPH</text>
+  <text x="70" y="110" class="subtitle">ARCH-01 · planning-graph gate · collect-only / UNBOUND · tickets 02–11 + FR-0.6 folded into 02</text>
+
+  <!-- Edges are deliberately drawn before nodes. -->
+  <path class="edge" d="M900 195 L900 232"/>
+  <path class="edge" d="M900 272 L900 310"/>
+  <path class="edge" d="M900 430 L900 455"/>
+  <path class="parallel" d="M900 485 C900 520 510 500 510 555"/>
+  <path class="parallel" d="M900 485 C900 520 1290 500 1290 555"/>
+  <path class="edge" d="M510 665 C510 710 900 685 900 725"/>
+  <path class="edge" d="M1290 665 C1290 710 900 685 900 725"/>
+  <path class="edge" d="M900 765 L900 790"/>
+  <path class="edge" d="M900 880 L900 920"/>
+  <path class="edge" d="M900 1010 L900 1050"/>
+  <path class="edge" d="M900 1140 L900 1165"/>
+  <path class="parallel" d="M900 1195 C900 1230 530 1210 530 1250"/>
+  <path class="parallel" d="M900 1195 C900 1230 1270 1210 1270 1250"/>
+  <path class="edge" d="M1270 1340 C1270 1365 1080 1355 1080 1382"/>
+  <path class="edge" d="M530 1340 C530 1365 720 1355 720 1382"/>
+  <path class="blockedge" d="M1455 1295 L1580 1295"/>
+  <path class="hitl" d="M285 610 L155 610"/>
+
+  <!-- Tier bands and labels -->
+  <rect class="tierband" x="55" y="135" width="1690" height="155"/>
+  <text x="75" y="160" class="tier">PLANNING GATE</text>
+
+  <rect class="tierband" x="55" y="300" width="1690" height="145"/>
+  <text x="75" y="325" class="tier">TIER 0 · FOUNDATION · MERGE 1</text>
+
+  <rect class="tierband" x="55" y="535" width="1690" height="145"/>
+  <text x="75" y="560" class="tier">TIER 1 · PARALLEL · MERGES 2A / 2B</text>
+
+  <rect class="tierband" x="55" y="780" width="1690" height="110"/>
+  <text x="75" y="805" class="tier">TIER 2 · TAGGER · MERGE 3</text>
+
+  <rect class="tierband" x="55" y="910" width="1690" height="110"/>
+  <text x="75" y="935" class="tier">TIER 3 · HARVEST · MERGE 4</text>
+
+  <rect class="tierband" x="55" y="1040" width="1690" height="110"/>
+  <text x="75" y="1065" class="tier">TIER 4 · ADD-ON · MERGE 5</text>
+
+  <rect class="tierband" x="55" y="1155" width="1690" height="75"/>
+  <text x="75" y="1180" class="tier">TIER 5 · PROFILES · MERGE 6</text>
+
+  <rect class="tierband" x="55" y="1240" width="1420" height="110"/>
+  <text x="75" y="1265" class="tier">TIER 6 · PARALLEL · MERGES 7A / 7B</text>
+
+  <!-- Gate and routers -->
+  <polygon class="gate" points="900,145 1055,195 900,245 745,195"/>
+  <text x="900" y="188" text-anchor="middle" class="name">V PLANNING-GRAPH GATE</text>
+  <text x="900" y="209" text-anchor="middle" class="tiny">Architecture.md + this SVG + lane-plan row</text>
+
+  <polygon class="router" points="900,455 930,485 900,515 870,485"/>
+  <text x="942" y="480" class="tiny">FAN-OUT A</text>
+  <text x="942" y="495" class="tiny">03 ∥ 08</text>
+
+  <polygon class="router" points="900,725 930,755 900,785 870,755"/>
+  <text x="942" y="750" class="tiny">MERGE ROUTER A</text>
+  <text x="942" y="765" class="tiny">both 03 + 08 on spine</text>
+
+  <polygon class="router" points="900,1165 930,1195 900,1225 870,1195"/>
+  <text x="942" y="1190" class="tiny">FAN-OUT B</text>
+  <text x="942" y="1205" class="tiny">09 ∥ 10</text>
+
+  <!-- Lane 02 -->
+  <rect class="foundation" x="470" y="335" width="860" height="95"/>
+  <circle cx="500" cy="365" r="15" fill="#a78bfa"/>
+  <text x="500" y="370" text-anchor="middle" class="order">1</text>
+  <text x="530" y="365" class="name">LANE 02 · FOUNDATION + FR-0.6 (OQ12 RESOLVED HERE)</text>
+  <text x="530" y="388" class="worktree">worktree: codex/eval-02-foundation</text>
+  <text x="530" y="410" class="body">package/app scaffold · evaluator schema · grants/triggers · vLLM isolation/catalog · binding resolver · blinding DTO</text>
+
+  <!-- Lanes 03 and 08 -->
+  <rect class="lane" x="285" y="565" width="450" height="100"/>
+  <circle cx="315" cy="595" r="15" fill="#34d399"/>
+  <text x="315" y="600" text-anchor="middle" class="order">2A</text>
+  <text x="345" y="595" class="name">LANE 03 · DOMAINS</text>
+  <text x="345" y="617" class="worktree">codex/eval-03-domains</text>
+  <text x="345" y="640" class="body">registry · guardrails · question link · V-approved seed</text>
+
+  <rect class="lane" x="1065" y="565" width="450" height="100"/>
+  <circle cx="1095" cy="595" r="15" fill="#34d399"/>
+  <text x="1095" y="600" text-anchor="middle" class="order">2B</text>
+  <text x="1125" y="595" class="name">LANE 08 · METERING</text>
+  <text x="1125" y="617" class="worktree">codex/eval-08-metering</text>
+  <text x="1125" y="640" class="body">relay/gateway usage · UNMETERED · cost normalization v1</text>
+
+  <rect class="gate" x="65" y="570" width="190" height="80" rx="8"/>
+  <text x="160" y="598" text-anchor="middle" class="name">HITL</text>
+  <text x="160" y="620" text-anchor="middle" class="body">V approves exact</text>
+  <text x="160" y="638" text-anchor="middle" class="body">starter domains</text>
+
+  <!-- Sequential lanes -->
+  <rect class="lane" x="540" y="800" width="720" height="80"/>
+  <circle cx="570" cy="830" r="15" fill="#34d399"/>
+  <text x="570" y="835" text-anchor="middle" class="order">3</text>
+  <text x="600" y="830" class="name">LANE 04 · ASK-TIME TAGGER</text>
+  <text x="600" y="853" class="worktree">codex/eval-04-tagger · depends on 02 + 03</text>
+
+  <rect class="lane" x="540" y="930" width="720" height="80"/>
+  <circle cx="570" cy="960" r="15" fill="#34d399"/>
+  <text x="570" y="965" text-anchor="middle" class="order">4</text>
+  <text x="600" y="960" class="name">LANE 05 · TERMINAL-RUN HARVEST</text>
+  <text x="600" y="983" class="worktree">codex/eval-05-harvest · deterministic · zero model calls</text>
+
+  <rect class="lane" x="540" y="1060" width="720" height="80"/>
+  <circle cx="570" cy="1090" r="15" fill="#34d399"/>
+  <text x="570" y="1095" text-anchor="middle" class="order">5</text>
+  <text x="600" y="1090" class="name">LANE 06 · BLIND JUDGE-GRADING ADD-ON</text>
+  <text x="600" y="1113" class="worktree">codex/eval-06-addon · sampling · different-maker DB guard</text>
+
+  <rect class="lane" x="540" y="1170" width="720" height="55"/>
+  <circle cx="570" cy="1197" r="15" fill="#34d399"/>
+  <text x="570" y="1202" text-anchor="middle" class="order">6</text>
+  <text x="600" y="1193" class="name">LANE 07 · BIAS → PROWESS → RANKS</text>
+  <text x="600" y="1214" class="worktree">codex/eval-07-profiles · isolated judge selector stays UNBOUND</text>
+
+  <!-- Lanes 09 and 10 -->
+  <rect class="lane" x="305" y="1260" width="450" height="80"/>
+  <circle cx="335" cy="1290" r="15" fill="#34d399"/>
+  <text x="335" y="1295" text-anchor="middle" class="order">7A</text>
+  <text x="365" y="1290" class="name">LANE 09 · CONSUMER</text>
+  <text x="365" y="1312" class="worktree">codex/eval-09-consumer</text>
+  <text x="365" y="1330" class="tiny">depends 02 + 07</text>
+
+  <rect class="lane" x="1045" y="1260" width="450" height="80"/>
+  <circle cx="1075" cy="1290" r="15" fill="#34d399"/>
+  <text x="1075" y="1295" text-anchor="middle" class="order">7B</text>
+  <text x="1105" y="1290" class="name">LANE 10 · SEAT-SHARE DARK</text>
+  <text x="1105" y="1312" class="worktree">codex/eval-10-seatshare</text>
+  <text x="1105" y="1330" class="tiny">depends 07 + 08 · M=1/2/3 shadow tests</text>
+
+  <rect class="blocked" x="1580" y="1250" width="165" height="92"/>
+  <text x="1662" y="1278" text-anchor="middle" class="name">LIVE BLOCKED</text>
+  <text x="1662" y="1300" text-anchor="middle" class="body">FR-8.0 panel shape</text>
+  <text x="1662" y="1319" text-anchor="middle" class="body">+ V bind required</text>
+  <text x="1662" y="1336" text-anchor="middle" class="tiny">no integration now</text>
+
+  <!-- Final merge row, compact by design -->
+  <rect class="ui" x="585" y="1370" width="630" height="58"/>
+  <circle cx="615" cy="1399" r="15" fill="#22d3ee"/>
+  <text x="615" y="1404" text-anchor="middle" class="order">8</text>
+  <text x="645" y="1395" class="name">LANE 11 · DEV MENU · MERGE LAST</text>
+  <text x="645" y="1416" class="worktree">codex/eval-11-devmenu · depends 03 + 07 + 09 · picker/status/HITL</text>
+
+  <!-- Lane-plan packet row -->
+  <rect x="55" y="1438" width="1690" height="1" fill="#334155"/>
+  <text x="70" y="1463" class="tier">LANE-PLAN PACKET ROW</text>
+  <text x="300" y="1463" class="body">02 → {03 ∥ 08} → 04 → 05 → 06 → 07 → {09 ∥ 10} → 11 · downstream worktrees cut/refreshed only after prerequisite merges</text>
+
+  <!-- Legend -->
+  <rect x="1390" y="148" width="330" height="120" rx="8" fill="#0f172a" stroke="#475569"/>
+  <text x="1410" y="172" class="tier">LEGEND</text>
+  <line x1="1410" y1="192" x2="1450" y2="192" class="parallel"/>
+  <text x="1465" y="196" class="tiny">parallel dependency branch</text>
+  <line x1="1410" y1="216" x2="1450" y2="216" class="edge"/>
+  <text x="1465" y="220" class="tiny">required merge dependency</text>
+  <line x1="1410" y1="240" x2="1450" y2="240" class="hitl"/>
+  <text x="1465" y="244" class="tiny">HITL / approval gate</text>
+  <text x="1410" y="260" class="tiny">rose dashed = forbidden/live blocker</text>
+</svg>

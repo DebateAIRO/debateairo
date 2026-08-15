@@ -1,0 +1,34 @@
+=== PROG-02 grok review round2 Fri Aug 14 22:38:02 EEST 2026 ===
+Writing a round-2 review plan from the objective and the rework commit scope.DoneRound 2 review: verifying Codex's rework against blocker 1 (genuine panel-isolation differential) and the isolation call site.Blocker 1 looks resolved. Writing notes, the round-2 review, and updating the self-report.## PROG-02 Round 2 — Blocker 1 resolved
+
+Reviewed rework commit `11ad2f3` (`test(evaluator): prove persisted panel isolation`) against the round-1 blocker bar.
+
+### Checklist
+
+| Criterion | Result |
+|---|---|
+| Discovery from `configuredProviderSet` like `main.ts` | **PASS** — `readDeploymentMakerCapability` + `ProviderProbeRepository.readLatest(configuredProviders…)` |
+| Healthy vs absent same ask | **PASS** — register 202 with family+AVAILABLE vs 201 without family |
+| Persisted `discovered_panel` + `agent_count` | **PASS** — after `PostgresAskApplication.submit`, hex-equal panel bytes + equal `agent_count` |
+| No evaluator provider/maker among members | **PASS** |
+| Able to fail if mis-enrolled | **PASS** — HEALTHY evaluator probe already in `core.provider_probe`; enrolling it in configured set would change membership/count |
+| Isolation in `runEvaluatorCatalogProbe` | **PASS** — `assertEvaluatorProviderIsolation` runs before probe/persist |
+
+The old fixture-only unit differential is gone. Focused suite: **12/12 pass**.
+
+### Outputs
+
+- `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-2.md`
+- Updated `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`
+- No code edits; HEAD remains `11ad2f3`
+
+REVIEW VERDICT: PASSI'll adversarially verify whether blocker 1 is genuinely resolved and whether the round-2 review evidence holds. Starting with the plan, review artifacts, and the rework commit.Review paths may be on MAIN, not this worktree. Checking MAIN outputs and implementer evidence next.Auditing the reworked tests and product paths against each blocker-1 sub-bar.Evidence checks out: review files, citations, and blocker-1 sub-bars align with shipped code and the 12/12 test log. Writing the verdict.Not RefutedI'll adversarially re-check blocker 1 against commit `11ad2f3` and the plan's FR-0.6 AC5 criteria—not take the implementer's PASS at face value.I'll audit whether round-2 blocker 1 is truly fixed and whether the claimed review artifacts match the evidence—not the implementer's summary.Implementer evidence and rework commit are next—I'll cross-check them against the FR-0.6 AC5 sub-bars.Review artifacts and reworked tests next — checking whether the PASS verdict matches the actual isolation differential.Spot-checking the reworked test and product paths against each sub-bar of blocker 1.I'll audit the written review against the actual reworked tests and product discovery path.Reading the integration differential and product discovery path side-by-side.Evidence matches the review: discovery mirrors `main.ts`, persisted panel/agent_count compare, isolation call site present, tests green. Writing the verdict.Confirming `PostgresAskApplication` persists discovery via the real path, and that the review’s verdict line is exact.Citations and tests hold under audit. Writing the skeptic verdict files.Not RefutedNot RefutedI'll inspect the delivered artifacts and acceptance plan so the closing summary names exactly what shipped and how to use it.Round-2 PROG-02 peer review is done: `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-2.md` (PASS on commit `11ad2f3` panel isolation), with self-report at `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`.
+
+- Open that review for findings and the terminal verdict.
+- On worktree `codex/eval-02-foundation`, re-check tests with:
+  `pnpm exec vitest run tests/integration/evaluator-database.test.ts tests/unit/evaluator-foundation.test.ts`Round-2 PROG-02 peer review is done: `docs/missions/2026-08-14-model-evaluator/programming/reviews/PROG-02-grok-review-2.md` (PASS on commit `11ad2f3` panel isolation), with self-report at `.hermes/reports/2026-08-14-model-evaluator/agent-reports/grok-PROG-02-review.md`.
+
+- Open that review for findings and the terminal verdict.
+- On worktree `codex/eval-02-foundation`, re-check tests with:
+  `pnpm exec vitest run tests/integration/evaluator-database.test.ts tests/unit/evaluator-foundation.test.ts`
+=== grok exited Fri Aug 14 22:44:05 EEST 2026 ===
