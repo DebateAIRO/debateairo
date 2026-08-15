@@ -244,6 +244,89 @@ export async function getSettingsView(
   return settingsViewFromDeployment(await client.readDeployment(token));
 }
 
+export interface EvaluatorDevMenuView {
+  readonly catalog: {
+    readonly state: "AVAILABLE" | "UNAVAILABLE";
+    readonly probeId: string | null;
+    readonly failureCode: string | null;
+    readonly models: readonly { readonly modelId: string }[];
+  };
+  readonly selectedConsumer: {
+    readonly consumerSelectionId: string;
+    readonly modelId: string;
+    readonly selectedAt: string;
+  } | null;
+  readonly dispatchBinding: {
+    readonly state: "UNBOUND";
+    readonly reason: "ROW_ABSENT" | "ROW_INVALID" | "EXPLICIT_UNBOUND";
+    readonly registerVersion: number;
+    readonly sourceRef: string | null;
+  };
+  readonly harvestedRows: number;
+  readonly domains: readonly {
+    readonly domainId: string;
+    readonly canonicalName: string;
+    readonly origin: "STARTER" | "GROWN";
+    readonly provenanceRef: string;
+    readonly admittedAt: string;
+  }[];
+  readonly profiles: readonly {
+    readonly provider: string;
+    readonly modelId: string;
+    readonly modelVersion: string;
+    readonly domainId: string | null;
+    readonly domainName: string | null;
+    readonly step: "AUTHORING" | "JUDGING" | "REVIEWING";
+    readonly metric: string;
+    readonly value: number | null;
+    readonly n: number;
+    readonly intervalLower: number | null;
+    readonly intervalUpper: number | null;
+    readonly derivationVersion: number;
+    readonly rank: number | null;
+  }[];
+  readonly parkedRuns: readonly {
+    readonly runId: string;
+    readonly consecutiveFailures: number;
+    readonly receipts: readonly {
+      readonly state: "FAILED";
+      readonly reason: string;
+      readonly attemptId: string;
+      readonly atSequence: number;
+    }[];
+  }[];
+}
+
+async function evaluatorDevMenuRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      "x-user-dev-token": token,
+      ...init?.headers
+    }
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: unknown; message?: unknown } | null;
+    const code = typeof body?.error === "string" ? body.error : "EVALUATOR_DEV_MENU_REQUEST_FAILED";
+    const message = typeof body?.message === "string" ? body.message : `Evaluator dev menu request failed (${response.status})`;
+    throw new Error(`${code}: ${message}`);
+  }
+  return await response.json() as T;
+}
+
+export function getEvaluatorDevMenu(token: string): Promise<EvaluatorDevMenuView> {
+  return evaluatorDevMenuRequest("/v1/dev/evaluator", token);
+}
+
+export async function selectEvaluatorConsumerModel(token: string, modelId: string): Promise<void> {
+  await evaluatorDevMenuRequest("/v1/dev/evaluator/consumer-selection", token, {
+    method: "POST",
+    body: JSON.stringify({ model_id: modelId })
+  });
+}
+
 export function saveSettings(): Promise<never> {
   return Promise.reject(new Error("V3_HAS_NO_SETTINGS_WRITE: deployment configuration is register-governed, not UI-writable."));
 }

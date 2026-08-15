@@ -35,6 +35,10 @@ import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/criti
 import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
+import type {
+  EvaluatorConsumerSelectionResult,
+  EvaluatorDevMenuView
+} from "@debateai/evaluator";
 
 export interface AskApplication {
   submit(ask: AskRequest, session: Session): Promise<AskAccepted>;
@@ -53,6 +57,19 @@ export interface AskApplication {
 
 export interface ApiOptions {
   readonly application: AskApplication;
+  readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
+  readonly evaluatorDevMenuRegisterVersion?: number;
+  readonly evaluatorDevMenuClock?: () => Date;
+}
+
+export interface EvaluatorDevMenuApplication {
+  readView(registerVersion: number): Promise<EvaluatorDevMenuView>;
+  selectConsumerModel(input: {
+    readonly modelId: string;
+    readonly selectedBy: string;
+    readonly orderRef: string;
+    readonly selectedAt: Date;
+  }): Promise<EvaluatorConsumerSelectionResult>;
 }
 
 /**
@@ -152,6 +169,45 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(session)));
   });
+
+  if (options.evaluatorDevMenu !== undefined) {
+    if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)
+      || options.evaluatorDevMenuRegisterVersion! < 1) {
+      throw new TypeError("EVALUATOR_DEV_MENU_REGISTER_VERSION_REQUIRED");
+    }
+    api.get("/v1/dev/evaluator", async (request, reply) => {
+      const session = resolveSession(request.headers["x-user-dev-token"]);
+      if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      return reply.send(await options.evaluatorDevMenu!.readView(options.evaluatorDevMenuRegisterVersion!));
+    });
+
+    api.post("/v1/dev/evaluator/consumer-selection", async (request, reply) => {
+      const session = resolveSession(request.headers["x-user-dev-token"]);
+      if (session === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      const body = request.body;
+      if (typeof body !== "object" || body === null || !("model_id" in body)
+        || typeof body.model_id !== "string" || body.model_id.trim() === "") {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      }
+      try {
+        const selection = await options.evaluatorDevMenu!.selectConsumerModel({
+          modelId: body.model_id,
+          selectedBy: session.asker_id,
+          orderRef: `dev-menu:${session.session_id}`,
+          selectedAt: options.evaluatorDevMenuClock?.() ?? new Date()
+        });
+        return reply.status(201).send(selection);
+      } catch (error) {
+        if (error instanceof TypedDomainError && [
+          "EVALUATOR_CATALOG_UNAVAILABLE",
+          "EVALUATOR_CONSUMER_MODEL_NOT_ENUMERATED"
+        ].includes(error.code)) {
+          return reply.status(409).send({ error: error.code, message: error.message });
+        }
+        throw error;
+      }
+    });
+  }
 
   api.post("/v1/asks", async (request, reply) => {
     const session = resolveSession(request.headers["x-user-dev-token"]);
