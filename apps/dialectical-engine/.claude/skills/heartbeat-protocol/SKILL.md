@@ -159,13 +159,24 @@ authority.
    and independent review as containment until Codex fixes land.
 
 9. **Hermes board polling — the QA/SCRUM/PROGRAMMING loop surface (V amendment,
-   2026-07-27).** Hermes runs its OWN Kanban board and serves it on
-   **port 9119** (`hermes dashboard`, default port; `--port`/`--host` to
-   override). The Main Orchestrator **polls that board** as the coordination
-   surface for the QA SCRUM PROGRAMMING LOOP — lane status, review state,
-   blockers, and successor routing are read from Hermes's board, not inferred
-   from agent stdout.
+   2026-07-27; tightened by V order 2026-08-15).** Hermes runs its OWN Kanban
+   board and serves it on **port 9119 — ALWAYS 9119, never overridden in
+   missions** (`hermes dashboard`; the `--port`/`--host` flags exist but mission
+   law pins 9119 so every agent and human always knows where the board lives).
+   The Main Orchestrator **polls that board** as the coordination surface for
+   the QA SCRUM PROGRAMMING LOOP — lane status, review state, blockers, and
+   successor routing are read from Hermes's board, not inferred from agent
+   stdout.
    - Poll surface: `http://localhost:9119` (the board Hermes serves).
+   - **Ticket assignee notation (V order, 2026-08-15):** every Kanban ticket
+     carries its assigned model in SQUARE BRACKETS at the start of the ticket
+     title — e.g. `[codex@gpt-5.6-sol] eval-04-tagger`, `[claude-opus] review
+     PROG-05`, `[hermes] stage verdict PROG-05`; unassigned tickets carry
+     `[unassigned]`. The bracket tag is updated on every (re)assignment and
+     must agree with the mission's `loop_ownership` map / model-law roster.
+     The board's assignee column duplicates it, but the title tag is the
+     human-readable law; board-crafting and board-fix goal packets must
+     instruct Hermes accordingly.
    - If the dashboard is not up, the orchestrator asks Hermes to start it
      (`hermes dashboard`) rather than substituting its own tracker; the
      `hermes kanban --board <slug>` CLI reads the same durable store and
