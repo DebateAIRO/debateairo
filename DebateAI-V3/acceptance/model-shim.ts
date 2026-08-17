@@ -143,7 +143,15 @@ function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {
     maker: ACCEPTANCE_MAKER,
     failureCode: "CODEX_CLI_FAILED",
     timeoutCode: "CODEX_CLI_TIMEOUT",
-    buildArguments: (prompt) => ["exec", "--json", prompt],
+    buildArguments: (prompt) => [
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      prompt
+    ],
     parseCompletion: (stdout) => parseCodexCompletion(stdout, sessionsRoot)
   };
 }

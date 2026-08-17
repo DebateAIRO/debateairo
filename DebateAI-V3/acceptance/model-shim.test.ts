@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { isAbsolute, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseCodexCompletion, startModelShim, type ModelShimHandle } from "./model-shim.js";
 
@@ -22,6 +24,44 @@ afterEach(async () => {
 });
 
 describe("ACC-01 model shim", () => {
+  it("spawns the Codex transport from a fresh empty scratch directory outside the project", async () => {
+    const probeScript = [
+      'const { readdirSync, writeFileSync } = require("node:fs");',
+      'const payload = JSON.stringify({ cwd: process.cwd(), pwd: process.env.PWD, oldpwd: process.env.OLDPWD, entries: readdirSync(process.cwd()) });',
+      'writeFileSync("vendor-litter.txt", "test-only litter");',
+      'console.log(JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }));',
+      'console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: payload } }));'
+    ].join("");
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", probeScript, "--"] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "ignored", messages: [{ role: "user", content: "Probe cwd." }] })
+    });
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const probe = JSON.parse(completion.choices[0]!.message.content) as {
+      cwd: string;
+      pwd: string;
+      oldpwd: string;
+      entries: readonly string[];
+    };
+    const fromProject = relative(process.cwd(), probe.cwd);
+
+    expect(probe.cwd).toMatch(/[/\\]relay-openai-[^/\\]+$/);
+    expect(fromProject === "" || (!fromProject.startsWith("..") && !isAbsolute(fromProject))).toBe(false);
+    expect(probe.pwd).toBe(probe.cwd);
+    expect(probe.oldpwd).toBe(probe.cwd);
+    expect(probe.entries).toEqual([]);
+    await expect.poll(() => existsSync(probe.cwd)).toBe(false);
+  });
+
   it("replays the real Codex JSONL shape and resolves lineage from its persisted turn context", async () => {
     const completion = await parseCodexCompletion([
       JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }),
@@ -63,7 +103,15 @@ describe("ACC-01 model shim", () => {
       prompt: string;
       arguments: readonly string[];
     };
-    expect(relayed.arguments.slice(0, 2)).toEqual(["exec", "--json"]);
+    expect(relayed.arguments).toEqual([
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      relayed.prompt
+    ]);
     expect(relayed.arguments.some((argument) => argument.startsWith("model="))).toBe(false);
     expect(relayed.prompt).toContain("[system]\nReturn strict JSON.");
     expect(relayed.prompt).toContain("[user]\nAssess this claim.");

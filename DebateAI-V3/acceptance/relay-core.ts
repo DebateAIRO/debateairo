@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { once } from "node:events";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 
 /**
@@ -80,8 +83,14 @@ export async function invokeCli(
   prompt: string,
   timeoutMs: number
 ): Promise<CliCompletion> {
+  const makerSlug = adapter.maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
+  const scratchDirectory = await mkdtemp(join(await realpath(tmpdir()), `relay-${makerSlug}-`));
   return new Promise((resolve, reject) => {
     const child = spawn(command.binary, [...command.prefixArguments, ...adapter.buildArguments(prompt)], {
+      // CONT-01: vendor CLIs receive no project cwd. A fresh empty directory is
+      // the only ambient filesystem context for every handshake and relay call.
+      cwd: scratchDirectory,
+      env: { ...process.env, PWD: scratchDirectory, OLDPWD: scratchDirectory },
       // DR-133 (kept for every maker): a CLI left with an open stdin can hang;
       // the prompt always travels as an argument, so stdin is closed.
       stdio: ["ignore", "pipe", "pipe"]
@@ -100,6 +109,9 @@ export async function invokeCli(
     });
     child.once("close", (code) => {
       clearTimeout(timer);
+      // Vendor litter is not relay input. Reap it after close without reading
+      // the directory and without making cleanup part of completion success.
+      void rm(scratchDirectory, { recursive: true, force: true }).catch(() => undefined);
       if (timedOut) {
         reject(new CliRelayFailure("TIMEOUT", adapter.timeoutCode));
         return;

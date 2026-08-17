@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { isAbsolute, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 
@@ -28,6 +29,36 @@ afterEach(async () => {
 });
 
 describe("GROK-01 Grok Build CLI relay", () => {
+  it("spawns the Grok transport from a fresh empty scratch directory outside the project", async () => {
+    const probeScript = [
+      'const { readdirSync } = require("node:fs");',
+      'const text = JSON.stringify({ cwd: process.cwd(), pwd: process.env.PWD, oldpwd: process.env.OLDPWD, entries: readdirSync(process.cwd()) });',
+      'console.log(JSON.stringify({ text, stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));'
+    ].join("");
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", probeScript, "--"] }
+    });
+    handles.push(relay);
+
+    const response = await postCompletion(relay, "Probe cwd.");
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const probe = JSON.parse(completion.choices[0]!.message.content) as {
+      cwd: string;
+      pwd: string;
+      oldpwd: string;
+      entries: readonly string[];
+    };
+    const fromProject = relative(process.cwd(), probe.cwd);
+
+    expect(probe.cwd).toMatch(/[/\\]relay-xai-[^/\\]+$/);
+    expect(fromProject === "" || (!fromProject.startsWith("..") && !isAbsolute(fromProject))).toBe(false);
+    expect(probe.pwd).toBe(probe.cwd);
+    expect(probe.oldpwd).toBe(probe.cwd);
+    expect(probe.entries).toEqual([]);
+  });
+
   it("keeps serving observed token usage when the CLI envelope omits cost", async () => {
     process.env.FAKE_GROK_COST_ABSENT = "1";
     try {
