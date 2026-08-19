@@ -593,3 +593,11 @@ export {
   mfaFactor,
   recoveryCode
 } from "./schema.js";
+
+export {
+  PostgresIdentityRepository,
+  type AuthSourceContext,
+  type PendingAccountInput,
+  type PendingAccountResult,
+  type ResendPreparation
+} from "./identity.js";

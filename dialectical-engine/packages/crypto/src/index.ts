@@ -3,9 +3,13 @@ import {
   createDecipheriv,
   createHash,
   createHmac,
-  randomBytes
+  randomBytes,
+  randomInt
 } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
+import { chmod, mkdir, open } from "node:fs/promises";
+import { join } from "node:path";
+import { argon2Verify, argon2id } from "hash-wasm";
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
@@ -181,6 +185,19 @@ export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
   }
 }
 
+export function loadSecretKey(path: string): Buffer {
+  try {
+    const metadata = statSync(path);
+    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+      throw new KekUnresolvedError();
+    }
+    return copyKey(readFileSync(path));
+  } catch (error) {
+    if (error instanceof KekUnresolvedError || error instanceof CryptoInputError) throw error;
+    throw new KekUnresolvedError();
+  }
+}
+
 export function wrapDek(kek: KekHandle, dek: Uint8Array, aad: AeadAad): CryptoEnvelope {
   const key = readKek(kek);
   try {
@@ -320,3 +337,160 @@ export function createEmailBlindIndex(key: Uint8Array, email: string): Buffer {
 }
 
 export const emailBlindIndex = createEmailBlindIndex;
+
+export interface Argon2idParameters {
+  readonly memoryCostKiB: number;
+  readonly timeCost: number;
+  readonly parallelism: number;
+  readonly hashLength: number;
+}
+
+export interface AuditSourceIpKdfParameters {
+  readonly algorithm: "argon2id";
+  readonly memoryCostKiB: number;
+  readonly iterations: number;
+  readonly parallelism: number;
+  readonly hashLength: 32;
+}
+
+const AUDIT_SOURCE_IP_KDF_DOMAIN = "debateai:audit-source-ip:v1\0";
+const AUDIT_USER_AGENT_KDF_DOMAIN = "debateai:audit-user-agent:v1\0";
+
+async function hashAuditContextValue(
+  value: string,
+  salt: Uint8Array,
+  parameters: AuditSourceIpKdfParameters,
+  domain: string
+): Promise<string> {
+  if (value.length === 0 || salt.byteLength < 32 || parameters.algorithm !== "argon2id"
+    || !Number.isInteger(parameters.memoryCostKiB) || parameters.memoryCostKiB < 19_456
+    || !Number.isInteger(parameters.iterations) || parameters.iterations < 2
+    || !Number.isInteger(parameters.parallelism) || parameters.parallelism < 1
+    || parameters.hashLength !== 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return argon2id({
+    password: `${domain}${value}`,
+    salt,
+    memorySize: parameters.memoryCostKiB,
+    iterations: parameters.iterations,
+    parallelism: parameters.parallelism,
+    hashLength: parameters.hashLength,
+    outputType: "hex"
+  });
+}
+
+export async function hashAuditSourceIp(
+  sourceIp: string,
+  salt: Uint8Array,
+  parameters: AuditSourceIpKdfParameters
+): Promise<string> {
+  return hashAuditContextValue(sourceIp, salt, parameters, AUDIT_SOURCE_IP_KDF_DOMAIN);
+}
+
+export async function hashAuditUserAgent(
+  userAgent: string,
+  salt: Uint8Array,
+  parameters: AuditSourceIpKdfParameters
+): Promise<string> {
+  return hashAuditContextValue(userAgent, salt, parameters, AUDIT_USER_AGENT_KDF_DOMAIN);
+}
+
+export async function hashPassword(password: string, parameters: Argon2idParameters): Promise<string> {
+  if (typeof password !== "string" || password.length === 0
+    || !Number.isInteger(parameters.memoryCostKiB) || parameters.memoryCostKiB < 19_456
+    || !Number.isInteger(parameters.timeCost) || parameters.timeCost < 2
+    || !Number.isInteger(parameters.parallelism) || parameters.parallelism < 1
+    || !Number.isInteger(parameters.hashLength) || parameters.hashLength < 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return argon2id({
+    password,
+    salt: randomBytes(16),
+    memorySize: parameters.memoryCostKiB,
+    iterations: parameters.timeCost,
+    parallelism: parameters.parallelism,
+    hashLength: parameters.hashLength,
+    outputType: "encoded"
+  });
+}
+
+export async function verifyPassword(encodedHash: string, password: string): Promise<boolean> {
+  if (!encodedHash.startsWith("$argon2id$")) return false;
+  try {
+    return await argon2Verify({ password, hash: encodedHash });
+  } catch {
+    return false;
+  }
+}
+
+export function generateVerificationToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashVerificationToken(token: string): string {
+  if (typeof token !== "string" || token.length < 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
+}
+
+const PSEUDONYM_ADJECTIVES = Object.freeze([
+  "amber", "brisk", "calm", "clear", "cobalt", "coral", "crisp", "daring",
+  "ember", "gentle", "golden", "honest", "indigo", "lucid", "mellow", "nimble",
+  "open", "patient", "quiet", "rapid", "silver", "steady", "verdant", "vivid"
+]);
+const PSEUDONYM_NOUNS = Object.freeze([
+  "badger", "cedar", "comet", "dolphin", "falcon", "forest", "harbor", "heron",
+  "island", "lantern", "maple", "meadow", "otter", "pebble", "quartz", "raven",
+  "river", "sparrow", "summit", "thistle", "tiger", "willow", "wren", "zephyr"
+]);
+
+export function generatePseudonym(): string {
+  const adjective = PSEUDONYM_ADJECTIVES[randomInt(PSEUDONYM_ADJECTIVES.length)]!;
+  const noun = PSEUDONYM_NOUNS[randomInt(PSEUDONYM_NOUNS.length)]!;
+  return `${adjective}-${noun}-${randomBytes(3).toString("hex")}`;
+}
+
+export interface UserDekStore {
+  store(userId: string, dek: Uint8Array): Promise<void>;
+}
+
+export class FileUserDekStore implements UserDekStore {
+  constructor(
+    private readonly root: string,
+    private readonly kek: KekHandle
+  ) {
+    if (root.trim() === "") throw new TypeError("USER_DEK_STORE_PATH_REQUIRED");
+  }
+
+  async store(userId: string, dek: Uint8Array): Promise<void> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
+    }
+    const aad = [
+      "secret-store", "user-dek", userId, "run:none", userId,
+      `user-dek:${userId}`, "1"
+    ] as const;
+    const envelope = wrapDek(this.kek, dek, aad);
+    const users = join(this.root, "users");
+    const directory = join(users, userId);
+    await mkdir(this.root, { recursive: true, mode: 0o700 });
+    await chmod(this.root, 0o700);
+    await mkdir(users, { recursive: true, mode: 0o700 });
+    await chmod(users, 0o700);
+    await mkdir(directory, { recursive: false, mode: 0o700 });
+    const location = join(directory, "dek.v1.json");
+    const file = await open(location, "wx", 0o600);
+    try {
+      await file.writeFile(JSON.stringify({
+        version: 1,
+        user_id: userId,
+        key_id: envelope.keyId,
+        wrapped_dek: envelope
+      }), "utf8");
+    } finally {
+      await file.close();
+    }
+  }
+}

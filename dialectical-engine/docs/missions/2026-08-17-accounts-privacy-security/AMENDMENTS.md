@@ -164,3 +164,44 @@ vendor register.
 
 **VR-6 · Commit hygiene: commit each dual-greenlit ticket locally** (ticket id +
 both verdicts referenced in the message). **Never pushed** — V's push law stands.
+
+**VR-7 · Memory-hard KDF for the audit source IP.** The audit table is
+append-only, so the IP salt can never be rotated; with a fast hash a leaked salt
+retroactively exposes every historical IP (2^32 IPv4 space = sub-second GPU
+sweep), permanently and unfixably. V ruled for defence in depth: use a
+memory-hard KDF (argon2id, already in-tree via hash-wasm) with **ruled cost
+parameters**, keyed by the secret-store salt. Correlation and no-raw-IP
+properties preserved; password hashing untouched.
+
+**VR-8 · Side-finding policy.** Reviewer findings outside the current ticket:
+**fold in if small** (a one-line predicate, a mechanical fix); **cut a board
+ticket if larger**, so it is visible and scheduled rather than forgotten. Applied
+this round: the LRU eviction bypass was folded in (one predicate); the lockfile
+gap was folded in once proven to be the ticket's own work.
+
+**VR-9 · Split S3.** After four rework rounds — each fixing its findings while
+introducing new ones — V ruled the ticket is too large to review to a safe state.
+It bundles seven subsystems. **Land the verified-safe parts; re-cut the rest into
+tickets with one concern each.** Verified safe and retained: the crypto
+foundation, the identity schema, VR-3 erasure (verified twice incl. an isolated
+Postgres + 12 encodings), pseudonyms, blind index, argon2id password hashing.
+Re-cut: registration durability, rate limiting, mail/cooldown, and migration 0032
+(which as written **bricks any database holding audit rows** — 0030 declares
+`actor_ciphertext NOT NULL`, 0032 adds `CHECK (actor_ciphertext IS NULL)` without
+`NOT VALID`, and migrate() runs all pending migrations in one transaction).
+
+**VR-10 · Mutation-test every security assertion (STANDING RULE).** All three of
+round 4's proof tests passed against deliberately broken implementations — rate
+limiting entirely deleted, the timing attack permitted by the assertion itself,
+weak hashing for any string over 32 chars (i.e. every real browser). Green gates
+therefore carried no information. **From now on, before any security ticket
+closes, the implementation is deliberately broken and each guarding test must be
+shown to FAIL.** A test that passes against a broken implementation is a defect
+in its own right and blocks the ticket.
+
+**Carried into S3b (from the S3a diamond):** the audit-context hashing still runs
+*inside* the transaction (`packages/db/src/identity.ts:89-92`), so the
+"throw rolls back the audit row" mechanism survives structurally. It is safe today
+only because every route funnels through `sourceContext`, which now clamps blanks.
+**S3b must normalise at the repository boundary** so a future writer cannot
+reintroduce audit evasion by bypassing `sourceContext`.

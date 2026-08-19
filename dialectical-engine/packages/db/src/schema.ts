@@ -22,6 +22,7 @@ export const identityUser = identity.table("user", {
   phoneCiphertext: jsonb("phone_ciphertext"),
   passwordHash: text("password_hash").notNull(),
   pseudonym: text("pseudonym").notNull().unique(),
+  auditToken: uuid("audit_token").notNull().defaultRandom().unique(),
   state: text("state").notNull().default("pending_verification"),
   adultAffirmedAt: timestamp("adult_affirmed_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
@@ -57,7 +58,13 @@ export const channelBinding = identity.table("channel_binding", {
   state: text("state").notNull().default("pending_verification"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
-  revokedAt: timestamp("revoked_at", { withTimezone: true })
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  verificationTokenHash: text("verification_token_hash"),
+  verificationExpiresAt: timestamp("verification_expires_at", { withTimezone: true }),
+  verificationConsumedAt: timestamp("verification_consumed_at", { withTimezone: true }),
+  verificationLastSentAt: timestamp("verification_last_sent_at", { withTimezone: true }),
+  deliveryStatus: text("delivery_status"),
+  deliveryError: text("delivery_error")
 });
 
 export const identitySession = identity.table("session", {
@@ -76,7 +83,7 @@ export const auditEvent = identity.table("audit_event", {
   auditId: uuid("audit_id").primaryKey().defaultRandom(),
   prevHash: bytea("prev_hash"),
   thisHash: bytea("this_hash").notNull().unique(),
-  actorCiphertext: jsonb("actor_ciphertext").notNull(),
+  actorCiphertext: jsonb("actor_ciphertext"),
   actorKeyRef: text("actor_key_ref").notNull(),
   eventType: text("event_type").notNull(),
   targetType: text("target_type").notNull(),

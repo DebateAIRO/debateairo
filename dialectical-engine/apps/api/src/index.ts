@@ -39,6 +39,10 @@ import type {
   EvaluatorConsumerSelectionResult,
   EvaluatorDevMenuView
 } from "@debateai/evaluator";
+import {
+  AuthFlowError,
+  type RegistrationApplication
+} from "./registration.js";
 
 type RouteAuthPolicy = "public" | "user";
 
@@ -69,6 +73,7 @@ export interface AskApplication {
 
 export interface ApiOptions {
   readonly application: AskApplication;
+  readonly registration?: RegistrationApplication;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
@@ -171,18 +176,63 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     const knownError = error instanceof Error ? error : new Error(String(error));
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
+    const authFlow = knownError instanceof AuthFlowError;
     // Only an error marked at the ask-evaluation stage is a refusal. Register,
     // memory, sequence-allocation and other persistence faults remain 5xx even
     // when they happen behind POST /v1/asks (DR-115).
     const askRefusal = knownError instanceof AskRefusal;
-    const statusCode = malformed ? 400 : askRefusal ? 422 : 500;
+    const statusCode = malformed ? 400 : authFlow ? knownError.statusCode : askRefusal ? 422 : 500;
     return reply.status(statusCode).send({
       error: malformed
         ? "MALFORMED_REQUEST"
-        : askRefusal ? knownError.code : "INTERNAL_ERROR",
+        : authFlow ? knownError.code : askRefusal ? knownError.code : "INTERNAL_ERROR",
       message: knownError.message
     });
   });
+
+  if (options.registration !== undefined) {
+    const sourceFor = (request: {
+      readonly ip: string;
+      readonly id: string;
+      readonly headers: Readonly<Record<string, unknown>>;
+    }) => Object.freeze({
+      ip: request.ip,
+      userAgent: typeof request.headers["user-agent"] === "string"
+        ? request.headers["user-agent"] as string
+        : "unknown",
+      requestId: request.id
+    });
+    api.post("/v1/auth/register", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      const response = await options.registration!.register({
+        email: typeof body.email === "string" ? body.email : "",
+        password: typeof body.password === "string" ? body.password : "",
+        recoveryEmail: typeof body.recovery_email === "string" ? body.recovery_email : "",
+        adultAffirmed: body.adult_affirmed === true
+      }, sourceFor(request));
+      return reply.status(202).send(response);
+    });
+    api.post("/v1/auth/verify-email", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      const response = await options.registration!.verifyEmail({
+        token: typeof body.token === "string" ? body.token : ""
+      }, sourceFor(request));
+      return reply.send(response);
+    });
+    api.post("/v1/auth/resend-verification", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      const response = await options.registration!.resendVerification({
+        email: typeof body.email === "string" ? body.email : ""
+      }, sourceFor(request));
+      return reply.status(202).send(response);
+    });
+  }
 
   api.get("/v1/session", { config: { auth: "user" } }, async (request, reply) => {
     return reply.send(request.session);

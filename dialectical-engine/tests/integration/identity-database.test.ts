@@ -148,19 +148,14 @@ describe("S2 identity schema on real PostgreSQL", () => {
 
   it("rejects update and delete of append-only audit events with SQLSTATE 55000", async () => {
     const auditId = randomUUID();
-    const auditKey = generateDek();
-    const actorAad = [
-      "identity", "audit_event", auditId, "run:none", "user:audit",
-      "audit-key:user:audit", "1"
-    ] as const;
-    const actorCiphertext = encrypt(auditKey, Buffer.from("user:audit", "utf8"), actorAad);
+    const auditToken = randomUUID();
     await database.pool.query(`
       INSERT INTO identity.audit_event (
         audit_id,prev_hash,this_hash,actor_ciphertext,actor_key_ref,event_type,
         target_type,target_id,occurred_at,source_context,decision,success,justification
-      ) VALUES ($1,NULL,$2,$3::jsonb,$4,'identity.login','identity.user','user:audit',
+      ) VALUES ($1,NULL,$2,NULL,$3,'identity.login','identity.user',$3,
         now(),'{}'::jsonb,'ALLOW',true,NULL)
-    `, [auditId, Buffer.alloc(32, 0x7a), JSON.stringify(actorCiphertext), "audit-key:user:audit"]);
+    `, [auditId, Buffer.alloc(32, 0x7a), auditToken]);
 
     await expect(database.pool.query(
       `UPDATE identity.audit_event SET success=false WHERE audit_id=$1`, [auditId]
