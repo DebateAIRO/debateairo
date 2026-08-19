@@ -40,13 +40,18 @@ export interface RegistrationApplication {
 }
 
 export class AuthFlowError extends Error {
-  constructor(readonly code: "AUTH_INPUT_INVALID" | "AUTH_RATE_LIMITED" | "VERIFICATION_TOKEN_INVALID") {
+  constructor(readonly code:
+    | "AUTH_INPUT_INVALID"
+    | "AUTH_RATE_LIMITED"
+    | "AUTH_REGISTRATION_FAILED"
+    | "VERIFICATION_TOKEN_INVALID"
+  ) {
     super(code);
     this.name = "AuthFlowError";
   }
 
-  get statusCode(): 400 | 429 {
-    return this.code === "AUTH_RATE_LIMITED" ? 429 : 400;
+  get statusCode(): 400 | 429 | 503 {
+    return this.code === "AUTH_RATE_LIMITED" ? 429 : this.code === "AUTH_REGISTRATION_FAILED" ? 503 : 400;
   }
 }
 
@@ -195,8 +200,10 @@ type IdentityRepository = Pick<PostgresIdentityRepository,
   | "findAuditIdentityByBlindIndex"
   | "findAuditIdentityByVerificationHash"
   | "recordVerificationDelivery"
+  | "recordDuplicateRegistrationPostwork"
   | "consumeVerification"
   | "prepareVerificationResend"
+  | "recordRegistrationFailure"
   | "recordRateLimitRefusal"
 >;
 
@@ -214,6 +221,26 @@ interface PendingRegistration {
   readonly source: AuthSourceContext;
 }
 
+interface VerificationDelivery {
+  readonly userId: string;
+  readonly channelBindingId: string;
+  readonly email: string;
+  readonly token: string;
+  readonly expiresAt: Date;
+  readonly source: AuthSourceContext;
+}
+
+type VerificationDeliveryPostwork = VerificationDelivery & Readonly<{ kind: "delivery" }>;
+
+interface DuplicateRegistrationPostwork {
+  readonly kind: "duplicate";
+  readonly userId: string;
+  readonly attemptId: string;
+  readonly source: AuthSourceContext;
+}
+
+type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
+
 function sourceContext(source: AuthSourceContext): AuthSourceContext {
   if (source.ip.trim() === "" || source.requestId.trim() === "") {
     throw new AuthFlowError("AUTH_INPUT_INVALID");
@@ -230,7 +257,6 @@ export class RegistrationService implements RegistrationApplication {
   private readonly clock: () => Date;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly pendingMailDispatches = new Set<Promise<void>>();
-  private readonly pendingRegistrationDispatches = new Set<Promise<void>>();
   private readonly pendingRefusalAuditFlushes = new Map<AuthRoute, {
     readonly windowStartedAt: number;
     readonly timer: ReturnType<typeof setTimeout>;
@@ -257,6 +283,13 @@ export class RegistrationService implements RegistrationApplication {
   private async holdEnumerationFloor(startedAt: number): Promise<void> {
     const remaining = this.dependencies.policy.verification.enumerationResponseFloorMs
       - (performance.now() - startedAt);
+    if (remaining > 0) await this.sleep(remaining);
+  }
+
+  private async holdRegistrationEnumerationClamp(startedAt: number): Promise<void> {
+    const clampMs = this.dependencies.policy.verification.enumerationResponseFloorMs
+      + this.dependencies.policy.verification.enumerationToleranceMs;
+    const remaining = clampMs - (performance.now() - startedAt);
     if (remaining > 0) await this.sleep(remaining);
   }
 
@@ -334,12 +367,27 @@ export class RegistrationService implements RegistrationApplication {
     throw new AuthFlowError("AUTH_RATE_LIMITED");
   }
 
-  private dispatchVerification(input: Parameters<RegistrationService["deliverVerification"]>[0]): void {
+  private dispatchVerification(input: RegistrationPostwork | VerificationDelivery): void {
+    const duplicate = "kind" in input && input.kind === "duplicate" ? input : undefined;
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
-      .then(() => this.deliverVerification(input))
+      .then(() => duplicate === undefined
+        ? this.deliverVerification(input as VerificationDelivery)
+        : this.dependencies.repository.recordDuplicateRegistrationPostwork({
+            userId: duplicate.userId,
+            occurredAt: this.clock(),
+            source: duplicate.source
+          }))
       .catch(() => {
-        console.error(`[AUTH_MAIL_DELIVERY_RECORD_FAILED] attempt=${input.channelBindingId} code=MAIL_RECORD_FAILED`);
+        if (duplicate === undefined) {
+          console.error(
+            `[AUTH_MAIL_DELIVERY_RECORD_FAILED] attempt=${(input as VerificationDelivery).channelBindingId} code=MAIL_RECORD_FAILED`
+          );
+        } else {
+          console.error(
+            `[AUTH_REGISTRATION_DUPLICATE_POSTWORK_FAILED] attempt=${duplicate.attemptId} code=AUDIT_RECORD_FAILED`
+          );
+        }
       })
       .finally(() => this.pendingMailDispatches.delete(pending));
     this.pendingMailDispatches.add(pending);
@@ -351,24 +399,7 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
-  private dispatchPendingRegistration(input: PendingRegistration): void {
-    let pending!: Promise<void>;
-    pending = this.sleep(this.dependencies.policy.verification.enumerationToleranceMs)
-      .then(() => this.provisionPendingAccount(input))
-      .catch(() => {
-        console.error("[AUTH_REGISTRATION_PROVISION_FAILED] code=PROVISION_FAILED");
-      })
-      .finally(() => this.pendingRegistrationDispatches.delete(pending));
-    this.pendingRegistrationDispatches.add(pending);
-  }
-
-  async drainRegistrationDispatches(): Promise<void> {
-    while (this.pendingRegistrationDispatches.size > 0) {
-      await Promise.allSettled([...this.pendingRegistrationDispatches]);
-    }
-  }
-
-  private async provisionPendingAccount(input: PendingRegistration): Promise<void> {
+  private async provisionPendingAccount(input: PendingRegistration): Promise<RegistrationPostwork> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const userId = randomUUID();
       const auditToken = randomUUID();
@@ -402,8 +433,16 @@ export class RegistrationService implements RegistrationApplication {
           source: input.source
         }, () => this.dependencies.dekStore.store(userId, dek));
         if (created.status === "pseudonym_collision") continue;
-        if (created.status === "email_duplicate") return;
-        this.dispatchVerification({
+        if (created.status === "email_duplicate") {
+          return Object.freeze({
+            kind: "duplicate" as const,
+            userId: created.userId,
+            attemptId: randomUUID(),
+            source: input.source
+          });
+        }
+        return Object.freeze({
+          kind: "delivery" as const,
           userId: created.userId,
           channelBindingId: created.channelBindingId,
           email: input.email,
@@ -411,7 +450,6 @@ export class RegistrationService implements RegistrationApplication {
           expiresAt,
           source: input.source
         });
-        return;
       } finally {
         dek.fill(0);
       }
@@ -419,14 +457,7 @@ export class RegistrationService implements RegistrationApplication {
     throw new Error("PSEUDONYM_ALLOCATION_EXHAUSTED");
   }
 
-  private async deliverVerification(input: {
-    readonly userId: string;
-    readonly channelBindingId: string;
-    readonly email: string;
-    readonly token: string;
-    readonly expiresAt: Date;
-    readonly source: AuthSourceContext;
-  }): Promise<void> {
+  private async deliverVerification(input: VerificationDelivery): Promise<void> {
     let errorCode: string | null = null;
     try {
       await this.dependencies.mail.sendVerification({
@@ -451,7 +482,8 @@ export class RegistrationService implements RegistrationApplication {
   async register(input: RegisterInput, rawSource: AuthSourceContext): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
-    let pendingRegistration: PendingRegistration | undefined;
+    const correlationId = randomUUID();
+    let pendingPostwork: RegistrationPostwork | undefined;
     try {
       if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
         || typeof input.password !== "string"
@@ -481,16 +513,31 @@ export class RegistrationService implements RegistrationApplication {
       }
 
       const passwordHash = await hashPassword(input.password, this.dependencies.policy.password.argon2id);
-      if (existing !== null) return REGISTRATION_PUBLIC_RESPONSE;
-      pendingRegistration = Object.freeze({
-        email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
-      });
+      try {
+        pendingPostwork = await this.provisionPendingAccount(Object.freeze({
+          email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
+        }));
+      } catch {
+        console.error(
+          `[AUTH_REGISTRATION_PROVISION_FAILED] correlation=${correlationId} code=PROVISION_FAILED`
+        );
+        await this.dependencies.repository.recordRegistrationFailure({
+          correlationId,
+          occurredAt: requestedAt,
+          source
+        }).catch(() => {
+          console.error(
+            `[AUTH_REGISTRATION_FAILURE_AUDIT_FAILED] correlation=${correlationId} code=AUDIT_RECORD_FAILED`
+          );
+        });
+        throw new AuthFlowError("AUTH_REGISTRATION_FAILED");
+      }
       return REGISTRATION_PUBLIC_RESPONSE;
     } finally {
       try {
-        await this.holdEnumerationFloor(startedAt);
+        await this.holdRegistrationEnumerationClamp(startedAt);
       } finally {
-        if (pendingRegistration !== undefined) this.dispatchPendingRegistration(pendingRegistration);
+        if (pendingPostwork !== undefined) this.dispatchVerification(pendingPostwork);
       }
     }
   }

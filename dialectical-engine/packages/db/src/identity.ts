@@ -31,7 +31,7 @@ export interface PendingAccountInput {
 
 export type PendingAccountResult =
   | Readonly<{ status: "created"; userId: string; auditToken: string; channelBindingId: string }>
-  | Readonly<{ status: "email_duplicate" }>
+  | Readonly<{ status: "email_duplicate"; userId: string }>
   | Readonly<{ status: "pseudonym_collision" }>;
 
 export type ResendPreparation =
@@ -53,6 +53,19 @@ function assertOpaqueToken(value: string): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
     throw new TypeError("AUDIT_TOKEN_MUST_BE_RANDOM_UUID_V4");
   }
+}
+
+function normalizeAuditContextValue(value: unknown, maximumLength: number): string {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return (trimmed === "" ? "unknown" : trimmed).slice(0, maximumLength);
+}
+
+function normalizeAuditSourceContext(source: AuthSourceContext): AuthSourceContext {
+  return Object.freeze({
+    ip: normalizeAuditContextValue(source?.ip, 64),
+    userAgent: normalizeAuditContextValue(source?.userAgent, 256),
+    requestId: normalizeAuditContextValue(source?.requestId, 128)
+  });
 }
 
 export class PostgresIdentityRepository {
@@ -86,9 +99,10 @@ export class PostgresIdentityRepository {
 
   private async appendAudit(client: PoolClient, event: AuditWrite): Promise<void> {
     assertOpaqueToken(event.actorToken);
-    const ipArgon2id = await hashAuditSourceIp(event.source.ip, this.sourceIpSalt, this.sourceIpKdf);
+    const source = normalizeAuditSourceContext(event.source);
+    const ipArgon2id = await hashAuditSourceIp(source.ip, this.sourceIpSalt, this.sourceIpKdf);
     const userAgentArgon2id = await hashAuditUserAgent(
-      event.source.userAgent, this.sourceIpSalt, this.sourceIpKdf
+      source.userAgent, this.sourceIpSalt, this.sourceIpKdf
     );
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('identity:audit-chain', 0))");
     const head = await client.query<{ this_hash: Buffer }>(`
@@ -161,12 +175,35 @@ export class PostgresIdentityRepository {
         input.occurredAt
       ]);
       if (inserted.rowCount === 0) {
-        const duplicate = await client.query(`
-          SELECT 1 FROM identity."user" WHERE email_blind_index=$1
+        const duplicate = await client.query<{ user_id: string; audit_token: string }>(`
+          SELECT user_id,audit_token FROM identity."user" WHERE email_blind_index=$1
         `, [input.emailBlindIndex]);
-        return Object.freeze({
-          status: duplicate.rowCount === 0 ? "pseudonym_collision" as const : "email_duplicate" as const
+        const existing = duplicate.rows[0];
+        if (existing === undefined) {
+          return Object.freeze({ status: "pseudonym_collision" as const });
+        }
+        await client.query(`
+          UPDATE identity."user" SET state=state WHERE user_id=$1
+        `, [existing.user_id]);
+        await client.query(`
+          UPDATE identity.channel_binding SET state=state
+          WHERE user_id=$1 AND channel_type='email'
+        `, [existing.user_id]);
+        await client.query(`
+          UPDATE identity.channel_binding SET state=state
+          WHERE user_id=$1 AND channel_type='recovery_email'
+        `, [existing.user_id]);
+        await this.appendAudit(client, {
+          actorToken: existing.audit_token,
+          eventType: "identity.registration",
+          targetType: "identity.user",
+          occurredAt: input.occurredAt,
+          source: input.source,
+          decision: "DENY",
+          success: false,
+          justification: "REGISTRATION_ADDRESS_UNAVAILABLE"
         });
+        return Object.freeze({ status: "email_duplicate" as const, userId: existing.user_id });
       }
       const emailChannel = await client.query<{ channel_binding_id: string }>(`
         INSERT INTO identity.channel_binding (
@@ -264,6 +301,33 @@ export class PostgresIdentityRepository {
         decision: "ALLOW",
         success: input.success,
         justification: input.errorCode
+      });
+    });
+  }
+
+  async recordDuplicateRegistrationPostwork(input: {
+    readonly userId: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<void> {
+    await this.transaction(async (client) => {
+      const user = await client.query<{ audit_token: string }>(`
+        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
+      `, [input.userId]);
+      if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
+      await client.query(`
+        UPDATE identity.channel_binding SET state=state
+        WHERE user_id=$1 AND channel_type='email'
+      `, [input.userId]);
+      await this.appendAudit(client, {
+        actorToken: user.rows[0].audit_token,
+        eventType: "identity.registration.duplicate_postwork",
+        targetType: "identity.channel_binding",
+        occurredAt: input.occurredAt,
+        source: input.source,
+        decision: "DENY",
+        success: false,
+        justification: "REGISTRATION_ADDRESS_UNAVAILABLE"
       });
     });
   }
@@ -400,6 +464,23 @@ export class PostgresIdentityRepository {
       success: false,
       justification: `aggregate:route-window;route:${input.route};window:${input.aggregateWindowStartedAt.toISOString()}`
         + `;count:${input.count};ip_count:${input.ipCount};address_count:${input.addressCount}`
+    }));
+  }
+
+  async recordRegistrationFailure(input: {
+    readonly correlationId: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<void> {
+    await this.transaction((client) => this.appendAudit(client, {
+      actorToken: input.correlationId,
+      eventType: "identity.registration.failed",
+      targetType: "identity.registration_attempt",
+      occurredAt: input.occurredAt,
+      source: input.source,
+      decision: "DENY",
+      success: false,
+      justification: "PROVISION_FAILED"
     }));
   }
 }

@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate, PostgresIdentityRepository } from "@debateai/db";
 import {
   createEmailBlindIndex,
+  encrypt,
   FileUserDekStore,
+  generateDek,
   generateVerificationToken,
   hashAuditSourceIp,
   hashAuditUserAgent,
@@ -48,6 +50,48 @@ const basePolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
 
 function withPolicy(overrides: Partial<AuthPolicy>): AuthPolicy {
   return Object.freeze({ ...basePolicy, ...overrides });
+}
+
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1]! + sorted[middle]!) / 2
+    : sorted[middle]!;
+}
+
+function bestSingleThresholdClassifierAccuracy(
+  existing: readonly number[],
+  missing: readonly number[]
+): number {
+  const distinct = [...new Set([...existing, ...missing])].sort((left, right) => left - right);
+  const thresholds = [
+    Number.NEGATIVE_INFINITY,
+    ...distinct.slice(0, -1).map((value, index) => (value + distinct[index + 1]!) / 2),
+    Number.POSITIVE_INFINITY
+  ];
+  let bestCorrect = 0;
+  for (const threshold of thresholds) {
+    const existingBelow = existing.filter((value) => value < threshold).length;
+    const missingAbove = missing.filter((value) => value >= threshold).length;
+    const forwardCorrect = existingBelow + missingAbove;
+    const reverseCorrect = existing.length + missing.length - forwardCorrect;
+    bestCorrect = Math.max(bestCorrect, forwardCorrect, reverseCorrect);
+  }
+  return bestCorrect / (existing.length + missing.length);
+}
+
+function aucSeparability(existing: readonly number[], missing: readonly number[]): number {
+  let missingWins = 0;
+  let ties = 0;
+  for (const existingValue of existing) {
+    for (const missingValue of missing) {
+      if (missingValue > existingValue) missingWins += 1;
+      if (missingValue === existingValue) ties += 1;
+    }
+  }
+  const auc = (missingWins + 0.5 * ties) / (existing.length * missing.length);
+  return Math.max(auc, 1 - auc);
 }
 
 function buildService(input: {
@@ -96,8 +140,6 @@ async function registerAccount(
   const password = override.password ?? "correct horse battery staple";
   const recoveryEmail = override.recoveryEmail ?? `${label}-recovery@example.test`;
   const response = await service.register({ email, password, recoveryEmail, adultAffirmed: true }, source);
-  await (service as RegistrationService & { drainRegistrationDispatches?: () => Promise<void> })
-    .drainRegistrationDispatches?.();
   await (service as RegistrationService & { drainMailDispatches?: () => Promise<void> })
     .drainMailDispatches?.();
   const index = createEmailBlindIndex(blindIndexKey, email);
@@ -248,7 +290,6 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         recoveryEmail: `s3a-a2-${label}-recovery@example.test`,
         adultAffirmed: true
       }, routeSource)).resolves.toEqual(REGISTRATION_PUBLIC_RESPONSE);
-      await flow.service.drainRegistrationDispatches();
       await flow.service.drainMailDispatches();
       await expect(flow.service.verifyEmail({ token: generateVerificationToken() }, routeSource))
         .rejects.toMatchObject({ code: "VERIFICATION_TOKEN_INVALID" });
@@ -292,27 +333,33 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     let intakeClockCalls = 0;
     let draining = false;
     let releaseProvisioning!: () => void;
+    let markProvisioningEntered!: () => void;
     const provisioningGate = new Promise<void>((resolve) => { releaseProvisioning = resolve; });
+    const provisioningEntered = new Promise<void>((resolve) => { markProvisioningEntered = resolve; });
+    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
     const flow = buildService({
       clock: () => draining
         ? new Date(drainTime)
         : new Date(requestedBase.getTime() + intakeClockCalls++),
-      sleep: async (milliseconds) => {
-        if (milliseconds === basePolicy.verification.enumerationToleranceMs) {
+      dekStore: {
+        async store(userId, dek) {
+          markProvisioningEntered();
           await provisioningGate;
+          await durableStore.store(userId, dek);
         }
       }
     });
 
-    await Promise.all(labels.map((label) => flow.service.register({
+    const registrations = labels.map((label) => flow.service.register({
       email: `s3a-a3-${label}@example.test`,
       password: "correct horse battery staple",
       recoveryEmail: `s3a-a3-${label}-recovery@example.test`,
       adultAffirmed: true
-    }, { ...source, requestId: `request:s3a:a3:${label}` })));
+    }, { ...source, requestId: `request:s3a:a3:${label}` }));
     draining = true;
+    await provisioningEntered;
     releaseProvisioning();
-    await flow.service.drainRegistrationDispatches();
+    await Promise.all(registrations);
     await flow.service.drainMailDispatches();
 
     const drifts: number[] = [];
@@ -342,6 +389,213 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     console.info(
       `[S3a A3 RED/GREEN] concurrent=${labels.length} drain_delay_ms=12700 `
       + `max_request_timestamp_drift_ms=${Math.max(...drifts)}`
+    );
+  }, 30_000);
+
+  it("S3b keeps a success pending until its real PostgreSQL transaction commits", async () => {
+    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+    let releaseStore!: () => void;
+    let markStoreEntered!: () => void;
+    const storeGate = new Promise<void>((resolve) => { releaseStore = resolve; });
+    const storeEntered = new Promise<void>((resolve) => { markStoreEntered = resolve; });
+    const gatedStore: UserDekStore = {
+      async store(userId, dek) {
+        markStoreEntered();
+        await storeGate;
+        await durableStore.store(userId, dek);
+      }
+    };
+    const flow = buildService({ dekStore: gatedStore });
+    const email = "s3b-commit-gate@example.test";
+    const index = createEmailBlindIndex(blindIndexKey, email);
+    let settledBeforeRelease = 0;
+    const registration = flow.service.register({
+      email,
+      password: "correct horse battery staple",
+      recoveryEmail: "s3b-commit-gate-recovery@example.test",
+      adultAffirmed: true
+    }, {
+      ip: "198.51.100.201",
+      userAgent: "vitest-s3b-commit-gate",
+      requestId: "request:s3b:commit-gate"
+    }).then((response) => {
+      settledBeforeRelease += 1;
+      return response;
+    });
+
+    await storeEntered;
+    await new Promise<void>((resolve) => setTimeout(
+      resolve,
+      basePolicy.verification.enumerationResponseFloorMs
+        + basePolicy.verification.enumerationToleranceMs
+        + 50
+    ));
+    const responsesSettledWhileCommitBlocked = settledBeforeRelease;
+    const beforeRelease = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM identity."user"
+      WHERE email_blind_index=$1
+    `, [index]);
+    releaseStore();
+    const response = await registration;
+    const committedAtResponse = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM identity."user"
+      WHERE email_blind_index=$1
+    `, [index]);
+    await flow.service.drainMailDispatches();
+
+    console.info(
+      `[S3b COMMIT GATE] backend=postgres settled_while_commit_blocked=${responsesSettledWhileCommitBlocked} `
+      + `committed_before_release=${beforeRelease.rows[0]!.count} `
+      + `committed_at_response=${committedAtResponse.rows[0]!.count}`
+    );
+    expect(Object.prototype.hasOwnProperty.call(flow.service, "pendingRegistrationDispatches")).toBe(false);
+    expect(responsesSettledWhileCommitBlocked).toBe(0);
+    expect(Number(beforeRelease.rows[0]!.count)).toBe(0);
+    expect(response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    expect(Number(committedAtResponse.rows[0]!.count)).toBe(1);
+  }, 30_000);
+
+  it("S3b returns 100 burst successes only after all 100 accounts are committed", async () => {
+    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+    const delayedStore: UserDekStore = {
+      async store(userId, dek) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 25));
+        await durableStore.store(userId, dek);
+      }
+    };
+    const burstPolicy = withPolicy({
+      password: Object.freeze({
+        ...basePolicy.password,
+        argon2id: Object.freeze({
+          ...basePolicy.password.argon2id,
+          memoryCostKiB: 19_456,
+          timeCost: 2
+        })
+      })
+    });
+    const flow = buildService({ policy: burstPolicy, dekStore: delayedStore });
+    const indexes: Buffer[] = [];
+    const responses = await Promise.all(Array.from({ length: 100 }, (_, index) => {
+      const email = `s3b-durability-${index}@example.test`;
+      indexes.push(createEmailBlindIndex(blindIndexKey, email));
+      return flow.service.register({
+        email,
+        password: "correct horse battery staple",
+        recoveryEmail: `s3b-durability-${index}-recovery@example.test`,
+        adultAffirmed: true
+      }, {
+        ip: `198.51.100.${index + 1}`,
+        userAgent: "vitest-s3b-durability",
+        requestId: `request:s3b:durability:${index}`
+      });
+    }));
+    const committedAtResponse = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM identity."user"
+      WHERE email_blind_index=ANY($1::bytea[])
+    `, [indexes]);
+    await flow.service.drainMailDispatches();
+
+    console.info(
+      `[S3b DURABILITY BURST] backend=postgres concurrent=100 successes=${responses.length} `
+      + `committed_at_response=${committedAtResponse.rows[0]!.count}`
+    );
+    expect(responses).toEqual(Array.from({ length: 100 }, () => REGISTRATION_PUBLIC_RESPONSE));
+    expect(Number(committedAtResponse.rows[0]!.count)).toBe(responses.length);
+  }, 120_000);
+
+  it("S3b turns a provisioning failure into a correlated typed failure and durable failure audit", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const flow = buildService({
+      dekStore: {
+        async store() {
+          throw new Error("simulated secret-store failure with private detail");
+        }
+      }
+    });
+    const email = "s3b-provision-failure@example.test";
+    let outcome: unknown = "success";
+    try {
+      await flow.service.register({
+        email,
+        password: "correct horse battery staple",
+        recoveryEmail: "s3b-provision-failure-recovery@example.test",
+        adultAffirmed: true
+      }, { ...source, requestId: "request:s3b:provision-failure" });
+    } catch (caught) {
+      outcome = caught;
+    }
+    try {
+      expect(outcome).toMatchObject({ code: "AUTH_REGISTRATION_FAILED", statusCode: 503 });
+      const operatorLines = error.mock.calls.flat().map(String);
+      const failureLine = operatorLines.find((line) => line.startsWith("[AUTH_REGISTRATION_PROVISION_FAILED]"));
+      expect(failureLine).toMatch(
+        /^\[AUTH_REGISTRATION_PROVISION_FAILED\] correlation=[0-9a-f-]{36} code=PROVISION_FAILED$/
+      );
+      expect(failureLine).not.toContain(email);
+      expect(failureLine).not.toContain(source.ip);
+      expect(failureLine).not.toContain(source.userAgent);
+      const correlationId = failureLine!.match(/correlation=([0-9a-f-]{36})/)![1]!;
+      const audit = await database.pool.query<{
+        target_id: string;
+        actor_key_ref: string;
+        justification: string;
+      }>(`
+        SELECT target_id,actor_key_ref,justification
+        FROM identity.audit_event
+        WHERE event_type='identity.registration.failed' AND target_id=$1
+      `, [correlationId]);
+      expect(audit.rows).toEqual([{
+        target_id: correlationId,
+        actor_key_ref: correlationId,
+        justification: "PROVISION_FAILED"
+      }]);
+      const account = await database.pool.query(`
+        SELECT 1 FROM identity."user" WHERE email_blind_index=$1
+      `, [createEmailBlindIndex(blindIndexKey, email)]);
+      expect(account.rowCount).toBe(0);
+      console.info(
+        `[S3b FAILURE HONESTY] backend=postgres typed=AUTH_REGISTRATION_FAILED status=503 `
+        + `correlation=${correlationId} audit_rows=${audit.rowCount} accounts=${account.rowCount}`
+      );
+    } finally {
+      error.mockRestore();
+    }
+  }, 30_000);
+
+  it("S3b normalises blank audit context at the repository boundary when a writer bypasses sourceContext", async () => {
+    const flow = buildService();
+    const actorToken = randomUUID();
+    await expect(flow.repository.recordRateLimitRefusal({
+      actorToken,
+      route: "register",
+      scope: "ip",
+      count: 1,
+      ipCount: 1,
+      addressCount: 0,
+      occurredAt: new Date("2026-08-19T15:00:00.000Z"),
+      aggregateWindowStartedAt: new Date("2026-08-19T15:00:00.000Z"),
+      source: { ip: "", userAgent: "  \t", requestId: "" }
+    })).resolves.toBeUndefined();
+    const [unknownIpArgon2id, unknownUserAgentArgon2id] = await Promise.all([
+      hashAuditSourceIp("unknown", sourceIpSalt, basePolicy.auditSourceIpKdf),
+      hashAuditUserAgent("unknown", sourceIpSalt, basePolicy.auditSourceIpKdf)
+    ]);
+    const audit = await database.pool.query<{
+      ip_argon2id: string;
+      user_agent_argon2id: string;
+    }>(`
+      SELECT source_context->>'ipArgon2id' AS ip_argon2id,
+        source_context->>'userAgentArgon2id' AS user_agent_argon2id
+      FROM identity.audit_event
+      WHERE event_type='identity.auth.rate_limit_refused' AND target_id=$1
+    `, [actorToken]);
+    expect(audit.rows).toEqual([{
+      ip_argon2id: unknownIpArgon2id,
+      user_agent_argon2id: unknownUserAgentArgon2id
+    }]);
+    console.info(
+      `[S3b REPOSITORY NORMALISATION] backend=postgres bypass=sourceContext `
+      + `blank_ip=unknown blank_ua=unknown audit_rows=${audit.rowCount}`
     );
   }, 30_000);
 
@@ -542,11 +796,197 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     expect(n1Gap).toBeLessThanOrEqual(basePolicy.verification.enumerationToleranceMs);
     expect(n4Gap).toBeLessThanOrEqual(basePolicy.verification.enumerationToleranceMs);
     for (const flow of [n1Flow, n4Flow]) {
-      await (flow.service as RegistrationService & { drainRegistrationDispatches?: () => Promise<void> })
-        .drainRegistrationDispatches?.();
       await flow.service.drainMailDispatches();
     }
   }, 45_000);
+
+  it("S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below the separation ceiling", async () => {
+    const aucCeiling = 0.8;
+    const cells: string[] = [];
+    const measurements: Array<{
+      readonly concurrency: 1 | 4 | 8;
+      readonly existing: readonly number[];
+      readonly missing: readonly number[];
+      readonly medianGapMs: number;
+      readonly classifierAccuracy: number;
+      readonly auc: number;
+      readonly waves: number;
+      readonly duplicateAuditCount: number;
+      readonly duplicatePostworkAuditCount: number;
+      readonly expectedMailCount: number;
+      readonly mailCount: number;
+    }> = [];
+    for (const concurrency of [1, 4, 8] as const) {
+      const waves = concurrency === 1 ? 8 : 4;
+      const existingGroups = Math.ceil(waves / 4);
+      const timingMail = new MemoryMailSender();
+      const flow = buildService({ mail: timingMail });
+      const existingEmails = Array.from(
+        { length: concurrency * existingGroups },
+        (_, index) => `s3b-timing-n${concurrency}-existing-${index}@example.test`
+      );
+      await Promise.all(existingEmails.map((email, index) => flow.service.register({
+        email,
+        password: "correct horse battery staple",
+        recoveryEmail: `s3b-timing-n${concurrency}-seed-${index}-recovery@example.test`,
+        adultAffirmed: true
+      }, {
+        ip: `203.0.${concurrency}.${index + 1}`,
+        userAgent: "vitest-s3b-timing-seed",
+        requestId: `request:s3b:timing:n${concurrency}:seed:${index}`
+      })));
+      await flow.service.drainMailDispatches();
+
+      const existing: number[] = [];
+      const missing: number[] = [];
+      const measureExistingWave = async (wave: number): Promise<number[]> => Promise.all(
+        Array.from({ length: concurrency }, async (_, index) => {
+          const email = existingEmails[(wave % existingGroups) * concurrency + index]!;
+          const startedAt = performance.now();
+          await flow.service.register({
+            email,
+            password: "correct horse battery staple",
+            recoveryEmail: `s3b-timing-n${concurrency}-existing-${index}-recovery@example.test`,
+            adultAffirmed: true
+          }, {
+            ip: `203.${concurrency}.${wave}.${index + 1}`,
+            userAgent: "vitest-s3b-timing-existing",
+            requestId: `request:s3b:timing:n${concurrency}:existing:${wave}:${index}`
+          });
+          return performance.now() - startedAt;
+        })
+      );
+      const measureMissingWave = async (wave: number): Promise<number[]> => Promise.all(
+        Array.from({ length: concurrency }, async (_, index) => {
+          const startedAt = performance.now();
+          await flow.service.register({
+            email: `s3b-timing-n${concurrency}-missing-${wave}-${index}@example.test`,
+            password: "correct horse battery staple",
+            recoveryEmail: `s3b-timing-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
+            adultAffirmed: true
+          }, {
+            ip: `204.${concurrency}.${wave}.${index + 1}`,
+            userAgent: "vitest-s3b-timing-missing",
+            requestId: `request:s3b:timing:n${concurrency}:missing:${wave}:${index}`
+          });
+          return performance.now() - startedAt;
+        })
+      );
+      for (let wave = 0; wave < waves; wave += 1) {
+        if (wave % 2 === 0) {
+          existing.push(...await measureExistingWave(wave));
+          missing.push(...await measureMissingWave(wave));
+        } else {
+          missing.push(...await measureMissingWave(wave));
+          await flow.service.drainMailDispatches();
+          existing.push(...await measureExistingWave(wave));
+        }
+        await flow.service.drainMailDispatches();
+      }
+
+      const medianGapMs = Math.abs(median(existing) - median(missing));
+      const classifierAccuracy = bestSingleThresholdClassifierAccuracy(existing, missing);
+      const auc = aucSeparability(existing, missing);
+      const clampMs = basePolicy.verification.enumerationResponseFloorMs
+        + basePolicy.verification.enumerationToleranceMs;
+      const existingTokens = await database.pool.query<{ audit_token: string }>(`
+        SELECT audit_token FROM identity."user"
+        WHERE email_blind_index=ANY($1::bytea[])
+      `, [existingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
+      const duplicateAudits = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity.audit_event
+        WHERE event_type='identity.registration' AND decision='DENY'
+          AND actor_key_ref=ANY($1::text[])
+      `, [existingTokens.rows.map((row) => row.audit_token)]);
+      const duplicatePostworkAudits = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity.audit_event
+        WHERE event_type='identity.registration.duplicate_postwork' AND decision='DENY'
+          AND actor_key_ref=ANY($1::text[])
+      `, [existingTokens.rows.map((row) => row.audit_token)]);
+      cells.push(
+        `n=${concurrency} existing=[${existing.map((value) => value.toFixed(1)).join(",")}] `
+        + `missing=[${missing.map((value) => value.toFixed(1)).join(",")}] `
+        + `median_gap_ms=${medianGapMs.toFixed(1)} `
+        + `best_classifier_pct=${(classifierAccuracy * 100).toFixed(1)} `
+        + `auc_separability_pct=${(auc * 100).toFixed(1)}`
+      );
+      measurements.push({
+        concurrency,
+        existing,
+        missing,
+        medianGapMs,
+        classifierAccuracy,
+        auc,
+        waves,
+        duplicateAuditCount: Number(duplicateAudits.rows[0]!.count),
+        duplicatePostworkAuditCount: Number(duplicatePostworkAudits.rows[0]!.count),
+        expectedMailCount: existingEmails.length + concurrency * waves,
+        mailCount: timingMail.messages.length
+      });
+      expect(Math.min(...existing, ...missing)).toBeGreaterThanOrEqual(clampMs - 20);
+    }
+    console.info(
+      `[S3b REWORK1 LIVE TIMING] backend=postgres mail=live password_argon2id_kib=${basePolicy.password.argon2id.memoryCostKiB} `
+        + `password_argon2id_time=${basePolicy.password.argon2id.timeCost} `
+        + `clamp_ms=${basePolicy.verification.enumerationResponseFloorMs
+          + basePolicy.verification.enumerationToleranceMs} `
+        + `auc_ceiling_pct=${(aucCeiling * 100).toFixed(1)} ${cells.join(" | ")}`
+    );
+    for (const measurement of measurements) {
+      expect(measurement.medianGapMs).toBeLessThanOrEqual(
+        basePolicy.verification.enumerationToleranceMs
+      );
+      expect(measurement.auc).toBeLessThanOrEqual(aucCeiling);
+    }
+    for (const measurement of measurements) {
+      expect(measurement.duplicateAuditCount).toBe(measurement.concurrency * measurement.waves);
+      expect(measurement.duplicatePostworkAuditCount).toBe(
+        measurement.concurrency * measurement.waves
+      );
+      expect(measurement.mailCount).toBe(measurement.expectedMailCount);
+    }
+  }, 300_000);
+
+  it("S3b F3 rejects an audit-invalid account before invoking the external DEK write", async () => {
+    const flow = buildService();
+    const userId = randomUUID();
+    const email = `s3b-f3-${userId}@example.test`;
+    const recoveryEmail = `s3b-f3-${userId}-recovery@example.test`;
+    const keyId = `user-dek:${userId}`;
+    const dek = generateDek();
+    let beforeCommitCalls = 0;
+    try {
+      await expect(flow.repository.createPendingAccount({
+        userId,
+        emailBlindIndex: createEmailBlindIndex(blindIndexKey, email),
+        emailCiphertext: encrypt(dek, Buffer.from(email), [
+          "identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"
+        ]),
+        recoveryEmailCiphertext: encrypt(dek, Buffer.from(recoveryEmail), [
+          "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
+        ]),
+        passwordHash: "s3b-f3-password-hash",
+        pseudonym: `s3b-f3-${userId}`,
+        auditToken: "00000000-0000-0000-0000-000000000000",
+        adultAffirmedAt: new Date("2026-08-20T00:00:00.000Z"),
+        verificationTokenHash: createHash("sha256").update(generateVerificationToken()).digest("hex"),
+        verificationExpiresAt: new Date("2026-08-21T00:00:00.000Z"),
+        occurredAt: new Date("2026-08-20T00:00:00.000Z"),
+        source
+      }, async () => { beforeCommitCalls += 1; })).rejects.toThrow("AUDIT_TOKEN_MUST_BE_RANDOM_UUID_V4");
+      const persisted = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity."user" WHERE user_id=$1
+      `, [userId]);
+      console.info(
+        `[S3b F3 ORDERING] backend=postgres audit_failure=pre_dek_write `
+        + `before_commit_calls=${beforeCommitCalls} persisted_accounts=${persisted.rows[0]!.count}`
+      );
+      expect(beforeCommitCalls).toBe(0);
+      expect(Number(persisted.rows[0]!.count)).toBe(0);
+    } finally {
+      dek.fill(0);
+    }
+  }, 20_000);
 
   it("S3 rework4 B3 atomically starts cooldown when minting and preserves the first token if delivery recording fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -561,8 +1001,6 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         recoveryEmail: "rework4-cooldown-recovery@example.test",
         adultAffirmed: true
       }, source);
-      await (flow.service as RegistrationService & { drainRegistrationDispatches?: () => Promise<void> })
-        .drainRegistrationDispatches?.();
       await flow.service.resendVerification({ email }, source);
       await flow.service.drainMailDispatches();
       const messages = (flow.mail as MemoryMailSender).messages;
