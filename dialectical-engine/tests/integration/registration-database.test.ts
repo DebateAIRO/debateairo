@@ -94,6 +94,20 @@ function aucSeparability(existing: readonly number[], missing: readonly number[]
   return Math.max(auc, 1 - auc);
 }
 
+function limiterMemoryOccupancy(limiter: InProcessAuthRateLimiter): Readonly<{
+  occupiedSlots: number;
+  slotCapacity: number;
+}> {
+  const inspected = limiter as unknown as {
+    memoryOccupancy?: () => Readonly<{ occupiedSlots: number; slotCapacity: number }>;
+    buckets?: ReadonlyMap<string, unknown>;
+  };
+  return inspected.memoryOccupancy?.() ?? Object.freeze({
+    occupiedSlots: inspected.buckets?.size ?? 0,
+    slotCapacity: basePolicy.rateLimitBucketCapacity
+  });
+}
+
 function buildService(input: {
   readonly mail?: MailSender;
   readonly policy?: AuthPolicy;
@@ -101,6 +115,7 @@ function buildService(input: {
   readonly dekStore?: UserDekStore;
   readonly clock?: () => Date;
   readonly sleep?: (milliseconds: number) => Promise<void>;
+  readonly limiterHashKey?: Uint8Array;
 } = {}) {
   let now = input.initialNow ?? new Date("2026-08-19T12:00:00.000Z");
   const policy = input.policy ?? basePolicy;
@@ -109,7 +124,10 @@ function buildService(input: {
     database.pool, sourceIpSalt, policy.auditSourceIpKdf
   );
   const limiter = new InProcessAuthRateLimiter(
-    policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
+    policy.rateLimits,
+    policy.rateLimitBucketCapacity,
+    policy.rateLimitRefusalAuditIntervalMs,
+    input.limiterHashKey
   );
   const service = new RegistrationService({
     repository,
@@ -637,6 +655,77 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     });
   });
 
+  it("S3c B1 caps victim-bound mail and token rotation while the owner retains admission and verifies", async () => {
+    const initialNow = new Date("2026-08-20T04:00:00.000Z");
+    const flow = buildService({ initialNow, sleep: async () => undefined });
+    const victimEmail = "s3c-b1-victim@example.test";
+    const registered = await registerAccount(flow.service, "s3c-b1-victim", {
+      email: victimEmail,
+      recoveryEmail: "s3c-b1-victim-recovery@example.test"
+    });
+    const tokenVersions = new Set<string>();
+    const rememberTokenVersion = async () => {
+      const result = await database.pool.query<{ token_hash: string }>(`
+        SELECT verification_token_hash AS token_hash
+        FROM identity.channel_binding
+        WHERE user_id=$1 AND channel_type='email'
+      `, [registered.user.user_id]);
+      tokenVersions.add(result.rows[0]!.token_hash);
+    };
+    await rememberTokenVersion();
+
+    const attackerOutcomes: string[] = [];
+    for (let minute = 1; minute < 60; minute += 1) {
+      flow.advance(60_000);
+      try {
+        await flow.service.resendVerification({ email: victimEmail }, {
+          ip: `203.0.120.${((minute - 1) % 20) + 1}`,
+          userAgent: "vitest-s3c-b1-attacker",
+          requestId: `request:s3c:b1:attacker:${minute}`
+        });
+        attackerOutcomes.push("ALLOWED");
+      } catch (error) {
+        attackerOutcomes.push((error as { code?: string }).code ?? "RAW_ERROR");
+      }
+      await flow.service.drainMailDispatches();
+      await rememberTokenVersion();
+    }
+
+    const ownerResponse = await flow.service.resendVerification({ email: victimEmail }, {
+      ip: "198.51.100.220",
+      userAgent: "vitest-s3c-b1-owner",
+      requestId: "request:s3c:b1:owner-resend"
+    });
+    await flow.service.drainMailDispatches();
+    const messages = (flow.mail as MemoryMailSender).messages.filter(
+      (message) => message.recipient === victimEmail
+    );
+    const latestToken = messages.at(-1)!.token;
+    const verification = await flow.service.verifyEmail({ token: latestToken }, {
+      ip: "198.51.100.220",
+      userAgent: "vitest-s3c-b1-owner",
+      requestId: "request:s3c:b1:owner-verify"
+    });
+    const state = await database.pool.query<{ state: string }>(`
+      SELECT state FROM identity."user" WHERE user_id=$1
+    `, [registered.user.user_id]);
+    const rotations = tokenVersions.size - 1;
+    console.info(
+      `[S3c B1 OUTBOUND CAP] backend=postgres attacker_sources=20 attempts=59 `
+      + `admission_successes=${attackerOutcomes.filter((outcome) => outcome === "ALLOWED").length}/59 `
+      + `victim_mails=${messages.length} token_versions=${tokenVersions.size} rotations=${rotations} `
+      + `owner_admission=success owner_verification=${verification.status}`
+    );
+
+    expect(attackerOutcomes).toEqual(Array.from({ length: 59 }, () => "ALLOWED"));
+    expect(messages.length).toBeLessThanOrEqual(3);
+    expect(tokenVersions.size).toBeLessThanOrEqual(3);
+    expect(rotations).toBeLessThanOrEqual(3);
+    expect(ownerResponse).toEqual(RESEND_PUBLIC_RESPONSE);
+    expect(verification).toEqual({ status: "active" });
+    expect(state.rows).toEqual([{ state: "active" }]);
+  }, 120_000);
+
   it("returns byte-identical registration responses with a ruled timing floor for new and duplicate email", async () => {
     const flow = buildService();
     const input = {
@@ -697,46 +786,325 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     console.info(`[S3 R1 RED/GREEN] ${evidence.join(" | ")}`);
   }, 15_000);
 
-  it("S3 rework4 B1 fails closed through the real PostgreSQL-backed verification stack at saturation", async () => {
-    const threshold = 10;
-    const rateLimits = Object.freeze({
-      ...basePolicy.rateLimits,
-      verify: Object.freeze({
-        ...basePolicy.rateLimits.verify,
-        perIp: threshold,
-        perAddress: threshold
-      })
-    });
-    const flow = buildService({
-      policy: withPolicy({ rateLimits, rateLimitBucketCapacity: 5 })
-    });
-    const now = new Date("2026-08-19T12:00:00.000Z");
-    for (const guard of ["pg-guard-a", "pg-guard-b"]) {
-      for (let count = 0; count < threshold; count += 1) {
+  it("S3c B3 keeps real route calls refused at production 20/10/3 before saturation", async () => {
+    const now = new Date("2026-08-20T00:30:00.000Z");
+    const cells: string[] = [];
+    for (const route of ["register", "verify", "resend"] as const) {
+      const flow = buildService({
+        initialNow: now,
+        limiterHashKey: Buffer.alloc(32, 0x41 + route.length)
+      });
+      const limit = basePolicy.rateLimits[route].admissionPerSource;
+      const floodIp = `198.51.100.${route.length + 210}`;
+      for (let count = 0; count < limit; count += 1) {
         expect(flow.limiter.consume({
-          route: "verify", ip: `${guard}:ip`, addressKey: `${guard}:address`, now
+          route, ip: floodIp, addressKey: `s3c-real-flood:${route}:${count}`, now
         })).toEqual({ allowed: true });
       }
+      const realCodes: string[] = [];
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          if (route === "register") {
+            await flow.service.register({
+              email: `s3c-real-flood-${route}-${attempt}@example.test`,
+              password: "correct horse battery staple",
+              recoveryEmail: `s3c-real-flood-${route}-${attempt}-recovery@example.test`,
+              adultAffirmed: true
+            }, {
+              ip: floodIp,
+              userAgent: "vitest-s3c-real-flood",
+              requestId: `request:s3c:real-flood:${route}:${attempt}`
+            });
+          } else if (route === "verify") {
+            await flow.service.verifyEmail({ token: generateVerificationToken() }, {
+              ip: floodIp,
+              userAgent: "vitest-s3c-real-flood",
+              requestId: `request:s3c:real-flood:${route}:${attempt}`
+            });
+          } else {
+            await flow.service.resendVerification({
+              email: `s3c-real-flood-${route}-${attempt}@example.test`
+            }, {
+              ip: floodIp,
+              userAgent: "vitest-s3c-real-flood",
+              requestId: `request:s3c:real-flood:${route}:${attempt}`
+            });
+          }
+          realCodes.push("ALLOWED");
+        } catch (error) {
+          realCodes.push((error as { code?: string }).code ?? "RAW_ERROR");
+        }
+      }
+      const occupancy = limiterMemoryOccupancy(flow.limiter);
+      cells.push(
+        `route=${route} threshold=${limit} `
+        + `real_refused=${realCodes.filter((code) => code === "AUTH_RATE_LIMITED").length}/${realCodes.length} `
+        + `occupied=${occupancy.occupiedSlots}/${occupancy.slotCapacity}`
+      );
+      expect(realCodes).toEqual(["AUTH_RATE_LIMITED", "AUTH_RATE_LIMITED"]);
+      expect(occupancy.occupiedSlots).toBeLessThan(occupancy.slotCapacity);
+    }
+    console.info(`[S3c B3 REAL PRE-SATURATION] backend=postgres ${cells.join(" | ")}`);
+  }, 60_000);
+
+  it("S3c B2 isolates route budgets and bounds per-route collision refusal under the stated threat", async () => {
+    const routes = ["register", "verify", "resend"] as const;
+    const intensities = [1, 5, 10, 20] as const;
+    const threatSources = 20_000;
+    const innocentSamples = 2_000;
+    const falseRefusalCeiling = 0.01;
+    const now = new Date("2026-08-20T05:00:00.000Z");
+    const invokeRealRoute = async (
+      flow: ReturnType<typeof buildService>,
+      route: typeof routes[number],
+      label: string
+    ): Promise<string> => {
+      const realSource = {
+        ip: `s3c-b2-real-innocent:${label}`,
+        userAgent: "vitest-s3c-b2-real-route",
+        requestId: `request:s3c:b2:${label}`
+      };
+      try {
+        if (route === "register") {
+          await flow.service.register({
+            email: `s3c-b2-${label}@example.test`,
+            password: "correct horse battery staple",
+            recoveryEmail: `s3c-b2-${label}-recovery@example.test`,
+            adultAffirmed: true
+          }, realSource);
+          await flow.service.drainMailDispatches();
+        } else if (route === "verify") {
+          await flow.service.verifyEmail({ token: generateVerificationToken() }, realSource);
+        } else {
+          await flow.service.resendVerification({
+            email: `s3c-b2-missing-${label}@example.test`
+          }, realSource);
+        }
+        return "ADMITTED";
+      } catch (error) {
+        const code = (error as { code?: string }).code ?? "RAW_ERROR";
+        return route === "verify" && code === "VERIFICATION_TOKEN_INVALID" ? "ADMITTED" : code;
+      }
+    };
+    const populate = (
+      limiter: InProcessAuthRateLimiter,
+      route: typeof routes[number],
+      requestsPerSource: number,
+      label: string
+    ) => {
+      for (let sourceIndex = 0; sourceIndex < threatSources; sourceIndex += 1) {
+        for (let request = 0; request < requestsPerSource; request += 1) {
+          limiter.consume({
+            route,
+            ip: `${label}:attacker:${sourceIndex}`,
+            addressKey: `${label}:ignored:${sourceIndex}:${request}`,
+            now
+          });
+        }
+      }
+    };
+    const probe = (
+      limiter: InProcessAuthRateLimiter,
+      route: typeof routes[number],
+      label: string
+    ): number => {
+      let refused = 0;
+      for (let sample = 0; sample < innocentSamples; sample += 1) {
+        const outcome = limiter.consume({
+          route,
+          ip: `${label}:innocent:${sample}`,
+          addressKey: `${label}:innocent-address:${sample}`,
+          now
+        });
+        if (!outcome.allowed) refused += 1;
+      }
+      return refused;
+    };
+
+    const isolated = buildService({
+      initialNow: now,
+      sleep: async () => undefined,
+      limiterHashKey: Buffer.alloc(32, 0xb2)
+    });
+    populate(isolated.limiter, "register", basePolicy.rateLimits.register.admissionPerSource,
+      "cross-route-register");
+    const crossRouteCells: string[] = [];
+    const crossRouteResults: Array<{ readonly rate: number; readonly realOutcome: string }> = [];
+    for (const route of ["verify", "resend"] as const) {
+      const refused = probe(isolated.limiter, route, `cross-route-${route}`);
+      const realOutcome = await invokeRealRoute(isolated, route, `cross-route-${route}`);
+      crossRouteCells.push(
+        `route=${route} refused=${refused}/${innocentSamples} real=${realOutcome}`
+      );
+      crossRouteResults.push({ rate: refused / innocentSamples, realOutcome });
     }
 
-    const tokens = [generateVerificationToken(), generateVerificationToken()];
-    const codes: string[] = [];
-    for (let index = 0; index < threshold * 2; index += 1) {
-      try {
-        await flow.service.verifyEmail(
-          { token: tokens[index % tokens.length]! },
-          { ...source, ip: "198.51.100.240", requestId: `request:b1:${index}` }
-        );
-      } catch (error) {
-        codes.push((error as { code?: string }).code ?? "RAW_ERROR");
+    const curve: string[] = [];
+    const curveResults: Array<{ readonly rate: number; readonly realOutcome: string }> = [];
+    type IntensityKey = "1" | "5" | "10" | "20";
+    const measuredRangesPpm: Record<
+      typeof routes[number],
+      Record<IntensityKey, { minimum: number; maximum: number; mean: number }>
+    > = {
+      register: {} as Record<IntensityKey, { minimum: number; maximum: number; mean: number }>,
+      verify: {} as Record<IntensityKey, { minimum: number; maximum: number; mean: number }>,
+      resend: {} as Record<IntensityKey, { minimum: number; maximum: number; mean: number }>
+    };
+    for (const route of routes) {
+      for (const requestsPerSource of intensities) {
+        const rates: number[] = [];
+        for (let hashKeyIndex = 0; hashKeyIndex < 3; hashKeyIndex += 1) {
+          const label = `${route}-n${requestsPerSource}-k${hashKeyIndex}`;
+          const flow = buildService({
+            initialNow: now,
+            sleep: async () => undefined,
+            limiterHashKey: Buffer.alloc(
+              32,
+              0x40 + route.length * 7 + requestsPerSource + hashKeyIndex * 23
+            )
+          });
+          populate(flow.limiter, route, requestsPerSource, label);
+          const refused = probe(flow.limiter, route, label);
+          const rate = refused / innocentSamples;
+          const realOutcome = hashKeyIndex === 0
+            ? await invokeRealRoute(flow, route, label)
+            : "ADMITTED";
+          const occupancy = limiterMemoryOccupancy(flow.limiter);
+          rates.push(rate);
+          curve.push(
+            `route=${route} requests_per_source=${requestsPerSource} hash_key=${hashKeyIndex + 1}/3 `
+            + `refused=${refused}/${innocentSamples} rate=${rate.toFixed(4)} real=${realOutcome} `
+            + `occupied=${occupancy.occupiedSlots}/${occupancy.slotCapacity}`
+          );
+          curveResults.push({ rate, realOutcome });
+        }
+        measuredRangesPpm[route][String(requestsPerSource) as IntensityKey] = {
+          minimum: Math.round(Math.min(...rates) * 1_000_000),
+          maximum: Math.round(Math.max(...rates) * 1_000_000),
+          mean: Math.round(rates.reduce((sum, rate) => sum + rate, 0) / rates.length * 1_000_000)
+        };
       }
     }
     console.info(
-      `[S3 REWORK4 B1 POSTGRES RED/GREEN] backend=postgres threshold=${threshold} `
-      + `rate_limited=${codes.filter((code) => code === "AUTH_RATE_LIMITED").length}/${codes.length}`
+      `[S3c B2 CROSS-ROUTE] backend=postgres attacker_route=register sources=${threatSources} `
+      + `requests_per_source=${basePolicy.rateLimits.register.admissionPerSource} `
+      + crossRouteCells.join(" | ")
     );
-    expect(codes).toEqual(Array.from({ length: threshold * 2 }, () => "AUTH_RATE_LIMITED"));
+    console.info(
+      `[S3c B2 COLLATERAL CURVE] backend=postgres threat_sources=${threatSources} `
+      + `innocents_per_cell=${innocentSamples} hash_keys=3 ceiling=${falseRefusalCeiling.toFixed(4)} `
+      + curve.join(" | ")
+    );
+    console.info(`[S3c B5 COLLATERAL SPREAD] ${JSON.stringify(measuredRangesPpm)}`);
+    expect(crossRouteResults.every(
+      (result) => result.rate === 0 && result.realOutcome === "ADMITTED"
+    )).toBe(true);
+    expect(curveResults.every(
+      (result) => result.rate <= falseRefusalCeiling && result.realOutcome === "ADMITTED"
+    )).toBe(true);
+    expect(Object.values(measuredRangesPpm).every((route) =>
+      Object.values(route).every((range) => range.mean < falseRefusalCeiling * 1_000_000)
+    )).toBe(true);
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const publishedRefusalPpm = (rateLimitRow.value as {
+      sketch_design: {
+        theoretical_collateral: {
+          model: string;
+          refusal_rate_ppm: Record<typeof routes[number], Record<IntensityKey, number>>;
+        };
+      };
+    }).sketch_design.theoretical_collateral;
+    expect(publishedRefusalPpm.model).toBe("exact_binomial_two_independent_rows");
+    expect(publishedRefusalPpm.refusal_rate_ppm.register["20"])
+      .toBe(publishedRefusalPpm.refusal_rate_ppm.verify["10"]);
+    expect(publishedRefusalPpm.refusal_rate_ppm.register["20"])
+      .toBe(publishedRefusalPpm.refusal_rate_ppm.resend["5"]);
+    expect(publishedRefusalPpm.refusal_rate_ppm.register["20"])
+      .toBeLessThan(falseRefusalCeiling * 1_000_000);
+  }, 180_000);
+
+  it("S3c D2 cannot spend a fresh registrant's budget by naming their address", async () => {
+    const flow = buildService({ initialNow: new Date("2026-08-20T02:00:00.000Z") });
+    const email = "s3c-d2-register-victim@example.test";
+    const addressKey = createEmailBlindIndex(blindIndexKey, email).toString("hex");
+    const legacyRegisterAddressBudget = 5;
+    for (let attempt = 0; attempt < legacyRegisterAddressBudget; attempt += 1) {
+      expect(flow.limiter.consume({
+        route: "register",
+        ip: `203.0.113.${attempt + 1}`,
+        addressKey,
+        now: new Date("2026-08-20T02:00:00.000Z")
+      })).toEqual({ allowed: true });
+    }
+    await expect(flow.service.register({
+      email,
+      password: "correct horse battery staple",
+      recoveryEmail: "s3c-d2-register-victim-recovery@example.test",
+      adultAffirmed: true
+    }, {
+      ip: "198.51.100.201",
+      userAgent: "vitest-s3c-d2-owner",
+      requestId: "request:s3c:d2:register-owner"
+    })).resolves.toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    await flow.service.drainMailDispatches();
+    const persisted = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM identity."user" WHERE email_blind_index=$1
+    `, [createEmailBlindIndex(blindIndexKey, email)]);
+    console.info(
+      `[S3c D2 REGISTER] backend=postgres attacker_address_attempts=${legacyRegisterAddressBudget} `
+      + `owner_outcome=success persisted=${persisted.rows[0]!.count}`
+    );
+    expect(Number(persisted.rows[0]!.count)).toBe(1);
   }, 30_000);
+
+  it("S3c D2 cannot spend a pending account's verify or resend budget from another source", async () => {
+    const initialNow = new Date("2026-08-20T03:00:00.000Z");
+    const flow = buildService({ initialNow });
+    const registered = await registerAccount(flow.service, "s3c-d2-pending-owner");
+    const addressKey = registered.index.toString("hex");
+    const token = (flow.mail as MemoryMailSender).messages.at(-1)!.token;
+    const legacyVerifyAddressBudget = 10;
+    for (let attempt = 0; attempt < legacyVerifyAddressBudget; attempt += 1) {
+      expect(flow.limiter.consume({
+        route: "verify",
+        ip: `203.0.114.${attempt + 1}`,
+        addressKey,
+        now: initialNow
+      })).toEqual({ allowed: true });
+    }
+    await expect(flow.service.verifyEmail({ token }, {
+      ip: "198.51.100.202",
+      userAgent: "vitest-s3c-d2-owner",
+      requestId: "request:s3c:d2:verify-owner"
+    })).resolves.toEqual({ status: "active" });
+
+    const resendFlow = buildService({ initialNow });
+    const resendRegistered = await registerAccount(resendFlow.service, "s3c-d2-resend-owner");
+    const resendAddressKey = resendRegistered.index.toString("hex");
+    resendFlow.advance(basePolicy.verification.resendCooldownMs + 1);
+    const legacyResendAddressBudget = 3;
+    for (let attempt = 0; attempt < legacyResendAddressBudget; attempt += 1) {
+      expect(resendFlow.limiter.consume({
+        route: "resend",
+        ip: `203.0.115.${attempt + 1}`,
+        addressKey: resendAddressKey,
+        now: new Date(initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1)
+      })).toEqual({ allowed: true });
+    }
+    await expect(resendFlow.service.resendVerification({ email: resendRegistered.email }, {
+      ip: "198.51.100.203",
+      userAgent: "vitest-s3c-d2-owner",
+      requestId: "request:s3c:d2:resend-owner"
+    })).resolves.toEqual(RESEND_PUBLIC_RESPONSE);
+    await resendFlow.service.drainMailDispatches();
+    const resendMessages = (resendFlow.mail as MemoryMailSender).messages.length;
+    console.info(
+      `[S3c D2 VERIFY_RESEND] backend=postgres verify_poison=${legacyVerifyAddressBudget} `
+      + `verify_owner=active resend_poison=${legacyResendAddressBudget} `
+      + `resend_owner=success resend_messages=${resendMessages}`
+    );
+    expect(resendMessages).toBe(2);
+  }, 45_000);
 
   it("S3 rework4 B2 overlaps existing and missing N=1/N=4 real-PostgreSQL distributions within tolerance", async () => {
     const fileStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
@@ -1080,7 +1448,12 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   it("persists one finalized refusal row with the bounded route-window count and preserves the chain", async () => {
     const rateLimits = Object.freeze({
       ...basePolicy.rateLimits,
-      verify: Object.freeze({ ...basePolicy.rateLimits.verify, perIp: 1, perAddress: 100 })
+      verify: Object.freeze({
+        ...basePolicy.rateLimits.verify,
+        admissionPerSource: 1,
+        perIp: 1,
+        perAddress: 100
+      })
     });
     const initialNow = new Date("2026-08-20T07:00:00.000Z");
     const refusalAuditIntervalMs = 25;
@@ -1201,7 +1574,12 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   it("S3 rework4 B5 preserves the typed 429 when a finalized refusal audit write fails", async () => {
     const rateLimits = Object.freeze({
       ...basePolicy.rateLimits,
-      verify: Object.freeze({ ...basePolicy.rateLimits.verify, perIp: 1, perAddress: 100 })
+      verify: Object.freeze({
+        ...basePolicy.rateLimits.verify,
+        admissionPerSource: 1,
+        perIp: 1,
+        perAddress: 100
+      })
     });
     const flow = buildService({
       policy: withPolicy({ rateLimits, rateLimitRefusalAuditIntervalMs: 60_000 }),
@@ -1276,9 +1654,24 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   it("audits refusals and leaves no user material in any audit column after real account deletion while the chain verifies", async () => {
     const lowRegisterLimit = {
       ...basePolicy.rateLimits,
-      register: { ...basePolicy.rateLimits.register, perAddress: 1, perIp: 20 },
-      verify: { ...basePolicy.rateLimits.verify, perAddress: 1, perIp: 20 },
-      resend: { ...basePolicy.rateLimits.resend, perAddress: 1, perIp: 20 }
+      register: {
+        ...basePolicy.rateLimits.register,
+        admissionPerSource: 1,
+        perAddress: 1,
+        perIp: 20
+      },
+      verify: {
+        ...basePolicy.rateLimits.verify,
+        admissionPerSource: 1,
+        perAddress: 1,
+        perIp: 20
+      },
+      resend: {
+        ...basePolicy.rateLimits.resend,
+        admissionPerSource: 1,
+        perAddress: 1,
+        perIp: 20
+      }
     };
     const policy = withPolicy({
       rateLimits: Object.freeze(lowRegisterLimit),

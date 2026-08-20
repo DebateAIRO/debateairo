@@ -1,7 +1,10 @@
+import { createHmac } from "node:crypto";
+import { execFile } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
   AUTH_POLICY_REGISTER_ROWS,
@@ -28,6 +31,83 @@ import {
 } from "../../apps/api/src/mail-channel.js";
 import { channelBinding, mfaFactor } from "../../packages/db/src/schema.js";
 import { buildApi, type AskApplication } from "@debateai/api";
+
+type TestAuthRoute = "register" | "verify" | "resend";
+const execFileAsync = promisify(execFile);
+
+function limiterOccupancy(limiter: InProcessAuthRateLimiter): Readonly<{
+  occupiedSlots: number;
+  slotCapacity: number;
+}> {
+  return limiter.memoryOccupancy();
+}
+
+function fixedSlotPair(
+  route: TestAuthRoute,
+  ip: string,
+  capacity: number,
+  hashKey: Uint8Array
+): string {
+  const digest = createHmac("sha256", hashKey)
+    .update(`${route}:source:${ip}`, "utf8")
+    .digest();
+  if (capacity === 1) return "0";
+  const firstWidth = Math.floor(capacity / 2);
+  return `${digest.readUInt32BE(0) % firstWidth}:`
+    + `${firstWidth + (digest.readUInt32BE(4) % (capacity - firstWidth))}`;
+}
+
+function collidingSources(
+  route: TestAuthRoute,
+  capacity: number,
+  hashKey: Uint8Array
+): readonly [string, string] {
+  const seen = new Map<string, string>();
+  for (let index = 0; index < capacity * 8; index += 1) {
+    const candidate = `s3c-rotating-source:${route}:${index}`;
+    const pair = fixedSlotPair(route, candidate, capacity, hashKey);
+    const prior = seen.get(pair);
+    if (prior !== undefined) return Object.freeze([prior, candidate]);
+    seen.set(pair, candidate);
+  }
+  throw new Error(`S3C_COLLISION_NOT_FOUND:${route}`);
+}
+
+function saturateLimiter(
+  limiter: InProcessAuthRateLimiter,
+  route: TestAuthRoute,
+  capacity: number,
+  now: Date,
+  label: string
+): number {
+  let sources = 0;
+  while (limiterOccupancy(limiter).occupiedSlots < capacity) {
+    sources += 1;
+    limiter.consume({
+      route,
+      ip: `${label}:source:${sources}`,
+      addressKey: `${label}:address:${sources}`,
+      now
+    });
+    if (sources > capacity * 16) throw new Error(`S3C_SATURATION_DID_NOT_CONVERGE:${route}`);
+  }
+  return sources;
+}
+
+function retainedStateContains(root: unknown, needle: string): boolean {
+  const seen = new Set<object>();
+  const visit = (value: unknown): boolean => {
+    if (typeof value === "string") return value.includes(needle);
+    if (typeof value !== "object" || value === null || seen.has(value)) return false;
+    seen.add(value);
+    if (value instanceof Map) {
+      return [...value.entries()].some(([key, entry]) => visit(key) || visit(entry));
+    }
+    if (value instanceof Set) return [...value.values()].some(visit);
+    return Object.values(value).some(visit);
+  };
+  return visit(root);
+}
 
 function fixtureAskApplication(): AskApplication {
   return {
@@ -66,18 +146,275 @@ describe("S3 ruled authentication policy", () => {
       parallelism: 1, hashLength: 32
     });
     expect(policy.verification.tokenTtlMs).toBeLessThanOrEqual(24 * 60 * 60 * 1_000);
-    expect(policy.verification.resendCooldownMs).toBeGreaterThan(0);
+    expect(policy.verification.resendCooldownMs).toBe(20 * 60_000);
+    expect(policy.verification.outboundSendWindowMs).toBe(60 * 60_000);
+    expect(policy.verification.outboundSendMax).toBe(3);
+    expect(policy.verification.resendCooldownMs * policy.verification.outboundSendMax)
+      .toBeGreaterThanOrEqual(policy.verification.outboundSendWindowMs);
     expect(policy.verification.enumerationToleranceMs).toBe(100);
-    expect(policy.rateLimitBucketCapacity).toBe(4_096);
+    expect(policy.rateLimitBucketCapacity).toBe(524_288);
     expect(policy.rateLimitRefusalAuditIntervalMs).toBe(60_000);
+    expect([
+      policy.rateLimits.register.admissionPerSource,
+      policy.rateLimits.verify.admissionPerSource,
+      policy.rateLimits.resend.admissionPerSource
+    ]).toEqual([20, 10, 3]);
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    expect((rateLimitRow.value as {
+      sketch_design?: Readonly<Record<string, unknown>>;
+    }).sketch_design).toMatchObject({
+      kind: "KEYED_TWO_ROW_PER_ROUTE_FLAT_TYPED_ARRAY",
+      capacity_scope: "per_route",
+      slots_per_route: 524_288,
+      threat_sources_per_window: 20_000,
+      target_false_refusal_rate_ppm: 10_000
+    });
+    expect((rateLimitRow.value as {
+      sketch_design: {
+        theoretical_collateral: Readonly<Record<string, unknown>>;
+      };
+    }).sketch_design.theoretical_collateral).toEqual({
+      model: "exact_binomial_two_independent_rows",
+      derivation: expect.stringMatching(/Binomial/),
+      sources_per_cell: 20_000,
+      selected_row_width: 262_144,
+      refusal_rate_ppm: {
+        register: { "1": 0, "5": 0.000002, "10": 7.652853, "20": 5_395.83117 },
+        verify: { "1": 0, "5": 7.652853, "10": 5_395.83117, "20": 5_395.83117 },
+        resend: { "1": 0.004886, "5": 5_395.83117, "10": 5_395.83117, "20": 5_395.83117 }
+      }
+    });
+    expect((rateLimitRow.value as { legacy_limits_status?: string }).legacy_limits_status)
+      .toBe("RETIRED_NOT_ENFORCED");
+    expect(Object.values((rateLimitRow.value as {
+      routes: Readonly<Record<string, Readonly<Record<string, number>>>>;
+    }).routes).every((route) => typeof route.per_ip === "number" && route.per_ip > 0
+      && typeof route.per_address === "number" && route.per_address > 0)).toBe(true);
     for (const route of ["register", "verify", "resend"] as const) {
-      expect(policy.rateLimits[route].perIp).toBeGreaterThan(0);
-      expect(policy.rateLimits[route].perAddress).toBeGreaterThan(0);
       expect(policy.rateLimits[route].windowMs).toBeGreaterThan(0);
     }
     expect(policy.channel.transport).toBe("own_sendmail");
     expect(policy.channel.transportTimeoutMs).toBe(5_000);
     expect(policy.channel.spamNotice).toMatch(/spam/i);
+  });
+
+  it("S3c B4 publishes a measured resident bound for flat preallocated limiter storage", () => {
+    const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const limiter = new InProcessAuthRateLimiter(
+      policy.rateLimits,
+      policy.rateLimitBucketCapacity,
+      policy.rateLimitRefusalAuditIntervalMs,
+      Buffer.alloc(32, 0xb4)
+    );
+    const storage = limiter as unknown as {
+      readonly slots?: unknown;
+      readonly slotCounts?: unknown;
+      readonly slotHeads?: unknown;
+      readonly slotSaturatedUntil?: unknown;
+      readonly slotExpiries?: unknown;
+      memoryOccupancy(): Readonly<{ allocatedBytes?: number }>;
+    };
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const sketch = (rateLimitRow.value as {
+      sketch_design: {
+        flat_storage: {
+          allocated_bytes: number;
+          budget_bytes: number;
+          retained_objects_per_occupied_slot: number;
+        };
+        isolated_limiter_resident_measurement?: {
+          measurement: string;
+          occupancy_percent: number;
+          measured_100_percent_rss_mib: number;
+          max_measured_curve_rss_mib: number;
+          isolated_measurement_ceiling_mib: number;
+          curve_rss_mib: Record<"0" | "25" | "50" | "100", number>;
+        };
+      };
+    }).sketch_design;
+
+    expect(Array.isArray(storage.slots)).toBe(false);
+    expect(storage.slotCounts).toBeInstanceOf(Uint8Array);
+    expect(storage.slotHeads).toBeInstanceOf(Uint8Array);
+    expect(storage.slotSaturatedUntil).toBeInstanceOf(Float64Array);
+    expect(storage.slotExpiries).toBeInstanceOf(Float64Array);
+    expect(storage.memoryOccupancy().allocatedBytes).toBe(sketch.flat_storage.allocated_bytes);
+    expect(sketch.flat_storage.allocated_bytes).toBeLessThanOrEqual(sketch.flat_storage.budget_bytes);
+    expect(sketch.flat_storage.retained_objects_per_occupied_slot).toBe(0);
+    expect(sketch.isolated_limiter_resident_measurement).toMatchObject({
+      measurement: "isolated_process_rss_at_100_percent_slot_occupancy",
+      occupancy_percent: 100
+    });
+    expect(sketch.isolated_limiter_resident_measurement!.isolated_measurement_ceiling_mib)
+      .toBeGreaterThan(0);
+    expect(sketch.isolated_limiter_resident_measurement!.measured_100_percent_rss_mib)
+      .toBe(sketch.isolated_limiter_resident_measurement!.curve_rss_mib["100"]);
+    expect(Math.max(...Object.values(sketch.isolated_limiter_resident_measurement!.curve_rss_mib)))
+      .toBe(sketch.isolated_limiter_resident_measurement!.max_measured_curve_rss_mib);
+    expect(sketch.isolated_limiter_resident_measurement!.max_measured_curve_rss_mib)
+      .toBeLessThanOrEqual(
+        sketch.isolated_limiter_resident_measurement!.isolated_measurement_ceiling_mib
+      );
+  });
+
+  it("S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const sketch = (rateLimitRow.value as {
+      sketch_design: {
+        flat_storage: { allocated_bytes: number };
+        isolated_limiter_resident_measurement: { isolated_measurement_ceiling_mib: number };
+      };
+    }).sketch_design;
+    const childProgram = [
+      "import { InProcessAuthRateLimiter } from './apps/api/src/registration.ts';",
+      "import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from './packages/register/src/auth-policy.ts';",
+      "const policy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);",
+      "const limiter=new InProcessAuthRateLimiter(policy.rateLimits,policy.rateLimitBucketCapacity,policy.rateLimitRefusalAuditIntervalMs,Buffer.alloc(32,0xb4));",
+      "const routes=['register','verify','resend'];",
+      "const counters={register:0,verify:0,resend:0};",
+      "const now=new Date(0);",
+      "const mib=(value)=>Number((value/1024/1024).toFixed(1));",
+      "const source=(route,n)=>{const r=routes.indexOf(route)+1;const h=n.toString(16).padStart(16,'0');return '2001:db8:5c3:'+r+':'+h.slice(0,4)+':'+h.slice(4,8)+':'+h.slice(8,12)+':'+h.slice(12,16);};",
+      "const sample=(target)=>{global.gc();const memory=process.memoryUsage();const occupancy=limiter.memoryOccupancy();process.stdout.write(JSON.stringify({target,occupied:occupancy.occupiedSlots,capacity:occupancy.slotCapacity,rss_mib:mib(memory.rss),allocated_bytes:occupancy.allocatedBytes,sources:{...counters}})+'\\n');};",
+      "sample(0);",
+      "for(const target of [25,50,100]){for(const route of routes){const wanted=Math.ceil(policy.rateLimitBucketCapacity*target/100);while(limiter.memoryOccupancy().occupiedSlotsByRoute[route]<wanted){const n=++counters[route];limiter.consume({route,ip:source(route,n),addressKey:'ignored',now});if(n>12000000)throw new Error('S3C_OCCUPANCY_DID_NOT_CONVERGE:'+route);}}sample(target);}"
+    ].join("\n");
+    const { stdout } = await execFileAsync(process.execPath, [
+      "--expose-gc", "--import", "tsx", "--input-type=module", "-e", childProgram
+    ], {
+      cwd: process.cwd(),
+      maxBuffer: 1024 * 1024,
+      timeout: 60_000
+    });
+    const curve = stdout.trim().split("\n").map((line) => JSON.parse(line) as {
+      target: number;
+      occupied: number;
+      capacity: number;
+      rss_mib: number;
+      allocated_bytes: number;
+      sources: Record<TestAuthRoute, number>;
+    });
+    console.info(`[S3c B4 RSS CURVE] ${JSON.stringify(curve)}`);
+
+    expect(curve.map((sample) => sample.target)).toEqual([0, 25, 50, 100]);
+    expect(curve.at(-1)!.occupied).toBe(curve.at(-1)!.capacity);
+    expect(curve.every((sample) => sample.allocated_bytes === sketch.flat_storage.allocated_bytes))
+      .toBe(true);
+    expect(Math.max(...curve.map((sample) => sample.rss_mib)))
+      .toBeLessThanOrEqual(
+        sketch.isolated_limiter_resident_measurement.isolated_measurement_ceiling_mib
+      );
+    expect(Object.values(curve.at(-1)!.sources).every((sources) => sources > 1_600_000))
+      .toBe(true);
+  }, 70_000);
+
+  it("S3c B5 publishes theoretical collateral and the ruled timestamp/rotation residuals", () => {
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const verificationRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "verificationPolicy")!;
+    const sketch = (rateLimitRow.value as {
+      sketch_design: {
+        theoretical_collateral?: {
+          model: string;
+          refusal_rate_ppm: Record<TestAuthRoute, Record<"1" | "5" | "10" | "20", number>>;
+        };
+        beyond_threat_curve?: { model: string };
+      };
+    }).sketch_design;
+    const verification = verificationRow.value as {
+      outbound_send_enforcement?: {
+        mechanism: string;
+        minimum_spacing_ms: number;
+      };
+      token_rotation_residual?: string;
+    };
+
+    expect(sketch.theoretical_collateral?.model)
+      .toBe("exact_binomial_two_independent_rows");
+    const fullBudget = sketch.theoretical_collateral!.refusal_rate_ppm;
+    expect(fullBudget.register["20"]).toBe(fullBudget.verify["10"]);
+    expect(fullBudget.register["20"]).toBe(fullBudget.resend["5"]);
+    expect(sketch.beyond_threat_curve?.model)
+      .toBe("exact_binomial_two_independent_rows_full_budget");
+    expect(verification.outbound_send_enforcement).toEqual({
+      mechanism: "per_row_last_sent_timestamp_minimum_spacing",
+      minimum_spacing_ms: 20 * 60_000
+    });
+    expect(verification.token_rotation_residual).toMatch(/newest mailed token/i);
+  });
+
+  it("S3c C1 publishes a booted-process provisioning bound distinct from the isolated limiter measurement", () => {
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const sketch = (rateLimitRow.value as {
+      sketch_design: {
+        isolated_limiter_resident_measurement?: {
+          operator_provisioning_field?: boolean;
+          includes_application_stack_baseline?: boolean;
+        };
+        booted_process_resident_bound?: {
+          measurement: string;
+          stack: string;
+          occupancy_percent: number;
+          worker_remeasurement_100_percent_rss_mib: number;
+          independent_verification_100_percent_rss_mib: number;
+          measured_100_percent_rss_mib: number;
+          provisioning_rounding_increment_mib: number;
+          published_provisioning_bound_mib: number;
+          includes_application_stack_baseline: boolean;
+          per_process: boolean;
+          operator_provisioning_field: boolean;
+          operator_instruction: string;
+        };
+      };
+    }).sketch_design;
+
+    expect(sketch.isolated_limiter_resident_measurement).toMatchObject({
+      operator_provisioning_field: false,
+      includes_application_stack_baseline: false
+    });
+    expect(sketch.booted_process_resident_bound).toMatchObject({
+      measurement: "booted_registration_process_rss_at_100_percent_slot_occupancy",
+      stack: "postgres_pool_argon2id_64mib_registration_service_file_dek_store",
+      occupancy_percent: 100,
+      includes_application_stack_baseline: true,
+      per_process: true,
+      operator_provisioning_field: true,
+      operator_instruction: expect.stringMatching(/published_provisioning_bound_mib.*per API process/i)
+    });
+    const booted = sketch.booted_process_resident_bound!;
+    expect(booted.worker_remeasurement_100_percent_rss_mib).toBe(295);
+    expect(booted.independent_verification_100_percent_rss_mib).toBe(368.7);
+    expect(booted.measured_100_percent_rss_mib).toBe(Math.max(
+      booted.worker_remeasurement_100_percent_rss_mib,
+      booted.independent_verification_100_percent_rss_mib
+    ));
+    expect(booted.published_provisioning_bound_mib)
+      .toBe(Math.ceil(booted.measured_100_percent_rss_mib
+        / booted.provisioning_rounding_increment_mib) * booted.provisioning_rounding_increment_mib);
+    expect(booted.measured_100_percent_rss_mib)
+      .toBeLessThanOrEqual(booted.published_provisioning_bound_mib);
+  });
+
+  it("S3c C2 derives every beyond-threat point from the exact-binomial full-budget model", () => {
+    const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
+    const curve = (rateLimitRow.value as {
+      sketch_design: {
+        beyond_threat_curve?: {
+          model: string;
+          derivation: string;
+          selected_row_width: number;
+          refusal_rate_ppm: Readonly<Record<"50000" | "100000" | "200000" | "400000" | "800000", number>>;
+        };
+      };
+    }).sketch_design.beyond_threat_curve!;
+
+    expect(curve.model).toBe("exact_binomial_two_independent_rows_full_budget");
+    expect(curve.derivation).toMatch(/P\(X>=1\)\^2\*1e6/);
+    const points = [50_000, 100_000, 200_000, 400_000, 800_000] as const;
+    const expected = Object.fromEntries(points.map((sources) => {
+      const occupiedProbability = 1 - Math.pow(1 - (1 / curve.selected_row_width), sources);
+      return [String(sources), Math.round(occupiedProbability ** 2 * 1_000_000)];
+    }));
+    expect(curve.refusal_rate_ppm).toEqual(expected);
   });
 
   it("S3 rework4 fold-in bounds attacker-controlled audit KDF cost rows", () => {
@@ -184,56 +521,41 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     }
   });
 
-  it("enforces ruled per-IP and per-address windows independently for every route", () => {
+  it("S3c D2 keeps admission source-owned at 20/10/3 despite attacker-controlled addresses", () => {
     const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
     for (const route of ["register", "verify", "resend"] as const) {
-      const addressLimiter = new InProcessAuthRateLimiter(
+      const limiter = new InProcessAuthRateLimiter(
         policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
       );
-      const addressLimit = policy.rateLimits[route].perAddress;
-      for (let index = 0; index < addressLimit; index += 1) {
-        expect(addressLimiter.consume({
-          route, ip: `192.0.2.${index + 1}`, addressKey: "address:a", now: new Date(0)
+      const routePolicy = policy.rateLimits[route];
+      const legacyAddressBudget = { register: 5, verify: 10, resend: 3 }[route];
+      for (let index = 0; index < legacyAddressBudget; index += 1) {
+        expect(limiter.consume({
+          route,
+          ip: `attacker:${route}:${index}`,
+          addressKey: "victim:address",
+          now: new Date(0)
         })).toEqual({ allowed: true });
       }
-      expect(addressLimiter.consume({
-        route, ip: "198.51.100.1", addressKey: "address:a", now: new Date(0)
-      })).toEqual({ allowed: false, scope: "address" });
-
-      const ipLimiter = new InProcessAuthRateLimiter(
-        policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
-      );
-      const ipLimit = policy.rateLimits[route].perIp;
-      for (let index = 0; index < ipLimit; index += 1) {
-        expect(ipLimiter.consume({
-          route, ip: "203.0.113.1", addressKey: `address:${index}`, now: new Date(0)
+      for (let index = 0; index < routePolicy.admissionPerSource; index += 1) {
+        expect(limiter.consume({
+          route,
+          ip: `owner:${route}`,
+          addressKey: "victim:address",
+          now: new Date(0)
         })).toEqual({ allowed: true });
       }
-      expect(ipLimiter.consume({
-        route, ip: "203.0.113.1", addressKey: "address:overflow", now: new Date(0)
+      expect(limiter.consume({
+        route,
+        ip: `owner:${route}`,
+        addressKey: "victim:address",
+        now: new Date(0)
       })).toEqual({ allowed: false, scope: "ip" });
     }
   });
 
-  it("checks the IP bucket first and keeps retained buckets bounded under a single-source flood", () => {
+  it("keeps fixed-slot memory bounded under a 200k single-source flood", () => {
     const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
-    const oneRequestPolicy = Object.freeze({
-      ...policy.rateLimits,
-      register: Object.freeze({ ...policy.rateLimits.register, perIp: 1, perAddress: 1 })
-    });
-    const orderLimiter = new InProcessAuthRateLimiter(
-      oneRequestPolicy, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
-    );
-    expect(orderLimiter.consume({
-      route: "register", ip: "198.51.100.9", addressKey: "first", now: new Date(0)
-    })).toEqual({ allowed: true });
-    const refusedByIp = orderLimiter.consume({
-      route: "register", ip: "198.51.100.9", addressKey: "victim", now: new Date(0)
-    });
-    const victimFromFreshIp = orderLimiter.consume({
-      route: "register", ip: "198.51.100.10", addressKey: "victim", now: new Date(0)
-    });
-
     const floodLimiter = new InProcessAuthRateLimiter(
       policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
     );
@@ -247,19 +569,35 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       });
       if (!result.allowed) refused += 1;
     }
-    const retained = (floodLimiter as unknown as { buckets: { size: number } }).buckets.size;
-    console.info(`[S3 R2 RED/GREEN] requests=200000 refused=${refused} retained_buckets=${retained}`);
+    const occupancy = limiterOccupancy(floodLimiter);
+    const retainedCounts = (floodLimiter as unknown as {
+      slotCounts: Uint8Array;
+    }).slotCounts;
+    console.info(
+      `[S3c D1 MEMORY] requests=200000 refused=${refused} `
+      + `occupied=${occupancy.occupiedSlots}/${occupancy.slotCapacity}`
+    );
 
-    expect(refusedByIp).toMatchObject({ allowed: false, scope: "ip" });
-    expect(victimFromFreshIp).toEqual({ allowed: true });
-    expect(retained).toBeLessThanOrEqual(policy.rateLimitBucketCapacity);
+    expect(refused).toBe(200_000 - policy.rateLimits.register.admissionPerSource);
+    expect(occupancy.occupiedSlots).toBeLessThanOrEqual(policy.rateLimitBucketCapacity);
+    expect(occupancy.slotCapacity).toBe(policy.rateLimitBucketCapacity * 3);
+    expect(retainedCounts).toHaveLength(policy.rateLimitBucketCapacity * 3);
+    expect(retainedCounts.reduce((maximum, count) => Math.max(maximum, count), 0))
+      .toBeLessThanOrEqual(Math.max(
+        ...Object.values(policy.rateLimits).map((route) => route.admissionPerSource)
+      ));
   });
 
   it("does not evict an active at-limit bucket when new keys churn past the cap", () => {
     const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
     const oneRequestPolicy = Object.freeze({
       ...policy.rateLimits,
-      register: Object.freeze({ ...policy.rateLimits.register, perIp: 1, perAddress: 10 })
+      register: Object.freeze({
+        ...policy.rateLimits.register,
+        admissionPerSource: 1,
+        perIp: 1,
+        perAddress: 10
+      })
     });
     const limiter = new InProcessAuthRateLimiter(
       oneRequestPolicy, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
@@ -286,14 +624,15 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     const afterChurn = limiter.consume({
       route: "register", ip: victimIp, addressKey: "victim:bypass-attempt", now
     });
-    const retained = (limiter as unknown as { buckets: { size: number } }).buckets.size;
+    const occupancy = limiterOccupancy(limiter);
     console.info(
       `[S3 W3 RED/GREEN] churn=${policy.rateLimitBucketCapacity + 10} `
-      + `victim_refused=${String(!afterChurn.allowed)} retained_buckets=${retained}`
+      + `victim_refused=${String(!afterChurn.allowed)} `
+      + `occupied=${occupancy.occupiedSlots}/${occupancy.slotCapacity}`
     );
 
     expect(afterChurn).toEqual({ allowed: false, scope: "ip" });
-    expect(retained).toBeLessThanOrEqual(policy.rateLimitBucketCapacity);
+    expect(occupancy.occupiedSlots).toBeLessThanOrEqual(policy.rateLimitBucketCapacity);
     expect(limiter.consume({
       route: "register",
       ip: "post-expiry:new-source",
@@ -302,39 +641,103 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     })).toEqual({ allowed: true });
   });
 
-  it("S3 rework4 B1 keeps a saturated limiter closed for sustained floods and two rotating keys", () => {
+  it("S3c B3 keeps a one-source flood refused at 20/10/3 before slot saturation", () => {
     const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
-    const thresholds = Object.freeze({ register: 20, verify: 10, resend: 3 });
-
     for (const route of ["register", "verify", "resend"] as const) {
-      const limit = thresholds[route];
-      const policy = Object.freeze({
-        ...base.rateLimits,
-        [route]: Object.freeze({ ...base.rateLimits[route], perIp: limit, perAddress: limit })
-      });
-      const limiter = new InProcessAuthRateLimiter(policy, 5, base.rateLimitRefusalAuditIntervalMs);
+      const limit = base.rateLimits[route].admissionPerSource;
+      const limiter = new InProcessAuthRateLimiter(
+        base.rateLimits,
+        base.rateLimitBucketCapacity,
+        base.rateLimitRefusalAuditIntervalMs,
+        Buffer.alloc(32, 0x31 + route.length)
+      );
       const now = new Date(0);
-      for (const guard of ["guard-a", "guard-b"]) {
-        for (let count = 0; count < limit; count += 1) {
-          expect(limiter.consume({ route, ip: `${guard}:ip`, addressKey: `${guard}:address`, now }))
-            .toEqual({ allowed: true });
-        }
+      const floodIp = `flood:one-ip:${route}`;
+      for (let count = 0; count < limit; count += 1) {
+        expect(limiter.consume({ route, ip: floodIp, addressKey: `flood:${count}`, now }))
+          .toEqual({ allowed: true });
       }
-
       const results = Array.from({ length: limit * 3 }, (_, index) => limiter.consume({
         route,
-        ip: "flood:one-ip",
+        ip: floodIp,
         addressKey: `rotating:${index % 2}`,
         now
       }));
-      const retained = (limiter as unknown as { buckets: { size: number } }).buckets.size;
+      const occupancy = limiterOccupancy(limiter);
       console.info(
-        `[S3 REWORK4 B1 UNIT RED/GREEN] route=${route} threshold=${limit} `
-        + `allowed=${results.filter((result) => result.allowed).length} retained=${retained}`
+        `[S3c B3 PRE-SATURATION] route=${route} threshold=${limit} `
+        + `post_limit_allowed=${results.filter((result) => result.allowed).length} `
+        + `occupied=${occupancy.occupiedSlots}/${occupancy.slotCapacity}`
       );
       expect(results.every((result) => !result.allowed)).toBe(true);
-      expect(retained).toBe(5);
+      expect(occupancy.occupiedSlots).toBeLessThan(occupancy.slotCapacity);
     }
+  });
+
+  it("S3c D1 makes two colliding rotating sources share one budget without laundering state", () => {
+    const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const hashKey = Buffer.alloc(32, 0x4d);
+    for (const route of ["register", "verify", "resend"] as const) {
+      const limit = base.rateLimits[route].admissionPerSource;
+      const [first, second] = collidingSources(route, base.rateLimitBucketCapacity, hashKey);
+      const limiter = new InProcessAuthRateLimiter(
+        base.rateLimits,
+        base.rateLimitBucketCapacity,
+        base.rateLimitRefusalAuditIntervalMs,
+        hashKey
+      );
+      const results = Array.from({ length: limit * 3 }, (_, index) => limiter.consume({
+        route,
+        ip: index % 2 === 0 ? first : second,
+        addressKey: `ignored:${index}`,
+        now: new Date(0)
+      }));
+      const allowed = results.filter((result) => result.allowed).length;
+      console.info(
+        `[S3c D1 ROTATING] route=${route} threshold=${limit} colliding_sources=2 `
+        + `allowed=${allowed} refused=${results.length - allowed}`
+      );
+      expect(allowed).toBe(limit);
+      expect(results.slice(limit).every((result) => !result.allowed)).toBe(true);
+    }
+  });
+
+  it("S3c D3 retains no raw bucket key but records the bounded refusal-source residual", () => {
+    const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const limiter = new InProcessAuthRateLimiter(
+      base.rateLimits,
+      base.rateLimitBucketCapacity,
+      base.rateLimitRefusalAuditIntervalMs,
+      Buffer.alloc(32, 0x72)
+    );
+    const rawIp = "198.51.100.254-D3-RAW-IP";
+    const rawAddress = "D3-RAW-ADDRESS";
+    expect(limiter.consume({
+      route: "register", ip: rawIp, addressKey: rawAddress, now: new Date(0)
+    })).toEqual({ allowed: true });
+    const rawBucketIpRetained = retainedStateContains(limiter, rawIp);
+    const rawBucketAddressRetained = retainedStateContains(limiter, rawAddress);
+    expect(rawBucketIpRetained).toBe(false);
+    expect(rawBucketAddressRetained).toBe(false);
+
+    limiter.aggregateRefusal({
+      route: "register",
+      scope: "ip",
+      actorToken: "00000000-0000-4000-8000-000000000001",
+      now: new Date(0),
+      source: { ip: rawIp, userAgent: "D3-UA", requestId: "D3-REQUEST" }
+    });
+    const aggregateState = JSON.stringify([
+      ...(limiter as unknown as {
+        refusalAggregates: ReadonlyMap<TestAuthRoute, unknown>;
+      }).refusalAggregates.values()
+    ]);
+    console.info(
+      `[S3c D3 RESIDUAL] raw_bucket_key_retained=${String(rawBucketIpRetained)} `
+      + `raw_refusal_source_retained=${String(aggregateState.includes(rawIp))} `
+      + `aggregate_routes=1/${(["register", "verify", "resend"] as const).length}`
+    );
+    expect(aggregateState).toContain(rawIp);
   });
 
   it("S3 rework4 B6 models verification and delivery columns only on channel_binding", () => {

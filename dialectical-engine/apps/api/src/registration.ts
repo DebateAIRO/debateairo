@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
@@ -56,12 +56,7 @@ export class AuthFlowError extends Error {
 }
 
 type AuthRoute = "register" | "verify" | "resend";
-
-interface RateLimitBucket {
-  readonly timestamps: readonly number[];
-  readonly limit: number;
-  readonly windowMs: number;
-}
+const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
 
 interface RefusalAggregate {
   readonly windowStartedAt: number;
@@ -74,59 +69,168 @@ interface RefusalAggregate {
 }
 
 export class InProcessAuthRateLimiter {
-  private readonly buckets = new Map<string, RateLimitBucket>();
+  private readonly slotCounts: Uint8Array;
+  private readonly slotHeads: Uint8Array;
+  private readonly slotSaturatedUntil: Float64Array;
+  private readonly slotExpiries: Float64Array;
+  private readonly slotRowsByRoute: Readonly<Record<
+    AuthRoute,
+    readonly Readonly<{ offset: number; width: number }>[]
+  >>;
+  private readonly slotOffsetByRoute: Readonly<Record<AuthRoute, number>>;
+  private readonly expiryOffsetByRoute: Readonly<Record<AuthRoute, number>>;
+  private readonly slotHashKey: Buffer;
+  private readonly occupiedSlotsByRoute: Record<AuthRoute, number> = {
+    register: 0,
+    verify: 0,
+    resend: 0
+  };
   private readonly refusalAggregates = new Map<AuthRoute, RefusalAggregate>();
 
   constructor(
     private readonly policy: Readonly<Record<AuthRoute, AuthRouteLimit>>,
     private readonly bucketCapacity: number,
-    private readonly refusalAuditIntervalMs: number
+    private readonly refusalAuditIntervalMs: number,
+    slotHashKey: Uint8Array = randomBytes(32)
   ) {
     if (!Number.isInteger(bucketCapacity) || bucketCapacity < 1
-      || !Number.isInteger(refusalAuditIntervalMs) || refusalAuditIntervalMs < 1) {
+      || !Number.isInteger(refusalAuditIntervalMs) || refusalAuditIntervalMs < 1
+      || slotHashKey.byteLength < 16
+      || AUTH_ROUTES.some((route) => !Number.isInteger(policy[route].admissionPerSource)
+        || policy[route].admissionPerSource < 1 || policy[route].admissionPerSource > 255)) {
       throw new TypeError("AUTH_RATE_LIMIT_POLICY_INVALID");
     }
+    const slotCapacity = bucketCapacity * AUTH_ROUTES.length;
+    this.slotCounts = new Uint8Array(slotCapacity);
+    this.slotHeads = new Uint8Array(slotCapacity);
+    this.slotSaturatedUntil = new Float64Array(slotCapacity);
+    let expiryOffset = 0;
+    this.slotOffsetByRoute = Object.freeze(Object.fromEntries(AUTH_ROUTES.map((route, routeIndex) =>
+      [route, routeIndex * bucketCapacity]
+    )) as Record<AuthRoute, number>);
+    this.expiryOffsetByRoute = Object.freeze(Object.fromEntries(AUTH_ROUTES.map((route) => {
+      const offset = expiryOffset;
+      expiryOffset += bucketCapacity * policy[route].admissionPerSource;
+      return [route, offset];
+    })) as Record<AuthRoute, number>);
+    this.slotExpiries = new Float64Array(expiryOffset);
+    const firstWidth = bucketCapacity === 1 ? 1 : Math.floor(bucketCapacity / 2);
+    this.slotRowsByRoute = Object.freeze(Object.fromEntries(AUTH_ROUTES.map((route, routeIndex) => {
+      const routeOffset = this.slotOffsetByRoute[route];
+      return [route, bucketCapacity === 1
+        ? Object.freeze([Object.freeze({ offset: routeOffset, width: 1 })])
+        : Object.freeze([
+            Object.freeze({ offset: routeOffset, width: firstWidth }),
+            Object.freeze({
+              offset: routeOffset + firstWidth,
+              width: bucketCapacity - firstWidth
+            })
+          ])];
+    })) as Record<AuthRoute, readonly Readonly<{ offset: number; width: number }>[]>);
+    this.slotHashKey = Buffer.from(slotHashKey);
   }
 
-  private sweepExpired(now: number): void {
-    for (const [key, bucket] of this.buckets) {
-      const timestamps = bucket.timestamps.filter((timestamp) => timestamp > now - bucket.windowMs);
-      if (timestamps.length === 0) {
-        this.buckets.delete(key);
-      } else if (timestamps.length !== bucket.timestamps.length) {
-        this.buckets.set(key, Object.freeze({ ...bucket, timestamps: Object.freeze(timestamps) }));
-      }
+  private slotIndexes(route: AuthRoute, key: string): readonly number[] {
+    const digest = createHmac("sha256", this.slotHashKey).update(key, "utf8").digest();
+    return this.slotRowsByRoute[route].map((row, index) =>
+      row.offset + (digest.readUInt32BE(index * 4) % row.width)
+    );
+  }
+
+  private expiryBase(route: AuthRoute, index: number, limit: number): number {
+    return this.expiryOffsetByRoute[route]
+      + (index - this.slotOffsetByRoute[route]) * limit;
+  }
+
+  private activeCount(route: AuthRoute, index: number, limit: number, now: number): number {
+    let count = this.slotCounts[index]!;
+    let head = this.slotHeads[index]!;
+    const wasOccupied = count > 0 || this.slotSaturatedUntil[index]! > 0;
+    const expiryBase = this.expiryBase(route, index, limit);
+    while (count > 0 && this.slotExpiries[expiryBase + head]! <= now) {
+      head = (head + 1) % limit;
+      count -= 1;
     }
+    if (this.slotSaturatedUntil[index]! <= now) this.slotSaturatedUntil[index] = 0;
+    if (count === 0) head = 0;
+    this.slotCounts[index] = count;
+    this.slotHeads[index] = head;
+    if (wasOccupied && count === 0 && this.slotSaturatedUntil[index] === 0) {
+      this.occupiedSlotsByRoute[route] -= 1;
+    }
+    return count;
   }
 
-  private retain(
+  /**
+   * Bounded memory, exact per-key counting, and zero false refusal at saturation
+   * cannot coexist. This keyed, route-isolated two-row fixed-slot sketch gives up
+   * exactness only on same-route collisions: colliding sources share counts, so
+   * information loss can over-count/refuse but can never mint a fresh budget.
+   * Slots are never evicted or reassigned, so an at-limit source receives no
+   * early amnesty. The random per-process key makes targeted collisions
+   * impractical while keeping the ruled slot count as the hard memory bound.
+   *
+   * D3 residual: raw IP exists transiently in the request and HMAC input but is
+   * not retained in slot state. RefusalAggregate intentionally retains one
+   * AuthSourceContext per route until the bounded audit-flush window; that map is
+   * capped at three routes, is never logged/persisted raw, and the repository
+   * hashes it at its boundary. A memory-hard per-request KDF is not justified for
+   * this bounded ephemeral state. Slot state is held in preallocated typed
+   * arrays, so attacker-driven occupancy changes values but never allocates a
+   * retained object or array and resident storage converges on the ruled bound.
+   */
+  private take(
+    route: AuthRoute,
     key: string,
-    timestamps: readonly number[],
     limit: number,
     windowMs: number,
     now: number
   ): boolean {
-    if (this.buckets.has(key)) {
-      this.buckets.delete(key);
-    } else if (this.buckets.size >= this.bucketCapacity) {
-      this.sweepExpired(now);
-      if (this.buckets.size >= this.bucketCapacity) return false;
+    const indexes = this.slotIndexes(route, key);
+    const counts = indexes.map((index) => this.activeCount(route, index, limit, now));
+    const estimatedCount = Math.min(...indexes.map((index, offset) =>
+      this.slotSaturatedUntil[index]! > now ? limit : counts[offset]!
+    ));
+    if (estimatedCount >= limit) return false;
+
+    const expiresAt = now + windowMs;
+    for (let offset = 0; offset < indexes.length; offset += 1) {
+      const index = indexes[offset]!;
+      const count = counts[offset]!;
+      if (count === 0 && this.slotSaturatedUntil[index] === 0) {
+        this.occupiedSlotsByRoute[route] += 1;
+      }
+      if (this.slotSaturatedUntil[index]! > now || count >= limit) {
+        this.slotSaturatedUntil[index] = Math.max(
+          this.slotSaturatedUntil[index]!,
+          expiresAt
+        );
+      } else {
+        const head = this.slotHeads[index]!;
+        const tail = (head + count) % limit;
+        this.slotExpiries[this.expiryBase(route, index, limit) + tail] = expiresAt;
+        this.slotCounts[index] = count + 1;
+      }
     }
-    this.buckets.set(key, Object.freeze({
-      timestamps: Object.freeze([...timestamps]), limit, windowMs
-    }));
     return true;
   }
 
-  private take(key: string, limit: number, windowMs: number, now: number): boolean {
-    const retained = (this.buckets.get(key)?.timestamps ?? [])
-      .filter((timestamp) => timestamp > now - windowMs);
-    if (retained.length >= limit) {
-      this.retain(key, retained, limit, windowMs, now);
-      return false;
-    }
-    retained.push(now);
-    return this.retain(key, retained, limit, windowMs, now);
+  memoryOccupancy(): Readonly<{
+    occupiedSlots: number;
+    slotCapacity: number;
+    perRouteSlotCapacity: number;
+    allocatedBytes: number;
+    occupiedSlotsByRoute: Readonly<Record<AuthRoute, number>>;
+  }> {
+    const occupiedSlotsByRoute = Object.freeze({ ...this.occupiedSlotsByRoute });
+    return Object.freeze({
+      occupiedSlots: Object.values(occupiedSlotsByRoute).reduce((sum, count) => sum + count, 0),
+      slotCapacity: this.bucketCapacity * AUTH_ROUTES.length,
+      perRouteSlotCapacity: this.bucketCapacity,
+      allocatedBytes: this.slotCounts.byteLength + this.slotHeads.byteLength
+        + this.slotSaturatedUntil.byteLength + this.slotExpiries.byteLength,
+      occupiedSlotsByRoute
+    });
   }
 
   aggregateRefusal(input: {
@@ -185,11 +289,18 @@ export class InProcessAuthRateLimiter {
   }): Readonly<{ allowed: true } | { allowed: false; scope: "ip" | "address" }> {
     const route = this.policy[input.route];
     const now = input.now.getTime();
-    if (!this.take(`${input.route}:ip:${input.ip}`, route.perIp, route.windowMs, now)) {
+    // Public addresses/tokens are attacker-supplied, so they cannot own an
+    // admission budget. Admission is charged only to the caller's source. The
+    // explicit per-source values preserve the ruled 20/10/3 route ceilings;
+    // existing channel cooldown remains the outbound-side-effect throttle.
+    if (!this.take(
+      input.route,
+      `${input.route}:source:${input.ip}`,
+      route.admissionPerSource,
+      route.windowMs,
+      now
+    )) {
       return Object.freeze({ allowed: false, scope: "ip" as const });
-    }
-    if (!this.take(`${input.route}:address:${input.addressKey}`, route.perAddress, route.windowMs, now)) {
-      return Object.freeze({ allowed: false, scope: "address" as const });
     }
     return Object.freeze({ allowed: true as const });
   }

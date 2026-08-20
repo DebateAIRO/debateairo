@@ -1,0 +1,23 @@
+#!/bin/zsh
+# S3c — same-terminal rework law: resume session 01a019e7, visible window.
+# The packet is the only scope authority; this script carries no file list.
+set -u
+MISSION="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine"
+REL="docs/missions/2026-08-17-accounts-privacy-security"
+PACKET="${REL}/logs/S3c-packet.md"
+LOG="${MISSION}/${REL}/logs/S3-codex.log"
+cd "${MISSION}" || exit 1
+[[ -f "${MISSION}/${PACKET}" ]] || { print "REFUSING: packet ${PACKET} missing" | tee -a "${LOG}"; exit 1; }
+if pgrep -f "codex exec" >/dev/null 2>&1; then print "REFUSING: codex alive" | tee -a "${LOG}"; exit 1; fi
+
+GOAL="/goal S3c: rate limiter, re-cut. S3a and S3b are CLOSED and dual-greenlit (commit cff3dd5) — do not touch their work. Read ${PACKET} in full; it is your only scope authority. Two blockers. D1: when the bucket map saturates, retain() returns false and an under-limit key that is not already resident is REFUSED — and because retain refreshes existing keys and never evicts them, the attacker's own buckets are the ones that survive while honest newcomers are locked out; at per_ip 20 roughly 103 IPs can hold registration closed for a 15-minute window. Measure the real number yourself. Bounded memory, exact per-key counting, and never-refusing-an-under-limit-key cannot all hold — name the tension and choose where to degrade, satisfying: memory bounded by a ruled constant; a key at or over its limit is never forgiven early (round 2 broke exactly this and slid metastably back open); saturation never refuses an under-limit key; and where bounding loses information it errs only toward over-counting, never toward granting a fresh budget. Fixed-slot counting with colliding keys sharing a budget is one shape that satisfies all four without eviction, but you choose and you justify. D2: an attacker spends a stranger's budget — the address bucket is keyed on attacker-supplied input, so naming a victim's email burns their 5-per-15min registration or 3-per-hour resend budget and denies the rightful owner; and consume() charges the IP bucket BEFORE testing the address, so a request refused on the address still spent the caller's own IP budget. The property: a party's budget must not be consumable by requests that party did not make. A per-address counter is inherently attacker-reachable, so counting harder does not fix it — reconsider what the per-address limit is protecting, and if the answer is stopping mail spam, throttle the outbound side effect rather than denying the request. You choose the design and state the reasoning. Do NOT fix the audit attribution — a refusal naming an attacker-chosen actor is ticket T4, already cut. D3: record deliberately whether plaintext IP in bucket keys and in RefusalAggregate.source is acceptable ephemeral state; a stated residual is fine, an undocumented one is not. VR-10 STANDING RULE: mutation-test every security assertion and show each goes RED — at minimum removing the at/over-limit protection, restoring eviction of the key being served (two-rotating-keys probe), making saturation refuse under-limit keys, and removing the D2 fix. Both lenses now re-derive your mutants themselves, so make them real. PROOF DISCIPLINE: real stack at production policy parameters, never a harness that suppresses the effect under test — round 4 shipped three tests that passed against broken code and S3b's timing test certified a configuration production never runs. Thresholds must be derived from a measured null, not picked because the achievable result clears them. Required proofs: a sustained one-IP flood stays refused at 20/10/3 under saturation; the two-rotating-keys probe; and — the assertion D1 exists for — saturate the structure from many sources, then register as a fresh innocent user and succeed. Report memory occupancy at saturation. Append progress lines to ${REL}/logs/S3c-progress.log. Do NOT commit or push. Post READY FOR PEER REVIEW when all gates pass."
+
+PROMPTFILE="$(mktemp -t codex-s3c)"
+print -r -- "${GOAL}" > "${PROMPTFILE}"
+osascript <<APPLESCRIPT >/dev/null
+tell application "Terminal"
+  do script "printf '\\\\033]0;CODEX S3c\\\\007'; cd '${MISSION}'; echo '=== S3c — Codex (resume 01a019e7) ==='; echo '(this window IS the seat — closing it stops the rework)'; echo; { echo \\"=== S3c starting \$(date -u +%FT%TZ) ===\\"; codex exec resume 01a019e7-e36f-7131-b509-5dcb8d52b8b6 -c model='\\"gpt-5.6-sol\\"' -c model_reasoning_effort='\\"xhigh\\"' -c sandbox_mode='\\"danger-full-access\\"' \\"\$(cat '${PROMPTFILE}')\\" </dev/null 2>&1; echo \\"=== S3c exited \$(date -u +%FT%TZ) ===\\"; } | tee -a '${LOG}'; rm -f '${PROMPTFILE}'"
+  activate
+end tell
+APPLESCRIPT
+print "launched S3c in a visible Terminal window; log: ${LOG}"
