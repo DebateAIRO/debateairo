@@ -219,6 +219,16 @@ export class PostgresIdentityRepository {
         input.verificationExpiresAt
       ]);
       await client.query(`
+        INSERT INTO identity.verification_token_credential (
+          token_hash,channel_binding_id,issued_at,expires_at
+        ) VALUES ($1,$2,$3,$4)
+      `, [
+        input.verificationTokenHash,
+        emailChannel.rows[0]!.channel_binding_id,
+        input.occurredAt,
+        input.verificationExpiresAt
+      ]);
+      await client.query(`
         INSERT INTO identity.channel_binding (
           user_id,channel_type,address_ciphertext,state,created_at,delivery_status
         ) VALUES ($1,'recovery_email',$2::jsonb,'pending_verification',$3,'not_requested')
@@ -264,9 +274,10 @@ export class PostgresIdentityRepository {
   } | null> {
     const result = await this.pool.query<{ audit_token: string; address_key: string }>(`
       SELECT u.audit_token,encode(u.email_blind_index,'hex') AS address_key
-      FROM identity.channel_binding c
+      FROM identity.verification_token_credential token
+      JOIN identity.channel_binding c ON c.channel_binding_id=token.channel_binding_id
       JOIN identity."user" u ON u.user_id=c.user_id
-      WHERE c.verification_token_hash=$1 AND c.channel_type='email'
+      WHERE token.token_hash=$1 AND c.channel_type='email'
     `, [tokenHash]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -305,6 +316,31 @@ export class PostgresIdentityRepository {
     });
   }
 
+  async recordVerificationDeliveryRecordFailure(input: {
+    readonly userId: string;
+    readonly correlationId: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+    readonly errorCode: "MAIL_RECORD_FAILED";
+  }): Promise<void> {
+    await this.transaction(async (client) => {
+      const user = await client.query<{ audit_token: string }>(`
+        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
+      `, [input.userId]);
+      if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
+      await this.appendAudit(client, {
+        actorToken: user.rows[0].audit_token,
+        eventType: "identity.verification.delivery_record_failed",
+        targetType: "identity.channel_binding",
+        occurredAt: input.occurredAt,
+        source: input.source,
+        decision: "DENY",
+        success: false,
+        justification: `correlation:${input.correlationId};code:${input.errorCode}`
+      });
+    });
+  }
+
   async recordDuplicateRegistrationPostwork(input: {
     readonly userId: string;
     readonly occurredAt: Date;
@@ -339,27 +375,33 @@ export class PostgresIdentityRepository {
   }): Promise<boolean> {
     return this.transaction(async (client) => {
       const found = await client.query<{
+        token_hash: string;
         channel_binding_id: string;
         user_id: string;
         audit_token: string;
-        verification_expires_at: Date;
-        verification_consumed_at: Date | null;
+        expires_at: Date;
+        consumed_at: Date | null;
         user_state: string;
       }>(`
-        SELECT c.channel_binding_id,c.user_id,u.audit_token,c.verification_expires_at,
-          c.verification_consumed_at,u.state AS user_state
-        FROM identity.channel_binding c
+        SELECT token.token_hash,c.channel_binding_id,c.user_id,u.audit_token,
+          token.expires_at,token.consumed_at,u.state AS user_state
+        FROM identity.verification_token_credential token
+        JOIN identity.channel_binding c ON c.channel_binding_id=token.channel_binding_id
         JOIN identity."user" u ON u.user_id=c.user_id
-        WHERE c.verification_token_hash=$1 AND c.channel_type='email'
-        FOR UPDATE OF c,u
+        WHERE token.token_hash=$1 AND c.channel_type='email'
+        FOR UPDATE OF token,c,u
       `, [input.tokenHash]);
       const row = found.rows[0];
       const valid = row !== undefined
-        && row.verification_consumed_at === null
-        && row.verification_expires_at.getTime() >= input.occurredAt.getTime()
+        && row.consumed_at === null
+        && row.expires_at.getTime() >= input.occurredAt.getTime()
         && row.user_state === "pending_verification";
       const actorToken = row?.audit_token ?? randomUUID();
       if (valid) {
+        await client.query(`
+          UPDATE identity.verification_token_credential SET consumed_at=$2
+          WHERE channel_binding_id=$1 AND consumed_at IS NULL
+        `, [row.channel_binding_id, input.occurredAt]);
         await client.query(`
           UPDATE identity.channel_binding
           SET state='verified',verified_at=$2,verification_consumed_at=$2,
@@ -410,6 +452,15 @@ export class PostgresIdentityRepository {
       const send = row !== undefined && row.state === "pending_verification" && !cooling;
       const actorToken = row?.audit_token ?? randomUUID();
       if (send) {
+        await client.query(`
+          DELETE FROM identity.verification_token_credential
+          WHERE channel_binding_id=$1 AND expires_at < $2
+        `, [row.channel_binding_id, input.occurredAt]);
+        await client.query(`
+          INSERT INTO identity.verification_token_credential (
+            token_hash,channel_binding_id,issued_at,expires_at
+          ) VALUES ($1,$2,$3,$4)
+        `, [input.tokenHash, row.channel_binding_id, input.occurredAt, input.expiresAt]);
         await client.query(`
           UPDATE identity.channel_binding
           SET verification_token_hash=$2,verification_expires_at=$3,

@@ -38,7 +38,13 @@ const verificationPolicySchema = z.object({
     mechanism: z.literal("per_row_last_sent_timestamp_minimum_spacing"),
     minimum_spacing_ms: z.literal(20 * 60_000)
   }).strict(),
-  token_rotation_residual: z.string().regex(/newest mailed token/i),
+  verification_credentials: z.object({
+    storage: z.literal("HASH_ONLY_APPEND_ONLY_LEDGER"),
+    validity: z.literal("EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION"),
+    maximum_live_hashes_per_account: z.literal(73),
+    pruning: z.literal("ON_RESEND_DELETE_EXPIRED"),
+    leaked_token_tradeoff: z.string().regex(/cannot.*revoke.*resend/i)
+  }).strict(),
   enumeration_response_floor_ms: z.number().int().positive(),
   enumeration_tolerance_ms: z.number().int().positive()
 }).strict();
@@ -158,7 +164,74 @@ const channelPolicySchema = z.object({
   transport: z.literal("own_sendmail"),
   sender_local_part: z.literal("noreply"),
   transport_timeout_ms: z.number().int().positive(),
-  spam_notice: z.string().regex(/spam/i)
+  spam_notice: z.string().regex(/spam/i),
+  verification_dispatch: z.object({
+    maximum_concurrent: z.literal(32),
+    queue_capacity: z.literal(96),
+    at_capacity: z.literal("RETRYABLE_503_BEFORE_ACCOUNT_COMMIT_AFTER_BOUNDED_WAIT"),
+    maximum_concurrent_registration_hashes: z.literal(32),
+    activation_spacing_ms: z.literal(60),
+    registration_activation_spacing_ms: z.literal(45),
+    pre_transport_work_budget_ms: z.literal(600),
+    no_send_equal_transport_work_ms: z.literal(5_000),
+    handoff_scheduler_tolerance_ms: z.literal(100),
+    registration_minimum_reservation_ms: z.literal(5_100),
+    minimum_reservation_ms: z.literal(5_700),
+    queue_wait_timeout_ms: z.literal(18_000),
+    release_semantics: z.literal("ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF"),
+    retained_payload: z.literal("ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT"),
+    operator_signal: z.object({
+      payload: z.literal("OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE"),
+      aggregation_window_ms: z.literal(60_000),
+      count_cap: z.literal(Number.MAX_SAFE_INTEGER),
+      maximum_retained_aggregates: z.literal(1)
+    }).strict(),
+    registration_clamp_absorption: z.object({
+      maximum_unsaturated_concurrency: z.number().int().positive(),
+      measured_hash_and_provisioning_max_ms: z.number().positive(),
+      measurement_safety_percent: z.number().int().positive(),
+      ruled_hash_and_provisioning_upper_bound_ms: z.number().int().positive(),
+      response_clamp_ms: z.number().int().positive(),
+      binding_headroom_ms: z.number().int().positive(),
+      first_measured_unabsorbed_concurrency: z.number().int().positive(),
+      beyond_n_star_protection: z.literal("EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION")
+    }).strict(),
+    cadence_sensitivity: z.object({
+      minus_15_ms: z.object({
+        cadence_ms: z.literal(30),
+        observation_count: z.literal(3),
+        red_count: z.literal(2),
+        green_count: z.literal(1),
+        n8_median_gap_tenths_ms_range: z.object({
+          minimum: z.literal(596),
+          maximum: z.literal(1_158)
+        }).strict(),
+        n8_auc_ppm_range: z.object({
+          minimum: z.literal(620_000),
+          maximum: z.literal(774_000)
+        }).strict(),
+        characterization: z.literal("NOISY_2_OF_3_RED_RATE_NOT_DETERMINISTIC_LOWER_BOUND")
+      }).strict(),
+      plus_15_ms: z.object({
+        cadence_ms: z.literal(60),
+        observation_count: z.literal(1),
+        red_count: z.literal(0),
+        green_count: z.literal(1),
+        n8_median_gap_tenths_ms: z.literal(121),
+        n8_auc_ppm: z.literal(529_000),
+        characterization: z.literal("SINGLE_GREEN_OBSERVATION_NOT_STABLE_BOUNDARY")
+      }).strict(),
+      conclusion: z.literal("CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING"),
+      recalibration_trigger: z.literal("TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS")
+    }).strict(),
+    sizing_derivation: z.string().regex(/45 ms.*N\*=2.*480 ms.*2 \* 45 ms.*570 ms.*600 ms.*30 ms.*equal-work distribution.*60 ms.*logical capacity permit.*durable provisioning.*response clamp.*lease activation.*32 accepted registration hashes.*5100 ms.*5000 ms.*100 ms.*5700 ms.*600 ms.*5000 ms.*100 ms.*18-second/i)
+  }).strict(),
+  delivery_audit: z.object({
+    public_result: z.literal("ENUMERATION_SAFE_GENERIC_RESPONSE"),
+    operator_result: z.literal("DURABLE_STATUS_AND_AUDIT_WITH_OPAQUE_CORRELATION"),
+    duplicate_registration_rows: z.literal(2),
+    duplicate_counting_instruction: z.string().regex(/do not double-count/i)
+  }).strict()
 }).strict();
 
 export interface AuthPolicyRegisterRow {
@@ -208,11 +281,17 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
         mechanism: "per_row_last_sent_timestamp_minimum_spacing",
         minimum_spacing_ms: 20 * 60_000
       }),
-      token_rotation_residual: "Under attack an older verification link stops working; the account owner can still activate only with the newest mailed token, with rotation bounded by the same 20-minute outbound spacing.",
+      verification_credentials: Object.freeze({
+        storage: "HASH_ONLY_APPEND_ONLY_LEDGER",
+        validity: "EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION",
+        maximum_live_hashes_per_account: 73,
+        pruning: "ON_RESEND_DELETE_EXPIRED",
+        leaked_token_tradeoff: "A token believed leaked cannot be selectively revoked by an unauthenticated resend; every mailed link instead expires at its own ruled 24-hour deadline or is consumed when the account activates. Selective revocation requires a separately authenticated recovery action."
+      }),
       enumeration_response_floor_ms: 500,
       enumeration_tolerance_ms: 100
     }),
-    sourceRef: "wave-2-target-architecture.md#10.7 + VR-5 + S3c rework1 B1 outbound cap (2026-08-20)"
+    sourceRef: "wave-2-target-architecture.md#10.7 + VR-5 + S3c rework1 B1 outbound cap + S3d D2 credential non-interference (2026-08-20)"
   }),
   Object.freeze({
     rowKey: "rateLimitPolicy" as const,
@@ -328,9 +407,76 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
       transport: "own_sendmail",
       sender_local_part: "noreply",
       transport_timeout_ms: 5_000,
-      spam_notice: "Check your spam folder if the verification message does not arrive."
+      spam_notice: "Check your spam folder if the verification message does not arrive.",
+      verification_dispatch: Object.freeze({
+        maximum_concurrent: 32,
+        queue_capacity: 96,
+        at_capacity: "RETRYABLE_503_BEFORE_ACCOUNT_COMMIT_AFTER_BOUNDED_WAIT",
+        maximum_concurrent_registration_hashes: 32,
+        activation_spacing_ms: 60,
+        registration_activation_spacing_ms: 45,
+        pre_transport_work_budget_ms: 600,
+        no_send_equal_transport_work_ms: 5_000,
+        handoff_scheduler_tolerance_ms: 100,
+        registration_minimum_reservation_ms: 5_100,
+        minimum_reservation_ms: 5_700,
+        queue_wait_timeout_ms: 18_000,
+        release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
+        retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
+        operator_signal: Object.freeze({
+          payload: "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
+          aggregation_window_ms: 60_000,
+          count_cap: Number.MAX_SAFE_INTEGER,
+          maximum_retained_aggregates: 1
+        }),
+        registration_clamp_absorption: Object.freeze({
+          maximum_unsaturated_concurrency: 2,
+          measured_hash_and_provisioning_max_ms: 436,
+          measurement_safety_percent: 110,
+          ruled_hash_and_provisioning_upper_bound_ms: 480,
+          response_clamp_ms: 600,
+          binding_headroom_ms: 30,
+          first_measured_unabsorbed_concurrency: 3,
+          beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"
+        }),
+        cadence_sensitivity: Object.freeze({
+          minus_15_ms: Object.freeze({
+            cadence_ms: 30,
+            observation_count: 3,
+            red_count: 2,
+            green_count: 1,
+            n8_median_gap_tenths_ms_range: Object.freeze({
+              minimum: 596,
+              maximum: 1_158
+            }),
+            n8_auc_ppm_range: Object.freeze({
+              minimum: 620_000,
+              maximum: 774_000
+            }),
+            characterization: "NOISY_2_OF_3_RED_RATE_NOT_DETERMINISTIC_LOWER_BOUND"
+          }),
+          plus_15_ms: Object.freeze({
+            cadence_ms: 60,
+            observation_count: 1,
+            red_count: 0,
+            green_count: 1,
+            n8_median_gap_tenths_ms: 121,
+            n8_auc_ppm: 529_000,
+            characterization: "SINGLE_GREEN_OBSERVATION_NOT_STABLE_BOUNDARY"
+          }),
+          conclusion: "CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING",
+          recalibration_trigger: "TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS"
+        }),
+        sizing_derivation: "The current 45 ms registration cadence has a measured clamp-absorption limit N*=2: the measured hash plus durable provisioning maximum is 436 ms; a ruled 110 percent safety factor rounded upward to 480 ms gives the binding inequality 480 ms + 2 * 45 ms = 570 ms < the 600 ms response clamp, leaving 30 ms ruled headroom. At N>=3 the clamp no longer absorbs the serialized work, so the frozen N=4/N=8 privacy result relies on measured equal-work distribution, not clamp absorption. Across three 30 ms observations the N=8 result was a noisy 2-of-3 RED rate, with median gaps from 59.6 to 115.8 ms and AUC from .620 to .774; the 60 ms result is one GREEN observation at 12.1 ms and .529. Central tendency orders in the safer direction as cadence rises, but run-to-run noise is comparable to the observed effect; 45 ms is the current value, is not claimed uniquely load-bearing, and has no ruled failure probability. Recalibrate on target-host or storage-class change, or the first unchanged-code RED at 45 ms. Resend retains the measured 60 ms cadence needed to keep its in-lease database work bounded. Registration first obtains one bounded logical capacity permit, then completes password hashing, durable provisioning, and the response clamp before lease activation; a full-capacity refusal therefore remains pre-hash and no branch-specific transaction or clamp tail occupies the measured lease. At saturation, at most 32 accepted registration hashes run concurrently. The registration reservation is 5100 ms, exactly the ruled 5000 ms transport-bound work plus 100 ms scheduler tolerance because provisioning and clamp are pre-activation. Resend retains the general 5700 ms reservation: its ruled 600 ms enumeration/pre-transport budget plus 5000 ms transport-bound work plus the same 100 ms tolerance. Delivery-result audit work follows handoff; the following reservation receives the route-derived guard. The 96-entry pre-mint queue retains opaque control nodes only. Suspended request frames necessarily retain validated plaintext email, recovery email, password, and source context until grant or the 18-second timeout; no raw verification token is minted before grant. Availability at healthy-transport bursts is measured separately for V rather than inferred from this arithmetic."
+      }),
+      delivery_audit: Object.freeze({
+        public_result: "ENUMERATION_SAFE_GENERIC_RESPONSE",
+        operator_result: "DURABLE_STATUS_AND_AUDIT_WITH_OPAQUE_CORRELATION",
+        duplicate_registration_rows: 2,
+        duplicate_counting_instruction: "A duplicate registration writes the registration DENY and equal-work postwork DENY; operators must correlate them and do not double-count them as two refusal attempts."
+      })
     }),
-    sourceRef: "AMENDMENTS.md#VR-5 own mail service, no relays (2026-08-19)"
+    sourceRef: "AMENDMENTS.md#VR-5 own mail service, no relays + S3d D1/D4 delivery boundedness and honesty (2026-08-20)"
   })
 ] satisfies readonly AuthPolicyRegisterRow[]);
 
@@ -372,6 +518,21 @@ export interface AuthPolicy {
     readonly senderLocalPart: "noreply";
     readonly transportTimeoutMs: number;
     readonly spamNotice: string;
+    readonly maxConcurrentVerificationDispatches: 32;
+    readonly maxQueuedVerificationDispatches: 96;
+    readonly maxConcurrentRegistrationHashes: 32;
+    readonly mailDispatchActivationSpacingMs: 60;
+    readonly registrationMailDispatchActivationSpacingMs: 45;
+    readonly mailDispatchPreTransportWorkBudgetMs: 600;
+    readonly mailDispatchNoSendEqualWorkMs: 5_000;
+    readonly mailDispatchHandoffSchedulerToleranceMs: 100;
+    readonly registrationMailDispatchMinimumReservationMs: 5_100;
+    readonly mailDispatchMinimumReservationMs: 5_700;
+    readonly mailDispatchQueueWaitTimeoutMs: 18_000;
+    readonly mailCapacitySignalAggregationWindowMs: 60_000;
+    readonly maximumClampAbsorbedRegistrationConcurrency: number;
+    readonly registrationHashAndProvisioningUpperBoundMs: number;
+    readonly registrationClampHeadroomMs: number;
   };
 }
 
@@ -410,6 +571,43 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
     && rateLimits.data.bucket_capacity !== rateLimits.data.sketch_design.slots_per_route) {
     throw new TypedDomainError("AUTH_POLICY_INVALID", "Rate-limit capacity contradicts sketch design");
   }
+  const dispatch = channel.data.verification_dispatch;
+  const derivedPreTransportBudgetMs = verification.data.enumeration_response_floor_ms
+    + verification.data.enumeration_tolerance_ms;
+  const derivedMinimumReservationMs = derivedPreTransportBudgetMs
+    + channel.data.transport_timeout_ms + dispatch.handoff_scheduler_tolerance_ms;
+  const derivedRegistrationMinimumReservationMs = channel.data.transport_timeout_ms
+    + dispatch.handoff_scheduler_tolerance_ms;
+  const absorption = dispatch.registration_clamp_absorption;
+  const safetyAdjustedWorkMs = Math.ceil(
+    absorption.measured_hash_and_provisioning_max_ms
+      * absorption.measurement_safety_percent / 100 / 10
+  ) * 10;
+  const derivedClampHeadroomMs = derivedPreTransportBudgetMs - (
+    absorption.ruled_hash_and_provisioning_upper_bound_ms
+      + absorption.maximum_unsaturated_concurrency
+        * dispatch.registration_activation_spacing_ms
+  );
+  if (dispatch.pre_transport_work_budget_ms !== derivedPreTransportBudgetMs
+    || dispatch.no_send_equal_transport_work_ms !== channel.data.transport_timeout_ms
+    || dispatch.minimum_reservation_ms !== derivedMinimumReservationMs
+    || dispatch.registration_minimum_reservation_ms
+      !== derivedRegistrationMinimumReservationMs
+    || dispatch.maximum_concurrent_registration_hashes > dispatch.maximum_concurrent
+    || dispatch.activation_spacing_ms * dispatch.maximum_concurrent
+      > dispatch.minimum_reservation_ms
+    || absorption.measurement_safety_percent !== 110
+    || absorption.ruled_hash_and_provisioning_upper_bound_ms !== safetyAdjustedWorkMs
+    || absorption.response_clamp_ms !== derivedPreTransportBudgetMs
+    || absorption.binding_headroom_ms !== derivedClampHeadroomMs
+    || derivedClampHeadroomMs <= 0
+    || absorption.first_measured_unabsorbed_concurrency
+      !== absorption.maximum_unsaturated_concurrency + 1) {
+    throw new TypedDomainError(
+      "AUTH_POLICY_INVALID",
+      "Mail reservation derivation contradicts verification or transport policy"
+    );
+  }
   return Object.freeze({
     password: Object.freeze({
       minimumLength: password.data.minimum_length,
@@ -446,7 +644,35 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
       transport: channel.data.transport,
       senderLocalPart: channel.data.sender_local_part,
       transportTimeoutMs: channel.data.transport_timeout_ms,
-      spamNotice: channel.data.spam_notice
+      spamNotice: channel.data.spam_notice,
+      maxConcurrentVerificationDispatches: channel.data.verification_dispatch.maximum_concurrent,
+      maxQueuedVerificationDispatches: channel.data.verification_dispatch.queue_capacity,
+      maxConcurrentRegistrationHashes:
+        channel.data.verification_dispatch.maximum_concurrent_registration_hashes,
+      mailDispatchActivationSpacingMs:
+        channel.data.verification_dispatch.activation_spacing_ms,
+      registrationMailDispatchActivationSpacingMs:
+        channel.data.verification_dispatch.registration_activation_spacing_ms,
+      mailDispatchPreTransportWorkBudgetMs:
+        channel.data.verification_dispatch.pre_transport_work_budget_ms,
+      mailDispatchNoSendEqualWorkMs:
+        channel.data.verification_dispatch.no_send_equal_transport_work_ms,
+      mailDispatchHandoffSchedulerToleranceMs:
+        channel.data.verification_dispatch.handoff_scheduler_tolerance_ms,
+      registrationMailDispatchMinimumReservationMs:
+        channel.data.verification_dispatch.registration_minimum_reservation_ms,
+      mailDispatchMinimumReservationMs: channel.data.verification_dispatch.minimum_reservation_ms,
+      mailDispatchQueueWaitTimeoutMs: channel.data.verification_dispatch.queue_wait_timeout_ms,
+      mailCapacitySignalAggregationWindowMs:
+        channel.data.verification_dispatch.operator_signal.aggregation_window_ms,
+      maximumClampAbsorbedRegistrationConcurrency:
+        channel.data.verification_dispatch.registration_clamp_absorption
+          .maximum_unsaturated_concurrency,
+      registrationHashAndProvisioningUpperBoundMs:
+        channel.data.verification_dispatch.registration_clamp_absorption
+          .ruled_hash_and_provisioning_upper_bound_ms,
+      registrationClampHeadroomMs:
+        channel.data.verification_dispatch.registration_clamp_absorption.binding_headroom_ms
     })
   });
 }

@@ -43,6 +43,7 @@ export class AuthFlowError extends Error {
   constructor(readonly code:
     | "AUTH_INPUT_INVALID"
     | "AUTH_RATE_LIMITED"
+    | "AUTH_MAIL_BUSY"
     | "AUTH_REGISTRATION_FAILED"
     | "VERIFICATION_TOKEN_INVALID"
   ) {
@@ -51,7 +52,8 @@ export class AuthFlowError extends Error {
   }
 
   get statusCode(): 400 | 429 | 503 {
-    return this.code === "AUTH_RATE_LIMITED" ? 429 : this.code === "AUTH_REGISTRATION_FAILED" ? 503 : 400;
+    return this.code === "AUTH_RATE_LIMITED" ? 429
+      : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY" ? 503 : 400;
   }
 }
 
@@ -311,6 +313,7 @@ type IdentityRepository = Pick<PostgresIdentityRepository,
   | "findAuditIdentityByBlindIndex"
   | "findAuditIdentityByVerificationHash"
   | "recordVerificationDelivery"
+  | "recordVerificationDeliveryRecordFailure"
   | "recordDuplicateRegistrationPostwork"
   | "consumeVerification"
   | "prepareVerificationResend"
@@ -341,6 +344,13 @@ interface VerificationDelivery {
   readonly source: AuthSourceContext;
 }
 
+interface VerificationDeliveryRecord {
+  readonly userId: string;
+  readonly channelBindingId: string;
+  readonly source: AuthSourceContext;
+  readonly errorCode: string | null;
+}
+
 type VerificationDeliveryPostwork = VerificationDelivery & Readonly<{ kind: "delivery" }>;
 
 interface DuplicateRegistrationPostwork {
@@ -351,6 +361,28 @@ interface DuplicateRegistrationPostwork {
 }
 
 type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
+type MailDispatchRelease = () => Promise<void>;
+type MailDispatchActivation = () => Promise<MailDispatchRelease>;
+
+interface WaitingMailDispatch {
+  readonly resolve: (activate: MailDispatchActivation) => void;
+  readonly reject: (error: AuthFlowError) => void;
+  readonly timeout: ReturnType<typeof setTimeout>;
+  readonly minimumReservationMs: number;
+  readonly activationSpacingMs: number;
+}
+
+interface MailCapacitySignalAggregate {
+  readonly windowStartedAt: number;
+  readonly correlationId: string;
+  count: number;
+  readonly timer: ReturnType<typeof setTimeout>;
+}
+
+interface RegistrationHashWork {
+  readonly promise: Promise<string>;
+  readonly cancel: () => void;
+}
 
 function sourceContext(source: AuthSourceContext): AuthSourceContext {
   if (source.ip.trim() === "" || source.requestId.trim() === "") {
@@ -368,6 +400,12 @@ export class RegistrationService implements RegistrationApplication {
   private readonly clock: () => Date;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly pendingMailDispatches = new Set<Promise<void>>();
+  private readonly waitingMailDispatches: WaitingMailDispatch[] = [];
+  private mailDispatchReservations = 0;
+  private nextMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
+  private registrationHashesActive = 0;
+  private readonly waitingRegistrationHashes: Array<() => void> = [];
+  private mailCapacitySignalAggregate: MailCapacitySignalAggregate | undefined;
   private readonly pendingRefusalAuditFlushes = new Map<AuthRoute, {
     readonly windowStartedAt: number;
     readonly timer: ReturnType<typeof setTimeout>;
@@ -384,6 +422,7 @@ export class RegistrationService implements RegistrationApplication {
     readonly limiter: InProcessAuthRateLimiter;
     readonly clock?: () => Date;
     readonly sleep?: (milliseconds: number) => Promise<void>;
+    readonly verificationTokenFactory?: () => string;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -402,6 +441,59 @@ export class RegistrationService implements RegistrationApplication {
       + this.dependencies.policy.verification.enumerationToleranceMs;
     const remaining = clampMs - (performance.now() - startedAt);
     if (remaining > 0) await this.sleep(remaining);
+  }
+
+  private startNextRegistrationHash(): void {
+    if (this.registrationHashesActive
+      >= this.dependencies.policy.channel.maxConcurrentRegistrationHashes) return;
+    this.waitingRegistrationHashes.shift()?.();
+  }
+
+  private scheduleRegistrationHash(password: string): RegistrationHashWork {
+    let passwordValue: string | undefined = password;
+    let started = false;
+    let settled = false;
+    let rejectWork!: (error: unknown) => void;
+    let start!: () => void;
+    const promise = new Promise<string>((resolve, reject) => {
+      rejectWork = reject;
+      start = () => {
+        if (settled) return;
+        started = true;
+        this.registrationHashesActive += 1;
+        const value = passwordValue!;
+        passwordValue = undefined;
+        void hashPassword(value, this.dependencies.policy.password.argon2id)
+          .then((hash) => {
+            settled = true;
+            resolve(hash);
+          }, (error: unknown) => {
+            settled = true;
+            reject(error);
+          })
+          .finally(() => {
+            this.registrationHashesActive -= 1;
+            this.startNextRegistrationHash();
+          });
+      };
+    });
+    if (this.registrationHashesActive
+      < this.dependencies.policy.channel.maxConcurrentRegistrationHashes) {
+      start();
+    } else {
+      this.waitingRegistrationHashes.push(start);
+    }
+    return Object.freeze({
+      promise,
+      cancel: () => {
+        if (started || settled) return;
+        const index = this.waitingRegistrationHashes.indexOf(start);
+        if (index >= 0) this.waitingRegistrationHashes.splice(index, 1);
+        passwordValue = undefined;
+        settled = true;
+        rejectWork(new Error("REGISTRATION_HASH_CANCELLED"));
+      }
+    });
   }
 
   private async recordRefusalAggregate(route: AuthRoute, aggregate: Readonly<RefusalAggregate>): Promise<void> {
@@ -457,6 +549,146 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
+  private activateMailDispatch(
+    enforceMinimum = false,
+    minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs
+  ): MailDispatchRelease {
+    const activatedAt = performance.now();
+    let release: Promise<void> | undefined;
+    return () => {
+      if (release !== undefined) return release;
+      release = (async () => {
+        const minimum = enforceMinimum || this.waitingMailDispatches.length > 0
+          ? minimumReservationMs
+          : 0;
+        const remaining = minimum - (performance.now() - activatedAt);
+        if (remaining > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+        }
+      })().then(async () => {
+        this.mailDispatchReservations -= 1;
+        const next = this.waitingMailDispatches.shift();
+        if (next !== undefined) {
+          clearTimeout(next.timeout);
+          this.mailDispatchReservations += 1;
+          next.resolve(() => this.scheduleMailDispatchActivation(
+            true, next.minimumReservationMs, next.activationSpacingMs
+          ));
+        }
+      });
+      return release;
+    };
+  }
+
+  private async scheduleMailDispatchActivation(
+    enforceMinimum = false,
+    minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs,
+    activationSpacingMs: number = this.dependencies.policy.channel.mailDispatchActivationSpacingMs
+  ): Promise<MailDispatchRelease> {
+    const now = performance.now();
+    const scheduledAt = Math.max(now, this.nextMailDispatchActivationAt);
+    this.nextMailDispatchActivationAt = scheduledAt
+      + activationSpacingMs;
+    const delay = scheduledAt - now;
+    if (delay > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+    return this.activateMailDispatch(enforceMinimum, minimumReservationMs);
+  }
+
+  private flushMailCapacitySignal(windowStartedAt: number): void {
+    const aggregate = this.mailCapacitySignalAggregate;
+    if (aggregate === undefined || aggregate.windowStartedAt !== windowStartedAt) return;
+    clearTimeout(aggregate.timer);
+    this.mailCapacitySignalAggregate = undefined;
+    console.error(
+      `[AUTH_MAIL_CAPACITY_EXHAUSTED] correlation=${aggregate.correlationId} `
+      + `code=MAIL_DISPATCH_CAPACITY window=${new Date(windowStartedAt).toISOString()} `
+      + `count=${aggregate.count}`
+    );
+  }
+
+  private signalMailCapacity(correlationId: string): void {
+    const now = this.clock().getTime();
+    const windowMs = this.dependencies.policy.channel.mailCapacitySignalAggregationWindowMs;
+    const active = this.mailCapacitySignalAggregate;
+    if (active !== undefined && now - active.windowStartedAt < windowMs) {
+      active.count = Math.min(Number.MAX_SAFE_INTEGER, active.count + 1);
+      return;
+    }
+    if (active !== undefined) this.flushMailCapacitySignal(active.windowStartedAt);
+    const windowStartedAt = now;
+    const timer = setTimeout(
+      () => this.flushMailCapacitySignal(windowStartedAt),
+      windowMs
+    );
+    timer.unref();
+    this.mailCapacitySignalAggregate = {
+      windowStartedAt,
+      correlationId,
+      count: 1,
+      timer
+    };
+  }
+
+  drainMailCapacitySignals(): void {
+    if (this.mailCapacitySignalAggregate !== undefined) {
+      this.flushMailCapacitySignal(this.mailCapacitySignalAggregate.windowStartedAt);
+    }
+  }
+
+  private reserveMailDispatchPermit(
+    correlationId: string,
+    minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs,
+    activationSpacingMs: number = this.dependencies.policy.channel.mailDispatchActivationSpacingMs
+  ): Promise<MailDispatchActivation> {
+    if (this.mailDispatchReservations < this.dependencies.policy.channel.maxConcurrentVerificationDispatches) {
+      this.mailDispatchReservations += 1;
+      return Promise.resolve(() => this.scheduleMailDispatchActivation(
+        false, minimumReservationMs, activationSpacingMs
+      ));
+    }
+    if (this.waitingMailDispatches.length >= this.dependencies.policy.channel.maxQueuedVerificationDispatches) {
+      this.signalMailCapacity(correlationId);
+      throw new AuthFlowError("AUTH_MAIL_BUSY");
+    }
+    return new Promise<MailDispatchActivation>((resolve, reject) => {
+      let waiting!: WaitingMailDispatch;
+      const timeout = setTimeout(() => {
+        const index = this.waitingMailDispatches.indexOf(waiting);
+        if (index < 0) return;
+        this.waitingMailDispatches.splice(index, 1);
+        this.signalMailCapacity(correlationId);
+        reject(new AuthFlowError("AUTH_MAIL_BUSY"));
+      }, this.dependencies.policy.channel.mailDispatchQueueWaitTimeoutMs);
+      waiting = Object.freeze({
+        resolve, reject, timeout, minimumReservationMs, activationSpacingMs
+      });
+      this.waitingMailDispatches.push(waiting);
+    });
+  }
+
+  private async reserveMailDispatch(correlationId: string): Promise<MailDispatchRelease> {
+    const activate = await this.reserveMailDispatchPermit(correlationId);
+    return activate();
+  }
+
+  mailDispatchOccupancy(): Readonly<{
+    inFlight: number;
+    activeSends: number;
+    maximum: number;
+    queued: number;
+    maximumQueued: number;
+  }> {
+    return Object.freeze({
+      inFlight: this.mailDispatchReservations,
+      activeSends: this.pendingMailDispatches.size,
+      maximum: this.dependencies.policy.channel.maxConcurrentVerificationDispatches,
+      queued: this.waitingMailDispatches.length,
+      maximumQueued: this.dependencies.policy.channel.maxQueuedVerificationDispatches
+    });
+  }
+
   private async refuseRateLimit(input: {
     readonly route: AuthRoute;
     readonly scope: "ip" | "address";
@@ -478,21 +710,37 @@ export class RegistrationService implements RegistrationApplication {
     throw new AuthFlowError("AUTH_RATE_LIMITED");
   }
 
-  private dispatchVerification(input: RegistrationPostwork | VerificationDelivery): void {
+  private dispatchVerification(
+    input: RegistrationPostwork | VerificationDelivery,
+    releaseReservation: MailDispatchRelease
+  ): void {
     const duplicate = "kind" in input && input.kind === "duplicate" ? input : undefined;
+    let delivery: VerificationDelivery | undefined = duplicate === undefined
+      ? input as VerificationDelivery
+      : undefined;
+    const deliveryAttemptId = delivery?.channelBindingId;
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
-      .then(() => duplicate === undefined
-        ? this.deliverVerification(input as VerificationDelivery)
-        : this.dependencies.repository.recordDuplicateRegistrationPostwork({
+      .then(async () => {
+        if (duplicate !== undefined) {
+          await this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs);
+          await releaseReservation();
+          await this.dependencies.repository.recordDuplicateRegistrationPostwork({
             userId: duplicate.userId,
             occurredAt: this.clock(),
             source: duplicate.source
-          }))
+          });
+          return;
+        }
+        const deliveryRecord = await this.attemptVerificationDelivery(delivery!);
+        delivery = undefined;
+        await releaseReservation();
+        await this.recordVerificationDelivery(deliveryRecord);
+      })
       .catch(() => {
         if (duplicate === undefined) {
           console.error(
-            `[AUTH_MAIL_DELIVERY_RECORD_FAILED] attempt=${(input as VerificationDelivery).channelBindingId} code=MAIL_RECORD_FAILED`
+            `[AUTH_MAIL_DISPATCH_FAILED] attempt=${deliveryAttemptId} code=UNEXPECTED_DISPATCH_FAILURE`
           );
         } else {
           console.error(
@@ -500,7 +748,25 @@ export class RegistrationService implements RegistrationApplication {
           );
         }
       })
-      .finally(() => this.pendingMailDispatches.delete(pending));
+      .finally(async () => {
+        delivery = undefined;
+        await releaseReservation();
+        this.pendingMailDispatches.delete(pending);
+      });
+    this.pendingMailDispatches.add(pending);
+  }
+
+  private dispatchMailReservationHold(
+    releaseReservation: MailDispatchRelease,
+    equalTransportWork = false
+  ): void {
+    let pending!: Promise<void>;
+    pending = (equalTransportWork
+      ? this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs)
+        .then(releaseReservation)
+      : releaseReservation()).finally(() => {
+      this.pendingMailDispatches.delete(pending);
+    });
     this.pendingMailDispatches.add(pending);
   }
 
@@ -515,7 +781,7 @@ export class RegistrationService implements RegistrationApplication {
       const userId = randomUUID();
       const auditToken = randomUUID();
       const pseudonym = generatePseudonym();
-      const token = generateVerificationToken();
+      const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
       const tokenHash = hashVerificationToken(token);
       const expiresAt = new Date(
         input.requestedAt.getTime() + this.dependencies.policy.verification.tokenTtlMs
@@ -568,7 +834,9 @@ export class RegistrationService implements RegistrationApplication {
     throw new Error("PSEUDONYM_ALLOCATION_EXHAUSTED");
   }
 
-  private async deliverVerification(input: VerificationDelivery): Promise<void> {
+  private async attemptVerificationDelivery(
+    input: VerificationDelivery
+  ): Promise<VerificationDeliveryRecord> {
     let errorCode: string | null = null;
     try {
       await this.dependencies.mail.sendVerification({
@@ -581,13 +849,39 @@ export class RegistrationService implements RegistrationApplication {
       errorCode = error instanceof MailDeliveryError ? error.operatorCode : "MAIL_DELIVERY_FAILED";
       console.error(`[AUTH_MAIL_DELIVERY_FAILED] attempt=${input.channelBindingId} code=${errorCode}`);
     }
-    await this.dependencies.repository.recordVerificationDelivery({
+    return Object.freeze({
       userId: input.userId,
-      occurredAt: this.clock(),
+      channelBindingId: input.channelBindingId,
       source: input.source,
-      success: errorCode === null,
       errorCode
     });
+  }
+
+  private async recordVerificationDelivery(input: VerificationDeliveryRecord): Promise<void> {
+    try {
+      await this.dependencies.repository.recordVerificationDelivery({
+        userId: input.userId,
+        occurredAt: this.clock(),
+        source: input.source,
+        success: input.errorCode === null,
+        errorCode: input.errorCode
+      });
+    } catch {
+      console.error(
+        `[AUTH_MAIL_DELIVERY_RECORD_FAILED] attempt=${input.channelBindingId} code=MAIL_RECORD_FAILED`
+      );
+      await this.dependencies.repository.recordVerificationDeliveryRecordFailure({
+        userId: input.userId,
+        correlationId: input.channelBindingId,
+        occurredAt: this.clock(),
+        source: input.source,
+        errorCode: "MAIL_RECORD_FAILED"
+      }).catch(() => {
+        console.error(
+          `[AUTH_MAIL_DELIVERY_FAILURE_AUDIT_FAILED] attempt=${input.channelBindingId} code=AUDIT_RECORD_FAILED`
+        );
+      });
+    }
   }
 
   async register(input: RegisterInput, rawSource: AuthSourceContext): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
@@ -595,6 +889,8 @@ export class RegistrationService implements RegistrationApplication {
     const startedAt = performance.now();
     const correlationId = randomUUID();
     let pendingPostwork: RegistrationPostwork | undefined;
+    let releaseMailDispatch: MailDispatchRelease | undefined;
+    let activateMailDispatch: MailDispatchActivation | undefined;
     try {
       if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
         || typeof input.password !== "string"
@@ -623,7 +919,25 @@ export class RegistrationService implements RegistrationApplication {
         });
       }
 
-      const passwordHash = await hashPassword(input.password, this.dependencies.policy.password.argon2id);
+      const reservation = this.reserveMailDispatchPermit(
+        correlationId,
+        this.dependencies.policy.channel.registrationMailDispatchMinimumReservationMs,
+        this.dependencies.policy.channel.registrationMailDispatchActivationSpacingMs
+      );
+      const passwordHashWork = this.scheduleRegistrationHash(input.password);
+      let passwordHash: string;
+      try {
+        [activateMailDispatch, passwordHash] = await Promise.all([
+          reservation, passwordHashWork.promise
+        ]);
+      } catch (error) {
+        passwordHashWork.cancel();
+        void reservation.then(async (activate) => {
+          this.dispatchMailReservationHold(await activate());
+        })
+          .catch(() => undefined);
+        throw error;
+      }
       try {
         pendingPostwork = await this.provisionPendingAccount(Object.freeze({
           email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
@@ -641,6 +955,10 @@ export class RegistrationService implements RegistrationApplication {
             `[AUTH_REGISTRATION_FAILURE_AUDIT_FAILED] correlation=${correlationId} code=AUDIT_RECORD_FAILED`
           );
         });
+        if (activateMailDispatch !== undefined) {
+          releaseMailDispatch = await activateMailDispatch();
+          activateMailDispatch = undefined;
+        }
         throw new AuthFlowError("AUTH_REGISTRATION_FAILED");
       }
       return REGISTRATION_PUBLIC_RESPONSE;
@@ -648,7 +966,18 @@ export class RegistrationService implements RegistrationApplication {
       try {
         await this.holdRegistrationEnumerationClamp(startedAt);
       } finally {
-        if (pendingPostwork !== undefined) this.dispatchVerification(pendingPostwork);
+        if (pendingPostwork !== undefined && activateMailDispatch !== undefined) {
+          releaseMailDispatch = await activateMailDispatch();
+          activateMailDispatch = undefined;
+        }
+        if (pendingPostwork !== undefined && releaseMailDispatch !== undefined) {
+          const release = releaseMailDispatch;
+          releaseMailDispatch = undefined;
+          this.dispatchVerification(pendingPostwork, release);
+        }
+        if (releaseMailDispatch !== undefined) {
+          this.dispatchMailReservationHold(releaseMailDispatch);
+        }
       }
     }
   }
@@ -690,7 +1019,9 @@ export class RegistrationService implements RegistrationApplication {
     rawSource: AuthSourceContext
   ): Promise<typeof RESEND_PUBLIC_RESPONSE> {
     const startedAt = performance.now();
-    let pendingDelivery: Parameters<RegistrationService["deliverVerification"]>[0] | undefined;
+    const correlationId = randomUUID();
+    let pendingDelivery: VerificationDelivery | undefined;
+    let releaseMailDispatch: MailDispatchRelease | undefined;
     try {
       if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
       const source = sourceContext(rawSource);
@@ -713,7 +1044,8 @@ export class RegistrationService implements RegistrationApplication {
           source
         });
       }
-      const token = generateVerificationToken();
+      releaseMailDispatch = await this.reserveMailDispatch(correlationId);
+      const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
       const expiresAt = new Date(now.getTime() + this.dependencies.policy.verification.tokenTtlMs);
       const prepared = await this.dependencies.repository.prepareVerificationResend({
         emailBlindIndex,
@@ -738,7 +1070,14 @@ export class RegistrationService implements RegistrationApplication {
       try {
         await this.holdEnumerationFloor(startedAt);
       } finally {
-        if (pendingDelivery !== undefined) this.dispatchVerification(pendingDelivery);
+        if (pendingDelivery !== undefined && releaseMailDispatch !== undefined) {
+          const release = releaseMailDispatch;
+          releaseMailDispatch = undefined;
+          this.dispatchVerification(pendingDelivery, release);
+        }
+        if (releaseMailDispatch !== undefined) {
+          this.dispatchMailReservationHold(releaseMailDispatch, true);
+        }
       }
     }
   }

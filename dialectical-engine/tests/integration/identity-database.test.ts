@@ -43,14 +43,15 @@ beforeAll(async () => {
 afterAll(async () => database?.stop());
 
 describe("S2 identity schema on real PostgreSQL", () => {
-  it("creates the six identity tables with the required contact and audit column types", async () => {
+  it("creates the identity tables with the required contact and audit column types", async () => {
     const tables = await database.pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema='identity' AND table_type='BASE TABLE'
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
-      "audit_event", "channel_binding", "mfa_factor", "recovery_code", "session", "user"
+      "audit_event", "channel_binding", "mfa_factor", "recovery_code", "session", "user",
+      "verification_token_credential"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

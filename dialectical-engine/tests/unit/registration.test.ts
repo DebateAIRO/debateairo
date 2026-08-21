@@ -8,7 +8,8 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
   AUTH_POLICY_REGISTER_ROWS,
-  authPolicyFromRegisterRows
+  authPolicyFromRegisterRows,
+  type AuthPolicyRegisterRow
 } from "../../packages/register/src/auth-policy.js";
 import {
   FileUserDekStore,
@@ -308,7 +309,7 @@ describe("S3 ruled authentication policy", () => {
       .toBe(true);
   }, 70_000);
 
-  it("S3c B5 publishes theoretical collateral and the ruled timestamp/rotation residuals", () => {
+  it("publishes S3c collateral and cooldown plus S3d non-interfering credential lifecycle", () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
     const verificationRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "verificationPolicy")!;
     const sketch = (rateLimitRow.value as {
@@ -325,7 +326,12 @@ describe("S3 ruled authentication policy", () => {
         mechanism: string;
         minimum_spacing_ms: number;
       };
-      token_rotation_residual?: string;
+      verification_credentials?: {
+        storage: string;
+        validity: string;
+        maximum_live_hashes_per_account: number;
+        leaked_token_tradeoff: string;
+      };
     };
 
     expect(sketch.theoretical_collateral?.model)
@@ -339,7 +345,135 @@ describe("S3 ruled authentication policy", () => {
       mechanism: "per_row_last_sent_timestamp_minimum_spacing",
       minimum_spacing_ms: 20 * 60_000
     });
-    expect(verification.token_rotation_residual).toMatch(/newest mailed token/i);
+    expect(verification.verification_credentials).toEqual(expect.objectContaining({
+      storage: "HASH_ONLY_APPEND_ONLY_LEDGER",
+      validity: "EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION",
+      maximum_live_hashes_per_account: 73,
+      leaked_token_tradeoff: expect.stringMatching(/cannot.*revoke.*resend/i)
+    }));
+  });
+
+  it("S3d D1 rules arm-independent leases, a deadline, and truthful bounded retention", () => {
+    const channelRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "channelPolicy")!;
+    const channel = channelRow.value as {
+      verification_dispatch?: Record<string, unknown>;
+      delivery_audit?: Record<string, unknown>;
+    };
+    expect(channel.verification_dispatch).toEqual(expect.objectContaining({
+      maximum_concurrent: 32,
+      queue_capacity: 96,
+      at_capacity: "RETRYABLE_503_BEFORE_ACCOUNT_COMMIT_AFTER_BOUNDED_WAIT",
+      maximum_concurrent_registration_hashes: 32,
+      activation_spacing_ms: 60,
+      registration_activation_spacing_ms: 45,
+      pre_transport_work_budget_ms: 600,
+      no_send_equal_transport_work_ms: 5_000,
+      handoff_scheduler_tolerance_ms: 100,
+      registration_minimum_reservation_ms: 5_100,
+      minimum_reservation_ms: 5_700,
+      queue_wait_timeout_ms: 18_000,
+      release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
+      retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
+      operator_signal: expect.objectContaining({
+        payload: "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
+        aggregation_window_ms: 60_000,
+        count_cap: Number.MAX_SAFE_INTEGER,
+        maximum_retained_aggregates: 1
+      }),
+      registration_clamp_absorption: {
+        maximum_unsaturated_concurrency: 2,
+        measured_hash_and_provisioning_max_ms: 436,
+        measurement_safety_percent: 110,
+        ruled_hash_and_provisioning_upper_bound_ms: 480,
+        response_clamp_ms: 600,
+        binding_headroom_ms: 30,
+        first_measured_unabsorbed_concurrency: 3,
+        beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"
+      },
+      cadence_sensitivity: {
+        minus_15_ms: {
+          cadence_ms: 30,
+          observation_count: 3,
+          red_count: 2,
+          green_count: 1,
+          n8_median_gap_tenths_ms_range: {
+            minimum: 596,
+            maximum: 1_158
+          },
+          n8_auc_ppm_range: {
+            minimum: 620_000,
+            maximum: 774_000
+          },
+          characterization: "NOISY_2_OF_3_RED_RATE_NOT_DETERMINISTIC_LOWER_BOUND"
+        },
+        plus_15_ms: {
+          cadence_ms: 60,
+          observation_count: 1,
+          red_count: 0,
+          green_count: 1,
+          n8_median_gap_tenths_ms: 121,
+          n8_auc_ppm: 529_000,
+          characterization: "SINGLE_GREEN_OBSERVATION_NOT_STABLE_BOUNDARY"
+        },
+        conclusion: "CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING",
+        recalibration_trigger: "TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS"
+      }
+    }));
+    expect(channel.delivery_audit).toEqual(expect.objectContaining({
+      public_result: "ENUMERATION_SAFE_GENERIC_RESPONSE",
+      operator_result: "DURABLE_STATUS_AND_AUDIT_WITH_OPAQUE_CORRELATION",
+      duplicate_registration_rows: 2,
+      duplicate_counting_instruction: expect.stringMatching(/do not double-count/i)
+    }));
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS)
+      .channel.maxConcurrentVerificationDispatches).toBe(32);
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS)
+      .channel.maxQueuedVerificationDispatches).toBe(96);
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS)
+      .channel.mailDispatchMinimumReservationMs).toBe(5_700);
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS)
+      .channel.mailDispatchQueueWaitTimeoutMs).toBe(18_000);
+    expect(authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).channel).toMatchObject({
+      maximumClampAbsorbedRegistrationConcurrency: 2,
+      registrationHashAndProvisioningUpperBoundMs: 480,
+      registrationClampHeadroomMs: 30
+    });
+    const transportDrift = AUTH_POLICY_REGISTER_ROWS.map((row) => row.rowKey === "channelPolicy"
+      ? {
+          ...row,
+          value: {
+            ...(row.value as Record<string, unknown>),
+            transport_timeout_ms: 5_001
+          }
+        }
+      : row) as readonly AuthPolicyRegisterRow[];
+    expect(() => authPolicyFromRegisterRows(transportDrift)).toThrowError(
+      /Mail reservation derivation contradicts/
+    );
+    const clampHeadroomDrift = AUTH_POLICY_REGISTER_ROWS.map((row) => {
+      if (row.rowKey !== "channelPolicy") return row;
+      const value = row.value as {
+        verification_dispatch: {
+          registration_clamp_absorption: Record<string, unknown>;
+        };
+      };
+      return {
+        ...row,
+        value: {
+          ...value,
+          verification_dispatch: {
+            ...value.verification_dispatch,
+            registration_clamp_absorption: {
+              ...value.verification_dispatch.registration_clamp_absorption,
+              binding_headroom_ms: 29
+            }
+          }
+        }
+      };
+    }) as readonly AuthPolicyRegisterRow[];
+    expect(() => authPolicyFromRegisterRows(clampHeadroomDrift)).toThrowError(
+      /Mail reservation derivation contradicts/
+    );
   });
 
   it("S3c C1 publishes a booted-process provisioning bound distinct from the isolated limiter measurement", () => {
@@ -793,6 +927,27 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       expect(performance.now() - startedAt).toBeLessThan(500);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects malformed and CRLF recipients before invoking sendmail", async () => {
+    const mail = new SendmailMailSender({
+      executable: "/definitely/not/a/sendmail-binary",
+      from: "noreply@debateai.test",
+      publicAppUrl: "https://debateai.test",
+      timeoutMs: 1_000
+    });
+    for (const recipient of [
+      "not-an-email",
+      "victim@example.test\r\nBcc: attacker@example.test",
+      "victim@example.test\r\nBcc: attacker.example.test"
+    ]) {
+      await expect(mail.sendVerification({
+        attemptId: "00000000-0000-4000-8000-000000000780",
+        recipient,
+        token: "a".repeat(43),
+        expiresAt: new Date("2026-08-20T00:00:00.000Z")
+      })).rejects.toEqual(expect.objectContaining({ operatorCode: "MAIL_INPUT_INVALID" }));
     }
   });
 

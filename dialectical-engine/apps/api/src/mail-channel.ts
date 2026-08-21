@@ -46,6 +46,8 @@ export class SendmailMailSender implements MailSender {
   }
 
   async sendVerification(mail: VerificationMail): Promise<void> {
+    // The shape regex currently rejects CR/LF through `\s`; keep the explicit
+    // guard as defence in depth if that broader recipient grammar is widened.
     if (!/^[^\s@]+@[^\s@]+$/.test(mail.recipient)
       || /[\r\n]/.test(mail.recipient)
       || !/^[A-Za-z0-9_-]{43}$/.test(mail.token)) {
