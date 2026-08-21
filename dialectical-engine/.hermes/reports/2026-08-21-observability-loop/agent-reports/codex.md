@@ -1,0 +1,16 @@
+# Codex self-report — 2026-08-21-observability-loop
+- Session: `01a0236a-e053-7ce3-9831-845c106a10c0`.
+- Went well: I stayed inside the two-file write contract and did not inspect other research-seat artifacts.
+- Went well: all 28 RQs are answered in the brief’s order.
+- Went well: the artifact contains 153 sequential, testable requirements rather than implementation design or code.
+- Went well: the adversarial pass made capture gaps, prompt injection, wrong-fix cascades, flapping, self-modification, and runaway spend explicit.
+- Went well: each hard agent guardrail names the concrete failure it prevents.
+- Went well: an automated citation audit found no missing local path or out-of-range cited line.
+- Fought me: the current failure surface is broad, with large sources and many catch/transform paths; exhaustive dynamic coverage remains unverified.
+- Fought me: observability history is not reconstructable from current path-scoped git objects because the relevant current files are untracked.
+- Fought me: “capture every error” conflicts with “never block product” under simultaneous DB, disk, and memory failure; I specified explicit gap accounting.
+- Fought me: the excluded security zone needs useful availability metadata without inner instrumentation or sensitive payloads.
+- Fought me: Codex CLI cost/usage telemetry is absent in the existing relay, so money-only caps would be fictional.
+- Would change: with a sanctioned runtime window, I would measure real event rates, envelope sizes, latency overhead, and recovery times before freezing numeric bounds.
+- Would change: with the missing git objects, I would replace the narrow A2 reconstruction gap with commit-exact signal provenance.
+- Would change: architecture should next prove branch protection, policy-bot independence, spool encryption, and outer security-zone classification before implementation.

@@ -1,0 +1,1 @@
+/goal SAME SESSION. Read docs/missions/2026-08-21-docker-hatchet/goal-packets/g3-rework2.md. Confirm F-1..F-7 still flipped on current Plan.md. Blind to H2. Step G3-rework-2. Do NOT commit or push.

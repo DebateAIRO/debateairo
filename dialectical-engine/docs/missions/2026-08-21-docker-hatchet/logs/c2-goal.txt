@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/c2-plan.md in full and execute it. It is your complete contract. C2 Plan.md only. Hermes Agent forbidden. Kanban is localhost:9119 board docker-hatchet. Do NOT commit or push.

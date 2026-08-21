@@ -1,0 +1,1 @@
+/goal S3-family rework, SAME SESSION. Re-read docs/missions/2026-08-21-docker-hatchet/goal-packets/c2-rework1.md in full; it is your contract. Union G3 F-1..F-7 and H2-01..H2-09 into Plan.md. Reproduce each finding against current Plan.md before rewriting. Do NOT commit or push. Post REWORK READY FOR PEER REVIEW.

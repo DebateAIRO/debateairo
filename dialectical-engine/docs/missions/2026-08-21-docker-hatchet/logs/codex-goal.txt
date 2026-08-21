@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/codex.md in full and execute it. It is your complete contract. Write ONLY the allowed artifact paths. Independent and blind: do not read other seats. Requirements only, no code, no compose edits. Freeze: do not touch accounts-privacy-security WIP. Emit READY FOR HERMES STAGE REVIEW when done. Do NOT commit or push.

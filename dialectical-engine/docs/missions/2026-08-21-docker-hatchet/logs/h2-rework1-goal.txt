@@ -1,0 +1,1 @@
+/goal SAME SESSION re-review. Read docs/missions/2026-08-21-docker-hatchet/goal-packets/h2-rework1.md in full. Confirm H2-01..H2-09 against current Plan.md. Blind to G3. Put READY marker IN THE FILE. Do NOT commit or push.

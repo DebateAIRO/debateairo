@@ -1,0 +1,1 @@
+/goal SAME SESSION re-review. Read docs/missions/2026-08-21-docker-hatchet/goal-packets/g3-rework1.md in full. Confirm F-1..F-7 against current Plan.md. Blind to H2. Hermes Agent forbidden. Do NOT commit or push.

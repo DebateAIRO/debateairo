@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/g3-planreview.md in full and execute it. It is your complete contract. Fresh Grok G3 PlanReview, not the orchestrator. Blind to H2. Hermes Agent forbidden. Do NOT commit or push.

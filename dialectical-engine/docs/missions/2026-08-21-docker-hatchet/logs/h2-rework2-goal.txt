@@ -1,0 +1,1 @@
+/goal SAME SESSION P8. Read docs/missions/2026-08-21-docker-hatchet/goal-packets/h2-rework2.md. Confirm H2-03..H2-09 against current Plan.md. Marker IN THE FILE. Step H2-rework-2. Blind to G3. Do NOT commit or push.

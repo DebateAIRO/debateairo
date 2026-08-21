@@ -1,0 +1,1 @@
+/goal SAME SESSION rework round 2. Read docs/missions/2026-08-21-docker-hatchet/goal-packets/c2-rework2.md. Keep G3 F-1..F-7 flips. Fix only remaining H2-03..H2-09. Reproduce-first. Do NOT commit or push. Post REWORK READY FOR PEER REVIEW with step C2-rework-2.

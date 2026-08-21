@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/h2-planreview.md in full and execute it. It is your complete contract. H2 Plan review recut (Hermes Agent forbidden). Blind to G3. Do NOT commit or push.

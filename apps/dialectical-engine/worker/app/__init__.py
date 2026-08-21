@@ -1,2 +1,0 @@
-"""Dialectical worker package."""
-

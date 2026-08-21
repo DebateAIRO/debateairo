@@ -1,5 +1,11 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
-import { FileUserDekStore, loadKek, loadSecretKey } from "@debateai/crypto";
+import {
+  Argon2WorkerPool,
+  AuditContextHasher,
+  FileUserDekStore,
+  loadKek,
+  loadSecretKey
+} from "@debateai/crypto";
 import { createPool, PostgresIdentityRepository, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
@@ -33,7 +39,16 @@ const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 const pool = createPool(environment.DATABASE_URL);
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
-const identityRepository = new PostgresIdentityRepository(pool, sourceIpSalt, authPolicy.auditSourceIpKdf);
+// Exactly ONE process-owned Argon2 worker pool. It is created before the
+// repository and the registration service, both of which receive this same
+// instance, and every worker completes its ready handshake before `listen`, so
+// no request can arrive while a worker is still booting.
+const argon2Pool = new Argon2WorkerPool();
+await argon2Pool.ready();
+const auditContextHasher = new AuditContextHasher(
+  argon2Pool, sourceIpSalt, authPolicy.auditSourceIpKdf
+);
+const identityRepository = new PostgresIdentityRepository(pool, auditContextHasher);
 sourceIpSalt.fill(0);
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
@@ -61,7 +76,8 @@ const registration = new RegistrationService({
     authPolicy.rateLimits,
     authPolicy.rateLimitBucketCapacity,
     authPolicy.rateLimitRefusalAuditIntervalMs
-  )
+  ),
+  argon2: argon2Pool
 });
 const application = new PostgresAskApplication(pool, dispatcher, {
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
@@ -116,5 +132,11 @@ const api = buildApi({
     evaluatorDevMenu,
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
+});
+// Close primitive only. Kanban T3 (t_de2be7d1) owns graceful signal shutdown
+// and must later consume this; deliberately no signal orchestration here.
+api.addHook("onClose", async () => {
+  auditContextHasher.close();
+  await argon2Pool.close();
 });
 await api.listen({ host: environment.API_HOST, port: environment.API_PORT });

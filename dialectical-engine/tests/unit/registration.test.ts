@@ -12,6 +12,8 @@ import {
   type AuthPolicyRegisterRow
 } from "../../packages/register/src/auth-policy.js";
 import {
+  Argon2InfrastructureError,
+  Argon2WorkerPool,
   FileUserDekStore,
   generatePseudonym,
   generateVerificationToken,
@@ -21,8 +23,11 @@ import {
   verifyPassword
 } from "../../packages/crypto/src/index.js";
 import {
+  AUTH_RETRYABLE_UNAVAILABLE_CODE,
+  AuthFlowError,
   InProcessAuthRateLimiter,
   REGISTRATION_PUBLIC_RESPONSE,
+  RegistrationService,
   RESEND_PUBLIC_RESPONSE,
   type RegistrationApplication
 } from "../../apps/api/src/registration.js";
@@ -571,12 +576,24 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
   it("hashes with the ruled Argon2id parameters and verifies without retaining plaintext", async () => {
     const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).password;
     const password = "correct horse battery staple";
-    const encoded = await hashPassword(password, policy.argon2id);
+    // Real worker pool: this asserts the shipped encoding is unchanged now that
+    // the KDF runs off-thread over transferred bytes rather than a JS string.
+    const argon2 = new Argon2WorkerPool();
+    try {
+      await argon2.ready();
+      const encoded = await hashPassword(argon2, password, policy.argon2id);
 
-    expect(encoded).toMatch(/^\$argon2id\$v=19\$m=65536,t=3,p=1\$/);
-    expect(encoded).not.toContain(password);
-    await expect(verifyPassword(encoded, password)).resolves.toBe(true);
-    await expect(verifyPassword(encoded, "wrong password")).resolves.toBe(false);
+      expect(encoded).toMatch(/^\$argon2id\$v=19\$m=65536,t=3,p=1\$/);
+      expect(encoded).not.toContain(password);
+      await expect(verifyPassword(argon2, encoded, password)).resolves.toBe(true);
+      await expect(verifyPassword(argon2, encoded, "wrong password")).resolves.toBe(false);
+      // Malformed encoded hashes stay `false` (pre-existing contract), and are
+      // never promoted into an infrastructure failure.
+      await expect(verifyPassword(argon2, "not-a-hash", password)).resolves.toBe(false);
+      await expect(verifyPassword(argon2, "$argon2id$corrupt", password)).resolves.toBe(false);
+    } finally {
+      await argon2.close();
+    }
   });
 
   it("creates single-purpose opaque tokens and stable-format non-derived pseudonym candidates", () => {
@@ -979,6 +996,217 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       ]);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// ==========================================================================
+// REWORK 1 P2 — one constant secret-free retryable 503 for every Argon2 pool
+// failure, at every auth-route boundary.
+// ==========================================================================
+
+const ARGON2_FAILURE_CODES = Object.freeze([
+  "ARGON2_POOL_CAPACITY_EXHAUSTED",
+  "ARGON2_POOL_UNAVAILABLE",
+  "ARGON2_WORKER_FAILED",
+  "ARGON2_JOB_TIMEOUT"
+] as const);
+
+const AUTH_ROUTE_REQUESTS = Object.freeze([
+  Object.freeze({
+    name: "register" as const,
+    url: "/v1/auth/register",
+    payload: {
+      email: "alice@example.test", password: "correct horse battery staple",
+      recovery_email: "recovery@example.test", adult_affirmed: true
+    }
+  }),
+  Object.freeze({
+    name: "verify" as const,
+    url: "/v1/auth/verify-email",
+    payload: { token: "A".repeat(43) }
+  }),
+  Object.freeze({
+    name: "resend" as const,
+    url: "/v1/auth/resend-verification",
+    payload: { email: "alice@example.test" }
+  })
+]);
+
+describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () => {
+  it("maps every failure code on every auth route to the same secret-free 503", async () => {
+    for (const code of ARGON2_FAILURE_CODES) {
+      const failing: RegistrationApplication = {
+        register: async () => { throw new Argon2InfrastructureError(code); },
+        verifyEmail: async () => { throw new Argon2InfrastructureError(code); },
+        resendVerification: async () => { throw new Argon2InfrastructureError(code); }
+      };
+      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      try {
+        for (const route of AUTH_ROUTE_REQUESTS) {
+          const response = await api.inject({
+            method: "POST", url: route.url, payload: route.payload
+          });
+          expect(response.statusCode).toBe(503);
+          expect(response.json()).toEqual({
+            error: AUTH_RETRYABLE_UNAVAILABLE_CODE,
+            message: AUTH_RETRYABLE_UNAVAILABLE_CODE
+          });
+          // The internal code describes pool capacity state. It must not be
+          // inferable from the body, and this must not be the generic 500 path.
+          expect(response.body).not.toContain("ARGON2_");
+          expect(response.body).not.toContain("INTERNAL_ERROR");
+        }
+      } finally {
+        await api.close();
+      }
+    }
+  });
+
+  it("keeps the pre-existing envelopes for failures that are not the pool", async () => {
+    const cases = [
+      { error: new AuthFlowError("AUTH_INPUT_INVALID"), status: 400, code: "AUTH_INPUT_INVALID" },
+      { error: new AuthFlowError("AUTH_RATE_LIMITED"), status: 429, code: "AUTH_RATE_LIMITED" },
+      { error: new AuthFlowError("AUTH_MAIL_BUSY"), status: 503, code: "AUTH_MAIL_BUSY" },
+      { error: new AuthFlowError("AUTH_REGISTRATION_FAILED"), status: 503, code: "AUTH_REGISTRATION_FAILED" },
+      { error: new Error("BOOM"), status: 500, code: "INTERNAL_ERROR" }
+    ];
+    for (const expected of cases) {
+      const failing: RegistrationApplication = {
+        register: async () => { throw expected.error; },
+        verifyEmail: async () => { throw expected.error; },
+        resendVerification: async () => { throw expected.error; }
+      };
+      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      try {
+        const response = await api.inject({
+          method: "POST", url: "/v1/auth/register", payload: AUTH_ROUTE_REQUESTS[0]!.payload
+        });
+        expect(response.statusCode).toBe(expected.status);
+        expect(response.json()).toMatchObject({ error: expected.code });
+      } finally {
+        await api.close();
+      }
+    }
+  });
+
+  it("types every service-level pool failure occurrence, retaining the cause internally", async () => {
+    const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const source = Object.freeze({
+      ip: "203.0.113.7", userAgent: "vitest-t1-rework1", requestId: "request:t1:rework1"
+    });
+    const workingArgon2 = {
+      async hashPassword() {
+        return `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".repeat(43)}`;
+      },
+      async verifyPassword() { return false; },
+      async hashAuditContext() { return "ab".repeat(32); }
+    };
+
+    // The five occurrences the reviewer enumerated: password hashing, audit
+    // derivation behind register, verification, resend, and provisioning.
+    const occurrences = [
+      {
+        label: "password hashing",
+        route: "register" as const,
+        argon2Fails: true,
+        repository: {}
+      },
+      {
+        label: "audit derivation on register",
+        route: "register" as const,
+        argon2Fails: false,
+        repository: {
+          findAuditIdentityByBlindIndex: async () => {
+            throw new Argon2InfrastructureError("ARGON2_WORKER_FAILED");
+          }
+        }
+      },
+      {
+        label: "account provisioning",
+        route: "register" as const,
+        argon2Fails: false,
+        repository: {
+          findAuditIdentityByBlindIndex: async () => null,
+          createPendingAccount: async () => {
+            throw new Argon2InfrastructureError("ARGON2_JOB_TIMEOUT");
+          },
+          recordRegistrationFailure: async () => undefined
+        }
+      },
+      {
+        label: "verification",
+        route: "verify" as const,
+        argon2Fails: false,
+        repository: {
+          findAuditIdentityByVerificationHash: async () => {
+            throw new Argon2InfrastructureError("ARGON2_POOL_UNAVAILABLE");
+          }
+        }
+      },
+      {
+        label: "resend",
+        route: "resend" as const,
+        argon2Fails: false,
+        repository: {
+          findAuditIdentityByBlindIndex: async () => null,
+          prepareVerificationResend: async () => {
+            throw new Argon2InfrastructureError("ARGON2_POOL_CAPACITY_EXHAUSTED");
+          }
+        }
+      }
+    ];
+
+    for (const occurrence of occurrences) {
+      const service = new RegistrationService({
+        repository: {
+          findAuditIdentityByBlindIndex: async () => null,
+          findAuditIdentityByVerificationHash: async () => null,
+          recordRateLimitRefusal: async () => undefined,
+          ...occurrence.repository
+        } as never,
+        mail: new MemoryMailSender(),
+        dekStore: { store: async () => undefined },
+        blindIndexKey: Buffer.alloc(32, 0x3c),
+        policy,
+        limiter: new InProcessAuthRateLimiter(
+          policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
+        ),
+        argon2: occurrence.argon2Fails
+          ? {
+            ...workingArgon2,
+            async hashPassword(): Promise<string> {
+              throw new Argon2InfrastructureError("ARGON2_POOL_CAPACITY_EXHAUSTED");
+            }
+          }
+          : workingArgon2,
+        sleep: async () => undefined
+      });
+
+      const attempt = occurrence.route === "register"
+        ? service.register({
+          email: "alice@example.test", password: "correct horse battery staple",
+          recoveryEmail: "recovery@example.test", adultAffirmed: true
+        }, source)
+        : occurrence.route === "verify"
+          ? service.verifyEmail({ token: "A".repeat(43) }, source)
+          : service.resendVerification({ email: "alice@example.test" }, source);
+
+      const error = await attempt.then(
+        () => { throw new Error(`${occurrence.label} unexpectedly succeeded`); },
+        (caught: unknown) => caught
+      );
+      expect(error, occurrence.label).toBeInstanceOf(AuthFlowError);
+      expect((error as AuthFlowError).code, occurrence.label)
+        .toBe(AUTH_RETRYABLE_UNAVAILABLE_CODE);
+      expect((error as AuthFlowError).statusCode, occurrence.label).toBe(503);
+      // Constant and secret-free on the wire...
+      expect((error as AuthFlowError).message, occurrence.label)
+        .toBe(AUTH_RETRYABLE_UNAVAILABLE_CODE);
+      // ...while the typed cause stays available to operators.
+      expect((error as AuthFlowError).cause, occurrence.label)
+        .toBeInstanceOf(Argon2InfrastructureError);
+      await service.drainMailDispatches();
     }
   });
 });

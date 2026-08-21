@@ -39,7 +39,9 @@ import type {
   EvaluatorConsumerSelectionResult,
   EvaluatorDevMenuView
 } from "@debateai/evaluator";
+import { Argon2InfrastructureError } from "@debateai/crypto";
 import {
+  AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
@@ -181,12 +183,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // memory, sequence-allocation and other persistence faults remain 5xx even
     // when they happen behind POST /v1/asks (DR-115).
     const askRefusal = knownError instanceof AskRefusal;
-    const statusCode = malformed ? 400 : authFlow ? knownError.statusCode : askRefusal ? 422 : 500;
+    // A pool failure that reached this boundary without being typed by the auth
+    // service still takes the one constant retryable envelope. It must never
+    // fall through to the generic 500 branch, whose body is `knownError.message`
+    // — for these that message IS the internal ARGON2_* code.
+    const argon2Unavailable = knownError instanceof Argon2InfrastructureError;
+    const statusCode = malformed ? 400
+      : authFlow ? knownError.statusCode
+        : argon2Unavailable ? 503
+          : askRefusal ? 422 : 500;
+    const errorCode = malformed
+      ? "MALFORMED_REQUEST"
+      : authFlow ? knownError.code
+        : argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE
+          : askRefusal ? knownError.code : "INTERNAL_ERROR";
     return reply.status(statusCode).send({
-      error: malformed
-        ? "MALFORMED_REQUEST"
-        : authFlow ? knownError.code : askRefusal ? knownError.code : "INTERNAL_ERROR",
-      message: knownError.message
+      error: errorCode,
+      message: argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE : knownError.message
     });
   });
 

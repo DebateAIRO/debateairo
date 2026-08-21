@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
 import {
+  Argon2InfrastructureError,
   createEmailBlindIndex,
   encrypt,
   generateDek,
@@ -11,6 +12,7 @@ import {
   hashPassword,
   hashVerificationToken,
   normalizeEmailForBlindIndex,
+  type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
@@ -39,22 +41,51 @@ export interface RegistrationApplication {
   ): Promise<typeof RESEND_PUBLIC_RESPONSE>;
 }
 
+/**
+ * The single code every Argon2 pool failure surfaces as, from every source and
+ * on every auth route. Exported so the HTTP error boundary can apply the same
+ * envelope to a pool failure that never passed through this service.
+ */
+export const AUTH_RETRYABLE_UNAVAILABLE_CODE = "AUTH_TEMPORARILY_UNAVAILABLE";
+
 export class AuthFlowError extends Error {
   constructor(readonly code:
     | "AUTH_INPUT_INVALID"
     | "AUTH_RATE_LIMITED"
     | "AUTH_MAIL_BUSY"
     | "AUTH_REGISTRATION_FAILED"
-    | "VERIFICATION_TOKEN_INVALID"
+    | "AUTH_TEMPORARILY_UNAVAILABLE"
+    | "VERIFICATION_TOKEN_INVALID",
+    options?: ErrorOptions
   ) {
-    super(code);
+    super(code, options);
     this.name = "AuthFlowError";
   }
 
   get statusCode(): 400 | 429 | 503 {
     return this.code === "AUTH_RATE_LIMITED" ? 429
-      : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY" ? 503 : 400;
+      : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
+        || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
   }
+}
+
+/**
+ * The ONE envelope every Argon2 pool failure gets, on every auth route and from
+ * every source — password hashing, audit derivation, verification, resend and
+ * account provisioning alike.
+ *
+ * Two properties matter. It is constant and secret-free: the body carries the
+ * code and nothing else, so `ARGON2_POOL_CAPACITY_EXHAUSTED` vs
+ * `ARGON2_WORKER_FAILED` — which describes internal capacity state — never
+ * reaches a client, and the generic 500 handler (whose body is
+ * `knownError.message`) is never the path these take. And it is a retryable
+ * 503, not a 500: the request failed for want of a worker, not because the
+ * credentials were wrong. The typed cause is retained on `cause` for operators.
+ */
+function asAuthFlowFailure(error: unknown): unknown {
+  return error instanceof Argon2InfrastructureError
+    ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: error })
+    : error;
 }
 
 type AuthRoute = "register" | "verify" | "resend";
@@ -420,6 +451,12 @@ export class RegistrationService implements RegistrationApplication {
     readonly blindIndexKey: Uint8Array;
     readonly policy: AuthPolicy;
     readonly limiter: InProcessAuthRateLimiter;
+    /**
+     * Off-thread Argon2. Injected, never constructed here: exactly one
+     * process-owned pool is created in main.ts and shared with the repository,
+     * so there is no module singleton, pool-per-request or second pool.
+     */
+    readonly argon2: Argon2Executor;
     readonly clock?: () => Date;
     readonly sleep?: (milliseconds: number) => Promise<void>;
     readonly verificationTokenFactory?: () => string;
@@ -463,7 +500,7 @@ export class RegistrationService implements RegistrationApplication {
         this.registrationHashesActive += 1;
         const value = passwordValue!;
         passwordValue = undefined;
-        void hashPassword(value, this.dependencies.policy.password.argon2id)
+        void hashPassword(this.dependencies.argon2, value, this.dependencies.policy.password.argon2id)
           .then((hash) => {
             settled = true;
             resolve(hash);
@@ -942,7 +979,7 @@ export class RegistrationService implements RegistrationApplication {
         pendingPostwork = await this.provisionPendingAccount(Object.freeze({
           email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
         }));
-      } catch {
+      } catch (provisionError) {
         console.error(
           `[AUTH_REGISTRATION_PROVISION_FAILED] correlation=${correlationId} code=PROVISION_FAILED`
         );
@@ -959,9 +996,18 @@ export class RegistrationService implements RegistrationApplication {
           releaseMailDispatch = await activateMailDispatch();
           activateMailDispatch = undefined;
         }
-        throw new AuthFlowError("AUTH_REGISTRATION_FAILED");
+        // A provisioning failure caused by the Argon2 pool takes the one shared
+        // retryable envelope; anything else keeps the existing registration
+        // failure code, whose response shape is unchanged.
+        throw provisionError instanceof Argon2InfrastructureError
+          ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: provisionError })
+          : new AuthFlowError("AUTH_REGISTRATION_FAILED");
       }
       return REGISTRATION_PUBLIC_RESPONSE;
+    } catch (error) {
+      // Password-hash and mail-reservation failures reach here; every Argon2
+      // pool failure among them leaves as the one constant 503 envelope.
+      throw asAuthFlowFailure(error);
     } finally {
       try {
         await this.holdRegistrationEnumerationClamp(startedAt);
@@ -983,6 +1029,18 @@ export class RegistrationService implements RegistrationApplication {
   }
 
   async verifyEmail(
+    input: { readonly token: string },
+    rawSource: AuthSourceContext
+  ): Promise<{ readonly status: "active" }> {
+    try {
+      return await this.runVerifyEmail(input, rawSource);
+    } catch (error) {
+      // The verify route reaches the pool through its audit derivations.
+      throw asAuthFlowFailure(error);
+    }
+  }
+
+  private async runVerifyEmail(
     input: { readonly token: string },
     rawSource: AuthSourceContext
   ): Promise<{ readonly status: "active" }> {
@@ -1066,6 +1124,9 @@ export class RegistrationService implements RegistrationApplication {
         };
       }
       return RESEND_PUBLIC_RESPONSE;
+    } catch (error) {
+      // The resend route reaches the pool through its audit derivations.
+      throw asAuthFlowFailure(error);
     } finally {
       try {
         await this.holdEnumerationFloor(startedAt);

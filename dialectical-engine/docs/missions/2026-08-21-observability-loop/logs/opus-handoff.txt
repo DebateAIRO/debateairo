@@ -1,0 +1,17 @@
+Durable record — Opus blind seat (SDK subagent) final handoff, received by
+Claude-Router 2026-08-21 ~11:50 local. Usage: 395,947 tokens, 128 tool uses,
+1592s. Transport: SDK subagent (no PTY; compaction N/A per spine).
+
+READY FOR HERMES STAGE REVIEW:
+- mission/step: 2026-08-21-observability-loop / H0-REQUIREMENTS
+- owner CLI session: SDK-subagent (opus blind seat)
+- artifact path: docs/missions/2026-08-21-observability-loop/research/opus-requirements.md
+- upstream artifacts used: brief.md; 00-intake-H0.md; goal-packets/opus.md; repo working tree (apps/**, packages/**, migrations/**, tests/**, acceptance/**, tools/**, web/**, docs/agent-protocols/debateai-heartbeat-protocol.md, docs/missions/2026-08-06-v3-programming/{logs/LOAD-01-codex.log,handoffs/EXEC-01-codex-handoff.md}, docs/missions/2026-08-17-accounts-privacy-security/AMENDMENTS.md)
+- checks/evidence: every RQ id A1-A5, B1-B6, C1-C4, D1-D7, E1-E6 answered in order; 75 numbered requirements OBS-OPUS-R01..R75; per-runtime unhandled-error destination table for all 7 runtimes with path:line; 65-entry RQ-C3 traceability-gap inventory classified SWALLOW/FLATTEN/REPLACE/DROP/BENIGN with remediation classes RC-1..RC-22; exhaustive console.* inventory; per-file throw-site density (492 throws, 49 catch-and-rethrow wraps); 173 statically-literal TypedDomainError codes enumerated; complete run_progress_event writer/reader enumeration; security-zone import boundary mapped to 7 named seams; ~22 riskiest citations re-verified line-by-line after drafting; two empirical probes (zod@4.4.3 error-message leakage; git history walk); every recommendation carries confidence + strongest counter-argument
+- assumptions/risks: no runtime executed (behavioural claims read off control flow); packages/serve + packages/evaluator surveyed by exhaustive throw/catch grep, not full read; Hatchet failure retention UNVERIFIED; production error volume + model pricing UNVERIFIED (no dollar figure asserted); zod leakage verified for 4 issue codes; core.run_progress_event has no timestamp column; apps/ui vs web live-surface ambiguity unresolved; BLOCKING RISK: repo git state makes loop-agent PR/commit authority impossible until fixed (R59/E6-1); security zone read for boundary mapping only, accounts resume points untouched
+- comments read through: not ticketed
+
+Orchestrator-verified addendum (Claude-Router, same hour): git fact-check
+confirms 4,265 phantom deletions and 141 tracked files under
+dialectical-engine/ (product-source subset ~= the accounts-committed files).
+Claim upheld.

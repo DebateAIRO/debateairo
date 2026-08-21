@@ -4,12 +4,42 @@ import {
   createHash,
   createHmac,
   randomBytes,
+  randomFillSync,
   randomInt
 } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { chmod, mkdir, open } from "node:fs/promises";
 import { join } from "node:path";
-import { argon2Verify, argon2id } from "hash-wasm";
+import { performance } from "node:perf_hooks";
+import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
+import type {
+  Argon2AuditParameters,
+  Argon2PasswordParameters
+} from "./argon2-worker-pool.js";
+
+// This module deliberately does NOT import hash-wasm. Argon2 is reachable only
+// through an injected executor backed by ./argon2-worker-pool.ts, whose worker
+// thread is the single production importer. Importing hash-wasm here would put
+// a memory-hard KDF back on the request/event-loop thread.
+//
+// The re-export below is value-safe: argon2-worker-pool.ts imports the worker's
+// types with `import type`, which is erased, so nothing here can pull hash-wasm
+// onto the main thread.
+export {
+  ARGON2_PROVISIONAL_BOUNDS,
+  ARGON2ID_ENCODING_BOUNDS,
+  Argon2InfrastructureError,
+  Argon2WorkerPool,
+  parseEncodedArgon2id,
+  type Argon2idEncodingParameters,
+  type Argon2AuditParameters,
+  type Argon2FailureCode,
+  type Argon2Lane,
+  type Argon2PasswordParameters,
+  type Argon2PoolStats,
+  type Argon2WorkerHandle,
+  type Argon2WorkerPoolOptions
+} from "./argon2-worker-pool.js";
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
@@ -356,12 +386,50 @@ export interface AuditSourceIpKdfParameters {
 const AUDIT_SOURCE_IP_KDF_DOMAIN = "debateai:audit-source-ip:v1\0";
 const AUDIT_USER_AGENT_KDF_DOMAIN = "debateai:audit-user-agent:v1\0";
 
-async function hashAuditContextValue(
+/**
+ * The off-thread Argon2 surface. `Argon2WorkerPool` satisfies it structurally;
+ * tests inject deterministic fakes. Nothing in this module may compute Argon2
+ * itself.
+ */
+export interface Argon2Executor {
+  hashPassword(
+    password: Uint8Array,
+    salt: Uint8Array,
+    parameters: Argon2PasswordParameters
+  ): Promise<string>;
+  verifyPassword(password: Uint8Array, encodedHash: string): Promise<boolean>;
+  hashAuditContext(
+    value: Uint8Array,
+    salt: Uint8Array,
+    parameters: Argon2AuditParameters
+  ): Promise<string>;
+}
+
+/**
+ * UTF-8 bytes in a freshly allocated, exactly-sized ArrayBuffer.
+ *
+ * `Buffer.from(string)` would draw from Node's shared allocation pool, and the
+ * pool transfers these buffers to the worker thread — detaching a shared pool
+ * buffer would corrupt unrelated live Buffers. TextEncoder always allocates its
+ * own exact-size buffer.
+ *
+ * hash-wasm hashes a Uint8Array password exactly as it hashes the equivalent
+ * UTF-8 string, so moving to byte transfer leaves every digest byte-identical.
+ */
+function utf8Bytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+/** A detachable, zeroable copy, so the caller's long-lived salt is never transferred. */
+function copyBytes(value: Uint8Array): Uint8Array {
+  return new Uint8Array(value);
+}
+
+function validateAuditKdfParameters(
   value: string,
   salt: Uint8Array,
-  parameters: AuditSourceIpKdfParameters,
-  domain: string
-): Promise<string> {
+  parameters: AuditSourceIpKdfParameters
+): void {
   if (value.length === 0 || salt.byteLength < 32 || parameters.algorithm !== "argon2id"
     || !Number.isInteger(parameters.memoryCostKiB) || parameters.memoryCostKiB < 19_456
     || !Number.isInteger(parameters.iterations) || parameters.iterations < 2
@@ -369,34 +437,47 @@ async function hashAuditContextValue(
     || parameters.hashLength !== 32) {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
   }
-  return argon2id({
-    password: `${domain}${value}`,
-    salt,
-    memorySize: parameters.memoryCostKiB,
+}
+
+async function hashAuditContextValue(
+  executor: Argon2Executor,
+  value: string,
+  salt: Uint8Array,
+  parameters: AuditSourceIpKdfParameters,
+  domain: string
+): Promise<string> {
+  validateAuditKdfParameters(value, salt, parameters);
+  return executor.hashAuditContext(utf8Bytes(`${domain}${value}`), copyBytes(salt), {
+    memoryCostKiB: parameters.memoryCostKiB,
     iterations: parameters.iterations,
     parallelism: parameters.parallelism,
-    hashLength: parameters.hashLength,
-    outputType: "hex"
+    hashLength: parameters.hashLength
   });
 }
 
 export async function hashAuditSourceIp(
+  executor: Argon2Executor,
   sourceIp: string,
   salt: Uint8Array,
   parameters: AuditSourceIpKdfParameters
 ): Promise<string> {
-  return hashAuditContextValue(sourceIp, salt, parameters, AUDIT_SOURCE_IP_KDF_DOMAIN);
+  return hashAuditContextValue(executor, sourceIp, salt, parameters, AUDIT_SOURCE_IP_KDF_DOMAIN);
 }
 
 export async function hashAuditUserAgent(
+  executor: Argon2Executor,
   userAgent: string,
   salt: Uint8Array,
   parameters: AuditSourceIpKdfParameters
 ): Promise<string> {
-  return hashAuditContextValue(userAgent, salt, parameters, AUDIT_USER_AGENT_KDF_DOMAIN);
+  return hashAuditContextValue(executor, userAgent, salt, parameters, AUDIT_USER_AGENT_KDF_DOMAIN);
 }
 
-export async function hashPassword(password: string, parameters: Argon2idParameters): Promise<string> {
+export async function hashPassword(
+  executor: Argon2Executor,
+  password: string,
+  parameters: Argon2idParameters
+): Promise<string> {
   if (typeof password !== "string" || password.length === 0
     || !Number.isInteger(parameters.memoryCostKiB) || parameters.memoryCostKiB < 19_456
     || !Number.isInteger(parameters.timeCost) || parameters.timeCost < 2
@@ -404,23 +485,227 @@ export async function hashPassword(password: string, parameters: Argon2idParamet
     || !Number.isInteger(parameters.hashLength) || parameters.hashLength < 32) {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
   }
-  return argon2id({
-    password,
-    salt: randomBytes(16),
-    memorySize: parameters.memoryCostKiB,
-    iterations: parameters.timeCost,
+  const salt = new Uint8Array(16);
+  randomFillSync(salt);
+  return executor.hashPassword(utf8Bytes(password), salt, {
+    memoryCostKiB: parameters.memoryCostKiB,
+    timeCost: parameters.timeCost,
     parallelism: parameters.parallelism,
-    hashLength: parameters.hashLength,
-    outputType: "encoded"
+    hashLength: parameters.hashLength
   });
 }
 
-export async function verifyPassword(encodedHash: string, password: string): Promise<boolean> {
-  if (!encodedHash.startsWith("$argon2id$")) return false;
-  try {
-    return await argon2Verify({ password, hash: encodedHash });
-  } catch {
-    return false;
+/**
+ * A wrong password, or a stored encoding that is malformed, of another
+ * algorithm/version, or outside the accepted cost envelope, is `false` — and
+ * the out-of-envelope cases are decided HERE, before any memory-hard work, so
+ * corrupted or hostile stored data can never drive an Argon2 allocation.
+ *
+ * Everything past that check is a real verification: infrastructure failure
+ * (worker crash, job timeout, capacity exhaustion, closed pool, a compute path
+ * that throws) propagates as a typed rejection and is never converted into
+ * `false`, because `false` is indistinguishable from a wrong password and would
+ * become a 401 for a user whose credentials are correct.
+ */
+export async function verifyPassword(
+  executor: Argon2Executor,
+  encodedHash: string,
+  password: string
+): Promise<boolean> {
+  if (parseEncodedArgon2id(encodedHash) === undefined) return false;
+  return executor.verifyPassword(utf8Bytes(password), encodedHash);
+}
+
+/**
+ * PROVISIONAL cache bounds, pending V ratification against measured evidence.
+ */
+export const AUDIT_SOURCE_IP_CACHE_BOUNDS = Object.freeze({
+  capacity: 4_096,
+  ttlMs: 60_000
+});
+
+const AUDIT_SOURCE_IP_CACHE_DOMAIN = "debateai:audit-source-ip-cache:v1";
+
+interface AuditIpCacheEntry {
+  digest: string | undefined;
+  promise: Promise<string> | undefined;
+  /** Absolute, on the MONOTONIC clock; set at insertion, never extended by a hit. */
+  readonly expiresAt: number;
+  /**
+   * Strictly increasing per-hasher use counter, not a timestamp. Two hits in
+   * the same millisecond still order deterministically, so eviction is true
+   * LRU rather than whatever the map happened to iterate first.
+   */
+  useSequence: number;
+}
+
+export interface AuditContextHasherOptions {
+  readonly capacity?: number;
+  readonly ttlMs?: number;
+  readonly now?: () => number;
+}
+
+/**
+ * Owns the audit-context derivations for ONE salt/parameter epoch, plus the
+ * ticket-authorized bounded per-IP cache.
+ *
+ * Privacy contract: only the normalized source IP derivation is cached. User
+ * agents use the worker but are never cached — T1 authorizes a per-IP cache,
+ * not broader retained UA state. Passwords, password verification, tokens,
+ * email, request IDs and raw IP values are never cached.
+ *
+ * The map key is an HMAC under a fresh random process-local key over a
+ * domain-separated canonical input that binds the normalized IP, a salt
+ * fingerprint and the full KDF parameter tuple. It is a locator only and is
+ * never persisted as the audit digest; a salt, parameter or domain change
+ * necessarily misses, preserving VR-7 domain separation and rotation.
+ */
+export class AuditContextHasher {
+  private readonly executor: Argon2Executor;
+  private readonly salt: Buffer;
+  private readonly parameters: AuditSourceIpKdfParameters;
+  private readonly capacity: number;
+  private readonly ttlMs: number;
+  private readonly now: () => number;
+  private readonly cacheKey: Buffer;
+  private readonly saltFingerprint: string;
+  private readonly entries = new Map<string, AuditIpCacheEntry>();
+  private useCounter = 0;
+  private closed = false;
+
+  constructor(
+    executor: Argon2Executor,
+    salt: Uint8Array,
+    parameters: AuditSourceIpKdfParameters,
+    options: AuditContextHasherOptions = {}
+  ) {
+    if (salt.byteLength < 32) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+    this.executor = executor;
+    this.salt = Buffer.from(salt);
+    this.parameters = Object.freeze({ ...parameters });
+    this.capacity = options.capacity ?? AUDIT_SOURCE_IP_CACHE_BOUNDS.capacity;
+    this.ttlMs = options.ttlMs ?? AUDIT_SOURCE_IP_CACHE_BOUNDS.ttlMs;
+    // TTL correctness is a duration question, so the default clock is the
+    // monotonic one. `Date.now` steps with NTP and manual clock changes: a
+    // backward step makes an absolute expiry unreachable and keeps a derived
+    // value past its ruled lifetime, a forward step discards fresh entries.
+    this.now = options.now ?? (() => performance.now());
+    this.cacheKey = randomBytes(32);
+    this.saltFingerprint = createHash("sha256").update(this.salt).digest("hex");
+  }
+
+  /** Opaque keyed locator. Never plaintext, never an unkeyed digest. */
+  private locator(normalizedIp: string): string {
+    const canonical = JSON.stringify([
+      AUDIT_SOURCE_IP_CACHE_DOMAIN,
+      AUDIT_SOURCE_IP_KDF_DOMAIN,
+      normalizedIp,
+      this.saltFingerprint,
+      this.parameters.algorithm,
+      this.parameters.memoryCostKiB,
+      this.parameters.iterations,
+      this.parameters.parallelism,
+      this.parameters.hashLength
+    ]);
+    return createHmac("sha256", this.cacheKey).update(canonical, "utf8").digest("hex");
+  }
+
+  /** Lazy, timer-free reclamation: expired first, then settled LRU. */
+  private reclaim(): void {
+    const now = this.now();
+    for (const [key, entry] of this.entries) {
+      if (entry.expiresAt <= now) this.entries.delete(key);
+    }
+    while (this.entries.size >= this.capacity) {
+      let oldestKey: string | undefined;
+      let oldestSequence = Number.POSITIVE_INFINITY;
+      for (const [key, entry] of this.entries) {
+        // In-flight entries are never evicted: they are the coalescing point
+        // for their own awaiters.
+        if (entry.digest === undefined) continue;
+        if (entry.useSequence < oldestSequence) {
+          oldestSequence = entry.useSequence;
+          oldestKey = key;
+        }
+      }
+      if (oldestKey === undefined) return;
+      this.entries.delete(oldestKey);
+    }
+  }
+
+  async hashSourceIp(normalizedIp: string): Promise<string> {
+    if (this.closed) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+    validateAuditKdfParameters(normalizedIp, this.salt, this.parameters);
+    const key = this.locator(normalizedIp);
+    const now = this.now();
+    const existing = this.entries.get(key);
+    if (existing !== undefined) {
+      if (existing.expiresAt > now) {
+        if (existing.digest !== undefined) {
+          this.useCounter += 1;
+          existing.useSequence = this.useCounter;
+          // Byte-identical to a miss: the same Argon2 digest string.
+          return existing.digest;
+        }
+        if (existing.promise !== undefined) return existing.promise;
+      }
+      this.entries.delete(key);
+    }
+
+    const promise = hashAuditContextValue(
+      this.executor, normalizedIp, this.salt, this.parameters, AUDIT_SOURCE_IP_KDF_DOMAIN
+    );
+
+    this.reclaim();
+    if (this.entries.size >= this.capacity) {
+      // Capacity is entirely in-flight. Bypass insertion rather than exceed the
+      // cap; the derivation still runs and still returns a correct digest.
+      return promise;
+    }
+    this.useCounter += 1;
+    const entry: AuditIpCacheEntry = {
+      digest: undefined,
+      promise,
+      expiresAt: now + this.ttlMs,
+      useSequence: this.useCounter
+    };
+    this.entries.set(key, entry);
+    // In-flight entries count toward the cap from this moment.
+    return promise.then((digest) => {
+      if (this.entries.get(key) === entry) {
+        entry.digest = digest;
+        entry.promise = undefined;
+        this.useCounter += 1;
+        entry.useSequence = this.useCounter;
+      }
+      return digest;
+    }, (error: unknown) => {
+      // Never cache an error, and never leave a rejected in-flight entry
+      // occupying capacity or coalescing later callers onto a failure.
+      if (this.entries.get(key) === entry) this.entries.delete(key);
+      throw error;
+    });
+  }
+
+  /** Worker-backed but deliberately uncached. */
+  async hashUserAgent(normalizedUserAgent: string): Promise<string> {
+    if (this.closed) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+    return hashAuditContextValue(
+      this.executor, normalizedUserAgent, this.salt, this.parameters, AUDIT_USER_AGENT_KDF_DOMAIN
+    );
+  }
+
+  cacheSize(): number {
+    return this.entries.size;
+  }
+
+  /** Idempotent. Clears cached entries and zeroes the HMAC key and salt copy. */
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.entries.clear();
+    this.cacheKey.fill(0);
+    this.salt.fill(0);
   }
 }
 

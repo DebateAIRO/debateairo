@@ -11,11 +11,16 @@ const passwordPolicySchema = z.object({
   minimum_length: z.literal(8),
   composition_rules: z.literal(false),
   forced_rotation: z.literal(false),
+  // Finite upper bounds only. Every lower bound and every shipped value is
+  // unchanged; these maxima exist so a syntactically valid but hostile register
+  // row cannot defeat the worker pool's resource bound by demanding, say, a
+  // multi-gibibyte Argon2 allocation per job. The maxima sit at the currently
+  // supported ceiling, so no deployed policy value moves.
   argon2id: z.object({
-    memory_cost_kib: z.number().int().min(19_456),
-    time_cost: z.number().int().min(2),
-    parallelism: z.number().int().positive(),
-    hash_length: z.number().int().min(32)
+    memory_cost_kib: z.number().int().min(19_456).max(262_144),
+    time_cost: z.number().int().min(2).max(10),
+    parallelism: z.number().int().positive().max(4),
+    hash_length: z.number().int().min(32).max(64)
   }).strict()
 }).strict();
 
@@ -24,7 +29,9 @@ const auditSourceIpKdfPolicySchema = z.object({
   algorithm: z.literal("argon2id"),
   memory_cost_kib: z.number().int().min(19_456).max(262_144),
   iterations: z.number().int().min(2).max(10),
-  parallelism: z.number().int().positive(),
+  // Bounded for the same reason as the password KDF above; the shipped value
+  // (1) and every other audit KDF value are unchanged.
+  parallelism: z.number().int().positive().max(4),
   hash_length: z.literal(32)
 }).strict();
 

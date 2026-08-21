@@ -1,0 +1,1 @@
+/goal LAST rework (round 3 of 3). Read docs/missions/2026-08-21-docker-hatchet/goal-packets/c2-rework3.md. Keep G3 F-1..F-7. Fix remaining H2-03..H2-09 residuals in current H2-plan-review.md. Reproduce-first. Step C2-rework-3. Do NOT commit or push.

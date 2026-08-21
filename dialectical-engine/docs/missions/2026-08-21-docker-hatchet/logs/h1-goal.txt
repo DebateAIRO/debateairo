@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/h1.md in full and execute it. It is your complete contract. Fresh Grok session, not the orchestrator. H1 integrity only. Do not use Hermes Agent. Do NOT commit or push.

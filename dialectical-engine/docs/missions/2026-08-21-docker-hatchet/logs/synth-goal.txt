@@ -1,0 +1,1 @@
+/goal Read docs/missions/2026-08-21-docker-hatchet/goal-packets/synth.md in full and execute it. It is your complete contract. You are a NEW Opus session synthesizing the three blind RE artifacts. Write ONLY the allowed artifact paths. Requirements only. Do NOT commit or push.
