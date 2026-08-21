@@ -8,6 +8,7 @@ import { runInNewContext } from "node:vm";
 import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { PoolClient } from "pg";
 import { migrate, PostgresIdentityRepository } from "@debateai/db";
 import {
   createEmailBlindIndex,
@@ -39,6 +40,7 @@ import {
   RegistrationService,
   RESEND_PUBLIC_RESPONSE
 } from "../../apps/api/src/registration.js";
+import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import {
   MailDeliveryError,
   MemoryMailSender,
@@ -368,6 +370,100 @@ async function registerAccount(
     FROM identity."user" WHERE email_blind_index=$1
   `, [index]);
   return { email, password, recoveryEmail, response, index, user: row.rows[0]! };
+}
+
+function fixtureAskApplication(): AskApplication {
+  return {
+    submit: async () => ({ run_ref: "run:t9", status: "QUEUED" }),
+    readAnswer: async () => null,
+    readRunAnswer: async () => null,
+    readRun: async () => null,
+    readAnswerIndex: async (_session, limit, offset) => ({
+      items: [], open_runs: [], limit, offset, total: 0
+    }),
+    readInspection: async () => null,
+    readLedgerDigest: async () => null,
+    readNode: async () => null,
+    recordInvestigation: async () => null,
+    unlinkMemoryLink: async () => ({ memory_link_id: "memory:t9", state: "UNLINKED" }),
+    readDeployment: async () => ({
+      register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
+      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+    }),
+    events: async function* () { /* no events */ }
+  };
+}
+
+/**
+ * Flushes every pooled backend's pending cumulative statistics so a
+ * `pg_stat_database` read observes deadlocks reported by whichever backend was
+ * the victim, not only by the reader. A backend flushes on its next query once
+ * PGSTAT_MIN_INTERVAL has passed and unconditionally after PGSTAT_IDLE_INTERVAL
+ * (10 s) of idleness, so idle pooled backends are touched first and the idle
+ * interval is then waited out for any backend this pool does not hand back.
+ * Only currently idle clients are checked out, never the whole pool, because
+ * callers may legitimately hold one.
+ */
+async function settleDatabaseStatistics(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 1_500));
+  const idleClients = (database.pool as unknown as { readonly idleCount: number }).idleCount;
+  const clients: PoolClient[] = [];
+  try {
+    for (let index = 0; index < idleClients; index += 1) {
+      clients.push(await database.pool.connect());
+    }
+    await Promise.all(clients.map((client) => client.query("SELECT pg_stat_force_next_flush()")));
+  } finally {
+    for (const client of clients) client.release();
+  }
+  await new Promise<void>((resolve) => setTimeout(resolve, 11_000));
+}
+
+async function databaseDeadlockCount(): Promise<number> {
+  const counter = await database.pool.query<{ deadlocks: string }>(`
+    SELECT deadlocks::text AS deadlocks FROM pg_stat_database WHERE datname=current_database()
+  `);
+  return Number(counter.rows[0]!.deadlocks);
+}
+
+async function readAuditChain(): Promise<Readonly<{
+  chain: readonly ChainedAuditEvent[];
+  order: readonly Readonly<{ eventType: string; actorKeyRef: string; occurredAt: Date }>[];
+  rootCount: number;
+  totalRows: number;
+}>> {
+  const roots = await database.pool.query<{ roots: string; total: string }>(`
+    SELECT count(*) FILTER (WHERE prev_hash IS NULL)::text AS roots,count(*)::text AS total
+    FROM identity.audit_event
+  `);
+  const rows = await database.pool.query<{
+    audit_id: string; prev_hash: Buffer | null; this_hash: Buffer; actor_ciphertext: null;
+    actor_key_ref: string; event_type: string; target_type: string; target_id: string;
+    occurred_at: Date; source_context: Record<string, unknown>; decision: string;
+    success: boolean; justification: string | null; depth: number;
+  }>(`
+    WITH RECURSIVE chain AS (
+      SELECT a.*, 1 AS depth FROM identity.audit_event a WHERE a.prev_hash IS NULL
+      UNION ALL
+      SELECT child.*, chain.depth + 1
+      FROM identity.audit_event child JOIN chain ON child.prev_hash=chain.this_hash
+    ) SELECT * FROM chain ORDER BY depth
+  `);
+  return Object.freeze({
+    chain: rows.rows.map((row) => ({
+      auditId: row.audit_id, actorCiphertext: row.actor_ciphertext,
+      actorKeyRef: row.actor_key_ref, eventType: row.event_type,
+      targetType: row.target_type, targetId: row.target_id, occurredAt: row.occurred_at,
+      sourceContext: row.source_context, decision: row.decision, success: row.success,
+      justification: row.justification, prevHash: row.prev_hash?.toString("hex") ?? null,
+      thisHash: row.this_hash.toString("hex")
+    })),
+    order: rows.rows.map((row) => Object.freeze({
+      eventType: row.event_type, actorKeyRef: row.actor_key_ref, occurredAt: row.occurred_at
+    })),
+    rootCount: Number(roots.rows[0]!.roots),
+    totalRows: Number(roots.rows[0]!.total)
+  });
 }
 
 beforeAll(async () => {
@@ -3791,6 +3887,1516 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       error.mockRestore();
     }
   });
+});
+
+describe("T9 resend lock-order race through the real HTTP boundary", () => {
+  const RESEND_BODY = JSON.stringify(RESEND_PUBLIC_RESPONSE);
+
+  /**
+   * Real transport that suspends exactly one armed send. Suspending the first
+   * eligible resend transport is what lets the asynchronous
+   * `recordVerificationDelivery` transaction meet live
+   * `prepareVerificationResend` transactions on the same rows.
+   */
+  class GatedVerificationMailSender implements MailSender {
+    readonly messages: VerificationMail[] = [];
+    private armed = false;
+    private signalEntered!: () => void;
+    private signalReleased!: () => void;
+    private readonly enteredPromise = new Promise<void>((resolve) => {
+      this.signalEntered = resolve;
+    });
+    private readonly releasedPromise = new Promise<void>((resolve) => {
+      this.signalReleased = resolve;
+    });
+
+    arm(): void { this.armed = true; }
+    entered(): Promise<void> { return this.enteredPromise; }
+    release(): void { this.signalReleased(); }
+
+    async sendVerification(mail: VerificationMail): Promise<void> {
+      this.messages.push(Object.freeze({ ...mail }));
+      if (!this.armed) return;
+      this.armed = false;
+      this.signalEntered();
+      await this.releasedPromise;
+    }
+  }
+
+  interface ResendObservation {
+    readonly arm: "existing" | "missing";
+    readonly index: number;
+    readonly ip: string;
+    readonly status: number | null;
+    readonly body: string | null;
+    readonly elapsedMs: number;
+    readonly rejection: string | null;
+  }
+
+  function driverErrorCode(error: unknown): string {
+    if (typeof error === "object" && error !== null && "code" in error) {
+      return String((error as { readonly code: unknown }).code);
+    }
+    return error instanceof Error ? `${error.name}:${error.message}` : String(error);
+  }
+
+  async function injectResend(
+    api: ReturnType<typeof buildApi>,
+    arm: "existing" | "missing",
+    index: number,
+    email: string,
+    ip: string
+  ): Promise<ResendObservation> {
+    const startedAt = performance.now();
+    try {
+      const response = await api.inject({
+        method: "POST",
+        url: "/v1/auth/resend-verification",
+        payload: { email },
+        remoteAddress: ip,
+        headers: { "user-agent": "vitest-t9" }
+      });
+      return Object.freeze({
+        arm, index, ip,
+        status: response.statusCode,
+        body: response.body,
+        elapsedMs: performance.now() - startedAt,
+        rejection: null
+      });
+    } catch (error) {
+      return Object.freeze({
+        arm, index, ip,
+        status: null,
+        body: null,
+        elapsedMs: performance.now() - startedAt,
+        rejection: driverErrorCode(error)
+      });
+    }
+  }
+
+  /**
+   * Waits until the launched resend burst is demonstrably live inside
+   * PostgreSQL, then lets the caller release the suspended transport into it.
+   * Runs on a client reserved before the burst so the probe never competes for
+   * the connection pool it observes. Committed preparation rows are the
+   * reliable signal: `pg_stat_activity` sampling is throttled by the same
+   * event loop that the synchronous WASM Argon2id audit hashing blocks.
+   */
+  async function waitForResendContention(
+    monitor: PoolClient,
+    occurredAt: Date,
+    minimumPrepared: number,
+    timeoutMs: number
+  ): Promise<Readonly<{ prepared: number; peakLockWaiters: number }>> {
+    const deadline = performance.now() + timeoutMs;
+    let prepared = 0;
+    let peakLockWaiters = 0;
+    while (performance.now() < deadline) {
+      const sample = await monitor.query<{ prepared: string; waiters: string }>(`
+        SELECT
+          (SELECT count(*) FROM identity.audit_event
+            WHERE event_type='identity.verification.resend_requested'
+              AND occurred_at=$1)::text AS prepared,
+          (SELECT count(*) FROM pg_stat_activity
+            WHERE datname=current_database() AND wait_event_type='Lock')::text AS waiters
+      `, [occurredAt]);
+      prepared = Number(sample.rows[0]!.prepared);
+      peakLockWaiters = Math.max(peakLockWaiters, Number(sample.rows[0]!.waiters));
+      if (prepared >= minimumPrepared || peakLockWaiters >= 2) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    }
+    return Object.freeze({ prepared, peakLockWaiters });
+  }
+
+  interface VerifyObservation {
+    readonly index: number;
+    readonly ip: string;
+    readonly status: number | null;
+    readonly body: string | null;
+    readonly elapsedMs: number;
+    readonly rejection: string | null;
+  }
+
+  async function injectVerify(
+    api: ReturnType<typeof buildApi>,
+    index: number,
+    token: string,
+    ip: string
+  ): Promise<VerifyObservation> {
+    const startedAt = performance.now();
+    try {
+      const response = await api.inject({
+        method: "POST",
+        url: "/v1/auth/verify-email",
+        payload: { token },
+        remoteAddress: ip,
+        headers: { "user-agent": "vitest-t9" }
+      });
+      return Object.freeze({
+        index, ip,
+        status: response.statusCode,
+        body: response.body,
+        elapsedMs: performance.now() - startedAt,
+        rejection: null
+      });
+    } catch (error) {
+      return Object.freeze({
+        index, ip,
+        status: null,
+        body: null,
+        elapsedMs: performance.now() - startedAt,
+        rejection: driverErrorCode(error)
+      });
+    }
+  }
+
+  interface RegisterObservation {
+    readonly index: number;
+    readonly ip: string;
+    readonly status: number | null;
+    readonly body: string | null;
+    readonly elapsedMs: number;
+    readonly rejection: string | null;
+  }
+
+  async function injectRegister(
+    api: ReturnType<typeof buildApi>,
+    index: number,
+    email: string,
+    recoveryEmail: string,
+    ip: string
+  ): Promise<RegisterObservation> {
+    const startedAt = performance.now();
+    try {
+      const response = await api.inject({
+        method: "POST",
+        url: "/v1/auth/register",
+        payload: {
+          email,
+          password: "correct horse battery staple",
+          recovery_email: recoveryEmail,
+          adult_affirmed: true
+        },
+        remoteAddress: ip,
+        headers: { "user-agent": "vitest-t9" }
+      });
+      return Object.freeze({
+        index, ip,
+        status: response.statusCode,
+        body: response.body,
+        elapsedMs: performance.now() - startedAt,
+        rejection: null
+      });
+    } catch (error) {
+      return Object.freeze({
+        index, ip,
+        status: null,
+        body: null,
+        elapsedMs: performance.now() - startedAt,
+        rejection: driverErrorCode(error)
+      });
+    }
+  }
+
+  /**
+   * Test-only barrier that pauses a real repository transaction immediately
+   * after one real SQL statement has returned, leaving that transaction open
+   * and its real row locks held. It observes and pauses actual SQL; it never
+   * mocks a repository result and never injects an error.
+   */
+  interface QueryBarrier {
+    readonly reached: Promise<void>;
+    release(): void;
+    hits(): number;
+  }
+
+  let activeQueryBarrier: {
+    readonly matches: (sql: string) => boolean;
+    readonly signalReached: () => void;
+    readonly released: Promise<void>;
+    count: number;
+  } | undefined;
+  const barrierPatchedClients = new WeakSet<PoolClient>();
+  let poolPatchedForBarriers = false;
+  let originalPoolConnect: ((...args: readonly unknown[]) => unknown) | undefined;
+
+  function instrumentClientForBarriers(client: PoolClient): PoolClient {
+    if (barrierPatchedClients.has(client)) return client;
+    barrierPatchedClients.add(client);
+    const mutable = client as unknown as { query: (...q: readonly unknown[]) => unknown };
+    const query = mutable.query.bind(client);
+    mutable.query = (...q: readonly unknown[]): unknown => {
+      const sql = typeof q[0] === "string" ? q[0] : "";
+      const result = query(...q);
+      const barrier = activeQueryBarrier;
+      if (barrier === undefined || barrier.count > 0
+        || !(result instanceof Promise) || !barrier.matches(sql)) {
+        return result;
+      }
+      return result.then(async (value: unknown) => {
+        barrier.count += 1;
+        barrier.signalReached();
+        await barrier.released;
+        return value;
+      });
+    };
+    return client;
+  }
+
+  /**
+   * `Pool.connect` has two call forms and `Pool.query` uses the callback one
+   * internally, where `connect` returns undefined rather than a promise. A
+   * Promise-only wrapper therefore awaits undefined and hands a non-object to a
+   * WeakSet, which throws while the callback path still succeeds — passing
+   * tests plus unhandled rejections. Both forms are handled here, exactly as
+   * `createPool` in packages/db already does for its own client wrapping.
+   */
+  function patchPoolForQueryBarriers(): void {
+    if (poolPatchedForBarriers) return;
+    poolPatchedForBarriers = true;
+    const pool = database.pool as unknown as {
+      connect: (...args: readonly unknown[]) => unknown;
+    };
+    const connect = pool.connect.bind(database.pool);
+    originalPoolConnect = pool.connect.bind(database.pool);
+    pool.connect = (...args: readonly unknown[]): unknown => {
+      const callback = args.at(-1);
+      if (typeof callback === "function") {
+        return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
+          (callback as (e: unknown, c: PoolClient | undefined, r: unknown) => void)(
+            error,
+            client === undefined ? undefined : instrumentClientForBarriers(client),
+            release
+          );
+        });
+      }
+      return (connect(...args) as Promise<PoolClient>)
+        .then((client) => instrumentClientForBarriers(client));
+    };
+  }
+
+  /** Restores the shared pool so no later test file inherits this patch. */
+  function restorePoolAfterQueryBarriers(): void {
+    if (!poolPatchedForBarriers || originalPoolConnect === undefined) return;
+    (database.pool as unknown as { connect: unknown }).connect = originalPoolConnect;
+    originalPoolConnect = undefined;
+    poolPatchedForBarriers = false;
+  }
+
+  afterAll(() => {
+    restorePoolAfterQueryBarriers();
+  });
+
+  function installQueryBarrier(matches: (sql: string) => boolean): QueryBarrier {
+    patchPoolForQueryBarriers();
+    let signalReached!: () => void;
+    let signalReleased!: () => void;
+    const reached = new Promise<void>((resolve) => { signalReached = resolve; });
+    const released = new Promise<void>((resolve) => { signalReleased = resolve; });
+    const barrier = { matches, signalReached, released, count: 0 };
+    activeQueryBarrier = barrier;
+    return Object.freeze({
+      reached,
+      release(): void {
+        activeQueryBarrier = undefined;
+        signalReleased();
+      },
+      hits: () => barrier.count
+    });
+  }
+
+  /** Counts backends genuinely queued on a row lock in this database. */
+  async function waitForLockWaiters(
+    monitor: PoolClient,
+    minimumWaiters: number,
+    timeoutMs: number
+  ): Promise<number> {
+    const deadline = performance.now() + timeoutMs;
+    let peak = 0;
+    while (performance.now() < deadline) {
+      const sample = await monitor.query<{ waiters: string }>(`
+        SELECT count(*)::text AS waiters FROM pg_stat_activity
+        WHERE datname=current_database() AND state='active' AND wait_event_type='Lock'
+      `);
+      peak = Math.max(peak, Number(sample.rows[0]!.waiters));
+      if (peak >= minimumWaiters) return peak;
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    }
+    return peak;
+  }
+
+  /**
+   * Savepoint-guarded NOWAIT probe. Production SQL is never changed to use
+   * NOWAIT; only this observer does, and only from its own transaction.
+   */
+  async function probeRowLock(
+    prober: PoolClient,
+    label: string,
+    sql: string,
+    parameters: readonly unknown[]
+  ): Promise<"acquired" | "locked"> {
+    await prober.query(`SAVEPOINT probe_${label}`);
+    try {
+      await prober.query(sql, [...parameters]);
+      await prober.query(`RELEASE SAVEPOINT probe_${label}`);
+      return "acquired";
+    } catch (error) {
+      await prober.query(`ROLLBACK TO SAVEPOINT probe_${label}`);
+      if ((error as { readonly code?: string }).code !== "55P03") throw error;
+      return "locked";
+    }
+  }
+
+  function databaseErrorLeak(body: string | null): boolean {
+    if (body === null) return false;
+    return /INTERNAL_ERROR|40P01|deadlock|SQLSTATE|identity\.|FOR UPDATE|pg_/i.test(body);
+  }
+
+  async function emailChannelOf(userId: string): Promise<string> {
+    const binding = await database.pool.query<{ channel_binding_id: string }>(`
+      SELECT channel_binding_id FROM identity.channel_binding
+      WHERE user_id=$1 AND channel_type='email'
+    `, [userId]);
+    return binding.rows[0]!.channel_binding_id;
+  }
+
+  it("T9-H keeps the query-barrier pool patch safe for both pg connect call forms", async () => {
+    // pg's Pool.query calls Pool.connect in CALLBACK form, where connect returns
+    // undefined rather than a promise. A Promise-only patch therefore awaits
+    // undefined and hands a non-object to a WeakSet: every query still succeeds,
+    // so tests stay green, while each call leaks one unhandled TypeError and
+    // fails the run. This regression pins both call forms.
+    const unhandled: string[] = [];
+    const capture = (reason: unknown): void => {
+      unhandled.push(reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason));
+    };
+    process.on("unhandledRejection", capture);
+    try {
+      patchPoolForQueryBarriers();
+
+      const callbackClient = await new Promise<PoolClient>((resolve, reject) => {
+        (database.pool as unknown as {
+          connect: (
+            callback: (error: unknown, client: PoolClient | undefined, release: () => void) => void
+          ) => unknown;
+        }).connect((error, client, release) => {
+          if (error !== undefined && error !== null) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+            return;
+          }
+          release();
+          resolve(client!);
+        });
+      });
+      const viaPoolQuery = await database.pool.query<{ ok: number }>("SELECT 1 AS ok");
+      const promiseClient = await database.pool.connect();
+      const viaClient = await promiseClient.query<{ ok: number }>("SELECT 2 AS ok");
+      promiseClient.release();
+      // Let any unhandled rejection surface before asserting.
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+
+      console.info(
+        `[T9-H POOL PATCH CALL FORMS] `
+        + `callback_client_instrumented=${barrierPatchedClients.has(callbackClient)} `
+        + `promise_client_instrumented=${barrierPatchedClients.has(promiseClient)} `
+        + `pool_query_ok=${viaPoolQuery.rows[0]!.ok} client_query_ok=${viaClient.rows[0]!.ok} `
+        + `unhandled=${unhandled.length} ${JSON.stringify(unhandled)}`
+      );
+
+      expect(viaPoolQuery.rows[0]!.ok).toBe(1);
+      expect(viaClient.rows[0]!.ok).toBe(2);
+      expect(barrierPatchedClients.has(callbackClient)).toBe(true);
+      expect(barrierPatchedClients.has(promiseClient)).toBe(true);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", capture);
+    }
+  }, 60_000);
+
+  it("T9 keeps 32 existing and 32 missing concurrent resends byte-identical with zero deadlocks", async () => {
+    const initialNow = new Date("2026-08-21T09:00:00.000Z");
+    const existingInstant = new Date(
+      initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
+    );
+    const missingInstant = new Date(existingInstant.getTime() + 1);
+    const mail = new GatedVerificationMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const observedDeliveryErrors: string[] = [];
+    const shippedRecordDelivery = flow.repository.recordVerificationDelivery
+      .bind(flow.repository);
+    // Pure observer: the shipped delivery-record error is recorded and rethrown
+    // unchanged, so the production failure path keeps its exact behaviour.
+    flow.repository.recordVerificationDelivery = async (
+      input: Parameters<typeof shippedRecordDelivery>[0]
+    ): Promise<void> => {
+      try {
+        await shippedRecordDelivery(input);
+      } catch (error) {
+        observedDeliveryErrors.push(driverErrorCode(error));
+        throw error;
+      }
+    };
+    const monitor = await database.pool.connect();
+    const openedAt = performance.now();
+    const phase = (name: string): void => console.info(
+      `[T9 RESEND RACE PHASE] ${name} t=${(performance.now() - openedAt).toFixed(0)}ms`
+    );
+    try {
+      const registered = await registerAccount(flow.service, "t9-resend-race");
+      phase("seeded");
+      const seededCredentials = await database.pool.query<{
+        token_hash: string; issued_at: Date; expires_at: Date; consumed_at: Date | null;
+      }>(`
+        SELECT token_hash,issued_at,expires_at,consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding USING (channel_binding_id)
+        WHERE binding.user_id=$1 ORDER BY issued_at
+      `, [registered.user.user_id]);
+      expect(seededCredentials.rows).toHaveLength(1);
+      expect(mail.messages).toHaveLength(1);
+
+      mail.arm();
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // Step 4: the first eligible existing-account resend, suspended in transport.
+      const existingRequests = [
+        injectResend(api, "existing", 0, registered.email, "198.51.100.1")
+      ];
+      await mail.entered();
+      phase("transport-suspended");
+
+      // Step 5: 31 more requests on the same address, each from its own source.
+      for (let index = 1; index < 32; index += 1) {
+        existingRequests.push(
+          injectResend(api, "existing", index, registered.email, `198.51.100.${index + 1}`)
+        );
+      }
+      const contention = await waitForResendContention(monitor, existingInstant, 3, 8_000);
+      phase(`contention prepared=${contention.prepared} waiters=${contention.peakLockWaiters}`);
+      mail.release();
+      const existingObservations = await Promise.all(existingRequests);
+      phase("existing-arm-responded");
+      await flow.service.drainMailDispatches();
+      phase("existing-arm-drained");
+
+      // Step 6: the paired missing-address arm across the same public boundary.
+      flow.advance(1);
+      const missingObservations = await Promise.all(Array.from({ length: 32 }, (_, index) =>
+        injectResend(
+          api, "missing", index, "t9-resend-race-missing@example.test", `203.0.113.${index + 1}`
+        )
+      ));
+      phase("missing-arm-responded");
+      await flow.service.drainMailDispatches();
+      phase("missing-arm-drained");
+
+      // Step 7: re-read the database deadlock counter.
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+      phase(`deadlocks-read delta=${deadlocksAfter - deadlocksBefore}`);
+
+      const resendAudit = await database.pool.query<{
+        actor_key_ref: string; decision: string; success: boolean;
+        justification: string | null; occurred_at: Date;
+      }>(`
+        SELECT actor_key_ref,decision,success,justification,occurred_at
+        FROM identity.audit_event
+        WHERE event_type='identity.verification.resend_requested' AND occurred_at IN ($1,$2)
+      `, [existingInstant, missingInstant]);
+      const existingAudit = resendAudit.rows.filter(
+        (row) => row.occurred_at.getTime() === existingInstant.getTime()
+      );
+      const missingAudit = resendAudit.rows.filter(
+        (row) => row.occurred_at.getTime() === missingInstant.getTime()
+      );
+      const deliveryAudit = await database.pool.query<{ event_type: string; decision: string }>(`
+        SELECT event_type,decision FROM identity.audit_event
+        WHERE actor_key_ref=$1 AND event_type IN (
+          'identity.verification.sent','identity.verification.delivery_record_failed'
+        )
+      `, [registered.user.audit_token]);
+      const rateLimitAudit = await database.pool.query<{ refusals: string }>(`
+        SELECT count(*)::text AS refusals FROM identity.audit_event
+        WHERE event_type='identity.auth.rate_limit_refused' AND occurred_at>=$1
+      `, [existingInstant]);
+      const credentials = await database.pool.query<{
+        token_hash: string; issued_at: Date; expires_at: Date; consumed_at: Date | null;
+      }>(`
+        SELECT token_hash,issued_at,expires_at,consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding USING (channel_binding_id)
+        WHERE binding.user_id=$1 ORDER BY issued_at
+      `, [registered.user.user_id]);
+      const binding = await database.pool.query<{
+        delivery_status: string; delivery_error: string | null; verification_last_sent_at: Date;
+      }>(`
+        SELECT delivery_status,delivery_error,verification_last_sent_at
+        FROM identity.channel_binding WHERE user_id=$1 AND channel_type='email'
+      `, [registered.user.user_id]);
+      const audit = await readAuditChain();
+
+      // The append-only chain is a total order, so the position of the resend's
+      // delivery-record row inside the existing arm's preparation rows proves
+      // the asynchronous delivery transaction really overlapped live
+      // preparation transactions rather than following them.
+      const deliveryChainIndex = audit.order.findIndex((event) =>
+        event.eventType === "identity.verification.sent"
+        && event.actorKeyRef === registered.user.audit_token
+        && event.occurredAt.getTime() >= existingInstant.getTime()
+      );
+      const existingChainIndexes = audit.order.flatMap((event, index) =>
+        event.eventType === "identity.verification.resend_requested"
+          && event.occurredAt.getTime() === existingInstant.getTime()
+          ? [index]
+          : []
+      );
+      const resendRowsAfterDelivery = existingChainIndexes.filter(
+        (index) => index > deliveryChainIndex
+      ).length;
+
+      const observations = [...existingObservations, ...missingObservations];
+      const statuses = (arm: "existing" | "missing"): number[] =>
+        observations.filter((observation) => observation.arm === arm)
+          .map((observation) => observation.status ?? -1);
+      console.info(
+        `[T9 RESEND RACE RED/GREEN] backend=postgres cooldown_ms=${basePolicy.verification.resendCooldownMs} `
+        + `prepared_at_release=${contention.prepared} peak_lock_waiters=${contention.peakLockWaiters} `
+        + `resend_rows_after_delivery=${resendRowsAfterDelivery}/${existingChainIndexes.length} `
+        + `existing_202=${statuses("existing").filter((status) => status === 202).length}/32 `
+        + `missing_202=${statuses("missing").filter((status) => status === 202).length}/32 `
+        + `non_202_existing=${JSON.stringify(observations.filter((observation) =>
+          observation.arm === "existing" && observation.status !== 202
+        ))} `
+        + `non_202_missing=${JSON.stringify(observations.filter((observation) =>
+          observation.arm === "missing" && observation.status !== 202
+        ))} `
+        + `rejections=${observations.filter((observation) => observation.rejection !== null).length} `
+        + `raw_delivery_errors=${JSON.stringify(observedDeliveryErrors)} `
+        + `deadlocks_before=${deadlocksBefore} deadlocks_after=${deadlocksAfter} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `existing_audit=${existingAudit.length} missing_audit=${missingAudit.length} `
+        + `delivery_audit=${JSON.stringify(deliveryAudit.rows)} `
+        + `delivery_status=${binding.rows[0]!.delivery_status} `
+        + `credentials=${credentials.rowCount} chain_root_count=${audit.rootCount} `
+        + `chain_depth=${audit.chain.length}/${audit.totalRows} `
+        + `existing_elapsed_ms=${existingObservations.map((observation) =>
+          observation.elapsedMs.toFixed(1)).join(",")} `
+        + `missing_elapsed_ms=${missingObservations.map((observation) =>
+          observation.elapsedMs.toFixed(1)).join(",")}`
+      );
+
+      // The race really happened: the delivery transaction committed in the
+      // middle of the existing arm's preparation transactions.
+      expect(deliveryChainIndex).toBeGreaterThanOrEqual(0);
+      expect(resendRowsAfterDelivery).toBeGreaterThanOrEqual(8);
+
+      // Permanent GREEN contract: both arms opaque, byte-identical, no deadlock.
+      expect(statuses("existing")).toEqual(Array.from({ length: 32 }, () => 202));
+      expect(statuses("missing")).toEqual(Array.from({ length: 32 }, () => 202));
+      for (const observation of observations) {
+        expect(observation.body).toBe(RESEND_BODY);
+        expect(observation.rejection).toBeNull();
+      }
+      expect(observations.filter((observation) => observation.body !== RESEND_BODY)).toEqual([]);
+      expect(observedDeliveryErrors).toEqual([]);
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+
+      // Non-vacuity: every request reached resend preparation.
+      expect(existingAudit).toHaveLength(32);
+      expect(missingAudit).toHaveLength(32);
+      expect(existingAudit.every((row) => row.actor_key_ref === registered.user.audit_token))
+        .toBe(true);
+      expect(existingAudit.filter((row) => row.decision === "ALLOW" && row.success)).toHaveLength(1);
+      expect(existingAudit.filter((row) =>
+        row.decision === "DENY" && !row.success && row.justification === "RESEND_COOLDOWN"
+      )).toHaveLength(31);
+      expect(missingAudit.every((row) =>
+        row.decision === "DENY" && !row.success && row.justification === "RESEND_NOT_APPLICABLE"
+        && row.actor_key_ref !== registered.user.audit_token
+      )).toBe(true);
+      expect(new Set(missingAudit.map((row) => row.actor_key_ref)).size).toBe(32);
+
+      // Non-vacuity: exactly one eligible resend mail, credential, and delivery record.
+      expect(mail.messages).toHaveLength(2);
+      expect(mail.messages[1]!.token).not.toBe(mail.messages[0]!.token);
+      expect(credentials.rows).toHaveLength(2);
+      expect(deliveryAudit.rows.filter((row) =>
+        row.event_type === "identity.verification.sent"
+      )).toHaveLength(2);
+      expect(deliveryAudit.rows.filter((row) =>
+        row.event_type === "identity.verification.delivery_record_failed"
+      )).toEqual([]);
+      expect(binding.rows[0]!.delivery_status).toBe("sent");
+      expect(binding.rows[0]!.delivery_error).toBeNull();
+
+      // Non-vacuity: no rate limit intervened in either arm.
+      expect(rateLimitAudit.rows[0]!.refusals).toBe("0");
+
+      // Non-vacuity: append-only chain has one root, covers every row, and verifies.
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+
+      // S3d credential semantics: the seeded credential is untouched and every
+      // live credential keeps its own ruled lifetime.
+      expect(credentials.rows[0]).toEqual(seededCredentials.rows[0]);
+      expect(credentials.rows.every((credential) =>
+        credential.consumed_at === null
+        && credential.expires_at.getTime() - credential.issued_at.getTime()
+          === basePolicy.verification.tokenTtlMs
+      )).toBe(true);
+
+      // S3d activation semantics: the original registration link still activates.
+      await expect(flow.service.verifyEmail({ token: mail.messages[0]!.token }, {
+        ip: "198.51.100.200", userAgent: "vitest-t9", requestId: "request:t9:owner-verify"
+      })).resolves.toEqual({ status: "active" });
+    } finally {
+      monitor.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9 keeps concurrent verification and resend on one account deadlock-free and singly activating", async () => {
+    const initialNow = new Date("2026-08-21T11:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    try {
+      const registered = await registerAccount(flow.service, "t9-verify-vs-resend");
+      const ownerToken = mail.messages[0]!.token;
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // Interleave both routes so `consumeVerification`'s token,c,u locking and
+      // `prepareVerificationResend`'s c,u locking meet the aligned c,u delivery
+      // record on the same rows.
+      const mixed: Array<Promise<ResendObservation | VerifyObservation>> = [];
+      for (let index = 0; index < 16; index += 1) {
+        mixed.push(injectResend(
+          api, "existing", index, registered.email, `198.51.100.${100 + index}`
+        ));
+        mixed.push(injectVerify(api, index, ownerToken, `203.0.113.${100 + index}`));
+      }
+      const settled = await Promise.all(mixed);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const resendResults = settled.filter((observation): observation is ResendObservation =>
+        "arm" in observation);
+      const verifyResults = settled.filter((observation): observation is VerifyObservation =>
+        !("arm" in observation));
+      const account = await database.pool.query<{ state: string; binding_state: string }>(`
+        SELECT u.state,c.state AS binding_state
+        FROM identity."user" u
+        JOIN identity.channel_binding c ON c.user_id=u.user_id AND c.channel_type='email'
+        WHERE u.user_id=$1
+      `, [registered.user.user_id]);
+      const consumed = await database.pool.query<{ consumed: string }>(`
+        SELECT count(consumed_at)::text AS consumed
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding USING (channel_binding_id)
+        WHERE binding.user_id=$1
+      `, [registered.user.user_id]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9 VERIFY VS RESEND RED/GREEN] backend=postgres resends=${resendResults.length} `
+        + `verifies=${verifyResults.length} `
+        + `resend_statuses=${JSON.stringify(resendResults.map((result) => result.status))} `
+        + `verify_statuses=${JSON.stringify(verifyResults.map((result) => result.status))} `
+        + `non_typed=${JSON.stringify(settled.filter((result) =>
+          result.body !== null && result.body.includes("INTERNAL_ERROR")))} `
+        + `rejections=${settled.filter((result) => result.rejection !== null).length} `
+        + `deadlocks_before=${deadlocksBefore} deadlocks_after=${deadlocksAfter} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `user_state=${account.rows[0]!.state} binding_state=${account.rows[0]!.binding_state} `
+        + `consumed=${consumed.rows[0]!.consumed} chain_root_count=${audit.rootCount} `
+        + `chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      for (const result of settled) {
+        expect(result.rejection).toBeNull();
+        expect(result.status).not.toBe(500);
+        expect(result.body).not.toContain("INTERNAL_ERROR");
+        expect(result.body).not.toContain("40P01");
+        expect(result.body).not.toContain("deadlock");
+      }
+      expect(resendResults.map((result) => result.status))
+        .toEqual(Array.from({ length: 16 }, () => 202));
+      for (const result of resendResults) expect(result.body).toBe(RESEND_BODY);
+      expect(verifyResults.filter((result) => result.status === 200)).toHaveLength(1);
+      expect(verifyResults.filter((result) =>
+        result.status === 200 && result.body === JSON.stringify({ status: "active" })
+      )).toHaveLength(1);
+      expect(verifyResults.filter((result) =>
+        result.status === 400
+        && result.body === JSON.stringify({
+          error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
+        })
+      )).toHaveLength(15);
+      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9 admits exactly one send when 32 concurrent resends race one expired cooldown", async () => {
+    // The race test above suspends the winner's transport, so its winner has
+    // already committed the cooldown write before the other 31 arrive. This
+    // check contends the read-decide-write window itself, which is the property
+    // prepareVerificationResend's `FOR UPDATE OF c,u` exists to guarantee.
+    const initialNow = new Date("2026-08-21T15:00:00.000Z");
+    const sendInstant = new Date(
+      initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
+    );
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    try {
+      const registered = await registerAccount(flow.service, "t9-single-send-race");
+      expect(mail.messages).toHaveLength(1);
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      const observations = await Promise.all(Array.from({ length: 32 }, (_, index) =>
+        injectResend(api, "existing", index, registered.email, `198.51.60.${index + 1}`)
+      ));
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const preparation = await database.pool.query<{
+        decision: string; success: boolean; justification: string | null;
+      }>(`
+        SELECT decision,success,justification FROM identity.audit_event
+        WHERE event_type='identity.verification.resend_requested'
+          AND actor_key_ref=$1 AND occurred_at=$2
+      `, [registered.user.audit_token, sendInstant]);
+      const credentials = await database.pool.query<{ credentials: string }>(`
+        SELECT count(*)::text AS credentials
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding USING (channel_binding_id)
+        WHERE binding.user_id=$1
+      `, [registered.user.user_id]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9 SINGLE SEND RACE RED/GREEN] backend=postgres requests=32 `
+        + `statuses=${JSON.stringify([...new Set(observations.map((one) => one.status))])} `
+        + `preparation_rows=${preparation.rowCount} `
+        + `allow=${preparation.rows.filter((row) => row.decision === "ALLOW").length} `
+        + `cooldown_deny=${preparation.rows.filter((row) =>
+          row.justification === "RESEND_COOLDOWN").length} `
+        + `mails=${mail.messages.length} credentials=${credentials.rows[0]!.credentials} `
+        + `distinct_tokens=${new Set(mail.messages.map((message) => message.token)).size} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      for (const observation of observations) {
+        expect(observation.status).toBe(202);
+        expect(observation.body).toBe(RESEND_BODY);
+        expect(observation.rejection).toBeNull();
+      }
+      expect(preparation.rows).toHaveLength(32);
+      expect(preparation.rows.filter((row) => row.decision === "ALLOW" && row.success))
+        .toHaveLength(1);
+      expect(preparation.rows.filter((row) =>
+        row.decision === "DENY" && row.justification === "RESEND_COOLDOWN"
+      )).toHaveLength(31);
+      expect(mail.messages).toHaveLength(2);
+      expect(new Set(mail.messages.map((message) => message.token)).size).toBe(2);
+      expect(credentials.rows[0]!.credentials).toBe("2");
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9 holds mixed-contention resend arms at or below the n=32 same-arm null q99", async () => {
+    const samplesPerArm = 32;
+    const initialNow = new Date("2026-08-21T13:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    try {
+      const registered = await registerAccount(flow.service, "t9-equivalence-existing");
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // One window, both labels alternating, every request from its own source.
+      // The window is issued at a cadence the ruled verification dispatcher
+      // sustains — every request occupies one of the 32 ruled concurrent
+      // reservations for the ruled 5 700 ms minimum, so half-capacity steady
+      // state is one request per (minimum reservation / half the ruled
+      // concurrency). Exceeding that cap would split BOTH arms across an
+      // immediate-grant mode and a queued-grant mode; that queueing mode is a
+      // ruled availability property covered by S3d, it is assigned by arrival
+      // order rather than by address, and on a bimodal mixture a median is a
+      // knife-edge estimator of the mode split rather than of address
+      // existence. The saturated 32-at-once case is separately covered by the
+      // deterministic race test above.
+      const windowCadenceMs = Math.ceil(
+        basePolicy.channel.mailDispatchMinimumReservationMs
+        / (basePolicy.channel.maxConcurrentVerificationDispatches / 2)
+      );
+      const issued: Array<Promise<ResendObservation>> = [];
+      for (let index = 0; index < samplesPerArm * 2; index += 1) {
+        const arm = index % 2 === 0 ? "existing" as const : "missing" as const;
+        const slot = Math.floor(index / 2);
+        issued.push(injectResend(
+          api,
+          arm,
+          slot,
+          arm === "existing"
+            ? registered.email
+            : `t9-equivalence-missing-${slot}@example.test`,
+          `198.51.${arm === "existing" ? 10 : 20}.${slot + 1}`
+        ));
+        await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
+      }
+      const window = await Promise.all(issued);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const armScores = (arm: "existing" | "missing"): number[] => window
+        .filter((observation) => observation.arm === arm)
+        .map((observation) => observation.elapsedMs);
+      const existingScores = armScores("existing");
+      const missingScores = armScores("missing");
+      expect(existingScores).toHaveLength(samplesPerArm);
+      expect(missingScores).toHaveLength(samplesPerArm);
+
+      const auc = aucSeparability(existingScores, missingScores);
+      const classifier = bestSingleThresholdClassifierAccuracy(existingScores, missingScores);
+      // Both nulls are drawn at the exact scored group size, from the same-arm
+      // series only, so the ceiling carries this window's own dispersion.
+      const existingNull = sameArmRelabelingNull(existingScores, samplesPerArm, 0x7c91);
+      const missingNull = sameArmRelabelingNull(missingScores, samplesPerArm, 0x7c92);
+      const aucCeiling = empiricalQuantile([...existingNull.auc, ...missingNull.auc], 0.99);
+      const classifierCeiling = empiricalQuantile(
+        [...existingNull.classifier, ...missingNull.classifier], 0.99
+      );
+
+      // Separated-series positive control: the same estimators must saturate
+      // and clear both ceilings, so a passing window is not a dead measurement.
+      const controlExisting = Array.from({ length: samplesPerArm }, (_, index) => 100 + index);
+      const controlMissing = Array.from({ length: samplesPerArm }, (_, index) => 10_000 + index);
+      const controlAuc = aucSeparability(controlExisting, controlMissing);
+      const controlClassifier = bestSingleThresholdClassifierAccuracy(
+        controlExisting, controlMissing
+      );
+
+      const medianGap = Math.abs(median(existingScores) - median(missingScores));
+      console.info(
+        `[T9 ENUMERATION EQUIVALENCE RED/GREEN] backend=postgres n_per_arm=${samplesPerArm} `
+        + `window_cadence_ms=${windowCadenceMs} `
+        + `null_group_size=${existingNull.groupSize}/${missingNull.groupSize} null_draws=2048 `
+        + `cross_auc=${auc.toFixed(4)} null_auc_q99=${aucCeiling.toFixed(4)} `
+        + `cross_accuracy=${classifier.toFixed(4)} null_accuracy_q99=${classifierCeiling.toFixed(4)} `
+        + `control_auc=${controlAuc.toFixed(4)} control_accuracy=${controlClassifier.toFixed(4)} `
+        + `existing_median_ms=${median(existingScores).toFixed(1)} `
+        + `missing_median_ms=${median(missingScores).toFixed(1)} `
+        + `median_gap_ms=${medianGap.toFixed(1)} tolerance_ms=${basePolicy.verification.enumerationToleranceMs} `
+        + `statuses=${JSON.stringify([...new Set(window.map((observation) => observation.status))])} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `existing_ms=${existingScores.map((score) => score.toFixed(1)).join(",")} `
+        + `missing_ms=${missingScores.map((score) => score.toFixed(1)).join(",")}`
+      );
+
+      for (const observation of window) {
+        expect(observation.status).toBe(202);
+        expect(observation.body).toBe(RESEND_BODY);
+        expect(observation.rejection).toBeNull();
+      }
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      expect(existingNull.groupSize).toBe(samplesPerArm);
+      expect(missingNull.groupSize).toBe(samplesPerArm);
+      expect(aucCeiling).toBeLessThan(1);
+      expect(classifierCeiling).toBeLessThan(1);
+      expect(auc).toBeLessThanOrEqual(aucCeiling);
+      expect(classifier).toBeLessThanOrEqual(classifierCeiling);
+      expect(controlAuc).toBe(1);
+      expect(controlClassifier).toBe(1);
+      expect(controlAuc).toBeGreaterThan(aucCeiling);
+      expect(controlClassifier).toBeGreaterThan(classifierCeiling);
+      // Secondary policy check only; the null-calibrated metrics above gate.
+      expect(medianGap).toBeLessThanOrEqual(basePolicy.verification.enumerationToleranceMs);
+    } finally {
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-A serializes expired-token verification against an eligible resend without deadlock", async () => {
+    const initialNow = new Date("2026-08-21T17:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const gate = await database.pool.connect();
+    const monitor = await database.pool.connect();
+    const prober = await database.pool.connect();
+    let gateOpen = false;
+    try {
+      const registered = await registerAccount(flow.service, "t9-a-expired-verify");
+      const expiredToken = mail.messages[0]!.token;
+      const expiredHash = hashVerificationToken(expiredToken);
+      const channelBindingId = await emailChannelOf(registered.user.user_id);
+      // Production TTL and cooldown: past the token's own 24 h life the
+      // credential is expired AND resend is eligible.
+      flow.advance(basePolicy.verification.tokenTtlMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // External gate holds the account's email channel row.
+      await gate.query("BEGIN");
+      await gate.query(`
+        SELECT channel_binding_id FROM identity.channel_binding
+        WHERE channel_binding_id=$1 FOR UPDATE
+      `, [channelBindingId]);
+      gateOpen = true;
+
+      // Resend first, and prove its backend really queued on that channel lock.
+      const resending = injectResend(api, "existing", 0, registered.email, "198.51.70.1");
+      const resendWaiters = await waitForLockWaiters(monitor, 1, 30_000);
+      // Then the expired-token verification, which must also queue.
+      const verifying = injectVerify(api, 0, expiredToken, "203.0.114.1");
+      const bothWaiters = await waitForLockWaiters(monitor, 2, 30_000);
+
+      // Non-vacuity: does verification hold the expired credential while it
+      // waits? The ratified explicit order must not have touched credentials.
+      await prober.query("BEGIN");
+      const credentialProbe = await probeRowLock(prober, "credential", `
+        SELECT token_hash FROM identity.verification_token_credential
+        WHERE token_hash=$1 FOR UPDATE NOWAIT
+      `, [expiredHash]);
+      await prober.query("ROLLBACK");
+
+      await gate.query("ROLLBACK");
+      gateOpen = false;
+      const [resend, verify] = await Promise.all([resending, verifying]);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const credentials = await database.pool.query<{
+        token_hash: string; consumed_at: Date | null; expires_at: Date;
+      }>(`
+        SELECT token_hash,consumed_at,expires_at
+        FROM identity.verification_token_credential WHERE channel_binding_id=$1
+      `, [channelBindingId]);
+      const account = await database.pool.query<{ state: string; binding_state: string }>(`
+        SELECT u.state,c.state AS binding_state
+        FROM identity."user" u
+        JOIN identity.channel_binding c ON c.channel_binding_id=$1
+        WHERE u.user_id=$2
+      `, [channelBindingId, registered.user.user_id]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9-A EXPIRED VERIFY VS RESEND RED/GREEN] backend=postgres `
+        + `resend_waiters=${resendWaiters} both_waiters=${bothWaiters} `
+        + `credential_probe=${credentialProbe} `
+        + `resend_status=${resend.status} verify_status=${verify.status} `
+        + `resend_body=${JSON.stringify(resend.body)} verify_body=${JSON.stringify(verify.body)} `
+        + `rejections=${[resend, verify].filter((one) => one.rejection !== null).length} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `mails=${mail.messages.length} credentials=${credentials.rowCount} `
+        + `expired_row_present=${credentials.rows.some((row) => row.token_hash === expiredHash)} `
+        + `user_state=${account.rows[0]!.state} binding_state=${account.rows[0]!.binding_state} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      // Both requests genuinely queued on the same real row lock.
+      expect(bothWaiters).toBeGreaterThanOrEqual(2);
+      // Explicit c -> u -> token order: no credential is held while waiting on c.
+      expect(credentialProbe).toBe("acquired");
+
+      expect(resend.status).toBe(202);
+      expect(resend.body).toBe(RESEND_BODY);
+      expect(verify.status).toBe(400);
+      expect(verify.body).toBe(JSON.stringify({
+        error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
+      }));
+      for (const observation of [resend, verify]) {
+        expect(observation.rejection).toBeNull();
+        expect(databaseErrorLeak(observation.body)).toBe(false);
+      }
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+
+      // Exactly one eligible resend mail and credential; expired row pruned;
+      // every live row preserved; no partial verification.
+      expect(mail.messages).toHaveLength(2);
+      expect(credentials.rows).toHaveLength(1);
+      expect(credentials.rows[0]!.token_hash).toBe(hashVerificationToken(mail.messages[1]!.token));
+      expect(credentials.rows[0]!.consumed_at).toBeNull();
+      expect(credentials.rows.some((row) => row.token_hash === expiredHash)).toBe(false);
+      expect(account.rows[0]).toEqual({
+        state: "pending_verification", binding_state: "pending_verification"
+      });
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      if (gateOpen) await gate.query("ROLLBACK").catch(() => undefined);
+      gate.release();
+      monitor.release();
+      prober.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-B1 serializes a duplicate registration against an eligible resend without deadlock", async () => {
+    const initialNow = new Date("2026-08-21T18:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const monitor = await database.pool.connect();
+    let barrier: QueryBarrier | undefined;
+    try {
+      const registered = await registerAccount(flow.service, "t9-b1-duplicate");
+      const identityBefore = await database.pool.query<{
+        user_id: string; pseudonym: string; password_hash: string; audit_token: string; state: string;
+      }>(`
+        SELECT user_id,pseudonym,password_hash,audit_token,state
+        FROM identity."user" WHERE user_id=$1
+      `, [registered.user.user_id]);
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // Pause the real duplicate transaction the instant its user no-op update
+      // returns, with that transaction still open and holding its real locks.
+      barrier = installQueryBarrier((sql) =>
+        sql.includes('UPDATE identity."user" SET state=state WHERE user_id=$1'));
+      const registering = injectRegister(
+        api, 0, registered.email, "t9-b1-duplicate-second-recovery@example.test", "198.51.71.1"
+      );
+      await barrier.reached;
+      const resending = injectResend(api, "existing", 0, registered.email, "198.51.71.2");
+      const waiters = await waitForLockWaiters(monitor, 1, 30_000);
+      barrier.release();
+      barrier = undefined;
+
+      const [register, resend] = await Promise.all([registering, resending]);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const users = await database.pool.query<{ users: string }>(`
+        SELECT count(*)::text AS users FROM identity."user" WHERE email_blind_index=$1
+      `, [registered.index]);
+      const bindings = await database.pool.query<{ channel_type: string }>(`
+        SELECT channel_type FROM identity.channel_binding WHERE user_id=$1 ORDER BY channel_type
+      `, [registered.user.user_id]);
+      const identityAfter = await database.pool.query<{
+        user_id: string; pseudonym: string; password_hash: string; audit_token: string; state: string;
+      }>(`
+        SELECT user_id,pseudonym,password_hash,audit_token,state
+        FROM identity."user" WHERE user_id=$1
+      `, [registered.user.user_id]);
+      const duplicateAudit = await database.pool.query<{ event_type: string; justification: string | null }>(`
+        SELECT event_type,justification FROM identity.audit_event
+        WHERE actor_key_ref=$1 AND event_type IN (
+          'identity.registration','identity.registration.duplicate_postwork'
+        ) AND decision='DENY'
+      `, [registered.user.audit_token]);
+      const credentials = await database.pool.query<{ credentials: string }>(`
+        SELECT count(*)::text AS credentials FROM identity.verification_token_credential
+        WHERE channel_binding_id=$1
+      `, [await emailChannelOf(registered.user.user_id)]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9-B1 DUPLICATE VS RESEND RED/GREEN] backend=postgres lock_waiters=${waiters} `
+        + `register_status=${register.status} resend_status=${resend.status} `
+        + `register_body=${JSON.stringify(register.body)} resend_body=${JSON.stringify(resend.body)} `
+        + `rejections=${[register, resend].filter((one) => one.rejection !== null).length} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} users=${users.rows[0]!.users} `
+        + `bindings=${JSON.stringify(bindings.rows.map((row) => row.channel_type))} `
+        + `duplicate_audits=${JSON.stringify(duplicateAudit.rows.map((row) => row.event_type))} `
+        + `mails=${mail.messages.length} credentials=${credentials.rows[0]!.credentials} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      expect(waiters).toBeGreaterThanOrEqual(1);
+      expect(register.status).toBe(202);
+      expect(register.body).toBe(JSON.stringify(REGISTRATION_PUBLIC_RESPONSE));
+      expect(resend.status).toBe(202);
+      expect(resend.body).toBe(RESEND_BODY);
+      for (const observation of [register, resend]) {
+        expect(observation.rejection).toBeNull();
+        expect(databaseErrorLeak(observation.body)).toBe(false);
+      }
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      expect(users.rows[0]!.users).toBe("1");
+      expect(bindings.rows.map((row) => row.channel_type)).toEqual(["email", "recovery_email"]);
+      expect(identityAfter.rows[0]).toEqual(identityBefore.rows[0]);
+      expect(duplicateAudit.rows.filter((row) => row.event_type === "identity.registration"))
+        .toHaveLength(1);
+      expect(duplicateAudit.rows.filter((row) =>
+        row.event_type === "identity.registration.duplicate_postwork")).toHaveLength(1);
+      expect(mail.messages).toHaveLength(2);
+      expect(credentials.rows[0]!.credentials).toBe("2");
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      barrier?.release();
+      monitor.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-B2 serializes duplicate postwork against an eligible resend without deadlock", async () => {
+    const initialNow = new Date("2026-08-21T19:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const monitor = await database.pool.connect();
+    let barrier: QueryBarrier | undefined;
+    try {
+      const registered = await registerAccount(flow.service, "t9-b2-postwork");
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // Pause the real scheduled duplicate postwork transaction the instant its
+      // user-lock query returns.
+      barrier = installQueryBarrier((sql) =>
+        sql.includes('SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE'));
+      const registering = injectRegister(
+        api, 0, registered.email, "t9-b2-duplicate-second-recovery@example.test", "198.51.72.1"
+      );
+      await barrier.reached;
+      const resending = injectResend(api, "existing", 0, registered.email, "198.51.72.2");
+      const waiters = await waitForLockWaiters(monitor, 1, 60_000);
+      barrier.release();
+      barrier = undefined;
+
+      const [register, resend] = await Promise.all([registering, resending]);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const duplicateAudit = await database.pool.query<{ event_type: string }>(`
+        SELECT event_type FROM identity.audit_event
+        WHERE actor_key_ref=$1 AND event_type IN (
+          'identity.registration','identity.registration.duplicate_postwork'
+        ) AND decision='DENY'
+      `, [registered.user.audit_token]);
+      const credentials = await database.pool.query<{ credentials: string }>(`
+        SELECT count(*)::text AS credentials FROM identity.verification_token_credential
+        WHERE channel_binding_id=$1
+      `, [await emailChannelOf(registered.user.user_id)]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9-B2 POSTWORK VS RESEND RED/GREEN] backend=postgres lock_waiters=${waiters} `
+        + `register_status=${register.status} resend_status=${resend.status} `
+        + `register_body=${JSON.stringify(register.body)} resend_body=${JSON.stringify(resend.body)} `
+        + `rejections=${[register, resend].filter((one) => one.rejection !== null).length} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `duplicate_audits=${JSON.stringify(duplicateAudit.rows.map((row) => row.event_type))} `
+        + `mails=${mail.messages.length} credentials=${credentials.rows[0]!.credentials} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      expect(waiters).toBeGreaterThanOrEqual(1);
+      expect(register.status).toBe(202);
+      expect(register.body).toBe(JSON.stringify(REGISTRATION_PUBLIC_RESPONSE));
+      expect(resend.status).toBe(202);
+      expect(resend.body).toBe(RESEND_BODY);
+      for (const observation of [register, resend]) {
+        expect(observation.rejection).toBeNull();
+        expect(databaseErrorLeak(observation.body)).toBe(false);
+      }
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      // Neither lost nor doubled: exactly one of each duplicate audit event.
+      expect(duplicateAudit.rows.filter((row) => row.event_type === "identity.registration"))
+        .toHaveLength(1);
+      expect(duplicateAudit.rows.filter((row) =>
+        row.event_type === "identity.registration.duplicate_postwork")).toHaveLength(1);
+      expect(mail.messages).toHaveLength(2);
+      expect(credentials.rows[0]!.credentials).toBe("2");
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      barrier?.release();
+      monitor.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-E serializes the asynchronous delivery record against an eligible resend", async () => {
+    // The 32-request race above reaches this same cycle only through natural
+    // timing, so it detects a reverted delivery lock order non-deterministically.
+    // This gate forces the interleaving: the delivery transaction is paused the
+    // instant its first locking statement returns, and a real resend is launched
+    // into it.
+    const initialNow = new Date("2026-08-21T22:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const monitor = await database.pool.connect();
+    let barrier: QueryBarrier | undefined;
+    try {
+      const registered = await registerAccount(flow.service, "t9-e-delivery-order");
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // Matches the delivery record's first locking statement in either shape,
+      // and never the resend preparation, which is keyed by blind index.
+      barrier = installQueryBarrier((sql) =>
+        sql.includes("audit_token") && sql.includes("FOR UPDATE")
+        && !sql.includes("email_blind_index")
+        && !sql.includes("verification_token_credential"));
+      const eligible = await injectResend(api, "existing", 0, registered.email, "198.51.74.1");
+      await barrier.reached;
+      const contending = injectResend(api, "existing", 1, registered.email, "198.51.74.2");
+      const waiters = await waitForLockWaiters(monitor, 1, 30_000);
+      barrier.release();
+      barrier = undefined;
+
+      const contended = await contending;
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const binding = await database.pool.query<{
+        delivery_status: string; delivery_error: string | null;
+      }>(`
+        SELECT delivery_status,delivery_error FROM identity.channel_binding
+        WHERE user_id=$1 AND channel_type='email'
+      `, [registered.user.user_id]);
+      const deliveryAudit = await database.pool.query<{ event_type: string }>(`
+        SELECT event_type FROM identity.audit_event
+        WHERE actor_key_ref=$1 AND event_type IN (
+          'identity.verification.sent','identity.verification.delivery_record_failed'
+        )
+      `, [registered.user.audit_token]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9-E DELIVERY VS RESEND RED/GREEN] backend=postgres lock_waiters=${waiters} `
+        + `eligible_status=${eligible.status} contended_status=${contended.status} `
+        + `contended_body=${JSON.stringify(contended.body)} `
+        + `rejections=${[eligible, contended].filter((one) => one.rejection !== null).length} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `delivery_status=${binding.rows[0]!.delivery_status} `
+        + `delivery_audit=${JSON.stringify(deliveryAudit.rows.map((row) => row.event_type))} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      expect(waiters).toBeGreaterThanOrEqual(1);
+      expect(eligible.status).toBe(202);
+      expect(contended.status).toBe(202);
+      expect(contended.body).toBe(RESEND_BODY);
+      for (const observation of [eligible, contended]) {
+        expect(observation.rejection).toBeNull();
+        expect(databaseErrorLeak(observation.body)).toBe(false);
+      }
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      // The delivery transaction itself must also have survived the contention.
+      expect(binding.rows[0]!.delivery_status).toBe("sent");
+      expect(binding.rows[0]!.delivery_error).toBeNull();
+      expect(deliveryAudit.rows.filter((row) =>
+        row.event_type === "identity.verification.delivery_record_failed")).toEqual([]);
+      expect(deliveryAudit.rows.filter((row) =>
+        row.event_type === "identity.verification.sent")).toHaveLength(2);
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      barrier?.release();
+      monitor.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-C proves verification takes the channel before the user and credentials last", async () => {
+    const initialNow = new Date("2026-08-21T20:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const gate = await database.pool.connect();
+    const monitor = await database.pool.connect();
+    const prober = await database.pool.connect();
+    let gateOpen = false;
+    try {
+      const registered = await registerAccount(flow.service, "t9-c-explicit-order");
+      const liveToken = mail.messages[0]!.token;
+      const liveHash = hashVerificationToken(liveToken);
+      const channelBindingId = await emailChannelOf(registered.user.user_id);
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      // External gate holds the USER row only.
+      await gate.query("BEGIN");
+      await gate.query(`
+        SELECT user_id FROM identity."user" WHERE user_id=$1 FOR UPDATE
+      `, [registered.user.user_id]);
+      gateOpen = true;
+
+      const verifying = injectVerify(api, 0, liveToken, "203.0.115.1");
+      const waiters = await waitForLockWaiters(monitor, 1, 30_000);
+
+      await prober.query("BEGIN");
+      const channelProbe = await probeRowLock(prober, "channel", `
+        SELECT channel_binding_id FROM identity.channel_binding
+        WHERE channel_binding_id=$1 FOR UPDATE NOWAIT
+      `, [channelBindingId]);
+      const credentialProbe = await probeRowLock(prober, "credential", `
+        SELECT token_hash FROM identity.verification_token_credential
+        WHERE token_hash=$1 FOR UPDATE NOWAIT
+      `, [liveHash]);
+      await prober.query("ROLLBACK");
+
+      await gate.query("ROLLBACK");
+      gateOpen = false;
+      const verify = await verifying;
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const server = await database.pool.query<{ version: string }>("SELECT version()");
+      const account = await database.pool.query<{ state: string; binding_state: string }>(`
+        SELECT u.state,c.state AS binding_state
+        FROM identity."user" u
+        JOIN identity.channel_binding c ON c.channel_binding_id=$1
+        WHERE u.user_id=$2
+      `, [channelBindingId, registered.user.user_id]);
+
+      console.info(
+        `[T9-C EXPLICIT ORDER PROOF] server=${JSON.stringify(server.rows[0]!.version)} `
+        + `blocked_on_user_waiters=${waiters} channel_probe=${channelProbe} `
+        + `credential_probe=${credentialProbe} verify_status=${verify.status} `
+        + `verify_body=${JSON.stringify(verify.body)} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `user_state=${account.rows[0]!.state} binding_state=${account.rows[0]!.binding_state} `
+        + `statements=${JSON.stringify([
+          'SELECT channel_binding_id FROM identity.channel_binding WHERE channel_binding_id=$1 FOR UPDATE NOWAIT',
+          'SELECT token_hash FROM identity.verification_token_credential WHERE token_hash=$1 FOR UPDATE NOWAIT'
+        ])}`
+      );
+
+      expect(waiters).toBeGreaterThanOrEqual(1);
+      // Already holds the email channel row...
+      expect(channelProbe).toBe("locked");
+      // ...and has not yet touched any credential row.
+      expect(credentialProbe).toBe("acquired");
+      expect(verify.status).toBe(200);
+      expect(verify.body).toBe(JSON.stringify({ status: "active" }));
+      expect(verify.rejection).toBeNull();
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+    } finally {
+      if (gateOpen) await gate.query("ROLLBACK").catch(() => undefined);
+      gate.release();
+      monitor.release();
+      prober.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
+
+  it("T9-D activates exactly once when two live sibling tokens verify simultaneously", async () => {
+    const initialNow = new Date("2026-08-21T21:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ mail, initialNow });
+    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    try {
+      const registered = await registerAccount(flow.service, "t9-d-siblings");
+      const channelBindingId = await emailChannelOf(registered.user.user_id);
+      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await expect(injectResend(api, "existing", 0, registered.email, "198.51.73.1"))
+        .resolves.toMatchObject({ status: 202 });
+      await flow.service.drainMailDispatches();
+      expect(mail.messages).toHaveLength(2);
+      const live = await database.pool.query<{ live: string }>(`
+        SELECT count(*)::text AS live FROM identity.verification_token_credential
+        WHERE channel_binding_id=$1 AND consumed_at IS NULL AND expires_at>=$2
+      `, [channelBindingId, new Date(initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1)]);
+      expect(live.rows[0]!.live).toBe("2");
+      const deadlocksBefore = await databaseDeadlockCount();
+
+      const [first, second] = await Promise.all([
+        injectVerify(api, 0, mail.messages[0]!.token, "203.0.116.1"),
+        injectVerify(api, 1, mail.messages[1]!.token, "203.0.116.2")
+      ]);
+      await flow.service.drainMailDispatches();
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      const credentials = await database.pool.query<{ total: string; consumed: string }>(`
+        SELECT count(*)::text AS total,count(consumed_at)::text AS consumed
+        FROM identity.verification_token_credential WHERE channel_binding_id=$1
+      `, [channelBindingId]);
+      const account = await database.pool.query<{ state: string; binding_state: string }>(`
+        SELECT u.state,c.state AS binding_state
+        FROM identity."user" u
+        JOIN identity.channel_binding c ON c.channel_binding_id=$1
+        WHERE u.user_id=$2
+      `, [channelBindingId, registered.user.user_id]);
+      const consumedAudit = await database.pool.query<{ decision: string; success: boolean }>(`
+        SELECT decision,success FROM identity.audit_event
+        WHERE event_type='identity.verification.consumed' AND actor_key_ref=$1
+      `, [registered.user.audit_token]);
+      const audit = await readAuditChain();
+
+      console.info(
+        `[T9-D SIBLING TOKENS RED/GREEN] backend=postgres `
+        + `statuses=${JSON.stringify([first.status, second.status])} `
+        + `bodies=${JSON.stringify([first.body, second.body])} `
+        + `rejections=${[first, second].filter((one) => one.rejection !== null).length} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+        + `credentials=${credentials.rows[0]!.consumed}/${credentials.rows[0]!.total} consumed `
+        + `user_state=${account.rows[0]!.state} binding_state=${account.rows[0]!.binding_state} `
+        + `consumed_audit=${JSON.stringify(consumedAudit.rows)} `
+        + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows}`
+      );
+
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+      for (const observation of [first, second]) {
+        expect(observation.rejection).toBeNull();
+        expect(databaseErrorLeak(observation.body)).toBe(false);
+      }
+      expect([first, second].filter((one) => one.status === 200)).toHaveLength(1);
+      expect([first, second].filter((one) =>
+        one.status === 200 && one.body === JSON.stringify({ status: "active" }))).toHaveLength(1);
+      expect([first, second].filter((one) =>
+        one.status === 400 && one.body === JSON.stringify({
+          error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
+        }))).toHaveLength(1);
+      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+      // Whole family consumed: no live sibling remains.
+      expect(credentials.rows[0]!.total).toBe("2");
+      expect(credentials.rows[0]!.consumed).toBe("2");
+      expect(consumedAudit.rows.filter((row) => row.decision === "ALLOW" && row.success))
+        .toHaveLength(1);
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+    } finally {
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 300_000);
 });
 
 describe("S3 VR-3 audit writer and rate-limit evidence", () => {

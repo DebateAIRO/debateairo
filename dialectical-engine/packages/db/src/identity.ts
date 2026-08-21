@@ -182,9 +182,11 @@ export class PostgresIdentityRepository {
         if (existing === undefined) {
           return Object.freeze({ status: "pseudonym_collision" as const });
         }
-        await client.query(`
-          UPDATE identity."user" SET state=state WHERE user_id=$1
-        `, [existing.user_id]);
+        // Same three no-op updates, same predicates, same round-trip count and
+        // row-version work as before, so the reviewed enumeration-equalization
+        // shape is untouched. Only their order changes, from user-before-channels
+        // to channels-before-user, so this branch can no longer hold the user row
+        // while waiting for the email channel a concurrent resend already holds.
         await client.query(`
           UPDATE identity.channel_binding SET state=state
           WHERE user_id=$1 AND channel_type='email'
@@ -192,6 +194,9 @@ export class PostgresIdentityRepository {
         await client.query(`
           UPDATE identity.channel_binding SET state=state
           WHERE user_id=$1 AND channel_type='recovery_email'
+        `, [existing.user_id]);
+        await client.query(`
+          UPDATE identity."user" SET state=state WHERE user_id=$1
         `, [existing.user_id]);
         await this.appendAudit(client, {
           actorToken: existing.audit_token,
@@ -294,8 +299,18 @@ export class PostgresIdentityRepository {
     readonly errorCode: string | null;
   }): Promise<void> {
     await this.transaction(async (client) => {
+      // Lock the channel binding and then the user in one statement, in the
+      // same `c,u` order prepareVerificationResend uses. Locking the user first
+      // and reaching the channel binding only through the UPDATE below inverted
+      // the order against a concurrent resend preparation, and the resulting
+      // 40P01 deadlock_detected surfaced on the request path as an untyped 500
+      // that a missing address could never produce.
       const user = await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
+        SELECT u.audit_token
+        FROM identity."user" u
+        JOIN identity.channel_binding c ON c.user_id=u.user_id AND c.channel_type='email'
+        WHERE u.user_id=$1
+        FOR UPDATE OF c,u
       `, [input.userId]);
       if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
       await client.query(`
@@ -347,14 +362,17 @@ export class PostgresIdentityRepository {
     readonly source: AuthSourceContext;
   }): Promise<void> {
     await this.transaction(async (client) => {
-      const user = await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
-      `, [input.userId]);
-      if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
+      // Both original round trips are retained; only their order changes, so the
+      // email channel is taken before the user and this path cannot invert
+      // against a concurrent resend preparation.
       await client.query(`
         UPDATE identity.channel_binding SET state=state
         WHERE user_id=$1 AND channel_type='email'
       `, [input.userId]);
+      const user = await client.query<{ audit_token: string }>(`
+        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
+      `, [input.userId]);
+      if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
       await this.appendAudit(client, {
         actorToken: user.rows[0].audit_token,
         eventType: "identity.registration.duplicate_postwork",
@@ -374,41 +392,66 @@ export class PostgresIdentityRepository {
     readonly source: AuthSourceContext;
   }): Promise<boolean> {
     return this.transaction(async (client) => {
-      const found = await client.query<{
-        token_hash: string;
-        channel_binding_id: string;
-        user_id: string;
-        audit_token: string;
-        expires_at: Date;
-        consumed_at: Date | null;
-        user_state: string;
-      }>(`
-        SELECT token.token_hash,c.channel_binding_id,c.user_id,u.audit_token,
-          token.expires_at,token.consumed_at,u.state AS user_state
+      // Explicit sequential row locking in the account-local order
+      // channel -> user -> credential. A multi-relation `FOR UPDATE OF` list is
+      // not a portable acquisition-order contract, so each row is locked by its
+      // own statement and every decision is re-derived from the locked rows.
+      //
+      // Step 1: locate the candidate credential's parent channel. This is only a
+      // locator; it takes no row lock and is never authorization.
+      const located = await client.query<{ channel_binding_id: string }>(`
+        SELECT c.channel_binding_id
         FROM identity.verification_token_credential token
         JOIN identity.channel_binding c ON c.channel_binding_id=token.channel_binding_id
-        JOIN identity."user" u ON u.user_id=c.user_id
         WHERE token.token_hash=$1 AND c.channel_type='email'
-        FOR UPDATE OF token,c,u
       `, [input.tokenHash]);
-      const row = found.rows[0];
-      const valid = row !== undefined
-        && row.consumed_at === null
-        && row.expires_at.getTime() >= input.occurredAt.getTime()
-        && row.user_state === "pending_verification";
-      const actorToken = row?.audit_token ?? randomUUID();
-      if (valid) {
+      const locatedChannelBindingId = located.rows[0]?.channel_binding_id;
+      // Step 2: lock that exact email channel row and read the authoritative
+      // user_id back off the locked row.
+      const channel = locatedChannelBindingId === undefined ? undefined : (
+        await client.query<{ channel_binding_id: string; user_id: string }>(`
+          SELECT channel_binding_id,user_id FROM identity.channel_binding
+          WHERE channel_binding_id=$1 AND channel_type='email'
+          FOR UPDATE
+        `, [locatedChannelBindingId])
+      ).rows[0];
+      // Step 3: lock that exact user row and read its actor token and state.
+      const user = channel === undefined ? undefined : (
+        await client.query<{ audit_token: string; state: string }>(`
+          SELECT audit_token,state FROM identity."user" WHERE user_id=$1 FOR UPDATE
+        `, [channel.user_id])
+      ).rows[0];
+      // Step 4: only now lock and re-read the requested credential, restricted
+      // to both the token hash and the locked channel binding.
+      const credential = channel === undefined || user === undefined ? undefined : (
+        await client.query<{ expires_at: Date; consumed_at: Date | null }>(`
+          SELECT expires_at,consumed_at FROM identity.verification_token_credential
+          WHERE token_hash=$1 AND channel_binding_id=$2
+          FOR UPDATE
+        `, [input.tokenHash, channel.channel_binding_id])
+      ).rows[0];
+      // Step 5: validity comes only from the locked, revalidated rows. Missing,
+      // moved, pruned, consumed, expired, wrong-channel or non-pending is the
+      // existing typed invalid-token outcome.
+      const valid = channel !== undefined
+        && user !== undefined
+        && credential !== undefined
+        && credential.consumed_at === null
+        && credential.expires_at.getTime() >= input.occurredAt.getTime()
+        && user.state === "pending_verification";
+      const actorToken = user?.audit_token ?? randomUUID();
+      if (channel !== undefined && valid) {
         await client.query(`
           UPDATE identity.verification_token_credential SET consumed_at=$2
           WHERE channel_binding_id=$1 AND consumed_at IS NULL
-        `, [row.channel_binding_id, input.occurredAt]);
+        `, [channel.channel_binding_id, input.occurredAt]);
         await client.query(`
           UPDATE identity.channel_binding
           SET state='verified',verified_at=$2,verification_consumed_at=$2,
             delivery_error=NULL
           WHERE channel_binding_id=$1
-        `, [row.channel_binding_id, input.occurredAt]);
-        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [row.user_id]);
+        `, [channel.channel_binding_id, input.occurredAt]);
+        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [channel.user_id]);
       }
       await this.appendAudit(client, {
         actorToken,
