@@ -1,4 +1,5 @@
 import { bigint, boolean, customType, doublePrecision, integer, jsonb, pgSchema, text, timestamp, uuid } from "drizzle-orm/pg-core";
+export * from "./obs-schema.js";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => "bytea"

@@ -601,3 +601,4 @@ export {
   type PendingAccountResult,
   type ResendPreparation
 } from "./identity.js";
+export * from "./obs-schema.js";
