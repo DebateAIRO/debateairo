@@ -45,6 +45,7 @@ import {
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
+import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user";
 
@@ -142,7 +143,10 @@ function resolveSession(token: unknown, scope: "ASKER" | "OPERATOR" = "ASKER"): 
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
-  const api = Fastify({ logger: false });
+  const api = Fastify({
+    logger: false,
+    trustProxy: [...TRUSTED_UI_PROXY_NETWORKS]
+  });
   api.decorateRequest("session");
   api.addHook("preHandler", async (request, reply) => {
     if (request.is404) return;
@@ -208,8 +212,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       readonly ip: string;
       readonly id: string;
       readonly headers: Readonly<Record<string, unknown>>;
+      readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
     }) => Object.freeze({
-      ip: request.ip,
+      // Fastify has already walked XFF right-to-left and stopped at the first
+      // peer outside the pinned loopback proxy set. Canonicalizing here makes
+      // one limiter/audit key for IPv4-mapped and equivalent IPv6 spellings.
+      // If a malformed value somehow crosses the trusted hop, fail safely to
+      // the socket peer rather than hashing attacker-controlled text.
+      ip: normalizeClientIp(request.ip)
+        ?? normalizeClientIp(request.raw.socket.remoteAddress)
+        ?? "unknown",
       userAgent: typeof request.headers["user-agent"] === "string"
         ? request.headers["user-agent"] as string
         : "unknown",
