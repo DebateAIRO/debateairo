@@ -599,6 +599,8 @@ export {
   type AuthSourceContext,
   type PendingAccountInput,
   type PendingAccountResult,
-  type ResendPreparation
+  type RecoveryCodeRecord,
+  type ResendPreparation,
+  type TotpEnrollmentRecord
 } from "./identity.js";
 export * from "./obs-schema.js";

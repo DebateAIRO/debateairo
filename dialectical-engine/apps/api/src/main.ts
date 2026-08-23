@@ -20,6 +20,7 @@ import {
   ENGINE_MAX_RECOMPOSE,
   readPanelDiscoveryPolicy,
   readAuthPolicy,
+  readMfaPolicy,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
@@ -30,6 +31,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { MfaEnrollmentService } from "./mfa.js";
 import { SendmailMailSender } from "./mail-channel.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 
@@ -39,6 +41,7 @@ const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 const pool = createPool(environment.DATABASE_URL);
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
+const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
@@ -61,6 +64,7 @@ const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTE
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
 const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
+const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
 const registration = new RegistrationService({
   repository: identityRepository,
   mail: new SendmailMailSender({
@@ -69,7 +73,7 @@ const registration = new RegistrationService({
     publicAppUrl: environment.PUBLIC_APP_URL,
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }),
-  dekStore: new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek),
+  dekStore,
   blindIndexKey,
   policy: authPolicy,
   limiter: new InProcessAuthRateLimiter(
@@ -78,6 +82,12 @@ const registration = new RegistrationService({
     authPolicy.rateLimitRefusalAuditIntervalMs
   ),
   argon2: argon2Pool
+});
+const mfa = new MfaEnrollmentService({
+  repository: identityRepository,
+  dekStore,
+  argon2: argon2Pool,
+  policy: mfaPolicy
 });
 const application = new PostgresAskApplication(pool, dispatcher, {
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
@@ -128,6 +138,7 @@ const evaluatorDevMenu = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
 const api = buildApi({
   application,
   registration,
+  mfa,
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION

@@ -641,7 +641,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     const calls: string[] = [];
     const registration: RegistrationApplication = {
       register: async () => { calls.push("register"); return REGISTRATION_PUBLIC_RESPONSE; },
-      verifyEmail: async () => { calls.push("verify"); return { status: "active" }; },
+      verifyEmail: async () => { calls.push("verify"); return { status: "mfa_required" }; },
       resendVerification: async () => { calls.push("resend"); return RESEND_PUBLIC_RESPONSE; }
     };
     const api = buildApi({ application: fixtureAskApplication(), registration });
@@ -664,7 +664,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       expect(register.json()).toEqual(REGISTRATION_PUBLIC_RESPONSE);
       expect(register.body).toMatch(/spam/i);
       expect(verify.statusCode).toBe(200);
-      expect(verify.json()).toEqual({ status: "active" });
+      expect(verify.json()).toEqual({ status: "mfa_required" });
       expect(resend.statusCode).toBe(202);
       expect(resend.json()).toEqual(RESEND_PUBLIC_RESPONSE);
       expect(resend.body).toMatch(/spam/i);

@@ -34,7 +34,7 @@ export interface RegisterInput {
 
 export interface RegistrationApplication {
   register(input: RegisterInput, source: AuthSourceContext): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
-  verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "active" }>;
+  verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
     input: { readonly email: string },
     source: AuthSourceContext
@@ -55,15 +55,22 @@ export class AuthFlowError extends Error {
     | "AUTH_MAIL_BUSY"
     | "AUTH_REGISTRATION_FAILED"
     | "AUTH_TEMPORARILY_UNAVAILABLE"
-    | "VERIFICATION_TOKEN_INVALID",
+    | "VERIFICATION_TOKEN_INVALID"
+    | "MFA_ENROLLMENT_INVALID"
+    | "MFA_ENROLLMENT_STATE_INVALID"
+    | "MFA_TOTP_INVALID"
+    | "MFA_TOTP_REPLAYED"
+    | "MFA_RECOVERY_CONFIRMATION_INVALID"
+    | "MFA_RATE_LIMITED",
     options?: ErrorOptions
   ) {
     super(code, options);
     this.name = "AuthFlowError";
   }
 
-  get statusCode(): 400 | 429 | 503 {
-    return this.code === "AUTH_RATE_LIMITED" ? 429
+  get statusCode(): 400 | 409 | 429 | 503 {
+    return this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
+      : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
         || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
   }
@@ -1452,7 +1459,7 @@ export class RegistrationService implements RegistrationApplication {
   async verifyEmail(
     input: { readonly token: string },
     rawSource: AuthSourceContext
-  ): Promise<{ readonly status: "active" }> {
+  ): Promise<{ readonly status: "mfa_required" }> {
     try {
       return await this.runVerifyEmail(input, rawSource);
     } catch (error) {
@@ -1464,7 +1471,7 @@ export class RegistrationService implements RegistrationApplication {
   private async runVerifyEmail(
     input: { readonly token: string },
     rawSource: AuthSourceContext
-  ): Promise<{ readonly status: "active" }> {
+  ): Promise<{ readonly status: "mfa_required" }> {
     if (typeof input.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(input.token)) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
@@ -1490,7 +1497,7 @@ export class RegistrationService implements RegistrationApplication {
     if (!await this.dependencies.repository.consumeVerification({ tokenHash, occurredAt: now, source })) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
-    return Object.freeze({ status: "active" as const });
+    return Object.freeze({ status: "mfa_required" as const });
   }
 
   async resendVerification(

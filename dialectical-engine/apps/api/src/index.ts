@@ -45,6 +45,7 @@ import {
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
+import type { MfaApplication } from "./mfa.js";
 
 type RouteAuthPolicy = "public" | "user";
 
@@ -76,6 +77,7 @@ export interface AskApplication {
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
+  readonly mfa?: MfaApplication;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
@@ -203,18 +205,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   });
 
+  const sourceFor = (request: {
+    readonly ip: string;
+    readonly id: string;
+    readonly headers: Readonly<Record<string, unknown>>;
+  }) => Object.freeze({
+    ip: request.ip,
+    userAgent: typeof request.headers["user-agent"] === "string"
+      ? request.headers["user-agent"] as string
+      : "unknown",
+    requestId: request.id
+  });
   if (options.registration !== undefined) {
-    const sourceFor = (request: {
-      readonly ip: string;
-      readonly id: string;
-      readonly headers: Readonly<Record<string, unknown>>;
-    }) => Object.freeze({
-      ip: request.ip,
-      userAgent: typeof request.headers["user-agent"] === "string"
-        ? request.headers["user-agent"] as string
-        : "unknown",
-      requestId: request.id
-    });
     api.post("/v1/auth/register", { config: { auth: "public" } }, async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
@@ -244,6 +246,43 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         email: typeof body.email === "string" ? body.email : ""
       }, sourceFor(request));
       return reply.status(202).send(response);
+    });
+  }
+
+  if (options.mfa !== undefined) {
+    api.post("/v1/auth/mfa/totp/begin", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      return reply.send(await options.mfa!.beginTotp({
+        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
+      }, sourceFor(request)));
+    });
+    api.post("/v1/auth/mfa/totp/verify", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      return reply.send(await options.mfa!.verifyTotp({
+        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : "",
+        code: typeof body.code === "string" ? body.code : ""
+      }, sourceFor(request)));
+    });
+    api.post("/v1/auth/mfa/recovery-codes/generate", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      return reply.send(await options.mfa!.generateRecoveryCodes({
+        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
+      }, sourceFor(request)));
+    });
+    api.post("/v1/auth/mfa/recovery-codes/confirm", { config: { auth: "public" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      return reply.send(await options.mfa!.confirmRecoveryCode({
+        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : "",
+        recoveryCode: typeof body.recovery_code === "string" ? body.recovery_code : ""
+      }, sourceFor(request)));
     });
   }
 

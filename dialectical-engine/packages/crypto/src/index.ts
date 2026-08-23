@@ -5,10 +5,11 @@ import {
   createHmac,
   randomBytes,
   randomFillSync,
-  randomInt
+  randomInt,
+  timingSafeEqual
 } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
-import { chmod, mkdir, open } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
@@ -517,6 +518,219 @@ export async function verifyPassword(
 }
 
 /**
+ * The one launch TOTP profile. These values are deliberately not caller
+ * options: allowing an algorithm, digit or period choice creates provisioning
+ * URIs that mainstream authenticator applications silently misinterpret.
+ */
+export const TOTP_PROFILE = Object.freeze({
+  algorithm: "SHA1" as const,
+  digits: 6 as const,
+  periodSeconds: 30 as const,
+  secretBytes: 20 as const
+});
+
+const RFC4648_BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const RECOVERY_BASE32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function encodeBase32(input: Uint8Array): string {
+  let bits = 0;
+  let accumulator = 0;
+  let encoded = "";
+  for (const byte of input) {
+    accumulator = (accumulator << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      encoded += RFC4648_BASE32[(accumulator >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) encoded += RFC4648_BASE32[(accumulator << (5 - bits)) & 31];
+  return encoded;
+}
+
+export function decodeBase32(input: string): Buffer {
+  const normalized = input.trim().toUpperCase();
+  if (normalized === "" || normalized.includes("=") || !/^[A-Z2-7]+$/.test(normalized)) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  let bits = 0;
+  let accumulator = 0;
+  const output: number[] = [];
+  for (const symbol of normalized) {
+    accumulator = (accumulator << 5) | RFC4648_BASE32.indexOf(symbol);
+    bits += 5;
+    if (bits >= 8) {
+      output.push((accumulator >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  if (bits > 0 && (accumulator & ((1 << bits) - 1)) !== 0) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  return Buffer.from(output);
+}
+
+export function generateTotpSecret(): Buffer {
+  return randomBytes(TOTP_PROFILE.secretBytes);
+}
+
+function validTotpSecret(secret: Uint8Array): Buffer {
+  const copy = Buffer.from(secret);
+  if (copy.byteLength !== TOTP_PROFILE.secretBytes) {
+    copy.fill(0);
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return copy;
+}
+
+export function totpCodeAtStep(secret: Uint8Array, step: number): string {
+  if (!Number.isSafeInteger(step) || step < 0) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  const material = validTotpSecret(secret);
+  try {
+    const counter = Buffer.alloc(8);
+    counter.writeBigUInt64BE(BigInt(step));
+    const digest = createHmac("sha1", material).update(counter).digest();
+    const offset = digest[digest.byteLength - 1]! & 0x0f;
+    const binary = (digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000;
+    return String(binary).padStart(TOTP_PROFILE.digits, "0");
+  } finally {
+    material.fill(0);
+  }
+}
+
+export type TotpMatch =
+  | Readonly<{ status: "accepted"; step: number }>
+  | Readonly<{ status: "replayed" }>
+  | Readonly<{ status: "invalid" }>;
+
+export function matchTotpStep(
+  secret: Uint8Array,
+  code: string,
+  currentStep: number,
+  lastAcceptedStep: number | null
+): TotpMatch {
+  if (!/^\d{6}$/.test(code) || !Number.isSafeInteger(currentStep) || currentStep < 0
+    || (lastAcceptedStep !== null && (!Number.isSafeInteger(lastAcceptedStep) || lastAcceptedStep < 0))) {
+    return Object.freeze({ status: "invalid" as const });
+  }
+  const supplied = Buffer.from(code, "ascii");
+  let replay = false;
+  for (const candidate of [currentStep - 1, currentStep, currentStep + 1]) {
+    if (candidate < 0) continue;
+    const expected = Buffer.from(totpCodeAtStep(secret, candidate), "ascii");
+    if (!timingSafeEqual(supplied, expected)) continue;
+    if (lastAcceptedStep !== null && candidate <= lastAcceptedStep) replay = true;
+    else return Object.freeze({ status: "accepted" as const, step: candidate });
+  }
+  return Object.freeze({ status: replay ? "replayed" as const : "invalid" as const });
+}
+
+export function totpProvisioningUri(
+  secret: Uint8Array,
+  input: { readonly issuer: string; readonly accountLabel: string }
+): string {
+  const issuer = input.issuer.trim();
+  const accountLabel = input.accountLabel.trim();
+  if (issuer === "" || accountLabel === "" || issuer.includes(":") || issuer.length > 64
+    || accountLabel.length > 128) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  const material = validTotpSecret(secret);
+  try {
+    const parameters = new URLSearchParams({
+      secret: encodeBase32(material),
+      issuer,
+      algorithm: TOTP_PROFILE.algorithm,
+      digits: String(TOTP_PROFILE.digits),
+      period: String(TOTP_PROFILE.periodSeconds)
+    });
+    return `otpauth://totp/${encodeURIComponent(`${issuer}:${accountLabel}`)}?${parameters.toString()}`;
+  } finally {
+    material.fill(0);
+  }
+}
+
+function recoverySymbols(random: Uint8Array): string {
+  // RECOVERY_BASE32 has exactly 32 members, so every random 5-bit value maps
+  // without modulo bias. Sixteen random bytes become 26 symbols (130 rendered
+  // bits, with the final two padding bits carrying no entropy): 128 real bits.
+  let bits = 0;
+  let accumulator = 0;
+  let encoded = "";
+  for (const byte of random) {
+    accumulator = (accumulator << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      encoded += RECOVERY_BASE32[(accumulator >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) encoded += RECOVERY_BASE32[(accumulator << (5 - bits)) & 31];
+  return encoded;
+}
+
+export function generateRecoveryCode(slot: number): string {
+  if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  const material = randomBytes(16);
+  try {
+    const symbols = recoverySymbols(material);
+    const groups = symbols.match(/.{1,4}/g)!;
+    return `${String(slot).padStart(2, "0")}-${groups.join("-")}`;
+  } finally {
+    material.fill(0);
+  }
+}
+
+export function generateRecoveryCodes(): readonly string[] {
+  return Object.freeze(Array.from({ length: 10 }, (_, index) => generateRecoveryCode(index + 1)));
+}
+
+export function normalizeRecoveryCode(code: string): string {
+  const normalized = typeof code === "string" ? code.trim().toUpperCase() : "";
+  if (!/^\d{2}-[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){5}-[A-HJ-NP-Z2-9]{2}$/.test(normalized)) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  const slot = Number(normalized.slice(0, 2));
+  if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+    throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
+  }
+  return normalized;
+}
+
+export function recoveryCodeSlot(code: string): number {
+  return Number(normalizeRecoveryCode(code).slice(0, 2));
+}
+
+const RECOVERY_CODE_KDF_DOMAIN = "debateai:recovery-code:v1\0";
+
+export async function hashRecoveryCode(
+  executor: Argon2Executor,
+  code: string,
+  parameters: Argon2idParameters
+): Promise<string> {
+  return hashPassword(executor, `${RECOVERY_CODE_KDF_DOMAIN}${normalizeRecoveryCode(code)}`, parameters);
+}
+
+export async function verifyRecoveryCode(
+  executor: Argon2Executor,
+  encodedHash: string,
+  code: string
+): Promise<boolean> {
+  try {
+    return await verifyPassword(
+      executor, encodedHash, `${RECOVERY_CODE_KDF_DOMAIN}${normalizeRecoveryCode(code)}`
+    );
+  } catch (error) {
+    if (error instanceof CryptoInputError) return false;
+    throw error;
+  }
+}
+
+/**
  * PROVISIONAL cache bounds, pending V ratification against measured evidence.
  */
 export const AUDIT_SOURCE_IP_CACHE_BOUNDS = Object.freeze({
@@ -741,7 +955,11 @@ export interface UserDekStore {
   store(userId: string, dek: Uint8Array): Promise<void>;
 }
 
-export class FileUserDekStore implements UserDekStore {
+export interface ReadableUserDekStore extends UserDekStore {
+  load(userId: string): Promise<Buffer>;
+}
+
+export class FileUserDekStore implements ReadableUserDekStore {
   constructor(
     private readonly root: string,
     private readonly kek: KekHandle
@@ -776,6 +994,38 @@ export class FileUserDekStore implements UserDekStore {
       }), "utf8");
     } finally {
       await file.close();
+    }
+  }
+
+  async load(userId: string): Promise<Buffer> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
+    }
+    const location = join(this.root, "users", userId, "dek.v1.json");
+    try {
+      const metadata = await stat(location);
+      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) throw new KekUnresolvedError();
+      const parsed = JSON.parse(await readFile(location, "utf8")) as unknown;
+      if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
+      const record = parsed as Record<string, unknown>;
+      const envelope = record.wrapped_dek;
+      if (record.version !== 1 || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
+        || typeof envelope !== "object" || envelope === null) {
+        throw new KekUnresolvedError();
+      }
+      const candidate = envelope as Record<string, unknown>;
+      if (candidate.v !== 1 || candidate.keyId !== `user-dek:${userId}`
+        || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+        || typeof candidate.tag !== "string") {
+        throw new KekUnresolvedError();
+      }
+      return unwrapDek(this.kek, candidate as unknown as CryptoEnvelope, [
+        "secret-store", "user-dek", userId, "run:none", userId,
+        `user-dek:${userId}`, "1"
+      ]);
+    } catch (error) {
+      if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
+      throw new KekUnresolvedError();
     }
   }
 }

@@ -1,4 +1,4 @@
-import { bigint, boolean, customType, doublePrecision, integer, jsonb, pgSchema, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, customType, doublePrecision, integer, jsonb, pgSchema, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core";
 export * from "./obs-schema.js";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -39,12 +39,14 @@ export const mfaFactor = identity.table("mfa_factor", {
   state: text("state").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
-  revokedAt: timestamp("revoked_at", { withTimezone: true })
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  lastAcceptedStep: bigint("last_accepted_step", { mode: "number" })
 });
 
 export const recoveryCode = identity.table("recovery_code", {
   recoveryCodeId: uuid("recovery_code_id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => identityUser.userId, { onDelete: "cascade" }),
+  codeSlot: smallint("code_slot"),
   codeHash: text("code_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   consumedAt: timestamp("consumed_at", { withTimezone: true }),

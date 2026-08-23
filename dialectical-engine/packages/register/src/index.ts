@@ -13,6 +13,7 @@ import {
   type ScoringOperator
 } from "@debateai/kernel";
 import { AUTH_POLICY_REGISTER_ROWS } from "./auth-policy.js";
+import { MFA_POLICY_REGISTER_ROW } from "./mfa-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export const ENGINE_BRANCHING_FACTOR = 2 as const;
@@ -481,10 +482,17 @@ export async function persistBootstrapRegister(pool: Pool, bootstrap: BootstrapR
       );
     }
     await client.query(
+      `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
+       VALUES ($1, $2, $3::jsonb, $4)
+       ON CONFLICT (register_version, row_key) DO NOTHING`,
+      [bootstrap.registerVersion, MFA_POLICY_REGISTER_ROW.rowKey,
+        JSON.stringify(MFA_POLICY_REGISTER_ROW.value), MFA_POLICY_REGISTER_ROW.sourceRef]
+    );
+    await client.query(
       `INSERT INTO register.register_version (register_version, row_count, sealed)
        VALUES ($1, $2, true)
        ON CONFLICT (register_version) DO NOTHING`,
-      [bootstrap.registerVersion, bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length]
+      [bootstrap.registerVersion, bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 1]
     );
     await client.query("COMMIT");
   } catch (error) {
@@ -530,3 +538,11 @@ export {
   type AuthPolicyRegisterRow,
   type AuthRouteLimit
 } from "./auth-policy.js";
+export {
+  MFA_POLICY_REGISTER_ROW,
+  MFA_POLICY_ROW_KEY,
+  mfaPolicyFromValue,
+  readMfaPolicy,
+  type MfaPolicy,
+  type MfaPolicyValue
+} from "./mfa-policy.js";

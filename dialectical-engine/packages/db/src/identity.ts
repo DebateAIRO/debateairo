@@ -36,6 +36,22 @@ export type ResendPreparation =
   | Readonly<{ status: "send"; userId: string; auditToken: string; channelBindingId: string }>
   | Readonly<{ status: "ignored" }>;
 
+export interface TotpEnrollmentRecord {
+  readonly userId: string;
+  readonly pseudonym: string;
+  readonly factorId: string;
+  readonly secretCiphertext: CryptoEnvelope;
+  readonly lastAcceptedStep: number | null;
+  readonly factorState: "pending" | "verified_pending_recovery" | "recovery_pending";
+}
+
+export interface RecoveryCodeRecord {
+  readonly userId: string;
+  readonly recoveryCodeId: string;
+  readonly codeHash: string;
+  readonly codeSlot: number;
+}
+
 // Deliberately carries no raw source context: by the time an AuditWrite exists
 // the IP and user agent have already been reduced to prepared Argon2 digests,
 // so raw values cannot reach the transactional append path at all.
@@ -469,7 +485,10 @@ export class PostgresIdentityRepository {
             delivery_error=NULL
           WHERE channel_binding_id=$1
         `, [channel.channel_binding_id, input.occurredAt]);
-        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [channel.user_id]);
+        // Email possession opens the short-lived MFA enrolment capability; it
+        // never makes the account usable. Only recovery-code confirmation in
+        // S4 promotes pending_mfa to active.
+        await client.query(`UPDATE identity."user" SET state='pending_mfa' WHERE user_id=$1`, [channel.user_id]);
       }
       await this.appendAudit(client, prepared, {
         actorToken,
@@ -593,5 +612,473 @@ export class PostgresIdentityRepository {
       success: false,
       justification: "PROVISION_FAILED"
     }));
+  }
+
+  /**
+   * Reuses the already-consumed email-verification credential as the bounded
+   * MFA-enrolment capability. The plaintext token is never persisted; only
+   * the S3 SHA-256 credential hash reaches this boundary.
+   */
+  async readMfaEnrollmentIdentity(enrollmentTokenHash: string): Promise<Readonly<{
+    userId: string;
+    pseudonym: string;
+  }> | null> {
+    const result = await this.pool.query<{ user_id: string; pseudonym: string }>(`
+      SELECT u.user_id,u.pseudonym
+      FROM identity.verification_token_credential credential
+      JOIN identity.channel_binding binding
+        ON binding.channel_binding_id=credential.channel_binding_id
+      JOIN identity."user" u ON u.user_id=binding.user_id
+      WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
+        AND credential.expires_at >= statement_timestamp()
+        AND u.state='pending_mfa'
+    `, [enrollmentTokenHash]);
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      userId: row.user_id,
+      pseudonym: row.pseudonym
+    });
+  }
+
+  async beginTotpEnrollment(input: {
+    readonly enrollmentTokenHash: string;
+    readonly factorId: string;
+    readonly secretCiphertext: CryptoEnvelope;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<Readonly<{ userId: string; pseudonym: string; factorId: string }> | null> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const credential = await client.query<{
+        user_id: string;
+        audit_token: string;
+        pseudonym: string;
+        state: string;
+        expires_at: Date;
+        consumed_at: Date | null;
+      }>(`
+        SELECT u.user_id,u.audit_token,u.pseudonym,u.state,
+          credential.expires_at,credential.consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding
+          ON binding.channel_binding_id=credential.channel_binding_id
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        WHERE credential.token_hash=$1 AND binding.channel_type='email'
+        FOR UPDATE OF credential,u
+      `, [input.enrollmentTokenHash]);
+      const row = credential.rows[0];
+      const valid = row !== undefined
+        && row.consumed_at !== null
+        && row.expires_at.getTime() >= input.occurredAt.getTime()
+        && row.state === "pending_mfa";
+      const actorToken = row?.audit_token ?? randomUUID();
+      if (!valid) {
+        await this.appendAudit(client, prepared, {
+          actorToken,
+          eventType: "identity.mfa.totp.begin",
+          targetType: "identity.mfa_factor",
+          occurredAt: input.occurredAt,
+          decision: "DENY",
+          success: false,
+          justification: "MFA_ENROLLMENT_CREDENTIAL_INVALID"
+        });
+        return null;
+      }
+      const currentFactor = await client.query<{ state: string }>(`
+        SELECT state
+        FROM identity.mfa_factor
+        WHERE user_id=$1 AND factor_type='totp'
+        ORDER BY created_at DESC,mfa_factor_id DESC
+        LIMIT 1
+        FOR UPDATE
+      `, [row.user_id]);
+      if (currentFactor.rows[0] !== undefined && currentFactor.rows[0].state !== "pending") {
+        await this.appendAudit(client, prepared, {
+          actorToken,
+          eventType: "identity.mfa.totp.begin",
+          targetType: "identity.mfa_factor",
+          occurredAt: input.occurredAt,
+          decision: "DENY",
+          success: false,
+          justification: "MFA_ENROLLMENT_STATE_INVALID"
+        });
+        return null;
+      }
+      // A begin retry never re-displays an earlier seed. It atomically removes
+      // only an unverified TOTP factor and creates a fresh envelope. After a
+      // successful TOTP proof, recovery-code state cannot be orphaned by begin.
+      await client.query(`
+        DELETE FROM identity.mfa_factor
+        WHERE user_id=$1 AND factor_type='totp' AND state='pending'
+      `, [row.user_id]);
+      const inserted = await client.query<{ mfa_factor_id: string }>(`
+        INSERT INTO identity.mfa_factor (
+          mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
+          state,created_at,verified_at,revoked_at,last_accepted_step
+        ) VALUES ($1,$2,'totp',$3::jsonb,NULL,NULL,'pending',$4,NULL,NULL,NULL)
+        RETURNING mfa_factor_id
+      `, [input.factorId, row.user_id, JSON.stringify(input.secretCiphertext), input.occurredAt]);
+      await this.appendAudit(client, prepared, {
+        actorToken,
+        eventType: "identity.mfa.totp.begin",
+        targetType: "identity.mfa_factor",
+        occurredAt: input.occurredAt,
+        decision: "ALLOW",
+        success: true,
+        justification: null
+      });
+      return Object.freeze({
+        userId: row.user_id,
+        pseudonym: row.pseudonym,
+        factorId: inserted.rows[0]!.mfa_factor_id
+      });
+    });
+  }
+
+  async readTotpEnrollment(enrollmentTokenHash: string): Promise<TotpEnrollmentRecord | null> {
+    const result = await this.pool.query<{
+      user_id: string;
+      pseudonym: string;
+      mfa_factor_id: string;
+      secret_ciphertext: CryptoEnvelope;
+      last_accepted_step: string | number | null;
+      factor_state: TotpEnrollmentRecord["factorState"];
+    }>(`
+      SELECT u.user_id,u.pseudonym,factor.mfa_factor_id,factor.secret_ciphertext,
+        factor.last_accepted_step,factor.state AS factor_state
+      FROM identity.verification_token_credential credential
+      JOIN identity.channel_binding binding
+        ON binding.channel_binding_id=credential.channel_binding_id
+      JOIN identity."user" u ON u.user_id=binding.user_id
+      JOIN LATERAL (
+        SELECT mfa_factor_id,secret_ciphertext,last_accepted_step,state,created_at
+        FROM identity.mfa_factor
+        WHERE user_id=u.user_id AND factor_type='totp'
+          AND state IN ('pending','verified_pending_recovery','recovery_pending')
+        ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
+      ) factor ON true
+      WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
+        AND credential.expires_at >= statement_timestamp()
+        AND u.state='pending_mfa'
+    `, [enrollmentTokenHash]);
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      userId: row.user_id,
+      pseudonym: row.pseudonym,
+      factorId: row.mfa_factor_id,
+      secretCiphertext: row.secret_ciphertext,
+      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
+      factorState: row.factor_state
+    });
+  }
+
+  async confirmTotpEnrollment(input: {
+    readonly enrollmentTokenHash: string;
+    readonly factorId: string;
+    readonly acceptedStep: number;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<"confirmed" | "replayed" | "invalid"> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const locked = await client.query<{
+        user_id: string;
+        audit_token: string;
+        user_state: string;
+        factor_state: string;
+        last_accepted_step: string | number | null;
+        expires_at: Date;
+        consumed_at: Date | null;
+      }>(`
+        SELECT u.user_id,u.audit_token,u.state AS user_state,
+          factor.state AS factor_state,factor.last_accepted_step,
+          credential.expires_at,credential.consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding
+          ON binding.channel_binding_id=credential.channel_binding_id
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
+        WHERE credential.token_hash=$1 AND factor.mfa_factor_id=$2
+          AND factor.factor_type='totp'
+        FOR UPDATE OF credential,u,factor
+      `, [input.enrollmentTokenHash, input.factorId]);
+      const row = locked.rows[0];
+      const current = row?.last_accepted_step === null || row?.last_accepted_step === undefined
+        ? null : Number(row.last_accepted_step);
+      const eligible = row !== undefined && row.user_state === "pending_mfa"
+        && row.factor_state === "pending" && row.consumed_at !== null
+        && row.expires_at.getTime() >= input.occurredAt.getTime();
+      const replayed = eligible && current !== null && input.acceptedStep <= current;
+      const confirmed = eligible && !replayed;
+      const actorToken = row?.audit_token ?? randomUUID();
+      if (confirmed) {
+        await client.query(`
+          UPDATE identity.mfa_factor
+          SET state='verified_pending_recovery',verified_at=$2,last_accepted_step=$3
+          WHERE mfa_factor_id=$1
+        `, [input.factorId, input.occurredAt, input.acceptedStep]);
+      }
+      await this.appendAudit(client, prepared, {
+        actorToken,
+        eventType: "identity.mfa.totp.verified",
+        targetType: "identity.mfa_factor",
+        occurredAt: input.occurredAt,
+        decision: confirmed ? "ALLOW" : "DENY",
+        success: confirmed,
+        justification: confirmed ? null : replayed ? "MFA_TOTP_REPLAYED" : "MFA_ENROLLMENT_INVALID"
+      });
+      return confirmed ? "confirmed" : replayed ? "replayed" : "invalid";
+    });
+  }
+
+  async recordMfaVerificationFailure(input: {
+    readonly enrollmentTokenHash: string;
+    readonly reason: "MFA_ENROLLMENT_INVALID" | "MFA_TOTP_INVALID"
+      | "MFA_RECOVERY_CONFIRMATION_INVALID" | "MFA_RATE_LIMITED";
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<void> {
+    const prepared = await this.prepareAuditContext(input.source);
+    await this.transaction(async (client) => {
+      const found = await client.query<{ audit_token: string }>(`
+        SELECT u.audit_token
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding
+          ON binding.channel_binding_id=credential.channel_binding_id
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        WHERE credential.token_hash=$1
+      `, [input.enrollmentTokenHash]);
+      await this.appendAudit(client, prepared, {
+        actorToken: found.rows[0]?.audit_token ?? randomUUID(),
+        eventType: "identity.mfa.verification_failed",
+        targetType: "identity.mfa_factor",
+        occurredAt: input.occurredAt,
+        decision: "DENY",
+        success: false,
+        justification: input.reason
+      });
+    });
+  }
+
+  async storeRecoveryCodes(input: {
+    readonly enrollmentTokenHash: string;
+    readonly factorId: string;
+    readonly codes: readonly Readonly<{ slot: number; hash: string }>[];
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<boolean> {
+    if (input.codes.length !== 10 || new Set(input.codes.map((code) => code.slot)).size !== 10
+      || input.codes.some((code) => code.slot < 1 || code.slot > 10 || code.hash.trim() === "")) {
+      throw new TypeError("MFA_RECOVERY_CODE_SET_INVALID");
+    }
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const locked = await client.query<{
+        user_id: string;
+        audit_token: string;
+        user_state: string;
+        factor_state: string;
+        expires_at: Date;
+        consumed_at: Date | null;
+      }>(`
+        SELECT u.user_id,u.audit_token,u.state AS user_state,
+          factor.state AS factor_state,credential.expires_at,credential.consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding
+          ON binding.channel_binding_id=credential.channel_binding_id
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
+        WHERE credential.token_hash=$1 AND factor.mfa_factor_id=$2
+        FOR UPDATE OF credential,u,factor
+      `, [input.enrollmentTokenHash, input.factorId]);
+      const row = locked.rows[0];
+      const valid = row !== undefined && row.user_state === "pending_mfa"
+        && (row.factor_state === "verified_pending_recovery" || row.factor_state === "recovery_pending")
+        && row.consumed_at !== null
+        && row.expires_at.getTime() >= input.occurredAt.getTime();
+      const actorToken = row?.audit_token ?? randomUUID();
+      if (valid) {
+        // A response can be lost before the user records its one-time
+        // plaintext. Regeneration is recoverable without redisplay: revoke
+        // the unseen set and insert a wholly fresh set in this transaction.
+        await client.query(`
+          UPDATE identity.recovery_code SET revoked_at=$2
+          WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL
+        `, [row.user_id, input.occurredAt]);
+        for (const code of input.codes) {
+          await client.query(`
+            INSERT INTO identity.recovery_code (
+              user_id,code_slot,code_hash,created_at,consumed_at,revoked_at
+            ) VALUES ($1,$2,$3,$4,NULL,NULL)
+          `, [row.user_id, code.slot, code.hash, input.occurredAt]);
+        }
+        await client.query(`
+          UPDATE identity.mfa_factor SET state='recovery_pending'
+          WHERE mfa_factor_id=$1
+        `, [input.factorId]);
+      }
+      await this.appendAudit(client, prepared, {
+        actorToken,
+        eventType: "identity.mfa.recovery_codes.generated",
+        targetType: "identity.recovery_code",
+        occurredAt: input.occurredAt,
+        decision: valid ? "ALLOW" : "DENY",
+        success: valid,
+        justification: valid ? null : "MFA_ENROLLMENT_INVALID"
+      });
+      return valid;
+    });
+  }
+
+  async readRecoveryCodeForConfirmation(
+    enrollmentTokenHash: string,
+    slot: number
+  ): Promise<RecoveryCodeRecord | null> {
+    const result = await this.pool.query<{
+      user_id: string;
+      recovery_code_id: string;
+      code_hash: string;
+      code_slot: number;
+    }>(`
+      SELECT u.user_id,code.recovery_code_id,code.code_hash,code.code_slot
+      FROM identity.verification_token_credential credential
+      JOIN identity.channel_binding binding
+        ON binding.channel_binding_id=credential.channel_binding_id
+      JOIN identity."user" u ON u.user_id=binding.user_id
+      JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
+      JOIN identity.recovery_code code ON code.user_id=u.user_id
+      WHERE credential.token_hash=$1 AND code.code_slot=$2
+        AND credential.consumed_at IS NOT NULL
+        AND credential.expires_at >= statement_timestamp()
+        AND u.state='pending_mfa' AND factor.state='recovery_pending'
+        AND code.consumed_at IS NULL AND code.revoked_at IS NULL
+    `, [enrollmentTokenHash, slot]);
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      userId: row.user_id,
+      recoveryCodeId: row.recovery_code_id,
+      codeHash: row.code_hash,
+      codeSlot: Number(row.code_slot)
+    });
+  }
+
+  async activateMfaEnrollment(input: {
+    readonly enrollmentTokenHash: string;
+    readonly recoveryCodeId: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<boolean> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const locked = await client.query<{
+        user_id: string;
+        audit_token: string;
+        user_state: string;
+        factor_id: string;
+        factor_state: string;
+        recovery_code_id: string | null;
+        expires_at: Date;
+        consumed_at: Date | null;
+      }>(`
+        SELECT u.user_id,u.audit_token,u.state AS user_state,
+          factor.mfa_factor_id AS factor_id,factor.state AS factor_state,
+          code.recovery_code_id,credential.expires_at,credential.consumed_at
+        FROM identity.verification_token_credential credential
+        JOIN identity.channel_binding binding
+          ON binding.channel_binding_id=credential.channel_binding_id
+        JOIN identity."user" u ON u.user_id=binding.user_id
+        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
+        LEFT JOIN identity.recovery_code code
+          ON code.recovery_code_id=$2 AND code.user_id=u.user_id
+          AND code.consumed_at IS NULL AND code.revoked_at IS NULL
+        WHERE credential.token_hash=$1
+        FOR UPDATE OF credential,u,factor
+      `, [input.enrollmentTokenHash, input.recoveryCodeId]);
+      const row = locked.rows[0];
+      const valid = row !== undefined && row.user_state === "pending_mfa"
+        && row.factor_state === "recovery_pending" && row.recovery_code_id !== null
+        && row.consumed_at !== null
+        && row.expires_at.getTime() >= input.occurredAt.getTime();
+      const actorToken = row?.audit_token ?? randomUUID();
+      if (valid) {
+        await client.query(`
+          UPDATE identity.mfa_factor SET state='active' WHERE mfa_factor_id=$1
+        `, [row.factor_id]);
+        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [row.user_id]);
+      }
+      await this.appendAudit(client, prepared, {
+        actorToken,
+        eventType: "identity.mfa.enrollment.activated",
+        targetType: "identity.mfa_factor",
+        occurredAt: input.occurredAt,
+        decision: valid ? "ALLOW" : "DENY",
+        success: valid,
+        justification: valid ? null : "MFA_ENROLLMENT_INVALID"
+      });
+      return valid;
+    });
+  }
+
+  async readRecoveryCodeForUse(userId: string, slot: number): Promise<RecoveryCodeRecord | null> {
+    const result = await this.pool.query<{
+      recovery_code_id: string;
+      code_hash: string;
+      code_slot: number;
+    }>(`
+      SELECT code.recovery_code_id,code.code_hash,code.code_slot
+      FROM identity.recovery_code code
+      JOIN identity."user" u ON u.user_id=code.user_id AND u.state='active'
+      JOIN identity.mfa_factor factor
+        ON factor.user_id=u.user_id AND factor.factor_type='totp' AND factor.state='active'
+      WHERE code.user_id=$1 AND code.code_slot=$2
+        AND code.consumed_at IS NULL AND code.revoked_at IS NULL
+    `, [userId, slot]);
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      userId,
+      recoveryCodeId: row.recovery_code_id,
+      codeHash: row.code_hash,
+      codeSlot: Number(row.code_slot)
+    });
+  }
+
+  async consumeAndReplaceRecoveryCode(input: {
+    readonly userId: string;
+    readonly recoveryCodeId: string;
+    readonly replacementHash: string;
+    readonly occurredAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<boolean> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const user = await client.query<{ audit_token: string }>(`
+        SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
+      `, [input.userId]);
+      const consumed = await client.query<{ code_slot: number }>(`
+        UPDATE identity.recovery_code SET consumed_at=$3
+        WHERE recovery_code_id=$1 AND user_id=$2
+          AND consumed_at IS NULL AND revoked_at IS NULL
+        RETURNING code_slot
+      `, [input.recoveryCodeId, input.userId, input.occurredAt]);
+      const row = consumed.rows[0];
+      const valid = user.rows[0] !== undefined && row !== undefined;
+      if (valid) {
+        await client.query(`
+          INSERT INTO identity.recovery_code (
+            user_id,code_slot,code_hash,created_at,consumed_at,revoked_at
+          ) VALUES ($1,$2,$3,$4,NULL,NULL)
+        `, [input.userId, row.code_slot, input.replacementHash, input.occurredAt]);
+      }
+      await this.appendAudit(client, prepared, {
+        actorToken: user.rows[0]?.audit_token ?? randomUUID(),
+        eventType: "identity.mfa.recovery_code.consumed",
+        targetType: "identity.recovery_code",
+        occurredAt: input.occurredAt,
+        decision: valid ? "ALLOW" : "DENY",
+        success: valid,
+        justification: valid ? null : "MFA_RECOVERY_CODE_INVALID"
+      });
+      return valid;
+    });
   }
 }

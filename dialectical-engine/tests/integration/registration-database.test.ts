@@ -15,6 +15,7 @@ import type { PoolClient } from "pg";
 import { migrate, PostgresIdentityRepository } from "@debateai/db";
 import {
   createEmailBlindIndex,
+  decodeBase32,
   encrypt,
   FileUserDekStore,
   generateDek,
@@ -25,6 +26,7 @@ import {
   hashAuditSourceIp,
   hashAuditUserAgent,
   loadKek,
+  totpCodeAtStep,
   verifyChain,
   type ChainedAuditEvent,
   type UserDekStore
@@ -37,8 +39,10 @@ import {
 import {
   loadBootstrapRegister,
   persistBootstrapRegister,
-  readAuthPolicy
+  readAuthPolicy,
+  readMfaPolicy
 } from "@debateai/register";
+import { MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
 import {
   InProcessAuthRateLimiter,
   REGISTRATION_PUBLIC_RESPONSE,
@@ -46,6 +50,7 @@ import {
   RESEND_PUBLIC_RESPONSE
 } from "../../apps/api/src/registration.js";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
+import { MfaEnrollmentService } from "../../apps/api/src/mfa.js";
 import {
   MailDeliveryError,
   MemoryMailSender,
@@ -894,7 +899,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     }
   }, 120_000);
 
-  it("registers a pending adult account, provisions a file DEK, sends through the stub, and activates once", async () => {
+  it("registers a pending adult account, provisions a readable file DEK, and requires MFA after email proof", async () => {
     const flow = buildService();
     const registered = await registerAccount(flow.service, "happy");
 
@@ -909,17 +914,170 @@ describe("S3 registration and verification on real PostgreSQL", () => {
 
     const dekPath = join(secretRoot, "users", registered.user.user_id, "dek.v1.json");
     expect((await stat(dekPath)).mode & 0o777).toBe(0o600);
+    const dekStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+    const firstDek = await dekStore.load(registered.user.user_id);
+    expect(firstDek).toHaveLength(32);
+    firstDek.fill(0);
+    const secondDek = await dekStore.load(registered.user.user_id);
+    expect(secondDek.equals(Buffer.alloc(32))).toBe(false);
+    secondDek.fill(0);
 
     const token = (flow.mail as MemoryMailSender).messages[0]!.token;
-    await expect(flow.service.verifyEmail({ token }, source)).resolves.toEqual({ status: "active" });
+    await expect(flow.service.verifyEmail({ token }, source)).resolves.toEqual({ status: "mfa_required" });
     await expect(flow.service.verifyEmail({ token }, source)).rejects.toMatchObject({
       code: "VERIFICATION_TOKEN_INVALID"
     });
     const state = await database.pool.query<{ state: string }>(
       `SELECT state FROM identity."user" WHERE user_id=$1`, [registered.user.user_id]
     );
-    expect(state.rows[0]!.state).toBe("active");
+    expect(state.rows[0]!.state).toBe("pending_mfa");
   });
+
+  it("S4 enrols TOTP, persists no plaintext seed/codes, confirms one code, and atomically replaces a used code", async () => {
+    const initialNow = new Date("2026-08-23T10:00:00.000Z");
+    const flow = buildService({ initialNow });
+    const registered = await registerAccount(flow.service, `s4-${randomUUID()}`);
+    const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
+    await expect(flow.service.verifyEmail({ token: enrollmentToken }, source))
+      .resolves.toEqual({ status: "mfa_required" });
+
+    const mfa = new MfaEnrollmentService({
+      repository: flow.repository,
+      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
+      argon2: sharedArgon2Pool(),
+      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
+      clock: () => initialNow
+    });
+    const api = buildApi({ application: fixtureAskApplication(), mfa });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const logs = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const begin = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/begin",
+        payload: { enrollment_token: enrollmentToken }
+      });
+      expect(begin.statusCode).toBe(200);
+      const begun = begin.json<{
+        status: string;
+        secret: string;
+        otpauthUri: string;
+      }>();
+      expect(begun).toMatchObject({ status: "verification_required" });
+      expect(begun.secret).toMatch(/^[A-Z2-7]{32}$/);
+      expect(begun.otpauthUri).toContain(`secret=${begun.secret}`);
+
+      const atRest = await database.pool.query<{ persisted: string }>(`
+        SELECT row_to_json(factor)::text AS persisted
+        FROM identity.mfa_factor factor WHERE user_id=$1
+      `, [registered.user.user_id]);
+      expect(atRest.rows).toHaveLength(1);
+      expect(atRest.rows[0]!.persisted).not.toContain(begun.secret);
+      expect(atRest.rows[0]!.persisted).toContain("secret_ciphertext");
+
+      const step = Math.floor(initialNow.getTime() / 30_000);
+      const code = totpCodeAtStep(decodeBase32(begun.secret), step);
+      const verified = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/verify",
+        payload: { enrollment_token: enrollmentToken, code }
+      });
+      expect(verified.statusCode).toBe(200);
+      expect(verified.json()).toEqual({ status: "recovery_codes_required" });
+
+      const generated = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/generate",
+        payload: { enrollment_token: enrollmentToken }
+      });
+      expect(generated.statusCode).toBe(200);
+      const unseen = generated.json<{ status: string; recoveryCodes: string[] }>();
+      expect(unseen.status).toBe("confirmation_required");
+      expect(unseen.recoveryCodes).toHaveLength(10);
+
+      const forbiddenRestart = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/begin",
+        payload: { enrollment_token: enrollmentToken }
+      });
+      expect(forbiddenRestart.statusCode).toBe(409);
+      expect(forbiddenRestart.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
+
+      const regenerated = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/generate",
+        payload: { enrollment_token: enrollmentToken }
+      });
+      expect(regenerated.statusCode).toBe(200);
+      const recovery = regenerated.json<{ status: string; recoveryCodes: string[] }>();
+      expect(recovery.recoveryCodes).toHaveLength(10);
+      expect(recovery.recoveryCodes).not.toEqual(unseen.recoveryCodes);
+
+      const obsolete = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/confirm",
+        payload: { enrollment_token: enrollmentToken, recovery_code: unseen.recoveryCodes[0] }
+      });
+      expect(obsolete.statusCode).toBe(400);
+      expect(obsolete.json()).toMatchObject({ error: "MFA_RECOVERY_CONFIRMATION_INVALID" });
+
+      const stored = await database.pool.query<{ code_hash: string; code_slot: number }>(`
+        SELECT code_hash,code_slot FROM identity.recovery_code
+        WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL ORDER BY code_slot
+      `, [registered.user.user_id]);
+      expect(stored.rows).toHaveLength(10);
+      expect(stored.rows.map((row) => Number(row.code_slot))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(stored.rows.every((row) => /^\$argon2id\$v=19\$m=19456,t=2,p=1\$/.test(row.code_hash)))
+        .toBe(true);
+      for (const plaintext of recovery.recoveryCodes) {
+        expect(stored.rows.every((row) => !row.code_hash.includes(plaintext))).toBe(true);
+      }
+
+      const confirmed = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/confirm",
+        payload: { enrollment_token: enrollmentToken, recovery_code: recovery.recoveryCodes[0] }
+      });
+      expect(confirmed.statusCode).toBe(200);
+      expect(confirmed.json()).toEqual({ status: "active" });
+      const activated = await database.pool.query<{ user_state: string; factor_state: string }>(`
+        SELECT u.state AS user_state,factor.state AS factor_state
+        FROM identity."user" u
+        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
+        WHERE u.user_id=$1
+      `, [registered.user.user_id]);
+      expect(activated.rows[0]).toEqual({ user_state: "active", factor_state: "active" });
+
+      const firstUse = await mfa.consumeRecoveryCode({
+        userId: registered.user.user_id,
+        recoveryCode: recovery.recoveryCodes[1]!
+      }, source);
+      expect(firstUse).toMatchObject({ consumed: true });
+      await expect(mfa.consumeRecoveryCode({
+        userId: registered.user.user_id,
+        recoveryCode: recovery.recoveryCodes[1]!
+      }, source)).resolves.toEqual({ consumed: false });
+      const lifecycle = await database.pool.query<{
+        total: string; active: string; consumed: string; revoked: string;
+      }>(`
+        SELECT count(*)::text AS total,
+          count(*) FILTER (WHERE consumed_at IS NULL AND revoked_at IS NULL)::text AS active,
+          count(*) FILTER (WHERE consumed_at IS NOT NULL)::text AS consumed,
+          count(*) FILTER (WHERE revoked_at IS NOT NULL)::text AS revoked
+        FROM identity.recovery_code WHERE user_id=$1
+      `, [registered.user.user_id]);
+      expect(lifecycle.rows[0]).toEqual({ total: "21", active: "10", consumed: "1", revoked: "10" });
+
+      const observable = [...errors.mock.calls, ...logs.mock.calls].flat().join(" ");
+      expect(observable).not.toContain(begun.secret);
+      for (const plaintext of unseen.recoveryCodes) expect(observable).not.toContain(plaintext);
+      for (const plaintext of recovery.recoveryCodes) expect(observable).not.toContain(plaintext);
+    } finally {
+      errors.mockRestore();
+      logs.mockRestore();
+      await api.close();
+    }
+  }, 120_000);
 
   it("S3a A2 clamps empty and whitespace User-Agent values for all auth-route audit writes", async () => {
     for (const [label, userAgent, ip] of [
@@ -1280,7 +1438,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     expect((flow.mail as MemoryMailSender).messages).toHaveLength(2);
     expect((flow.mail as MemoryMailSender).messages[1]!.token).not.toBe(firstToken);
     await expect(flow.service.verifyEmail({ token: firstToken }, source))
-      .resolves.toEqual({ status: "active" });
+      .resolves.toEqual({ status: "mfa_required" });
   });
 
   it("S3c B1 caps victim-bound mail and token rotation while the owner retains admission and verifies", async () => {
@@ -1350,8 +1508,8 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     expect(tokenVersions.size).toBeLessThanOrEqual(3);
     expect(rotations).toBeLessThanOrEqual(3);
     expect(ownerResponse).toEqual(RESEND_PUBLIC_RESPONSE);
-    expect(verification).toEqual({ status: "active" });
-    expect(state.rows).toEqual([{ state: "active" }]);
+    expect(verification).toEqual({ status: "mfa_required" });
+    expect(state.rows).toEqual([{ state: "pending_mfa" }]);
   }, 120_000);
 
   it("S3d D1 bounds hanging verification dispatches without committing accounts it cannot notify", async () => {
@@ -3335,7 +3493,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       userAgent: "vitest-s3d-owner",
       requestId: "request:s3d:d2:owner-verify"
     });
-    expect(verification).toEqual({ status: "active" });
+    expect(verification).toEqual({ status: "mfa_required" });
     const consumedFamily = await database.pool.query<{ total: string; consumed: string }>(`
       SELECT count(*)::text AS total,count(consumed_at)::text AS consumed
       FROM identity.verification_token_credential credential
@@ -3394,7 +3552,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       ip: "2001:db8:3d:4::ffff",
       userAgent: "vitest-s3d-current-owner-token",
       requestId: "request:s3d:credential-lifetime:current"
-    })).resolves.toEqual({ status: "active" });
+    })).resolves.toEqual({ status: "mfa_required" });
     console.info(
       `[S3d D2 LIFETIME] backend=postgres issued_tokens=${messages.length} `
       + `live_hashes=${liveHashes} ruled_maximum=73 first_expired=true newest_active=true`
@@ -3490,7 +3648,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       ip: "2001:db8:3d:3::2",
       userAgent: "vitest-s3d-owner",
       requestId: "request:s3d:d3:owner-verify"
-    })).resolves.toEqual({ status: "active" });
+    })).resolves.toEqual({ status: "mfa_required" });
     console.info(
       "[S3d D3 CURRENT] backend=postgres first_transport=paused delivery_record=pending "
       + "immediate_resend_mails=1 first_link=active"
@@ -3847,7 +4005,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       ip: "198.51.100.202",
       userAgent: "vitest-s3c-d2-owner",
       requestId: "request:s3c:d2:verify-owner"
-    })).resolves.toEqual({ status: "active" });
+    })).resolves.toEqual({ status: "mfa_required" });
 
     const resendFlow = buildService({ initialNow });
     const resendRegistered = await registerAccount(resendFlow.service, "s3c-d2-resend-owner");
@@ -4291,7 +4449,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       const messages = (flow.mail as MemoryMailSender).messages;
       expect(messages).toHaveLength(1);
       await expect(flow.service.verifyEmail({ token: messages[0]!.token }, source))
-        .resolves.toEqual({ status: "active" });
+        .resolves.toEqual({ status: "mfa_required" });
     } finally {
       error.mockRestore();
     }
@@ -5077,7 +5235,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // S3d activation semantics: the original registration link still activates.
       await expect(flow.service.verifyEmail({ token: mail.messages[0]!.token }, {
         ip: "198.51.100.200", userAgent: "vitest-t9", requestId: "request:t9:owner-verify"
-      })).resolves.toEqual({ status: "active" });
+      })).resolves.toEqual({ status: "mfa_required" });
     } finally {
       monitor.release();
       await flow.service.drainMailDispatches();
@@ -5157,7 +5315,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       for (const result of resendResults) expect(result.body).toBe(RESEND_BODY);
       expect(verifyResults.filter((result) => result.status === 200)).toHaveLength(1);
       expect(verifyResults.filter((result) =>
-        result.status === 200 && result.body === JSON.stringify({ status: "active" })
+        result.status === 200 && result.body === JSON.stringify({ status: "mfa_required" })
       )).toHaveLength(1);
       expect(verifyResults.filter((result) =>
         result.status === 400
@@ -5165,7 +5323,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
         })
       )).toHaveLength(15);
-      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+      expect(account.rows[0]).toEqual({ state: "pending_mfa", binding_state: "verified" });
       expect(audit.rootCount).toBe(1);
       expect(audit.chain).toHaveLength(audit.totalRows);
       expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
@@ -5709,7 +5867,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           ip: `203.0.113.${windowIndex + 1}`,
           userAgent: "vitest-t9-rework9-owner",
           requestId: `request:${namespace}:owner-verify`
-        })).resolves.toEqual({ status: "active" });
+        })).resolves.toEqual({ status: "mfa_required" });
         const activationAudit = await database.pool.query<{ activations: string }>(`
           SELECT count(*)::text AS activations FROM identity.audit_event
           WHERE event_type='identity.verification.consumed' AND actor_key_ref=$1
@@ -6214,10 +6372,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // ...and has not yet touched any credential row.
       expect(credentialProbe).toBe("acquired");
       expect(verify.status).toBe(200);
-      expect(verify.body).toBe(JSON.stringify({ status: "active" }));
+      expect(verify.body).toBe(JSON.stringify({ status: "mfa_required" }));
       expect(verify.rejection).toBeNull();
       expect(deadlocksAfter - deadlocksBefore).toBe(0);
-      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+      expect(account.rows[0]).toEqual({ state: "pending_mfa", binding_state: "verified" });
     } finally {
       if (gateOpen) await gate.query("ROLLBACK").catch(() => undefined);
       gate.release();
@@ -6291,12 +6449,12 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       }
       expect([first, second].filter((one) => one.status === 200)).toHaveLength(1);
       expect([first, second].filter((one) =>
-        one.status === 200 && one.body === JSON.stringify({ status: "active" }))).toHaveLength(1);
+        one.status === 200 && one.body === JSON.stringify({ status: "mfa_required" }))).toHaveLength(1);
       expect([first, second].filter((one) =>
         one.status === 400 && one.body === JSON.stringify({
           error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
         }))).toHaveLength(1);
-      expect(account.rows[0]).toEqual({ state: "active", binding_state: "verified" });
+      expect(account.rows[0]).toEqual({ state: "pending_mfa", binding_state: "verified" });
       // Whole family consumed: no live sibling remains.
       expect(credentials.rows[0]!.total).toBe("2");
       expect(credentials.rows[0]!.consumed).toBe("2");
@@ -6503,6 +6661,9 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const bootstrap = await loadBootstrapRegister();
     await persistBootstrapRegister(database.pool, bootstrap);
     await expect(readAuthPolicy(database.pool, bootstrap.registerVersion)).resolves.toEqual(basePolicy);
+    await expect(readMfaPolicy(database.pool, bootstrap.registerVersion)).resolves.toEqual(
+      mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value)
+    );
     const policyRows = await database.pool.query<{ row_key: string }>(`
       SELECT row_key FROM register.register_row
       WHERE register_version=$1 AND row_key=ANY($2::text[]) ORDER BY row_key
