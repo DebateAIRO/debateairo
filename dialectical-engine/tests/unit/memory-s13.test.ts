@@ -50,7 +50,7 @@ describe("S13 / FX-S22-04 — four database-predicate tiers and honest disclosur
     expect(matchQuestionKeys(
       key({ canonicalQuestionText: "tram a", settlementAct: null, questionType: null, declaredField: null, normalizedBinding: {}, frozenTerms: ["tram"] }),
       key({ runId: "run:prior", canonicalQuestionText: "tram b", settlementAct: null, questionType: null, declaredField: null, normalizedBinding: {}, frozenTerms: ["tram", "rail"] })
-    )).toMatchObject({ tier: "TERM_OVERLAP", autoLink: false, agreedFields: ["term:tram"] });
+    )).toMatchObject({ tier: "TERM_OVERLAP", autoLink: false, agreedFields: ["termOverlap"] });
     expect(matchQuestionKeys(key(), key({ runId: "run:prior", askerScope: "asker:other" }))).toBeNull();
   });
 
@@ -91,7 +91,8 @@ describe("S13 / FX-S22-04 — four database-predicate tiers and honest disclosur
     });
     const sentence = renderMemorySentence(disclosure)!;
     expect(sentence).toContain("PARTIAL_BINDING");
-    expect(sentence).toContain("comparator");
+    expect(sentence).toContain("binding");
+    expect(sentence).not.toContain("comparator");
     expect(sentence).toContain("STALE");
     expect(validateMemorySentence(disclosure, sentence)).toBe(sentence);
     expect(() => validateMemorySentence(disclosure, sentence.replace("STALE", "FRESH")))

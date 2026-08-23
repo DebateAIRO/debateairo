@@ -14,12 +14,102 @@ describe("S13 / cross-run memory architecture", () => {
     expect(migration).toContain("reject_mutation");
     expect(memory).not.toMatch(/embedding|cosine|vector/i);
     expect(memory).not.toContain("transitiveClosure");
-    expect(memory).toContain("CROSS JOIN LATERAL");
+
+    const matcher = memory.slice(
+      memory.indexOf("export function matchQuestionKeys"),
+      memory.indexOf("export interface PinnedMemoryPull")
+    );
+    const rank = memory.slice(
+      memory.indexOf("const MEMORY_MATCH_RANK"),
+      memory.indexOf("function ownershipFromMemoryScope")
+    );
+    expect(matcher).toContain("const tier: MemoryMatchTier | null");
+    expect(rank).toContain("function prefersCandidate");
     for (const tier of ["EXACT_QUESTION", "SAME_BINDING", "PARTIAL_BINDING", "TERM_OVERLAP"])
-      expect(memory).toContain(`THEN '${tier}'`);
-    expect(memory).toContain("MEMORY_MATCH_PREDICATE_DRIFT");
+      expect(rank).toContain(`${tier}:`);
+    expect(matcher).toContain('Object.freeze(["termOverlap"])');
+    expect(memory).toContain('field.startsWith("binding:") ? "binding" : field');
+    expect(memory).not.toContain("sharedTermCount");
+
+    const record = memory.slice(
+      memory.indexOf("async recordQuestionAndMatch"),
+      memory.indexOf("async #ownerScopedCandidateRefs")
+    );
+    const candidateRefs = memory.slice(
+      memory.indexOf("async #ownerScopedCandidateRefs"),
+      memory.indexOf("async #evaluateCandidate")
+    );
+    const evaluate = memory.slice(
+      memory.indexOf("async #evaluateCandidate"),
+      memory.indexOf("async #recordAnswerPull")
+    );
+    const answerPull = memory.slice(
+      memory.indexOf("async #recordAnswerPull"),
+      memory.indexOf("async readDisclosure")
+    );
+    const contradiction = memory.slice(memory.indexOf("async observeAnswerContradiction"));
+
+    expect(candidateRefs).toContain("SELECT key.question_key_id, key.run_id, key.at_seq");
+    expect(candidateRefs).toContain("key_owner.owner_ref=$2::uuid");
+    expect(candidateRefs).not.toContain("canonical_question_text");
+    expect(candidateRefs).not.toContain("normalized_binding");
+    expect(candidateRefs).not.toContain("frozen_terms");
+    expect(record).toMatch(/for \(const candidateRef of candidateRefs\) \{\s*const evaluated = await this\.#evaluateCandidate/);
+
+    const candidatePrepare = evaluate.indexOf("prepareContentEncryptionForRun");
+    const candidateTransaction = evaluate.indexOf("withWriteTransaction");
+    const candidateLock = evaluate.indexOf("FOR UPDATE", candidateTransaction);
+    const candidateOwner = evaluate.indexOf("core.run_is_owned_by", candidateLock);
+    const candidateFetch = evaluate.indexOf("const candidateRows = await client.query", candidateOwner);
+    const candidateDecrypt = evaluate.indexOf("decryptPreparedContentForRun", candidateFetch);
+    const candidateMatch = evaluate.indexOf("matchQuestionKeys", candidateDecrypt);
+    expect(candidatePrepare).toBeGreaterThan(-1);
+    expect(candidatePrepare).toBeLessThan(candidateTransaction);
+    expect(evaluate.match(/prepareContentEncryptionForRun/g)).toHaveLength(1);
+    expect(candidateTransaction).toBeLessThan(candidateLock);
+    expect(candidateLock).toBeLessThan(candidateOwner);
+    expect(candidateOwner).toBeLessThan(candidateFetch);
+    expect(candidateFetch).toBeLessThan(candidateDecrypt);
+    expect(candidateDecrypt).toBeLessThan(candidateMatch);
+
+    const finalTransaction = record.indexOf("await withWriteTransaction");
+    const finalCallback = record.indexOf("async (client) =>", finalTransaction);
+    const sortedRunIds = record.indexOf("[input.key.runId, selected.priorRunId].sort()", finalCallback);
+    const finalLock = record.indexOf("ORDER BY run_id FOR UPDATE", sortedRunIds);
+    const sourceOwner = record.indexOf("core.run_is_owned_by", finalLock);
+    const selectedOwner = record.indexOf("core.run_is_owned_by", sourceOwner + 1);
+    const firstWrite = record.indexOf("INSERT INTO memory.question_key", selectedOwner);
+    expect(finalCallback).toBeGreaterThan(finalTransaction);
+    expect(sortedRunIds).toBeGreaterThan(finalCallback);
+    expect(finalLock).toBeGreaterThan(sortedRunIds);
+    expect(sourceOwner).toBeGreaterThan(finalLock);
+    expect(selectedOwner).toBeGreaterThan(sourceOwner);
+    expect(firstWrite).toBeGreaterThan(selectedOwner);
+
+    expect(record).toContain("normalizedBinding: input.key.normalizedBinding");
+    expect(record).toContain("frozenTerms: input.key.frozenTerms");
+    expect(record).toContain("const storedBinding = questionContent === null ? input.key.normalizedBinding : {};");
+    expect(record).toContain("const storedTerms = questionContent === null ? input.key.frozenTerms : [];");
+    expect(answerPull).not.toContain("this.pool");
+    expect(answerPull).toContain("decryptPreparedContentForRun");
+    expect(answerPull).toContain("encryptPreparedContentForRun");
+
+    for (const [name, method, transaction] of [
+      ["recordQuestionAndMatch", record, finalTransaction],
+      ["evaluateCandidate", evaluate, candidateTransaction],
+      ["observeAnswerContradiction", contradiction, contradiction.indexOf("withWriteTransaction")]
+    ] as const) {
+      expect(transaction, name).toBeGreaterThan(-1);
+      const callback = method.indexOf("async (client) =>", transaction);
+      expect(callback, name).toBeGreaterThan(transaction);
+      const callbackAndCleanup = method.slice(callback);
+      expect(callbackAndCleanup, name).not.toContain("this.pool");
+      expect(callbackAndCleanup, name).not.toContain("prepareContentEncryptionForRun");
+      expect(callbackAndCleanup, name).not.toContain("encryptContentForRun");
+      expect(callbackAndCleanup, name).not.toContain("decryptContentForRun");
+    }
+
     expect(memory).not.toContain("jsonb_object_length");
-    expect(memory).toContain("current.normalized_binding<>'{}'::jsonb");
     for (const mirror of ["memoryQuestionKey", "memoryLink", "memoryLinkEvent", "memoryAliasRow", "memoryAliasRevocation", "memoryPullRecord", "memoryCandidateRecord"])
       expect(drizzle).toContain(`export const ${mirror}`);
   });

@@ -85,14 +85,62 @@ describe("Accounts S7 ownership architecture", () => {
     expect(memory).toContain("`owner:${access.ownerRef}`");
     const recordAndMatch = memory.slice(
       memory.indexOf("async recordQuestionAndMatch"),
+      memory.indexOf("async #ownerScopedCandidateRefs")
+    );
+    expect(recordAndMatch).toContain("#ownerScopedCandidateRefs");
+    expect(recordAndMatch).toContain("#evaluateCandidate");
+    expect(recordAndMatch.indexOf("prepareContentEncryptionForRun"))
+      .toBeLessThan(recordAndMatch.indexOf("await withWriteTransaction"));
+    const finalRunLock = recordAndMatch.indexOf("ORDER BY run_id FOR UPDATE");
+    const finalOwnershipCheck = recordAndMatch.indexOf("core.run_is_owned_by", finalRunLock);
+    const firstAllocation = recordAndMatch.indexOf("await allocateSequence(client)");
+    expect(finalRunLock).toBeGreaterThan(-1);
+    expect(finalOwnershipCheck).toBeGreaterThan(finalRunLock);
+    expect(firstAllocation).toBeGreaterThan(finalOwnershipCheck);
+
+    const candidateRefs = memory.slice(
+      memory.indexOf("async #ownerScopedCandidateRefs"),
+      memory.indexOf("async #evaluateCandidate")
+    );
+    expect(candidateRefs).toContain("key_owner.owner_ref=$2::uuid");
+    expect(candidateRefs).not.toContain("canonical_question_text");
+    expect(candidateRefs).not.toContain("normalized_binding");
+    expect(candidateRefs).not.toContain("frozen_terms");
+
+    const evaluateCandidate = memory.slice(
+      memory.indexOf("async #evaluateCandidate"),
       memory.indexOf("async #recordAnswerPull")
     );
-    const candidateDiscovery = recordAndMatch.indexOf("const candidates = await client.query");
-    const orderedRunLock = recordAndMatch.indexOf("ORDER BY run_id FOR UPDATE");
-    const firstAllocation = recordAndMatch.indexOf("await allocateSequence(client)");
-    expect(candidateDiscovery).toBeGreaterThan(-1);
-    expect(orderedRunLock).toBeGreaterThan(candidateDiscovery);
-    expect(firstAllocation).toBeGreaterThan(orderedRunLock);
+    const candidatePreparation = evaluateCandidate.indexOf("prepareContentEncryptionForRun");
+    const candidateTransaction = evaluateCandidate.indexOf("withWriteTransaction");
+    const candidateLock = evaluateCandidate.indexOf("FOR UPDATE");
+    const candidateOwnership = evaluateCandidate.indexOf("core.run_is_owned_by");
+    const candidateFetch = evaluateCandidate.indexOf("const candidateRows = await client.query");
+    const candidateDecrypt = evaluateCandidate.indexOf("decryptPreparedContentForRun");
+    expect(candidatePreparation).toBeLessThan(candidateTransaction);
+    expect(candidateLock).toBeLessThan(candidateOwnership);
+    expect(candidateOwnership).toBeLessThan(candidateFetch);
+    expect(candidateFetch).toBeLessThan(candidateDecrypt);
+
+    const answerPull = memory.slice(
+      memory.indexOf("async #recordAnswerPull"),
+      memory.indexOf("async readDisclosure")
+    );
+    expect(answerPull).toContain("decryptPreparedContentForRun");
+    expect(answerPull).toContain("encryptPreparedContentForRun");
+    expect(answerPull).not.toContain("this.pool");
+
+    const contradiction = memory.slice(memory.indexOf("async observeAnswerContradiction"));
+    const contradictionPreparation = contradiction.indexOf("prepareContentEncryptionForRun");
+    const contradictionTransaction = contradiction.indexOf("withWriteTransaction");
+    const contradictionLock = contradiction.indexOf("ORDER BY run_id FOR UPDATE");
+    const contradictionOwnership = contradiction.indexOf("core.run_is_owned_by");
+    const contradictionDecrypt = contradiction.indexOf("decryptPreparedContentForRun");
+    expect(contradictionPreparation).toBeLessThan(contradictionTransaction);
+    expect(contradictionLock).toBeLessThan(contradictionOwnership);
+    expect(contradictionOwnership).toBeLessThan(contradictionDecrypt);
+    expect(contradiction.slice(contradictionTransaction)).not.toContain("decryptContentForRun");
+    expect(contradiction.slice(contradictionTransaction)).not.toContain("encryptContentForRun");
   });
 
   it("revalidates ownership after reading the ungated lifecycle projection", async () => {
@@ -104,6 +152,21 @@ describe("Accounts S7 ownership architecture", () => {
     expect(finalRecheck).toBeGreaterThan(projectionRead);
     expect(firstYield).toBeGreaterThan(finalRecheck);
     expect(api.slice(finalRecheck, firstYield)).toContain("core.run_is_owned_by");
+  });
+
+  it("keeps replay-eviction content-key I/O outside the write transaction", async () => {
+    const serve = await read("packages/serve/src/index.ts");
+    const replayEviction = serve.slice(
+      serve.indexOf("async recordReplayEviction"),
+      serve.indexOf("async persist", serve.indexOf("async recordReplayEviction"))
+    );
+    const decrypt = replayEviction.indexOf("decryptContentForRun");
+    const transaction = replayEviction.indexOf("withWriteTransaction");
+    const callback = replayEviction.indexOf("async (client) =>", transaction);
+    expect(decrypt).toBeGreaterThan(-1);
+    expect(transaction).toBeGreaterThan(decrypt);
+    expect(callback).toBeGreaterThan(transaction);
+    expect(replayEviction.slice(callback)).not.toContain("this.pool");
   });
 
   it("never trusts ask-body ownership or caller scope", async () => {

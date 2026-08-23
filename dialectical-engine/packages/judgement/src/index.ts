@@ -337,13 +337,13 @@ export class JudgementRepository {
   }
 
   async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
+    const nodeReviewId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, input.runId, "ledger.node_review", nodeReviewId,
+      { reasons: input.reasons }
+    );
     try {
       return await withWriteTransaction(this.pool, async (client) => {
-        const nodeReviewId = randomUUID();
-        const content = await encryptContentForRun(
-          this.pool, input.runId, "ledger.node_review", nodeReviewId,
-          { reasons: input.reasons }
-        );
         const result = await client.query<{ node_review_id: string }>(
           `INSERT INTO ledger.node_review (
             node_review_id, run_id, node_id, author_raw_artifact_ref,

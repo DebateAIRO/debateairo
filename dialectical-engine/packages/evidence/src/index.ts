@@ -233,12 +233,12 @@ export class EvidenceRepository {
 
   async recordFrozenQuerySet(input: { readonly runId: string; readonly version: number; readonly seeds: readonly QuerySeed[] }): Promise<string> {
     const frozen = freezeQuerySet(input.seeds);
+    const querySetId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, input.runId, "evidence.query_set", querySetId,
+      { queries: frozen.queries }
+    );
     return withWriteTransaction(this.pool, async (client) => {
-      const querySetId = randomUUID();
-      const content = await encryptContentForRun(
-        this.pool, input.runId, "evidence.query_set", querySetId,
-        { queries: frozen.queries }
-      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ query_set_id: string }>(
         `INSERT INTO evidence.query_set (
@@ -262,12 +262,12 @@ export class EvidenceRepository {
     readonly reason: string;
   }): Promise<string> {
     const amendment = createQueryAmendment(input);
+    const queryAmendmentId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, input.runId, "evidence.query_amendment", queryAmendmentId,
+      { amendedQuery: amendment.amendedQuery, reason: amendment.reason }
+    );
     return withWriteTransaction(this.pool, async (client) => {
-      const queryAmendmentId = randomUUID();
-      const content = await encryptContentForRun(
-        this.pool, input.runId, "evidence.query_amendment", queryAmendmentId,
-        { amendedQuery: amendment.amendedQuery, reason: amendment.reason }
-      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ query_amendment_id: string }>(
         `INSERT INTO evidence.query_amendment (
@@ -350,11 +350,11 @@ export class EvidenceRepository {
       evidenceItemRef: evidenceItemId,
       replayHandle: input.replayHandle ?? ""
     });
+    const content = input.excerpt === null ? null : await encryptContentForRun(
+      this.pool, input.runId, "evidence.evidence_item", evidenceItemId,
+      { excerpt: input.excerpt }
+    );
     return withWriteTransaction(this.pool, async (client) => {
-      const content = input.excerpt === null ? null : await encryptContentForRun(
-        this.pool, input.runId, "evidence.evidence_item", evidenceItemId,
-        { excerpt: input.excerpt }
-      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ evidence_item_id: string }>(
         `INSERT INTO evidence.evidence_item (
@@ -378,12 +378,12 @@ export class EvidenceRepository {
   }
 
   async recordAbsence(input: { readonly runId: string; readonly querySetRef: string; readonly queryText: string; readonly scope: string; readonly observedAt: Date; readonly reason: string }): Promise<string> {
+    const absenceRowId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, input.runId, "evidence.absence_row", absenceRowId,
+      { queryText: input.queryText, reason: input.reason }
+    );
     return withWriteTransaction(this.pool, async (client) => {
-      const absenceRowId = randomUUID();
-      const content = await encryptContentForRun(
-        this.pool, input.runId, "evidence.absence_row", absenceRowId,
-        { queryText: input.queryText, reason: input.reason }
-      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ absence_row_id: string }>(
         `INSERT INTO evidence.absence_row (

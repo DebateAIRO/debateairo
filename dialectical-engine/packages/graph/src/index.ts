@@ -3,9 +3,11 @@ import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
-  decryptContentForRun,
-  encryptContentForRun,
+  decryptPreparedContentForRun,
+  encryptPreparedContentForRun,
+  prepareContentEncryptionForRun,
   type CryptoEnvelope,
+  type PreparedRunContentCipher,
   withWriteTransaction
 } from "@debateai/db";
 import {
@@ -212,8 +214,8 @@ function sameEdgePayload(
 export class GraphWriter {
   constructor(
     private readonly client: PoolClient,
-    private readonly pool: Pool,
-    private readonly runId: string
+    private readonly runId: string,
+    private readonly preparedContent: PreparedRunContentCipher | null
   ) {}
 
   async addNode(input: AddNodeInput): Promise<string> {
@@ -238,8 +240,8 @@ export class GraphWriter {
       materializedPath = `${parentRow.materialized_path}/${input.siblingOrdinal}`;
     }
     const nodeId = randomUUID();
-    const content = await encryptContentForRun(
-      this.pool, input.runId, "core.node", nodeId, { claimText: input.statementText }
+    const content = encryptPreparedContentForRun(
+      this.preparedContent, "core.node", nodeId, { claimText: input.statementText }
     );
     const inserted = await this.client.query<{ node_id: string }>(
       `INSERT INTO core.node (
@@ -375,8 +377,8 @@ export class GraphWriter {
     );
     const replay = existing.rows[0];
     if (replay !== undefined) {
-      const replayContent = await decryptContentForRun<{ claimText: string }>(
-        this.pool, this.runId, "core.node", replay.node_id, replay.content_ciphertext,
+      const replayContent = decryptPreparedContentForRun<{ claimText: string }>(
+        this.preparedContent, "core.node", replay.node_id, replay.content_ciphertext,
         { claimText: replay.claim_text }
       );
       if (
@@ -429,8 +431,8 @@ export class GraphWriter {
     readonly checkStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
   }): Promise<void> {
     const restatementId = randomUUID();
-    const content = await encryptContentForRun(
-      this.pool, this.runId, "core.stranger_restatement", restatementId,
+    const content = encryptPreparedContentForRun(
+      this.preparedContent, "core.stranger_restatement", restatementId,
       { restatementText: input.text }
     );
     await this.client.query(
@@ -452,10 +454,15 @@ export class GraphRepository {
   constructor(private readonly pool: Pool) {}
 
   async withGraphWrite<T>(runId: string, operation: (writer: GraphWriter) => Promise<T>): Promise<T> {
-    return withWriteTransaction(this.pool, async (client) => {
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [runId]);
-      return operation(new GraphWriter(client, this.pool, runId));
-    });
+    const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [runId]);
+        return operation(new GraphWriter(client, runId, preparedContent));
+      });
+    } finally {
+      preparedContent?.close();
+    }
   }
 
   async spawnPendingChild(input: SpawnPendingChildInput): Promise<SpawnedPendingChild> {

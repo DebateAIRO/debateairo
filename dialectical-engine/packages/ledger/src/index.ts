@@ -213,12 +213,12 @@ export class LedgerRepository {
   }
 
   async appendRawArtifact(input: AppendRawArtifactInput): Promise<string> {
+    const content = input.runId === null ? null : await encryptContentForRun(
+      this.pool, input.runId, "ledger.raw_artifact", input.artifactId,
+      { rawText: input.rawText }
+    );
     return withWriteTransaction(this.pool, async (client) => {
       const sequence = await allocateSequence(client);
-      const content = input.runId === null ? null : await encryptContentForRun(
-        this.pool, input.runId, "ledger.raw_artifact", input.artifactId,
-        { rawText: input.rawText }
-      );
       const result = await client.query<{ raw_artifact_id: string }>(
         `INSERT INTO ledger.raw_artifact (
           raw_artifact_id, attempt_id, run_id, provider_ref, provider,

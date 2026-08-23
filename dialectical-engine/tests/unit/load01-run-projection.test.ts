@@ -8,6 +8,9 @@ describe("LOAD-01 persisted run projection", () => {
     const pool = {
       query: async (text: string, values: readonly unknown[]) => {
         calls.push({ text, values });
+        if (text.includes("information_schema.columns")) {
+          return { rows: [{ applied: false }] };
+        }
         return {
           rows: [{
             run_id: "run:failed",
@@ -26,7 +29,8 @@ describe("LOAD-01 persisted run projection", () => {
       state: "FAILED",
       terminalReason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
     });
-    expect(calls[0]?.values).toEqual(["run:failed", null, "asker:owner"]);
-    expect(calls[0]?.text).toMatch(/core\.run_is_owned_by\(run\.run_id,\$2,\$3\)/);
+    const ownershipQuery = calls.find((call) => call.text.includes("core.run_is_owned_by"));
+    expect(ownershipQuery?.values).toEqual(["run:failed", null, "asker:owner"]);
+    expect(ownershipQuery?.text).toMatch(/core\.run_is_owned_by\(run\.run_id,\$2,\$3\)/);
   });
 });

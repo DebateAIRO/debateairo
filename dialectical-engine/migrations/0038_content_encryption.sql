@@ -144,6 +144,7 @@ BEGIN
     END IF;
   ELSIF TG_TABLE_SCHEMA = 'memory' AND TG_TABLE_NAME = 'question_key' THEN
     IF NEW.canonical_question_text <> sentinel OR octet_length(NEW.question_blind_index) <> 32
+      OR NEW.normalized_binding <> '{}'::jsonb OR NEW.frozen_terms <> '[]'::jsonb
       OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
       RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory.question_key' USING ERRCODE = '22023';
     END IF;

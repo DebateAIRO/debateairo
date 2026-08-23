@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +27,7 @@ import {
   loadApiEnvironment,
   loadRunnerEnvironment
 } from "../../packages/register/src/runtime-environment.js";
+import { encryptContentForRun, type Pool } from "../../packages/db/src/index.js";
 
 class MemoryUserDekStore implements ReadableUserDekStore {
   readonly #keys = new Map<string, Buffer>();
@@ -31,6 +41,66 @@ class MemoryUserDekStore implements ReadableUserDekStore {
     if (key === undefined) throw new Error("USER_DEK_NOT_FOUND");
     return Buffer.from(key);
   }
+}
+
+type RunKeyFileSystemFailure = "temp-sync" | "directory-sync" | "cleanup";
+
+function observingRunKeyFileSystem(
+  events: string[],
+  failures: ReadonlySet<RunKeyFileSystemFailure> = new Set()
+) {
+  return {
+    mkdir,
+    chmod,
+    stat,
+    readFile,
+    async rename(source: string, destination: string) {
+      events.push("rename");
+      await rename(source, destination);
+    },
+    async rm(path: string, options: { recursive: boolean; force: boolean }) {
+      events.push("cleanup");
+      if (failures.has("cleanup")) throw new Error("S6_INJECTED_CLEANUP_FAILURE");
+      await rm(path, options);
+    },
+    async open(path: string, flags: string, mode?: number) {
+      const handle = await open(path, flags, mode);
+      const directory = !path.includes("content-key.v1.json");
+      events.push(directory ? "open-directory" : "open-temp");
+      return {
+        writeFile: handle.writeFile.bind(handle),
+        async sync() {
+          events.push(directory ? "sync-directory" : "sync-temp");
+          if (!directory && failures.has("temp-sync")) {
+            throw new Error("S6_INJECTED_TEMP_FSYNC_FAILURE");
+          }
+          if (directory && failures.has("directory-sync")) {
+            throw new Error("S6_INJECTED_DIRECTORY_FSYNC_FAILURE");
+          }
+          await handle.sync();
+        },
+        async close() {
+          events.push(directory ? "close-directory" : "close-temp");
+          await handle.close();
+        }
+      };
+    }
+  };
+}
+
+function fileRunContentKeyStoreWithIo(
+  root: string,
+  users: ReadableUserDekStore,
+  resolveUserId: (ownerRef: string) => Promise<string>,
+  io: ReturnType<typeof observingRunKeyFileSystem>
+): FileRunContentKeyStore {
+  const InjectableStore = FileRunContentKeyStore as unknown as new (
+    candidateRoot: string,
+    candidateUsers: ReadableUserDekStore,
+    candidateResolver: (ownerRef: string) => Promise<string>,
+    candidateIo: ReturnType<typeof observingRunKeyFileSystem>
+  ) => FileRunContentKeyStore;
+  return new InjectableStore(root, users, resolveUserId, io);
 }
 
 async function fixture() {
@@ -123,6 +193,21 @@ function stubRunnerEnvironment(): void {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("S6 per-run private content encryption", () => {
+  it("returns null without touching PostgreSQL when no content cipher is configured", async () => {
+    const query = vi.fn(async () => {
+      throw new Error("S6_DISABLED_CIPHER_MUST_NOT_QUERY");
+    });
+    const pool = { query } as unknown as Pool;
+    await expect(encryptContentForRun(
+      pool,
+      randomUUID(),
+      "core.node",
+      randomUUID(),
+      { claimText: "legacy plaintext" }
+    )).resolves.toBeNull();
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("binds ciphertext to the carrier, primary key, run, user and envelope version", async () => {
     const { cipher, runId } = await fixture();
     const rowId = randomUUID();
@@ -253,6 +338,111 @@ describe("S6 per-run private content encryption", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  it("durably publishes a run key by syncing the temporary file and containing directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-s6-key-durability-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    const events: string[] = [];
+    await users.store(userId, generateDek());
+    const store = fileRunContentKeyStoreWithIo(
+      root,
+      users,
+      async (candidate) => candidate === ownerRef ? userId : "unresolved",
+      observingRunKeyFileSystem(events)
+    );
+    try {
+      await store.store(runId, { userId, ownerRef }, generateDek());
+      expect(events).toEqual([
+        "open-temp",
+        "sync-temp",
+        "close-temp",
+        "rename",
+        "open-directory",
+        "sync-directory",
+        "close-directory"
+      ]);
+      const location = join(root, "runs", runId, "content-key.v1.json");
+      expect((await stat(location)).mode & 0o777).toBe(0o600);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("removes an unpublished run-key directory after a temporary-file fsync crash", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-s6-key-temp-crash-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    const events: string[] = [];
+    await users.store(userId, generateDek());
+    const store = fileRunContentKeyStoreWithIo(
+      root,
+      users,
+      async () => userId,
+      observingRunKeyFileSystem(events, new Set(["temp-sync"]))
+    );
+    try {
+      await expect(store.store(runId, { userId, ownerRef }, generateDek()))
+        .rejects.toThrow("S6_INJECTED_TEMP_FSYNC_FAILURE");
+      expect(events).toContain("cleanup");
+      await expect(stat(join(root, "runs", runId))).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("surfaces cleanup failure instead of swallowing it after an unpublished write fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-s6-key-cleanup-crash-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    await users.store(userId, generateDek());
+    const store = fileRunContentKeyStoreWithIo(
+      root,
+      users,
+      async () => userId,
+      observingRunKeyFileSystem([], new Set(["temp-sync", "cleanup"]))
+    );
+    try {
+      await expect(store.store(runId, { userId, ownerRef }, generateDek()))
+        .rejects.toMatchObject({
+          code: "RUN_CONTENT_KEY_STORE_CLEANUP_FAILED",
+          message: "Run content-key publication cleanup did not complete"
+        });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports uncertain durability without deleting a key that was already renamed", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-s6-key-directory-crash-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    await users.store(userId, generateDek());
+    const store = fileRunContentKeyStoreWithIo(
+      root,
+      users,
+      async () => userId,
+      observingRunKeyFileSystem([], new Set(["directory-sync"]))
+    );
+    try {
+      await expect(store.store(runId, { userId, ownerRef }, generateDek()))
+        .rejects.toMatchObject({
+          code: "RUN_CONTENT_KEY_STORE_DURABILITY_UNCERTAIN",
+          message: "Run content-key durability could not be confirmed"
+        });
+      expect((await stat(join(root, "runs", runId, "content-key.v1.json"))).isFile()).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("defaults content encryption off and fails closed when enablement lacks key paths", () => {
     vi.stubEnv("CONTENT_ENCRYPTION_ENABLED", undefined);
     vi.stubEnv("CONTENT_BLIND_INDEX_KEY_PATH", undefined);
@@ -312,5 +502,27 @@ describe("S6 per-run private content encryption", () => {
     await expect(failing.provisionRun(randomUUID(), { userId, ownerRef }))
       .rejects.toThrow("SECRET_STORE_WRITE_FAILED");
     expect([...failedKey!].every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("zeroes a prepared run key immediately on close and cannot reuse it", async () => {
+    const runId = randomUUID();
+    const ownerRef = randomUUID();
+    let loaded: Buffer | undefined;
+    const cipher = new ContentCipher({
+      async store() {},
+      async load(): Promise<LoadedRunContentKey> {
+        loaded = generateDek();
+        return { runId, ownerRef, key: loaded };
+      },
+      async destroy() {}
+    }, Buffer.alloc(32, 0x1c));
+    const prepared = await cipher.prepareRun(runId);
+    expect([...loaded!].some((byte) => byte !== 0)).toBe(true);
+    prepared.encrypt("core.run", runId, { questionLine: "prepared lifetime" });
+    prepared.close();
+    expect([...loaded!].every((byte) => byte === 0)).toBe(true);
+    expect(() => prepared.encrypt("core.run", runId, { questionLine: "must fail" }))
+      .toThrow("RUN_CONTENT_KEY_UNRESOLVED");
+    prepared.close();
   });
 });

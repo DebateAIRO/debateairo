@@ -919,34 +919,34 @@ export class ServeRepository {
   }
 
   async recordReplayEviction(servedNumberId: string): Promise<void> {
-    await withWriteTransaction(this.pool, async (client) => {
-      const number = await client.query<{
-        run_id: string;
-        answer_id: string;
-        answer_version: number;
-        number_ref: string;
-        composed_text_id: string | null;
-        content_ciphertext: CryptoEnvelope | null;
-        segments: Array<{ segment_id: string; served_number_refs: string[] }> | null;
-      }>(
-        `SELECT answer.run_id, number.answer_id, number.answer_version, number.number_ref,
-                composed.composed_text_id, composed.segments, composed.content_ciphertext
-         FROM serve.served_number AS number
-         JOIN serve.answer AS answer
-           ON answer.answer_id = number.answer_id AND answer.answer_version = number.answer_version
-         LEFT JOIN serve.composed_text AS composed ON composed.composed_text_id = answer.composed_text_id
-         WHERE number.served_number_id = $1`,
-        [servedNumberId]
+    const number = await this.pool.query<{
+      run_id: string;
+      answer_id: string;
+      answer_version: number;
+      number_ref: string;
+      composed_text_id: string | null;
+      content_ciphertext: CryptoEnvelope | null;
+      segments: Array<{ segment_id: string; served_number_refs: string[] }> | null;
+    }>(
+      `SELECT answer.run_id, number.answer_id, number.answer_version, number.number_ref,
+              composed.composed_text_id, composed.segments, composed.content_ciphertext
+       FROM serve.served_number AS number
+       JOIN serve.answer AS answer
+         ON answer.answer_id = number.answer_id AND answer.answer_version = number.answer_version
+       LEFT JOIN serve.composed_text AS composed ON composed.composed_text_id = answer.composed_text_id
+       WHERE number.served_number_id = $1`,
+      [servedNumberId]
+    );
+    const owner = number.rows[0];
+    if (owner === undefined) {
+      throw new TypedDomainError("SERVED_NUMBER_NOT_FOUND", `No served number ${servedNumberId} exists`);
+    }
+    const composedContent = owner.composed_text_id === null ? { segments: owner.segments ?? [] }
+      : await decryptContentForRun<{ segments: Array<{ segment_id: string; served_number_refs: string[] }> }>(
+        this.pool, owner.run_id, "serve.composed_text", owner.composed_text_id,
+        owner.content_ciphertext, { segments: owner.segments ?? [] }
       );
-      const owner = number.rows[0];
-      if (owner === undefined) {
-        throw new TypedDomainError("SERVED_NUMBER_NOT_FOUND", `No served number ${servedNumberId} exists`);
-      }
-      const composedContent = owner.composed_text_id === null ? { segments: owner.segments ?? [] }
-        : await decryptContentForRun<{ segments: Array<{ segment_id: string; served_number_refs: string[] }> }>(
-          this.pool, owner.run_id, "serve.composed_text", owner.composed_text_id,
-          owner.content_ciphertext, { segments: owner.segments ?? [] }
-        );
+    await withWriteTransaction(this.pool, async (client) => {
       await client.query(
         `INSERT INTO serve.served_number_event (served_number_id, status, reason, at_seq)
          VALUES ($1,'EVICTED','MISSING-NUMBER',$2)`,
@@ -1005,6 +1005,24 @@ export class ServeRepository {
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
       reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
     });
+    const factBundleId = randomUUID();
+    const factContent = await encryptContentForRun(
+      this.pool, input.runId, "serve.fact_bundle", factBundleId,
+      { facts: input.factBundle.facts, residualObjections: input.factBundle.residualObjections }
+    );
+    const nextComposedTextId = randomUUID();
+    const storedSegments = input.segments.map((segment) => ({
+      segment_id: segment.segmentId,
+      text: segment.text,
+      load_bearing: segment.loadBearing,
+      served_number_refs: segment.servedNumberRefs
+    }));
+    const composedContent = input.supersedes !== undefined || input.compositionRawArtifactRef === null
+      ? null
+      : await encryptContentForRun(
+        this.pool, input.runId, "serve.composed_text", nextComposedTextId,
+        { segments: storedSegments }
+      );
     return withWriteTransaction(this.pool, async (client) => {
       const prior = input.supersedes === undefined ? null : await client.query<{
         answer_id: string;
@@ -1038,11 +1056,6 @@ export class ServeRepository {
       const answerVersion = priorAnswer === undefined
         ? input.factBundleVersion
         : priorAnswer.answer_version + 1;
-      const factBundleId = randomUUID();
-      const factContent = await encryptContentForRun(
-        this.pool, input.runId, "serve.fact_bundle", factBundleId,
-        { facts: input.factBundle.facts, residualObjections: input.factBundle.residualObjections }
-      );
       const facts = await client.query<{ fact_bundle_id: string }>(
         `INSERT INTO serve.fact_bundle (
           fact_bundle_id,run_id,facts,residual_objections,content_hash,version,content_ciphertext
@@ -1057,19 +1070,6 @@ export class ServeRepository {
         ]
       );
       const storedFactBundleId = facts.rows[0]!.fact_bundle_id;
-      const nextComposedTextId = randomUUID();
-      const storedSegments = input.segments.map((segment) => ({
-        segment_id: segment.segmentId,
-        text: segment.text,
-        load_bearing: segment.loadBearing,
-        served_number_refs: segment.servedNumberRefs
-      }));
-      const composedContent = priorAnswer !== undefined || input.compositionRawArtifactRef === null
-        ? null
-        : await encryptContentForRun(
-          this.pool, input.runId, "serve.composed_text", nextComposedTextId,
-          { segments: storedSegments }
-        );
       const composed = priorAnswer !== undefined || input.compositionRawArtifactRef === null ? null : await client.query<{ composed_text_id: string }>(
         `INSERT INTO serve.composed_text (
           composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext
@@ -1755,16 +1755,21 @@ export class ServeRepository {
     readonly userInput: string | null;
   }): Promise<InvestigationAccepted | null> {
     const access = normalizeRunOwnership(input.ownership);
+    const candidate = (await this.pool.query<{ answer_version: number; run_id: string }>(
+      `SELECT answer.answer_version,answer.run_id
+       FROM serve.answer AS answer
+       WHERE answer.answer_id=$1
+       ORDER BY answer.answer_version DESC LIMIT 1`,
+      [input.answerId]
+    )).rows[0];
+    if (candidate === undefined) return null;
+    const requestRef = randomUUID();
+    const replayHandle = `investigation-request:${requestRef}`;
+    const content = input.userInput === null ? null : await encryptContentForRun(
+      this.pool, candidate.run_id, "core.investigation_request", requestRef,
+      { userInput: input.userInput }
+    );
     return withWriteTransaction(this.pool, async (client) => {
-      const located = await client.query<{ answer_version: number; run_id: string }>(
-        `SELECT answer.answer_version,answer.run_id
-         FROM serve.answer AS answer
-         WHERE answer.answer_id=$1
-         ORDER BY answer.answer_version DESC LIMIT 1`,
-        [input.answerId]
-      );
-      const candidate = located.rows[0];
-      if (candidate === undefined) return null;
       const locked = await client.query<{ run_id: string }>(
         `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [candidate.run_id]
       );
@@ -1789,12 +1794,7 @@ export class ServeRepository {
         [input.answerId, candidate.run_id, input.gapRef]
       )).rows[0];
       if (answer === undefined) return null;
-      const requestRef = randomUUID();
-      const replayHandle = `investigation-request:${requestRef}`;
-      const content = input.userInput === null ? null : await encryptContentForRun(
-        this.pool, answer.run_id, "core.investigation_request", requestRef,
-        { userInput: input.userInput }
-      );
+      if (answer.run_id !== candidate.run_id) return null;
       await client.query(
         `INSERT INTO core.investigation_request (
            investigation_request_id, run_id, answer_id, answer_version, gap_ref,

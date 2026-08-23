@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ContentCipher,
   FileRunContentKeyStore,
@@ -16,6 +17,7 @@ import {
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   configureContentEncryption,
+  createPool,
   migrate,
   RunRepository
 } from "@debateai/db";
@@ -29,23 +31,29 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
+const { Pool: PgPool } = pg;
+
 class TrackingRunContentKeyStore implements RunContentKeyStore {
   readonly storedRunIds: string[] = [];
   readonly destroyedRunIds: string[] = [];
   failNextDestroy = false;
+  operationObserver: ((operation: "store" | "load" | "destroy") => void) | undefined;
 
   constructor(private readonly delegate: RunContentKeyStore) {}
 
   async store(runId: string, identity: RunContentKeyIdentity, key: Uint8Array): Promise<void> {
+    this.operationObserver?.("store");
     await this.delegate.store(runId, identity, key);
     this.storedRunIds.push(runId);
   }
 
   load(runId: string): Promise<LoadedRunContentKey> {
+    this.operationObserver?.("load");
     return this.delegate.load(runId);
   }
 
   async destroy(runId: string): Promise<void> {
+    this.operationObserver?.("destroy");
     if (this.failNextDestroy) {
       this.failNextDestroy = false;
       throw new Error("SECRET_STORE_DELETE_FAILED");
@@ -61,6 +69,7 @@ let userId: string;
 let ownerRef: string;
 let keys: TrackingRunContentKeyStore;
 let cipher: ContentCipher;
+let ownerResolverObserver: (() => void) | undefined;
 
 async function createActiveUser(): Promise<void> {
   userId = randomUUID();
@@ -76,7 +85,13 @@ async function createActiveUser(): Promise<void> {
 }
 
 async function createEncryptedRun(questionLine: string): Promise<string> {
-  return new RunRepository(database.pool).startRun({
+  return new RunRepository(database.pool).startRun(serverRunInput(questionLine));
+}
+
+function serverRunInput(
+  questionLine: string
+): Parameters<RunRepository["startRun"]>[0] {
+  return {
     questionLine,
     askContract: { audience: "private-test" },
     principal: { kind: "server", userId, ownerRef },
@@ -95,7 +110,7 @@ async function createEncryptedRun(questionLine: string): Promise<string> {
     registerVersion: 1,
     batteryVersion: "s6:integration",
     batteryRows: []
-  });
+  };
 }
 
 async function createLegacyRun(questionLine: string): Promise<string> {
@@ -119,6 +134,49 @@ async function createLegacyRun(questionLine: string): Promise<string> {
     batteryVersion: "s6:legacy-compatibility",
     batteryRows: []
   });
+}
+
+async function createForeignOwnerRef(): Promise<string> {
+  const foreignOwnerRef = randomUUID();
+  await database.pool.query(
+    `INSERT INTO identity."user" (
+       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+       adult_affirmed_at,created_at
+     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+    [randomUUID(), randomBytes(32), `s6-foreign-${randomUUID()}`, randomUUID(), foreignOwnerRef]
+  );
+  return foreignOwnerRef;
+}
+
+async function persistAcceptedTerminal(runId: string, marker: string): Promise<string> {
+  const terminal = await persistTerminalRun({
+    pool: database.pool,
+    runId,
+    fixtureKey: marker,
+    factBundle: {
+      facts: [`s6-accepted-fact-${marker}`],
+      residualObjections: [],
+      badges: [],
+      conditionMarks: ["DEFECT"],
+      reversalPoint: `s6-accepted-reversal-${marker}`,
+      buildsOnPrevious: { value: false, answerRef: null },
+      memoryDisclosure: null
+    }
+  });
+  await database.pool.query(
+    `INSERT INTO scorecard.answer_outcome (
+       outcome_attempt_id,answer_id,answer_version,as_of,run_id,model_id,
+       model_version,provider,task_class,prior,posterior,basis,resolver_ref,
+       resolver_is_external,resolved_outcome,resolved_at,provenance_ref,
+       scoreability,accepted,superseded_by_answer_outcome_id,at_seq
+     ) VALUES ($1,$2,1,now(),$3,'model:s6-memory','v1','provider:s6-memory',
+       'task:s6-memory',0.5,0.7,'s6:memory-race','resolver:s6-memory',true,true,
+       now(),'artifact:s6-memory','PERMANENTLY_UNSCOREABLE',true,NULL,
+       ledger.allocate_sequence())`,
+    [randomUUID(), terminal.answerId, runId]
+  );
+  return terminal.answerId;
 }
 
 async function postgresDataContains(root: string, needle: string): Promise<boolean> {
@@ -152,6 +210,7 @@ beforeAll(async () => {
     secretRoot,
     users,
     async (candidate) => {
+      ownerResolverObserver?.();
       const result = await database.pool.query<{ user_id: string }>(
         `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
         [candidate]
@@ -384,11 +443,496 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     await expect(keys.load(provisioned)).rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
   });
 
+  it("retains the external key and reports a sanitized incomplete rollback after an ambiguous COMMIT", async () => {
+    const storedBefore = keys.storedRunIds.length;
+    const repositoryPool = createPool(database.connectionString);
+    configureContentEncryption(repositoryPool, cipher);
+    const pool = repositoryPool as unknown as {
+      connect(): Promise<{
+        query: (...args: unknown[]) => Promise<unknown>;
+      }>;
+    };
+    const connect = pool.connect.bind(pool);
+    const connectSpy = vi.spyOn(pool, "connect").mockImplementationOnce(async () => {
+      const client = await connect();
+      const query = client.query.bind(client);
+      client.query = async (...args: unknown[]) => {
+        const result = await query(...args);
+        if (String(args[0]).trim() === "COMMIT") {
+          client.query = query;
+          throw Object.assign(new Error("s6 transport details must not escape"), { code: "ECONNRESET" });
+        }
+        return result;
+      };
+      return client;
+    });
+    try {
+      const failure = await new RunRepository(repositoryPool)
+        .startRun(serverRunInput(`S6 ambiguous commit ${randomUUID()}`))
+        .catch((error: unknown) => error);
+      expect(failure).toMatchObject({
+        code: "RUN_CONTENT_ROLLBACK_INCOMPLETE",
+        message: "Run rollback or external content-key cleanup did not complete"
+      });
+      expect(String(failure)).not.toContain("transport details");
+      expect(String(failure)).not.toContain("ECONNRESET");
+      const provisioned = keys.storedRunIds[storedBefore]!;
+      expect(keys.destroyedRunIds).not.toContain(provisioned);
+      await expect(keys.load(provisioned)).resolves.toMatchObject({ runId: provisioned });
+      expect((await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM core.run WHERE run_id=$1",
+        [provisioned]
+      )).rows[0]?.count).toBe("1");
+    } finally {
+      connectSpy.mockRestore();
+      await repositoryPool.end();
+    }
+  });
+
+  it("performs provisioning, initial encryption, key loading, and owner resolution before BEGIN", async () => {
+    const observations: Array<{
+      operation: "store" | "load" | "destroy" | "resolve";
+      transactionOpen: boolean;
+      identityLockHeld: boolean;
+    }> = [];
+    let transactionOpen = false;
+    let identityLockHeld = false;
+    const observe = (operation: "store" | "load" | "destroy" | "resolve") => {
+      observations.push({ operation, transactionOpen, identityLockHeld });
+    };
+    keys.operationObserver = observe;
+    ownerResolverObserver = () => observe("resolve");
+    const repositoryPool = createPool(database.connectionString);
+    configureContentEncryption(repositoryPool, cipher);
+    const pool = repositoryPool as unknown as {
+      connect(): Promise<{
+        query: (...args: unknown[]) => Promise<unknown>;
+      }>;
+    };
+    const connect = pool.connect.bind(pool);
+    const connectSpy = vi.spyOn(pool, "connect").mockImplementationOnce(async () => {
+      const client = await connect();
+      const query = client.query.bind(client);
+      client.query = async (...args: unknown[]) => {
+        const sql = String(args[0]);
+        const result = await query(...args);
+        if (sql.trim() === "BEGIN") transactionOpen = true;
+        if (/FROM identity\."user"[\s\S]*FOR UPDATE/.test(sql)) identityLockHeld = true;
+        if (sql.trim() === "COMMIT" || sql.trim() === "ROLLBACK") {
+          transactionOpen = false;
+          identityLockHeld = false;
+          client.query = query;
+        }
+        return result;
+      };
+      return client;
+    });
+    try {
+      await new RunRepository(repositoryPool).startRun(serverRunInput(`S6 ordering ${randomUUID()}`));
+    } finally {
+      connectSpy.mockRestore();
+      keys.operationObserver = undefined;
+      ownerResolverObserver = undefined;
+      await repositoryPool.end();
+    }
+    expect(observations.map((entry) => entry.operation)).toEqual(["store", "load", "resolve"]);
+    expect(observations.every((entry) => !entry.transactionOpen && !entry.identityLockHeld)).toBe(true);
+  });
+
+  it("fails closed when a 0038 encrypted run is read through a pool without a content cipher", async () => {
+    const runId = await createEncryptedRun(`S6 missing cipher ${randomUUID()}`);
+    const unconfiguredPool = createPool(database.connectionString);
+    try {
+      await expect(new RunRepository(unconfiguredPool).readLoadingProjection(runId, {
+        ownerRef,
+        legacyAskerId: null
+      })).rejects.toMatchObject({ code: "CONTENT_CIPHER_UNAVAILABLE" });
+      await expect(new RunRepository(unconfiguredPool).readFrozenHead(runId))
+        .rejects.toMatchObject({ code: "CONTENT_CIPHER_UNAVAILABLE" });
+    } finally {
+      await unconfiguredPool.end();
+    }
+  });
+
+  it("stores encrypted memory bindings and terms only inside the authenticated envelope", async () => {
+    const marker = randomUUID();
+    const runId = await createEncryptedRun(`S6 memory metadata ${marker}`);
+    const canonicalQuestionText = `s6 memory metadata question ${marker}`;
+    const bindingField = `s6-distinct-binding-field-${marker}`;
+    const normalizedBinding = { [bindingField]: `s6-distinct-binding-${marker}` };
+    const frozenTerms = [`s6-distinct-term-${marker}`];
+    await new MemoryRepository(database.pool).recordQuestionAndMatch({
+      key: {
+        runId,
+        canonicalQuestionText,
+        callerScope: "ASKER",
+        askerScope: `owner:${ownerRef}`,
+        settlementAct: null,
+        questionType: null,
+        declaredField: null,
+        normalizedBinding,
+        frozenTerms,
+        frozenQuerySetHash: null,
+        asOf: "2026-08-23T00:00:00.000Z",
+        policyVersion: 1,
+        keyVersion: 1
+      },
+      decidedBy: "s6:memory-metadata-red",
+      ownership: { ownerRef, legacyAskerId: null }
+    });
+    const raw = (await database.pool.query<{
+      question_key_id: string;
+      normalized_binding: Record<string, string>;
+      frozen_terms: string[];
+      content_ciphertext: object;
+    }>(
+      `SELECT question_key_id,normalized_binding,frozen_terms,content_ciphertext
+       FROM memory.question_key WHERE run_id=$1`,
+      [runId]
+    )).rows[0]!;
+    expect(raw.normalized_binding).toEqual({});
+    expect(raw.frozen_terms).toEqual([]);
+    await expect(cipher.decrypt(
+      runId, "memory.question_key", raw.question_key_id, raw.content_ciphertext as never
+    )).resolves.toEqual({ canonicalQuestionText, normalizedBinding, frozenTerms });
+    const serialized = JSON.stringify(raw);
+    expect(serialized).not.toContain(normalizedBinding[bindingField]);
+    expect(serialized).not.toContain(frozenTerms[0]!);
+
+    await persistAcceptedTerminal(runId, `metadata-${marker}`);
+    const currentRunId = await createEncryptedRun(`s6 metadata candidate ${marker}`);
+    const disclosure = await new MemoryRepository(database.pool).recordQuestionAndMatch({
+      key: {
+        runId: currentRunId,
+        canonicalQuestionText: `s6 alternate metadata question ${marker}`,
+        callerScope: "ASKER",
+        askerScope: `owner:${ownerRef}`,
+        settlementAct: null,
+        questionType: null,
+        declaredField: null,
+        normalizedBinding: {},
+        frozenTerms,
+        frozenQuerySetHash: null,
+        asOf: "2026-08-23T00:00:00.000Z",
+        policyVersion: 1,
+        keyVersion: 1
+      },
+      decidedBy: "s6:memory-metadata-red",
+      ownership: { ownerRef, legacyAskerId: null }
+    });
+    expect(disclosure).toMatchObject({
+      matched: false,
+      candidates_not_linked: [{ prior_run_id: runId, tier: "TERM_OVERLAP" }]
+    });
+    const matchMetadata = (await database.pool.query<{
+      match_tier: string;
+      agreement_pattern: Record<string, unknown>;
+    }>(
+      `SELECT match_tier,agreement_pattern
+       FROM memory.candidate_record WHERE source_run_id=$1`,
+      [currentRunId]
+    )).rows[0]!;
+    expect(matchMetadata).toMatchObject({
+      match_tier: "TERM_OVERLAP",
+      agreement_pattern: { agreedFields: ["termOverlap"] }
+    });
+    const persistedMetadata = JSON.stringify((await database.pool.query<{ body: string }>(
+      `SELECT string_agg(body, E'\\n') AS body FROM (
+         SELECT to_jsonb(value)::text AS body
+         FROM memory.question_key AS value WHERE run_id=ANY($1::uuid[])
+         UNION ALL
+         SELECT to_jsonb(value)::text AS body
+         FROM memory.candidate_record AS value WHERE source_run_id=$2
+       ) AS persisted`,
+      [[runId, currentRunId], currentRunId]
+    )).rows[0]?.body ?? "");
+    for (const forbidden of [
+      frozenTerms[0]!,
+      bindingField,
+      `binding:${bindingField}`,
+      `term:${frozenTerms[0]!}`,
+      "frozenTerms:1",
+      "sharedTermCount"
+    ]) expect(persistedMetadata).not.toContain(forbidden);
+    await database.pool.query("CHECKPOINT");
+    const dataDirectory = (await database.pool.query<{ data_directory: string }>(
+      "SHOW data_directory"
+    )).rows[0]!.data_directory;
+    for (const forbidden of [
+      frozenTerms[0]!, bindingField, `binding:${bindingField}`, "frozenTerms:1", "sharedTermCount"
+    ]) {
+      await expect(postgresDataContains(dataDirectory, forbidden)).resolves.toBe(false);
+    }
+  });
+
+  it("does not decrypt a candidate after a queued ownership change wins its short lock", async () => {
+    const marker = randomUUID();
+    const canonicalQuestionText = `s6 candidate ownership race ${marker}`;
+    const priorRunId = await createEncryptedRun(`s6 candidate race prior ${marker}`);
+    await persistAcceptedTerminal(priorRunId, `candidate-race-${marker}`);
+    const questionKeyId = randomUUID();
+    const wrongPrimaryKey = randomUUID();
+    const relocatedEnvelope = await cipher.encrypt(
+      priorRunId,
+      "memory.question_key",
+      wrongPrimaryKey,
+      { canonicalQuestionText, normalizedBinding: {}, frozenTerms: [] }
+    );
+    await database.pool.query(
+      `INSERT INTO memory.question_key (
+         question_key_id,run_id,canonical_question_text,caller_scope,asker_scope,
+         settlement_act,question_type,declared_field,normalized_binding,frozen_terms,
+         frozen_query_set_hash,as_of,policy_version,key_version,at_seq,
+         question_blind_index,content_ciphertext
+       ) VALUES ($1,$2,$3,'ASKER',$4,NULL,NULL,NULL,'{}'::jsonb,'[]'::jsonb,
+         NULL,now(),1,1,ledger.allocate_sequence(),$5,$6::jsonb)`,
+      [
+        questionKeyId,
+        priorRunId,
+        CONTENT_CIPHERTEXT_SENTINEL,
+        `owner:${ownerRef}`,
+        cipher.questionBlindIndex(ownerRef, canonicalQuestionText),
+        JSON.stringify(relocatedEnvelope)
+      ]
+    );
+    const currentRunId = await createEncryptedRun(`s6 candidate race current ${marker}`);
+    const foreignOwnerRef = await createForeignOwnerRef();
+    const blocker = await database.pool.connect();
+    const claimant = await database.pool.connect();
+    let claim: Promise<unknown> | undefined;
+    let matching: Promise<Awaited<ReturnType<MemoryRepository["recordQuestionAndMatch"]>>> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [priorRunId]);
+      await claimant.query("BEGIN");
+      claim = claimant.query(
+        "SELECT core.append_run_ownership_event($1,$2) AS at_seq",
+        [priorRunId, foreignOwnerRef]
+      );
+      matching = new MemoryRepository(database.pool).recordQuestionAndMatch({
+        key: {
+          runId: currentRunId,
+          canonicalQuestionText,
+          callerScope: "ASKER",
+          askerScope: `owner:${ownerRef}`,
+          settlementAct: null,
+          questionType: null,
+          declaredField: null,
+          normalizedBinding: {},
+          frozenTerms: [],
+          frozenQuerySetHash: null,
+          asOf: "2026-08-23T00:00:00.000Z",
+          policyVersion: 1,
+          keyVersion: 1
+        },
+        decidedBy: "s6:candidate-ownership-race",
+        ownership: { ownerRef, legacyAskerId: null }
+      });
+      let lockWaiters = 0;
+      for (let attempt = 0; attempt < 60 && lockWaiters < 2; attempt += 1) {
+        lockWaiters = Number((await database.pool.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity
+           WHERE wait_event_type='Lock'
+             AND (query LIKE '%append_run_ownership_event%'
+               OR query LIKE '%core.run WHERE run_id=$1 FOR UPDATE%')`
+        )).rows[0]!.count);
+        if (lockWaiters < 2) await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(lockWaiters).toBeGreaterThanOrEqual(2);
+      await blocker.query("COMMIT");
+      await claim;
+      await claimant.query("COMMIT");
+      await expect(matching).resolves.toBeNull();
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      await claimant.query("ROLLBACK").catch(() => undefined);
+      await claim?.catch(() => undefined);
+      await matching?.catch(() => undefined);
+      blocker.release();
+      claimant.release();
+    }
+    expect((await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM memory.memory_link WHERE source_run_id=$1",
+      [currentRunId]
+    )).rows[0]!.count).toBe("0");
+  }, 60_000);
+
+  it("drops a selected match when ownership changes before the final deterministic lock", async () => {
+    const marker = randomUUID();
+    const canonicalQuestionText = `s6 final ownership race ${marker}`;
+    const memory = new MemoryRepository(database.pool);
+    let priorRunId = await createEncryptedRun(`s6 final race prior ${marker}`);
+    for (let attempt = 0; attempt < 32 && priorRunId < "80000000-0000-4000-8000-000000000000"; attempt += 1) {
+      priorRunId = await createEncryptedRun(`s6 final race prior retry ${attempt} ${marker}`);
+    }
+    expect(priorRunId >= "80000000-0000-4000-8000-000000000000").toBe(true);
+    await expect(memory.recordQuestionAndMatch({
+      key: {
+        runId: priorRunId,
+        canonicalQuestionText,
+        callerScope: "ASKER",
+        askerScope: `owner:${ownerRef}`,
+        settlementAct: null,
+        questionType: null,
+        declaredField: null,
+        normalizedBinding: {},
+        frozenTerms: [],
+        frozenQuerySetHash: null,
+        asOf: "2026-08-23T00:00:00.000Z",
+        policyVersion: 1,
+        keyVersion: 1
+      },
+      decidedBy: "s6:final-ownership-race",
+      ownership: { ownerRef, legacyAskerId: null }
+    })).resolves.toBeNull();
+    await persistAcceptedTerminal(priorRunId, `final-race-${marker}`);
+    let currentRunId = await createEncryptedRun(`s6 final race current ${marker}`);
+    for (let attempt = 0; attempt < 32 && currentRunId >= priorRunId; attempt += 1) {
+      currentRunId = await createEncryptedRun(`s6 final race current retry ${attempt} ${marker}`);
+    }
+    expect(currentRunId < priorRunId).toBe(true);
+    const foreignOwnerRef = await createForeignOwnerRef();
+    const blocker = await database.pool.connect();
+    let matching: Promise<Awaited<ReturnType<MemoryRepository["recordQuestionAndMatch"]>>> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [currentRunId]);
+      matching = memory.recordQuestionAndMatch({
+        key: {
+          runId: currentRunId,
+          canonicalQuestionText,
+          callerScope: "ASKER",
+          askerScope: `owner:${ownerRef}`,
+          settlementAct: null,
+          questionType: null,
+          declaredField: null,
+          normalizedBinding: {},
+          frozenTerms: [],
+          frozenQuerySetHash: null,
+          asOf: "2026-08-23T00:00:00.000Z",
+          policyVersion: 1,
+          keyVersion: 1
+        },
+        decidedBy: "s6:final-ownership-race",
+        ownership: { ownerRef, legacyAskerId: null }
+      });
+      let finalLockWaiters = 0;
+      for (let attempt = 0; attempt < 60 && finalLockWaiters < 1; attempt += 1) {
+        finalLockWaiters = Number((await database.pool.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity
+           WHERE wait_event_type='Lock'
+             AND query LIKE '%run_id=ANY($1::uuid[])%ORDER BY run_id FOR UPDATE%'`
+        )).rows[0]!.count);
+        if (finalLockWaiters < 1) await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(finalLockWaiters).toBeGreaterThanOrEqual(1);
+      await database.pool.query(
+        "SELECT core.append_run_ownership_event($1,$2) AS at_seq",
+        [priorRunId, foreignOwnerRef]
+      );
+      await blocker.query("COMMIT");
+      await expect(matching).resolves.toBeNull();
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      await matching?.catch(() => undefined);
+      blocker.release();
+    }
+    expect((await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM memory.memory_link WHERE source_run_id=$1",
+      [currentRunId]
+    )).rows[0]!.count).toBe("0");
+  }, 60_000);
+
+  it("completes concurrent encrypted graph writes through a bounded one-connection pool", async () => {
+    const boundedPool = new PgPool({
+      connectionString: database.connectionString,
+      max: 1,
+      connectionTimeoutMillis: 750
+    });
+    configureContentEncryption(boundedPool, cipher);
+    try {
+      const repository = new RunRepository(boundedPool);
+      const runIds = [
+        await repository.startRun(serverRunInput(`S6 bounded graph A ${randomUUID()}`)),
+        await repository.startRun(serverRunInput(`S6 bounded graph B ${randomUUID()}`))
+      ];
+      expect(boundedPool.totalCount).toBe(1);
+      const nodeIds = await Promise.all(runIds.map((runId, index) =>
+        new GraphRepository(boundedPool).withGraphWrite(runId, (writer) => writer.addNode({
+          runId,
+          statementText: `S6 bounded node ${index} ${randomUUID()}`,
+          claimType: "unknown",
+          parentNodeId: null,
+          childKind: null,
+          siblingOrdinal: 0,
+          generationStatus: "complete",
+          pathStatus: "active",
+          explorationDecision: "continue",
+          provenanceRef: null,
+          wayOfKnowing: "REASONING",
+          locator: null,
+          valueLaden: false
+        }))
+      ));
+      expect(nodeIds).toHaveLength(2);
+      expect(new Set(nodeIds).size).toBe(2);
+      expect(boundedPool.totalCount).toBe(1);
+      expect(boundedPool.waitingCount).toBe(0);
+    } finally {
+      await boundedPool.end();
+    }
+  });
+
   it("round-trips every physical carrier and shreds all eleven logical groups while rows persist", async () => {
     const marker = randomUUID();
     const runQuestion = `s6-run-${marker}`;
     const runId = await createEncryptedRun(runQuestion);
     const priorRunId = await createEncryptedRun(`s6-prior-${marker}`);
+    let activeTransactions = 0;
+    const nestedPoolQueries: string[] = [];
+    type GuardedClient = { query: (...args: unknown[]) => Promise<unknown> };
+    const guardedPool = database.pool as unknown as {
+      connect: (...args: unknown[]) => unknown;
+      query: (...args: unknown[]) => Promise<unknown>;
+    };
+    const directConnect = guardedPool.connect.bind(guardedPool);
+    const directQuery = guardedPool.query.bind(guardedPool);
+    const instrumentedClients = new WeakSet<object>();
+    const instrumentClient = (client: GuardedClient): GuardedClient => {
+      if (instrumentedClients.has(client)) return client;
+      instrumentedClients.add(client);
+      const query = client.query.bind(client);
+      client.query = async (...args: unknown[]) => {
+        const sql = String(args[0]).trim();
+        const result = await query(...args);
+        if (sql === "BEGIN") activeTransactions += 1;
+        if (sql === "COMMIT" || sql === "ROLLBACK") {
+          activeTransactions -= 1;
+        }
+        return result;
+      };
+      return client;
+    };
+    const connectSpy = vi.spyOn(guardedPool, "connect").mockImplementation((...args: unknown[]) => {
+      const connected = directConnect() as Promise<GuardedClient>;
+      const callback = args[0];
+      if (typeof callback === "function") {
+        void connected.then(
+          (client) => callback(undefined, instrumentClient(client)),
+          (error: unknown) => callback(error)
+        );
+        return undefined;
+      }
+      return connected.then(instrumentClient);
+    });
+    const querySpy = vi.spyOn(guardedPool, "query").mockImplementation(async (...args: unknown[]) => {
+      if (activeTransactions > 0) {
+        nestedPoolQueries.push(String(args[0]));
+        throw new Error("S6_NESTED_POOL_CHECKOUT_INSIDE_WRITE_TRANSACTION");
+      }
+      return directQuery(...args);
+    });
+    try {
     const ledger = new LedgerRepository(database.pool);
     const authorArtifactId = randomUUID();
     const reviewerArtifactId = randomUUID();
@@ -506,6 +1050,8 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     );
 
     const canonicalQuestion = `s6-memory-question-${marker}`;
+    const normalizedBindingMarker = `s6-memory-binding-${marker}`;
+    const frozenTermMarker = `s6-memory-term-${marker}`;
     await new MemoryRepository(database.pool).recordQuestionAndMatch({
       key: {
         runId,
@@ -515,8 +1061,8 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         settlementAct: null,
         questionType: null,
         declaredField: null,
-        normalizedBinding: {},
-        frozenTerms: [],
+        normalizedBinding: { subject: normalizedBindingMarker },
+        frozenTerms: [frozenTermMarker],
         frozenQuerySetHash: null,
         asOf: "2026-08-23T00:00:00.000Z",
         policyVersion: 1,
@@ -529,6 +1075,24 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       "SELECT question_key_id FROM memory.question_key WHERE run_id=$1",
       [runId]
     )).rows[0]!.question_key_id;
+    const rawMemoryKey = (await database.pool.query<{
+      normalized_binding: Record<string, string>;
+      frozen_terms: string[];
+      content_ciphertext: object;
+    }>(
+      `SELECT normalized_binding,frozen_terms,content_ciphertext
+       FROM memory.question_key WHERE question_key_id=$1`,
+      [questionKeyId]
+    )).rows[0]!;
+    expect(rawMemoryKey.normalized_binding).toEqual({});
+    expect(rawMemoryKey.frozen_terms).toEqual([]);
+    await expect(cipher.decrypt(
+      runId, "memory.question_key", questionKeyId, rawMemoryKey.content_ciphertext as never
+    )).resolves.toMatchObject({
+      canonicalQuestionText: canonicalQuestion,
+      normalizedBinding: { subject: normalizedBindingMarker },
+      frozenTerms: [frozenTermMarker]
+    });
 
     const memoryLinkId = randomUUID();
     await database.pool.query(
@@ -805,7 +1369,8 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     );
     for (const plaintext of [
       runQuestion, rawText, nodeClaim, restatementText, factMarker, residualMarker,
-      segmentMarker, reviewReasons[0]!, canonicalQuestion, payloadSnapshot.note, userInput,
+      segmentMarker, reviewReasons[0]!, canonicalQuestion, normalizedBindingMarker,
+      frozenTermMarker, payloadSnapshot.note, userInput,
       `s6-support-${marker}`, `s6-amended-${marker}`, `s6-excerpt-${marker}`,
       `s6-absence-query-${marker}`
     ]) expect(persisted.rows[0]!.body).not.toContain(plaintext);
@@ -824,7 +1389,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     const dataDirectory = (await database.pool.query<{ data_directory: string }>(
       "SHOW data_directory"
     )).rows[0]!.data_directory;
-    for (const plaintext of [runQuestion, rawText, canonicalQuestion, userInput]) {
+    for (const plaintext of [
+      runQuestion, rawText, canonicalQuestion, normalizedBindingMarker, frozenTermMarker, userInput
+    ]) {
       await expect(postgresDataContains(dataDirectory, plaintext)).resolves.toBe(false);
     }
 
@@ -855,5 +1422,10 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       [runId]
     );
     expect(Number(rowCount.rows[0]?.count)).toBeGreaterThanOrEqual(14);
+    expect(nestedPoolQueries).toEqual([]);
+    } finally {
+      querySpy.mockRestore();
+      connectSpy.mockRestore();
+    }
   });
 });

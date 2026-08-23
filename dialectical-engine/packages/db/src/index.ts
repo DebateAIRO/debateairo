@@ -3,7 +3,12 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
-import type { ContentCarrier, ContentCipher, CryptoEnvelope } from "@debateai/crypto";
+import type {
+  ContentCarrier,
+  ContentCipher,
+  CryptoEnvelope,
+  PreparedRunContentCipher
+} from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export {
@@ -58,12 +63,60 @@ export async function encryptContentForRun(
   primaryKey: string,
   value: unknown
 ): Promise<CryptoEnvelope | null> {
+  const cipher = contentCipherFor(pool);
+  if (cipher === undefined) return null;
   if (!await runUsesContentEncryption(pool, runId)) return null;
+  const prepared = await cipher.prepareRun(runId);
+  try {
+    return prepared.encrypt(carrier, primaryKey, value);
+  } finally {
+    prepared.close();
+  }
+}
+
+export async function prepareContentEncryptionForRun(
+  pool: Pool,
+  runId: string
+): Promise<PreparedRunContentCipher | null> {
+  const cipher = contentCipherFor(pool);
+  if (cipher === undefined) return null;
+  if (!await runUsesContentEncryption(pool, runId)) return null;
+  return cipher.prepareRun(runId);
+}
+
+export function encryptPreparedContentForRun(
+  prepared: PreparedRunContentCipher | null,
+  carrier: ContentCarrier,
+  primaryKey: string,
+  value: unknown
+): CryptoEnvelope | null {
+  if (prepared === null) return null;
+  return prepared.encrypt(carrier, primaryKey, value);
+}
+
+export function decryptPreparedContentForRun<T>(
+  prepared: PreparedRunContentCipher | null,
+  carrier: ContentCarrier,
+  primaryKey: string,
+  envelope: CryptoEnvelope | null,
+  legacyValue: T
+): T {
+  if (envelope === null) return legacyValue;
+  if (prepared === null) {
+    throw new TypedDomainError(
+      "CONTENT_CIPHER_UNAVAILABLE",
+      "Encrypted content cannot be read without the external key store"
+    );
+  }
+  return prepared.decrypt<T>(carrier, primaryKey, envelope);
+}
+
+export function assertContentCipherAvailable(pool: Pool): ContentCipher {
   const cipher = contentCipherFor(pool);
   if (cipher === undefined) {
     throw new TypedDomainError("CONTENT_CIPHER_UNAVAILABLE", "Encrypted content cannot be written without the external key store");
   }
-  return cipher.encrypt(runId, carrier, primaryKey, value);
+  return cipher;
 }
 
 export async function decryptContentForRun<T>(
@@ -80,6 +133,17 @@ export async function decryptContentForRun<T>(
     throw new TypedDomainError("CONTENT_CIPHER_UNAVAILABLE", "Encrypted content cannot be read without the external key store");
   }
   return cipher.decrypt<T>(runId, carrier, primaryKey, envelope);
+}
+
+async function contentEncryptionSchemaIsApplied(pool: Pool): Promise<boolean> {
+  const result = await pool.query<{ applied: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='core' AND table_name='run'
+         AND column_name='content_encryption_version'
+     ) AS applied`
+  );
+  return result.rows[0]?.applied === true;
 }
 
 type UntypedMethod = (...args: unknown[]) => unknown;
@@ -445,40 +509,30 @@ export class RunRepository {
     const runId = randomUUID();
     const cipher = contentCipherFor(this.pool);
     let contentKeyProvisioned = false;
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      const askerId = input.principal.kind === "server"
-        ? `owner:${input.principal.ownerRef}`
-        : input.principal.legacyAskerId;
-      if (input.principal.kind === "legacy") {
-        if (RAW_USER_ASKER.test(askerId)) {
-          throw new TypedDomainError("RUN_OWNER_RAW_ID_FORBIDDEN", "Raw user identifiers cannot enter immutable run rows");
-        }
-        try {
-          normalizeRunOwnership(Object.freeze({ ownerRef: null, legacyAskerId: askerId }));
-        } catch {
-          throw new TypedDomainError("RUN_LEGACY_ASKER_INVALID", "Legacy runs cannot use a reserved identity scope");
-        }
-      } else {
-        if (!UUID_V4.test(input.principal.ownerRef)) {
-          throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
-        }
-        const activeOwner = await client.query<{ owner_ref: string }>(
-          `SELECT owner_ref FROM identity."user"
-           WHERE user_id=$1 AND owner_ref=$2 AND state='active'
-           FOR UPDATE`,
-          [input.principal.userId, input.principal.ownerRef]
-        );
-        if (activeOwner.rows[0]?.owner_ref !== input.principal.ownerRef) {
-          throw new TypedDomainError("RUN_OWNER_INVALID", "The authenticated owner mapping is no longer active");
-        }
+    let commitAttempted = false;
+    let transactionStarted = false;
+    let client: PoolClient | undefined;
+    const askerId = input.principal.kind === "server"
+      ? `owner:${input.principal.ownerRef}`
+      : input.principal.legacyAskerId;
+    if (input.principal.kind === "legacy") {
+      if (RAW_USER_ASKER.test(askerId)) {
+        throw new TypedDomainError("RUN_OWNER_RAW_ID_FORBIDDEN", "Raw user identifiers cannot enter immutable run rows");
       }
-      const askContract = input.askContract ?? {};
-      let storedQuestionLine = input.questionLine;
-      let storedAskContract: Readonly<Record<string, unknown>> = askContract;
-      let contentEnvelope: CryptoEnvelope | null = null;
-      let questionBlindIndex: Buffer | null = null;
+      try {
+        normalizeRunOwnership(Object.freeze({ ownerRef: null, legacyAskerId: askerId }));
+      } catch {
+        throw new TypedDomainError("RUN_LEGACY_ASKER_INVALID", "Legacy runs cannot use a reserved identity scope");
+      }
+    } else if (!UUID_V4.test(input.principal.ownerRef)) {
+      throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
+    }
+    const askContract = input.askContract ?? {};
+    let storedQuestionLine = input.questionLine;
+    let storedAskContract: Readonly<Record<string, unknown>> = askContract;
+    let contentEnvelope: CryptoEnvelope | null = null;
+    let questionBlindIndex: Buffer | null = null;
+    try {
       if (input.principal.kind === "server" && cipher !== undefined) {
         await cipher.provisionRun(runId, {
           userId: input.principal.userId,
@@ -492,6 +546,20 @@ export class RunRepository {
         questionBlindIndex = cipher.questionBlindIndex(input.principal.ownerRef, input.questionLine);
         storedQuestionLine = CONTENT_CIPHERTEXT_SENTINEL;
         storedAskContract = CONTENT_JSON_SENTINEL;
+      }
+      client = await this.pool.connect();
+      await client.query("BEGIN");
+      transactionStarted = true;
+      if (input.principal.kind === "server") {
+        const activeOwner = await client.query<{ owner_ref: string }>(
+          `SELECT owner_ref FROM identity."user"
+           WHERE user_id=$1 AND owner_ref=$2 AND state='active'
+           FOR UPDATE`,
+          [input.principal.userId, input.principal.ownerRef]
+        );
+        if (activeOwner.rows[0]?.owner_ref !== input.principal.ownerRef) {
+          throw new TypedDomainError("RUN_OWNER_INVALID", "The authenticated owner mapping is no longer active");
+        }
       }
       const createdAtSeq = await allocateSequence(client);
       const baseRunValues = [
@@ -576,14 +644,24 @@ export class RunRepository {
           ]
         );
       }
+      commitAttempted = true;
       await client.query("COMMIT");
+      transactionStarted = false;
       return runId;
     } catch (error) {
+      if (commitAttempted) {
+        throw new TypedDomainError(
+          "RUN_CONTENT_ROLLBACK_INCOMPLETE",
+          "Run rollback or external content-key cleanup did not complete"
+        );
+      }
       let rollbackIncomplete = false;
-      try {
-        await client.query("ROLLBACK");
-      } catch {
-        rollbackIncomplete = true;
+      if (client !== undefined && transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          rollbackIncomplete = true;
+        }
       }
       if (contentKeyProvisioned) {
         try {
@@ -600,18 +678,20 @@ export class RunRepository {
       }
       throw error;
     } finally {
-      client.release();
+      client?.release();
     }
   }
 
   async readLoadingProjection(runId: string, ownership: RunOwnershipInput): Promise<RunLoadingProjection | null> {
     const access = normalizeRunOwnership(ownership);
-    const contentCiphertextProjection = contentCipherFor(this.pool) === undefined
-      ? ""
-      : ", run.content_ciphertext";
+    const encryptionSchemaApplied = await contentEncryptionSchemaIsApplied(this.pool);
+    const contentCiphertextProjection = encryptionSchemaApplied
+      ? ", run.content_encryption_version, run.content_ciphertext"
+      : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
       state: RunLoadingProjection["state"];
       terminal_reason: string | null;
@@ -648,6 +728,12 @@ export class RunRepository {
     );
     const row = result.rows[0];
     if (row === undefined) return null;
+    if (row.content_encryption_version === 1 && contentCipherFor(this.pool) === undefined) {
+      throw new TypedDomainError(
+        "CONTENT_CIPHER_UNAVAILABLE",
+        "Encrypted content cannot be read without the external key store"
+      );
+    }
     const content = await decryptContentForRun<{ questionLine: string }>(
       this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext ?? null,
       { questionLine: row.question_line }
@@ -758,12 +844,14 @@ export class RunRepository {
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
   }> {
-    const contentCiphertextProjection = contentCipherFor(this.pool) === undefined
-      ? ""
-      : ", content_ciphertext";
+    const encryptionSchemaApplied = await contentEncryptionSchemaIsApplied(this.pool);
+    const contentCiphertextProjection = encryptionSchemaApplied
+      ? ", content_encryption_version, content_ciphertext"
+      : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
       agent_count: number;
       discovered_panel: DiscoveredPanelMember[];
@@ -779,6 +867,12 @@ export class RunRepository {
     );
     const row = result.rows[0];
     if (row === undefined) throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
+    if (row.content_encryption_version === 1 && contentCipherFor(this.pool) === undefined) {
+      throw new TypedDomainError(
+        "CONTENT_CIPHER_UNAVAILABLE",
+        "Encrypted content cannot be read without the external key store"
+      );
+    }
     const content = await decryptContentForRun<{ questionLine: string }>(
       this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext ?? null,
       { questionLine: row.question_line }
@@ -797,7 +891,7 @@ export class RunRepository {
 }
 
 export type { Pool } from "pg";
-export type { CryptoEnvelope } from "@debateai/crypto";
+export type { CryptoEnvelope, PreparedRunContentCipher } from "@debateai/crypto";
 export {
   auditEvent,
   channelBinding,

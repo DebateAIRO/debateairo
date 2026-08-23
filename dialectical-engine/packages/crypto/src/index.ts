@@ -9,7 +9,7 @@ import {
   timingSafeEqual
 } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
-import { chmod, mkdir, open, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
@@ -1069,6 +1069,26 @@ export interface RunContentKeyStore {
   destroy(runId: string): Promise<void>;
 }
 
+export interface RunContentKeyFileSystem {
+  readonly mkdir: typeof mkdir;
+  readonly chmod: typeof chmod;
+  readonly open: typeof open;
+  readonly readFile: typeof readFile;
+  readonly rename: typeof rename;
+  readonly rm: typeof rm;
+  readonly stat: typeof stat;
+}
+
+const defaultRunContentKeyFileSystem: RunContentKeyFileSystem = Object.freeze({
+  mkdir,
+  chmod,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat
+});
+
 export class RunContentKeyUnresolvedError extends CryptoError {
   constructor() {
     super("RUN_CONTENT_KEY_UNRESOLVED", "RUN_CONTENT_KEY_UNRESOLVED");
@@ -1197,7 +1217,8 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
   constructor(
     private readonly root: string,
     private readonly users: ReadableUserDekStore,
-    private readonly resolveUserId: OwnerRefResolver
+    private readonly resolveUserId: OwnerRefResolver,
+    private readonly fileSystem: RunContentKeyFileSystem = defaultRunContentKeyFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("RUN_CONTENT_KEY_STORE_PATH_REQUIRED");
   }
@@ -1207,25 +1228,67 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     const runs = join(this.root, "runs");
     const directory = join(runs, runId);
     const location = join(directory, "content-key.v1.json");
+    const temporary = join(directory, "content-key.v1.json.tmp");
     let file: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
+    let published = false;
     try {
-      await mkdir(this.root, { recursive: true, mode: 0o700 });
-      await chmod(this.root, 0o700);
-      await mkdir(runs, { recursive: true, mode: 0o700 });
-      await chmod(runs, 0o700);
-      await mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(this.root, 0o700);
+      await this.fileSystem.mkdir(runs, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(runs, 0o700);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
       directoryCreated = true;
-      file = await open(location, "wx", 0o600);
+      file = await this.fileSystem.open(temporary, "wx", 0o600);
       await file.writeFile(JSON.stringify(record), "utf8");
+      await file.sync();
+      await file.close();
+      file = undefined;
+      await this.fileSystem.rename(temporary, location);
+      published = true;
+      directoryHandle = await this.fileSystem.open(directory, "r");
+      await directoryHandle.sync();
+      await directoryHandle.close();
+      directoryHandle = undefined;
     } catch (error) {
-      await file?.close().catch(() => undefined);
+      const cleanupFailures: unknown[] = [];
+      if (file !== undefined) {
+        try {
+          await file.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        file = undefined;
+      }
+      if (directoryHandle !== undefined) {
+        try {
+          await directoryHandle.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        directoryHandle = undefined;
+      }
+      if (published) {
+        throw new CryptoError(
+          "RUN_CONTENT_KEY_STORE_DURABILITY_UNCERTAIN",
+          "Run content-key durability could not be confirmed"
+        );
+      }
       if (directoryCreated) {
-        await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+        try {
+          await this.fileSystem.rm(directory, { recursive: true, force: true });
+        } catch (cleanupError) {
+          cleanupFailures.push(cleanupError);
+        }
+      }
+      if (cleanupFailures.length > 0) {
+        throw new CryptoError(
+          "RUN_CONTENT_KEY_STORE_CLEANUP_FAILED",
+          "Run content-key publication cleanup did not complete"
+        );
       }
       throw error;
-    } finally {
-      await file?.close().catch(() => undefined);
     }
   }
 
@@ -1233,11 +1296,11 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     const location = join(this.root, "runs", runId, "content-key.v1.json");
     try {
-      const metadata = await stat(location);
+      const metadata = await this.fileSystem.stat(location);
       if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
         throw new RunContentKeyUnresolvedError();
       }
-      const record = parseStoredRunContentKey(JSON.parse(await readFile(location, "utf8")), runId);
+      const record = parseStoredRunContentKey(JSON.parse(await this.fileSystem.readFile(location, "utf8")), runId);
       return await unwrapRunContentKey(this.users, this.resolveUserId, record);
     } catch (error) {
       if (error instanceof RunContentKeyUnresolvedError) throw error;
@@ -1247,7 +1310,65 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
 
   async destroy(runId: string): Promise<void> {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
-    await rm(join(this.root, "runs", runId), { recursive: true, force: true });
+    await this.fileSystem.rm(join(this.root, "runs", runId), { recursive: true, force: true });
+  }
+}
+
+export interface PreparedRunContentCipher {
+  readonly runId: string;
+  encrypt(carrier: ContentCarrier, primaryKey: string, value: unknown): CryptoEnvelope;
+  decrypt<T = unknown>(carrier: ContentCarrier, primaryKey: string, envelope: CryptoEnvelope): T;
+  close(): void;
+}
+
+class PreparedRunContentCipherImpl implements PreparedRunContentCipher {
+  #key: Buffer | undefined;
+
+  constructor(
+    readonly runId: string,
+    private readonly ownerRef: string,
+    key: Buffer
+  ) {
+    this.#key = key;
+  }
+
+  encrypt(carrier: ContentCarrier, primaryKey: string, value: unknown): CryptoEnvelope {
+    const key = this.#key;
+    if (key === undefined) throw new RunContentKeyUnresolvedError();
+    const plaintext = Buffer.from(JSON.stringify(value), "utf8");
+    try {
+      const [schema, table] = carrier.split(".") as [string, string];
+      return encrypt(key, plaintext, [
+        schema, table, primaryKey, this.runId, this.ownerRef,
+        `run-content:${this.runId}:v1`, "1"
+      ]);
+    } finally {
+      plaintext.fill(0);
+    }
+  }
+
+  decrypt<T = unknown>(carrier: ContentCarrier, primaryKey: string, envelope: CryptoEnvelope): T {
+    const key = this.#key;
+    if (key === undefined) throw new RunContentKeyUnresolvedError();
+    let plaintext: Buffer | undefined;
+    try {
+      const [schema, table] = carrier.split(".") as [string, string];
+      plaintext = decrypt(key, envelope, [
+        schema, table, primaryKey, this.runId, this.ownerRef,
+        `run-content:${this.runId}:v1`, "1"
+      ]);
+      return JSON.parse(plaintext.toString("utf8")) as T;
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new CryptoAuthenticationError();
+      throw error;
+    } finally {
+      plaintext?.fill(0);
+    }
+  }
+
+  close(): void {
+    this.#key?.fill(0);
+    this.#key = undefined;
   }
 }
 
@@ -1279,18 +1400,17 @@ export class ContentCipher {
     primaryKey: string,
     value: unknown
   ): Promise<CryptoEnvelope> {
-    const loaded = await this.keys.load(runId);
-    const plaintext = Buffer.from(JSON.stringify(value), "utf8");
+    const prepared = await this.prepareRun(runId);
     try {
-      const [schema, table] = carrier.split(".") as [string, string];
-      return encrypt(loaded.key, plaintext, [
-        schema, table, primaryKey, runId, loaded.ownerRef,
-        `run-content:${runId}:v1`, "1"
-      ]);
+      return prepared.encrypt(carrier, primaryKey, value);
     } finally {
-      plaintext.fill(0);
-      loaded.key.fill(0);
+      prepared.close();
     }
+  }
+
+  async prepareRun(runId: string): Promise<PreparedRunContentCipher> {
+    const loaded = await this.keys.load(runId);
+    return new PreparedRunContentCipherImpl(runId, loaded.ownerRef, loaded.key);
   }
 
   async decrypt<T = unknown>(
@@ -1299,21 +1419,11 @@ export class ContentCipher {
     primaryKey: string,
     envelope: CryptoEnvelope
   ): Promise<T> {
-    const loaded = await this.keys.load(runId);
-    let plaintext: Buffer | undefined;
+    const prepared = await this.prepareRun(runId);
     try {
-      const [schema, table] = carrier.split(".") as [string, string];
-      plaintext = decrypt(loaded.key, envelope, [
-        schema, table, primaryKey, runId, loaded.ownerRef,
-        `run-content:${runId}:v1`, "1"
-      ]);
-      return JSON.parse(plaintext.toString("utf8")) as T;
-    } catch (error) {
-      if (error instanceof SyntaxError) throw new CryptoAuthenticationError();
-      throw error;
+      return prepared.decrypt<T>(carrier, primaryKey, envelope);
     } finally {
-      plaintext?.fill(0);
-      loaded.key.fill(0);
+      prepared.close();
     }
   }
 

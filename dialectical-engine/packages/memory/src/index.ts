@@ -4,10 +4,13 @@ import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
   decryptContentForRun,
-  encryptContentForRun,
+  decryptPreparedContentForRun,
+  encryptPreparedContentForRun,
   normalizeRunOwnership,
+  prepareContentEncryptionForRun,
   questionBlindIndexForOwner,
   type CryptoEnvelope,
+  type PreparedRunContentCipher,
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
@@ -43,7 +46,6 @@ export interface MemoryMatchFact {
   readonly agreedFields: readonly string[];
   readonly disagreedFields: readonly string[];
   readonly notComparedFields: readonly string[];
-  readonly sharedTermCount: number;
 }
 
 function nonBlank(value: string | null | undefined): value is string {
@@ -62,6 +64,12 @@ function compareField(
     notCompared.push(name);
   } else if (current === prior) agreed.push(name);
   else disagreed.push(name);
+}
+
+function nonContentMatchFields(fields: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(fields.map((field) =>
+    field.startsWith("binding:") ? "binding" : field
+  ))]);
 }
 
 export function canonicalizeQuestionText(value: string): string {
@@ -105,10 +113,11 @@ export function matchQuestionKeys(current: MemoryQuestionKey, prior: MemoryQuest
     tier,
     relation: autoLink ? "REPEATS" : "RELATED_ONLY",
     autoLink,
-    agreedFields: Object.freeze(tier === "TERM_OVERLAP" ? sharedTerms.map((term) => `term:${term}`) : agreed),
-    disagreedFields: Object.freeze(disagreed),
-    notComparedFields: Object.freeze(notCompared),
-    sharedTermCount: sharedTerms.length
+    agreedFields: tier === "TERM_OVERLAP"
+      ? Object.freeze(["termOverlap"])
+      : nonContentMatchFields(agreed),
+    disagreedFields: nonContentMatchFields(disagreed),
+    notComparedFields: nonContentMatchFields(notCompared)
   });
 }
 
@@ -264,8 +273,49 @@ type QuestionKeyRow = {
   caller_scope: string; asker_scope: string;
   settlement_act: string | null; question_type: string | null; declared_field: string | null;
   normalized_binding: Record<string, string | null>; frozen_terms: string[]; frozen_query_set_hash: string | null;
-  as_of: Date; policy_version: string; key_version: number;
+  as_of: Date; policy_version: string; key_version: number; at_seq: string;
 };
+
+type MemoryCandidateRef = {
+  readonly question_key_id: string;
+  readonly run_id: string;
+  readonly at_seq: string;
+};
+
+type MemoryCandidateSelection = {
+  readonly priorRunId: string;
+  readonly answerId: string;
+  readonly atSeq: string;
+  readonly priorAsOf: Date;
+  readonly priorPolicyVersion: number;
+  readonly priorKeyVersion: number;
+  readonly match: MemoryMatchFact;
+};
+
+const MEMORY_MATCH_RANK: Readonly<Record<MemoryMatchTier, number>> = Object.freeze({
+  EXACT_QUESTION: 1,
+  SAME_BINDING: 2,
+  PARTIAL_BINDING: 3,
+  TERM_OVERLAP: 4
+});
+
+function prefersCandidate(
+  candidate: MemoryCandidateSelection,
+  selected: MemoryCandidateSelection | undefined
+): boolean {
+  if (selected === undefined) return true;
+  const candidateRank = MEMORY_MATCH_RANK[candidate.match.tier];
+  const selectedRank = MEMORY_MATCH_RANK[selected.match.tier];
+  if (candidateRank !== selectedRank) return candidateRank < selectedRank;
+  return BigInt(candidate.atSeq) > BigInt(selected.atSeq);
+}
+
+function ownershipFromMemoryScope(askerScope: string): ReturnType<typeof normalizeRunOwnership> {
+  if (askerScope.startsWith("owner:")) {
+    return normalizeRunOwnership({ ownerRef: askerScope.slice("owner:".length), legacyAskerId: null });
+  }
+  return normalizeRunOwnership(askerScope);
+}
 
 function fromRow(row: QuestionKeyRow): MemoryQuestionKey {
   return Object.freeze({
@@ -300,112 +350,45 @@ export class MemoryRepository {
         "The immutable memory scope must be derived from the authenticated run owner"
       );
     }
+    const currentKey = Object.freeze({ ...input.key, askerScope });
+    let selected: MemoryCandidateSelection | undefined;
+    const candidateRefs = await this.#ownerScopedCandidateRefs(input.key.runId, access);
+    for (const candidateRef of candidateRefs) {
+      const evaluated = await this.#evaluateCandidate(currentKey, access, askerScope, candidateRef);
+      if (evaluated !== null && prefersCandidate(evaluated, selected)) selected = evaluated;
+    }
+
     const questionKeyId = randomUUID();
-    const questionContent = await encryptContentForRun(
-      this.pool, input.key.runId, "memory.question_key", questionKeyId,
-      { canonicalQuestionText: input.key.canonicalQuestionText }
-    );
-    const questionBlindIndex = access.ownerRef === null
-      ? null
-      : questionBlindIndexForOwner(this.pool, access.ownerRef, input.key.canonicalQuestionText);
-    const storedQuestion = questionContent === null
-      ? input.key.canonicalQuestionText
-      : CONTENT_CIPHERTEXT_SENTINEL;
-    await withWriteTransaction(this.pool, async (client) => {
-      const candidates = await client.query<QuestionKeyRow & {
-        answer_id: string;
-        db_match_tier: MemoryMatchTier;
-        effective_asker_scope: string;
-        current_effective_asker_scope: string;
-      }>(
-        `WITH current AS (
-           SELECT $1::uuid AS run_id, $2::text AS canonical_question_text,
-             $3::text AS caller_scope, $4::text AS asker_scope,
-             $5::text AS settlement_act, $6::text AS question_type,
-             $7::text AS declared_field, $8::jsonb AS normalized_binding,
-             $9::jsonb AS frozen_terms, $10::bytea AS question_blind_index
-         )
-         SELECT key.*, outcome.answer_id, matched.match_tier AS db_match_tier,
-           CASE WHEN key_owner.owner_ref IS NULL THEN key.asker_scope
-                ELSE 'owner:' || key_owner.owner_ref::text END AS effective_asker_scope,
-           current.asker_scope AS current_effective_asker_scope
-         FROM current
-         JOIN memory.question_key AS key ON key.run_id<>current.run_id
-         LEFT JOIN LATERAL (
-           SELECT event.owner_ref FROM core.run_ownership_event AS event
-           WHERE event.run_id=key.run_id ORDER BY event.at_seq DESC LIMIT 1
-         ) AS key_owner ON true
-         JOIN scorecard.answer_outcome AS outcome ON outcome.run_id=key.run_id AND outcome.accepted
-         CROSS JOIN LATERAL (
-           SELECT CASE
-             WHEN (
-               (current.question_blind_index IS NOT NULL
-                 AND current.question_blind_index=key.question_blind_index)
-               OR (current.question_blind_index IS NULL
-                 AND key.question_blind_index IS NULL
-                 AND current.canonical_question_text=key.canonical_question_text)
-             )
-              AND current.caller_scope=key.caller_scope THEN 'EXACT_QUESTION'
-             WHEN current.settlement_act IS NOT NULL AND current.settlement_act=key.settlement_act
-              AND current.question_type IS NOT NULL AND current.question_type=key.question_type
-              AND current.declared_field IS NOT NULL AND current.declared_field=key.declared_field
-              AND current.normalized_binding<>'{}'::jsonb
-              AND current.normalized_binding=key.normalized_binding
-              AND NOT EXISTS (
-                SELECT 1 FROM jsonb_each(current.normalized_binding) AS binding WHERE binding.value='null'::jsonb
-              ) THEN 'SAME_BINDING'
-             WHEN (current.settlement_act IS NOT NULL AND current.settlement_act=key.settlement_act)
-               OR (current.question_type IS NOT NULL AND current.question_type=key.question_type)
-               OR (current.declared_field IS NOT NULL AND current.declared_field=key.declared_field)
-               OR EXISTS (
-                 SELECT 1
-                 FROM jsonb_each(current.normalized_binding) AS current_binding
-                 JOIN jsonb_each(key.normalized_binding) AS prior_binding USING (key)
-                 WHERE current_binding.value<>'null'::jsonb
-                   AND prior_binding.value<>'null'::jsonb
-                   AND current_binding.value=prior_binding.value
-               ) THEN 'PARTIAL_BINDING'
-             WHEN EXISTS (
-               SELECT 1
-               FROM jsonb_array_elements_text(current.frozen_terms) AS current_term(value)
-               JOIN jsonb_array_elements_text(key.frozen_terms) AS prior_term(value) USING (value)
-             ) THEN 'TERM_OVERLAP'
-             ELSE NULL
-           END AS match_tier
-         ) AS matched
-         WHERE matched.match_tier IS NOT NULL
-           AND (
-             (key_owner.owner_ref IS NOT NULL
-               AND current.asker_scope='owner:' || key_owner.owner_ref::text)
-             OR (key_owner.owner_ref IS NULL AND current.asker_scope=key.asker_scope)
-           )
-           AND EXISTS (SELECT 1 FROM core.run_progress_event WHERE run_id=key.run_id AND kind='TERMINAL')
-         ORDER BY CASE matched.match_tier
-           WHEN 'EXACT_QUESTION' THEN 1 WHEN 'SAME_BINDING' THEN 2
-           WHEN 'PARTIAL_BINDING' THEN 3 WHEN 'TERM_OVERLAP' THEN 4 END,
-           key.at_seq DESC
-         LIMIT 1`,
-        [input.key.runId, storedQuestion, input.key.callerScope, askerScope,
-          input.key.settlementAct, input.key.questionType, input.key.declaredField,
-          JSON.stringify(input.key.normalizedBinding), JSON.stringify(input.key.frozenTerms),
-          questionBlindIndex]
-      );
-      let candidate = candidates.rows[0];
-      if (candidate !== undefined) {
-        const content = await decryptContentForRun<{ canonicalQuestionText: string }>(
-          this.pool, candidate.run_id, "memory.question_key", candidate.question_key_id,
-          candidate.content_ciphertext,
-          { canonicalQuestionText: candidate.canonical_question_text }
-        );
-        candidate = { ...candidate, canonical_question_text: content.canonicalQuestionText };
+    const sourcePrepared = await prepareContentEncryptionForRun(this.pool, input.key.runId);
+    let selectedPrepared: PreparedRunContentCipher | null = null;
+    try {
+      if (selected?.match.autoLink === true && input.pullPolicy !== undefined && input.pullPolicy.bound > 0) {
+        selectedPrepared = await prepareContentEncryptionForRun(this.pool, selected.priorRunId);
       }
-      // Select without mutable writes, then lock every involved run in one
-      // deterministic order before any global sequence allocation. This keeps
-      // memory matching on the same run->identity->allocator order as claims
-      // and prevents cross-run matching from forming a lock cycle.
-      const runIds = candidate === undefined
+      const questionContent = encryptPreparedContentForRun(
+        sourcePrepared, "memory.question_key", questionKeyId,
+        {
+          canonicalQuestionText: input.key.canonicalQuestionText,
+          normalizedBinding: input.key.normalizedBinding,
+          frozenTerms: input.key.frozenTerms
+        }
+      );
+      const questionBlindIndex = access.ownerRef === null
+        ? null
+        : questionBlindIndexForOwner(this.pool, access.ownerRef, input.key.canonicalQuestionText);
+      const storedQuestion = questionContent === null
+        ? input.key.canonicalQuestionText
+        : CONTENT_CIPHERTEXT_SENTINEL;
+      const storedBinding = questionContent === null ? input.key.normalizedBinding : {};
+      const storedTerms = questionContent === null ? input.key.frozenTerms : [];
+
+      await withWriteTransaction(this.pool, async (client) => {
+      // Candidate evaluation deliberately released its short lock and zeroed
+      // its key. Lock the source and chosen prior in stable order, then
+      // revalidate both before any immutable write or final pull decryption.
+      const runIds = selected === undefined
         ? [input.key.runId]
-        : [input.key.runId, candidate.run_id].sort();
+        : [input.key.runId, selected.priorRunId].sort();
       const locked = await client.query<{ run_id: string }>(
         `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
         [runIds]
@@ -420,15 +403,15 @@ export class MemoryRepository {
       if (owned.rows[0]?.owned !== true) {
         throw new TypedDomainError("MEMORY_RUN_NOT_OWNED", "The run owner changed before memory persistence");
       }
-      if (candidate !== undefined) {
-        if (!locked.rows.some((row) => row.run_id === candidate!.run_id)) {
-          candidate = undefined;
+      if (selected !== undefined) {
+        if (!locked.rows.some((row) => row.run_id === selected!.priorRunId)) {
+          selected = undefined;
         } else {
           const stillOwned = await client.query<{ owned: boolean }>(
             `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-            [candidate.run_id, access.ownerRef, access.legacyAskerId]
+            [selected.priorRunId, access.ownerRef, access.legacyAskerId]
           );
-          if (stillOwned.rows[0]?.owned !== true) candidate = undefined;
+          if (stillOwned.rows[0]?.owned !== true) selected = undefined;
         }
       }
       await client.query(
@@ -440,26 +423,18 @@ export class MemoryRepository {
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb)`,
         [questionKeyId, input.key.runId, storedQuestion, input.key.callerScope, askerScope,
           input.key.settlementAct, input.key.questionType, input.key.declaredField,
-          JSON.stringify(input.key.normalizedBinding), JSON.stringify(input.key.frozenTerms),
+          JSON.stringify(storedBinding), JSON.stringify(storedTerms),
           input.key.frozenQuerySetHash, new Date(input.key.asOf), input.key.policyVersion,
           input.key.keyVersion, await allocateSequence(client), questionBlindIndex,
           questionContent === null ? null : JSON.stringify(questionContent)]
       );
-      const match = candidate === undefined ? null : matchQuestionKeys(
-        Object.freeze({ ...input.key, askerScope: candidate.current_effective_asker_scope }),
-        fromRow(Object.freeze({ ...candidate, asker_scope: candidate.effective_asker_scope }))
-      );
-      if (candidate !== undefined && match?.tier !== candidate.db_match_tier) {
-        throw new TypedDomainError("MEMORY_MATCH_PREDICATE_DRIFT", "Database and domain match predicates disagree");
-      }
-      const selected = candidate === undefined || match === null ? undefined : { row: candidate, match };
       if (selected === undefined) return;
       if (!selected.match.autoLink) {
         await client.query(
           `INSERT INTO memory.candidate_record (
-             source_run_id, prior_run_id, match_tier, agreement_pattern, reason, at_seq
+           source_run_id, prior_run_id, match_tier, agreement_pattern, reason, at_seq
            ) VALUES ($1,$2,$3,$4::jsonb,'BELOW_AUTOLINK_TIER',$5)`,
-          [input.key.runId, selected.match.priorRunId, selected.match.tier, JSON.stringify(selected.match), await allocateSequence(client)]
+          [input.key.runId, selected.priorRunId, selected.match.tier, JSON.stringify(selected.match), await allocateSequence(client)]
         );
         return;
       }
@@ -467,9 +442,9 @@ export class MemoryRepository {
       for (const alias of input.confirmedAliases ?? []) {
         const inserted = await client.query<{ alias_row_id: string }>(
           `INSERT INTO memory.alias_row (
-             surface, canonical, confirmed_by, confirmed_at, source_run_id, prior_run_id, key_version, at_seq
+           surface, canonical, confirmed_by, confirmed_at, source_run_id, prior_run_id, key_version, at_seq
            ) VALUES ($1,$2,$3,clock_timestamp(),$4,$5,$6,$7) RETURNING alias_row_id`,
-          [alias.surface, alias.canonical, alias.confirmedBy, input.key.runId, selected.match.priorRunId,
+          [alias.surface, alias.canonical, alias.confirmedBy, input.key.runId, selected.priorRunId,
             input.key.keyVersion, await allocateSequence(client)]
         );
         aliasIds.push(inserted.rows[0]!.alias_row_id);
@@ -482,11 +457,11 @@ export class MemoryRepository {
            alias_row_ids, prior_answer_id, at_seq
          ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,clock_timestamp(),$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17)
          RETURNING memory_link_id`,
-        [input.key.runId, selected.match.priorRunId, selected.match.relation, selected.match.tier,
+        [input.key.runId, selected.priorRunId, selected.match.relation, selected.match.tier,
           JSON.stringify(selected.match.agreedFields), JSON.stringify(selected.match.disagreedFields),
           JSON.stringify(selected.match.notComparedFields), input.decidedBy, new Date(input.key.asOf),
-          new Date(selected.row.as_of), input.key.policyVersion, Number(selected.row.policy_version),
-          input.key.keyVersion, selected.row.key_version, JSON.stringify(aliasIds), selected.row.answer_id,
+          selected.priorAsOf, input.key.policyVersion, selected.priorPolicyVersion,
+          input.key.keyVersion, selected.priorKeyVersion, JSON.stringify(aliasIds), selected.answerId,
           await allocateSequence(client)]
       );
       const memoryLinkId = link.rows[0]!.memory_link_id;
@@ -497,16 +472,126 @@ export class MemoryRepository {
       );
       if (input.pullPolicy !== undefined && input.pullPolicy.bound > 0) {
         await this.#recordAnswerPull(
-          client, input.key.runId, memoryLinkId, askerScope,
-          selected.row.answer_id, input.pullPolicy
+          client, sourcePrepared, selectedPrepared, input.key.runId, memoryLinkId,
+          askerScope, selected.answerId, input.pullPolicy
         );
       }
-    });
+      });
+    } finally {
+      selectedPrepared?.close();
+      sourcePrepared?.close();
+    }
     return this.readDisclosure(input.key.runId);
+  }
+
+  async #ownerScopedCandidateRefs(
+    sourceRunId: string,
+    access: ReturnType<typeof normalizeRunOwnership>
+  ): Promise<readonly MemoryCandidateRef[]> {
+    const candidates = await this.pool.query<MemoryCandidateRef>(
+      `SELECT key.question_key_id, key.run_id, key.at_seq
+       FROM memory.question_key AS key
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref FROM core.run_ownership_event AS event
+         WHERE event.run_id=key.run_id ORDER BY event.at_seq DESC LIMIT 1
+       ) AS key_owner ON true
+       WHERE key.run_id<>$1
+         AND (
+           ($2::uuid IS NOT NULL AND key_owner.owner_ref=$2::uuid)
+           OR ($2::uuid IS NULL AND key_owner.owner_ref IS NULL AND key.asker_scope=$3::text)
+         )
+         AND EXISTS (
+           SELECT 1 FROM scorecard.answer_outcome AS outcome
+           WHERE outcome.run_id=key.run_id AND outcome.accepted
+         )
+         AND EXISTS (
+           SELECT 1 FROM core.run_progress_event AS progress
+           WHERE progress.run_id=key.run_id AND progress.kind='TERMINAL'
+         )
+       ORDER BY key.at_seq DESC`,
+      [sourceRunId, access.ownerRef, access.legacyAskerId]
+    );
+    return candidates.rows;
+  }
+
+  async #evaluateCandidate(
+    current: MemoryQuestionKey,
+    access: ReturnType<typeof normalizeRunOwnership>,
+    askerScope: string,
+    reference: MemoryCandidateRef
+  ): Promise<MemoryCandidateSelection | null> {
+    const prepared = await prepareContentEncryptionForRun(this.pool, reference.run_id);
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        const locked = await client.query<{ run_id: string }>(
+          `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`,
+          [reference.run_id]
+        );
+        if (locked.rows[0] === undefined) return null;
+        const owned = await client.query<{ owned: boolean }>(
+          `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+          [reference.run_id, access.ownerRef, access.legacyAskerId]
+        );
+        if (owned.rows[0]?.owned !== true) return null;
+        const candidateRows = await client.query<QuestionKeyRow & { answer_id: string }>(
+          `SELECT key.*, outcome.answer_id
+           FROM memory.question_key AS key
+           JOIN LATERAL (
+             SELECT candidate.answer_id
+             FROM scorecard.answer_outcome AS candidate
+             WHERE candidate.run_id=key.run_id AND candidate.accepted
+             ORDER BY candidate.at_seq DESC LIMIT 1
+           ) AS outcome ON true
+           WHERE key.question_key_id=$1 AND key.run_id=$2
+             AND EXISTS (
+               SELECT 1 FROM core.run_progress_event AS progress
+               WHERE progress.run_id=key.run_id AND progress.kind='TERMINAL'
+             )`,
+          [reference.question_key_id, reference.run_id]
+        );
+        const candidate = candidateRows.rows[0];
+        if (candidate === undefined) return null;
+        const content = decryptPreparedContentForRun<{
+          canonicalQuestionText: string;
+          normalizedBinding?: Readonly<Record<string, string | null>>;
+          frozenTerms?: readonly string[];
+        }>(
+          prepared, "memory.question_key", reference.question_key_id,
+          candidate.content_ciphertext,
+          {
+            canonicalQuestionText: candidate.canonical_question_text,
+            normalizedBinding: candidate.normalized_binding,
+            frozenTerms: candidate.frozen_terms
+          }
+        );
+        const prior = fromRow(Object.freeze({
+          ...candidate,
+          asker_scope: askerScope,
+          canonical_question_text: content.canonicalQuestionText,
+          normalized_binding: { ...(content.normalizedBinding ?? candidate.normalized_binding) },
+          frozen_terms: [...(content.frozenTerms ?? candidate.frozen_terms)]
+        }));
+        const match = matchQuestionKeys(current, prior);
+        if (match === null) return null;
+        return Object.freeze({
+          priorRunId: candidate.run_id,
+          answerId: candidate.answer_id,
+          atSeq: candidate.at_seq,
+          priorAsOf: candidate.as_of,
+          priorPolicyVersion: Number(candidate.policy_version),
+          priorKeyVersion: candidate.key_version,
+          match
+        });
+      });
+    } finally {
+      prepared?.close();
+    }
   }
 
   async #recordAnswerPull(
     client: PoolClient,
+    sourcePrepared: PreparedRunContentCipher | null,
+    selectedPrepared: PreparedRunContentCipher | null,
     sourceRunId: string,
     memoryLinkId: string,
     askerScope: string,
@@ -530,8 +615,8 @@ export class MemoryRepository {
     );
     const row = snapshot.rows[0];
     if (row === undefined) throw new TypedDomainError("MEMORY_PRIOR_ANSWER_MISSING", "The linked settled answer is unavailable");
-    const runContent = await decryptContentForRun<{ questionLine: string }>(
-      this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+    const runContent = decryptPreparedContentForRun<{ questionLine: string }>(
+      selectedPrepared, "core.run", row.run_id, row.run_content_ciphertext,
       { questionLine: row.question_line }
     );
     const pin: PinnedMemoryPull = {
@@ -549,8 +634,8 @@ export class MemoryRepository {
       verdictAdmissibility: classifyPulledArtifact("PRIOR_VERDICT"),
       confidenceBand: row.confidence_band
     };
-    const content = await encryptContentForRun(
-      this.pool, sourceRunId, "memory.pull_record", pullRecordId,
+    const content = encryptPreparedContentForRun(
+      sourcePrepared, "memory.pull_record", pullRecordId,
       { payloadSnapshot }
     );
     await client.query(
@@ -614,7 +699,7 @@ export class MemoryRepository {
     const match: MemoryMatchFact = Object.freeze({
       sourceRunId: row.source_run_id, priorRunId: row.prior_run_id, tier: row.match_tier,
       relation: row.relation, autoLink: true, agreedFields: row.agreed_fields,
-      disagreedFields: row.disagreed_fields, notComparedFields: row.not_compared_fields, sharedTermCount: 0
+      disagreedFields: row.disagreed_fields, notComparedFields: row.not_compared_fields
     });
     return buildMemoryDisclosure({
       match, memoryLinkId: row.memory_link_id, decidedBy: row.decided_by,
@@ -675,18 +760,15 @@ export class MemoryRepository {
   }
 
   async observeAnswerContradiction(answerId: string, actorRef: string): Promise<string | null> {
-    const observation = await this.pool.query<{
-      source_run_id: string; prior_run_id: string; memory_link_id: string; match_tier: MemoryMatchTier;
-      agreed_fields: string[]; disagreed_fields: string[]; not_compared_fields: string[]; decided_by: string;
-      source_as_of: Date; prior_as_of: Date; source_policy_version: string; prior_policy_version: string;
-      source_key_version: number; prior_key_version: number; alias_row_ids: string[]; prior_answer_id: string;
-      current_verdict: string | null; pull_record_id: string;
-      payload_snapshot: Readonly<Record<string, unknown>>;
-      pull_content_ciphertext: CryptoEnvelope | null;
+    const located = await this.pool.query<{
+      source_run_id: string;
+      prior_run_id: string;
+      memory_link_id: string;
+      pull_record_id: string;
+      asker_scope: string;
     }>(
-      `SELECT link.*, answer.verdict_state AS current_verdict,
-              pull.pull_record_id, pull.payload_snapshot,
-              pull.content_ciphertext AS pull_content_ciphertext
+      `SELECT link.source_run_id, link.prior_run_id, link.memory_link_id,
+              pull.pull_record_id, pull.asker_scope
        FROM serve.answer AS answer
        JOIN memory.memory_link AS link ON link.source_run_id=answer.run_id
        JOIN LATERAL (SELECT state FROM memory.memory_link_event WHERE memory_link_id=link.memory_link_id ORDER BY at_seq DESC LIMIT 1) AS event ON true
@@ -695,17 +777,61 @@ export class MemoryRepository {
        ORDER BY link.at_seq DESC, pull.at_seq LIMIT 1`,
       [answerId]
     );
-    const row = observation.rows[0];
-    if (row === undefined || row.current_verdict === null) return null;
-    const observedPull = await decryptContentForRun<{ payloadSnapshot: Readonly<Record<string, unknown>> }>(
-      this.pool, row.source_run_id, "memory.pull_record", row.pull_record_id,
-      row.pull_content_ciphertext, { payloadSnapshot: row.payload_snapshot }
-    );
-    const priorVerdict = typeof observedPull.payloadSnapshot.verdict === "string"
-      ? observedPull.payloadSnapshot.verdict
-      : null;
-    if (priorVerdict === null || row.current_verdict === priorVerdict) return null;
-    return withWriteTransaction(this.pool, async (client) => {
+    const reference = located.rows[0];
+    if (reference === undefined) return null;
+    const access = ownershipFromMemoryScope(reference.asker_scope);
+    const sourcePrepared = await prepareContentEncryptionForRun(this.pool, reference.source_run_id);
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+      const runIds = [reference.source_run_id, reference.prior_run_id].sort();
+      const locked = await client.query<{ run_id: string }>(
+        `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
+        [runIds]
+      );
+      if (locked.rows.length !== runIds.length) return null;
+      for (const runId of runIds) {
+        const owned = await client.query<{ owned: boolean }>(
+          `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+          [runId, access.ownerRef, access.legacyAskerId]
+        );
+        if (owned.rows[0]?.owned !== true) return null;
+      }
+      const observation = await client.query<{
+        source_run_id: string; prior_run_id: string; memory_link_id: string; match_tier: MemoryMatchTier;
+        agreed_fields: string[]; disagreed_fields: string[]; not_compared_fields: string[]; decided_by: string;
+        source_as_of: Date; prior_as_of: Date; source_policy_version: string; prior_policy_version: string;
+        source_key_version: number; prior_key_version: number; alias_row_ids: string[]; prior_answer_id: string;
+        current_verdict: string | null; pull_record_id: string;
+        payload_snapshot: Readonly<Record<string, unknown>>;
+        pull_content_ciphertext: CryptoEnvelope | null;
+      }>(
+        `SELECT link.*, answer.verdict_state AS current_verdict,
+                pull.pull_record_id, pull.payload_snapshot,
+                pull.content_ciphertext AS pull_content_ciphertext
+         FROM serve.answer AS answer
+         JOIN memory.memory_link AS link ON link.source_run_id=answer.run_id
+         JOIN LATERAL (
+           SELECT state FROM memory.memory_link_event
+           WHERE memory_link_id=link.memory_link_id ORDER BY at_seq DESC LIMIT 1
+         ) AS event ON true
+         JOIN memory.pull_record AS pull
+           ON pull.memory_link_id=link.memory_link_id AND pull.artifact_kind='PRIOR_ANSWER'
+         WHERE answer.answer_id=$1 AND link.memory_link_id=$2
+           AND pull.pull_record_id=$3 AND event.state='LINKED'`,
+        [answerId, reference.memory_link_id, reference.pull_record_id]
+      );
+      const row = observation.rows[0];
+      if (row === undefined || row.current_verdict === null) return null;
+      const observedPull = decryptPreparedContentForRun<{
+        payloadSnapshot: Readonly<Record<string, unknown>>;
+      }>(
+        sourcePrepared, "memory.pull_record", row.pull_record_id,
+        row.pull_content_ciphertext, { payloadSnapshot: row.payload_snapshot }
+      );
+      const priorVerdict = typeof observedPull.payloadSnapshot.verdict === "string"
+        ? observedPull.payloadSnapshot.verdict
+        : null;
+      if (priorVerdict === null || row.current_verdict === priorVerdict) return null;
       const linkSequence = await allocateSequence(client);
       const inserted = await client.query<{ memory_link_id: string }>(
         `INSERT INTO memory.memory_link (
@@ -731,13 +857,15 @@ export class MemoryRepository {
         content_ciphertext: CryptoEnvelope | null;
       }>("SELECT * FROM memory.pull_record WHERE memory_link_id=$1 ORDER BY at_seq", [row.memory_link_id]);
       for (const pull of priorPulls.rows) {
-        const oldContent = await decryptContentForRun<{ payloadSnapshot: Readonly<Record<string, unknown>> }>(
-          this.pool, row.source_run_id, "memory.pull_record", pull.pull_record_id,
+        const oldContent = decryptPreparedContentForRun<{
+          payloadSnapshot: Readonly<Record<string, unknown>>;
+        }>(
+          sourcePrepared, "memory.pull_record", pull.pull_record_id,
           pull.content_ciphertext, { payloadSnapshot: pull.payload_snapshot }
         );
         const pullRecordId = randomUUID();
-        const content = await encryptContentForRun(
-          this.pool, row.source_run_id, "memory.pull_record", pullRecordId, oldContent
+        const content = encryptPreparedContentForRun(
+          sourcePrepared, "memory.pull_record", pullRecordId, oldContent
         );
         await client.query(
           `INSERT INTO memory.pull_record (
@@ -769,6 +897,9 @@ export class MemoryRepository {
         [row.prior_run_id, `memory-contradiction:${memoryLinkId}`, row.prior_answer_id, await allocateSequence(client)]
       );
       return memoryLinkId;
-    });
+      });
+    } finally {
+      sourcePrepared?.close();
+    }
   }
 }
