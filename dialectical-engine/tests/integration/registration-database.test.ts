@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,7 +13,7 @@ import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PoolClient } from "pg";
-import { migrate, PostgresIdentityRepository } from "@debateai/db";
+import { createPool, migrate, PostgresIdentityRepository } from "@debateai/db";
 import {
   createEmailBlindIndex,
   decodeBase32,
@@ -51,6 +52,7 @@ import {
 } from "../../apps/api/src/registration.js";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import { MfaEnrollmentService } from "../../apps/api/src/mfa.js";
+import { installGracefulShutdown } from "../../apps/api/src/graceful-shutdown.js";
 import {
   MailDeliveryError,
   MemoryMailSender,
@@ -64,6 +66,15 @@ let secretRoot: string;
 const blindIndexKey = Buffer.alloc(32, 0x3c);
 const sourceIpSalt = Buffer.alloc(32, 0x6e);
 const basePolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+
+class LifecycleTestProcess extends EventEmitter {
+  exitCode: number | undefined;
+  readonly exitCalls: number[] = [];
+
+  exit(code: number): void {
+    this.exitCalls.push(code);
+  }
+}
 
 // Exactly one process-owned Argon2 worker pool for the whole file, mirroring
 // the production topology in apps/api/src/main.ts: no pool-per-test,
@@ -6653,6 +6664,138 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 });
 
 describe("S3 VR-3 audit writer and rate-limit evidence", () => {
+  it("T3 force-finalizes a real PostgreSQL refusal aggregate through the installed SIGTERM lifecycle", async () => {
+    const lifecyclePool = createPool(database.connectionString);
+    const lifecycleArgon2 = new Argon2WorkerPool({ workers: 1 });
+    const lifecycleHasher = new AuditContextHasher(
+      lifecycleArgon2,
+      sourceIpSalt,
+      basePolicy.auditSourceIpKdf
+    );
+    const rateLimits = Object.freeze({
+      ...basePolicy.rateLimits,
+      verify: Object.freeze({
+        ...basePolicy.rateLimits.verify,
+        admissionPerSource: 1,
+        perIp: 1,
+        perAddress: 100
+      })
+    });
+    const initialNow = new Date("2036-01-02T03:04:00.000Z");
+    const policy = withPolicy({ rateLimits, rateLimitRefusalAuditIntervalMs: 60_000 });
+    const service = new RegistrationService({
+      repository: new PostgresIdentityRepository(lifecyclePool, lifecycleHasher),
+      mail: new MemoryMailSender(),
+      dekStore: { async store(): Promise<void> { /* verify never provisions a DEK */ } },
+      blindIndexKey,
+      policy,
+      limiter: new InProcessAuthRateLimiter(
+        policy.rateLimits,
+        policy.rateLimitBucketCapacity,
+        policy.rateLimitRefusalAuditIntervalMs,
+        Buffer.alloc(32, 0x4d)
+      ),
+      argon2: lifecycleArgon2,
+      clock: () => initialNow
+    });
+    const api = buildApi({ application: fixtureAskApplication(), registration: service });
+    const lifecycleProcess = new LifecycleTestProcess();
+    const logger = { error: vi.fn() };
+    const auditDrain = vi.spyOn(service, "drainRateLimitAuditFlushes");
+    const hasherClose = vi.spyOn(lifecycleHasher, "close");
+    const argonClose = vi.spyOn(lifecycleArgon2, "close");
+    const databaseClose = vi.spyOn(lifecyclePool, "end");
+    const apiClose = vi.spyOn(api, "close");
+    const shutdown = installGracefulShutdown({
+      api,
+      registration: service,
+      auditContextHasher: lifecycleHasher,
+      argon2Pool: lifecycleArgon2,
+      databasePools: [lifecyclePool],
+      process: lifecycleProcess,
+      logger
+    });
+    const windowStartedAt = new Date(
+      Math.floor(initialNow.getTime() / policy.rateLimitRefusalAuditIntervalMs)
+        * policy.rateLimitRefusalAuditIntervalMs
+    );
+    const summaryPattern = `%window:${windowStartedAt.toISOString()}%`;
+    let lifecycleClosed = false;
+    try {
+      await lifecycleArgon2.ready();
+      await lifecyclePool.query("SELECT 1");
+      const token = generateVerificationToken();
+      const first = await api.inject({
+        method: "POST",
+        url: "/v1/auth/verify-email",
+        headers: { "user-agent": "t3-real-lifecycle" },
+        payload: { token }
+      });
+      const refused = await api.inject({
+        method: "POST",
+        url: "/v1/auth/verify-email",
+        headers: { "user-agent": "t3-real-lifecycle" },
+        payload: { token }
+      });
+      expect(first).toMatchObject({ statusCode: 400 });
+      expect(refused).toMatchObject({ statusCode: 429 });
+
+      const pending = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity.audit_event
+        WHERE event_type='identity.auth.rate_limit_refused' AND target_type='auth.verify'
+          AND justification LIKE $1
+      `, [summaryPattern]);
+      expect(pending.rows[0]!.count).toBe("0");
+
+      expect(lifecycleProcess.emit("SIGTERM", "SIGTERM")).toBe(true);
+      await shutdown.close("test joins installed SIGTERM");
+      lifecycleClosed = true;
+
+      const durable = await database.pool.query<{ justification: string }>(`
+        SELECT justification FROM identity.audit_event
+        WHERE event_type='identity.auth.rate_limit_refused' AND target_type='auth.verify'
+          AND justification LIKE $1
+      `, [summaryPattern]);
+      const audit = await readAuditChain();
+      const dedicatedPoolClosed = await lifecyclePool.query("SELECT 1").then(
+        () => false,
+        () => true
+      );
+
+      expect(durable.rows).toEqual([{
+        justification: `aggregate:route-window;route:verify;window:${windowStartedAt.toISOString()};count:1;ip_count:1;address_count:0`
+      }]);
+      expect(audit.rootCount).toBe(1);
+      expect(audit.chain).toHaveLength(audit.totalRows);
+      expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+      expect(apiClose).toHaveBeenCalledTimes(1);
+      expect(auditDrain).toHaveBeenCalledTimes(1);
+      expect(hasherClose).toHaveBeenCalledTimes(1);
+      expect(argonClose).toHaveBeenCalledTimes(1);
+      expect(databaseClose).toHaveBeenCalledTimes(1);
+      expect(lifecycleArgon2.stats()).toMatchObject({
+        state: "CLOSED", liveHandles: 0, outstandingTotal: 0
+      });
+      expect(dedicatedPoolClosed).toBe(true);
+      expect(lifecycleProcess.listenerCount("SIGTERM")).toBe(0);
+      expect(lifecycleProcess.listenerCount("SIGINT")).toBe(0);
+      expect(lifecycleProcess.exitCalls).toEqual([]);
+      expect(logger.error).not.toHaveBeenCalled();
+      console.info(
+        `[T3 REAL LIFECYCLE] signal=SIGTERM pending_rows=${pending.rows[0]!.count} `
+        + `durable_rows=${durable.rowCount} chain_valid=true argon_handles=0 db_pool_closed=true`
+      );
+    } finally {
+      if (!lifecycleClosed) {
+        await shutdown.close("test cleanup").catch(() => undefined);
+        lifecycleHasher.close();
+        await lifecycleArgon2.close().catch(() => undefined);
+        await lifecyclePool.end().catch(() => undefined);
+        await api.close().catch(() => undefined);
+      }
+    }
+  }, 120_000);
+
   it("persists one finalized refusal row with the bounded route-window count and preserves the chain", async () => {
     const rateLimits = Object.freeze({
       ...basePolicy.rateLimits,

@@ -46,6 +46,7 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { MfaApplication } from "./mfa.js";
+import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user";
 
@@ -144,7 +145,10 @@ function resolveSession(token: unknown, scope: "ASKER" | "OPERATOR" = "ASKER"): 
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
-  const api = Fastify({ logger: false });
+  const api = Fastify({
+    logger: false,
+    trustProxy: [...TRUSTED_UI_PROXY_NETWORKS]
+  });
   api.decorateRequest("session");
   api.addHook("preHandler", async (request, reply) => {
     if (request.is404) return;
@@ -209,8 +213,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     readonly ip: string;
     readonly id: string;
     readonly headers: Readonly<Record<string, unknown>>;
+    readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
   }) => Object.freeze({
-    ip: request.ip,
+    // Registration and MFA share the one pinned, canonical public source.
+    // This preserves T2's trusted-hop boundary for every auth rate limiter and
+    // audit writer, including S4 routes added on this branch.
+    ip: normalizeClientIp(request.ip)
+      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+      ?? "unknown",
     userAgent: typeof request.headers["user-agent"] === "string"
       ? request.headers["user-agent"] as string
       : "unknown",

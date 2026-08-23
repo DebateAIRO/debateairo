@@ -1,9 +1,24 @@
+import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../../../trusted-client-ip.mjs";
+
 type ProxyContext = Readonly<{
   params: Promise<Readonly<{ path: string[] }>>;
 }>;
 
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
 const BODYLESS_STATUSES = new Set([204, 205, 304]);
+const REQUEST_HEADER_ALLOWLIST = Object.freeze([
+  "accept",
+  "accept-language",
+  "cache-control",
+  "content-type",
+  "if-match",
+  "if-modified-since",
+  "if-none-match",
+  "if-unmodified-since",
+  "last-event-id",
+  "range",
+  "x-user-dev-token"
+] as const);
 
 function readApiBase(): URL {
   const configured = process.env.DIALECTICAL_API_BASE?.trim();
@@ -34,12 +49,21 @@ function createTargetUrl(request: Request, path: readonly string[]): URL {
   return target;
 }
 
+function createUpstreamHeaders(request: Request): Headers {
+  const headers = new Headers();
+  for (const name of REQUEST_HEADER_ALLOWLIST) {
+    const value = request.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  const clientIp = normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER));
+  if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
+  return headers;
+}
+
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {
   const { path } = await context.params;
   const target = createTargetUrl(request, path);
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  headers.delete("expect");
+  const headers = createUpstreamHeaders(request);
 
   // exactOptionalPropertyTypes: a bodyless method must OMIT body, not pass
   // `undefined` for it, so the two shapes are built separately.

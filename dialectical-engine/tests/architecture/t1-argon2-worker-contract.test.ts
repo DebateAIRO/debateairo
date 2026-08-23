@@ -483,8 +483,8 @@ describe("T1 database ordering — no KDF after connect/BEGIN", () => {
     // The same instance reaches both consumers.
     expect(main).toMatch(/new AuditContextHasher\(\s*argon2Pool,/);
     expect(main).toMatch(/argon2:\s*argon2Pool/);
-    // Close is wired to Fastify's onClose, with no signal orchestration here.
-    expect(main).toMatch(/addHook\(\s*["']onClose["']/);
+    // Close is wired to the T3 lifecycle, with no duplicate signal owner here.
+    expect(main).toMatch(/installGracefulShutdown\(\{/);
     expect(main).not.toMatch(/process\.on\(\s*["']SIG/);
   });
 });
@@ -493,24 +493,24 @@ describe("T1 database ordering — no KDF after connect/BEGIN", () => {
 // REWORK 2 R4 — the T1 close primitive must drain post-response work BEFORE
 // it tears down the Argon2 surface that work depends on.
 //
-// These tests execute the ACTUAL bytes of the `onClose` hook in
-// apps/api/src/main.ts. main.ts is a boot script with top-level side effects
-// (environment, KEK, Postgres pool, policy read) so it cannot be imported; the
-// hook body is therefore lifted verbatim out of the shipped source and run
-// against instrumented doubles for its three free identifiers. Reversing the
-// order in main.ts turns these RED, and the HARNESS CONTROL below proves the
-// probe itself can fail.
+// These tests execute the ACTUAL bytes of the resource-drain function installed
+// by T3. The boot script has top-level side effects, so the pure drain body is
+// lifted verbatim and run against instrumented doubles. Reversing the order
+// turns these RED, and the HARNESS CONTROL below proves the probe itself can fail.
 // ==========================================================================
 
 const AsyncFunction = Object.getPrototypeOf(async function noop() { /* probe */ }).constructor;
 
-/** Lifts the exact body of `api.addHook("onClose", async () => { ... })`. */
+/** Lifts the exact body of the shipped T3 resource-drain function. */
 function extractOnCloseBody(source: string): string {
-  const opener = `api.addHook("onClose", async () => {`;
-  const start = source.indexOf(opener);
+  const functionName = "export async function drainGracefulShutdownResources(";
+  const start = source.indexOf(functionName);
   if (start < 0) throw new Error("T1_CLOSE_PRIMITIVE_HOOK_NOT_FOUND");
+  const opener = "): Promise<void> {";
+  const bodyStart = source.indexOf(opener, start);
+  if (bodyStart < 0) throw new Error("T1_CLOSE_PRIMITIVE_HOOK_NOT_FOUND");
   let depth = 1;
-  let index = start + opener.length;
+  let index = bodyStart + opener.length;
   while (index < source.length && depth > 0) {
     const character = source[index];
     if (character === "{") depth += 1;
@@ -518,7 +518,7 @@ function extractOnCloseBody(source: string): string {
     index += 1;
   }
   if (depth !== 0) throw new Error("T1_CLOSE_PRIMITIVE_HOOK_UNBALANCED");
-  return source.slice(start + opener.length, index - 1);
+  return source.slice(bodyStart + opener.length, index - 1);
 }
 
 interface CloseHarness {
@@ -584,9 +584,10 @@ function closeHarness(): CloseHarness {
 
 describe("T1 rework2 R4 — shutdown drains post-response work before closing Argon", () => {
   const mainPath = join(repoRoot, "apps/api/src/main.ts");
+  const lifecyclePath = join(repoRoot, "apps/api/src/graceful-shutdown.ts");
 
   it("awaits mail dispatch and refusal-audit work before the hasher and the pool close", async () => {
-    const body = extractOnCloseBody(readFileSync(mainPath, "utf8"));
+    const body = extractOnCloseBody(readFileSync(lifecyclePath, "utf8"));
     const run = new AsyncFunction(
       "registration", "auditContextHasher", "argon2Pool", body
     ) as (r: unknown, a: unknown, p: unknown) => Promise<void>;
@@ -686,11 +687,16 @@ describe("T1 rework2 R4 — shutdown drains post-response work before closing Ar
       .toBeLessThan(harness.events.indexOf("postworkAuditContextHash"));
   }, 60_000);
 
-  it("keeps signal orchestration out of the close primitive (T3 scope)", () => {
+  it("keeps process signals in the T3 lifecycle module rather than the boot script", () => {
     const main = readFileSync(mainPath, "utf8");
-    expect(main).toMatch(/addHook\(\s*["']onClose["']/);
+    const lifecycle = readFileSync(join(repoRoot, "apps/api/src/graceful-shutdown.ts"), "utf8");
+    expect(main).toMatch(/installGracefulShutdown\(\{/);
     expect(main).not.toMatch(/process\.on\(\s*["']SIG/);
     expect(main).not.toMatch(/process\.once\(\s*["']SIG/);
+    expect(lifecycle).toMatch(/\.on\("SIGTERM", signalHandler\)/);
+    expect(lifecycle).toMatch(/\.on\("SIGINT", signalHandler\)/);
+    expect(lifecycle).toMatch(/addHook\("preClose"/);
+    expect(lifecycle).toMatch(/addHook\("onClose"/);
   });
 });
 
@@ -1234,7 +1240,7 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
 });
 
 describe("T1 rework3 RED 2 — a failed shutdown refusal-audit write is never reported drained", () => {
-  const mainPath = join(repoRoot, "apps/api/src/main.ts");
+  const mainPath = join(repoRoot, "apps/api/src/graceful-shutdown.ts");
 
   /** A window boundary, so the scheduled delay is the FULL ruled interval. */
   const windowBase = (): number => 1_800_000_000_000
@@ -1490,7 +1496,7 @@ describe("T1 rework3 RED 2 — a failed shutdown refusal-audit write is never re
 // ==========================================================================
 
 describe("T1 rework4 — rollover has exactly one persistence owner per route", () => {
-  const mainPath = join(repoRoot, "apps/api/src/main.ts");
+  const mainPath = join(repoRoot, "apps/api/src/graceful-shutdown.ts");
   const intervalMs = (): number => authPolicy().rateLimitRefusalAuditIntervalMs;
   /** A window boundary, so W1 is the very next window and nothing else. */
   const windowBase = (): number => 1_800_000_000_000 - (1_800_000_000_000 % intervalMs());
@@ -1909,7 +1915,7 @@ describe("T1 rework4 — rollover has exactly one persistence owner per route", 
 // durable row — and a drain that reports success over both.
 // ====================================================================
 describe("T1 rework5 — a retrograde window never displaces the in-flight write", () => {
-  const mainPath = join(repoRoot, "apps/api/src/main.ts");
+  const mainPath = join(repoRoot, "apps/api/src/graceful-shutdown.ts");
   const intervalMs = (): number => authPolicy().rateLimitRefusalAuditIntervalMs;
   const windowBase = (): number => 1_800_000_000_000 - (1_800_000_000_000 % intervalMs());
   /** The window whose write is put in flight and held. */
