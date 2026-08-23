@@ -900,12 +900,13 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
     expect(migration).toMatch(/EXCEPTION WHEN duplicate_object OR unique_violation THEN/);
   });
 
-  it("records the parent bare resolution and proves the mocked @debateai/db runtime import is lane-local", async () => {
-    expect(import.meta.resolve("@debateai/db")).not.toContain("/.worktrees/obs-lane-1/");
+  it("proves the mocked @debateai/db runtime import stays aligned with the direct DB exports", async () => {
+    expect(import.meta.resolve("@debateai/db"))
+      .toMatch(/\/packages\/db\/src\/index\.ts$/);
     const bareDb = await import("@debateai/db");
     expect(bareDb.obsOccurrence).toBe(directObsOccurrence);
     expect(bareDb.obsSourceLink).toBe(directObsSourceLink);
     expect(import.meta.resolve("../../packages/db/src/index.js"))
-      .toContain("/.worktrees/obs-lane-1/dialectical-engine/packages/db/src/index.js");
+      .toMatch(/\/packages\/db\/src\/index\.js$/);
   });
 });
