@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream } from "node:fs";
@@ -7,7 +7,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { promisify } from "node:util";
 import { runInNewContext } from "node:vm";
 import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
@@ -793,27 +792,106 @@ async function runPlateauDetectorChild(
   childPath: string,
   scratch: string,
   retainMibPerWave: number
-): Promise<PlateauChildReport & { readonly childExitMs: number }> {
+): Promise<PlateauChildReport & {
+  readonly childTotalMs: number;
+  readonly postReportExitMs: number;
+}> {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const childSecretRoot = await mkdtemp(join(scratch, `secrets-${retainMibPerWave}-`));
   const startedAt = performance.now();
-  const { stdout } = await promisify(execFile)(
+  const child = spawn(
     process.execPath,
     [
       "--import", "tsx", childPath,
       database.connectionString, childSecretRoot, String(retainMibPerWave),
       `r${retainMibPerWave}-${randomUUID()}`
     ],
-    { cwd: root, maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }
+    { cwd: root, stdio: ["ignore", "pipe", "pipe"] }
   );
-  // The child is measured from spawn to exit, so "prompt exit" is a fact about
-  // the process, not an assumption about close().
-  const childExitMs = performance.now() - startedAt;
-  const line = stdout.split("\n").find((candidate) => candidate.startsWith(S3D_PLATEAU_REPORT_MARKER));
-  if (line === undefined) throw new Error(`S3D_PLATEAU_CHILD_NO_REPORT:${stdout.slice(-2_000)}`);
-  return Object.freeze({
-    ...JSON.parse(line.slice(S3D_PLATEAU_REPORT_MARKER.length)) as PlateauChildReport,
-    childExitMs
+
+  return await new Promise((resolve, reject) => {
+    const outputLimit = 64 * 1024 * 1024;
+    let stdoutPending = "";
+    let stdoutTail = "";
+    let stderrTail = "";
+    let report: PlateauChildReport | undefined;
+    let reportReceivedAt: number | undefined;
+    let processError: Error | undefined;
+    let workloadTimedOut = false;
+
+    const retainTail = (current: string, chunk: string): string =>
+      (current + chunk).slice(-2_000);
+    const failProcess = (error: Error): void => {
+      if (processError === undefined) processError = error;
+      child.kill("SIGKILL");
+    };
+    const consumeLine = (rawLine: string): void => {
+      const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+      if (!line.startsWith(S3D_PLATEAU_REPORT_MARKER) || report !== undefined) return;
+      try {
+        report = JSON.parse(line.slice(S3D_PLATEAU_REPORT_MARKER.length)) as PlateauChildReport;
+        // Start the asserted latency clock only once the complete newline-
+        // terminated report has arrived and parsed successfully.
+        reportReceivedAt = performance.now();
+      } catch (error) {
+        failProcess(new Error("S3D_PLATEAU_CHILD_INVALID_REPORT", { cause: error }));
+      }
+    };
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdoutTail = retainTail(stdoutTail, chunk);
+      stdoutPending += chunk;
+      if (stdoutPending.length > outputLimit) {
+        failProcess(new Error("S3D_PLATEAU_CHILD_STDOUT_LIMIT"));
+        return;
+      }
+      const lines = stdoutPending.split("\n");
+      stdoutPending = lines.pop() ?? "";
+      for (const line of lines) consumeLine(line);
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderrTail = retainTail(stderrTail, chunk);
+    });
+    child.on("error", (error) => {
+      processError = error;
+    });
+
+    // This guards the entire expensive workload independently of the short
+    // post-report exit-latency assertion below.
+    const wholeWorkloadWatchdog = setTimeout(() => {
+      workloadTimedOut = true;
+      child.kill("SIGKILL");
+    }, 600_000);
+
+    child.on("close", (code, signal) => {
+      clearTimeout(wholeWorkloadWatchdog);
+      const closedAt = performance.now();
+      if (workloadTimedOut) {
+        reject(new Error("S3D_PLATEAU_CHILD_WORKLOAD_TIMEOUT"));
+        return;
+      }
+      if (processError !== undefined) {
+        reject(processError);
+        return;
+      }
+      if (code !== 0) {
+        reject(new Error(
+          `S3D_PLATEAU_CHILD_EXIT:code=${String(code)} signal=${String(signal)} stderr=${stderrTail}`
+        ));
+        return;
+      }
+      if (report === undefined || reportReceivedAt === undefined) {
+        reject(new Error(`S3D_PLATEAU_CHILD_NO_REPORT:${stdoutTail}`));
+        return;
+      }
+      resolve(Object.freeze({
+        ...report,
+        childTotalMs: closedAt - startedAt,
+        postReportExitMs: closedAt - reportReceivedAt
+      }));
+    });
   });
 }
 
@@ -831,6 +909,32 @@ afterAll(async () => {
 });
 
 describe("S3 registration and verification on real PostgreSQL", () => {
+  it("S3d plateau child harness measures exit latency only after the complete report line", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "s3d-rss-harness-"));
+    const syntheticBoundMs = 250;
+    try {
+      const promptPath = join(scratch, "prompt-after-report.mjs");
+      await writeFile(promptPath, `
+setTimeout(() => {
+  process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}{}\\n");
+}, 500);
+`, "utf8");
+      const prompt = await runPlateauDetectorChild(promptPath, scratch, 0);
+      expect(prompt.postReportExitMs).toBeLessThan(syntheticBoundMs);
+
+      const delayedPath = join(scratch, "delayed-after-report.mjs");
+      await writeFile(delayedPath, `
+process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}{}\\n");
+setTimeout(() => undefined, 500);
+`, "utf8");
+      const delayed = await runPlateauDetectorChild(delayedPath, scratch, 0);
+      expect(delayed.postReportExitMs).toBeGreaterThanOrEqual(syntheticBoundMs);
+      expect(() => expect(delayed.postReportExitMs).toBeLessThan(syntheticBoundMs)).toThrow();
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  }, 10_000);
+
   it("S3a A1 migrates legacy audit history and enforces both erasure checks on every new row", async () => {
     const upgrade = await startTestDatabase();
     try {
@@ -3519,7 +3623,8 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         + `worker_count=${detector.workerCount} worker_restarts=${detector.workerRestartsInWindow} `
         + `live_handles_after_close=${detector.liveHandlesAfterClose} `
         + `close_ms=${detector.closeMs.toFixed(1)} quiesce_wait_ms=${detector.quiesceWaitMs.toFixed(1)} `
-        + `child_exit_ms=${detector.childExitMs.toFixed(1)} `
+        + `child_total_ms=${detector.childTotalMs.toFixed(1)} `
+        + `post_report_exit_ms=${detector.postReportExitMs.toFixed(1)} `
         + `measured_aggregates=${detector.capacityCounts.length} `
         + `measured_total_count=${detector.measuredCapacityCount} `
         + `unrelated_signals=${detector.unrelatedSignals}`
@@ -3538,7 +3643,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       expect(detector.inFlightPeakRssMib)
         .toBeGreaterThanOrEqual(Math.max(...detector.waveRssMib) - 1);
       // Prompt exit: no worker holds the child open once close() has run.
-      expect(detector.childExitMs).toBeLessThan(30_000);
+      expect(detector.postReportExitMs).toBeLessThan(30_000);
 
       // THE UNCHANGED THRESHOLD.
       expect(detector.tunedCeilingMib).toBe(2);
