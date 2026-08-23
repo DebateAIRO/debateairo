@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   beginMfaEnrollment,
   confirmMfaRecoveryCode,
+  consumeMailedEnrollmentTokenFromUrl,
   createMfaRecoveryCodes,
   MfaEnrollmentHttpError,
+  verifyMfaEmail,
   verifyMfaTotp
 } from "@/lib/mfaEnrollment";
 import { totpQrMatrix } from "@/lib/totpQr";
@@ -55,15 +57,52 @@ function TotpQr({ uri }: { uri: string }) {
 }
 
 export default function EnrollMfaPage() {
+  const initializationStarted = useRef(false);
   const [token, setToken] = useState("");
   const [provisioning, setProvisioning] = useState<Provisioning | null>(null);
   const [totp, setTotp] = useState("");
   const [codes, setCodes] = useState<readonly string[] | null>(null);
   const [typeback, setTypeback] = useState("");
   const [active, setActive] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (initializationStarted.current) return;
+    initializationStarted.current = true;
+    void consumeMailedEnrollmentTokenFromUrl(
+      window.location,
+      window.history,
+      async (mailedToken) => {
+        try {
+          await verifyMfaEmail(mailedToken);
+        } catch (failure) {
+          // A response may have been lost after S3 consumed the token. The S4
+          // begin/generate calls still require its exact, unexpired binding, so
+          // retrying there is both recoverable and fail-closed.
+          if (!(failure instanceof MfaEnrollmentHttpError)
+            || failure.code !== "VERIFICATION_TOKEN_INVALID") throw failure;
+        }
+      }
+    ).then(async (mailedToken) => {
+      if (mailedToken === null) {
+        throw new MfaEnrollmentHttpError("MFA_ENROLLMENT_INVALID", 400);
+      }
+      setToken(mailedToken);
+      try {
+        setProvisioning(await beginMfaEnrollment(mailedToken));
+      } catch (failure) {
+        if (!(failure instanceof MfaEnrollmentHttpError)
+          || failure.code !== "MFA_ENROLLMENT_STATE_INVALID") throw failure;
+        setCodes(await createMfaRecoveryCodes(mailedToken));
+      }
+    }).catch((failure: unknown) => {
+      setError(friendlyError(failure));
+    }).finally(() => {
+      setBusy(false);
+    });
+  }, []);
 
   async function perform(action: () => Promise<void>): Promise<void> {
     setBusy(true);
@@ -106,37 +145,14 @@ export default function EnrollMfaPage() {
         {error ? <div className="error" role="alert" style={{ marginTop: 24 }}>{error}</div> : null}
 
         <section className="miniCard" aria-labelledby="enrolment-link" style={{ marginTop: 24 }}>
-          <h2 id="enrolment-link">1. Enter your enrolment token</h2>
-          <p className="optionHint">Use the one-time token from your verified-email flow. It is not saved in this browser.</p>
-          <label className="fieldGroup" htmlFor="mfa-token">
-            Enrolment token
-            <input
-              id="mfa-token"
-              type="password"
-              autoComplete="one-time-code"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              disabled={busy || provisioning !== null || codes !== null}
-            />
-          </label>
-          <div className="formActions" style={{ flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="startBtn"
-              disabled={busy || token.trim() === "" || provisioning !== null || codes !== null}
-              onClick={() => void perform(async () => setProvisioning(await beginMfaEnrollment(token.trim())))}
-            >
-              Start authenticator setup
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy || token.trim() === "" || provisioning !== null || codes !== null}
-              onClick={() => void generateCodes()}
-            >
-              Recover an interrupted code setup
-            </button>
-          </div>
+          <h2 id="enrolment-link">1. Verify the mailed link</h2>
+          <p className="optionHint">
+            {busy
+              ? "Verifying your email and preparing authenticator setup…"
+              : token === ""
+                ? "Open the private link from your verification email to continue."
+                : "Email verified. The one-time token was removed from the address bar and is not saved in this browser."}
+          </p>
         </section>
 
         {provisioning ? (

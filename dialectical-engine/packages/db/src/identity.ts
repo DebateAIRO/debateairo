@@ -52,6 +52,17 @@ export interface RecoveryCodeRecord {
   readonly codeSlot: number;
 }
 
+interface LockedMfaEnrollmentBearer {
+  readonly channelBindingId: string;
+  readonly userId: string;
+  readonly auditToken: string;
+  readonly pseudonym: string;
+  readonly userState: string;
+  readonly expiresAt: Date;
+  readonly consumedAt: Date | null;
+  readonly isBindingBearer: boolean;
+}
+
 // Deliberately carries no raw source context: by the time an AuditWrite exists
 // the IP and user agent have already been reduced to prepared Argon2 digests,
 // so raw values cannot reach the transactional append path at all.
@@ -126,6 +137,72 @@ export class PostgresIdentityRepository {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Locks every row used to authorize MFA enrolment in the same explicit
+   * account-local order as email verification: channel -> user -> credential.
+   * The initial credential lookup is only a locator. Authorization is derived
+   * again from the locked rows, including exact equality with the one sibling
+   * credential designated as the channel's MFA bearer.
+   */
+  private async lockMfaEnrollmentBearer(
+    client: PoolClient,
+    enrollmentTokenHash: string
+  ): Promise<LockedMfaEnrollmentBearer | null> {
+    const located = await client.query<{ channel_binding_id: string }>(`
+      SELECT channel_binding_id
+      FROM identity.verification_token_credential
+      WHERE token_hash=$1
+    `, [enrollmentTokenHash]);
+    const channelBindingId = located.rows[0]?.channel_binding_id;
+    if (channelBindingId === undefined) return null;
+
+    const channel = (await client.query<{
+      channel_binding_id: string;
+      user_id: string;
+      verification_token_hash: string | null;
+    }>(`
+      SELECT channel_binding_id,user_id,verification_token_hash
+      FROM identity.channel_binding
+      WHERE channel_binding_id=$1 AND channel_type='email'
+      FOR UPDATE
+    `, [channelBindingId])).rows[0];
+    if (channel === undefined) return null;
+
+    const user = (await client.query<{
+      audit_token: string;
+      pseudonym: string;
+      state: string;
+    }>(`
+      SELECT audit_token,pseudonym,state
+      FROM identity."user"
+      WHERE user_id=$1
+      FOR UPDATE
+    `, [channel.user_id])).rows[0];
+    if (user === undefined) return null;
+
+    const credential = (await client.query<{
+      expires_at: Date;
+      consumed_at: Date | null;
+    }>(`
+      SELECT expires_at,consumed_at
+      FROM identity.verification_token_credential
+      WHERE token_hash=$1 AND channel_binding_id=$2
+      FOR UPDATE
+    `, [enrollmentTokenHash, channel.channel_binding_id])).rows[0];
+    if (credential === undefined) return null;
+
+    return Object.freeze({
+      channelBindingId: channel.channel_binding_id,
+      userId: channel.user_id,
+      auditToken: user.audit_token,
+      pseudonym: user.pseudonym,
+      userState: user.state,
+      expiresAt: credential.expires_at,
+      consumedAt: credential.consumed_at,
+      isBindingBearer: channel.verification_token_hash === enrollmentTokenHash
+    });
   }
 
   private async appendAudit(
@@ -482,9 +559,15 @@ export class PostgresIdentityRepository {
         await client.query(`
           UPDATE identity.channel_binding
           SET state='verified',verified_at=$2,verification_consumed_at=$2,
+            verification_token_hash=$3,verification_expires_at=$4,
             delivery_error=NULL
           WHERE channel_binding_id=$1
-        `, [channel.channel_binding_id, input.occurredAt]);
+        `, [
+          channel.channel_binding_id,
+          input.occurredAt,
+          input.tokenHash,
+          credential!.expires_at
+        ]);
         // Email possession opens the short-lived MFA enrolment capability; it
         // never makes the account usable. Only recovery-code confirmation in
         // S4 promotes pending_mfa to active.
@@ -630,6 +713,7 @@ export class PostgresIdentityRepository {
         ON binding.channel_binding_id=credential.channel_binding_id
       JOIN identity."user" u ON u.user_id=binding.user_id
       WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
+        AND binding.verification_token_hash=credential.token_hash
         AND credential.expires_at >= statement_timestamp()
         AND u.state='pending_mfa'
     `, [enrollmentTokenHash]);
@@ -649,29 +733,14 @@ export class PostgresIdentityRepository {
   }): Promise<Readonly<{ userId: string; pseudonym: string; factorId: string }> | null> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const credential = await client.query<{
-        user_id: string;
-        audit_token: string;
-        pseudonym: string;
-        state: string;
-        expires_at: Date;
-        consumed_at: Date | null;
-      }>(`
-        SELECT u.user_id,u.audit_token,u.pseudonym,u.state,
-          credential.expires_at,credential.consumed_at
-        FROM identity.verification_token_credential credential
-        JOIN identity.channel_binding binding
-          ON binding.channel_binding_id=credential.channel_binding_id
-        JOIN identity."user" u ON u.user_id=binding.user_id
-        WHERE credential.token_hash=$1 AND binding.channel_type='email'
-        FOR UPDATE OF credential,u
-      `, [input.enrollmentTokenHash]);
-      const row = credential.rows[0];
+      const row = await this.lockMfaEnrollmentBearer(client, input.enrollmentTokenHash);
       const valid = row !== undefined
-        && row.consumed_at !== null
-        && row.expires_at.getTime() >= input.occurredAt.getTime()
-        && row.state === "pending_mfa";
-      const actorToken = row?.audit_token ?? randomUUID();
+        && row !== null
+        && row.isBindingBearer
+        && row.consumedAt !== null
+        && row.expiresAt.getTime() >= input.occurredAt.getTime()
+        && row.userState === "pending_mfa";
+      const actorToken = row?.isBindingBearer === true ? row.auditToken : randomUUID();
       if (!valid) {
         await this.appendAudit(client, prepared, {
           actorToken,
@@ -691,7 +760,7 @@ export class PostgresIdentityRepository {
         ORDER BY created_at DESC,mfa_factor_id DESC
         LIMIT 1
         FOR UPDATE
-      `, [row.user_id]);
+      `, [row!.userId]);
       if (currentFactor.rows[0] !== undefined && currentFactor.rows[0].state !== "pending") {
         await this.appendAudit(client, prepared, {
           actorToken,
@@ -710,14 +779,14 @@ export class PostgresIdentityRepository {
       await client.query(`
         DELETE FROM identity.mfa_factor
         WHERE user_id=$1 AND factor_type='totp' AND state='pending'
-      `, [row.user_id]);
+      `, [row!.userId]);
       const inserted = await client.query<{ mfa_factor_id: string }>(`
         INSERT INTO identity.mfa_factor (
           mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
           state,created_at,verified_at,revoked_at,last_accepted_step
         ) VALUES ($1,$2,'totp',$3::jsonb,NULL,NULL,'pending',$4,NULL,NULL,NULL)
         RETURNING mfa_factor_id
-      `, [input.factorId, row.user_id, JSON.stringify(input.secretCiphertext), input.occurredAt]);
+      `, [input.factorId, row!.userId, JSON.stringify(input.secretCiphertext), input.occurredAt]);
       await this.appendAudit(client, prepared, {
         actorToken,
         eventType: "identity.mfa.totp.begin",
@@ -728,8 +797,8 @@ export class PostgresIdentityRepository {
         justification: null
       });
       return Object.freeze({
-        userId: row.user_id,
-        pseudonym: row.pseudonym,
+        userId: row!.userId,
+        pseudonym: row!.pseudonym,
         factorId: inserted.rows[0]!.mfa_factor_id
       });
     });
@@ -758,6 +827,7 @@ export class PostgresIdentityRepository {
         ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
       ) factor ON true
       WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
+        AND binding.verification_token_hash=credential.token_hash
         AND credential.expires_at >= statement_timestamp()
         AND u.state='pending_mfa'
     `, [enrollmentTokenHash]);
@@ -781,36 +851,26 @@ export class PostgresIdentityRepository {
   }): Promise<"confirmed" | "replayed" | "invalid"> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const locked = await client.query<{
-        user_id: string;
-        audit_token: string;
-        user_state: string;
+      const bearer = await this.lockMfaEnrollmentBearer(client, input.enrollmentTokenHash);
+      const lockedFactor = bearer === null ? undefined : (await client.query<{
         factor_state: string;
         last_accepted_step: string | number | null;
-        expires_at: Date;
-        consumed_at: Date | null;
       }>(`
-        SELECT u.user_id,u.audit_token,u.state AS user_state,
-          factor.state AS factor_state,factor.last_accepted_step,
-          credential.expires_at,credential.consumed_at
-        FROM identity.verification_token_credential credential
-        JOIN identity.channel_binding binding
-          ON binding.channel_binding_id=credential.channel_binding_id
-        JOIN identity."user" u ON u.user_id=binding.user_id
-        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
-        WHERE credential.token_hash=$1 AND factor.mfa_factor_id=$2
-          AND factor.factor_type='totp'
-        FOR UPDATE OF credential,u,factor
-      `, [input.enrollmentTokenHash, input.factorId]);
-      const row = locked.rows[0];
-      const current = row?.last_accepted_step === null || row?.last_accepted_step === undefined
-        ? null : Number(row.last_accepted_step);
-      const eligible = row !== undefined && row.user_state === "pending_mfa"
-        && row.factor_state === "pending" && row.consumed_at !== null
-        && row.expires_at.getTime() >= input.occurredAt.getTime();
+        SELECT state AS factor_state,last_accepted_step
+        FROM identity.mfa_factor
+        WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp'
+        FOR UPDATE
+      `, [input.factorId, bearer.userId])).rows[0];
+      const current = lockedFactor?.last_accepted_step === null
+        || lockedFactor?.last_accepted_step === undefined
+        ? null : Number(lockedFactor.last_accepted_step);
+      const eligible = bearer !== null && bearer.isBindingBearer
+        && bearer.userState === "pending_mfa"
+        && lockedFactor?.factor_state === "pending" && bearer.consumedAt !== null
+        && bearer.expiresAt.getTime() >= input.occurredAt.getTime();
       const replayed = eligible && current !== null && input.acceptedStep <= current;
       const confirmed = eligible && !replayed;
-      const actorToken = row?.audit_token ?? randomUUID();
+      const actorToken = bearer?.isBindingBearer === true ? bearer.auditToken : randomUUID();
       if (confirmed) {
         await client.query(`
           UPDATE identity.mfa_factor
@@ -840,16 +900,9 @@ export class PostgresIdentityRepository {
   }): Promise<void> {
     const prepared = await this.prepareAuditContext(input.source);
     await this.transaction(async (client) => {
-      const found = await client.query<{ audit_token: string }>(`
-        SELECT u.audit_token
-        FROM identity.verification_token_credential credential
-        JOIN identity.channel_binding binding
-          ON binding.channel_binding_id=credential.channel_binding_id
-        JOIN identity."user" u ON u.user_id=binding.user_id
-        WHERE credential.token_hash=$1
-      `, [input.enrollmentTokenHash]);
+      const bearer = await this.lockMfaEnrollmentBearer(client, input.enrollmentTokenHash);
       await this.appendAudit(client, prepared, {
-        actorToken: found.rows[0]?.audit_token ?? randomUUID(),
+        actorToken: bearer?.isBindingBearer === true ? bearer.auditToken : randomUUID(),
         eventType: "identity.mfa.verification_failed",
         targetType: "identity.mfa_factor",
         occurredAt: input.occurredAt,
@@ -873,30 +926,22 @@ export class PostgresIdentityRepository {
     }
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const locked = await client.query<{
-        user_id: string;
-        audit_token: string;
-        user_state: string;
+      const bearer = await this.lockMfaEnrollmentBearer(client, input.enrollmentTokenHash);
+      const lockedFactor = bearer === null ? undefined : (await client.query<{
         factor_state: string;
-        expires_at: Date;
-        consumed_at: Date | null;
       }>(`
-        SELECT u.user_id,u.audit_token,u.state AS user_state,
-          factor.state AS factor_state,credential.expires_at,credential.consumed_at
-        FROM identity.verification_token_credential credential
-        JOIN identity.channel_binding binding
-          ON binding.channel_binding_id=credential.channel_binding_id
-        JOIN identity."user" u ON u.user_id=binding.user_id
-        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
-        WHERE credential.token_hash=$1 AND factor.mfa_factor_id=$2
-        FOR UPDATE OF credential,u,factor
-      `, [input.enrollmentTokenHash, input.factorId]);
-      const row = locked.rows[0];
-      const valid = row !== undefined && row.user_state === "pending_mfa"
-        && (row.factor_state === "verified_pending_recovery" || row.factor_state === "recovery_pending")
-        && row.consumed_at !== null
-        && row.expires_at.getTime() >= input.occurredAt.getTime();
-      const actorToken = row?.audit_token ?? randomUUID();
+        SELECT state AS factor_state
+        FROM identity.mfa_factor
+        WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp'
+        FOR UPDATE
+      `, [input.factorId, bearer.userId])).rows[0];
+      const valid = bearer !== null && bearer.isBindingBearer
+        && bearer.userState === "pending_mfa"
+        && (lockedFactor?.factor_state === "verified_pending_recovery"
+          || lockedFactor?.factor_state === "recovery_pending")
+        && bearer.consumedAt !== null
+        && bearer.expiresAt.getTime() >= input.occurredAt.getTime();
+      const actorToken = bearer?.isBindingBearer === true ? bearer.auditToken : randomUUID();
       if (valid) {
         // A response can be lost before the user records its one-time
         // plaintext. Regeneration is recoverable without redisplay: revoke
@@ -904,13 +949,13 @@ export class PostgresIdentityRepository {
         await client.query(`
           UPDATE identity.recovery_code SET revoked_at=$2
           WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL
-        `, [row.user_id, input.occurredAt]);
+        `, [bearer.userId, input.occurredAt]);
         for (const code of input.codes) {
           await client.query(`
             INSERT INTO identity.recovery_code (
               user_id,code_slot,code_hash,created_at,consumed_at,revoked_at
             ) VALUES ($1,$2,$3,$4,NULL,NULL)
-          `, [row.user_id, code.slot, code.hash, input.occurredAt]);
+          `, [bearer.userId, code.slot, code.hash, input.occurredAt]);
         }
         await client.query(`
           UPDATE identity.mfa_factor SET state='recovery_pending'
@@ -948,6 +993,7 @@ export class PostgresIdentityRepository {
       JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
       JOIN identity.recovery_code code ON code.user_id=u.user_id
       WHERE credential.token_hash=$1 AND code.code_slot=$2
+        AND binding.verification_token_hash=credential.token_hash
         AND credential.consumed_at IS NOT NULL
         AND credential.expires_at >= statement_timestamp()
         AND u.state='pending_mfa' AND factor.state='recovery_pending'
@@ -970,41 +1016,48 @@ export class PostgresIdentityRepository {
   }): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const locked = await client.query<{
-        user_id: string;
-        audit_token: string;
-        user_state: string;
-        factor_id: string;
+      const bearer = await this.lockMfaEnrollmentBearer(client, input.enrollmentTokenHash);
+      const lockedFactor = bearer === null ? undefined : (await client.query<{
+        mfa_factor_id: string;
         factor_state: string;
-        recovery_code_id: string | null;
-        expires_at: Date;
-        consumed_at: Date | null;
       }>(`
-        SELECT u.user_id,u.audit_token,u.state AS user_state,
-          factor.mfa_factor_id AS factor_id,factor.state AS factor_state,
-          code.recovery_code_id,credential.expires_at,credential.consumed_at
-        FROM identity.verification_token_credential credential
-        JOIN identity.channel_binding binding
-          ON binding.channel_binding_id=credential.channel_binding_id
-        JOIN identity."user" u ON u.user_id=binding.user_id
-        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
-        LEFT JOIN identity.recovery_code code
-          ON code.recovery_code_id=$2 AND code.user_id=u.user_id
-          AND code.consumed_at IS NULL AND code.revoked_at IS NULL
-        WHERE credential.token_hash=$1
-        FOR UPDATE OF credential,u,factor
-      `, [input.enrollmentTokenHash, input.recoveryCodeId]);
-      const row = locked.rows[0];
-      const valid = row !== undefined && row.user_state === "pending_mfa"
-        && row.factor_state === "recovery_pending" && row.recovery_code_id !== null
-        && row.consumed_at !== null
-        && row.expires_at.getTime() >= input.occurredAt.getTime();
-      const actorToken = row?.audit_token ?? randomUUID();
+        SELECT mfa_factor_id,state AS factor_state
+        FROM identity.mfa_factor
+        WHERE user_id=$1 AND factor_type='totp'
+        ORDER BY created_at DESC,mfa_factor_id DESC
+        LIMIT 1
+        FOR UPDATE
+      `, [bearer.userId])).rows[0];
+      // Recovery-code rows are always locked after their parent factor.
+      const lockedCode = bearer === null || lockedFactor === undefined
+        ? undefined
+        : (await client.query<{ recovery_code_id: string }>(`
+          SELECT recovery_code_id
+          FROM identity.recovery_code
+          WHERE recovery_code_id=$1 AND user_id=$2
+            AND consumed_at IS NULL AND revoked_at IS NULL
+          FOR UPDATE
+        `, [input.recoveryCodeId, bearer.userId])).rows[0];
+      const valid = bearer !== null && bearer.isBindingBearer
+        && bearer.userState === "pending_mfa"
+        && lockedFactor?.factor_state === "recovery_pending"
+        && lockedCode !== undefined
+        && bearer.consumedAt !== null
+        && bearer.expiresAt.getTime() >= input.occurredAt.getTime();
+      const actorToken = bearer?.isBindingBearer === true ? bearer.auditToken : randomUUID();
       if (valid) {
         await client.query(`
           UPDATE identity.mfa_factor SET state='active' WHERE mfa_factor_id=$1
-        `, [row.factor_id]);
-        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [row.user_id]);
+        `, [lockedFactor.mfa_factor_id]);
+        await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [bearer.userId]);
+        // Activation destroys the short-lived enrolment capability at its
+        // ownership row. Consumed sibling credentials remain only as S3 audit
+        // history and cannot be reused as MFA bearers.
+        await client.query(`
+          UPDATE identity.channel_binding
+          SET verification_token_hash=NULL,verification_expires_at=NULL
+          WHERE channel_binding_id=$1
+        `, [bearer.channelBindingId]);
       }
       await this.appendAudit(client, prepared, {
         actorToken,

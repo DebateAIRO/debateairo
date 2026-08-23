@@ -319,9 +319,18 @@ export class MfaEnrollmentService implements MfaApplication {
         throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
       }
       const codes = generateRecoveryCodes();
-      const hashes = await Promise.all(codes.map((code) =>
-        hashRecoveryCode(this.dependencies.argon2, code, this.dependencies.policy.recoveryCodes.argon2id)
-      ));
+      // Keep at most one recovery-code KDF queued at a time. The shared
+      // credential pool has two workers and registration must retain a lane;
+      // enqueuing all ten here lets one enrolment monopolize both workers and
+      // strand registration behind eight additional credential jobs.
+      const hashes: string[] = [];
+      for (const code of codes) {
+        hashes.push(await hashRecoveryCode(
+          this.dependencies.argon2,
+          code,
+          this.dependencies.policy.recoveryCodes.argon2id
+        ));
+      }
       const stored = await this.dependencies.repository.storeRecoveryCodes({
         enrollmentTokenHash: tokenHash,
         factorId: enrollment.factorId,

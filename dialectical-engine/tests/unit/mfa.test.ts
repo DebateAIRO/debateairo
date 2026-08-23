@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type Argon2Executor,
   type CryptoEnvelope,
@@ -9,6 +9,7 @@ import {
   generateRecoveryCodes,
   generateTotpSecret,
   generateVerificationToken,
+  hashPassword,
   matchTotpStep,
   totpCodeAtStep,
   totpProvisioningUri
@@ -271,5 +272,79 @@ describe("S4 MFA enrolment service", () => {
       userId, recoveryCode: generated.recoveryCodes[1]!
     }, source)).resolves.toEqual({ consumed: false });
     expect(failures).toEqual(["MFA_RECOVERY_CONFIRMATION_INVALID"]);
+  });
+
+  it("bounds recovery hashing so a registration credential job coexists within two workers", async () => {
+    const policy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
+    const token = generateVerificationToken();
+    const requestSource = { ip: "198.51.100.10", userAgent: "vitest-mfa", requestId: "mfa-capacity" };
+    let entered = 0;
+    let active = 0;
+    let maximumActive = 0;
+    let passThrough = false;
+    const releases: Array<() => void> = [];
+    const encoded = (sequence: number) =>
+      `$argon2id$v=19$m=19456,t=2,p=1$${String(sequence).padStart(22, "A")}$${String(sequence).padStart(43, "B")}`;
+    const controlled: Argon2Executor = {
+      async hashPassword() {
+        const sequence = ++entered;
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        return new Promise<string>((resolve) => {
+          const finish = () => {
+            active -= 1;
+            resolve(encoded(sequence));
+          };
+          if (passThrough) finish();
+          else releases.push(finish);
+        });
+      },
+      async verifyPassword() { return false; },
+      async hashAuditContext() { throw new Error("unused"); }
+    };
+    let stored: readonly Readonly<{ slot: number; hash: string }>[] = [];
+    const service = new MfaEnrollmentService({
+      repository: {
+        async readTotpEnrollment() {
+          return {
+            userId: "11111111-1111-4111-8111-111111111111",
+            pseudonym: "amber-raven-010203",
+            factorId: "22222222-2222-4222-8222-222222222222",
+            secretCiphertext: { v: 1, keyId: "unused", nonce: "", ct: "", tag: "" },
+            lastAcceptedStep: 1,
+            factorState: "verified_pending_recovery" as const
+          };
+        },
+        async storeRecoveryCodes(input: { codes: readonly Readonly<{ slot: number; hash: string }>[] }) {
+          stored = input.codes;
+          return true;
+        },
+        async recordMfaVerificationFailure() { throw new Error("unused"); }
+      } as never,
+      dekStore: {
+        async store() { throw new Error("unused"); },
+        async load() { throw new Error("unused"); }
+      },
+      argon2: controlled,
+      policy
+    });
+
+    const generating = service.generateRecoveryCodes({ enrollmentToken: token }, requestSource);
+    await vi.waitFor(() => expect(entered).toBeGreaterThan(0));
+    const recoveryJobsSubmittedBeforeRegistration = entered;
+    const registration = hashPassword(controlled, "registration password", {
+      memoryCostKiB: 65_536, timeCost: 3, parallelism: 1, hashLength: 32
+    });
+    await vi.waitFor(() => expect(entered).toBeGreaterThan(recoveryJobsSubmittedBeforeRegistration));
+    try {
+      expect(recoveryJobsSubmittedBeforeRegistration).toBeLessThanOrEqual(2);
+      expect(maximumActive).toBeLessThanOrEqual(2);
+    } finally {
+      passThrough = true;
+      for (const release of releases.splice(0)) release();
+    }
+    const [, registrationHash] = await Promise.all([generating, registration]);
+    expect(stored).toHaveLength(10);
+    expect(registrationHash).toMatch(/^\$argon2id\$/);
   });
 });

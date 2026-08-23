@@ -7,8 +7,15 @@ export class MfaEnrollmentHttpError extends Error {
   }
 }
 
-async function postMfa(path: string, body: Readonly<Record<string, string>>): Promise<unknown> {
-  const sameOriginFetch = createSameOriginFetch(API_BASE);
+async function postMfa(
+  path: string,
+  body: Readonly<Record<string, string>>,
+  fetchImplementation: typeof fetch = fetch,
+  apiBase: string = API_BASE
+): Promise<unknown> {
+  const sameOriginFetch = apiBase === API_BASE && fetchImplementation === fetch
+    ? createSameOriginFetch(API_BASE)
+    : createSameOriginFetch(apiBase, fetchImplementation);
   const response = await sameOriginFetch(new URL(path, "http://contract.invalid").toString(), {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -22,6 +29,53 @@ async function postMfa(path: string, body: Readonly<Record<string, string>>): Pr
     );
   }
   return payload;
+}
+
+export async function verifyMfaEmail(
+  token: string,
+  fetchImplementation: typeof fetch = fetch,
+  apiBase: string = API_BASE
+): Promise<void> {
+  const payload = await postMfa(
+    "/v1/auth/verify-email",
+    { token },
+    fetchImplementation,
+    apiBase
+  ) as Record<string, unknown>;
+  if (payload.status !== "mfa_required") {
+    throw new MfaEnrollmentHttpError("MFA_RESPONSE_INVALID", 502);
+  }
+}
+
+type EnrollmentLocation = Readonly<{ href: string }>;
+type EnrollmentHistory = Readonly<{
+  state: unknown;
+  replaceState(state: unknown, unused: string, url?: string | URL | null): void;
+}>;
+
+/**
+ * Takes the mailed bearer out of browser-visible navigation state before the
+ * first network await, then proves email possession through the same-origin
+ * verification route. The returned value lives only in the current component
+ * state; this helper never writes browser storage or a cookie.
+ */
+export async function consumeMailedEnrollmentTokenFromUrl(
+  location: EnrollmentLocation,
+  history: EnrollmentHistory,
+  verify: (token: string) => Promise<void> = verifyMfaEmail
+): Promise<string | null> {
+  const url = new URL(location.href);
+  const token = url.searchParams.get("token");
+  if (token === null) return null;
+  url.searchParams.delete("token");
+  const query = url.searchParams.toString();
+  history.replaceState(
+    history.state,
+    "",
+    `${url.pathname}${query === "" ? "" : `?${query}`}${url.hash}`
+  );
+  await verify(token);
+  return token;
 }
 
 export async function beginMfaEnrollment(enrollmentToken: string): Promise<Readonly<{

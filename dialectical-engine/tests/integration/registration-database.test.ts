@@ -1079,6 +1079,110 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     }
   }, 120_000);
 
+  it("S4 grants MFA enrolment only to the sibling token actually presented for email proof", async () => {
+    const initialNow = new Date("2026-08-23T11:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ initialNow, mail });
+    const registered = await registerAccount(flow.service, `s4-sibling-${randomUUID()}`);
+    const presentedToken = mail.messages[0]!.token;
+    flow.advance(basePolicy.verification.resendCooldownMs + 1);
+    await expect(flow.service.resendVerification({ email: registered.email }, source))
+      .resolves.toEqual(RESEND_PUBLIC_RESPONSE);
+    await flow.service.drainMailDispatches();
+    expect(mail.messages).toHaveLength(2);
+    const nonPresentedToken = mail.messages[1]!.token;
+    const mfaNow = new Date(initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1);
+    await expect(flow.service.verifyEmail({ token: presentedToken }, source))
+      .resolves.toEqual({ status: "mfa_required" });
+
+    const mfa = new MfaEnrollmentService({
+      repository: flow.repository,
+      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
+      argon2: sharedArgon2Pool(),
+      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
+      clock: () => mfaNow
+    });
+    const api = buildApi({ application: fixtureAskApplication(), mfa });
+    try {
+      const refusedBegin = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/begin",
+        payload: { enrollment_token: nonPresentedToken }
+      });
+      expect(refusedBegin.statusCode).toBe(400);
+      expect(refusedBegin.json()).toMatchObject({ error: "MFA_ENROLLMENT_INVALID" });
+
+      const begin = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/begin",
+        payload: { enrollment_token: presentedToken }
+      });
+      expect(begin.statusCode).toBe(200);
+      const begun = begin.json<{ secret: string }>();
+      const code = totpCodeAtStep(decodeBase32(begun.secret), Math.floor(mfaNow.getTime() / 30_000));
+
+      const refusedVerify = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/verify",
+        payload: { enrollment_token: nonPresentedToken, code }
+      });
+      expect(refusedVerify.statusCode).toBe(409);
+      expect(refusedVerify.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
+
+      const verified = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/verify",
+        payload: { enrollment_token: presentedToken, code }
+      });
+      expect(verified.statusCode).toBe(200);
+
+      const refusedGenerate = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/generate",
+        payload: { enrollment_token: nonPresentedToken }
+      });
+      expect(refusedGenerate.statusCode).toBe(409);
+      expect(refusedGenerate.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
+
+      const generated = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/generate",
+        payload: { enrollment_token: presentedToken }
+      });
+      expect(generated.statusCode).toBe(200);
+      const recoveryCode = generated.json<{ recoveryCodes: string[] }>().recoveryCodes[0]!;
+
+      const refusedActivate = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/confirm",
+        payload: { enrollment_token: nonPresentedToken, recovery_code: recoveryCode }
+      });
+      expect(refusedActivate.statusCode).toBe(400);
+      expect(refusedActivate.json()).toMatchObject({ error: "MFA_RECOVERY_CONFIRMATION_INVALID" });
+
+      const activated = await api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/recovery-codes/confirm",
+        payload: { enrollment_token: presentedToken, recovery_code: recoveryCode }
+      });
+      expect(activated.statusCode).toBe(200);
+      const binding = await database.pool.query<{
+        verification_token_hash: string | null;
+        verification_expires_at: Date | null;
+      }>(`
+        SELECT verification_token_hash,verification_expires_at
+        FROM identity.channel_binding
+        WHERE user_id=$1 AND channel_type='email'
+      `, [registered.user.user_id]);
+      expect(binding.rows[0]).toEqual({
+        verification_token_hash: null,
+        verification_expires_at: null
+      });
+    } finally {
+      await api.close();
+    }
+  }, 120_000);
+
   it("S3a A2 clamps empty and whitespace User-Agent values for all auth-route audit writes", async () => {
     for (const [label, userAgent, ip] of [
       ["empty", "", "192.0.2.241"],
@@ -4943,6 +5047,84 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     `, [userId]);
     return binding.rows[0]!.channel_binding_id;
   }
+
+  it("S4 takes the channel lock before user and credential during verify/enrol overlap", async () => {
+    const initialNow = new Date("2026-08-23T12:00:00.000Z");
+    const mail = new MemoryMailSender();
+    const flow = buildService({ initialNow, mail });
+    const registered = await registerAccount(flow.service, `s4-lock-order-${randomUUID()}`);
+    const token = mail.messages[0]!.token;
+    await expect(flow.service.verifyEmail({ token }, source))
+      .resolves.toEqual({ status: "mfa_required" });
+
+    const mfa = new MfaEnrollmentService({
+      repository: flow.repository,
+      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
+      argon2: sharedArgon2Pool(),
+      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
+      clock: () => initialNow
+    });
+    const api = buildApi({
+      application: fixtureAskApplication(),
+      registration: flow.service,
+      mfa
+    });
+    const monitor = await database.pool.connect();
+    let barrier: QueryBarrier | undefined;
+    try {
+      const deadlocksBefore = await databaseDeadlockCount();
+      barrier = installQueryBarrier((sql) =>
+        sql.includes("SELECT channel_binding_id,user_id")
+        && sql.includes("FROM identity.channel_binding")
+        && sql.includes("channel_binding_id=$1")
+        && sql.includes("FOR UPDATE")
+      );
+
+      // The retry is valid public behaviour but cannot consume the credential
+      // twice. Pausing its first channel-row lock makes the overlap repeatable.
+      const retryVerification = api.inject({
+        method: "POST",
+        url: "/v1/auth/verify-email",
+        payload: { token }
+      });
+      await barrier.reached;
+
+      const beginningEnrollment = api.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/totp/begin",
+        payload: { enrollment_token: token }
+      });
+      const peakLockWaiters = await Promise.race([
+        beginningEnrollment.then(() => 0),
+        waitForLockWaiters(monitor, 1, 8_000)
+      ]);
+
+      barrier.release();
+      barrier = undefined;
+      const [retried, begun] = await Promise.all([retryVerification, beginningEnrollment]);
+      await settleDatabaseStatistics();
+      const deadlocksAfter = await databaseDeadlockCount();
+
+      console.info(
+        `[S4 VERIFY/ENROL LOCK ORDER RED/GREEN] `
+        + `peak_lock_waiters=${peakLockWaiters} retry_status=${retried.statusCode} `
+        + `begin_status=${begun.statusCode} deadlock_delta=${deadlocksAfter - deadlocksBefore}`
+      );
+      expect(peakLockWaiters).toBeGreaterThanOrEqual(1);
+      expect(retried.statusCode).toBe(400);
+      expect(retried.json()).toMatchObject({ error: "VERIFICATION_TOKEN_INVALID" });
+      expect(begun.statusCode).toBe(200);
+      expect([retried.statusCode, begun.statusCode]).not.toContain(500);
+      expect(databaseErrorLeak(retried.body)).toBe(false);
+      expect(databaseErrorLeak(begun.body)).toBe(false);
+      expect(deadlocksAfter - deadlocksBefore).toBe(0);
+    } finally {
+      barrier?.release();
+      monitor.release();
+      await flow.service.drainMailDispatches();
+      await api.close();
+    }
+  }, 120_000);
 
   it("T9-H keeps the query-barrier pool patch safe for both pg connect call forms", async () => {
     // pg's Pool.query calls Pool.connect in CALLBACK form, where connect returns
