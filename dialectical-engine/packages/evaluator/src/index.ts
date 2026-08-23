@@ -1,7 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  decryptContentForRun,
+  type CryptoEnvelope,
+  withWriteTransaction
+} from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
@@ -683,17 +688,23 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
     if (harvested.rowCount === 0) return "HARVEST_REQUIRED";
     const result = await database.query<{
       run_id: string; run_ordinal: number; domain_id: string | null;
-      reduced_judgement_id: string; raw_artifact_ref: string; provider: string;
+      reduced_judgement_id: string; node_id: string; raw_artifact_ref: string; provider: string;
       model_id: string; model_version: string; maker: string; question_line: string;
       claim_text: string; tau: number; number_kind: string; raw_text: string;
+      run_content_ciphertext: CryptoEnvelope | null;
+      node_content_ciphertext: CryptoEnvelope | null;
+      artifact_content_ciphertext: CryptoEnvelope | null;
     }>(`
       SELECT run.run_id,
         (SELECT count(*)::int FROM core.run AS preceding
          WHERE preceding.created_at_seq <= run.created_at_seq) AS run_ordinal,
-        domain.domain_id, judgement.reduced_judgement_id, judgement.raw_artifact_ref,
+        domain.domain_id, judgement.reduced_judgement_id, node.node_id,
+        judgement.raw_artifact_ref,
         artifact.provider, artifact.model_id, artifact.model_version, artifact.maker,
-        run.question_line, node.claim_text, judgement.tau, judgement.number_kind,
-        artifact.raw_text
+        run.question_line, run.content_ciphertext AS run_content_ciphertext,
+        node.claim_text, node.content_ciphertext AS node_content_ciphertext,
+        judgement.tau, judgement.number_kind,
+        artifact.raw_text, artifact.content_ciphertext AS artifact_content_ciphertext
       FROM core.run AS run
       JOIN ledger.reduced_judgement AS judgement ON judgement.run_id=run.run_id
       JOIN core.node AS node ON node.node_id=judgement.node_id AND node.run_id=run.run_id
@@ -707,6 +718,20 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
     `, [runId]);
     const row = result.rows[0];
     if (row === undefined) return "NO_JUDGEMENT";
+    const [runContent, nodeContent, artifactContent] = await Promise.all([
+      decryptContentForRun<{ questionLine: string }>(
+        this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+        { questionLine: row.question_line }
+      ),
+      decryptContentForRun<{ claimText: string }>(
+        this.pool, row.run_id, "core.node", row.node_id,
+        row.node_content_ciphertext, { claimText: row.claim_text }
+      ),
+      decryptContentForRun<{ rawText: string }>(
+        this.pool, row.run_id, "ledger.raw_artifact", row.raw_artifact_ref,
+        row.artifact_content_ciphertext, { rawText: row.raw_text }
+      )
+    ]);
     return Object.freeze({
       runId: row.run_id,
       runOrdinal: Number(row.run_ordinal),
@@ -717,10 +742,10 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
       gradedModelId: row.model_id,
       gradedModelVersion: row.model_version,
       gradedMaker: row.maker,
-      questionExcerpt: row.question_line,
-      taskExcerpt: row.claim_text,
+      questionExcerpt: runContent.questionLine,
+      taskExcerpt: nodeContent.claimText,
       grade: `${Number(row.tau)} (${row.number_kind})`,
-      reasons: extractBlindJudgementReasons(row.raw_text)
+      reasons: extractBlindJudgementReasons(artifactContent.rawText)
     });
   }
 
@@ -2023,10 +2048,19 @@ export class EvaluatorHarvestRepository {
     const reviews = await client.query<{
       node_review_id: string; author_raw_artifact_ref: string; review_raw_artifact_ref: string;
       outcome: string; reasons: unknown;
+      content_ciphertext: CryptoEnvelope | null;
     }>(`
-      SELECT node_review_id, author_raw_artifact_ref, review_raw_artifact_ref, outcome, reasons
+      SELECT node_review_id,author_raw_artifact_ref,review_raw_artifact_ref,outcome,reasons,
+             content_ciphertext
       FROM ledger.node_review WHERE run_id=$1 ORDER BY node_review_id
     `, [runId]);
+    const decryptedReviews = await Promise.all(reviews.rows.map(async (row) => {
+      const content = await decryptContentForRun<{ reasons: unknown }>(
+        this.pool, runId, "ledger.node_review", row.node_review_id,
+        row.content_ciphertext, { reasons: row.reasons }
+      );
+      return { ...row, reasons: content.reasons };
+    }));
     const judgements = await client.query<{
       reduced_judgement_id: string; raw_artifact_ref: string; tau: number;
       number_kind: string; producer: string;
@@ -2080,7 +2114,7 @@ export class EvaluatorHarvestRepository {
         nodeId: row.node_id, rawArtifactRef: row.raw_artifact_ref,
         generationStatus: row.generation_status, pathStatus: row.path_status, claimType: row.claim_type
       }))),
-      reviews: Object.freeze(reviews.rows.map((row) => Object.freeze({
+      reviews: Object.freeze(decryptedReviews.map((row) => Object.freeze({
         nodeReviewId: row.node_review_id, authorRawArtifactRef: row.author_raw_artifact_ref,
         reviewRawArtifactRef: row.review_raw_artifact_ref, outcome: row.outcome, reasons: row.reasons
       }))),

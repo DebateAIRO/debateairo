@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  CONTENT_CIPHERTEXT_SENTINEL,
+  allocateSequence,
+  encryptContentForRun,
+  withWriteTransaction
+} from "@debateai/db";
 import {
   TypedDomainError,
   createLabeledNumber,
@@ -229,11 +234,21 @@ export class EvidenceRepository {
   async recordFrozenQuerySet(input: { readonly runId: string; readonly version: number; readonly seeds: readonly QuerySeed[] }): Promise<string> {
     const frozen = freezeQuerySet(input.seeds);
     return withWriteTransaction(this.pool, async (client) => {
+      const querySetId = randomUUID();
+      const content = await encryptContentForRun(
+        this.pool, input.runId, "evidence.query_set", querySetId,
+        { queries: frozen.queries }
+      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ query_set_id: string }>(
-        `INSERT INTO evidence.query_set (run_id, version, queries, content_hash, frozen_at_seq)
-         VALUES ($1,$2,$3::jsonb,$4,$5) RETURNING query_set_id`,
-        [input.runId, input.version, JSON.stringify(frozen.queries), frozen.contentHash, atSeq]
+        `INSERT INTO evidence.query_set (
+           query_set_id,run_id,version,queries,content_hash,frozen_at_seq,content_ciphertext
+         ) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7::jsonb) RETURNING query_set_id`,
+        [
+          querySetId, input.runId, input.version,
+          JSON.stringify(content === null ? frozen.queries : [CONTENT_CIPHERTEXT_SENTINEL]),
+          frozen.contentHash, atSeq, content === null ? null : JSON.stringify(content)
+        ]
       );
       return row.rows[0]!.query_set_id;
     });
@@ -248,12 +263,23 @@ export class EvidenceRepository {
   }): Promise<string> {
     const amendment = createQueryAmendment(input);
     return withWriteTransaction(this.pool, async (client) => {
+      const queryAmendmentId = randomUUID();
+      const content = await encryptContentForRun(
+        this.pool, input.runId, "evidence.query_amendment", queryAmendmentId,
+        { amendedQuery: amendment.amendedQuery, reason: amendment.reason }
+      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ query_amendment_id: string }>(
         `INSERT INTO evidence.query_amendment (
-          run_id, query_set_ref, kind, amended_query, reason, confirmation_power, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING query_amendment_id`,
-        [input.runId, amendment.querySetRef, amendment.kind, amendment.amendedQuery, amendment.reason, amendment.confirmationPower, atSeq]
+          query_amendment_id,run_id,query_set_ref,kind,amended_query,reason,
+          confirmation_power,at_seq,content_ciphertext
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING query_amendment_id`,
+        [
+          queryAmendmentId, input.runId, amendment.querySetRef, amendment.kind,
+          content === null ? amendment.amendedQuery : CONTENT_CIPHERTEXT_SENTINEL,
+          content === null ? amendment.reason : CONTENT_CIPHERTEXT_SENTINEL,
+          amendment.confirmationPower, atSeq, content === null ? null : JSON.stringify(content)
+        ]
       );
       return row.rows[0]!.query_amendment_id;
     });
@@ -325,18 +351,26 @@ export class EvidenceRepository {
       replayHandle: input.replayHandle ?? ""
     });
     return withWriteTransaction(this.pool, async (client) => {
+      const content = input.excerpt === null ? null : await encryptContentForRun(
+        this.pool, input.runId, "evidence.evidence_item", evidenceItemId,
+        { excerpt: input.excerpt }
+      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ evidence_item_id: string }>(
         `INSERT INTO evidence.evidence_item (
           evidence_item_id, run_id, node_id, source_ref, excerpt, excerpt_truncated, truncation_at_word_boundary,
           admissibility, off_subject_share, base_score, score_producer, provenance_cluster_key,
-          archived_source_version, retrieved_at, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING evidence_item_id`,
+          archived_source_version, retrieved_at, at_seq, content_ciphertext
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)
+        RETURNING evidence_item_id`,
         [
-          evidenceItemId, input.runId, input.nodeId, input.sourceRef, input.excerpt, input.excerptTruncated,
+          evidenceItemId, input.runId, input.nodeId, input.sourceRef,
+          content === null ? input.excerpt : CONTENT_CIPHERTEXT_SENTINEL,
+          input.excerptTruncated,
           input.truncationAtWordBoundary, admissibility.outcome, admissibility.visibleDowngrade,
           score?.value ?? null, score === null ? null : "EVIDENCE_PIPELINE", clusterKey,
-          input.archivedSourceVersion, input.retrievedAt, atSeq
+          input.archivedSourceVersion, input.retrievedAt, atSeq,
+          content === null ? null : JSON.stringify(content)
         ]
       );
       return row.rows[0]!.evidence_item_id;
@@ -345,11 +379,23 @@ export class EvidenceRepository {
 
   async recordAbsence(input: { readonly runId: string; readonly querySetRef: string; readonly queryText: string; readonly scope: string; readonly observedAt: Date; readonly reason: string }): Promise<string> {
     return withWriteTransaction(this.pool, async (client) => {
+      const absenceRowId = randomUUID();
+      const content = await encryptContentForRun(
+        this.pool, input.runId, "evidence.absence_row", absenceRowId,
+        { queryText: input.queryText, reason: input.reason }
+      );
       const atSeq = await allocateSequence(client);
       const row = await client.query<{ absence_row_id: string }>(
-        `INSERT INTO evidence.absence_row (run_id, query_set_ref, query_text, scope, observed_at, reason, at_seq)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING absence_row_id`,
-        [input.runId, input.querySetRef, input.queryText, input.scope, input.observedAt, input.reason, atSeq]
+        `INSERT INTO evidence.absence_row (
+           absence_row_id,run_id,query_set_ref,query_text,scope,observed_at,reason,at_seq,content_ciphertext
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING absence_row_id`,
+        [
+          absenceRowId, input.runId, input.querySetRef,
+          content === null ? input.queryText : CONTENT_CIPHERTEXT_SENTINEL,
+          input.scope, input.observedAt,
+          content === null ? input.reason : CONTENT_CIPHERTEXT_SENTINEL,
+          atSeq, content === null ? null : JSON.stringify(content)
+        ]
       );
       return row.rows[0]!.absence_row_id;
     });

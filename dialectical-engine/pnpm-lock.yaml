@@ -192,6 +192,9 @@ importers:
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget
+      '@debateai/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@debateai/db':
         specifier: workspace:*
         version: link:../../packages/db

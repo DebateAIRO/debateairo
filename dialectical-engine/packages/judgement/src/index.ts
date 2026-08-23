@@ -3,7 +3,14 @@ import { randomUUID } from "node:crypto";
 import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
 import { ProviderContentUnacceptedError, type CallBound, type PromptPacket, type ProviderGateway } from "@debateai/providers";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  CONTENT_CIPHERTEXT_SENTINEL,
+  allocateSequence,
+  decryptContentForRun,
+  encryptContentForRun,
+  type CryptoEnvelope,
+  withWriteTransaction
+} from "@debateai/db";
 import {
   classifyClaimText,
   judgeAssessmentSchema,
@@ -333,14 +340,19 @@ export class JudgementRepository {
     try {
       return await withWriteTransaction(this.pool, async (client) => {
         const nodeReviewId = randomUUID();
+        const content = await encryptContentForRun(
+          this.pool, input.runId, "ledger.node_review", nodeReviewId,
+          { reasons: input.reasons }
+        );
         const result = await client.query<{ node_review_id: string }>(
           `INSERT INTO ledger.node_review (
             node_review_id, run_id, node_id, author_raw_artifact_ref,
-            review_raw_artifact_ref, outcome, reasons, at_seq
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING node_review_id`,
+            review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb) RETURNING node_review_id`,
           [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
-            input.reviewRawArtifactRef, input.outcome, JSON.stringify(input.reasons),
-            await allocateSequence(client)]
+            input.reviewRawArtifactRef, input.outcome,
+            JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
+            await allocateSequence(client), content === null ? null : JSON.stringify(content)]
         );
         return result.rows[0]!.node_review_id;
       });
@@ -386,10 +398,11 @@ export class JudgementRepository {
     const result = await this.pool.query<{
       node_id: string;
       claim_text: string;
+      content_ciphertext: CryptoEnvelope | null;
       maker: string;
       raw_artifact_id: string;
     }>(
-      `SELECT node.node_id::text, node.claim_text, artifact.maker,
+      `SELECT node.node_id::text, node.claim_text, node.content_ciphertext, artifact.maker,
               artifact.raw_artifact_id::text
        FROM core.node AS node
        JOIN ledger.reduced_judgement AS judgement ON judgement.node_id=node.node_id
@@ -400,11 +413,17 @@ export class JudgementRepository {
        ORDER BY node.created_at_seq, node.node_id`,
       [runId]
     );
-    return Object.freeze(result.rows.map((row) => Object.freeze({
-      nodeId: row.node_id,
-      statement: row.claim_text,
-      authorMaker: row.maker,
-      authorRawArtifactRef: row.raw_artifact_id
+    return Object.freeze(await Promise.all(result.rows.map(async (row) => {
+      const content = await decryptContentForRun<{ claimText: string }>(
+        this.pool, runId, "core.node", row.node_id, row.content_ciphertext,
+        { claimText: row.claim_text }
+      );
+      return Object.freeze({
+        nodeId: row.node_id,
+        statement: content.claimText,
+        authorMaker: row.maker,
+        authorRawArtifactRef: row.raw_artifact_id
+      });
     })));
   }
 

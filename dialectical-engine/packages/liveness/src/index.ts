@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import {
   allocateSequence,
   normalizeRunOwnership,
+  questionBlindIndexForOwner,
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
@@ -126,12 +127,18 @@ export class LivenessRepository {
   async recordQuery(questionLine: string, ownership: RunOwnershipInput, queriedAt = new Date()): Promise<number> {
     if (questionLine.trim() === "") throw new TypedDomainError("LIVENESS_QUERY_INVALID", "Question and owner are required");
     const access = normalizeRunOwnership(ownership);
+    const questionBlindIndex = access.ownerRef === null
+      ? null
+      : questionBlindIndexForOwner(this.pool, access.ownerRef, questionLine);
     return withWriteTransaction(this.pool, async (client) => {
       const matches = await client.query<{ run_id: string }>(
         `SELECT run_id FROM core.run
-         WHERE question_line=$1 AND core.run_is_owned_by(run_id,$2,$3)
+         WHERE (
+           (question_blind_index IS NOT NULL AND question_blind_index=$1)
+           OR (question_blind_index IS NULL AND question_line=$2)
+         ) AND core.run_is_owned_by(run_id,$3,$4)
          ORDER BY created_at_seq`,
-        [questionLine, access.ownerRef, access.legacyAskerId]
+        [questionBlindIndex, questionLine, access.ownerRef, access.legacyAskerId]
       );
       const runIds = matches.rows.map((row) => row.run_id).sort();
       const locked = runIds.length === 0

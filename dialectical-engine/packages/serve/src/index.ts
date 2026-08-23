@@ -3,9 +3,13 @@ import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
+  CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
+  decryptContentForRun,
+  encryptContentForRun,
   normalizeRunOwnership,
   RunRepository,
+  type CryptoEnvelope,
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
@@ -917,12 +921,16 @@ export class ServeRepository {
   async recordReplayEviction(servedNumberId: string): Promise<void> {
     await withWriteTransaction(this.pool, async (client) => {
       const number = await client.query<{
+        run_id: string;
         answer_id: string;
         answer_version: number;
         number_ref: string;
+        composed_text_id: string | null;
+        content_ciphertext: CryptoEnvelope | null;
         segments: Array<{ segment_id: string; served_number_refs: string[] }> | null;
       }>(
-        `SELECT number.answer_id, number.answer_version, number.number_ref, composed.segments
+        `SELECT answer.run_id, number.answer_id, number.answer_version, number.number_ref,
+                composed.composed_text_id, composed.segments, composed.content_ciphertext
          FROM serve.served_number AS number
          JOIN serve.answer AS answer
            ON answer.answer_id = number.answer_id AND answer.answer_version = number.answer_version
@@ -934,12 +942,17 @@ export class ServeRepository {
       if (owner === undefined) {
         throw new TypedDomainError("SERVED_NUMBER_NOT_FOUND", `No served number ${servedNumberId} exists`);
       }
+      const composedContent = owner.composed_text_id === null ? { segments: owner.segments ?? [] }
+        : await decryptContentForRun<{ segments: Array<{ segment_id: string; served_number_refs: string[] }> }>(
+          this.pool, owner.run_id, "serve.composed_text", owner.composed_text_id,
+          owner.content_ciphertext, { segments: owner.segments ?? [] }
+        );
       await client.query(
         `INSERT INTO serve.served_number_event (served_number_id, status, reason, at_seq)
          VALUES ($1,'EVICTED','MISSING-NUMBER',$2)`,
         [servedNumberId, await allocateSequence(client)]
       );
-      for (const segment of owner.segments ?? []) {
+      for (const segment of composedContent.segments) {
         if (!segment.served_number_refs.includes(owner.number_ref)) continue;
         await client.query(
           `INSERT INTO serve.segment_suppression (
@@ -1025,29 +1038,46 @@ export class ServeRepository {
       const answerVersion = priorAnswer === undefined
         ? input.factBundleVersion
         : priorAnswer.answer_version + 1;
+      const factBundleId = randomUUID();
+      const factContent = await encryptContentForRun(
+        this.pool, input.runId, "serve.fact_bundle", factBundleId,
+        { facts: input.factBundle.facts, residualObjections: input.factBundle.residualObjections }
+      );
       const facts = await client.query<{ fact_bundle_id: string }>(
         `INSERT INTO serve.fact_bundle (
-          run_id, facts, residual_objections, content_hash, version
-        ) VALUES ($1,$2::jsonb,$3::jsonb,$4,$5) RETURNING fact_bundle_id`,
+          fact_bundle_id,run_id,facts,residual_objections,content_hash,version,content_ciphertext
+        ) VALUES ($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7::jsonb) RETURNING fact_bundle_id`,
         [
-          input.runId,
-          JSON.stringify(input.factBundle.facts),
-          JSON.stringify(input.factBundle.residualObjections),
+          factBundleId, input.runId,
+          JSON.stringify(factContent === null ? input.factBundle.facts : []),
+          JSON.stringify(factContent === null ? input.factBundle.residualObjections : []),
           input.factBundleContentHash,
-          answerVersion
+          answerVersion,
+          factContent === null ? null : JSON.stringify(factContent)
         ]
       );
-      const factBundleId = facts.rows[0]!.fact_bundle_id;
+      const storedFactBundleId = facts.rows[0]!.fact_bundle_id;
+      const nextComposedTextId = randomUUID();
+      const storedSegments = input.segments.map((segment) => ({
+        segment_id: segment.segmentId,
+        text: segment.text,
+        load_bearing: segment.loadBearing,
+        served_number_refs: segment.servedNumberRefs
+      }));
+      const composedContent = priorAnswer !== undefined || input.compositionRawArtifactRef === null
+        ? null
+        : await encryptContentForRun(
+          this.pool, input.runId, "serve.composed_text", nextComposedTextId,
+          { segments: storedSegments }
+        );
       const composed = priorAnswer !== undefined || input.compositionRawArtifactRef === null ? null : await client.query<{ composed_text_id: string }>(
         `INSERT INTO serve.composed_text (
-          fact_bundle_id, segments, raw_artifact_ref, attempt
-        ) VALUES ($1,$2::jsonb,$3,$4) RETURNING composed_text_id`,
-        [factBundleId, JSON.stringify(input.segments.map((segment) => ({
-          segment_id: segment.segmentId,
-          text: segment.text,
-          load_bearing: segment.loadBearing,
-          served_number_refs: segment.servedNumberRefs
-        }))), input.compositionRawArtifactRef, input.compositionAttempt]
+          composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext
+        ) VALUES ($1,$2,$3::jsonb,$4,$5,$6::jsonb) RETURNING composed_text_id`,
+        [nextComposedTextId, storedFactBundleId,
+        JSON.stringify(composedContent === null ? storedSegments : []),
+        input.compositionRawArtifactRef, input.compositionAttempt,
+        composedContent === null ? null : JSON.stringify(composedContent)]
       );
       const composedTextId = priorAnswer?.composed_text_id ?? composed?.rows[0]!.composed_text_id ?? null;
       const conformance = priorAnswer !== undefined || composedTextId === null ? null : await client.query<{ conformance_record_id: string }>(
@@ -1089,7 +1119,7 @@ export class ServeRepository {
           priorAnswer === undefined ? verdict.verdictState : priorAnswer.verdict_state,
           JSON.stringify(input.result.answerForm),
           JSON.stringify(input.result.conditionMarks),
-          factBundleId,
+          storedFactBundleId,
           composedTextId,
           conformanceRecordId,
           answerSealedAtSeq,
@@ -1219,8 +1249,10 @@ export class ServeRepository {
       answer_id: string;
       answer_version: number;
       work_item_id: string;
+      fact_bundle_id: string;
       facts: string[];
       residual_objections: string[];
+      facts_content_ciphertext: CryptoEnvelope | null;
       content_hash: string;
       fact_bundle_version: number;
       badges: string[];
@@ -1243,7 +1275,8 @@ export class ServeRepository {
               latest_owner.owner_ref,
               CASE WHEN latest_owner.owner_ref IS NULL THEN run.asker_id ELSE NULL END AS legacy_asker_id,
               answer.answer_id::text, answer.answer_version,
-              answer.work_item_id::text, facts.facts, facts.residual_objections,
+              answer.work_item_id::text, facts.fact_bundle_id, facts.facts,
+              facts.residual_objections, facts.content_ciphertext AS facts_content_ciphertext,
               facts.content_hash, facts.version AS fact_bundle_version,
               answer.badges, answer.condition_marks, answer.reversal_point,
               answer.builds_on_previous, answer.memory_disclosure,
@@ -1270,6 +1303,14 @@ export class ServeRepository {
     );
     const row = head.rows[0];
     if (row === undefined) throw new TypedDomainError("CATCH_UP_ANSWER_NOT_FOUND", runId);
+    const factContent = await decryptContentForRun<{
+      facts: string[];
+      residualObjections: string[];
+    }>(
+      this.pool, runId, "serve.fact_bundle", row.fact_bundle_id,
+      row.facts_content_ciphertext,
+      { facts: row.facts, residualObjections: row.residual_objections }
+    );
     const ownership = row.owner_ref === null
       ? Object.freeze({ ownerRef: null, legacyAskerId: row.legacy_asker_id })
       : Object.freeze({ ownerRef: row.owner_ref, legacyAskerId: null });
@@ -1282,8 +1323,8 @@ export class ServeRepository {
       workItemId: row.work_item_id,
       answer,
       factBundle: Object.freeze({
-        facts: Object.freeze([...row.facts]),
-        residualObjections: Object.freeze([...row.residual_objections]),
+        facts: Object.freeze([...factContent.facts]),
+        residualObjections: Object.freeze([...factContent.residualObjections]),
         badges: Object.freeze([...row.badges]),
         conditionMarks: Object.freeze([...row.condition_marks]),
         reversalPoint: row.reversal_point,
@@ -1312,6 +1353,12 @@ export class ServeRepository {
       answer_version: number;
       run_id: string;
       question_line: string;
+      run_content_ciphertext: CryptoEnvelope | null;
+      fact_bundle_id: string;
+      facts: string[];
+      facts_content_ciphertext: CryptoEnvelope | null;
+      composed_text_id: string | null;
+      composed_content_ciphertext: CryptoEnvelope | null;
       terminal: Answer["terminal"];
       serve_state: Answer["serve_state"];
       verdict_state: Answer["verdict_state"];
@@ -1339,7 +1386,13 @@ export class ServeRepository {
       as_of: Date;
       relevant_as_of: Date;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line, answer.terminal,
+      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
+              run.content_ciphertext AS run_content_ciphertext,
+              facts.fact_bundle_id, facts.facts,
+              facts.content_ciphertext AS facts_content_ciphertext,
+              composed.composed_text_id,
+              composed.content_ciphertext AS composed_content_ciphertext,
+              answer.terminal,
               answer.serve_state, answer.verdict_state, answer.verdict_unavailable,
               answer.confidence_band, answer.band_ceiling,
               answer.answer_form, composed.segments, facts.residual_objections, answer.condition_marks,
@@ -1368,6 +1421,23 @@ export class ServeRepository {
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
+    const [runContent, factContent, composedContent] = await Promise.all([
+      decryptContentForRun<{ questionLine: string }>(
+        this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+        { questionLine: row.question_line }
+      ),
+      decryptContentForRun<{ facts: string[]; residualObjections: string[] }>(
+        this.pool, row.run_id, "serve.fact_bundle", row.fact_bundle_id,
+        row.facts_content_ciphertext,
+        { facts: row.facts, residualObjections: row.residual_objections }
+      ),
+      row.composed_text_id === null
+        ? Promise.resolve({ segments: row.segments ?? [] })
+        : decryptContentForRun<{ segments: Answer["composed_text"] }>(
+          this.pool, row.run_id, "serve.composed_text", row.composed_text_id,
+          row.composed_content_ciphertext, { segments: row.segments ?? [] }
+        )
+    ]);
     const staleness = await this.#liveness.readSubjectStaleness({
       runId: row.run_id,
       subjectKind: "ANSWER",
@@ -1508,7 +1578,7 @@ export class ServeRepository {
       answer_id: row.answer_id,
       answer_version: row.answer_version,
       run_ref: row.run_id,
-      question_line: row.question_line,
+      question_line: runContent.questionLine,
       terminal: hasEviction ? "COMPONENTS_ONLY" : row.terminal,
       verdict_state: hasEviction ? null : row.verdict_state,
       verdict_unavailable: hasEviction
@@ -1518,7 +1588,7 @@ export class ServeRepository {
       band_ceiling: hasEviction ? null : row.band_ceiling,
       answer_form: hasEviction ? null : row.answer_form,
       serve_state: answerServeState.serveState,
-      composed_text: hasEviction ? [] : row.segments ?? [],
+      composed_text: hasEviction ? [] : composedContent.segments,
       number_slots: numberSlots,
       abstention: abstention.rows[0] ?? null,
       shadow_suppressions: shadowSuppressions.rows,
@@ -1527,7 +1597,7 @@ export class ServeRepository {
       badges: staleness.badge === null || row.badges.includes(staleness.badge)
         ? row.badges
         : [...row.badges, staleness.badge],
-      residual_objections: row.residual_objections,
+      residual_objections: factContent.residualObjections,
       value_hinges: valueHinges.rows,
       condition_marks: conditionMarks,
       condition_mark_records: conditionMarkRecords.rows.map((record) => ({
@@ -1721,13 +1791,19 @@ export class ServeRepository {
       if (answer === undefined) return null;
       const requestRef = randomUUID();
       const replayHandle = `investigation-request:${requestRef}`;
+      const content = input.userInput === null ? null : await encryptContentForRun(
+        this.pool, answer.run_id, "core.investigation_request", requestRef,
+        { userInput: input.userInput }
+      );
       await client.query(
         `INSERT INTO core.investigation_request (
            investigation_request_id, run_id, answer_id, answer_version, gap_ref,
-           user_input, input_kind, status, replay_handle, at_seq
-         ) VALUES ($1,$2,$3,$4,$5,$6,'HUMAN_STEER','RECORDED',$7,$8)`,
+           user_input, input_kind, status, replay_handle, at_seq, content_ciphertext
+         ) VALUES ($1,$2,$3,$4,$5,$6,'HUMAN_STEER','RECORDED',$7,$8,$9::jsonb)`,
         [requestRef, answer.run_id, input.answerId, answer.answer_version, input.gapRef,
-          input.userInput, replayHandle, await allocateSequence(client)]
+          content === null ? input.userInput : CONTENT_CIPHERTEXT_SENTINEL,
+          replayHandle, await allocateSequence(client),
+          content === null ? null : JSON.stringify(content)]
       );
       return Object.freeze({ request_ref: requestRef, status: "RECORDED" as const, replay_handle: replayHandle });
     });
@@ -1912,6 +1988,7 @@ export class ServeRepository {
     const result = await this.pool.query<{
       node_id: string;
       claim_text: string;
+      node_content_ciphertext: CryptoEnvelope | null;
       way_of_knowing: Node["way_of_knowing"];
       provenance_ref: string;
       maker: string | null;
@@ -1921,6 +1998,8 @@ export class ServeRepository {
       provider_ref: string | null;
       review_outcome: "agree" | "dispute" | "cannot-assess" | null;
       review_reasons: string[] | null;
+      node_review_id: string | null;
+      review_content_ciphertext: CryptoEnvelope | null;
       review_provenance_ref: string | null;
       reviewer_maker: string | null;
       reviewer_model_id: string | null;
@@ -1945,10 +2024,12 @@ export class ServeRepository {
       check_status: "PASS" | "FAIL" | "NOT_SAMPLED";
       relevant_as_of: Date;
     }>(
-      `SELECT node.node_id, node.claim_text, node.way_of_knowing,
+      `SELECT node.node_id, node.claim_text,
+              node.content_ciphertext AS node_content_ciphertext, node.way_of_knowing,
               node.provenance_ref::text, artifact.maker, artifact.model_id,
               artifact.model_version, artifact.provider, artifact.provider_ref,
               review.outcome AS review_outcome, review.reasons AS review_reasons,
+              review.node_review_id, review.content_ciphertext AS review_content_ciphertext,
               review.review_raw_artifact_ref::text AS review_provenance_ref,
               review_artifact.maker AS reviewer_maker,
               review_artifact.model_id AS reviewer_model_id,
@@ -1976,7 +2057,8 @@ export class ServeRepository {
        LEFT JOIN ledger.raw_artifact AS artifact
          ON artifact.raw_artifact_id = node.provenance_ref
        LEFT JOIN LATERAL (
-         SELECT outcome, reasons, review_raw_artifact_ref FROM ledger.node_review
+         SELECT node_review_id,outcome,reasons,review_raw_artifact_ref,content_ciphertext
+         FROM ledger.node_review
          WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1
        ) AS review ON true
        LEFT JOIN ledger.raw_artifact AS review_artifact
@@ -2014,15 +2096,27 @@ export class ServeRepository {
       markLinks.map((link) => ({ nodeId: link.node_id, mark: link.mark }))
     );
     return Promise.all(result.rows.map(async (row) => {
-      const staleness = await this.#liveness.readSubjectStaleness({
-        runId,
-        subjectKind: "NODE",
-        subjectRef: row.node_id,
-        relevantAsOf: row.relevant_as_of
-      });
+      const [staleness, nodeContent, reviewContent] = await Promise.all([
+        this.#liveness.readSubjectStaleness({
+          runId,
+          subjectKind: "NODE",
+          subjectRef: row.node_id,
+          relevantAsOf: row.relevant_as_of
+        }),
+        decryptContentForRun<{ claimText: string }>(
+          this.pool, runId, "core.node", row.node_id, row.node_content_ciphertext,
+          { claimText: row.claim_text }
+        ),
+        row.node_review_id === null
+          ? Promise.resolve({ reasons: row.review_reasons })
+          : decryptContentForRun<{ reasons: string[] }>(
+            this.pool, runId, "ledger.node_review", row.node_review_id,
+            row.review_content_ciphertext, { reasons: row.review_reasons ?? [] }
+          )
+      ]);
       return {
       node_id: row.node_id,
-      claim: row.claim_text,
+      claim: nodeContent.claimText,
       way_of_knowing: row.way_of_knowing,
       base_score: {
         value: Number(row.tau),
@@ -2053,7 +2147,7 @@ export class ServeRepository {
         ? null
         : {
             outcome: row.review_outcome,
-            reasons: row.review_reasons,
+            reasons: reviewContent.reasons ?? [],
             provenance_ref: row.review_provenance_ref,
             reviewer_lineage: projectNodeMakerLineage({
               maker: row.reviewer_maker,

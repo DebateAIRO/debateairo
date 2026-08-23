@@ -9,7 +9,7 @@ import {
   timingSafeEqual
 } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
-import { chmod, mkdir, open, readFile, stat } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
@@ -1027,5 +1027,310 @@ export class FileUserDekStore implements ReadableUserDekStore {
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
     }
+  }
+}
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const CONTENT_CARRIERS = Object.freeze([
+  "core.run",
+  "core.node",
+  "core.stranger_restatement",
+  "ledger.raw_artifact",
+  "serve.fact_bundle",
+  "serve.composed_text",
+  "ledger.node_review",
+  "memory.question_key",
+  "memory.pull_record",
+  "core.investigation_request",
+  "evidence.query_set",
+  "evidence.query_amendment",
+  "evidence.evidence_item",
+  "evidence.absence_row"
+] as const);
+
+export type ContentCarrier = typeof CONTENT_CARRIERS[number];
+export type OwnerRefResolver = (ownerRef: string) => Promise<string>;
+
+export interface RunContentKeyIdentity {
+  readonly userId: string;
+  readonly ownerRef: string;
+}
+
+export interface LoadedRunContentKey {
+  readonly runId: string;
+  readonly ownerRef: string;
+  readonly key: Buffer;
+}
+
+export interface RunContentKeyStore {
+  store(runId: string, identity: RunContentKeyIdentity, contentKey: Uint8Array): Promise<void>;
+  load(runId: string): Promise<LoadedRunContentKey>;
+  destroy(runId: string): Promise<void>;
+}
+
+export class RunContentKeyUnresolvedError extends CryptoError {
+  constructor() {
+    super("RUN_CONTENT_KEY_UNRESOLVED", "RUN_CONTENT_KEY_UNRESOLVED");
+    this.name = "RunContentKeyUnresolvedError";
+  }
+}
+
+type StoredRunContentKey = Readonly<{
+  version: 1;
+  run_id: string;
+  owner_ref: string;
+  key_id: string;
+  wrapped_content_key: CryptoEnvelope;
+}>;
+
+function assertRunContentIdentity(runId: string, identity: RunContentKeyIdentity): void {
+  if (!UUID_V4.test(runId)) throw new TypeError("RUN_CONTENT_KEY_RUN_ID_INVALID");
+  if (!UUID_V4.test(identity.userId)) throw new TypeError("RUN_CONTENT_KEY_USER_ID_INVALID");
+  if (!UUID_V4.test(identity.ownerRef)) throw new TypeError("RUN_CONTENT_KEY_OWNER_REF_INVALID");
+}
+
+function runContentKeyAad(runId: string, ownerRef: string): AeadAad {
+  const keyId = `run-content:${runId}:v1`;
+  return ["secret-store", "run-content-key", runId, runId, ownerRef, keyId, "1"];
+}
+
+function parseStoredRunContentKey(value: unknown, runId: string): StoredRunContentKey {
+  if (typeof value !== "object" || value === null) throw new RunContentKeyUnresolvedError();
+  const record = value as Record<string, unknown>;
+  const envelope = record.wrapped_content_key;
+  if (record.version !== 1 || record.run_id !== runId || !UUID_V4.test(String(record.owner_ref))
+    || record.key_id !== `run-content:${runId}:v1`
+    || typeof envelope !== "object" || envelope === null) {
+    throw new RunContentKeyUnresolvedError();
+  }
+  const candidate = envelope as Record<string, unknown>;
+  if (candidate.v !== 1 || candidate.keyId !== record.key_id
+    || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+    || typeof candidate.tag !== "string") {
+    throw new RunContentKeyUnresolvedError();
+  }
+  return Object.freeze({
+    version: 1,
+    run_id: runId,
+    owner_ref: String(record.owner_ref),
+    key_id: String(record.key_id),
+    wrapped_content_key: candidate as unknown as CryptoEnvelope
+  });
+}
+
+async function wrapRunContentKey(
+  users: ReadableUserDekStore,
+  runId: string,
+  identity: RunContentKeyIdentity,
+  contentKey: Uint8Array
+): Promise<StoredRunContentKey> {
+  assertRunContentIdentity(runId, identity);
+  const userDek = await users.load(identity.userId);
+  try {
+    const envelope = encrypt(userDek, contentKey, runContentKeyAad(runId, identity.ownerRef));
+    return Object.freeze({
+      version: 1,
+      run_id: runId,
+      owner_ref: identity.ownerRef,
+      key_id: envelope.keyId,
+      wrapped_content_key: envelope
+    });
+  } finally {
+    userDek.fill(0);
+  }
+}
+
+async function unwrapRunContentKey(
+  users: ReadableUserDekStore,
+  resolveUserId: OwnerRefResolver,
+  record: StoredRunContentKey
+): Promise<LoadedRunContentKey> {
+  let userDek: Buffer | undefined;
+  try {
+    const userId = await resolveUserId(record.owner_ref);
+    if (!UUID_V4.test(userId)) throw new RunContentKeyUnresolvedError();
+    userDek = await users.load(userId);
+    const key = decrypt(
+      userDek,
+      record.wrapped_content_key,
+      runContentKeyAad(record.run_id, record.owner_ref)
+    );
+    if (key.byteLength !== KEY_BYTES) {
+      key.fill(0);
+      throw new RunContentKeyUnresolvedError();
+    }
+    return Object.freeze({ runId: record.run_id, ownerRef: record.owner_ref, key });
+  } catch (error) {
+    if (error instanceof RunContentKeyUnresolvedError) throw error;
+    throw new RunContentKeyUnresolvedError();
+  } finally {
+    userDek?.fill(0);
+  }
+}
+
+export class MemoryRunContentKeyStore implements RunContentKeyStore {
+  readonly #records = new Map<string, StoredRunContentKey>();
+
+  constructor(
+    private readonly users: ReadableUserDekStore,
+    private readonly resolveUserId: OwnerRefResolver
+  ) {}
+
+  async store(runId: string, identity: RunContentKeyIdentity, contentKey: Uint8Array): Promise<void> {
+    if (this.#records.has(runId)) throw new TypeError("RUN_CONTENT_KEY_EXISTS");
+    this.#records.set(runId, await wrapRunContentKey(this.users, runId, identity, contentKey));
+  }
+
+  async load(runId: string): Promise<LoadedRunContentKey> {
+    const record = this.#records.get(runId);
+    if (record === undefined) throw new RunContentKeyUnresolvedError();
+    return unwrapRunContentKey(this.users, this.resolveUserId, record);
+  }
+
+  async destroy(runId: string): Promise<void> {
+    this.#records.delete(runId);
+  }
+}
+
+export class FileRunContentKeyStore implements RunContentKeyStore {
+  constructor(
+    private readonly root: string,
+    private readonly users: ReadableUserDekStore,
+    private readonly resolveUserId: OwnerRefResolver
+  ) {
+    if (root.trim() === "") throw new TypeError("RUN_CONTENT_KEY_STORE_PATH_REQUIRED");
+  }
+
+  async store(runId: string, identity: RunContentKeyIdentity, contentKey: Uint8Array): Promise<void> {
+    const record = await wrapRunContentKey(this.users, runId, identity, contentKey);
+    const runs = join(this.root, "runs");
+    const directory = join(runs, runId);
+    const location = join(directory, "content-key.v1.json");
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryCreated = false;
+    try {
+      await mkdir(this.root, { recursive: true, mode: 0o700 });
+      await chmod(this.root, 0o700);
+      await mkdir(runs, { recursive: true, mode: 0o700 });
+      await chmod(runs, 0o700);
+      await mkdir(directory, { recursive: false, mode: 0o700 });
+      directoryCreated = true;
+      file = await open(location, "wx", 0o600);
+      await file.writeFile(JSON.stringify(record), "utf8");
+    } catch (error) {
+      await file?.close().catch(() => undefined);
+      if (directoryCreated) {
+        await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+      }
+      throw error;
+    } finally {
+      await file?.close().catch(() => undefined);
+    }
+  }
+
+  async load(runId: string): Promise<LoadedRunContentKey> {
+    if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
+    const location = join(this.root, "runs", runId, "content-key.v1.json");
+    try {
+      const metadata = await stat(location);
+      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+        throw new RunContentKeyUnresolvedError();
+      }
+      const record = parseStoredRunContentKey(JSON.parse(await readFile(location, "utf8")), runId);
+      return await unwrapRunContentKey(this.users, this.resolveUserId, record);
+    } catch (error) {
+      if (error instanceof RunContentKeyUnresolvedError) throw error;
+      throw new RunContentKeyUnresolvedError();
+    }
+  }
+
+  async destroy(runId: string): Promise<void> {
+    if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
+    await rm(join(this.root, "runs", runId), { recursive: true, force: true });
+  }
+}
+
+export class ContentCipher {
+  readonly #blindIndexKey: Buffer;
+
+  constructor(
+    private readonly keys: RunContentKeyStore,
+    blindIndexKey: Uint8Array
+  ) {
+    if (!(blindIndexKey instanceof Uint8Array) || blindIndexKey.byteLength !== KEY_BYTES) {
+      throw new TypeError("CONTENT_BLIND_INDEX_KEY_INVALID");
+    }
+    this.#blindIndexKey = Buffer.from(blindIndexKey);
+  }
+
+  async provisionRun(runId: string, identity: RunContentKeyIdentity): Promise<void> {
+    const contentKey = generateDek();
+    try {
+      await this.keys.store(runId, identity, contentKey);
+    } finally {
+      contentKey.fill(0);
+    }
+  }
+
+  async encrypt(
+    runId: string,
+    carrier: ContentCarrier,
+    primaryKey: string,
+    value: unknown
+  ): Promise<CryptoEnvelope> {
+    const loaded = await this.keys.load(runId);
+    const plaintext = Buffer.from(JSON.stringify(value), "utf8");
+    try {
+      const [schema, table] = carrier.split(".") as [string, string];
+      return encrypt(loaded.key, plaintext, [
+        schema, table, primaryKey, runId, loaded.ownerRef,
+        `run-content:${runId}:v1`, "1"
+      ]);
+    } finally {
+      plaintext.fill(0);
+      loaded.key.fill(0);
+    }
+  }
+
+  async decrypt<T = unknown>(
+    runId: string,
+    carrier: ContentCarrier,
+    primaryKey: string,
+    envelope: CryptoEnvelope
+  ): Promise<T> {
+    const loaded = await this.keys.load(runId);
+    let plaintext: Buffer | undefined;
+    try {
+      const [schema, table] = carrier.split(".") as [string, string];
+      plaintext = decrypt(loaded.key, envelope, [
+        schema, table, primaryKey, runId, loaded.ownerRef,
+        `run-content:${runId}:v1`, "1"
+      ]);
+      return JSON.parse(plaintext.toString("utf8")) as T;
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new CryptoAuthenticationError();
+      throw error;
+    } finally {
+      plaintext?.fill(0);
+      loaded.key.fill(0);
+    }
+  }
+
+  questionBlindIndex(ownerRef: string, question: string): Buffer {
+    if (!UUID_V4.test(ownerRef) || typeof question !== "string" || question.trim() === "") {
+      throw new TypeError("CONTENT_BLIND_INDEX_INPUT_INVALID");
+    }
+    const normalized = question.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+    return createHmac("sha256", this.#blindIndexKey)
+      .update("debateai:content-question:v1\0", "utf8")
+      .update(ownerRef.toLowerCase(), "utf8")
+      .update("\0", "utf8")
+      .update(normalized, "utf8")
+      .digest();
+  }
+
+  destroyRunKey(runId: string): Promise<void> {
+    return this.keys.destroy(runId);
   }
 }

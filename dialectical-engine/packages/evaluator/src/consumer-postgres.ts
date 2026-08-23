@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  decryptContentForRun,
+  type CryptoEnvelope,
+  withWriteTransaction
+} from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { createBlindEvaluationSample } from "./blind-sample.js";
 import {
@@ -134,11 +139,17 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       domain_id: string | null;
       question_line: string;
       claim_text: string;
+      run_id: string;
+      node_id: string;
+      run_content_ciphertext: CryptoEnvelope | null;
+      node_content_ciphertext: CryptoEnvelope | null;
       tau: number;
       number_kind: string;
     }>(`
       SELECT observation.observation_id,observation.provider,observation.model_id,
-        observation.model_version,observation.domain_id,run.question_line,node.claim_text,
+        observation.model_version,observation.domain_id,run.run_id,node.node_id,
+        run.question_line,run.content_ciphertext AS run_content_ciphertext,
+        node.claim_text,node.content_ciphertext AS node_content_ciphertext,
         judgement.tau,judgement.number_kind
       FROM evaluator.observation AS observation
       JOIN ledger.reduced_judgement AS judgement
@@ -159,10 +170,20 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       });
       const current = samplesByModelDomain.get(key) ?? [];
       if (current.length >= 3) continue;
+      const [runContent, nodeContent] = await Promise.all([
+        decryptContentForRun<{ questionLine: string }>(
+          this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+          { questionLine: row.question_line }
+        ),
+        decryptContentForRun<{ claimText: string }>(
+          this.pool, row.run_id, "core.node", row.node_id, row.node_content_ciphertext,
+          { claimText: row.claim_text }
+        )
+      ]);
       samplesByModelDomain.set(key, Object.freeze([...current, createBlindEvaluationSample({
         sampleId: `opaque:sample-${sha256(row.observation_id).slice(0, 24)}`,
-        questionExcerpt: row.question_line,
-        taskExcerpt: row.claim_text,
+        questionExcerpt: runContent.questionLine,
+        taskExcerpt: nodeContent.claimText,
         grade: `${row.tau} (${row.number_kind})`,
         reasons: Object.freeze([])
       })]));

@@ -1,6 +1,12 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
-import { loadKek } from "../../../packages/crypto/src/index.js";
-import { createPool } from "@debateai/db";
+import {
+  ContentCipher,
+  FileRunContentKeyStore,
+  FileUserDekStore,
+  loadKek,
+  loadSecretKey
+} from "@debateai/crypto";
+import { configureContentEncryption, createPool } from "@debateai/db";
 import { WorkItemRepository } from "@debateai/battery";
 import {
   loadBootstrapRegister,
@@ -10,8 +16,33 @@ import {
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 
 const environment = loadRunnerEnvironment();
-loadKek(environment.KEK_PATH);
+const kek = loadKek(environment.KEK_PATH);
 const pool = createPool(environment.DATABASE_URL);
+if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
+  const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
+  const contentBlindIndexKey = loadSecretKey(environment.CONTENT_BLIND_INDEX_KEY_PATH!);
+  try {
+    configureContentEncryption(pool, new ContentCipher(
+      new FileRunContentKeyStore(
+        environment.USER_DEK_STORE_PATH!,
+        users,
+        async (ownerRef) => {
+          const resolved = await pool.query<{ user_id: string }>(
+            `SELECT user_id FROM identity."user"
+             WHERE owner_ref=$1 AND state='active'`,
+            [ownerRef]
+          );
+          const userId = resolved.rows[0]?.user_id;
+          if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
+          return userId;
+        }
+      ),
+      contentBlindIndexKey
+    ));
+  } finally {
+    contentBlindIndexKey.fill(0);
+  }
+}
 const bootstrap = await loadBootstrapRegister();
 // DR-128: the canonical row is attached to the judgement path; absence blocks loudly before claim.
 const compositionRow = await readClaimTypeCompositionMap(pool, bootstrap.registerVersion);

@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  CONTENT_CIPHERTEXT_SENTINEL,
+  allocateSequence,
+  decryptContentForRun,
+  encryptContentForRun,
+  type CryptoEnvelope,
+  withWriteTransaction
+} from "@debateai/db";
 import {
   TypedDomainError,
   classifyLedgerActionKind,
@@ -56,6 +63,7 @@ interface ScheduledArtifactRow {
   readonly subject_item_id: string;
   readonly raw_artifact_id: string | null;
   readonly raw_text: string | null;
+  readonly content_ciphertext: CryptoEnvelope | null;
   readonly parse_status: "PARSED" | "UNPARSED" | "PARSE_FAILED" | "SCHEMA_FAILED" | null;
 }
 
@@ -207,17 +215,25 @@ export class LedgerRepository {
   async appendRawArtifact(input: AppendRawArtifactInput): Promise<string> {
     return withWriteTransaction(this.pool, async (client) => {
       const sequence = await allocateSequence(client);
+      const content = input.runId === null ? null : await encryptContentForRun(
+        this.pool, input.runId, "ledger.raw_artifact", input.artifactId,
+        { rawText: input.rawText }
+      );
       const result = await client.query<{ raw_artifact_id: string }>(
         `INSERT INTO ledger.raw_artifact (
           raw_artifact_id, attempt_id, run_id, provider_ref, provider,
           model_id, maker, model_version, raw_text, metadata_json,
-          parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16)
+          parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq,
+          content_ciphertext
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb)
         RETURNING raw_artifact_id`,
         [
           input.artifactId, input.attemptId, input.runId, input.providerRef, input.provider,
-          input.model, input.maker, input.modelVersion, input.rawText, JSON.stringify(input.metadata),
-          input.parseStatus, input.parseError ?? null, input.inputHash, input.contractHash, input.contentHash, sequence
+          input.model, input.maker, input.modelVersion,
+          content === null ? input.rawText : CONTENT_CIPHERTEXT_SENTINEL,
+          JSON.stringify(input.metadata), input.parseStatus, input.parseError ?? null,
+          input.inputHash, input.contractHash, input.contentHash, sequence,
+          content === null ? null : JSON.stringify(content)
         ]
       );
       return result.rows[0]!.raw_artifact_id;
@@ -370,13 +386,14 @@ export class LedgerRepository {
 
   private async scheduledArtifacts(runId: string): Promise<readonly ScheduledArtifactRow[]> {
     const result = await this.pool.query<ScheduledArtifactRow>(
-      `SELECT required.subject_item_id, artifact.raw_artifact_id, artifact.raw_text, artifact.parse_status
+      `SELECT required.subject_item_id, artifact.raw_artifact_id, artifact.raw_text,
+              artifact.content_ciphertext, artifact.parse_status
        FROM (
          SELECT DISTINCT subject_item_id FROM ledger.ledger_entry
          WHERE run_id = $1 AND action_kind = 'JUDGEMENT_SCHEDULED'
        ) AS required
        LEFT JOIN LATERAL (
-         SELECT raw.raw_artifact_id, raw.raw_text, raw.parse_status
+         SELECT raw.raw_artifact_id, raw.raw_text, raw.content_ciphertext, raw.parse_status
          FROM ledger.ledger_entry AS entry
          JOIN ledger.raw_artifact AS raw ON raw.raw_artifact_id = entry.raw_artifact_ref
          WHERE entry.run_id = $1 AND entry.subject_item_id = required.subject_item_id
@@ -385,7 +402,14 @@ export class LedgerRepository {
        ORDER BY required.subject_item_id`,
       [runId]
     );
-    return result.rows;
+    return Promise.all(result.rows.map(async (row) => {
+      if (row.raw_artifact_id === null) return row;
+      const content = await decryptContentForRun<{ rawText: string }>(
+        this.pool, runId, "ledger.raw_artifact", row.raw_artifact_id,
+        row.content_ciphertext, { rawText: row.raw_text! }
+      );
+      return { ...row, raw_text: content.rawText };
+    }));
   }
 
   async assertComplete(runId: string): Promise<void> {

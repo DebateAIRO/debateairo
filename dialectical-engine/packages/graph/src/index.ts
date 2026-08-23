@@ -1,5 +1,13 @@
+import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  CONTENT_CIPHERTEXT_SENTINEL,
+  allocateSequence,
+  decryptContentForRun,
+  encryptContentForRun,
+  type CryptoEnvelope,
+  withWriteTransaction
+} from "@debateai/db";
 import {
   TypedDomainError,
   type ChildKind,
@@ -202,7 +210,11 @@ function sameEdgePayload(
 }
 
 export class GraphWriter {
-  constructor(private readonly client: PoolClient, private readonly runId: string) {}
+  constructor(
+    private readonly client: PoolClient,
+    private readonly pool: Pool,
+    private readonly runId: string
+  ) {}
 
   async addNode(input: AddNodeInput): Promise<string> {
     if (input.runId !== this.runId) throw new TypedDomainError("GRAPH_RUN_MISMATCH", "Node belongs to another graph");
@@ -225,15 +237,22 @@ export class GraphWriter {
       depth = Number(parentRow.depth) + 1;
       materializedPath = `${parentRow.materialized_path}/${input.siblingOrdinal}`;
     }
+    const nodeId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, input.runId, "core.node", nodeId, { claimText: input.statementText }
+    );
     const inserted = await this.client.query<{ node_id: string }>(
       `INSERT INTO core.node (
-        run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
+        node_id, run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
         materialized_path, generation_status, path_status, exploration_decision,
-        provenance_ref, way_of_knowing, locator, value_laden, position_label, is_folder, created_at_seq
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING node_id`,
+        provenance_ref, way_of_knowing, locator, value_laden, position_label, is_folder, created_at_seq,
+        content_ciphertext
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb)
+      RETURNING node_id`,
       [
+        nodeId,
         input.runId,
-        input.statementText,
+        content === null ? input.statementText : CONTENT_CIPHERTEXT_SENTINEL,
         input.claimType,
         input.parentNodeId,
         input.childKind,
@@ -249,7 +268,8 @@ export class GraphWriter {
         input.valueLaden,
         input.positionLabel ?? null,
         input.isFolder ?? false,
-        await allocateSequence(this.client)
+        await allocateSequence(this.client),
+        content === null ? null : JSON.stringify(content)
       ]
     );
     return inserted.rows[0]!.node_id;
@@ -338,11 +358,13 @@ export class GraphWriter {
     const existing = await this.client.query<{
       node_id: string;
       claim_text: string;
+      content_ciphertext: CryptoEnvelope | null;
       child_kind: ChildKind;
       generation_status: GenerationStatus;
       edge_id: string | null;
     }>(
-      `SELECT node.node_id, node.claim_text, node.child_kind, node.generation_status,
+      `SELECT node.node_id, node.claim_text, node.content_ciphertext,
+              node.child_kind, node.generation_status,
               edge.edge_id
        FROM core.node AS node
        LEFT JOIN core.edge AS edge
@@ -353,8 +375,12 @@ export class GraphWriter {
     );
     const replay = existing.rows[0];
     if (replay !== undefined) {
+      const replayContent = await decryptContentForRun<{ claimText: string }>(
+        this.pool, this.runId, "core.node", replay.node_id, replay.content_ciphertext,
+        { claimText: replay.claim_text }
+      );
       if (
-        replay.claim_text !== input.statementText
+        replayContent.claimText !== input.statementText
         || replay.child_kind !== input.childKind
         || replay.generation_status !== "pending"
         || replay.edge_id === null
@@ -402,11 +428,22 @@ export class GraphWriter {
     readonly text: string;
     readonly checkStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
   }): Promise<void> {
+    const restatementId = randomUUID();
+    const content = await encryptContentForRun(
+      this.pool, this.runId, "core.stranger_restatement", restatementId,
+      { restatementText: input.text }
+    );
     await this.client.query(
       `INSERT INTO core.stranger_restatement (
-        run_id, subject_kind, subject_id, restatement_text, check_status, at_seq
-      ) VALUES ($1,'node',$2,$3,$4,$5)`,
-      [this.runId, input.nodeId, input.text, input.checkStatus, await allocateSequence(this.client)]
+        restatement_id, run_id, subject_kind, subject_id, restatement_text,
+        check_status, at_seq, content_ciphertext
+      ) VALUES ($1,$2,'node',$3,$4,$5,$6,$7::jsonb)`,
+      [
+        restatementId, this.runId, input.nodeId,
+        content === null ? input.text : CONTENT_CIPHERTEXT_SENTINEL,
+        input.checkStatus, await allocateSequence(this.client),
+        content === null ? null : JSON.stringify(content)
+      ]
     );
   }
 }
@@ -417,7 +454,7 @@ export class GraphRepository {
   async withGraphWrite<T>(runId: string, operation: (writer: GraphWriter) => Promise<T>): Promise<T> {
     return withWriteTransaction(this.pool, async (client) => {
       await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [runId]);
-      return operation(new GraphWriter(client, runId));
+      return operation(new GraphWriter(client, this.pool, runId));
     });
   }
 

@@ -54,6 +54,8 @@ export function loadApiEnvironment() {
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
     USER_DEK_STORE_PATH: z.string().min(1),
+    CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
@@ -76,12 +78,19 @@ export function loadApiEnvironment() {
   if (environment.EVALUATOR_DEV_MENU_ENABLED === "true" && environment.NODE_ENV === "production") {
     throw new TypeError("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
   }
+  if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
+    && environment.CONTENT_BLIND_INDEX_KEY_PATH === undefined) {
+    throw new TypeError("CONTENT_BLIND_INDEX_KEY_PATH_REQUIRED");
+  }
   return environment;
 }
 
 export function loadRunnerEnvironment() {
-  return parseEnvironment({
+  const environment = parseEnvironment({
     KEK_PATH: kekPath, DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
+    CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
+    USER_DEK_STORE_PATH: z.string().min(1).optional(),
     CLAIM_MS: positiveInteger, CLAIM_MARGIN_MS: nonNegativeInteger,
     JUDGE_MAX_ATTEMPTS: positiveInteger, JUDGE_TOKEN_CEILING: positiveInteger, JUDGE_DEADLINE_MS: positiveInteger,
     COMPOSER_MAX_ATTEMPTS: positiveInteger, COMPOSER_TOKEN_CEILING: positiveInteger, COMPOSER_DEADLINE_MS: positiveInteger,
@@ -96,4 +105,10 @@ export function loadRunnerEnvironment() {
     VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
     VLLM_AUTHORIZATION: z.string().min(1).optional(), ...hatchetShape
   });
+  if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
+    && (environment.CONTENT_BLIND_INDEX_KEY_PATH === undefined
+      || environment.USER_DEK_STORE_PATH === undefined)) {
+    throw new TypeError("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
+  }
+  return environment;
 }

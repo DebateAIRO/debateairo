@@ -12,6 +12,7 @@ describe("LOAD-01 persisted run projection", () => {
           rows: [{
             run_id: "run:failed",
             question_line: "Messi or Ronaldo?",
+            content_ciphertext: null,
             state: "FAILED",
             terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
           }]

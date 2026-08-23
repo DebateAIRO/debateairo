@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { createHash, randomUUID } from "node:crypto";
+import { decryptContentForRun, type CryptoEnvelope } from "@debateai/db";
 import type { CallBound, ProviderGateway } from "@debateai/providers";
 import {
   assertEvaluatorProviderIsolation,
@@ -282,14 +283,21 @@ async function runPersistedQuestionTag(input: {
   readonly provenanceRef: string;
   readonly basis: "TAGGER" | "BACKFILL";
 }): Promise<EvaluatorQuestionTagResult> {
-  const run = await input.pool.query<{ question_line: string }>(
-    "SELECT question_line FROM core.run WHERE run_id=$1",
+  const run = await input.pool.query<{
+    question_line: string;
+    content_ciphertext: CryptoEnvelope | null;
+  }>(
+    "SELECT question_line,content_ciphertext FROM core.run WHERE run_id=$1",
     [input.runId]
   );
-  const rawQuestion = run.rows[0]?.question_line;
-  if (rawQuestion === undefined) {
+  const storedRun = run.rows[0];
+  if (storedRun === undefined) {
     return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_RUN_UNRESOLVED" });
   }
+  const rawQuestion = (await decryptContentForRun<{ questionLine: string }>(
+    input.pool, input.runId, "core.run", input.runId, storedRun.content_ciphertext,
+    { questionLine: storedRun.question_line }
+  )).questionLine;
   return runEvaluatorQuestionTagger({
     runId: input.runId,
     rawQuestion,

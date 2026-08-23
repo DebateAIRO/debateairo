@@ -1,7 +1,9 @@
 import { readFile, readdir } from "node:fs/promises";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
+import type { ContentCarrier, ContentCipher, CryptoEnvelope } from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export {
@@ -16,6 +18,69 @@ const { Pool: PgPool } = pg;
 const writeTransaction = new AsyncLocalStorage<boolean>();
 const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
 const wrappedPoolClients = new WeakSet<PoolClient>();
+const contentCiphers = new WeakMap<Pool, ContentCipher>();
+
+export const CONTENT_CIPHERTEXT_SENTINEL = "⟦DEBATEAI:CIPHERTEXT:V1⟧" as const;
+export const CONTENT_JSON_SENTINEL = Object.freeze({ ciphertext: true, v: 1 }) as Readonly<{
+  readonly ciphertext: true;
+  readonly v: 1;
+}>;
+
+export function configureContentEncryption(pool: Pool, cipher: ContentCipher): void {
+  if (contentCiphers.has(pool)) throw new TypeError("CONTENT_CIPHER_ALREADY_CONFIGURED");
+  contentCiphers.set(pool, cipher);
+}
+
+export function contentCipherFor(pool: Pool): ContentCipher | undefined {
+  return contentCiphers.get(pool);
+}
+
+export function questionBlindIndexForOwner(
+  pool: Pool,
+  ownerRef: string,
+  question: string
+): Buffer | null {
+  return contentCipherFor(pool)?.questionBlindIndex(ownerRef, question) ?? null;
+}
+
+export async function runUsesContentEncryption(pool: Pool, runId: string): Promise<boolean> {
+  const result = await pool.query<{ enabled: boolean }>(
+    "SELECT content_encryption_version=1 AS enabled FROM core.run WHERE run_id=$1",
+    [runId]
+  );
+  return result.rows[0]?.enabled === true;
+}
+
+export async function encryptContentForRun(
+  pool: Pool,
+  runId: string,
+  carrier: ContentCarrier,
+  primaryKey: string,
+  value: unknown
+): Promise<CryptoEnvelope | null> {
+  if (!await runUsesContentEncryption(pool, runId)) return null;
+  const cipher = contentCipherFor(pool);
+  if (cipher === undefined) {
+    throw new TypedDomainError("CONTENT_CIPHER_UNAVAILABLE", "Encrypted content cannot be written without the external key store");
+  }
+  return cipher.encrypt(runId, carrier, primaryKey, value);
+}
+
+export async function decryptContentForRun<T>(
+  pool: Pool,
+  runId: string,
+  carrier: ContentCarrier,
+  primaryKey: string,
+  envelope: CryptoEnvelope | null,
+  legacyValue: T
+): Promise<T> {
+  if (envelope === null) return legacyValue;
+  const cipher = contentCipherFor(pool);
+  if (cipher === undefined) {
+    throw new TypedDomainError("CONTENT_CIPHER_UNAVAILABLE", "Encrypted content cannot be read without the external key store");
+  }
+  return cipher.decrypt<T>(runId, carrier, primaryKey, envelope);
+}
 
 type UntypedMethod = (...args: unknown[]) => unknown;
 
@@ -377,6 +442,9 @@ export class RunRepository {
   }
 
   async startRun(input: StartRunInput): Promise<string> {
+    const runId = randomUUID();
+    const cipher = contentCipherFor(this.pool);
+    let contentKeyProvisioned = false;
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -406,27 +474,65 @@ export class RunRepository {
           throw new TypedDomainError("RUN_OWNER_INVALID", "The authenticated owner mapping is no longer active");
         }
       }
+      const askContract = input.askContract ?? {};
+      let storedQuestionLine = input.questionLine;
+      let storedAskContract: Readonly<Record<string, unknown>> = askContract;
+      let contentEnvelope: CryptoEnvelope | null = null;
+      let questionBlindIndex: Buffer | null = null;
+      if (input.principal.kind === "server" && cipher !== undefined) {
+        await cipher.provisionRun(runId, {
+          userId: input.principal.userId,
+          ownerRef: input.principal.ownerRef
+        });
+        contentKeyProvisioned = true;
+        contentEnvelope = await cipher.encrypt(runId, "core.run", runId, {
+          questionLine: input.questionLine,
+          askContract
+        });
+        questionBlindIndex = cipher.questionBlindIndex(input.principal.ownerRef, input.questionLine);
+        storedQuestionLine = CONTENT_CIPHERTEXT_SENTINEL;
+        storedAskContract = CONTENT_JSON_SENTINEL;
+      }
       const createdAtSeq = await allocateSequence(client);
-      const inserted = await client.query<{ run_id: string }>(
-        `INSERT INTO core.run (
-          question_line, asker_id, session_id, caller_scope, as_of,
-          asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier, depth_params, agent_count, discovered_panel,
-          stranger_sample_rate, envelope_basis, register_version,
-          battery_version, ask_contract, created_at_seq
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11::jsonb, jsonb_array_length($12::jsonb), $12::jsonb, $13, $14::jsonb, $15, $16, $17::jsonb, $18
-        ) RETURNING run_id`,
-        [
-          input.questionLine, askerId, input.sessionId, input.callerScope, input.asOf,
-          input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
-          input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
-          input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
-          input.batteryVersion, JSON.stringify(input.askContract ?? {}), createdAtSeq
-        ]
-      );
-      const runId = inserted.rows[0]!.run_id;
+      const baseRunValues = [
+        runId, storedQuestionLine, askerId, input.sessionId, input.callerScope, input.asOf,
+        input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
+        input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
+        input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
+        input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+      ];
+      if (contentEnvelope === null) {
+        await client.query(
+          `INSERT INTO core.run (
+            run_id, question_line, asker_id, session_id, caller_scope, as_of,
+            asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+            composition_budget_tier, depth_params, agent_count, discovered_panel,
+            stranger_sample_rate, envelope_basis, register_version,
+            battery_version, ask_contract, created_at_seq
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12::jsonb, jsonb_array_length($13::jsonb), $13::jsonb, $14,
+            $15::jsonb, $16, $17, $18::jsonb, $19
+          )`,
+          baseRunValues
+        );
+      } else {
+        await client.query(
+          `INSERT INTO core.run (
+            run_id, question_line, asker_id, session_id, caller_scope, as_of,
+            asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+            composition_budget_tier, depth_params, agent_count, discovered_panel,
+            stranger_sample_rate, envelope_basis, register_version,
+            battery_version, ask_contract, created_at_seq,
+            content_encryption_version, question_blind_index, content_ciphertext
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12::jsonb, jsonb_array_length($13::jsonb), $13::jsonb, $14,
+            $15::jsonb, $16, $17, $18::jsonb, $19, 1, $20, $21::jsonb
+          )`,
+          [...baseRunValues, questionBlindIndex, JSON.stringify(contentEnvelope)]
+        );
+      }
 
       if (input.principal.kind === "server") {
         await client.query(
@@ -473,7 +579,25 @@ export class RunRepository {
       await client.query("COMMIT");
       return runId;
     } catch (error) {
-      await client.query("ROLLBACK");
+      let rollbackIncomplete = false;
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        rollbackIncomplete = true;
+      }
+      if (contentKeyProvisioned) {
+        try {
+          await cipher!.destroyRunKey(runId);
+        } catch {
+          rollbackIncomplete = true;
+        }
+      }
+      if (rollbackIncomplete) {
+        throw new TypedDomainError(
+          "RUN_CONTENT_ROLLBACK_INCOMPLETE",
+          "Run rollback or external content-key cleanup did not complete"
+        );
+      }
       throw error;
     } finally {
       client.release();
@@ -482,14 +606,18 @@ export class RunRepository {
 
   async readLoadingProjection(runId: string, ownership: RunOwnershipInput): Promise<RunLoadingProjection | null> {
     const access = normalizeRunOwnership(ownership);
+    const contentCiphertextProjection = contentCipherFor(this.pool) === undefined
+      ? ""
+      : ", run.content_ciphertext";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      content_ciphertext?: CryptoEnvelope | null;
       state: RunLoadingProjection["state"];
       terminal_reason: string | null;
       hold_until: Date | null;
     }>(
-      `SELECT run.run_id, run.question_line,
+      `SELECT run.run_id, run.question_line${contentCiphertextProjection},
          CASE
            WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
@@ -515,14 +643,18 @@ export class RunRepository {
        FROM core.run AS run
        LEFT JOIN core.work_item AS work ON work.run_id = run.run_id
        WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
-       GROUP BY run.run_id, run.question_line`,
+       GROUP BY run.run_id, run.question_line${contentCiphertextProjection}`,
       [runId, access.ownerRef, access.legacyAskerId]
     );
     const row = result.rows[0];
     if (row === undefined) return null;
+    const content = await decryptContentForRun<{ questionLine: string }>(
+      this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext ?? null,
+      { questionLine: row.question_line }
+    );
     return Object.freeze({
       runRef: row.run_id,
-      questionLine: row.question_line,
+      questionLine: content.questionLine,
       state: row.state,
       terminalReason: row.terminal_reason,
       holdUntil: row.hold_until
@@ -626,9 +758,13 @@ export class RunRepository {
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
   }> {
+    const contentCiphertextProjection = contentCipherFor(this.pool) === undefined
+      ? ""
+      : ", content_ciphertext";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      content_ciphertext?: CryptoEnvelope | null;
       agent_count: number;
       discovered_panel: DiscoveredPanelMember[];
       depth_params: Readonly<Record<string, unknown>>;
@@ -636,16 +772,20 @@ export class RunRepository {
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
     }>(
-      `SELECT run_id, question_line, agent_count, discovered_panel, depth_params,
+      `SELECT run_id, question_line${contentCiphertextProjection}, agent_count, discovered_panel, depth_params,
               composition_budget_tier, stranger_sample_rate, envelope_basis
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
     const row = result.rows[0];
     if (row === undefined) throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
+    const content = await decryptContentForRun<{ questionLine: string }>(
+      this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext ?? null,
+      { questionLine: row.question_line }
+    );
     return {
       runId: row.run_id,
-      questionLine: row.question_line,
+      questionLine: content.questionLine,
       agentCount: Number(row.agent_count),
       discoveredPanel: Object.freeze(row.discovered_panel.map((member) => Object.freeze({ ...member }))),
       depthParams: Object.freeze({ ...row.depth_params }),
@@ -657,6 +797,7 @@ export class RunRepository {
 }
 
 export type { Pool } from "pg";
+export type { CryptoEnvelope } from "@debateai/crypto";
 export {
   auditEvent,
   channelBinding,
