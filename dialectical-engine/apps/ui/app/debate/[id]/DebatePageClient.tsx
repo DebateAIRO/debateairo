@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import {
-  clearStoredToken,
+  COOKIE_SESSION_MARKER,
   contractClient,
   getDebateAdaptiveDepthDryRun,
   getDebateBundle,
   getDebateScoring,
-  getStoredToken,
-  setStoredToken,
-  validateUserToken
+  validateSession
 } from "@/lib/api";
 import {
   ContractHttpError,
@@ -34,10 +32,7 @@ import {
   readDebateHeaderGeometry
 } from "@/lib/debateHeaderOverflow";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
-import {
-  shouldClearStoredTokenAfterUnlockFailure,
-  tokenUnlockFailureMessage
-} from "@/lib/v3/tokenUnlock";
+import { tokenUnlockFailureMessage } from "@/lib/v3/tokenUnlock";
 import {
   applyRunEvent,
   createLiveRunState,
@@ -385,8 +380,6 @@ export default function DebatePageClient({
   });
   const [scoreAwareFilter, setScoreAwareFilter] = useState<ScoreAwareFilter>("all");
   const [actionToken, setActionToken] = useState<string | null>(null);
-  const [tokenDraft, setTokenDraft] = useState("");
-  const [tokenBusy, setTokenBusy] = useState(false);
 
   const [view, setView] = useState<DebateView>("tree");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -403,7 +396,6 @@ export default function DebatePageClient({
   const [guideOpen, setGuideOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [scoringDiagnosticsOpen, setScoringDiagnosticsOpen] = useState(false);
-  const [tokenBarOpen, setTokenBarOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const canvasElRef = useRef<HTMLDivElement | null>(null);
@@ -416,10 +408,8 @@ export default function DebatePageClient({
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
 
   const refresh = useCallback(async (answerExpected = false) => {
-    const token = getStoredToken();
-    if (!token) return; // AuthGate supplies the token before this page mounts
     try {
-      const bundle = await getDebateBundle(id, token, contractClient, {
+      const bundle = await getDebateBundle(id, COOKIE_SESSION_MARKER, contractClient, {
         answerExpected,
         currentAnswer: answerRef.current
       });
@@ -491,9 +481,7 @@ export default function DebatePageClient({
 
   useEffect(() => {
     let active = true;
-    const token = getStoredToken();
-    if (!token) return;
-    contractClient.readDeployment(token)
+    contractClient.readDeployment(COOKIE_SESSION_MARKER)
       .then((deployment) => {
         if (!active) return;
         setLowStrengthThreshold(hiddenNodeScoreThresholdFromDeployment(deployment).value);
@@ -533,34 +521,29 @@ export default function DebatePageClient({
 
   useEffect(() => {
     let active = true;
-    async function validateStoredToken() {
-      const stored = getStoredToken();
-      if (!stored) return;
+    async function validateCookieSession() {
       try {
-        await validateUserToken(stored);
-        if (active) setActionToken(stored);
+        await validateSession();
+        if (active) setActionToken(COOKIE_SESSION_MARKER);
       } catch (error) {
-        if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
         if (active) {
           setActionToken(null);
           setError(tokenUnlockFailureMessage(error));
         }
       }
     }
-    validateStoredToken();
+    void validateCookieSession();
     return () => {
       active = false;
     };
   }, []);
 
   // UI-01 data-access swap: V2's coordinator EventSource becomes the V3 run
-  // stream (token-authenticated fetch streaming — EventSource cannot carry
-  // the x-user-dev-token header). Every V3 event lands in the pure live-state
+  // stream (cookie-authenticated fetch streaming — EventSource cannot carry
+  // the authenticated same-origin cookie request). Every V3 event lands in the pure live-state
   // translator; while no settled answer exists, the tree the stream described
   // is materialized into the SAME debate state the V2 views already render.
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) return;
     const runRef = answerRef.current?.run_ref ?? id;
 
     const consume = createDebatePageRunEventConsumer({
@@ -583,7 +566,7 @@ export default function DebatePageClient({
       // without holding a live connection open.
       let active = true;
       contractClient
-        .readEvents(runRef, token)
+        .readEvents(runRef, COOKIE_SESSION_MARKER)
         .then((events) => {
           if (!active) return;
           let state = createLiveRunState();
@@ -624,7 +607,7 @@ export default function DebatePageClient({
       contractClient
         .streamEvents(
           runRef,
-          token!,
+          COOKIE_SESSION_MARKER,
           (event) => {
             if (!opened) {
               opened = true;
@@ -672,11 +655,10 @@ export default function DebatePageClient({
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
-    const token = getStoredToken();
-    if (token === null || answer === null) return;
+    if (answer === null) return;
     let active = true;
     contractClient
-      .readLedgerDigest(answer.answer_id, token)
+      .readLedgerDigest(answer.answer_id, COOKIE_SESSION_MARKER)
       .then((digest) => {
         if (!active) return;
         setLedgerDigest(digest);
@@ -692,10 +674,13 @@ export default function DebatePageClient({
   }, [answer]);
 
   const showInspection = useCallback(async () => {
-    const token = getStoredToken();
-    if (token === null || answerRef.current === null) return;
+    if (answerRef.current === null) return;
     try {
-      setInspection(await contractClient.readInspection(answerRef.current.answer_id, token, answerRef.current.answer_version));
+      setInspection(await contractClient.readInspection(
+        answerRef.current.answer_id,
+        COOKIE_SESSION_MARKER,
+        answerRef.current.answer_version
+      ));
       setInspectionError(null);
     } catch (failure) {
       setInspectionError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
@@ -703,10 +688,9 @@ export default function DebatePageClient({
   }, []);
 
   const unlinkMemory = useCallback(async () => {
-    const token = getStoredToken();
-    if (token === null || answerRef.current === null) return;
+    if (answerRef.current === null) return;
     try {
-      await contractClient.unlinkMemory(answerRef.current.answer_id, token);
+      await contractClient.unlinkMemory(answerRef.current.answer_id, COOKIE_SESSION_MARKER);
       setHonestyActionState("MEMORY_UNLINKED");
       await refresh();
     } catch (failure) {
@@ -716,15 +700,14 @@ export default function DebatePageClient({
 
   const recordInvestigation = useCallback(
     async (gap: InvestigationGap) => {
-      const token = getStoredToken();
-      if (token === null || answerRef.current === null) return;
+      if (answerRef.current === null) return;
       const verbatim = investigationInput[gap.gap_ref] ?? "";
       try {
         const accepted = await contractClient.recordInvestigation(
           answerRef.current.answer_id,
           gap.gap_ref,
           { user_input: gap.accepts_user_input && verbatim.length > 0 ? verbatim : null, human_steer_input: true },
-          token
+          COOKIE_SESSION_MARKER
         );
         setHonestyActionState(`${accepted.status} · replay ${accepted.replay_handle}`);
       } catch (failure) {
@@ -989,36 +972,7 @@ export default function DebatePageClient({
     return true;
   }
 
-  async function unlockActions(event: FormEvent) {
-    event.preventDefault();
-    const value = tokenDraft.trim();
-    if (!value) return;
-    setTokenBusy(true);
-    setError(null);
-    try {
-      await validateUserToken(value);
-      setStoredToken(value);
-      setActionToken(value);
-      setTokenDraft("");
-      setTokenBarOpen(false);
-    } catch (error) {
-      if (shouldClearStoredTokenAfterUnlockFailure(error)) clearStoredToken();
-      setActionToken(null);
-      // DR-115: only say "rejected" when the coordinator actually rejected it.
-      setError(tokenUnlockFailureMessage(error));
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  function lockActions() {
-    clearStoredToken();
-    setActionToken(null);
-    setTokenDraft("");
-  }
-
   function rejectActionToken() {
-    clearStoredToken();
     setActionToken(null);
   }
 
@@ -1479,34 +1433,9 @@ export default function DebatePageClient({
 
       {toast ? <Toast message={toast} /> : null}
 
-      {/* ---- action token (subtle, bottom-right) ---- */}
+      {/* S5: the only browser credential is the server-set HttpOnly cookie. */}
       <div className="tokenDock">
-        {actionToken ? (
-          <button type="button" className="btn" onClick={lockActions}>
-            🔓 Actions unlocked
-          </button>
-        ) : tokenBarOpen ? (
-          <form className="tokenForm" onSubmit={unlockActions}>
-            <input
-              id="action-user-token"
-              name="action-user-token"
-              className="tokenInput"
-              value={tokenDraft}
-              onChange={(event) => setTokenDraft(event.target.value)}
-              type="password"
-              autoComplete="off"
-              placeholder="User token"
-              aria-label="User token"
-            />
-            <button className="btn btnDark" type="submit" disabled={tokenBusy}>
-              {tokenBusy ? "…" : "Unlock"}
-            </button>
-          </form>
-        ) : (
-          <button type="button" className="btn" onClick={() => setTokenBarOpen(true)}>
-            🔒 Unlock actions
-          </button>
-        )}
+        <span className="btn" aria-live="polite">{actionToken ? "🔓 Signed in" : "Session required"}</span>
       </div>
     </div>
   );

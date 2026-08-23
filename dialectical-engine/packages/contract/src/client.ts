@@ -9,7 +9,10 @@ import {
   NodeSchema,
   RunEventSchema,
   RunProjectionSchema,
+  RevokeAllSessionsSchema,
+  SessionListSchema,
   SessionSchema,
+  StepUpResponseSchema,
   type Answer,
   type AnswerIndex,
   type AskAccepted,
@@ -22,7 +25,8 @@ import {
   type Node,
   type RunEvent,
   type RunProjection,
-  type Session
+  type Session,
+  type SessionList
 } from "./index.js";
 
 export type ContractErrorCode =
@@ -83,14 +87,28 @@ async function requestJson<T>(
   path: string,
   token: string,
   schema: { parse(value: unknown): T },
-  init: RequestInit = {}
+  init: RequestInit = {},
+  auth: ContractClientAuth = { mode: "legacy" }
 ): Promise<T> {
   let response: Response;
   try {
     const headers = new Headers(init.headers);
-    headers.set("x-user-dev-token", token);
+    if (auth.mode === "legacy") {
+      headers.set("x-user-dev-token", token);
+    } else {
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (init.method !== undefined && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
+        const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+        if (csrf !== null) headers.set("x-csrf-token", csrf);
+      }
+    }
     if (init.body !== undefined) headers.set("content-type", "application/json");
-    response = await fetchImplementation(new URL(path, baseUrl), { ...init, headers, cache: "no-store" });
+    response = await fetchImplementation(new URL(path, baseUrl), {
+      ...init,
+      headers,
+      cache: "no-store",
+      ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+    });
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
   }
@@ -102,7 +120,69 @@ async function requestJson<T>(
   }
 }
 
+async function requestNoContent(
+  baseUrl: string,
+  fetchImplementation: typeof fetch,
+  path: string,
+  init: RequestInit,
+  auth: ContractClientAuth
+): Promise<void> {
+  let response: Response;
+  try {
+    const headers = new Headers(init.headers);
+    if (auth.mode === "cookie") {
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
+    }
+    response = await fetchImplementation(new URL(path, baseUrl), {
+      ...init,
+      headers,
+      cache: "no-store",
+      ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+    });
+  } catch (error) {
+    throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+  }
+  if (!response.ok) throw await contractErrorForResponse(response);
+  if (response.status !== 204) {
+    throw new ContractHttpError("INVALID_RESPONSE", response.status, "Expected an empty session mutation response");
+  }
+}
+
+export type ContractClientAuth =
+  | Readonly<{ mode: "legacy" }>
+  | Readonly<{
+    mode: "cookie";
+    /** Server-side rendering only; browser code relies on the cookie jar. */
+    cookieHeader?: string;
+    csrfToken?: () => string | null;
+  }>;
+
+function browserCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const values = document.cookie.split(";").flatMap((member) => {
+    const index = member.indexOf("=");
+    if (index < 1 || member.slice(0, index).trim() !== "__Host-debateai-csrf") return [];
+    const value = member.slice(index + 1).trim();
+    return /^[A-Za-z0-9_-]{43}$/.test(value) ? [value] : [];
+  });
+  return values.length === 1 ? values[0]! : null;
+}
+
 export interface ContractClient {
+  beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
+  completeLogin(challengeToken: string, code: string): Promise<{
+    status: "authenticated";
+    csrf_token: string;
+    session: Session;
+    replacement_recovery_code?: string;
+  }>;
+  logout(): Promise<void>;
+  listSessions(): Promise<SessionList>;
+  revokeSession(sessionId: string): Promise<void>;
+  revokeAllSessions(): Promise<{ revoked: number }>;
+  stepUp(password: string, code: string): Promise<{ status: "step_up_complete"; csrf_token: string }>;
   submitAsk(input: AskRequest, token: string): Promise<AskAccepted>;
   readSession(token: string): Promise<Session>;
   readDeployment(token: string): Promise<Deployment>;
@@ -126,15 +206,25 @@ const UnlinkSchema = { parse(value: unknown) {
   return { memory_link_id: row.memory_link_id, state: "UNLINKED" as const };
 } };
 
-export function createContractClient(baseUrl: string, fetchImplementation: typeof fetch = fetch): ContractClient {
+export function createContractClient(
+  baseUrl: string,
+  fetchImplementation: typeof fetch = fetch,
+  auth: ContractClientAuth = { mode: "legacy" }
+): ContractClient {
   const root = new URL(baseUrl);
   const versionQuery = (version?: number) => version === undefined ? "" : `?version=${encodeURIComponent(String(version))}`;
+  const request = <T>(path: string, token: string, schema: { parse(value: unknown): T }, init: RequestInit = {}) =>
+    requestJson(root.href, fetchImplementation, path, token, schema, init, auth);
   const eventResponse = async (runId: string, token: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
     try {
+      const headers = new Headers();
+      if (auth.mode === "legacy") headers.set("x-user-dev-token", token);
+      else if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
       response = await fetchImplementation(new URL(`/v1/runs/${encodeURIComponent(runId)}/events`, root), {
-        headers: { "x-user-dev-token": token },
+        headers,
         cache: "no-store",
+        ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {}),
         ...(signal === undefined ? {} : { signal })
       });
     } catch (error) {
@@ -157,18 +247,74 @@ export function createContractClient(baseUrl: string, fetchImplementation: typeo
     }
   };
   return Object.freeze({
-    submitAsk: (input: AskRequest, token: string) => requestJson(root.href, fetchImplementation, "/v1/asks", token, AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
-    readSession: (token: string) => requestJson(root.href, fetchImplementation, "/v1/session", token, SessionSchema),
-    readDeployment: (token: string) => requestJson(root.href, fetchImplementation, "/v1/deployment", token, DeploymentSchema),
-    readAnswerIndex: (token: string, limit: number, offset: number) => requestJson(root.href, fetchImplementation, `/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, token, AnswerIndexSchema),
-    readAnswer: (answerId: string, token: string, version?: number) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, token, AnswerSchema),
-    readRunAnswer: (runId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/answer`, token, AnswerSchema),
-    readRun: (runId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}`, token, RunProjectionSchema),
-    readInspection: (answerId: string, token: string, version?: number) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, token, InspectionSchema),
-    readLedgerDigest: (answerId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, token, ExecutionLedgerDigestSchema),
-    readNode: (answerId: string, nodeId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, token, NodeSchema),
-    recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, token, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
-    unlinkMemory: (answerId: string, token: string) => requestJson(root.href, fetchImplementation, `/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, token, UnlinkSchema, { method: "POST" }),
+    beginLogin: (email: string, password: string) => request("/v1/auth/login", "", {
+      parse(value: unknown) {
+        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
+        const row = value as Record<string, unknown>;
+        if (row.status !== "mfa_required" || typeof row.challenge_token !== "string") throw new TypeError("Invalid login challenge response");
+        return { status: "mfa_required" as const, challenge_token: row.challenge_token };
+      }
+    }, { method: "POST", body: JSON.stringify({ email, password }) }),
+    completeLogin: (challengeToken: string, code: string) => request("/v1/auth/login", "", {
+      parse(value: unknown) {
+        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login response");
+        const row = value as Record<string, unknown>;
+        if (row.status !== "authenticated" || typeof row.csrf_token !== "string") throw new TypeError("Invalid login response");
+        const session = SessionSchema.parse(row.session);
+        return {
+          status: "authenticated" as const,
+          csrf_token: row.csrf_token,
+          session,
+          ...(typeof row.replacement_recovery_code === "string"
+            ? { replacement_recovery_code: row.replacement_recovery_code } : {})
+        };
+      }
+    }, { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
+    async logout() {
+      let response: Response;
+      const headers = new Headers();
+      if (auth.mode === "cookie") {
+        if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+        const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+        if (csrf !== null) headers.set("x-csrf-token", csrf);
+      }
+      try {
+        response = await fetchImplementation(new URL("/v1/auth/logout", root), {
+          method: "POST", headers, cache: "no-store",
+          ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+        });
+      } catch (error) {
+        throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+      }
+      if (!response.ok) throw await contractErrorForResponse(response);
+    },
+    listSessions: () => request("/v1/auth/sessions", "", SessionListSchema),
+    revokeSession: (sessionId: string) => requestNoContent(
+      root.href,
+      fetchImplementation,
+      `/v1/auth/sessions/${encodeURIComponent(sessionId)}`,
+      { method: "DELETE" },
+      auth
+    ),
+    revokeAllSessions: () => request(
+      "/v1/auth/sessions", "", RevokeAllSessionsSchema, { method: "DELETE" }
+    ),
+    stepUp: (password: string, code: string) => request(
+      "/v1/auth/step-up", "", StepUpResponseSchema,
+      { method: "POST", body: JSON.stringify({ password, code }) }
+    ),
+    submitAsk: (input: AskRequest, token: string) => request("/v1/asks", token, AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    readSession: (token: string) => request("/v1/session", token, SessionSchema),
+    readDeployment: (token: string) => request("/v1/deployment", token, DeploymentSchema),
+    readAnswerIndex: (token: string, limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, token, AnswerIndexSchema),
+    readAnswer: (answerId: string, token: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, token, AnswerSchema),
+    readRunAnswer: (runId: string, token: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, token, AnswerSchema),
+    readRun: (runId: string, token: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, token, RunProjectionSchema),
+    readInspection: (answerId: string, token: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, token, InspectionSchema),
+    readLedgerDigest: (answerId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, token, ExecutionLedgerDigestSchema),
+    readNode: (answerId: string, nodeId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, token, NodeSchema),
+    recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, token, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    unlinkMemory: (answerId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, token, UnlinkSchema, { method: "POST" }),
     async readEvents(runId: string, token: string) {
       const response = await eventResponse(runId, token);
       const text = await response.text();

@@ -9,12 +9,14 @@ import { createBrowserContractClient, getDebateBundle } from "../../apps/ui/lib/
 /**
  * UI-01 S05 ownership proof through the real UI chain: browser contract
  * client -> same-origin rewrite -> compiled proxy route -> real HTTP socket ->
- * an upstream that scopes every read by x-user-dev-token exactly like
+ * an upstream that scopes every read by the exact host-only session cookie
  * apps/api does (owner 200 / foreign 404 / anonymous 401). Nothing here is
  * mocked below the route handler: the proxy performs a real network fetch.
  */
 
-const OWNER_TOKEN = "token:owner";
+const OWNER_TOKEN = "o".repeat(43);
+const FOREIGN_TOKEN = "f".repeat(43);
+const SESSION_MARKER = "cookie-session";
 const answer = buildFairShapedAnswer();
 
 let server: Server;
@@ -22,8 +24,12 @@ let baseBefore: string | undefined;
 
 beforeAll(async () => {
   server = createServer((request, response) => {
-    const token = request.headers["x-user-dev-token"];
-    if (typeof token !== "string" || token.length === 0) {
+    const token = request.headers.cookie
+      ?.split(";")
+      .map((member) => member.trim())
+      .find((member) => member.startsWith("__Host-debateai-session="))
+      ?.slice("__Host-debateai-session=".length);
+    if (token === undefined || token.length === 0) {
       response.writeHead(401, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: "SESSION_REQUIRED" }));
       return;
@@ -69,10 +75,20 @@ const throughProxy = (async (input: unknown, init?: RequestInit) => {
   throw new Error(`unexpected proxy method: ${request.method}`);
 }) as typeof fetch;
 
+function throughProxyAs(sessionToken: string | null): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    if (sessionToken !== null) {
+      headers.set("cookie", `__Host-debateai-session=${sessionToken}`);
+    }
+    return throughProxy(input, { ...init, headers });
+  }) as typeof fetch;
+}
+
 describe("S05 ownership through the restored V2 data layer", () => {
   it("serves the owner their own debate (200 path)", async () => {
-    const client = createBrowserContractClient(throughProxy);
-    const bundle = await getDebateBundle(answer.answer_id, OWNER_TOKEN, client);
+    const client = createBrowserContractClient(throughProxyAs(OWNER_TOKEN));
+    const bundle = await getDebateBundle(answer.answer_id, SESSION_MARKER, client);
     expect(bundle.kind).toBe("served");
     if (bundle.kind !== "served") throw new Error("expected served owner debate");
     expect(bundle.answer.answer_id).toBe(answer.answer_id);
@@ -81,8 +97,8 @@ describe("S05 ownership through the restored V2 data layer", () => {
   });
 
   it("refuses a foreign asker with NOT_FOUND on both the answer and run projections (404 path)", async () => {
-    const client = createBrowserContractClient(throughProxy);
-    const failure = await getDebateBundle(answer.answer_id, "token:foreign", client).then(
+    const client = createBrowserContractClient(throughProxyAs(FOREIGN_TOKEN));
+    const failure = await getDebateBundle(answer.answer_id, SESSION_MARKER, client).then(
       () => null,
       (thrown: unknown) => thrown
     );
@@ -92,8 +108,8 @@ describe("S05 ownership through the restored V2 data layer", () => {
   });
 
   it("refuses an anonymous read with SESSION_REQUIRED (401 path)", async () => {
-    const client = createBrowserContractClient(throughProxy);
-    const failure = await client.readAnswer(answer.answer_id, "").then(
+    const client = createBrowserContractClient(throughProxyAs(null));
+    const failure = await client.readAnswer(answer.answer_id, SESSION_MARKER).then(
       () => null,
       (thrown: unknown) => thrown
     );

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildApi, type AskApplication, type EvaluatorDevMenuApplication } from "@debateai/api";
+import {
+  buildApi,
+  createLegacyDevSessionResolver,
+  type AskApplication,
+  type EvaluatorDevMenuApplication
+} from "@debateai/api";
 import { loadApiEnvironment } from "@debateai/register";
 
 const view = {
@@ -88,7 +93,12 @@ describe("dev-only evaluator API", () => {
       readView: vi.fn(async () => view),
       selectConsumerModel
     };
-    const api = buildApi({ application: askApplication(), evaluatorDevMenu, evaluatorDevMenuRegisterVersion: 1 });
+    const api = buildApi({
+      application: askApplication(),
+      evaluatorDevMenu,
+      evaluatorDevMenuRegisterVersion: 1,
+      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "token" })
+    });
 
     expect((await api.inject({ method: "GET", url: "/v1/dev/evaluator" })).statusCode).toBe(401);
     const read = await api.inject({
@@ -105,7 +115,7 @@ describe("dev-only evaluator API", () => {
     expect(selectConsumerModel).toHaveBeenCalledWith(expect.objectContaining({
       modelId: "consumer:alpha",
       selectedBy: expect.stringMatching(/^asker:/),
-      orderRef: expect.stringMatching(/^dev-menu:session:/)
+      orderRef: expect.stringMatching(/^dev-menu:legacy:/)
     }));
     await api.close();
   });

@@ -55,6 +55,7 @@ export class AuthFlowError extends Error {
     | "AUTH_MAIL_BUSY"
     | "AUTH_REGISTRATION_FAILED"
     | "AUTH_TEMPORARILY_UNAVAILABLE"
+    | "AUTH_CREDENTIALS_INVALID"
     | "VERIFICATION_TOKEN_INVALID"
     | "MFA_ENROLLMENT_INVALID"
     | "MFA_ENROLLMENT_STATE_INVALID"
@@ -68,8 +69,9 @@ export class AuthFlowError extends Error {
     this.name = "AuthFlowError";
   }
 
-  get statusCode(): 400 | 409 | 429 | 503 {
-    return this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
+  get statusCode(): 400 | 401 | 409 | 429 | 503 {
+    return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
+      : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
       : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
         || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;

@@ -5,10 +5,7 @@ import { createContractClient } from "@debateai/contract";
 import { ContractHttpError } from "@debateai/contract";
 import { readDeploymentRiskTier } from "@debateai/register";
 import { createDebate } from "../../apps/ui/lib/api.js";
-import {
-  classifyTokenUnlockFailure,
-  shouldClearStoredTokenAfterUnlockFailure
-} from "../../apps/ui/lib/v3/tokenUnlock.js";
+import { classifyTokenUnlockFailure } from "../../apps/ui/lib/v3/tokenUnlock.js";
 
 function poolReturning(rows: readonly Record<string, unknown>[]): Pool {
   return { query: async () => ({ rows }) } as unknown as Pool;
@@ -64,34 +61,39 @@ describe("POL-01 register-owned deployment floor", () => {
     );
   });
 
-  it("clears a stored token only after an observed rejection, never after an outage", () => {
-    expect(shouldClearStoredTokenAfterUnlockFailure(
+  it("distinguishes a rejected cookie session from an outage", () => {
+    expect(classifyTokenUnlockFailure(
       new ContractHttpError("SESSION_REQUIRED", 401, "denied")
-    )).toBe(true);
-    expect(shouldClearStoredTokenAfterUnlockFailure(
+    ).kind).toBe("REJECTED");
+    expect(classifyTokenUnlockFailure(
       new ContractHttpError("FORBIDDEN", 403, "denied")
-    )).toBe(true);
-    expect(shouldClearStoredTokenAfterUnlockFailure(
+    ).kind).toBe("REJECTED");
+    expect(classifyTokenUnlockFailure(
       new ContractHttpError("NETWORK_FAILURE", 0, "ECONNREFUSED")
-    )).toBe(false);
-    expect(shouldClearStoredTokenAfterUnlockFailure(
+    ).kind).toBe("UNREACHABLE");
+    expect(classifyTokenUnlockFailure(
       new ContractHttpError("SERVER_FAILURE", 500, "coordinator failed")
-    )).toBe(false);
+    ).kind).toBe("COORDINATOR_FAILED");
     expect(classifyTokenUnlockFailure(
       new ContractHttpError("SERVER_FAILURE", 502, "API unreachable", "API_UPSTREAM_UNREACHABLE")
     )).toMatchObject({ kind: "UNREACHABLE" });
   });
 
-  it("routes both automatic stored-token checks through the typed failure decision", async () => {
-    const [authGate, debatePage, debateTree, nodeDrawer] = await Promise.all([
+  it("uses cookie-session validation without browser storage or manual credential gates", async () => {
+    const [authGate, debatePage, uiApi, webApi, debateTree, nodeDrawer] = await Promise.all([
       readFile(new URL("../../apps/ui/components/AuthGate.tsx", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/app/debate/[id]/DebatePageClient.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../web/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/components/DebateTree.tsx", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/components/NodeDetailDrawer.tsx", import.meta.url), "utf8")
     ]);
-    expect(authGate.match(/if \(shouldClearStoredTokenAfterUnlockFailure\(error\)\) clearStoredToken\(\)/g)).toHaveLength(2);
+    expect(authGate).toContain("validateSession()");
     expect(authGate).not.toContain("Saved token is no longer valid.");
-    expect(debatePage.match(/if \(shouldClearStoredTokenAfterUnlockFailure\(error\)\) clearStoredToken\(\)/g)).toHaveLength(2);
+    expect(debatePage).toContain("COOKIE_SESSION_MARKER");
+    for (const source of [authGate, debatePage, uiApi, webApi]) {
+      expect(source).not.toMatch(/getStoredToken|setStoredToken|clearStoredToken|localStorage/);
+    }
     expect(debatePage).not.toContain("looksAuthRelated");
     expect(debateTree).not.toContain("looksAuthRelated");
     expect(nodeDrawer).not.toContain("looksAuthRelated");

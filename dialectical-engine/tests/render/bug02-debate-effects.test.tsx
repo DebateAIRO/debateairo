@@ -27,8 +27,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
   return {
     ...actual,
-    getStoredToken: () => "token:test",
-    validateUserToken: vi.fn().mockResolvedValue(undefined),
+    COOKIE_SESSION_MARKER: "cookie-session",
+    validateSession: vi.fn().mockResolvedValue(undefined),
     contractClient: {
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,

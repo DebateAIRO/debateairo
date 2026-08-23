@@ -228,22 +228,25 @@ describe("S14 / W6 / FX-LG-17 — live lifecycle and freshness", () => {
 describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
   it("prefixes browser contract requests with the same-origin /api route", async () => {
     const { createBrowserContractClient } = await import("../../web/lib/api.js");
-    const calls: Array<{ input: string; headers: Headers }> = [];
+    const calls: Array<{ input: string; headers: Headers; credentials: RequestCredentials | undefined }> = [];
     const client = createBrowserContractClient(async (input, init) => {
-      calls.push({ input: String(input), headers: new Headers(init?.headers) });
+      calls.push({ input: String(input), headers: new Headers(init?.headers), credentials: init?.credentials });
       return new Response(JSON.stringify({
-        asker_id: "asker:test",
-        session_id: "session:test",
+        asker_id: "user:11111111-1111-4111-8111-111111111111",
+        session_id: "22222222-2222-4222-8222-222222222222",
         caller_scope: "ASKER",
-        ownership_provenance: "user_dev_token",
-        provisional_identity_model: true
+        ownership_provenance: "server_session",
+        provisional_identity_model: false
       }), { status: 200, headers: { "content-type": "application/json" } });
     }, "/api");
 
-    await expect(client.readSession("token:test")).resolves.toMatchObject({ session_id: "session:test" });
+    await expect(client.readSession("token:test")).resolves.toMatchObject({
+      session_id: "22222222-2222-4222-8222-222222222222"
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.input).toBe("/api/v1/session");
-    expect(calls[0]?.headers.get("x-user-dev-token")).toBe("token:test");
+    expect(calls[0]?.headers.get("x-user-dev-token")).toBeNull();
+    expect(calls[0]?.credentials).toBe("same-origin");
   });
 
   it("branches on typed 429 rather than response prose", async () => {

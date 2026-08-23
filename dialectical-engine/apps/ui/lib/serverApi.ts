@@ -6,19 +6,27 @@ import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.j
  * UI-01 (DR-145): V2's SSR data access, swapped onto V3's typed contract
  * client. The upstream base is server-only (DIALECTICAL_API_BASE — ACC-01
  * rev-3 pattern) and required loudly: no silent default upstream. Every read
- * is asker-scoped by the dev token the pages read from the identity cookie
+ * is asker-scoped by the opaque server session the pages read from the HttpOnly cookie
  * (S05); with no token the pages render their own pending/auth states and
  * never fetch.
  */
 
-export const USER_TOKEN_COOKIE = "debateai:user-dev-token";
+export const USER_TOKEN_COOKIE = "__Host-debateai-session";
 
-export function createServerContractClient(fetchImplementation: typeof fetch = fetch): ContractClient {
+export function createServerContractClient(
+  fetchImplementation: typeof fetch = fetch,
+  sessionCookie?: string
+): ContractClient {
   const baseUrl = process.env.DIALECTICAL_API_BASE?.trim();
   if (baseUrl === undefined || baseUrl.length === 0) {
     throw new Error("DIALECTICAL_API_BASE_REQUIRED");
   }
-  return createContractClient(baseUrl, fetchImplementation);
+  return createContractClient(baseUrl, fetchImplementation, {
+    mode: "cookie",
+    ...(sessionCookie === undefined ? {} : {
+      cookieHeader: `${USER_TOKEN_COOKIE}=${sessionCookie}`
+    })
+  });
 }
 
 /**
@@ -36,9 +44,10 @@ export type DebateListPage = {
 
 export async function listDebatesPageServer(
   token: string,
-  client: ContractClient = createServerContractClient()
+  client?: ContractClient
 ): Promise<DebateListPage> {
-  const index = await client.readAnswerIndex(token, HOME_PAGE_SIZE, 0);
+  const index = await (client ?? createServerContractClient(fetch, token))
+    .readAnswerIndex("cookie-session", HOME_PAGE_SIZE, 0);
   return {
     summaries: debateSummariesFromIndex(index),
     shown: index.items.length,
@@ -62,15 +71,16 @@ export type GetDebateServerResult =
 export async function getDebateServer(
   id: string,
   token: string,
-  client: ContractClient = createServerContractClient()
+  client?: ContractClient
 ): Promise<GetDebateServerResult> {
+  const resolvedClient = client ?? createServerContractClient(fetch, token);
   let answer: Answer;
   try {
     try {
-      answer = await client.readAnswer(id, token);
+      answer = await resolvedClient.readAnswer(id, "cookie-session");
     } catch (failure) {
       if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") throw failure;
-      answer = await client.readRunAnswer(id, token);
+      answer = await resolvedClient.readRunAnswer(id, "cookie-session");
     }
   } catch (failure) {
     if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") {
@@ -80,7 +90,7 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: failure instanceof Error ? failure.message : "Unable to load debate" };
     }
     try {
-      const run = await client.readRun(id, token);
+      const run = await resolvedClient.readRun(id, "cookie-session");
       if (run.state === "FAILED") {
         return { ok: false, kind: "failed", run, reason: run.terminal_reason! };
       }

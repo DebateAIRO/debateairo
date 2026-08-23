@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
   AnswerSchema,
@@ -46,17 +46,35 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { MfaApplication } from "./mfa.js";
+import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user";
+type RouteOriginPolicy = "trusted";
+
+export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
+export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
+const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const SECURITY_HEADERS = Object.freeze({
+  "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+});
 
 declare module "fastify" {
   interface FastifyContextConfig {
     auth?: RouteAuthPolicy;
+    origin?: RouteOriginPolicy;
   }
 
   interface FastifyRequest {
     session: Session;
+    authenticatedSession?: AuthenticatedSession;
+    cookieRefresh?: Readonly<{ sessionToken: string; csrfToken: string | null }>;
   }
 }
 
@@ -79,9 +97,45 @@ export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   readonly mfa?: MfaApplication;
+  readonly sessions?: SessionApplication;
+  readonly allowedOrigin?: string;
+  readonly legacyDevSessionResolver?: LegacyDevSessionResolver;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+}
+
+export type LegacyDevSessionResolver = (token: unknown) => Session | null;
+
+/**
+ * S9 rollback boundary: only an explicitly configured, exact credential can
+ * resolve. Cookie presence always suppresses this fallback in the HTTP hook.
+ */
+export function createLegacyDevSessionResolver(input: Readonly<{
+  userToken?: string;
+  operatorToken?: string;
+}>): LegacyDevSessionResolver {
+  const configured = Object.freeze([
+    ...(input.userToken === undefined ? [] : [{ token: input.userToken, scope: "ASKER" as const }]),
+    ...(input.operatorToken === undefined ? [] : [{ token: input.operatorToken, scope: "OPERATOR" as const }])
+  ].map((entry) => Object.freeze({
+    digest: createHash("sha256").update(entry.token, "utf8").digest(),
+    scope: entry.scope
+  })));
+  return (token: unknown): Session | null => {
+    if (typeof token !== "string" || token.length === 0) return null;
+    const digest = createHash("sha256").update(token, "utf8").digest();
+    const match = configured.find((entry) => timingSafeEqual(entry.digest, digest));
+    if (match === undefined) return null;
+    const tokenDigest = digest.toString("hex");
+    return SessionSchema.parse({
+      asker_id: `asker:${tokenDigest}`,
+      session_id: `legacy:${tokenDigest}`,
+      caller_scope: match.scope,
+      ownership_provenance: match.scope === "OPERATOR" ? "operator_dev_token" : "user_dev_token",
+      provisional_identity_model: true
+    });
+  };
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -132,36 +186,136 @@ function markAskRefusal(error: unknown): never {
   throw error;
 }
 
-function resolveSession(token: unknown, scope: "ASKER" | "OPERATOR" = "ASKER"): Session | null {
-  if (typeof token !== "string" || token.trim().length === 0) return null;
-  const tokenDigest = createHash("sha256").update(token).digest("hex");
-  return SessionSchema.parse({
-    asker_id: `asker:${tokenDigest}`,
-    session_id: `session:${tokenDigest}`,
-    caller_scope: scope,
-    ownership_provenance: scope === "OPERATOR" ? "operator_dev_token" : "user_dev_token",
-    provisional_identity_model: true
-  });
+function exactCookie(raw: unknown, name: string): string | null {
+  if (typeof raw !== "string" || raw.length === 0 || /[\r\n\0]/.test(raw)) return null;
+  const matches: string[] = [];
+  for (const member of raw.split(";")) {
+    const index = member.indexOf("=");
+    if (index < 1) continue;
+    if (member.slice(0, index).trim() === name) matches.push(member.slice(index + 1).trim());
+  }
+  return matches.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(matches[0]!) ? matches[0]! : null;
+}
+
+function exactOrigin(value: unknown, allowedOrigin: string | undefined): boolean {
+  return typeof value === "string" && allowedOrigin !== undefined
+    && !value.includes(",") && value === allowedOrigin;
+}
+
+function exactCsrfPair(header: unknown, cookie: string | null): string | null {
+  if (typeof header !== "string" || cookie === null || !/^[A-Za-z0-9_-]{43}$/.test(header)) return null;
+  const headerBytes = Buffer.from(header, "utf8");
+  const cookieBytes = Buffer.from(cookie, "utf8");
+  return headerBytes.byteLength === cookieBytes.byteLength && timingSafeEqual(headerBytes, cookieBytes)
+    ? header : null;
+}
+
+function sessionCookie(value: string, maxAgeSeconds: number): string {
+  return `${SESSION_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+function csrfCookie(value: string, maxAgeSeconds: number): string {
+  return `${CSRF_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; Secure; SameSite=Lax`;
+}
+
+function expiredCookies(): readonly string[] {
+  const expired = "Thu, 01 Jan 1970 00:00:00 GMT";
+  return Object.freeze([
+    `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; Expires=${expired}; HttpOnly; Secure; SameSite=Lax`,
+    `${CSRF_COOKIE_NAME}=; Path=/; Max-Age=0; Expires=${expired}; Secure; SameSite=Lax`
+  ]);
+}
+
+function refreshedCookies(input: Readonly<{
+  sessionToken: string;
+  csrfToken: string | null;
+}>): readonly string[] {
+  return Object.freeze([
+    sessionCookie(input.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
+    ...(input.csrfToken === null ? [] : [csrfCookie(input.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)])
+  ]);
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
+  const allowedOrigin = options.allowedOrigin === undefined
+    ? undefined : new URL(options.allowedOrigin).origin;
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS]
   });
   api.decorateRequest("session");
+  api.decorateRequest("authenticatedSession");
+  api.decorateRequest("cookieRefresh");
+  const sourceFor = (request: {
+    readonly ip: string;
+    readonly id: string;
+    readonly headers: Readonly<Record<string, unknown>>;
+    readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
+  }) => Object.freeze({
+    // Registration, MFA and sessions share T2's one canonical public source.
+    ip: normalizeClientIp(request.ip)
+      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+      ?? "unknown",
+    userAgent: typeof request.headers["user-agent"] === "string"
+      ? request.headers["user-agent"] as string
+      : "unknown",
+    requestId: request.id
+  });
+  api.addHook("onSend", async (request, reply, payload) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
+    reply.header("cache-control", "no-store");
+    // Reissue the same opaque generation after successful cookie auth so the
+    // browser transport observes the ruled sliding 14-day idle lifetime. The
+    // conditional database refresh remains the sole authorization decision,
+    // and route-level rotation/deletion headers take precedence here.
+    if (request.cookieRefresh !== undefined && reply.getHeader("set-cookie") === undefined) {
+      reply.header("set-cookie", refreshedCookies(request.cookieRefresh));
+    }
+    return payload;
+  });
   api.addHook("preHandler", async (request, reply) => {
     if (request.is404) return;
     const authPolicy = request.routeOptions.config.auth;
-    if (authPolicy === "public") return;
+    if (authPolicy === "public") {
+      if (request.routeOptions.config.origin === "trusted"
+        && !exactOrigin(request.headers.origin, allowedOrigin)) {
+        return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+      }
+      return;
+    }
     if (authPolicy !== "user") {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
-    const session = resolveSession(request.headers["x-user-dev-token"]);
-    if (session === null) {
+    const rawCookie = request.headers.cookie;
+    const cookieWasPresented = typeof rawCookie === "string"
+      && rawCookie.split(";").some((member) => member.trimStart().startsWith(`${SESSION_COOKIE_NAME}=`));
+    const legacyWasPresented = typeof request.headers["x-user-dev-token"] === "string";
+    if (cookieWasPresented && legacyWasPresented) {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
-    request.session = session;
+    if (cookieWasPresented) {
+      const sessionToken = exactCookie(rawCookie, SESSION_COOKIE_NAME);
+      const authenticated = sessionToken === null || options.sessions === undefined
+        ? null : await options.sessions.authenticate(sessionToken, sourceFor(request));
+      if (authenticated === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      request.authenticatedSession = authenticated;
+      request.session = authenticated.session;
+      const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);
+      if (MUTATING_METHODS.has(request.method)) {
+        const csrf = exactCsrfPair(
+          request.headers["x-csrf-token"], csrfCookieToken
+        );
+        if (!exactOrigin(request.headers.origin, allowedOrigin) || csrf === null
+          || !options.sessions!.verifyCsrf(authenticated, csrf)) {
+          return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+        }
+      }
+      request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
+      return;
+    }
+    const legacy = options.legacyDevSessionResolver?.(request.headers["x-user-dev-token"]) ?? null;
+    if (legacy === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    request.session = legacy;
   });
   api.setErrorHandler((error, _request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
@@ -209,23 +363,77 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   });
 
-  const sourceFor = (request: {
-    readonly ip: string;
-    readonly id: string;
-    readonly headers: Readonly<Record<string, unknown>>;
-    readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
-  }) => Object.freeze({
-    // Registration and MFA share the one pinned, canonical public source.
-    // This preserves T2's trusted-hop boundary for every auth rate limiter and
-    // audit writer, including S4 routes added on this branch.
-    ip: normalizeClientIp(request.ip)
-      ?? normalizeClientIp(request.raw.socket.remoteAddress)
-      ?? "unknown",
-    userAgent: typeof request.headers["user-agent"] === "string"
-      ? request.headers["user-agent"] as string
-      : "unknown",
-    requestId: request.id
-  });
+  if (options.sessions !== undefined) {
+    api.post("/v1/auth/login", { config: { auth: "public", origin: "trusted" } }, async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown> : {};
+      if (typeof body.challenge_token === "string") {
+        const result = await options.sessions!.completeLogin({
+          challengeToken: body.challenge_token,
+          code: typeof body.code === "string" ? body.code : ""
+        }, sourceFor(request));
+        reply.header("set-cookie", [
+          sessionCookie(result.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
+          csrfCookie(result.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
+        ]);
+        return reply.send({
+          status: result.status,
+          csrf_token: result.csrfToken,
+          session: result.session,
+          ...(result.replacementRecoveryCode === undefined
+            ? {} : { replacement_recovery_code: result.replacementRecoveryCode })
+        });
+      }
+      const result = await options.sessions!.beginLogin({
+        email: typeof body.email === "string" ? body.email : "",
+        password: typeof body.password === "string" ? body.password : ""
+      }, sourceFor(request));
+      return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
+    });
+    api.post("/v1/auth/logout", { config: { auth: "user" } }, async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      await options.sessions!.logout(authenticated, sourceFor(request));
+      reply.header("set-cookie", expiredCookies());
+      return reply.status(204).send();
+    });
+    api.get("/v1/auth/sessions", { config: { auth: "user" } }, async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      return reply.send({ sessions: await options.sessions!.listSessions(authenticated) });
+    });
+    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", { config: { auth: "user" } }, async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      const revoked = await options.sessions!.revokeSession(authenticated, request.params.id, sourceFor(request));
+      if (!revoked) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (request.params.id === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
+      return reply.status(204).send();
+    });
+    api.delete("/v1/auth/sessions", { config: { auth: "user" } }, async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
+      reply.header("set-cookie", expiredCookies());
+      return reply.send({ revoked });
+    });
+    api.post("/v1/auth/step-up", { config: { auth: "user" } }, async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown> : {};
+      const rotated = await options.sessions!.stepUp({
+        session: authenticated,
+        password: typeof body.password === "string" ? body.password : "",
+        code: typeof body.code === "string" ? body.code : ""
+      }, sourceFor(request));
+      reply.header("set-cookie", [
+        sessionCookie(rotated.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
+        csrfCookie(rotated.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
+      ]);
+      return reply.send({ status: "step_up_complete", csrf_token: rotated.csrfToken });
+    });
+  }
   if (options.registration !== undefined) {
     api.post("/v1/auth/register", { config: { auth: "public" } }, async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -394,8 +602,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", { config: { auth: "user" } }, async (request, reply) => {
     reply.raw.writeHead(200, {
+      ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
-      "cache-control": "no-cache",
+      "cache-control": "no-store",
+      ...(request.cookieRefresh === undefined
+        ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
     for await (const candidate of options.application.events(request.params.id, request.session)) {

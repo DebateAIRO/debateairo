@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import type { Deployment } from "@/lib/types";
-import { contractClient, getStoredToken } from "@/lib/api";
+import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
 
 export default function FleetPage() {
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [error, setError] = useState<string | null>(null);
   async function readFleet() {
-    const token = getStoredToken();
-    if (token === null) { setError("SESSION_REQUIRED"); return; }
-    try { setDeployment(await contractClient.readDeployment(token)); setError(null); }
+    try { setDeployment(await contractClient.readDeployment(COOKIE_SESSION_MARKER)); setError(null); }
     catch (failure) { setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE"); }
   }
   return <main className="screen scroll"><div className="screenInner">

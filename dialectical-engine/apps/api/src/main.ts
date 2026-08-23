@@ -6,7 +6,7 @@ import {
   loadKek,
   loadSecretKey
 } from "@debateai/crypto";
-import { createPool, PostgresIdentityRepository, ProviderProbeRepository } from "@debateai/db";
+import { createPool, PostgresIdentityRepository, PostgresSessionRepository, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -21,17 +21,20 @@ import {
   readPanelDiscoveryPolicy,
   readAuthPolicy,
   readMfaPolicy,
+  readSessionPolicy,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
 import {
   buildApi,
+  createLegacyDevSessionResolver,
   HatchetDispatcher,
   PostgresAskApplication,
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
 import { MfaEnrollmentService } from "./mfa.js";
+import { SessionService } from "./sessions.js";
 import { SendmailMailSender } from "./mail-channel.js";
 import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
@@ -43,6 +46,7 @@ const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 const pool = createPool(environment.DATABASE_URL);
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
+const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
@@ -89,6 +93,15 @@ const mfa = new MfaEnrollmentService({
   dekStore,
   argon2: argon2Pool,
   policy: mfaPolicy
+});
+const sessions = await SessionService.create({
+  repository: new PostgresSessionRepository(pool, auditContextHasher),
+  dekStore,
+  argon2: argon2Pool,
+  authPolicy,
+  mfaPolicy,
+  sessionPolicy,
+  blindIndexKey
 });
 const application = new PostgresAskApplication(pool, dispatcher, {
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
@@ -143,6 +156,19 @@ const api = buildApi({
   application,
   registration,
   mfa,
+  sessions,
+  allowedOrigin: environment.PUBLIC_APP_URL,
+  ...(
+    environment.LEGACY_USER_DEV_TOKEN === undefined
+      && environment.LEGACY_OPERATOR_DEV_TOKEN === undefined
+      ? {}
+      : { legacyDevSessionResolver: createLegacyDevSessionResolver({
+        ...(environment.LEGACY_USER_DEV_TOKEN === undefined
+          ? {} : { userToken: environment.LEGACY_USER_DEV_TOKEN }),
+        ...(environment.LEGACY_OPERATOR_DEV_TOKEN === undefined
+          ? {} : { operatorToken: environment.LEGACY_OPERATOR_DEV_TOKEN })
+      }) }
+  ),
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION

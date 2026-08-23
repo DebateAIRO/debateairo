@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildApi, type AskApplication } from "@debateai/api";
+import { buildApi, createLegacyDevSessionResolver, type AskApplication } from "@debateai/api";
 import {
   createContractClient,
   type AskRequest,
@@ -74,12 +74,15 @@ function injectedFetch(api: ReturnType<typeof buildApi>): typeof fetch {
 
 describe("LOAD-01 provider-double composition proof", () => {
   it("POST /new equivalent -> queued run ref -> debate loading projection keeps the real question", async () => {
-    const api = buildApi({ application: providerDoubleApplication() });
+    const api = buildApi({
+      application: providerDoubleApplication(),
+      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "cookie-session" })
+    });
     const client = createContractClient("http://load01.test", injectedFetch(api));
-    const accepted = await client.submitAsk(ASK, "token:test");
+    const accepted = await client.submitAsk(ASK, "cookie-session");
     expect(accepted).toEqual({ run_ref: "run:load01", status: "QUEUED" });
 
-    const page = await getDebateServer(accepted.run_ref, "token:test", client);
+    const page = await getDebateServer(accepted.run_ref, "cookie-session", client);
     expect(page).toMatchObject({
       ok: false,
       kind: "loading",

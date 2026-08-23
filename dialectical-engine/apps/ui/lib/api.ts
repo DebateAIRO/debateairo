@@ -90,36 +90,21 @@ export function createBrowserContractClient(
   apiBase: string = API_BASE
 ): ContractClient {
   const contractOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
-  return createContractClient(contractOrigin, createSameOriginFetch(apiBase, fetchImplementation));
+  return createContractClient(
+    contractOrigin,
+    createSameOriginFetch(apiBase, fetchImplementation),
+    { mode: "cookie" }
+  );
 }
 
 export const contractClient: ContractClient = createBrowserContractClient();
 
-const TOKEN_KEY = "debateai:user-dev-token";
-
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
-
-export function setStoredToken(token: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TOKEN_KEY, token);
-  // Raw cookie name, encoded value — the exact S14 browser-proven pattern
-  // (web/lib/api.ts); the SSR pages read the same name via next/headers.
-  document.cookie = `${TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
-}
-
-export function clearStoredToken(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOKEN_KEY);
-  document.cookie = `${TOKEN_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-}
+export const COOKIE_SESSION_MARKER = "cookie-session";
 
 function requireToken(token?: string | null): string {
-  const resolved = token ?? getStoredToken();
+  const resolved = token ?? COOKIE_SESSION_MARKER;
   if (resolved === null || resolved.length === 0) {
-    throw new ContractHttpError("SESSION_REQUIRED", 401, "Every V3 read is asker-scoped; unlock actions with your dev token first.");
+    throw new ContractHttpError("SESSION_REQUIRED", 401, "Every V3 read is asker-scoped; sign in first.");
   }
   return resolved;
 }
@@ -128,9 +113,9 @@ export function isNotFound(failure: unknown): boolean {
   return failure instanceof ContractHttpError && failure.code === "NOT_FOUND";
 }
 
-/** readSession proves the token names a real asker identity (S05). */
-export async function validateUserToken(token: string, client: ContractClient = contractClient): Promise<void> {
-  await client.readSession(token);
+/** readSession proves the browser's HttpOnly cookie names a real asker identity. */
+export async function validateSession(client: ContractClient = contractClient): Promise<void> {
+  await client.readSession(COOKIE_SESSION_MARKER);
 }
 
 export type DebateBundle =
@@ -298,12 +283,16 @@ export interface EvaluatorDevMenuView {
 }
 
 async function evaluatorDevMenuRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const csrfToken = typeof document === "undefined" ? null : document.cookie.split(";").flatMap((member) => {
+    const [name, value] = member.trim().split("=", 2);
+    return name === "__Host-debateai-csrf" && value !== undefined ? [value] : [];
+  })[0] ?? null;
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     cache: "no-store",
     headers: {
       "content-type": "application/json",
-      "x-user-dev-token": token,
+      ...(csrfToken === null ? {} : { "x-csrf-token": csrfToken }),
       ...init?.headers
     }
   });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ContractHttpError, type ExecutionLedgerDigest, type Inspection, type RunEvent } from "@debateai/contract";
-import { contractClient, getStoredToken } from "@/lib/api";
+import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import type { Answer, Node } from "@/lib/types";
 import { applyRunEvent, createEmptyLiveAnswerState, projectAnswerSurface, type LiveAnswerState } from "@/lib/v3Presentation";
 import { VerdictBanner } from "@/components/VerdictBanner";
@@ -25,14 +25,12 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   const surface = useMemo(() => answer === null ? null : projectAnswerSurface(answer), [answer]);
 
   const refresh = useCallback(async () => {
-    const token = getStoredToken();
-    if (token === null) { setError("SESSION_REQUIRED"); return; }
     try {
       let next;
-      try { next = await contractClient.readAnswer(id, token); }
+      try { next = await contractClient.readAnswer(id, COOKIE_SESSION_MARKER); }
       catch (failure) {
         if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") throw failure;
-        next = await contractClient.readRunAnswer(id, token);
+        next = await contractClient.readRunAnswer(id, COOKIE_SESSION_MARKER);
       }
       setAnswer(next); setError(null);
     } catch (failure) {
@@ -42,22 +40,24 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
 
   useEffect(() => { if (answer === null) void refresh(); }, [answer, refresh]);
   useEffect(() => {
-    const token = getStoredToken();
-    if (token === null || answer === null) return;
-    void contractClient.readLedgerDigest(answer.answer_id, token)
+    if (answer === null) return;
+    void contractClient.readLedgerDigest(answer.answer_id, COOKIE_SESSION_MARKER)
       .then(setLedgerDigest)
       .catch((failure) => setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE"));
   }, [answer]);
   useEffect(() => {
-    const token = getStoredToken();
-    if (token === null) return;
     const controller = new AbortController();
     const consume = (event: RunEvent) => {
       setLive((current) => applyRunEvent(current, event));
       if (event.event_type === "honesty.staleness_trigger_fired") void refresh();
       if (event.event_type === "run.terminal") void refresh();
     };
-    void contractClient.streamEvents(answer?.run_ref ?? id, token, consume, controller.signal).catch((failure) => {
+    void contractClient.streamEvents(
+      answer?.run_ref ?? id,
+      COOKIE_SESSION_MARKER,
+      consume,
+      controller.signal
+    ).catch((failure) => {
       if (!controller.signal.aborted) setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
     });
     return () => controller.abort();
@@ -69,10 +69,13 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   }, [refresh]);
 
   const showInspection = useCallback(async () => {
-    const token = getStoredToken();
-    if (token === null || answer === null) { setActionState("SESSION_REQUIRED"); return; }
+    if (answer === null) { setActionState("SESSION_REQUIRED"); return; }
     try {
-      setInspection(await contractClient.readInspection(answer.answer_id, token, answer.answer_version));
+      setInspection(await contractClient.readInspection(
+        answer.answer_id,
+        COOKIE_SESSION_MARKER,
+        answer.answer_version
+      ));
       setActionState(null);
     } catch (failure) {
       setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
@@ -80,11 +83,10 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   }, [answer]);
 
   const unlinkMemory = useCallback(async () => {
-    const token = getStoredToken();
-    if (token === null || answer === null) { setActionState("SESSION_REQUIRED"); return; }
+    if (answer === null) { setActionState("SESSION_REQUIRED"); return; }
     try {
-      await contractClient.unlinkMemory(answer.answer_id, token);
-      setAnswer(await contractClient.readAnswer(answer.answer_id, token));
+      await contractClient.unlinkMemory(answer.answer_id, COOKIE_SESSION_MARKER);
+      setAnswer(await contractClient.readAnswer(answer.answer_id, COOKIE_SESSION_MARKER));
       setActionState("MEMORY_UNLINKED");
     } catch (failure) {
       setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
@@ -92,14 +94,13 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   }, [answer]);
 
   const recordInvestigation = useCallback(async (gapRef: string, acceptsUserInput: boolean) => {
-    const token = getStoredToken();
-    if (token === null || answer === null) { setActionState("SESSION_REQUIRED"); return; }
+    if (answer === null) { setActionState("SESSION_REQUIRED"); return; }
     const verbatim = investigationInput[gapRef] ?? "";
     try {
       const accepted = await contractClient.recordInvestigation(answer.answer_id, gapRef, {
         user_input: acceptsUserInput && verbatim.length > 0 ? verbatim : null,
         human_steer_input: true
-      }, token);
+      }, COOKIE_SESSION_MARKER);
       setActionState(`${accepted.status} · ${accepted.replay_handle}`);
     } catch (failure) {
       setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");

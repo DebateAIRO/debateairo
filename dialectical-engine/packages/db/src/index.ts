@@ -4,6 +4,14 @@ import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
+export {
+  PostgresSessionRepository,
+  type LoginChallengeRecord,
+  type LoginIdentityRecord,
+  type SessionAuthenticationRecord,
+  type SessionListRecord
+} from "./sessions.js";
+
 const { Pool: PgPool } = pg;
 const writeTransaction = new AsyncLocalStorage<boolean>();
 const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";

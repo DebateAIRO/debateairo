@@ -8,18 +8,9 @@ import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 
 export const dynamic = "force-dynamic";
 
-function readCookieToken(raw: string | undefined): string | null {
-  if (raw === undefined || raw.length === 0) return null;
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
 export default async function DebatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const token = readCookieToken((await cookies()).get(USER_TOKEN_COOKIE)?.value);
+  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
 
   // SSR reads the asker-scoped projection with the identity cookie (S05).
   // If no answer has been served, the typed run projection distinguishes a

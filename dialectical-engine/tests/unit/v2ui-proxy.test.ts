@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
-  it("forwards method, path, query, body, and the caller token without inventing headers", async () => {
+  it("forwards only the exact session, Origin, CSRF, and user-agent boundary", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     globalThis.fetch = (async (url: unknown, init: RequestInit = {}) => {
       calls.push({ url: String(url), init });
@@ -34,7 +34,16 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
     const response = await route.POST(
       new Request("http://web.local/api/v1/asks?mode=live", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-user-dev-token": "token:test" },
+        headers: {
+          "content-type": "application/json",
+          cookie: `unrelated=strip; __Host-debateai-session=${"s".repeat(43)}; __Host-debateai-csrf=${"c".repeat(43)}`,
+          origin: "https://ui.example.test",
+          "user-agent": "S5 proxy proof",
+          "x-csrf-token": "c".repeat(43),
+          "x-user-dev-token": "attacker-controlled-legacy-header",
+          authorization: "Bearer must-not-cross",
+          "x-forwarded-for": "198.51.100.8"
+        },
         body: JSON.stringify({ question_line: "What follows?" })
       }),
       { params: Promise.resolve({ path: ["v1", "asks"] }) }
@@ -44,15 +53,25 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
     expect(calls[0]!.url).toBe("http://acceptance.local:8790/v1/asks?mode=live");
     expect(calls[0]!.init.method).toBe("POST");
     const forwarded = new Headers(calls[0]!.init.headers);
-    expect(forwarded.get("x-user-dev-token")).toBe("token:test");
+    expect(forwarded.get("cookie")).toBe(
+      `__Host-debateai-session=${"s".repeat(43)}; __Host-debateai-csrf=${"c".repeat(43)}`
+    );
+    expect(forwarded.get("origin")).toBe("https://ui.example.test");
+    expect(forwarded.get("user-agent")).toBe("S5 proxy proof");
+    expect(forwarded.get("x-csrf-token")).toBe("c".repeat(43));
+    expect(forwarded.get("x-user-dev-token")).toBeNull();
+    expect(forwarded.get("authorization")).toBeNull();
+    expect(forwarded.get("x-forwarded-for")).toBeNull();
     expect(forwarded.get("host")).toBeNull();
     expect(forwarded.get("expect")).toBeNull();
-    expect([...forwarded.keys()].sort()).toEqual(["content-type", "x-user-dev-token"]);
+    expect([...forwarded.keys()].sort()).toEqual([
+      "content-type", "cookie", "origin", "user-agent", "x-csrf-token"
+    ]);
     expect(new TextDecoder().decode(calls[0]!.init.body as ArrayBuffer)).toBe(
       JSON.stringify({ question_line: "What follows?" })
     );
     expect(response.status).toBe(202);
-    expect(response.headers.get("x-upstream")).toBe("kept");
+    expect(response.headers.get("x-upstream")).toBeNull();
     await expect(response.json()).resolves.toEqual({ run_ref: "run:test", status: "QUEUED" });
   });
 

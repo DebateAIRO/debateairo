@@ -77,8 +77,3 @@ export function classifyTokenUnlockFailure(error: unknown): TokenUnlockFailure {
 export function tokenUnlockFailureMessage(error: unknown): string {
   return classifyTokenUnlockFailure(error).message;
 }
-
-/** Forget a stored token only when the coordinator actually declined it. */
-export function shouldClearStoredTokenAfterUnlockFailure(error: unknown): boolean {
-  return classifyTokenUnlockFailure(error).kind === "REJECTED";
-}

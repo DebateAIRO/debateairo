@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createDebate, getStoredToken, validateUserToken } from "@/lib/api";
+import { COOKIE_SESSION_MARKER, createDebate, validateSession } from "@/lib/api";
 
 export function LibraryComposer() {
   const router = useRouter();
@@ -16,14 +16,13 @@ export function LibraryComposer() {
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
-    const stored = getStoredToken();
     try {
-      if (stored) {
-        await validateUserToken(stored);
-        const debate = await createDebate(topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 }, stored);
-        router.push(`/debate/${debate.id}`);
-        return;
-      }
+      await validateSession();
+      const debate = await createDebate(
+        topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 }, COOKIE_SESSION_MARKER
+      );
+      router.push(`/debate/${debate.id}`);
+      return;
     } catch {
       // fall through to the authenticated /new flow
     }

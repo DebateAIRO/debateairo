@@ -1,6 +1,7 @@
 import { createContractClient, type ContractClient } from "@debateai/contract";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
+export const COOKIE_SESSION_MARKER = "cookie-session";
 
 function normalizeSameOriginApiPath(apiBase: string): string {
   const normalized = apiBase.trim().replace(/\/+$/, "");
@@ -20,26 +21,7 @@ export function createBrowserContractClient(
     const contractUrl = input instanceof Request ? new URL(input.url) : new URL(String(input));
     return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init);
   };
-  return createContractClient(contractOrigin, proxyFetch);
+  return createContractClient(contractOrigin, proxyFetch, { mode: "cookie" });
 }
 
 export const contractClient: ContractClient = createBrowserContractClient();
-
-const TOKEN_KEY = "debateai:user-dev-token";
-
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
-
-export function setStoredToken(token: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TOKEN_KEY, token);
-  document.cookie = `${TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
-}
-
-export function clearStoredToken(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOKEN_KEY);
-  document.cookie = `${TOKEN_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-}

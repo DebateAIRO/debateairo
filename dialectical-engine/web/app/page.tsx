@@ -13,7 +13,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   let index: AnswerIndex | null = null;
   let indexError: string | null = null;
   if (pageRequested && token !== null) {
-    try { index = await createServerContractClient().readAnswerIndex(token, limit, offset); }
+    try { index = await createServerContractClient(fetch, token).readAnswerIndex("cookie-session", limit, offset); }
     catch (failure) { indexError = failure instanceof Error ? failure.name : "INVALID_RESPONSE"; }
   }
   return (
@@ -31,7 +31,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <section className="card" style={{ marginTop: 28 }}><h2>Your answers</h2>
           <form method="get" style={{ display: "flex", gap: 12 }}><label>Page size<input name="limit" inputMode="numeric" required /></label><label>Offset<input name="offset" inputMode="numeric" required /></label><button className="button">Read page</button></form>
           {!pageRequested ? <p>Choose an explicit page size and offset; the interface has no hidden truncation default.</p> : null}
-          {pageRequested && token === null ? <p>Add your identity token in Settings to read asker-scoped answers.</p> : null}
+          {pageRequested && token === null ? <p>Sign in through Settings to read asker-scoped answers.</p> : null}
           {indexError ? <div className="error">{indexError}</div> : null}
           {index ? <><p>{index.items.length} shown · {index.total} total</p>{index.items.map((answer) => <article className="debateCard" key={answer.answer_id}><Link href={`/debate/${encodeURIComponent(answer.answer_id)}`}>{answer.question_line}</Link><p>{answer.verdict_state ?? answer.abstention?.kind ?? "Verdict unavailable"} · {answer.serve_state} · {answer.staleness_state} · {answer.builds_on_previous ? "Builds on previous" : "No prior answer"}</p></article>)}</> : null}
         </section>

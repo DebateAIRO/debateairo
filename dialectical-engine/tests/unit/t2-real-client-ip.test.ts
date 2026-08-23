@@ -166,8 +166,7 @@ describe.each([
 
     expect(Object.fromEntries(headers)).toEqual({
       "content-type": "application/json",
-      "x-forwarded-for": "203.0.113.9",
-      "x-user-dev-token": "token:test"
+      "x-forwarded-for": "203.0.113.9"
     });
   });
 

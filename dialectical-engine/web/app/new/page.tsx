@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { contractClient, getStoredToken } from "@/lib/api";
+import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import type { AskRequest } from "@/lib/types";
 import { ContractHttpError } from "@debateai/contract";
 
@@ -13,8 +13,6 @@ export default function NewQuestionPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const token = getStoredToken();
-    if (token === null) { setError("Add your development identity token in Settings first."); return; }
     const data = new FormData(event.currentTarget);
     const depth = Number(data.get("depth"));
     const asOf = new Date(String(data.get("as_of") ?? ""));
@@ -40,7 +38,7 @@ export default function NewQuestionPage() {
     };
     setSubmitting(true); setError(null);
     try {
-      const accepted = await contractClient.submitAsk(ask, token);
+      const accepted = await contractClient.submitAsk(ask, COOKIE_SESSION_MARKER);
       router.push(`/debate/${encodeURIComponent(accepted.run_ref)}`);
     } catch (failure) {
       setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");

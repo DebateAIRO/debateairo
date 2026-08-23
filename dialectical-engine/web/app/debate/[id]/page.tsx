@@ -9,10 +9,10 @@ export default async function DebatePage({ params }: { params: Promise<{ id: str
   let initialAnswer: Answer | null = null;
   let initialError: string | null = null;
   if (token !== null) {
-    const client = createServerContractClient();
-    try { initialAnswer = await client.readAnswer(id, token); }
+    const client = createServerContractClient(fetch, token);
+    try { initialAnswer = await client.readAnswer(id, "cookie-session"); }
     catch {
-      try { initialAnswer = await client.readRunAnswer(id, token); }
+      try { initialAnswer = await client.readRunAnswer(id, "cookie-session"); }
       catch (failure) { initialError = failure instanceof Error ? failure.name : "INVALID_RESPONSE"; }
     }
   }

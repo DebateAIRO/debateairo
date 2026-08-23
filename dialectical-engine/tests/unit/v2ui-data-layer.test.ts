@@ -46,11 +46,11 @@ import { getDebateServer } from "../../apps/ui/lib/serverApi.js";
 import { statusLabel } from "../../apps/ui/lib/format.js";
 
 const sessionFixture: Session = {
-  asker_id: "asker:test",
-  session_id: "session:test",
+  asker_id: "user:11111111-1111-4111-8111-111111111111",
+  session_id: "22222222-2222-4222-8222-222222222222",
   caller_scope: "ASKER",
-  ownership_provenance: "user_dev_token",
-  provisional_identity_model: true
+  ownership_provenance: "server_session",
+  provisional_identity_model: false
 };
 
 function jsonResponse(payload: unknown): Response {
@@ -61,7 +61,7 @@ function jsonResponse(payload: unknown): Response {
 }
 
 describe("v2-ui same-origin browser client (rev-3 advisories A1/A4 closed)", () => {
-  it("rewrites contract URLs onto the same-origin /api path with the token attached", async () => {
+  it("rewrites contract URLs onto the same-origin /api path with cookie credentials", async () => {
     const calls: Array<{ input: string; init: RequestInit | undefined }> = [];
     const fetchSpy = (async (input: unknown, init?: RequestInit) => {
       calls.push({ input: String(input), init });
@@ -71,7 +71,8 @@ describe("v2-ui same-origin browser client (rev-3 advisories A1/A4 closed)", () 
     await client.readSession("token:test");
     expect(calls).toHaveLength(1);
     expect(calls[0]!.input).toBe("/api/v1/session");
-    expect(new Headers(calls[0]!.init?.headers).get("x-user-dev-token")).toBe("token:test");
+    expect(new Headers(calls[0]!.init?.headers).get("x-user-dev-token")).toBeNull();
+    expect(calls[0]!.init?.credentials).toBe("same-origin");
   });
 
   it.each([

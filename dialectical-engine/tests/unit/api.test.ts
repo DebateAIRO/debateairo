@@ -1,15 +1,34 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import {
   AskRefusal,
-  buildApi,
+  buildApi as buildApiBase,
   evaluateAskAdmission,
   preserveSubmittedTierSource,
   type AskApplication,
   type RunCreationSettings
 } from "@debateai/api";
-import { createContractClient, type AskRequest } from "@debateai/contract";
+import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+
+/** Explicit test-only S9 rollback seam; production buildApi has no fallback. */
+function buildApi(options: Parameters<typeof buildApiBase>[0]) {
+  return buildApiBase({
+    ...options,
+    legacyDevSessionResolver(token): Session | null {
+      if (typeof token !== "string" || token.trim() === "") return null;
+      const digest = createHash("sha256").update(token).digest("hex");
+      return {
+        asker_id: `asker:${digest}`,
+        session_id: `legacy:${digest}`,
+        caller_scope: "ASKER",
+        ownership_provenance: "user_dev_token",
+        provisional_identity_model: true
+      };
+    }
+  });
+}
 
 function fixtureApplication(): AskApplication {
   return {

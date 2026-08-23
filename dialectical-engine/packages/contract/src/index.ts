@@ -146,14 +146,46 @@ export const RunProjectionSchema = z.object({
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
 
-export const SessionSchema = z.object({
+const LegacyDevelopmentSessionSchema = z.object({
   asker_id: z.string().min(1),
   session_id: z.string().min(1),
   caller_scope: z.enum(["ASKER", "OPERATOR"]),
   ownership_provenance: z.enum(["user_dev_token", "operator_dev_token"]),
   provisional_identity_model: z.literal(true)
 }).strict();
+
+const ServerSessionSchema = z.object({
+  asker_id: z.string().regex(/^user:[0-9a-f-]{36}$/i),
+  session_id: z.uuid(),
+  caller_scope: z.literal("ASKER"),
+  ownership_provenance: z.literal("server_session"),
+  provisional_identity_model: z.literal(false)
+}).strict();
+
+export const SessionSchema = z.union([LegacyDevelopmentSessionSchema, ServerSessionSchema]);
 export type Session = z.infer<typeof SessionSchema>;
+
+export const SessionSummarySchema = z.object({
+  session_id: z.uuid(),
+  created_at: z.iso.datetime(),
+  last_seen_at: z.iso.datetime(),
+  idle_expires_at: z.iso.datetime(),
+  absolute_expires_at: z.iso.datetime(),
+  last_mfa_at: z.iso.datetime(),
+  current: z.boolean()
+}).strict();
+export type SessionSummary = z.infer<typeof SessionSummarySchema>;
+
+export const SessionListSchema = z.object({
+  sessions: z.array(SessionSummarySchema)
+}).strict();
+export type SessionList = z.infer<typeof SessionListSchema>;
+
+export const RevokeAllSessionsSchema = z.object({ revoked: z.number().int().nonnegative() }).strict();
+export const StepUpResponseSchema = z.object({
+  status: z.literal("step_up_complete"),
+  csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
 
 export const DeploymentSchema = z.object({
   register: z.object({
@@ -503,6 +535,19 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    "POST /v1/auth/register",
+    "POST /v1/auth/verify-email",
+    "POST /v1/auth/resend-verification",
+    "POST /v1/auth/mfa/totp/begin",
+    "POST /v1/auth/mfa/totp/verify",
+    "POST /v1/auth/mfa/recovery-codes/generate",
+    "POST /v1/auth/mfa/recovery-codes/confirm",
+    "POST /v1/auth/login",
+    "POST /v1/auth/logout",
+    "GET /v1/auth/sessions",
+    "DELETE /v1/auth/sessions/{id}",
+    "DELETE /v1/auth/sessions",
+    "POST /v1/auth/step-up",
     "POST /v1/asks",
     "GET /v1/session",
     "GET /v1/deployment",
@@ -512,12 +557,15 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/nodes/{nodeId}",
     "GET /v1/answers/{id}/ledger-digest",
     "POST /v1/answers/{id}/investigations/{gapRef}",
+    "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
+    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
+    SessionListSchema, RevokeAllSessionsSchema, StepUpResponseSchema,
+    DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

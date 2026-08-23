@@ -14,5 +14,6 @@ export type {
   Node,
   RunEvent,
   Session,
+  SessionSummary,
   StalenessState
 } from "@debateai/contract";
