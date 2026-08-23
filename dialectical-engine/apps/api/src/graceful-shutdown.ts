@@ -24,6 +24,7 @@ interface ClosableDatabasePool {
 
 interface ShutdownProcess {
   exitCode: number | undefined;
+  exit(code: number): unknown;
   on(event: ShutdownSignal, listener: (signal: ShutdownSignal) => void): unknown;
   off(event: ShutdownSignal, listener: (signal: ShutdownSignal) => void): unknown;
 }
@@ -82,13 +83,33 @@ export async function drainGracefulShutdownResources(
   // This call synchronously fires every active unref'd aggregation timer and
   // then awaits the shared route writer. Never wait for the timer itself.
   await registration.drainRateLimitAuditFlushes();
-  auditContextHasher.close();
-  await argon2Pool.close();
+  let firstCloseFailure;
+  let closeFailed = false;
+  try {
+    auditContextHasher.close();
+  } catch (error) {
+    closeFailed = true;
+    firstCloseFailure = error;
+  }
+  try {
+    await argon2Pool.close();
+  } catch (error) {
+    if (!closeFailed) firstCloseFailure = error;
+    closeFailed = true;
+  }
 
   // The guard exists for the architecture harness, which executes these exact
   // bytes with the original three T1 free identifiers. Production always passes
   // the explicit pool list.
-  if (typeof databasePools !== "undefined") await closeDatabasePools(databasePools);
+  if (typeof databasePools !== "undefined") {
+    try {
+      await closeDatabasePools(databasePools);
+    } catch (error) {
+      if (!closeFailed) firstCloseFailure = error;
+      closeFailed = true;
+    }
+  }
+  if (closeFailed) throw firstCloseFailure;
 }
 
 /**
@@ -115,8 +136,12 @@ export function installGracefulShutdown(options: Readonly<{
   let admissionDrain: Promise<void> | undefined;
   let resourceDrain: Promise<void> | undefined;
   let apiClose: Promise<void> | undefined;
+  let fastifyCloseFailed = false;
+  let resourcesClosed = false;
+  let resourceFailureCount = 0;
   let failureReported = false;
   let signalHandlersInstalled = true;
+  let terminationRequested = false;
 
   const drainAdmissions = (): Promise<void> => {
     admissionDrain ??= options.registration.drainRegistrationAdmissions();
@@ -140,15 +165,55 @@ export function installGracefulShutdown(options: Readonly<{
     }
   };
 
-  const signalHandler = (_signal: ShutdownSignal): void => {
-    void closeApi().catch(() => undefined);
-  };
-
   const removeSignalHandlers = (): void => {
     if (!signalHandlersInstalled) return;
     signalHandlersInstalled = false;
     shutdownProcess.off("SIGTERM", signalHandler);
     shutdownProcess.off("SIGINT", signalHandler);
+  };
+
+  const drainResources = (): Promise<void> => {
+    if (resourcesClosed) return Promise.resolve();
+    if (resourceDrain !== undefined) return resourceDrain;
+
+    const attempt = drainGracefulShutdownResources(
+      lifecycleRegistration,
+      options.auditContextHasher,
+      options.argon2Pool,
+      options.databasePools
+    ).then(() => {
+      resourcesClosed = true;
+      removeSignalHandlers();
+    }, (error: unknown) => {
+      resourceFailureCount += 1;
+      reportFailure();
+      throw genericShutdownFailure(error);
+    }).finally(() => {
+      // A failed audit flush retains its aggregate. Do not make that failure
+      // sticky: a later signal/controller close must be able to write it.
+      if (!resourcesClosed && resourceDrain === attempt) resourceDrain = undefined;
+    });
+    resourceDrain = attempt;
+    // Signal callbacks cannot await; always attach an observer at creation.
+    attempt.catch(() => undefined);
+    return attempt;
+  };
+
+  const terminateAfterRepeatedSignalFailure = (): void => {
+    if (resourceFailureCount < 2 || terminationRequested) return;
+    terminationRequested = true;
+    try {
+      shutdownProcess.exit(1);
+    } catch {
+      // Real process.exit does not return. Test/process shims may throw; the
+      // signal callback must still not create an unhandled rejection.
+    }
+  };
+
+  const signalHandler = (_signal: ShutdownSignal): void => {
+    void closeApi().catch(() => {
+      terminateAfterRepeatedSignalFailure();
+    });
   };
 
   options.api.addHook("preClose", async () => {
@@ -158,17 +223,10 @@ export function installGracefulShutdown(options: Readonly<{
   });
 
   options.api.addHook("onClose", async () => {
-    resourceDrain ??= drainGracefulShutdownResources(
-      lifecycleRegistration,
-      options.auditContextHasher,
-      options.argon2Pool,
-      options.databasePools
-    );
     try {
-      await resourceDrain;
-      removeSignalHandlers();
+      await drainResources();
     } catch (error) {
-      reportFailure();
+      fastifyCloseFailed = true;
       // Keep signal handlers and all not-yet-closed dependencies alive. A failed
       // durable audit write must never be converted into a successful exit that
       // silently discards the retained aggregate.
@@ -180,8 +238,13 @@ export function installGracefulShutdown(options: Readonly<{
   shutdownProcess.on("SIGINT", signalHandler);
 
   function closeApi(): Promise<void> {
+    if (resourcesClosed) return Promise.resolve();
+    // Fastify caches a rejected close. Once its hook graph has failed, retry the
+    // resource half directly rather than joining that permanently rejected join.
+    if (fastifyCloseFailed) return drainResources();
     if (apiClose === undefined) {
       apiClose = options.api.close().catch((error: unknown) => {
+        fastifyCloseFailed = true;
         reportFailure();
         throw genericShutdownFailure(error);
       });

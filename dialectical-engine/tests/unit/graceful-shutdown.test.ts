@@ -23,6 +23,12 @@ function deferred<T = void>(): Readonly<{
 
 class FakeProcess extends EventEmitter {
   exitCode: number | undefined;
+  readonly exitCalls: number[] = [];
+
+  exit(code: number): never {
+    this.exitCalls.push(code);
+    throw new Error("FAKE_PROCESS_EXIT");
+  }
 }
 
 function harness(overrides: Partial<GracefulShutdownRegistration> = {}) {
@@ -185,28 +191,85 @@ describe("T3 graceful shutdown", () => {
     expect(flow.logger.error).not.toHaveBeenCalled();
   });
 
-  it("fails closed on an audit persistence error and exposes only a generic operator code", async () => {
+  it("retries a failed durable audit drain independently of Fastify close", async () => {
     const secret = "postgres://operator:do-not-log@db/accounts";
     const flow = harness();
-    flow.registration.drainRateLimitAuditFlushes = vi.fn(async () => {
-      flow.order.push("refusal-audit");
-      throw new Error(secret);
-    });
+    flow.registration.drainRateLimitAuditFlushes = vi.fn()
+      .mockImplementationOnce(async () => {
+        flow.order.push("refusal-audit:failed");
+        throw new Error(secret);
+      })
+      .mockImplementationOnce(async () => {
+        flow.order.push("refusal-audit:durable");
+      });
 
-    await expect(flow.shutdown.close("SIGTERM")).rejects.toEqual(expect.objectContaining({
+    await expect(flow.shutdown.close("api.close:first")).rejects.toEqual(expect.objectContaining({
       name: "GracefulShutdownError",
       code: "API_SHUTDOWN_FAILED",
       message: "API_SHUTDOWN_FAILED"
     }));
     expect(flow.auditContextHasher.close).not.toHaveBeenCalled();
-    expect(flow.argon2Pool.close).not.toHaveBeenCalled();
-    expect(flow.primaryDatabase.end).not.toHaveBeenCalled();
+    expect(flow.process.listenerCount("SIGTERM")).toBe(1);
+
+    await expect(flow.shutdown.close("api.close:retry")).resolves.toBeUndefined();
+
+    expect(flow.registration.drainRateLimitAuditFlushes).toHaveBeenCalledTimes(2);
+    expect(flow.auditContextHasher.close).toHaveBeenCalledTimes(1);
+    expect(flow.argon2Pool.close).toHaveBeenCalledTimes(1);
+    expect(flow.primaryDatabase.end).toHaveBeenCalledTimes(1);
+    expect(flow.evaluatorDatabase.end).toHaveBeenCalledTimes(1);
+    expect(flow.process.listenerCount("SIGTERM")).toBe(0);
+    expect(flow.process.listenerCount("SIGINT")).toBe(0);
     expect(flow.process.exitCode).toBe(1);
     const logged = JSON.stringify(flow.logger.error.mock.calls);
     expect(logged).toContain("API_SHUTDOWN_FAILED");
     expect(logged).not.toContain(secret);
+  });
+
+  it("does not swallow a repeated signal when the durable audit drain keeps failing", async () => {
+    const flow = harness();
+    flow.registration.drainRateLimitAuditFlushes = vi.fn(async () => {
+      flow.order.push("refusal-audit");
+      throw new Error("secret audit storage failure");
+    });
+
+    flow.process.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => {
+      expect(flow.registration.drainRateLimitAuditFlushes).toHaveBeenCalledTimes(1);
+    });
+    expect(flow.process.exitCalls).toEqual([]);
+
+    expect(() => flow.process.emit("SIGINT", "SIGINT")).not.toThrow();
+    await vi.waitFor(() => {
+      expect(flow.registration.drainRateLimitAuditFlushes).toHaveBeenCalledTimes(2);
+      expect(flow.process.exitCalls).toEqual([1]);
+    });
+    flow.process.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => {
+      expect(flow.registration.drainRateLimitAuditFlushes).toHaveBeenCalledTimes(3);
+    });
+    expect(flow.process.exitCalls).toEqual([1]);
     expect(flow.process.listenerCount("SIGTERM")).toBe(1);
     expect(flow.process.listenerCount("SIGINT")).toBe(1);
+  });
+
+  it("attempts every DB pool when Argon2 worker closure fails", async () => {
+    const flow = harness();
+    const argonFailure = new Error("secret worker failure");
+    flow.argon2Pool.close.mockImplementationOnce(async () => {
+      flow.order.push("argon2-pool:failed");
+      throw argonFailure;
+    });
+
+    const failure = await flow.shutdown.close("api.close").catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(GracefulShutdownError);
+    expect(failure).toMatchObject({ cause: argonFailure });
+    expect(flow.primaryDatabase.end).toHaveBeenCalledTimes(1);
+    expect(flow.evaluatorDatabase.end).toHaveBeenCalledTimes(1);
+    expect(flow.order.indexOf("argon2-pool:failed"))
+      .toBeLessThan(flow.order.indexOf("primary-database"));
+    expect(flow.order.indexOf("primary-database"))
+      .toBeLessThan(flow.order.indexOf("evaluator-database"));
   });
 
   it("closes every DB pool even when one pool end fails, then rejects generically", async () => {
