@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   AUTH_POLICY_REGISTER_ROWS,
   authPolicyFromRegisterRows,
@@ -378,7 +378,9 @@ describe("S3 ruled authentication policy", () => {
       minimum_reservation_ms: 5_700,
       queue_wait_timeout_ms: 18_000,
       release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
-      retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
+      // Rework7 gave registration its own 28-second wait deadline, so the
+      // retention disclosure names both routes and both bounds.
+      retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
       operator_signal: expect.objectContaining({
         payload: "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
         aggregation_window_ms: 60_000,
@@ -1207,6 +1209,1172 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
       expect((error as AuthFlowError).cause, occurrence.label)
         .toBeInstanceOf(Argon2InfrastructureError);
       await service.drainMailDispatches();
+    }
+  });
+});
+
+// ==========================================================================
+// T1 REWORK7-A — the structural registration admission budget and the
+// route-specific registration mail-permit deadline.
+//
+// Two earlier claims are repaired here.
+//
+// The first is what "103" means. decision_version 2 published it as a MEASURED
+// accepted-request capacity, and unchanged-code RED evidence then contradicted
+// that: the same burst accepted 98, then 96. 103 is now what it structurally
+// is — a process-owned admission budget with no wait queue, taken synchronously
+// before the first repository await, so the 104th valid request is refused
+// before any repository, limiter, KDF, mail, token or mutation work happens.
+//
+// The second is the wait deadline. Three fresh diagnostic processes committed
+// and sent all 103 registrations with zero refusals once the registration wait
+// ceiling was widened, at a worst reservation wait of 21,902.2 ms. The shipped
+// 18,000 ms bound was therefore censoring real admissions rather than bounding
+// lost capacity. Registration alone now waits 28,000 ms; resend keeps 18,000.
+//
+// Every lifecycle assertion below is driven by an explicit barrier, a held
+// permit, or a test-local deadline. Nothing here sleeps for 28 seconds of wall
+// time, and the two tests that assert the EXACT ruled deadlines read them off
+// the unmodified production policy.
+// ==========================================================================
+
+type Rework7Policy = ReturnType<typeof authPolicyFromRegisterRows>;
+
+interface Rework7Counters {
+  repository: number;
+  limiterConsume: number;
+  limiterRefusal: number;
+  passwordHash: number;
+  auditHash: number;
+  mailReservation: number;
+  tokenMint: number;
+  send: number;
+  mutation: number;
+  deliveryAudit: number;
+  registrationFailureAudit: number;
+}
+
+interface Rework7Occupancy {
+  readonly admitted: number;
+  readonly maximum: number;
+  readonly closing: boolean;
+  readonly admissions: number;
+  readonly releases: number;
+}
+
+type Rework7Activation = () => Promise<() => Promise<void>>;
+
+interface Rework7Harness {
+  readonly service: RegistrationService;
+  readonly policy: Rework7Policy;
+  readonly counters: Rework7Counters;
+  readonly sleeps: number[];
+  readonly errorLog: string[];
+  readonly admittedDuringSleep: number[];
+  readonly admittedAtCommit: number[];
+  readonly admittedAtHandoff: number[];
+  readonly heldPermits: Rework7Activation[];
+  readonly reservationHoldOccupancy: Rework7Occupancy[];
+  occupancy(): Rework7Occupancy;
+  openLookupGate(): void;
+  holdMailPermits(count: number): Promise<void>;
+  freeOneMailPermit(): Promise<void>;
+  register(index: number): Promise<unknown>;
+  resend(index: number): Promise<unknown>;
+  restore(): void;
+  /**
+   * Rework8 additions. `deferHash` makes every Argon2 call park until the test
+   * settles it EXPLICITLY, which is what lets the started-KDF race below be
+   * deterministic without real time and without a hostile KDF that never
+   * finishes. `pendingHashes()` is the non-vacuity read: it is the number of
+   * KDF calls that have really begun and really have not settled.
+   */
+  pendingHashes(): number;
+  settleHashes(count: number): void;
+  failHashes(count: number): void;
+}
+
+const REWORK7_PASSWORD = "correct horse battery staple";
+
+/**
+ * Reservation minimums and activation spacing are the only production values a
+ * unit harness overrides, and only to zero: they are wall-clock waits on the
+ * RAW timer, not on the injected sleep, so leaving them shipped would make
+ * every barrier test wait out a 5,100 ms lease per permit wave. The two ruled
+ * wait DEADLINES are deliberately NOT in this set — the tests that assert 28 s
+ * and 18 s read them straight off the production policy.
+ */
+const REWORK7_INSTANT_LEASES = Object.freeze({
+  mailDispatchMinimumReservationMs: 0,
+  registrationMailDispatchMinimumReservationMs: 0,
+  mailDispatchActivationSpacingMs: 0,
+  registrationMailDispatchActivationSpacingMs: 0
+});
+
+function rework7Harness(options: {
+  readonly channel?: Readonly<Record<string, number>>;
+  readonly gateLookup?: boolean;
+  readonly existingAddress?: boolean;
+  readonly duplicate?: boolean;
+  readonly hashFails?: boolean;
+  readonly provisionFails?: boolean;
+  readonly deliveryAuditFails?: boolean;
+  readonly clampFails?: boolean;
+  readonly password?: string;
+  readonly deferHash?: boolean;
+} = {}): Rework7Harness {
+  const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+  const policy = Object.freeze({
+    ...base,
+    channel: Object.freeze({ ...base.channel, ...REWORK7_INSTANT_LEASES, ...options.channel })
+    // Through `unknown`: the shipped policy pins the untouched cadences as
+    // literal types, and this harness deliberately zeroes them.
+  }) as unknown as Rework7Policy;
+
+  const counters: Rework7Counters = {
+    repository: 0, limiterConsume: 0, limiterRefusal: 0, passwordHash: 0, auditHash: 0,
+    mailReservation: 0, tokenMint: 0, send: 0, mutation: 0, deliveryAudit: 0,
+    registrationFailureAudit: 0
+  };
+  const sleeps: number[] = [];
+  const errorLog: string[] = [];
+  const admittedDuringSleep: number[] = [];
+  const admittedAtCommit: number[] = [];
+  const admittedAtHandoff: number[] = [];
+  const heldPermits: Rework7Activation[] = [];
+  const reservationHoldOccupancy: Rework7Occupancy[] = [];
+
+  let openLookupGate!: () => void;
+  const lookupGate = new Promise<void>((resolve) => { openLookupGate = resolve; });
+
+  const identity = options.existingAddress === true
+    ? { auditToken: "audit-token:existing", addressKey: "address-key:existing" }
+    : null;
+
+  const repository = {
+    findAuditIdentityByBlindIndex: async () => {
+      counters.repository += 1;
+      if (options.gateLookup === true) await lookupGate;
+      return identity;
+    },
+    findAuditIdentityByVerificationHash: async () => {
+      counters.repository += 1;
+      return null;
+    },
+    createPendingAccount: async (
+      _input: unknown,
+      storeDek: () => Promise<void>
+    ): Promise<unknown> => {
+      counters.repository += 1;
+      counters.mutation += 1;
+      admittedAtCommit.push(occupancy().admitted);
+      if (options.provisionFails === true) throw new Error("REWORK7_TEST_DB_FAILURE");
+      await storeDek();
+      return options.duplicate === true
+        ? Object.freeze({
+            status: "email_duplicate",
+            userId: "11111111-1111-4111-8111-111111111111"
+          })
+        : Object.freeze({
+            status: "created",
+            userId: "22222222-2222-4222-8222-222222222222",
+            channelBindingId: "33333333-3333-4333-8333-333333333333"
+          });
+    },
+    recordVerificationDelivery: async () => {
+      counters.repository += 1;
+      counters.deliveryAudit += 1;
+      if (options.deliveryAuditFails === true) throw new Error("REWORK7_TEST_AUDIT_FAILURE");
+    },
+    recordVerificationDeliveryRecordFailure: async () => {
+      counters.repository += 1;
+      counters.deliveryAudit += 1;
+    },
+    recordDuplicateRegistrationPostwork: async () => {
+      counters.repository += 1;
+      counters.deliveryAudit += 1;
+    },
+    consumeVerification: async () => {
+      counters.repository += 1;
+      return true;
+    },
+    prepareVerificationResend: async () => {
+      counters.repository += 1;
+      return Object.freeze({ status: "cooldown" as const });
+    },
+    recordRegistrationFailure: async () => {
+      counters.repository += 1;
+      counters.registrationFailureAudit += 1;
+    },
+    recordRateLimitRefusal: async () => {
+      counters.repository += 1;
+      return undefined;
+    }
+  };
+
+  const limiter = new InProcessAuthRateLimiter(
+    policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
+  );
+  const realConsume = limiter.consume.bind(limiter);
+  limiter.consume = (input) => {
+    counters.limiterConsume += 1;
+    return realConsume(input);
+  };
+  const realAggregate = limiter.aggregateRefusal.bind(limiter);
+  limiter.aggregateRefusal = (input) => {
+    counters.limiterRefusal += 1;
+    return realAggregate(input);
+  };
+
+  const hashDeferrals: Array<Readonly<{
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }>> = [];
+
+  const argon2 = {
+    async hashPassword(): Promise<string> {
+      counters.passwordHash += 1;
+      if (options.deferHash === true) {
+        // Parks the KDF exactly where a real one spends its time: dispatched,
+        // running, and not yet settled. The test decides when it finishes.
+        await new Promise<void>((resolve, reject) => {
+          hashDeferrals.push(Object.freeze({ resolve, reject }));
+        });
+      }
+      if (options.hashFails === true) {
+        throw new Argon2InfrastructureError("ARGON2_POOL_CAPACITY_EXHAUSTED");
+      }
+      return `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".repeat(43)}`;
+    },
+    async verifyPassword(): Promise<boolean> { return false; },
+    async hashAuditContext(): Promise<string> {
+      counters.auditHash += 1;
+      return "ab".repeat(32);
+    }
+  };
+
+  const service = new RegistrationService({
+    repository: repository as never,
+    mail: { async sendVerification(): Promise<void> { counters.send += 1; } },
+    dekStore: { store: async () => undefined },
+    blindIndexKey: Buffer.alloc(32, 0x3c),
+    policy,
+    limiter,
+    argon2,
+    sleep: async (milliseconds: number) => {
+      sleeps.push(milliseconds);
+      admittedDuringSleep.push(occupancy().admitted);
+      if (options.clampFails === true) throw new Error("REWORK7_TEST_CLAMP_FAILURE");
+    },
+    verificationTokenFactory: () => {
+      counters.tokenMint += 1;
+      return "r7".padEnd(43, "T");
+    }
+  });
+
+  interface Rework7Inspected {
+    reserveMailDispatchPermit(request: {
+      readonly correlationId: string;
+      readonly minimumReservationMs?: number;
+      readonly activationSpacingMs?: number;
+      readonly waitDeadlineMs?: number;
+    }): Promise<Rework7Activation>;
+    dispatchVerification(input: unknown, release: () => Promise<void>): void;
+    dispatchMailReservationHold(release: () => Promise<void>, equalTransportWork?: boolean): void;
+    registrationAdmissionOccupancy?(): Rework7Occupancy;
+  }
+  const inspected = service as unknown as Rework7Inspected;
+  const realReserve = inspected.reserveMailDispatchPermit.bind(service);
+  inspected.reserveMailDispatchPermit = (request) => {
+    counters.mailReservation += 1;
+    return realReserve(request);
+  };
+  const realDispatchVerification = inspected.dispatchVerification.bind(service);
+  inspected.dispatchVerification = (input, release) => {
+    admittedAtHandoff.push(occupancy().admitted);
+    realDispatchVerification(input, release);
+  };
+  const realDispatchHold = inspected.dispatchMailReservationHold.bind(service);
+  inspected.dispatchMailReservationHold = (release, equalTransportWork) => {
+    reservationHoldOccupancy.push(occupancy());
+    realDispatchHold(release, equalTransportWork);
+  };
+
+  function occupancy(): Rework7Occupancy {
+    const reader = (service as unknown as Rework7Inspected).registrationAdmissionOccupancy;
+    if (typeof reader !== "function") throw new Error("REWORK7_ADMISSION_OCCUPANCY_MISSING");
+    return reader.call(service);
+  }
+
+  const realConsoleError = console.error;
+  console.error = (...args: unknown[]) => { errorLog.push(args.map(String).join(" ")); };
+
+  return {
+    service,
+    policy,
+    counters,
+    sleeps,
+    errorLog,
+    admittedDuringSleep,
+    admittedAtCommit,
+    admittedAtHandoff,
+    heldPermits,
+    reservationHoldOccupancy,
+    occupancy,
+    openLookupGate: () => openLookupGate(),
+    holdMailPermits: async (count: number) => {
+      for (let index = 0; index < count; index += 1) {
+        heldPermits.push(await realReserve({ correlationId: `rework7-fill:${index}` }));
+      }
+    },
+    freeOneMailPermit: async () => {
+      const activate = heldPermits.shift();
+      if (activate === undefined) throw new Error("REWORK7_NO_HELD_PERMIT");
+      await (await activate())();
+    },
+    register: (index: number) => service.register({
+      email: `rework7-${index}@example.test`,
+      password: options.password ?? REWORK7_PASSWORD,
+      recoveryEmail: `rework7-${index}-recovery@example.test`,
+      adultAffirmed: true
+    }, {
+      ip: `2001:db8:7ea::${(index + 1).toString(16)}`,
+      userAgent: "vitest-t1-rework7",
+      requestId: `request:t1:rework7:${index}`
+    }),
+    resend: (index: number) => service.resendVerification({
+      email: `rework7-resend-${index}@example.test`
+    }, {
+      ip: `2001:db8:7eb::${(index + 1).toString(16)}`,
+      userAgent: "vitest-t1-rework7",
+      requestId: `request:t1:rework7:resend:${index}`
+    }),
+    restore: () => { console.error = realConsoleError; },
+    pendingHashes: () => hashDeferrals.length,
+    settleHashes: (count: number) => {
+      if (hashDeferrals.length < count) {
+        throw new Error(`REWORK8_NOT_ENOUGH_PENDING_HASHES:${hashDeferrals.length}<${count}`);
+      }
+      for (const deferral of hashDeferrals.splice(0, count)) deferral.resolve();
+    },
+    failHashes: (count: number) => {
+      if (hashDeferrals.length < count) {
+        throw new Error(`REWORK8_NOT_ENOUGH_PENDING_HASHES:${hashDeferrals.length}<${count}`);
+      }
+      for (const deferral of hashDeferrals.splice(0, count)) {
+        deferral.reject(new Argon2InfrastructureError("ARGON2_POOL_CAPACITY_EXHAUSTED"));
+      }
+    }
+  };
+}
+
+async function rework7Settle(): Promise<void> {
+  for (let turn = 0; turn < 8; turn += 1) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+}
+
+function rework7Code(error: unknown): string {
+  return (error as { code?: string }).code ?? `RAW:${String(error)}`;
+}
+
+const REWORK8_STILL_PENDING = "REWORK8_STILL_PENDING_AT_THE_CLOSED_LOOKUP_GATE";
+
+/**
+ * REWORK8 F3 support. The 104th request is refused BEFORE the first repository
+ * await, so with the lookup gate shut it must still settle on its own. Racing
+ * it against a generous fixed number of scheduler turns — 64, against the two
+ * or three the refusal actually needs, and no wall clock anywhere — converts
+ * "a mutant admitted the 104th and it is now parked on the gate forever" from a
+ * bare suite timeout into a crisp named assertion. It only ever ADDS this
+ * requirement: every original assertion on the refusal still runs unchanged.
+ */
+async function rework8PendingMarker(): Promise<string> {
+  for (let turn = 0; turn < 64; turn += 1) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  return REWORK8_STILL_PENDING;
+}
+
+describe("T1 rework7 A1 — the structural admission budget is exactly 103", () => {
+  it("admits 100 and 103, refuses the 104th, and charges nothing for invalid input or source", async () => {
+    const harness = rework7Harness({ gateLookup: true });
+    try {
+      expect(harness.policy.channel.structuralMaximumConcurrentRegistrations).toBe(103);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, maximum: 103, closing: false });
+
+      const hundred = Array.from({ length: 100 }, (_, index) => harness.register(index));
+      expect(harness.occupancy().admitted).toBe(100);
+      const upToCap = Array.from({ length: 3 }, (_, index) => harness.register(100 + index));
+      // NON-VACUITY: all 103 really are inside the service, parked on the gated
+      // first repository await, each still holding its admission slot.
+      expect(harness.occupancy().admitted).toBe(103);
+      expect(harness.counters.repository).toBe(103);
+
+      const refused = harness.register(103).then(
+        () => { throw new Error("REWORK7_104TH_UNEXPECTEDLY_ADMITTED"); },
+        (error: unknown) => error
+      );
+      // Settles at the CLOSED gate, because the refusal never reaches it.
+      expect(await Promise.race([
+        refused.then((error) => rework7Code(error), (error: unknown) => rework7Code(error)),
+        rework8PendingMarker()
+      ])).toBe("AUTH_MAIL_BUSY");
+      const refusal = await refused;
+      expect(rework7Code(refusal)).toBe("AUTH_MAIL_BUSY");
+      expect(refusal).toBeInstanceOf(AuthFlowError);
+      expect((refusal as AuthFlowError).statusCode).toBe(503);
+      // The refusal consumed no budget of its own and displaced no holder.
+      expect(harness.occupancy()).toMatchObject({ admitted: 103, admissions: 103 });
+
+      const invalidInput = await harness.service.register({
+        email: "not-an-address", password: REWORK7_PASSWORD,
+        recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
+      }, { ip: "2001:db8:7ea::ffff", userAgent: "vitest", requestId: "request:invalid" })
+        .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
+      expect(invalidInput).toBe("AUTH_INPUT_INVALID");
+      const invalidSource = await harness.service.register({
+        email: "r7-valid@example.test", password: REWORK7_PASSWORD,
+        recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true
+      }, { ip: "   ", userAgent: "vitest", requestId: "request:invalid-source" })
+        .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
+      expect(invalidSource).toBe("AUTH_INPUT_INVALID");
+      expect(harness.occupancy()).toMatchObject({ admitted: 103, admissions: 103 });
+
+      harness.openLookupGate();
+      await Promise.all([...hundred, ...upToCap]);
+      await harness.service.drainMailDispatches();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 103, releases: 103 });
+
+      // Releasing a slot admits a LATER new request; the refused 104th was
+      // never queued and does not resume.
+      await harness.register(500);
+      await harness.service.drainMailDispatches();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 104, releases: 104 });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  for (const size of [128, 160]) {
+    it(`caps a simultaneous burst of ${size} at exactly 103 admissions`, async () => {
+      const harness = rework7Harness({ gateLookup: true });
+      try {
+        const attempts = Array.from({ length: size }, (_, index) =>
+          harness.register(index).then(() => "SUCCESS", (error: unknown) => rework7Code(error)));
+        // Captured immediately after the synchronous launch loop: the gate is
+        // taken before the first await, so the ceiling is already decided here.
+        const peak = harness.occupancy().admitted;
+        harness.openLookupGate();
+        const outcomes = await Promise.all(attempts);
+        await harness.service.drainMailDispatches();
+
+        expect(peak).toBe(103);
+        expect(outcomes.filter((outcome) => outcome === "SUCCESS")).toHaveLength(103);
+        expect(outcomes.filter((outcome) => outcome === "AUTH_MAIL_BUSY"))
+          .toHaveLength(size - 103);
+        expect(outcomes.filter((outcome) =>
+          outcome !== "SUCCESS" && outcome !== "AUTH_MAIL_BUSY")).toEqual([]);
+        expect(harness.occupancy()).toMatchObject({
+          admitted: 0, admissions: 103, releases: 103
+        });
+      } finally {
+        harness.restore();
+      }
+    });
+  }
+
+  it("does no repository, limiter, KDF, mail, token, mutation or audit work for the 104th", async () => {
+    const harness = rework7Harness({ gateLookup: true });
+    try {
+      const admitted = Array.from({ length: 103 }, (_, index) => harness.register(index));
+      await rework7Settle();
+      const before = { ...harness.counters };
+      // NON-VACUITY: the gate sits BEFORE the limiter and the reservation, so
+      // the only work 103 admitted requests have done is the one lookup each.
+      expect(before).toMatchObject({
+        repository: 103, limiterConsume: 0, passwordHash: 0, mailReservation: 0,
+        tokenMint: 0, mutation: 0, send: 0
+      });
+
+      const fourth = harness.register(103)
+        .then(() => "REWORK7_104TH_UNEXPECTEDLY_ADMITTED", (error: unknown) => rework7Code(error));
+      // Settles at the CLOSED gate, because the refusal never reaches it.
+      expect(await Promise.race([fourth, rework8PendingMarker()])).toBe("AUTH_MAIL_BUSY");
+
+      expect(harness.counters).toEqual(before);
+      expect(harness.service.mailDispatchOccupancy().inFlight).toBe(0);
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+
+      harness.openLookupGate();
+      await Promise.all(admitted);
+      await harness.service.drainMailDispatches();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it("holds the 104th refusal to the ruled clamp and returns identical bytes on both address arms", async () => {
+    const arms: Array<Readonly<{
+      code: string; message: string; status: number; clampMs: number;
+    }>> = [];
+    for (const existingAddress of [false, true]) {
+      const harness = rework7Harness({ gateLookup: true, existingAddress });
+      try {
+        const admitted = Array.from({ length: 103 }, (_, index) => harness.register(index));
+        await rework7Settle();
+        const sleepsBefore = harness.sleeps.length;
+        const refusal = harness.register(103).then(
+          () => { throw new Error("REWORK7_104TH_UNEXPECTEDLY_ADMITTED"); },
+          (caught: unknown) => caught as AuthFlowError
+        );
+        // Same closed-gate settle race as the no-work case above: an admitted
+        // 104th parks here, and must say so crisply.
+        expect(await Promise.race([
+          refusal.then((caught) => rework7Code(caught), (caught: unknown) => rework7Code(caught)),
+          rework8PendingMarker()
+        ])).toBe("AUTH_MAIL_BUSY");
+        const error = await refusal;
+        const clampSleeps = harness.sleeps.slice(sleepsBefore);
+        expect(clampSleeps).toHaveLength(1);
+        arms.push(Object.freeze({
+          code: error.code,
+          message: error.message,
+          status: error.statusCode,
+          clampMs: clampSleeps[0]!
+        }));
+        harness.openLookupGate();
+        await Promise.all(admitted);
+        await harness.service.drainMailDispatches();
+      } finally {
+        harness.restore();
+      }
+    }
+    const verification = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).verification;
+    const ruledClampMs = verification.enumerationResponseFloorMs
+      + verification.enumerationToleranceMs;
+    for (const arm of arms) {
+      expect(arm.code).toBe("AUTH_MAIL_BUSY");
+      expect(arm.status).toBe(503);
+      // The refusal does no work of its own, so its remaining hold is the WHOLE
+      // ruled window rather than a shortened one.
+      expect(arm.clampMs).toBeGreaterThan(ruledClampMs - 50);
+      expect(arm.clampMs).toBeLessThanOrEqual(ruledClampMs);
+    }
+    expect({ ...arms[0]!, clampMs: 0 }).toEqual({ ...arms[1]!, clampMs: 0 });
+  });
+});
+
+describe("T1 rework7 A1 — the admission token is released exactly once, and never early", () => {
+  it("keeps the admission through commit, clamp and handoff, and drops it only after", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.register(0);
+      // Released only after the handoff block, so every observation INSIDE the
+      // request still sees the slot held.
+      expect(harness.admittedAtCommit).toEqual([1]);
+      expect(harness.admittedAtHandoff).toEqual([1]);
+      expect(harness.admittedDuringSleep.length).toBeGreaterThan(0);
+      expect(Math.min(...harness.admittedDuringSleep)).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+      await harness.service.drainMailDispatches();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  const lifecycles: ReadonlyArray<Readonly<{
+    label: string;
+    harness: () => Rework7Harness;
+    prepare?: (harness: Rework7Harness) => Promise<void>;
+    expected: string;
+  }>> = Object.freeze([
+    Object.freeze({
+      label: "successful delivery",
+      harness: () => rework7Harness(),
+      expected: "SUCCESS"
+    }),
+    Object.freeze({
+      label: "duplicate address",
+      harness: () => rework7Harness({ duplicate: true }),
+      expected: "SUCCESS"
+    }),
+    Object.freeze({
+      label: "rate-limit refusal",
+      harness: () => rework7Harness(),
+      prepare: async (harness: Rework7Harness) => {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          harness.service.register({
+            email: `rework7-limiter-${attempt}@example.test`,
+            password: REWORK7_PASSWORD,
+            recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
+            adultAffirmed: true
+          }, {
+            ip: "2001:db8:7ea::1",
+            userAgent: "vitest-t1-rework7",
+            requestId: `request:t1:rework7:limiter:${attempt}`
+          }).catch(() => undefined);
+        }
+        await rework7Settle();
+        await harness.service.drainMailDispatches();
+      },
+      expected: "AUTH_RATE_LIMITED"
+    }),
+    Object.freeze({
+      label: "immediate shared-queue full",
+      harness: () => rework7Harness({
+        channel: { maxConcurrentVerificationDispatches: 1, maxQueuedVerificationDispatches: 0 }
+      }),
+      prepare: async (harness: Rework7Harness) => { await harness.holdMailPermits(1); },
+      expected: "AUTH_MAIL_BUSY"
+    }),
+    Object.freeze({
+      label: "password hash failure",
+      harness: () => rework7Harness({ hashFails: true }),
+      expected: "AUTH_TEMPORARILY_UNAVAILABLE"
+    }),
+    Object.freeze({
+      label: "database provisioning failure",
+      harness: () => rework7Harness({ provisionFails: true }),
+      expected: "AUTH_REGISTRATION_FAILED"
+    }),
+    Object.freeze({
+      label: "delivery audit failure",
+      harness: () => rework7Harness({ deliveryAuditFails: true }),
+      expected: "SUCCESS"
+    }),
+    Object.freeze({
+      label: "response clamp failure",
+      harness: () => rework7Harness({ clampFails: true }),
+      expected: "RAW:Error: REWORK7_TEST_CLAMP_FAILURE"
+    })
+  ]);
+
+  for (const lifecycle of lifecycles) {
+    it(`releases exactly once on ${lifecycle.label}`, async () => {
+      const harness = lifecycle.harness();
+      try {
+        await lifecycle.prepare?.(harness);
+        const admissionsBefore = harness.occupancy().admissions;
+        const outcome = await harness.register(0)
+          .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+        await harness.service.drainMailDispatches();
+        expect(outcome).toBe(lifecycle.expected);
+        const occupancy = harness.occupancy();
+        expect(occupancy.admitted).toBe(0);
+        expect(occupancy.admissions).toBe(admissionsBefore + 1);
+        // Exactly once: a second release would show up here as a surplus, and
+        // as an admitted counter that can go below zero.
+        expect(occupancy.releases).toBe(occupancy.admissions);
+      } finally {
+        harness.restore();
+      }
+    });
+  }
+
+  // The lifecycle cases above observe release counts through whole requests, and
+  // on every one of those paths the product calls the closure exactly once. That
+  // leaves the closure's OWN idempotence guard unpinned: deleting it is invisible
+  // to them. VR-10 M07 (release made non-idempotent, in isolation) survived that
+  // gap. This test pins the guard directly, and then pins the consequence.
+  it("makes the admission release closure idempotent, so surplus calls cannot underflow the budget", async () => {
+    const harness = rework7Harness({ gateLookup: true });
+    try {
+      interface Rework7Admission {
+        acquireRegistrationAdmission(correlationId: string): () => void;
+      }
+      const inspected = harness.service as unknown as Rework7Admission;
+      expect(typeof inspected.acquireRegistrationAdmission).toBe("function");
+
+      const release = inspected.acquireRegistrationAdmission
+        .call(harness.service, "rework7-idempotence");
+      // NON-VACUITY: the slot really is held before the closure is touched.
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+
+      release();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+
+      // The guard's whole point: every later call is a no-op. Without it the
+      // held counter walks NEGATIVE and releases outrun admissions.
+      release();
+      release();
+      release();
+      const after = harness.occupancy();
+      expect(after.admitted).toBe(0);
+      expect(after.admitted).toBeGreaterThanOrEqual(0);
+      expect(after.releases).toBe(1);
+      expect(after.releases).toBeLessThanOrEqual(after.admissions);
+
+      // CONSEQUENCE: a negative held counter would silently hand out budget the
+      // structural cap never granted, so the very next burst would admit more
+      // than 103. It must still admit exactly 103.
+      const attempts = Array.from({ length: 110 }, (_, index) =>
+        harness.register(index).then(() => "SUCCESS", (error: unknown) => rework7Code(error)));
+      const peak = harness.occupancy().admitted;
+      harness.openLookupGate();
+      const outcomes = await Promise.all(attempts);
+      await harness.service.drainMailDispatches();
+
+      expect(peak).toBe(103);
+      expect(outcomes.filter((outcome) => outcome === "SUCCESS")).toHaveLength(103);
+      expect(outcomes.filter((outcome) => outcome === "AUTH_MAIL_BUSY")).toHaveLength(7);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 104, releases: 104 });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it("hands the admission to the reservation continuation, which releases it after registering the hold", async () => {
+    const harness = rework7Harness({
+      hashFails: true,
+      channel: {
+        maxConcurrentVerificationDispatches: 1,
+        maxQueuedVerificationDispatches: 1,
+        registrationMailDispatchMinimumReservationMs: 200
+      }
+    });
+    try {
+      await harness.holdMailPermits(1);
+      const attempt = harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      expect(await attempt).toBe("AUTH_TEMPORARILY_UNAVAILABLE");
+      // The request is gone but its reservation is still QUEUED, so the local
+      // finally must NOT have released: exactly one owner exists, and it is the
+      // continuation.
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+
+      await harness.freeOneMailPermit();
+      await rework7Settle();
+
+      // The hold was registered in pendingMailDispatches BEFORE the token was
+      // released, and the release did not wait out the 200 ms lease.
+      expect(harness.reservationHoldOccupancy).toHaveLength(1);
+      expect(harness.reservationHoldOccupancy[0]).toMatchObject({ admitted: 1, releases: 0 });
+      expect(harness.service.mailDispatchOccupancy().activeSends).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+
+      await harness.service.drainMailDispatches();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, releases: 1 });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it("lets the reservation continuation release the admission when the reservation is rejected", async () => {
+    const harness = rework7Harness({
+      hashFails: true,
+      channel: {
+        maxConcurrentVerificationDispatches: 1,
+        maxQueuedVerificationDispatches: 1,
+        registrationMailDispatchQueueWaitTimeoutMs: 40
+      }
+    });
+    try {
+      await harness.holdMailPermits(1);
+      expect(await harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error)))
+        .toBe("AUTH_TEMPORARILY_UNAVAILABLE");
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, releases: 0 });
+
+      await new Promise<void>((resolve) => { setTimeout(resolve, 120); });
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+      expect(harness.reservationHoldOccupancy).toEqual([]);
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and resend stays 18 s", () => {
+  it("publishes 28,000 ms for registration and 18,000 ms for everything else", () => {
+    const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    expect(policy.channel.registrationMailDispatchQueueWaitTimeoutMs).toBe(28_000);
+    expect(policy.channel.mailDispatchQueueWaitTimeoutMs).toBe(18_000);
+  });
+
+  for (const route of ["register", "resend"] as const) {
+    it(`arms exactly ${route === "register" ? 28_000 : 18_000} ms on a queued ${route}`, async () => {
+      const harness = rework7Harness();
+      try {
+        await harness.holdMailPermits(
+          harness.policy.channel.maxConcurrentVerificationDispatches
+        );
+        const delays: number[] = [];
+        const realSetTimeout = globalThis.setTimeout;
+        const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+          handler: TimerHandler, delay?: number, ...rest: unknown[]
+        ) => {
+          delays.push(delay ?? 0);
+          const timer = realSetTimeout(handler as () => void, delay, ...rest);
+          // Unref'd so a 28-second deadline the test never intends to reach
+          // cannot hold the process open past the assertions below.
+          (timer as unknown as { unref?: () => void }).unref?.();
+          return timer;
+        }) as unknown as typeof setTimeout);
+
+        const attempt = route === "register" ? harness.register(0) : harness.resend(0);
+        const settled = attempt.then(() => "SETTLED", () => "SETTLED");
+        await rework7Settle();
+        spy.mockRestore();
+
+        // NON-VACUITY: the request really is queued behind the 32 held permits,
+        // so the delay recorded below is its own deadline timer.
+        expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+        if (route === "register") {
+          expect(delays.filter((delay) => delay === 28_000)).toHaveLength(1);
+          expect(delays).not.toContain(18_000);
+        } else {
+          expect(delays.filter((delay) => delay === 18_000)).toHaveLength(1);
+          expect(delays).not.toContain(28_000);
+        }
+
+        await harness.freeOneMailPermit();
+        expect(await settled).toBe("SETTLED");
+        await harness.service.drainMailDispatches();
+        // Handoff CLEARS the deadline and leaves no queue node behind.
+        expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      } finally {
+        harness.restore();
+      }
+    });
+  }
+
+  it("times a queued registration out as AUTH_MAIL_BUSY, retaining no waiter, token or secret", async () => {
+    const secret = "rework7-timeout-secret-passphrase";
+    const harness = rework7Harness({
+      password: secret,
+      channel: { registrationMailDispatchQueueWaitTimeoutMs: 40 }
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      await harness.holdMailPermits(
+        harness.policy.channel.maxConcurrentVerificationDispatches
+      );
+      const attempt = harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      await rework7Settle();
+      // NON-VACUITY: it is genuinely waiting when the deadline is armed.
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
+      await rework7Settle();
+
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      expect(harness.service.mailDispatchOccupancy().inFlight)
+        .toBe(harness.policy.channel.maxConcurrentVerificationDispatches);
+      // No account, no token, no send, and the clamp was still traversed.
+      expect(harness.counters).toMatchObject({ tokenMint: 0, mutation: 0, send: 0 });
+      expect(harness.sleeps.length).toBeGreaterThan(0);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+      expect(retainedStateContains(harness.service, secret)).toBe(false);
+      expect(retainedStateContains(harness.service, "rework7-0@example.test")).toBe(false);
+      for (const line of harness.errorLog) {
+        expect(line).not.toContain(secret);
+        expect(line).not.toContain("rework7-0@example.test");
+      }
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+      harness.restore();
+    }
+  });
+
+  it("still times a queued resend out on its own 18-second-derived deadline", async () => {
+    const harness = rework7Harness({ channel: { mailDispatchQueueWaitTimeoutMs: 40 } });
+    try {
+      await harness.holdMailPermits(
+        harness.policy.channel.maxConcurrentVerificationDispatches
+      );
+      const attempt = harness.resend(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      await rework7Settle();
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
+      await rework7Settle();
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      // A resend holds no admission slot: the budget is registration-only.
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 0, releases: 0 });
+    } finally {
+      harness.restore();
+    }
+  });
+});
+
+/**
+ * REWORK8 F1/F2. The admission token is the whole capacity contract, so nothing
+ * that still holds the caller's password may outlive it. Two shapes of
+ * secret-bearing work exist at the reservation race, and Rework7 proved neither:
+ *
+ *   STARTED — the KDF is already dispatched, `cancel()` is by construction a
+ *   no-op, and the worker pool's own execution timeout has not even begun
+ *   (it starts at dispatch, not at submission);
+ *   QUEUED  — the KDF is still a start closure in `waitingRegistrationHashes`
+ *   with the password captured in it, and `cancel()` is the only thing that
+ *   will ever remove it.
+ *
+ * The Rework7 timeout test could only ever see the second shape indirectly: it
+ * ran ONE registration against 32 free hash slots, so its hash started at once,
+ * and `retainedStateContains` cannot look inside a closure at all.
+ */
+describe("T1 rework8 F1/F2 — password work may not outlive its admission token", () => {
+  it("holds the admission and the drain until already-started password work settles after a reservation rejection", async () => {
+    const secret = "rework8-started-kdf-secret-passphrase";
+    const harness = rework7Harness({ deferHash: true, password: secret });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      interface Rework8Reservation {
+        reserveMailDispatchPermit(request: {
+          readonly correlationId: string;
+          readonly waitDeadlineMs?: number;
+        }): Promise<Rework7Activation>;
+      }
+      const inspected = harness.service as unknown as Rework8Reservation;
+      // The reservation is driven by the TEST, not by a timer: the race this
+      // pins is "reservation rejected while the KDF is still running", and
+      // wall-clock timing has no business deciding when that happens.
+      const deadlines: Array<number | undefined> = [];
+      let rejectReservation!: (error: unknown) => void;
+      const reservation = new Promise<Rework7Activation>((_resolve, reject) => {
+        rejectReservation = reject;
+      });
+      inspected.reserveMailDispatchPermit = (request) => {
+        deadlines.push(request.waitDeadlineMs);
+        return reservation;
+      };
+
+      const attempt = harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      await rework7Settle();
+
+      // NON-VACUITY. The request is really admitted, its reservation is really
+      // outstanding on the ruled 28-second deadline, and its KDF has really
+      // been dispatched and really has not settled.
+      expect(deadlines).toEqual([28_000]);
+      expect(harness.counters.passwordHash).toBe(1);
+      expect(harness.pendingHashes()).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+
+      rejectReservation(new AuthFlowError("AUTH_MAIL_BUSY"));
+
+      // The CALLER is allowed to leave immediately with the opaque failure.
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
+      await rework7Settle();
+
+      // The TOKEN is not. Password work is still in the pool with the secret in
+      // its closure, so the slot it was admitted under stays occupied.
+      expect(harness.pendingHashes()).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+
+      let drained = false;
+      const drain = harness.service.drainRegistrationAdmissions()
+        .then(() => { drained = true; });
+      await rework7Settle();
+      // A shutdown drain must not be able to walk past secret-bearing work and
+      // report the service quiescent while the pool is still hashing.
+      expect(drained).toBe(false);
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, closing: true, releases: 0 });
+
+      harness.settleHashes(1);
+      await rework7Settle();
+      expect(drained).toBe(true);
+      await drain;
+
+      const after = harness.occupancy();
+      expect(after.admitted).toBe(0);
+      expect(after.admissions).toBe(1);
+      // Exactly one release: the local owner did not release, the continuation
+      // did, and it did so once.
+      expect(after.releases).toBe(1);
+      expect(harness.pendingHashes()).toBe(0);
+      // The losing attempt did no account, token or mail work.
+      expect(harness.counters).toMatchObject({ tokenMint: 0, mutation: 0, send: 0 });
+      expect(retainedStateContains(harness.service, secret)).toBe(false);
+      for (const line of harness.errorLog) expect(line).not.toContain(secret);
+      // The losing KDF outcome is consumed, not orphaned.
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+      harness.restore();
+    }
+  });
+
+  it("cancels a genuinely queued registration hash on mail timeout, removing its start closure and clearing its password", async () => {
+    const secret = "rework8-queued-kdf-secret-passphrase";
+    const harness = rework7Harness({
+      deferHash: true,
+      password: secret,
+      // The only shortened value is the test-only mail reservation deadline.
+      channel: { registrationMailDispatchQueueWaitTimeoutMs: 40 }
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      interface Rework8Hashes {
+        scheduleRegistrationHash(password: string): Readonly<{
+          promise: Promise<string>;
+          cancel: () => void;
+        }>;
+        registrationHashesActive: number;
+        waitingRegistrationHashes: Array<() => void>;
+        /**
+         * Optional on purpose: this is the observable cleanup seam the finding
+         * asked for, and a build without it must FAIL here rather than silently
+         * pass a shallow property scan that cannot see into a closure.
+         */
+        registrationPasswordReferencesHeld?: number;
+      }
+      const inspected = harness.service as unknown as Rework8Hashes;
+      const slots = harness.policy.channel.maxConcurrentRegistrationHashes;
+      expect(slots).toBe(32);
+
+      // Saturate EVERY registration-hash slot with work that has really started
+      // and cannot finish until this test says so. Only then can a later hash be
+      // genuinely queued rather than dispatched immediately.
+      const saturators = Array.from({ length: slots }, (_, index) =>
+        inspected.scheduleRegistrationHash.call(harness.service, `rework8-saturator-${index}`));
+      for (const saturator of saturators) void saturator.promise.catch(() => undefined);
+      await rework7Settle();
+      expect(inspected.registrationHashesActive).toBe(slots);
+      expect(harness.pendingHashes()).toBe(slots);
+      expect(harness.counters.passwordHash).toBe(slots);
+      expect(inspected.waitingRegistrationHashes).toHaveLength(0);
+      // Every saturator STARTED, so each already handed its password to the KDF
+      // and none of them still retains a reference.
+      expect(inspected.registrationPasswordReferencesHeld).toBe(0);
+
+      // Fill the shared dispatcher so the target's permit must really queue.
+      await harness.holdMailPermits(
+        harness.policy.channel.maxConcurrentVerificationDispatches
+      );
+
+      const attempt = harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      await rework7Settle();
+
+      // NON-VACUITY, every clause checked BEFORE the deadline fires.
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(inspected.waitingRegistrationHashes).toHaveLength(1);
+      const queuedStart = inspected.waitingRegistrationHashes[0]!;
+      // The target hash was NOT dispatched: the pool call count is unmoved.
+      expect(harness.counters.passwordHash).toBe(slots);
+      // ...and the target is the one and only holder of a password reference.
+      expect(inspected.registrationPasswordReferencesHeld).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
+      await rework7Settle();
+
+      // The start closure was REMOVED and never executed.
+      expect(inspected.waitingRegistrationHashes).toHaveLength(0);
+      expect(inspected.waitingRegistrationHashes).not.toContain(queuedStart);
+      expect(harness.counters.passwordHash).toBe(slots);
+      expect(harness.pendingHashes()).toBe(slots);
+      // The password reference was cleared, proven by the counter and not by a
+      // shallow scan that a closure would defeat.
+      expect(inspected.registrationPasswordReferencesHeld).toBe(0);
+      // The mail waiter is gone with it and nothing was left queued.
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      expect(harness.service.mailDispatchOccupancy().inFlight)
+        .toBe(harness.policy.channel.maxConcurrentVerificationDispatches);
+      // Beyond the already-ruled validation / pre-race lookup and limiter call,
+      // the timed-out target did no work at all.
+      expect(harness.counters.repository).toBe(1);
+      expect(harness.counters.limiterConsume).toBe(1);
+      expect(harness.counters).toMatchObject({
+        tokenMint: 0, mutation: 0, send: 0, deliveryAudit: 0,
+        registrationFailureAudit: 0, limiterRefusal: 0
+      });
+      // Exactly one grant and exactly one release for the target...
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
+      // ...so the drain reaches zero without waiting on anything.
+      await harness.service.drainRegistrationAdmissions();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, releases: 1 });
+
+      expect(retainedStateContains(harness.service, secret)).toBe(false);
+      expect(retainedStateContains(harness.service, "rework7-0@example.test")).toBe(false);
+      for (const line of harness.errorLog) {
+        expect(line).not.toContain(secret);
+        expect(line).not.toContain("rework7-0@example.test");
+      }
+      expect(unhandled).toEqual([]);
+    } finally {
+      harness.settleHashes(harness.pendingHashes());
+      await rework7Settle();
+      process.off("unhandledRejection", onUnhandled);
+      harness.restore();
+    }
+  });
+});
+
+describe("T1 rework7 A3 — admission close-and-drain", () => {
+  it("awaits the exact transition to zero and then refuses new registrations", async () => {
+    const harness = rework7Harness({ gateLookup: true });
+    try {
+      const inFlight = Array.from({ length: 3 }, (_, index) => harness.register(index));
+      await rework7Settle();
+      expect(harness.occupancy().admitted).toBe(3);
+
+      let drained = false;
+      const drain = harness.service.drainRegistrationAdmissions().then(() => { drained = true; });
+      await rework7Settle();
+      // NON-VACUITY: the drain is really blocked on the three admitted requests.
+      expect(drained).toBe(false);
+      expect(harness.occupancy().closing).toBe(true);
+
+      const before = { ...harness.counters };
+      const refused = await harness.register(900)
+        .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
+      expect(refused).toBe("AUTH_TEMPORARILY_UNAVAILABLE");
+      // A closing refusal enqueues no mail or audit work of its own.
+      expect(harness.counters).toEqual(before);
+
+      harness.openLookupGate();
+      await Promise.all(inFlight);
+      await drain;
+      expect(drained).toBe(true);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 3, releases: 3 });
+
+      // Repeated and concurrent drains join and neither hang nor underflow.
+      await Promise.all([
+        harness.service.drainRegistrationAdmissions(),
+        harness.service.drainRegistrationAdmissions()
+      ]);
+      await harness.service.drainRegistrationAdmissions();
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, releases: 3 });
+
+      await harness.service.drainMailDispatches();
+      expect(harness.service.mailDispatchOccupancy()).toMatchObject({
+        inFlight: 0, activeSends: 0, queued: 0
+      });
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it("joins one promise for concurrent drains started while requests are still admitted", async () => {
+    const harness = rework7Harness({ gateLookup: true });
+    try {
+      const inFlight = Array.from({ length: 2 }, (_, index) => harness.register(index));
+      await rework7Settle();
+      const drains = [
+        harness.service.drainRegistrationAdmissions(),
+        harness.service.drainRegistrationAdmissions(),
+        harness.service.drainRegistrationAdmissions()
+      ];
+      harness.openLookupGate();
+      await Promise.all(inFlight);
+      await Promise.all(drains);
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 2, releases: 2 });
+    } finally {
+      harness.restore();
     }
   });
 });

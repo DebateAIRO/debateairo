@@ -31,13 +31,57 @@ const ENCODED_HASH = `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".rep
 /** The lawful `hash-audit` reply shape: lowercase hex of exactly hashLength bytes. */
 const AUDIT_DIGEST = "ab".repeat(32);
 
+/** Unpadded base64 character count for `bytes` bytes, exactly as Argon2 encodes. */
+function encodedChars(bytes: number): number {
+  return Math.ceil((bytes * 4) / 3);
+}
+
+/**
+ * The encoding a lawful worker would return for THIS request: the request's own
+ * memory cost, time cost, parallelism, salt and digest length. Built from the
+ * recorded dispatch rather than from a constant, because a constant encoding is
+ * exactly the weaker-but-in-envelope answer rework2 RED 3 exists to refuse.
+ */
+function lawfulPasswordEncoding(job: DispatchedJob): string {
+  return `$argon2id$v=19$m=${job.memoryCostKiB!},t=${job.timeCost!},p=${job.parallelism!}`
+    + `$${job.saltBase64!}$${"A".repeat(encodedChars(job.hashLength!))}`;
+}
+
+/**
+ * One dispatched request, as the parent handed it over. Every field a response
+ * must be bound to is captured BEFORE the structured-clone transfer detaches
+ * the payload, so the fake can answer lawfully — or deliberately not.
+ */
+interface DispatchedJob {
+  readonly id: string;
+  readonly op: string;
+  readonly memoryCostKiB?: number | undefined;
+  readonly timeCost?: number | undefined;
+  readonly iterations?: number | undefined;
+  readonly parallelism?: number | undefined;
+  readonly hashLength?: number | undefined;
+  readonly saltBase64?: string | undefined;
+}
+
+/**
+ * How this fake answers a termination REQUEST.
+ *
+ * - `resolve`  — the ordinary case: `terminate()` settles and the thread dies.
+ * - `hang`     — termination is in flight until the test releases it.
+ * - `reject`   — the request is REFUSED and the thread KEEPS RUNNING. A real
+ *                worker looks like this when the handle is torn down under it
+ *                or the thread is wedged; the parent learns nothing about death
+ *                from the rejection, which is rework2 RED 1.
+ */
+type TerminationMode = "resolve" | "hang" | "reject";
+
 // --------------------------------------------------------------------------
 // Barrier fake worker. Never computes Argon2: it holds each job open until the
 // test releases it, so capacity, fairness, fault and close behaviour are proven
 // deterministically rather than by racing real KDFs.
 // --------------------------------------------------------------------------
 interface FakeWorker extends Argon2WorkerHandle {
-  readonly received: { id: string; op: string }[];
+  readonly received: DispatchedJob[];
   emitReady(): void;
   /** Replies with the lawful result shape for the operation this id carried. */
   settle(id: string): void;
@@ -47,6 +91,8 @@ interface FakeWorker extends Argon2WorkerHandle {
   fail(id: string): void;
   crash(): void;
   releaseTermination(): void;
+  /** The explicit thread-death signal a real Worker emits when it is gone. */
+  emitExit(code?: number): void;
   readonly terminated: () => number;
   readonly refCount: () => number;
   readonly isAlive: () => boolean;
@@ -55,10 +101,11 @@ interface FakeWorker extends Argon2WorkerHandle {
 function createFakeWorker(
   index: number,
   autoReady = true,
-  hangTermination = false
+  hangTermination = false,
+  terminationMode: TerminationMode = hangTermination ? "hang" : "resolve"
 ): FakeWorker {
   const listeners = new Map<string, ((value: never) => void)[]>();
-  const received: { id: string; op: string }[] = [];
+  const received: DispatchedJob[] = [];
   let terminateCalls = 0;
   let refs = 0;
   let alive = true;
@@ -71,8 +118,24 @@ function createFakeWorker(
     threadId: 100 + index,
     received,
     postMessage(message: unknown, transfer?: readonly ArrayBuffer[]) {
-      const request = message as { id: string; op: string };
-      received.push({ id: request.id, op: request.op });
+      const request = message as {
+        id: string; op: string; salt?: Uint8Array;
+        memoryCostKiB?: number; timeCost?: number; iterations?: number;
+        parallelism?: number; hashLength?: number;
+      };
+      // Read the binding parameters BEFORE the transfer below detaches them.
+      received.push(Object.freeze({
+        id: request.id,
+        op: request.op,
+        memoryCostKiB: request.memoryCostKiB,
+        timeCost: request.timeCost,
+        iterations: request.iterations,
+        parallelism: request.parallelism,
+        hashLength: request.hashLength,
+        saltBase64: request.salt === undefined
+          ? undefined
+          : Buffer.from(request.salt).toString("base64").replace(/=+$/, "")
+      }));
       // Mirror real structured-clone transfer: the parent's buffers are
       // DETACHED at handoff. Without this the fake silently leaves dispatched
       // plaintext readable in the parent, which is the one thing the ownership
@@ -88,9 +151,14 @@ function createFakeWorker(
     },
     terminate(): Promise<unknown> {
       terminateCalls += 1;
+      if (terminationMode === "reject") {
+        // Deliberately NOT idempotent-cached: a refused request leaves nothing
+        // in flight. The thread stays alive and emits no exit.
+        return Promise.reject(new Error("ERR_WORKER_TERMINATE_REFUSED"));
+      }
       // Idempotent, like a real Worker: a second terminate() observes the SAME
       // in-flight termination instead of starting another one.
-      pendingTermination ??= hangTermination
+      pendingTermination ??= terminationMode === "hang"
         ? new Promise((resolve) => {
           releaseTermination = () => { alive = false; resolve(0); };
         })
@@ -101,13 +169,21 @@ function createFakeWorker(
     unref() { refs -= 1; },
     emitReady() { emit("message", { kind: "ready" }); },
     settle(id: string) {
-      const op = received.find((job) => job.id === id)?.op ?? "hash-password";
+      const job = received.find((candidate) => candidate.id === id);
+      const op = job?.op ?? "hash-password";
       if (op === "verify-password") {
         emit("message", { kind: "verified", id, matches: false });
         return;
       }
+      if (op === "hash-audit") {
+        emit("message", {
+          kind: "result", id, digest: "ab".repeat(job?.hashLength ?? 32)
+        });
+        return;
+      }
       emit("message", {
-        kind: "result", id, digest: op === "hash-audit" ? AUDIT_DIGEST : ENCODED_HASH
+        kind: "result", id,
+        digest: job === undefined ? ENCODED_HASH : lawfulPasswordEncoding(job)
       });
     },
     raw(frame: unknown) { emit("message", frame); },
@@ -117,6 +193,7 @@ function createFakeWorker(
     },
     crash() { emit("error", new Error("worker died")); },
     releaseTermination() { releaseTermination?.(); },
+    emitExit(code = 1) { alive = false; emit("exit", code); },
     terminated: () => terminateCalls,
     refCount: () => refs,
     isAlive: () => alive
@@ -151,6 +228,8 @@ function makePool(options: Partial<{
   restartWindowMs: number;
   closeDrainMs: number;
   autoReady: boolean;
+  terminationMode: TerminationMode;
+  terminationConfirmTimeoutMs: number;
 }> = {}): { pool: Argon2WorkerPool; workers: FakeWorker[] } {
   const workers: FakeWorker[] = [];
   const pool = new Argon2WorkerPool({
@@ -162,8 +241,11 @@ function makePool(options: Partial<{
     restartBudget: options.restartBudget ?? 3,
     restartWindowMs: options.restartWindowMs ?? 60_000,
     closeDrainMs: options.closeDrainMs ?? 50,
+    terminationConfirmTimeoutMs: options.terminationConfirmTimeoutMs ?? 200,
     spawn: (index) => {
-      const worker = createFakeWorker(index, options.autoReady ?? true);
+      const worker = createFakeWorker(
+        index, options.autoReady ?? true, false, options.terminationMode ?? "resolve"
+      );
       workers.push(worker);
       return worker;
     }
@@ -1423,8 +1505,11 @@ describe("T1 rework1 P1-D — operation-bound protocol validation", () => {
 
     const hash = pool.hashPassword(bytes(8), bytes(16), PASSWORD_KDF);
     await flush();
-    worker.raw({ kind: "result", id: worker.received[0]!.id, digest: ENCODED_HASH });
-    await expect(hash).resolves.toBe(ENCODED_HASH);
+    // The lawful reply is the one bound to THIS request's costs and salt, not
+    // merely some in-envelope encoding (see rework2 RED 3).
+    const lawful = lawfulPasswordEncoding(worker.received[0]!);
+    worker.raw({ kind: "result", id: worker.received[0]!.id, digest: lawful });
+    await expect(hash).resolves.toBe(lawful);
 
     const audit = pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF);
     await flush();
@@ -1753,4 +1838,663 @@ describe("T1 rework1 — the worker's encoding validator cannot drift from the p
       expect(password.every((byte) => byte === 0)).toBe(true);
     }
   });
+});
+
+// ==========================================================================
+// REWORK 2 — binding Sol xHigh findings from the final review round.
+// Every block below was written against a reproduction of the defect it pins,
+// and every assertion here was proved RED against the pre-rework2 pool bytes
+// (packages/crypto/src/argon2-worker-pool.ts sha256
+//  af84e900a611f9719397fcf905a66cc157a8a06b47e24cea79dbace305563124).
+// ==========================================================================
+
+/** Collects unhandled rejections for the duration of one assertion. */
+async function withoutUnhandledRejections<T>(body: () => Promise<T>): Promise<T> {
+  const seen: unknown[] = [];
+  const listener = (reason: unknown): void => { seen.push(reason); };
+  process.on("unhandledRejection", listener);
+  try {
+    const result = await body();
+    // Give any orphaned rejection a full turn to be reported.
+    await new Promise<void>((resolve) => { setTimeout(resolve, 25); });
+    expect(seen.map((reason) => String(reason))).toEqual([]);
+    return result;
+  } finally {
+    process.off("unhandledRejection", listener);
+  }
+}
+
+describe("T1 rework2 R1 — a refused termination is not a confirmed death", () => {
+  const CONFIRM_MS = 60;
+
+  /**
+   * Two workers whose `terminate()` REJECTS while the thread keeps running and
+   * emits no exit. This is the only fixture that can tell "the request failed"
+   * apart from "the 64 MiB worker is gone", which is the whole finding.
+   */
+  function refusingPool(options: { readonly restartBudget?: number } = {}): {
+    pool: Argon2WorkerPool;
+    workers: FakeWorker[];
+  } {
+    const workers: FakeWorker[] = [];
+    const pool = new Argon2WorkerPool({
+      workers: 2,
+      restartBudget: options.restartBudget ?? 5,
+      jobTimeoutMs: 200,
+      closeDrainMs: 20,
+      terminationConfirmTimeoutMs: CONFIRM_MS,
+      spawn: (index) => {
+        const worker = createFakeWorker(index, true, false, "reject");
+        workers.push(worker);
+        return worker;
+      }
+    });
+    return { pool, workers };
+  }
+
+  it("builds no replacement while a refused termination leaves the old worker alive", async () => {
+    const { pool, workers } = refusingPool();
+    await pool.ready();
+    expect(pool.stats().liveHandles).toBe(2);
+
+    workers[0]!.crash();
+    await flush(16);
+
+    // The rejection told the pool NOTHING about the thread. Its 64 MiB arena is
+    // still mapped, so a replacement here would put three physical workers
+    // behind a two-worker bound.
+    expect(workers[0]!.isAlive()).toBe(true);
+    expect(workers).toHaveLength(2);
+    expect(pool.stats().liveHandles).toBe(2);
+    expect(pool.stats().retiringHandles).toBe(1);
+
+    // ...and it stays that way past the confirmation deadline: an unconfirmed
+    // worker is never silently forgotten, and no third thread is ever built.
+    await new Promise<void>((resolve) => { setTimeout(resolve, CONFIRM_MS * 3); });
+    expect(workers).toHaveLength(2);
+    expect(pool.stats().retiringHandles).toBeGreaterThanOrEqual(1);
+    expect(pool.stats().liveHandles).toBe(2);
+    await pool.close().catch(() => undefined);
+  });
+
+  it("fails the pool closed once death cannot be confirmed within the ruled deadline", async () => {
+    const { pool, workers } = refusingPool();
+    await pool.ready();
+    workers[0]!.crash();
+
+    // A REAL ruled deadline elapses here: CONFIRM_MS is the injected
+    // terminationConfirmTimeoutMs, and nothing else can settle this.
+    await new Promise<void>((resolve) => { setTimeout(resolve, CONFIRM_MS * 3); });
+
+    expect(pool.stats().breakerTripped).toBe(true);
+    const refused = pool.verifyPassword(bytes(8), ENCODED_HASH);
+    await expect(refused).rejects.toBeInstanceOf(Argon2InfrastructureError);
+    await expect(refused).rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+    // Failing closed never invents a replacement for the slot it lost.
+    expect(workers).toHaveLength(2);
+    await pool.close().catch(() => undefined);
+  });
+
+  it("close() refuses to claim zero handles for an unconfirmed worker, and fails typed not hung", async () => {
+    await withoutUnhandledRejections(async () => {
+      const { pool, workers } = refusingPool();
+      await pool.ready();
+      workers[0]!.crash();
+      await flush(16);
+
+      // A named watchdog, so a HANG is reported as a hang rather than as
+      // vitest's generic 120 s backstop. Correct code settles in ~CONFIRM_MS.
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const hang = new Promise<never>((_resolve, reject) => {
+        watchdog = setTimeout(() => reject(new Error("CLOSE_UNCONFIRMED_HANG")), 5_000);
+      });
+      const startedAt = performance.now();
+      let outcome: unknown;
+      try {
+        outcome = await Promise.race([
+          pool.close().then(() => ({ settled: "resolved" as const }),
+            (error: unknown) => ({ settled: "rejected" as const, error })),
+          hang
+        ]);
+      } finally {
+        clearTimeout(watchdog);
+      }
+      expect(performance.now() - startedAt).toBeLessThan(5_000);
+
+      // Bounded and TYPED, never a silent success.
+      expect(outcome).toMatchObject({ settled: "rejected" });
+      const error = (outcome as { error: unknown }).error;
+      expect(error).toBeInstanceOf(Argon2InfrastructureError);
+      expect(error).toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+
+      // And the books are honest: an unconfirmed 64 MiB worker is still counted.
+      expect(workers[0]!.isAlive()).toBe(true);
+      expect(pool.stats().retiringHandles).toBeGreaterThanOrEqual(1);
+      expect(pool.stats().liveHandles).toBeGreaterThanOrEqual(1);
+      expect(pool.stats().state).not.toBe("CLOSED");
+
+      // Idempotent: a second close observes the SAME typed settlement.
+      await expect(pool.close()).rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+    });
+  }, 30_000);
+
+  it("POSITIVE CONTROL: an explicit exit after the refused request does confirm death", async () => {
+    const { pool, workers } = refusingPool();
+    await pool.ready();
+    workers[0]!.crash();
+    await flush(16);
+    // Custody is held: no replacement yet, so this control is not vacuous.
+    expect(workers).toHaveLength(2);
+    expect(pool.stats().retiringHandles).toBe(1);
+
+    // The one signal that DOES prove the thread is gone.
+    workers[0]!.emitExit(1);
+    await flush(16);
+
+    expect(workers[0]!.isAlive()).toBe(false);
+    expect(workers).toHaveLength(3);
+    expect(pool.stats().retiringHandles).toBe(0);
+    expect(pool.stats().liveHandles).toBe(2);
+    expect(pool.stats().breakerTripped).toBe(false);
+    expect(pool.stats().state).toBe("OPEN");
+
+    // The replacement is a working worker, and close now completes cleanly.
+    const later = pool.verifyPassword(bytes(8), ENCODED_HASH);
+    await flush(8);
+    const replacement = workers[2]!;
+    expect(replacement.received).toHaveLength(1);
+    replacement.verified(replacement.received[0]!.id, false);
+    await expect(later).resolves.toBe(false);
+    const closing = pool.close();
+    await flush(4);
+    for (const worker of workers) worker.emitExit(0);
+    await closing;
+    expect(pool.stats().state).toBe("CLOSED");
+    expect(pool.stats().liveHandles).toBe(0);
+  });
+
+  it("settles every promise exactly once and raises no unhandled rejection", async () => {
+    await withoutUnhandledRejections(async () => {
+      const { pool, workers } = refusingPool();
+      await pool.ready();
+      const settlements: string[] = [];
+      const jobs = Array.from({ length: 6 }, () => {
+        const promise = pool.verifyPassword(bytes(8), ENCODED_HASH);
+        promise.then(() => settlements.push("resolved"),
+          (error: unknown) => settlements.push((error as { code: string }).code));
+        return promise;
+      });
+      await flush();
+      workers[0]!.crash();
+      workers[1]!.crash();
+      await new Promise<void>((resolve) => { setTimeout(resolve, CONFIRM_MS * 3); });
+      await Promise.allSettled(jobs);
+      await pool.close().catch(() => undefined);
+      await Promise.allSettled(jobs);
+      // Six jobs, six settlements: no double-settle, no hang, no stray reject.
+      expect(settlements).toHaveLength(6);
+      expect(settlements.every((code) => code.startsWith("ARGON2_"))).toBe(true);
+      expect(pool.stats().outstandingTotal).toBe(0);
+    });
+  }, 30_000);
+});
+
+describe("T1 rework2 R2 — closing never pumps queued secrets", () => {
+  const PASSWORD_KDF = { memoryCostKiB: 65_536, timeCost: 3, parallelism: 1, hashLength: 32 };
+  const AUDIT_KDF = { memoryCostKiB: 19_456, iterations: 2, parallelism: 1, hashLength: 32 };
+
+  it("dispatches nothing once CLOSING begins, and cancels/zeroes every queued payload", async () => {
+    const { pool, workers } = makePool({ workers: 1, closeDrainMs: 400 });
+    await pool.ready();
+    const worker = workers[0]!;
+
+    // One ACTIVE secret-bearing job holds the only worker.
+    const activePassword = new TextEncoder().encode("active-correct-horse-battery");
+    const activeSalt = new Uint8Array(16).fill(7);
+    const active = pool.hashPassword(activePassword, activeSalt, PASSWORD_KDF);
+    active.catch(() => undefined);
+    await flush();
+    expect(worker.received).toHaveLength(1);
+
+    // ...and three QUEUED secret-bearing jobs sit behind it, in both lanes.
+    const queuedPayloads = Array.from({ length: 2 }, () => ({
+      secret: new TextEncoder().encode("queued-correct-horse-battery"),
+      salt: new Uint8Array(16).fill(9)
+    }));
+    const auditPayload = {
+      secret: new TextEncoder().encode("queued-audit-source-value"),
+      salt: new Uint8Array(32).fill(4)
+    };
+    const settlements: string[] = [];
+    const queued = [
+      ...queuedPayloads.map((payload) =>
+        pool.hashPassword(payload.secret, payload.salt, PASSWORD_KDF)),
+      pool.hashAuditContext(auditPayload.secret, auditPayload.salt, AUDIT_KDF)
+    ];
+    for (const promise of queued) {
+      promise.then(() => settlements.push("resolved"),
+        (error: unknown) => settlements.push((error as { code: string }).code));
+    }
+    await flush();
+    expect(pool.stats().queuedTotal).toBe(3);
+
+    // Close BEGINS. The contract: refuse new work, let the active job drain,
+    // cancel queued work. It must not hand a queued password to a worker.
+    const closing = pool.close();
+    await flush();
+    expect(pool.stats().state).toBe("CLOSING");
+    const dispatchedAtCloseStart = worker.received.length;
+    expect(dispatchedAtCloseStart).toBe(1);
+
+    // The active job answers. THIS is the trigger: a result calls pump(), and a
+    // pump that stops only for CLOSED dispatches a queued secret after close.
+    worker.settle(worker.received[0]!.id);
+    await new Promise<void>((resolve) => { setTimeout(resolve, 40); });
+    expect(worker.received).toHaveLength(dispatchedAtCloseStart);
+    expect(worker.received.map((job) => job.id))
+      .toEqual([worker.received[0]!.id]);
+
+    await closing;
+    // The already-active job drained to a real result rather than being killed.
+    await expect(active).resolves.toMatch(/^\$argon2id\$v=19\$m=65536,t=3,p=1\$/);
+
+    // Every queued promise rejected EXACTLY once, with the typed error.
+    expect(settlements).toEqual([
+      "ARGON2_POOL_UNAVAILABLE", "ARGON2_POOL_UNAVAILABLE", "ARGON2_POOL_UNAVAILABLE"
+    ]);
+    for (const promise of queued) {
+      await expect(promise).rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+    }
+
+    // A queued payload was never dispatched, so it must be ZEROED in place -
+    // not detached, which is what a dispatch would have done to it instead.
+    for (const payload of [...queuedPayloads, auditPayload]) {
+      expect(payload.secret.byteLength).toBeGreaterThan(0);
+      expect([...payload.secret].every((byte) => byte === 0)).toBe(true);
+      expect(payload.salt.byteLength).toBeGreaterThan(0);
+      expect([...payload.salt].every((byte) => byte === 0)).toBe(true);
+    }
+    expect(pool.stats().queuedTotal).toBe(0);
+    expect(pool.stats().outstandingTotal).toBe(0);
+    expect(pool.stats().state).toBe("CLOSED");
+  }, 30_000);
+
+  it("never grows a worker's received-job count after CLOSING, over repeated pumps", async () => {
+    const { pool, workers } = makePool({ workers: 2, closeDrainMs: 400 });
+    await pool.ready();
+    const activeJobs = Array.from({ length: 2 }, () => {
+      const promise = pool.verifyPassword(bytes(8), ENCODED_HASH);
+      promise.catch(() => undefined);
+      return promise;
+    });
+    const queuedJobs = Array.from({ length: 6 }, () => {
+      const promise = pool.verifyPassword(bytes(8), ENCODED_HASH);
+      promise.catch(() => undefined);
+      return promise;
+    });
+    await flush();
+    const before = workers.map((worker) => worker.received.length);
+    expect(before).toEqual([1, 1]);
+
+    const closing = pool.close();
+    await flush();
+    expect(pool.stats().state).toBe("CLOSING");
+    // Settle both actives, then poke every remaining pump entry point.
+    for (const worker of workers) worker.settle(worker.received[0]!.id);
+    for (const worker of workers) worker.emitReady();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 40); });
+    expect(workers.map((worker) => worker.received.length)).toEqual(before);
+
+    await closing;
+    expect(workers.map((worker) => worker.received.length)).toEqual(before);
+    for (const promise of queuedJobs) {
+      await expect(promise).rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+    }
+    await Promise.allSettled(activeJobs);
+    expect(pool.stats().outstandingTotal).toBe(0);
+  }, 30_000);
+});
+
+describe("T1 rework2 R3 — a response must answer the EXACT request", () => {
+  const PASSWORD_KDF = { memoryCostKiB: 65_536, timeCost: 3, parallelism: 1, hashLength: 32 };
+  const AUDIT_KDF = { memoryCostKiB: 19_456, iterations: 2, parallelism: 1, hashLength: 32 };
+  const OTHER_SALT_BASE64 = Buffer.from(new Uint8Array(16).fill(0xbe))
+    .toString("base64").replace(/=+$/, "");
+
+  async function answerPasswordWith(
+    digestFor: (job: DispatchedJob) => unknown
+  ): Promise<{ outcome: unknown; workers: FakeWorker[]; pool: Argon2WorkerPool }> {
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const job = pool.hashPassword(bytes(8), bytes(16), PASSWORD_KDF);
+    const settlement = job.then(
+      (value) => ({ settled: "resolved" as const, value }),
+      (error: unknown) => ({ settled: "rejected" as const, code: (error as { code: string }).code })
+    );
+    await flush();
+    const dispatched = workers[0]!.received[0]!;
+    workers[0]!.raw({ kind: "result", id: dispatched.id, digest: digestFor(dispatched) });
+    return { outcome: await settlement, workers, pool };
+  }
+
+  /**
+   * Every one of these is a well-formed, in-ENVELOPE Argon2id encoding that the
+   * pre-rework2 parser accepted and the repository would have persisted as this
+   * user's password hash - while being a different, and mostly weaker, KDF than
+   * the 64 MiB / t=3 / p=1 job that was actually requested.
+   */
+  const responseMutants: readonly {
+    readonly label: string;
+    readonly dimension: string;
+    readonly digest: (job: DispatchedJob) => string;
+  }[] = [
+    {
+      label: "a weaker 19 MiB memory cost", dimension: "memoryCostKiB",
+      digest: (job) => lawfulPasswordEncoding({ ...job, memoryCostKiB: 19_456 })
+    },
+    {
+      label: "a weaker t=2 time cost", dimension: "timeCost",
+      digest: (job) => lawfulPasswordEncoding({ ...job, timeCost: 2 })
+    },
+    {
+      label: "a different p=4 parallelism", dimension: "parallelism",
+      digest: (job) => lawfulPasswordEncoding({ ...job, parallelism: 4 })
+    },
+    {
+      label: "a different 64-byte digest length", dimension: "hashLength",
+      digest: (job) => lawfulPasswordEncoding({ ...job, hashLength: 64 })
+    },
+    {
+      label: "a salt the request never supplied", dimension: "salt",
+      digest: (job) => lawfulPasswordEncoding({ ...job, saltBase64: OTHER_SALT_BASE64 })
+    },
+    {
+      label: "every cost lowered to the envelope floor", dimension: "all",
+      digest: (job) => lawfulPasswordEncoding({
+        ...job, memoryCostKiB: 19_456, timeCost: 2, saltBase64: OTHER_SALT_BASE64
+      })
+    }
+  ];
+
+  for (const mutant of responseMutants) {
+    it(`refuses ${mutant.label} as a protocol fault, not a stored hash`, async () => {
+      const { outcome, workers, pool } = await answerPasswordWith(mutant.digest);
+      // Proof the mutant really is in-envelope: the old envelope check passes it.
+      const digest = mutant.digest(workers[0]!.received[0]!);
+      expect(parseEncodedArgon2id(digest)).toBeDefined();
+      // ...and it is still refused, on the `${mutant.dimension}` dimension.
+      expect(outcome).toMatchObject({ settled: "rejected", code: "ARGON2_WORKER_FAILED" });
+      expect(outcome).not.toMatchObject({ settled: "resolved" });
+      // A worker that answers a different question is no longer trustworthy.
+      await flush(12);
+      expect(workers[0]!.terminated()).toBe(1);
+      expect(workers.length).toBeGreaterThan(1);
+      await pool.close();
+    });
+  }
+
+  it("POSITIVE CONTROL: accepts the encoding bound to this exact request", async () => {
+    const { outcome, workers, pool } = await answerPasswordWith(
+      (job) => lawfulPasswordEncoding(job)
+    );
+    expect(outcome).toMatchObject({ settled: "resolved" });
+    expect((outcome as { value: string }).value)
+      .toBe(lawfulPasswordEncoding(workers[0]!.received[0]!));
+    await flush(12);
+    // The lawful answer neither retires nor replaces the worker.
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.terminated()).toBe(0);
+    await pool.close();
+  });
+
+  it("POSITIVE CONTROL: every dimension is checked independently, one at a time", async () => {
+    // Each mutant above changes exactly one dimension away from a digest that
+    // IS accepted, so none of them can be passing for an unrelated reason.
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const first = pool.hashPassword(bytes(8), bytes(16), PASSWORD_KDF);
+    await flush();
+    const dispatched = workers[0]!.received[0]!;
+    expect(dispatched.memoryCostKiB).toBe(65_536);
+    expect(dispatched.timeCost).toBe(3);
+    expect(dispatched.parallelism).toBe(1);
+    expect(dispatched.hashLength).toBe(32);
+    expect(dispatched.saltBase64).toBe(
+      Buffer.from(bytes(16)).toString("base64").replace(/=+$/, "")
+    );
+    workers[0]!.raw({
+      kind: "result", id: dispatched.id, digest: lawfulPasswordEncoding(dispatched)
+    });
+    await expect(first).resolves.toBe(lawfulPasswordEncoding(dispatched));
+    await pool.close();
+  });
+
+  it("preserves the exact audit digest length and operation binding", async () => {
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const audit = pool.hashAuditContext(bytes(8), bytes(32), AUDIT_KDF);
+    const settlement = audit.then(
+      (value) => ({ settled: "resolved" as const, value }),
+      (error: unknown) => ({ settled: "rejected" as const, code: (error as { code: string }).code })
+    );
+    await flush();
+    // A 16-byte hex digest for a 32-byte audit request is still refused.
+    workers[0]!.raw({ kind: "result", id: workers[0]!.received[0]!.id, digest: "ab".repeat(16) });
+    expect(await settlement).toMatchObject({
+      settled: "rejected", code: "ARGON2_WORKER_FAILED"
+    });
+    await pool.close();
+  });
+
+  const failureCodeMutants: readonly string[] = [
+    "", "argon2_worker_job_failed", "ARGON2_WORKER_JOB_FAILED ",
+    "ARGON2_POOL_UNAVAILABLE", "OK", "ARGON2_WORKER_JOB_FAILED_BUT_HERE_IS_A_HASH"
+  ];
+
+  for (const code of failureCodeMutants) {
+    it(`treats the failure code ${JSON.stringify(code)} as a protocol fault`, async () => {
+      const { pool, workers } = makePool({ workers: 1 });
+      await pool.ready();
+      const job = pool.verifyPassword(bytes(8), ENCODED_HASH);
+      const settlement = job.then(
+        (value) => ({ settled: "resolved" as const, value }),
+        (error: unknown) => ({ settled: "rejected" as const, code: (error as { code: string }).code })
+      );
+      await flush();
+      workers[0]!.raw({ kind: "failed", id: workers[0]!.received[0]!.id, code });
+      expect(await settlement).toMatchObject({
+        settled: "rejected", code: "ARGON2_WORKER_FAILED"
+      });
+      // An unlawful code is a protocol fault: the worker is retired, not believed.
+      await flush(12);
+      expect(workers[0]!.terminated()).toBe(1);
+      expect(workers.length).toBeGreaterThan(1);
+      await pool.close();
+    });
+  }
+
+  it("POSITIVE CONTROL: the one lawful failure code settles without retiring the worker", async () => {
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const job = pool.verifyPassword(bytes(8), ENCODED_HASH);
+    await flush();
+    workers[0]!.raw({
+      kind: "failed", id: workers[0]!.received[0]!.id, code: "ARGON2_WORKER_JOB_FAILED"
+    });
+    await expect(job).rejects.toMatchObject({ code: "ARGON2_WORKER_FAILED" });
+    await flush(12);
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.terminated()).toBe(0);
+    await pool.close();
+  });
+
+  it("pins the pool's lawful failure code to the worker module's own constant", async () => {
+    // The pool cannot import the value from the worker module: that module
+    // imports hash-wasm at its top level, so a value import would drag the WASM
+    // Argon2 surface back onto the request thread. The constant is therefore a
+    // deliberate mirror, and this is what makes drift a test failure.
+    const worker = await import("../../packages/crypto/src/argon2-worker.js");
+    const pool = await import("../../packages/crypto/src/argon2-worker-pool.js");
+    expect(pool.ARGON2_LAWFUL_WORKER_FAILURE_CODE).toBe(worker.ARGON2_WORKER_JOB_FAILED);
+    expect(pool.ARGON2_LAWFUL_WORKER_FAILURE_CODE).toBe("ARGON2_WORKER_JOB_FAILED");
+  });
+});
+
+describe("T1 rework3 RED 1 — a bounded observation never disables a later death confirmation", () => {
+  /**
+   * The REAL ruled deadline exercised below: it is injected verbatim as
+   * `terminationConfirmTimeoutMs`, and nothing in these tests can settle a
+   * retirement before it elapses. There is no fake clock and no early escape,
+   * so a harness that could not fail is not possible here.
+   */
+  const CONFIRM_MS = 60;
+
+  /**
+   * A worker whose `terminate()` is REFUSED — the thread keeps running and emits
+   * no exit — until the test explicitly makes it terminable again.
+   *
+   * This is the only fixture that can separate the two authoritative death
+   * signals from each other and from the bounded observation: a LATE explicit
+   * `exit` (limb 1) and a LATER termination attempt that actually FULFILS
+   * (limb 2), each arriving strictly after the confirmation deadline has already
+   * handed its caller a bounded `unconfirmed` answer.
+   */
+  interface RetryableWorker extends FakeWorker {
+    /** From now on `terminate()` fulfils and the thread really stops. */
+    allowTermination(): void;
+  }
+
+  function createRetryableWorker(index: number): RetryableWorker {
+    const base = createFakeWorker(index, true, false, "reject");
+    let permitted = false;
+    let killed = false;
+    // Counted HERE rather than in the base fake, so that every termination
+    // REQUEST is counted on both sides of `allowTermination()`. That is what
+    // makes "close issued a fresh attempt" a real observation.
+    let attempts = 0;
+    return {
+      ...base,
+      terminate(): Promise<unknown> {
+        attempts += 1;
+        // Refused: tells the pool NOTHING about the thread.
+        if (!permitted) return base.terminate();
+        // Fulfilled: the thread really stopped. Deliberately emits no `exit`,
+        // so limb 2 is proven by the fulfilled attempt alone.
+        return Promise.resolve().then(() => { killed = true; return 0; });
+      },
+      terminated: () => attempts,
+      isAlive: () => base.isAlive() && !killed,
+      allowTermination() { permitted = true; }
+    } as RetryableWorker;
+  }
+
+  function retryablePool(): { pool: Argon2WorkerPool; workers: RetryableWorker[] } {
+    const workers: RetryableWorker[] = [];
+    const pool = new Argon2WorkerPool({
+      workers: 2,
+      restartBudget: 5,
+      jobTimeoutMs: 200,
+      closeDrainMs: 20,
+      terminationConfirmTimeoutMs: CONFIRM_MS,
+      spawn: (index) => {
+        const worker = createRetryableWorker(index);
+        workers.push(worker);
+        return worker;
+      }
+    });
+    return { pool, workers };
+  }
+
+  it("accepts an explicit exit that lands AFTER the confirmation deadline", async () => {
+    await withoutUnhandledRejections(async () => {
+      const { pool, workers } = retryablePool();
+      await pool.ready();
+      expect(pool.stats().liveHandles).toBe(2);
+
+      workers[0]!.crash();
+      await flush(16);
+      // The refused request proved nothing: custody is held and no replacement
+      // is built, so the deadline below is reached non-vacuously.
+      expect(workers).toHaveLength(2);
+      expect(workers[0]!.isAlive()).toBe(true);
+      expect(pool.stats().retiringHandles).toBe(1);
+
+      // The ruled deadline actually elapses. Nothing else can settle it.
+      await new Promise<void>((resolve) => { setTimeout(resolve, CONFIRM_MS * 3); });
+      expect(pool.stats().breakerTripped).toBe(true);
+      expect(workers).toHaveLength(2);
+      expect(pool.stats().retiringHandles).toBeGreaterThanOrEqual(1);
+      await expect(pool.verifyPassword(bytes(8), ENCODED_HASH))
+        .rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+
+      // THE FINDING. The bounded observation expired, but physical death is a
+      // separate, permanent fact. An explicit exit after that deadline is still
+      // authoritative and must reconcile custody truthfully.
+      for (const worker of workers) worker.emitExit(0);
+      await flush(16);
+      expect(pool.stats().retiringHandles).toBe(0);
+      expect(pool.stats().liveHandles).toBe(0);
+      // A late confirmation reconciles the books; it does not reopen the
+      // fail-closed breaker and never spawns a replacement.
+      expect(workers).toHaveLength(2);
+      expect(pool.stats().breakerTripped).toBe(true);
+
+      // And once every handle is confirmed, close can truthfully reach CLOSED.
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const hang = new Promise<never>((_resolve, reject) => {
+        watchdog = setTimeout(() => reject(new Error("CLOSE_AFTER_LATE_EXIT_HANG")), 5_000);
+      });
+      try {
+        await Promise.race([pool.close(), hang]);
+      } finally {
+        clearTimeout(watchdog);
+      }
+      expect(pool.stats().state).toBe("CLOSED");
+      expect(pool.stats().liveHandles).toBe(0);
+      expect(pool.stats().retiringHandles).toBe(0);
+    });
+  }, 30_000);
+
+  it("lets a fulfilled close-time retry confirm death instead of reusing a stale verdict", async () => {
+    await withoutUnhandledRejections(async () => {
+      const { pool, workers } = retryablePool();
+      await pool.ready();
+      workers[0]!.crash();
+
+      // Again the REAL ruled deadline expires with no exit and no fulfilled
+      // termination, so every retirement already holds a bounded `unconfirmed`.
+      await new Promise<void>((resolve) => { setTimeout(resolve, CONFIRM_MS * 3); });
+      expect(pool.stats().breakerTripped).toBe(true);
+      expect(pool.stats().retiringHandles).toBeGreaterThanOrEqual(1);
+      expect(workers.every((worker) => worker.isAlive())).toBe(true);
+      const terminationsBeforeClose = workers.map((worker) => worker.terminated());
+
+      // The threads become terminable. No exit is ever emitted: the fulfilled
+      // close-time retry is the ONLY confirmation available from here on.
+      for (const worker of workers) worker.allowTermination();
+
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const hang = new Promise<never>((_resolve, reject) => {
+        watchdog = setTimeout(() => reject(new Error("CLOSE_RETRY_HANG")), 5_000);
+      });
+      const startedAt = performance.now();
+      try {
+        await Promise.race([pool.close(), hang]);
+      } finally {
+        clearTimeout(watchdog);
+      }
+      expect(performance.now() - startedAt).toBeLessThan(5_000);
+
+      // NON-VACUITY: close really did issue a fresh termination request rather
+      // than settling on the stale verdict it already had.
+      expect(workers.map((worker) => worker.terminated()))
+        .not.toEqual(terminationsBeforeClose);
+      expect(workers.every((worker) => !worker.isAlive())).toBe(true);
+      expect(pool.stats().state).toBe("CLOSED");
+      expect(pool.stats().liveHandles).toBe(0);
+      expect(pool.stats().retiringHandles).toBe(0);
+      // One physical handle per slot throughout: no replacement overlap.
+      expect(workers).toHaveLength(2);
+    });
+  }, 30_000);
 });

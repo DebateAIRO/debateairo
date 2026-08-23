@@ -2,9 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
   appendAuditEvent,
-  hashAuditSourceIp,
-  hashAuditUserAgent,
-  type AuditSourceIpKdfParameters,
+  type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
 
@@ -38,12 +36,14 @@ export type ResendPreparation =
   | Readonly<{ status: "send"; userId: string; auditToken: string; channelBindingId: string }>
   | Readonly<{ status: "ignored" }>;
 
+// Deliberately carries no raw source context: by the time an AuditWrite exists
+// the IP and user agent have already been reduced to prepared Argon2 digests,
+// so raw values cannot reach the transactional append path at all.
 interface AuditWrite {
   readonly actorToken: string;
   readonly eventType: string;
   readonly targetType: string;
   readonly occurredAt: Date;
-  readonly source: AuthSourceContext;
   readonly decision: "ALLOW" | "DENY";
   readonly success: boolean;
   readonly justification: string | null;
@@ -68,18 +68,33 @@ function normalizeAuditSourceContext(source: AuthSourceContext): AuthSourceConte
   });
 }
 
-export class PostgresIdentityRepository {
-  private readonly sourceIpSalt: Buffer;
-  private readonly sourceIpKdf: AuditSourceIpKdfParameters;
+/**
+ * The two audit KDF digests, derived off-thread BEFORE any connection is taken.
+ * `appendAudit` accepts only prepared digests, so no Argon2 work can begin
+ * after `pool.connect()`, `BEGIN`, a row lock, or the audit-chain advisory lock.
+ */
+export interface PreparedAuditContext {
+  readonly ipArgon2id: string;
+  readonly userAgentArgon2id: string;
+}
 
+export class PostgresIdentityRepository {
   constructor(
     private readonly pool: Pool,
-    sourceIpSalt: Uint8Array,
-    sourceIpKdf: AuditSourceIpKdfParameters
-  ) {
-    if (sourceIpSalt.byteLength < 32) throw new TypeError("AUDIT_SOURCE_IP_SALT_INVALID");
-    this.sourceIpSalt = Buffer.from(sourceIpSalt);
-    this.sourceIpKdf = Object.freeze({ ...sourceIpKdf });
+    private readonly auditContext: AuditContextHasher
+  ) {}
+
+  /**
+   * Normalizes the source and derives both audit digests through the worker
+   * pool. Callers MUST await this before entering `transaction`, so a KDF
+   * failure surfaces before any durable identity mutation and no memory-hard
+   * work is ever performed while holding a connection or a lock.
+   */
+  private async prepareAuditContext(source: AuthSourceContext): Promise<PreparedAuditContext> {
+    const normalized = normalizeAuditSourceContext(source);
+    const ipArgon2id = await this.auditContext.hashSourceIp(normalized.ip);
+    const userAgentArgon2id = await this.auditContext.hashUserAgent(normalized.userAgent);
+    return Object.freeze({ ipArgon2id, userAgentArgon2id });
   }
 
   private async transaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -97,13 +112,13 @@ export class PostgresIdentityRepository {
     }
   }
 
-  private async appendAudit(client: PoolClient, event: AuditWrite): Promise<void> {
+  private async appendAudit(
+    client: PoolClient,
+    prepared: PreparedAuditContext,
+    event: AuditWrite
+  ): Promise<void> {
     assertOpaqueToken(event.actorToken);
-    const source = normalizeAuditSourceContext(event.source);
-    const ipArgon2id = await hashAuditSourceIp(source.ip, this.sourceIpSalt, this.sourceIpKdf);
-    const userAgentArgon2id = await hashAuditUserAgent(
-      source.userAgent, this.sourceIpSalt, this.sourceIpKdf
-    );
+    const { ipArgon2id, userAgentArgon2id } = prepared;
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('identity:audit-chain', 0))");
     const head = await client.query<{ this_hash: Buffer }>(`
       SELECT parent.this_hash
@@ -155,6 +170,10 @@ export class PostgresIdentityRepository {
     input: PendingAccountInput,
     beforeCommit: () => Promise<void>
   ): Promise<PendingAccountResult> {
+    // Prepared once, before any connection: the new-account and duplicate
+    // branches below consume the same digests, so both perform equivalent
+    // audit KDF work and neither branch is distinguishable by timing.
+    const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
       const inserted = await client.query<{ user_id: string }>(`
         INSERT INTO identity."user" (
@@ -198,12 +217,11 @@ export class PostgresIdentityRepository {
         await client.query(`
           UPDATE identity."user" SET state=state WHERE user_id=$1
         `, [existing.user_id]);
-        await this.appendAudit(client, {
+        await this.appendAudit(client, prepared, {
           actorToken: existing.audit_token,
           eventType: "identity.registration",
           targetType: "identity.user",
           occurredAt: input.occurredAt,
-          source: input.source,
           decision: "DENY",
           success: false,
           justification: "REGISTRATION_ADDRESS_UNAVAILABLE"
@@ -238,12 +256,11 @@ export class PostgresIdentityRepository {
           user_id,channel_type,address_ciphertext,state,created_at,delivery_status
         ) VALUES ($1,'recovery_email',$2::jsonb,'pending_verification',$3,'not_requested')
       `, [input.userId, JSON.stringify(input.recoveryEmailCiphertext), input.occurredAt]);
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken: input.auditToken,
         eventType: "identity.registration",
         targetType: "identity.user",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: "ALLOW",
         success: true,
         justification: null
@@ -298,6 +315,7 @@ export class PostgresIdentityRepository {
     readonly success: boolean;
     readonly errorCode: string | null;
   }): Promise<void> {
+    const prepared = await this.prepareAuditContext(input.source);
     await this.transaction(async (client) => {
       // Lock the channel binding and then the user in one statement, in the
       // same `c,u` order prepareVerificationResend uses. Locking the user first
@@ -318,12 +336,11 @@ export class PostgresIdentityRepository {
         SET verification_last_sent_at=$2,delivery_status=$3,delivery_error=$4
         WHERE user_id=$1 AND channel_type='email'
       `, [input.userId, input.occurredAt, input.success ? "sent" : "failed", input.errorCode]);
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken: user.rows[0].audit_token,
         eventType: "identity.verification.sent",
         targetType: "identity.channel_binding",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: "ALLOW",
         success: input.success,
         justification: input.errorCode
@@ -338,17 +355,17 @@ export class PostgresIdentityRepository {
     readonly source: AuthSourceContext;
     readonly errorCode: "MAIL_RECORD_FAILED";
   }): Promise<void> {
+    const prepared = await this.prepareAuditContext(input.source);
     await this.transaction(async (client) => {
       const user = await client.query<{ audit_token: string }>(`
         SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
       `, [input.userId]);
       if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken: user.rows[0].audit_token,
         eventType: "identity.verification.delivery_record_failed",
         targetType: "identity.channel_binding",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: "DENY",
         success: false,
         justification: `correlation:${input.correlationId};code:${input.errorCode}`
@@ -361,6 +378,7 @@ export class PostgresIdentityRepository {
     readonly occurredAt: Date;
     readonly source: AuthSourceContext;
   }): Promise<void> {
+    const prepared = await this.prepareAuditContext(input.source);
     await this.transaction(async (client) => {
       // Both original round trips are retained; only their order changes, so the
       // email channel is taken before the user and this path cannot invert
@@ -373,12 +391,11 @@ export class PostgresIdentityRepository {
         SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE
       `, [input.userId]);
       if (user.rows[0] === undefined) throw new Error("IDENTITY_USER_NOT_FOUND");
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken: user.rows[0].audit_token,
         eventType: "identity.registration.duplicate_postwork",
         targetType: "identity.channel_binding",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: "DENY",
         success: false,
         justification: "REGISTRATION_ADDRESS_UNAVAILABLE"
@@ -391,6 +408,7 @@ export class PostgresIdentityRepository {
     readonly occurredAt: Date;
     readonly source: AuthSourceContext;
   }): Promise<boolean> {
+    const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
       // Explicit sequential row locking in the account-local order
       // channel -> user -> credential. A multi-relation `FOR UPDATE OF` list is
@@ -453,12 +471,11 @@ export class PostgresIdentityRepository {
         `, [channel.channel_binding_id, input.occurredAt]);
         await client.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [channel.user_id]);
       }
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken,
         eventType: "identity.verification.consumed",
         targetType: "identity.channel_binding",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: valid ? "ALLOW" : "DENY",
         success: valid,
         justification: valid ? null : "VERIFICATION_TOKEN_INVALID"
@@ -475,6 +492,7 @@ export class PostgresIdentityRepository {
     readonly cooldownMs: number;
     readonly source: AuthSourceContext;
   }): Promise<ResendPreparation> {
+    const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
       const found = await client.query<{
         channel_binding_id: string;
@@ -512,12 +530,11 @@ export class PostgresIdentityRepository {
           WHERE channel_binding_id=$1
         `, [row.channel_binding_id, input.tokenHash, input.expiresAt, input.occurredAt]);
       }
-      await this.appendAudit(client, {
+      await this.appendAudit(client, prepared, {
         actorToken,
         eventType: "identity.verification.resend_requested",
         targetType: "identity.channel_binding",
         occurredAt: input.occurredAt,
-        source: input.source,
         decision: send ? "ALLOW" : "DENY",
         success: send,
         justification: send ? null : cooling ? "RESEND_COOLDOWN" : "RESEND_NOT_APPLICABLE"
@@ -548,12 +565,12 @@ export class PostgresIdentityRepository {
       || input.ipCount + input.addressCount !== input.count) {
       throw new TypeError("RATE_LIMIT_REFUSAL_AGGREGATE_INVALID");
     }
-    await this.transaction((client) => this.appendAudit(client, {
+    const prepared = await this.prepareAuditContext(input.source);
+    await this.transaction((client) => this.appendAudit(client, prepared, {
       actorToken: input.actorToken,
       eventType: "identity.auth.rate_limit_refused",
       targetType: `auth.${input.route}`,
       occurredAt: input.occurredAt,
-      source: input.source,
       decision: "DENY",
       success: false,
       justification: `aggregate:route-window;route:${input.route};window:${input.aggregateWindowStartedAt.toISOString()}`
@@ -566,12 +583,12 @@ export class PostgresIdentityRepository {
     readonly occurredAt: Date;
     readonly source: AuthSourceContext;
   }): Promise<void> {
-    await this.transaction((client) => this.appendAudit(client, {
+    const prepared = await this.prepareAuditContext(input.source);
+    await this.transaction((client) => this.appendAudit(client, prepared, {
       actorToken: input.correlationId,
       eventType: "identity.registration.failed",
       targetType: "identity.registration_attempt",
       occurredAt: input.occurredAt,
-      source: input.source,
       decision: "DENY",
       success: false,
       justification: "PROVISION_FAILED"

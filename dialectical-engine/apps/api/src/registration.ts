@@ -413,6 +413,49 @@ interface MailCapacitySignalAggregate {
 interface RegistrationHashWork {
   readonly promise: Promise<string>;
   readonly cancel: () => void;
+  /**
+   * Resolves — and NEVER rejects — at the exact moment this unit of
+   * secret-bearing work is finished, whichever way it finished: the KDF
+   * returned, the KDF failed, or it was cancelled while still queued and never
+   * ran at all.
+   *
+   * `promise` cannot serve this purpose. It is the request's own result and its
+   * losing outcome is discarded by `Promise.all`, whereas the admission token
+   * must be held until the WORK is over, not until the CALLER is done with it.
+   * Awaiting this is also what makes the outcome consumed rather than orphaned.
+   */
+  readonly settlement: Promise<void>;
+}
+
+/**
+ * The route-owned refusal-audit persistence coordinator: one ordered queue, one
+ * writer, one advancing window.
+ */
+interface RefusalAuditCoordinator {
+  /**
+   * Finalized aggregates awaiting their UNIQUE durable write, oldest window
+   * first. The limiter has already released every entry here, so this array is
+   * the last copy of that refusal evidence: an entry leaves only once its own
+   * write has landed.
+   */
+  readonly queue: Readonly<RefusalAggregate>[];
+  /**
+   * The one window still accumulating inside the limiter, with the timer that
+   * finalizes it at its aggregation deadline. Rollover ADVANCES this field and
+   * touches nothing else.
+   */
+  active: Readonly<{
+    windowStartedAt: number;
+    timer: ReturnType<typeof setTimeout>;
+  }> | undefined;
+  /**
+   * THE writer for this route while one is running. Every path — the public
+   * refusal, the deadline timer, and every concurrent shutdown drain — joins
+   * this exact promise rather than starting a private one, which is what makes
+   * a second write of an in-flight window impossible and makes a drain unable
+   * to return while this route still owes a write.
+   */
+  writer: Promise<void> | undefined;
 }
 
 function sourceContext(source: AuthSourceContext): AuthSourceContext {
@@ -436,13 +479,54 @@ export class RegistrationService implements RegistrationApplication {
   private nextMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
   private registrationHashesActive = 0;
   private readonly waitingRegistrationHashes: Array<() => void> = [];
+  /**
+   * How many scheduled hash units currently still RETAIN the caller's password
+   * in their start closure. It rises when work is scheduled and falls the
+   * moment the password is handed to the KDF or dropped by cancellation.
+   *
+   * It exists because that reference is otherwise unobservable: it lives inside
+   * a closure, where no property walk over the service can reach it, so
+   * "cancellation really cleared the secret" could only ever be asserted
+   * vacuously. This counter is the seam that makes it provable.
+   */
+  private registrationPasswordReferencesHeld = 0;
   private mailCapacitySignalAggregate: MailCapacitySignalAggregate | undefined;
-  private readonly pendingRefusalAuditFlushes = new Map<AuthRoute, {
-    readonly windowStartedAt: number;
-    readonly timer: ReturnType<typeof setTimeout>;
-    readonly completion: Promise<void>;
-    readonly complete: () => void;
-  }>();
+  /**
+   * The structural registration admission budget: at most
+   * `structuralMaximumConcurrentRegistrations` registrations may be inside the
+   * service at once, and there is NO wait queue in front of it.
+   *
+   * `granted` and `released` are monotone lifetime totals, not live state. They
+   * exist so that "released exactly once" is directly observable: a double
+   * release would show up as `released > granted`, and a missing one as a
+   * `held` that never returns to zero.
+   */
+  private registrationAdmissionsHeld = 0;
+  private registrationAdmissionsGranted = 0;
+  private registrationAdmissionsReleased = 0;
+  private registrationAdmissionClosing = false;
+  /**
+   * THE drain promise while one is pending. Every concurrent drain joins this
+   * exact promise rather than starting a private wait, which is what makes
+   * repeated and concurrent drains impossible to hang or double-settle.
+   */
+  private registrationAdmissionDrain: Promise<void> | undefined;
+  private settleRegistrationAdmissionDrain: (() => void) | undefined;
+  /**
+   * ONE persistence coordinator per route, stable across every window.
+   *
+   * A refusal window that rolls over is the hard case: W0 stops accumulating
+   * the instant W1 opens, and from that moment exactly one owner must carry W0
+   * to a durable row. Giving each window its own queue and its own writer is
+   * what produced two owners (a superseded window's aggregates shallow-copied
+   * into a successor that writes them again behind the still-unresolved
+   * predecessor) or none (a rollover snapshot awaited on the public path and
+   * discarded when its write failed).
+   *
+   * So the queue and the writer belong to the ROUTE and only the active window
+   * advances. Nothing here is ever replaced or copied on rollover.
+   */
+  private readonly refusalAuditRoutes = new Map<AuthRoute, RefusalAuditCoordinator>();
 
   constructor(private readonly dependencies: {
     readonly repository: IdentityRepository;
@@ -467,6 +551,87 @@ export class RegistrationService implements RegistrationApplication {
     });
   }
 
+  /**
+   * Takes one admission slot, or refuses. Synchronous by construction: the
+   * caller must be able to run this before its first `await`, so the ceiling is
+   * already decided by the time a simultaneous burst has been launched.
+   *
+   * Returns the ONE idempotent release closure for that slot. Idempotence is not
+   * defensive here — ownership of this closure legitimately moves to a
+   * reservation continuation on some failure paths, and both the local owner and
+   * the continuation must be able to call it without a second release landing.
+   */
+  private acquireRegistrationAdmission(correlationId: string): () => void {
+    if (this.registrationAdmissionClosing) {
+      // Shutdown has begun. A generic retryable failure, and deliberately NOT
+      // the capacity envelope: this is not a full budget, it is a closing one.
+      throw new AuthFlowError(AUTH_RETRYABLE_UNAVAILABLE_CODE);
+    }
+    if (this.registrationAdmissionsHeld
+      >= this.dependencies.policy.channel.structuralMaximumConcurrentRegistrations) {
+      // The same opaque bounded capacity signal the shared queue already emits.
+      // No address and no source material: window count and correlation only.
+      this.signalMailCapacity(correlationId);
+      throw new AuthFlowError("AUTH_MAIL_BUSY");
+    }
+    this.registrationAdmissionsHeld += 1;
+    this.registrationAdmissionsGranted += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.registrationAdmissionsHeld -= 1;
+      this.registrationAdmissionsReleased += 1;
+      if (this.registrationAdmissionsHeld === 0) this.settleRegistrationAdmissionDrain?.();
+    };
+  }
+
+  registrationAdmissionOccupancy(): Readonly<{
+    admitted: number;
+    maximum: number;
+    closing: boolean;
+    admissions: number;
+    releases: number;
+  }> {
+    return Object.freeze({
+      admitted: this.registrationAdmissionsHeld,
+      maximum: this.dependencies.policy.channel.structuralMaximumConcurrentRegistrations,
+      closing: this.registrationAdmissionClosing,
+      admissions: this.registrationAdmissionsGranted,
+      releases: this.registrationAdmissionsReleased
+    });
+  }
+
+  /**
+   * Closes admission and awaits the exact transition to zero admitted
+   * registrations.
+   *
+   * This is a fail-closed join of in-flight OWNERSHIP, and nothing more. It does
+   * not bound how long an admitted request may take: repository and transaction
+   * awaits have no request-wide cancellation deadline, and the Argon2 worker
+   * timeout only begins at dispatch. Any outer process-level shutdown budget and
+   * its escalation policy belong to the deployment shutdown owner (T3), not
+   * here.
+   *
+   * It runs FIRST in the shutdown order because an admitted registration can
+   * still enqueue mail and refusal-audit work; draining those before this
+   * returns would report work complete that had not yet been created.
+   */
+  async drainRegistrationAdmissions(): Promise<void> {
+    this.registrationAdmissionClosing = true;
+    if (this.registrationAdmissionsHeld === 0) return;
+    if (this.registrationAdmissionDrain === undefined) {
+      this.registrationAdmissionDrain = new Promise<void>((resolve) => {
+        this.settleRegistrationAdmissionDrain = () => {
+          this.settleRegistrationAdmissionDrain = undefined;
+          this.registrationAdmissionDrain = undefined;
+          resolve();
+        };
+      });
+    }
+    await this.registrationAdmissionDrain;
+  }
+
   private async holdEnumerationFloor(startedAt: number): Promise<void> {
     const remaining = this.dependencies.policy.verification.enumerationResponseFloorMs
       - (performance.now() - startedAt);
@@ -488,10 +653,20 @@ export class RegistrationService implements RegistrationApplication {
 
   private scheduleRegistrationHash(password: string): RegistrationHashWork {
     let passwordValue: string | undefined = password;
+    this.registrationPasswordReferencesHeld += 1;
     let started = false;
     let settled = false;
     let rejectWork!: (error: unknown) => void;
     let start!: () => void;
+    let finishWork!: () => void;
+    const settlement = new Promise<void>((resolve) => { finishWork = resolve; });
+    // Idempotent by construction: the password is dropped either by dispatch or
+    // by cancellation, never by both, and the counter must follow it exactly.
+    const dropPasswordReference = (): void => {
+      if (passwordValue === undefined) return;
+      passwordValue = undefined;
+      this.registrationPasswordReferencesHeld -= 1;
+    };
     const promise = new Promise<string>((resolve, reject) => {
       rejectWork = reject;
       start = () => {
@@ -499,7 +674,7 @@ export class RegistrationService implements RegistrationApplication {
         started = true;
         this.registrationHashesActive += 1;
         const value = passwordValue!;
-        passwordValue = undefined;
+        dropPasswordReference();
         void hashPassword(this.dependencies.argon2, value, this.dependencies.policy.password.argon2id)
           .then((hash) => {
             settled = true;
@@ -511,6 +686,10 @@ export class RegistrationService implements RegistrationApplication {
           .finally(() => {
             this.registrationHashesActive -= 1;
             this.startNextRegistrationHash();
+            // LAST, and only here: once this resolves, an admission owner
+            // waiting on it is free to hand the slot back, so it must not
+            // resolve while the pool slot is still charged to this work.
+            finishWork();
           });
       };
     });
@@ -522,13 +701,18 @@ export class RegistrationService implements RegistrationApplication {
     }
     return Object.freeze({
       promise,
+      settlement,
       cancel: () => {
+        // Once dispatched this is a no-op BY CONSTRUCTION — the pool owns the
+        // work and there is nothing here to revoke. That is precisely why the
+        // caller must await `settlement` rather than assume cancellation won.
         if (started || settled) return;
         const index = this.waitingRegistrationHashes.indexOf(start);
         if (index >= 0) this.waitingRegistrationHashes.splice(index, 1);
-        passwordValue = undefined;
+        dropPasswordReference();
         settled = true;
         rejectWork(new Error("REGISTRATION_HASH_CANCELLED"));
+        finishWork();
       }
     });
   }
@@ -547,42 +731,186 @@ export class RegistrationService implements RegistrationApplication {
     });
   }
 
-  private scheduleRefusalAuditFlush(route: AuthRoute, windowStartedAt: number, now: Date): void {
-    const active = this.pendingRefusalAuditFlushes.get(route);
-    if (active?.windowStartedAt === windowStartedAt) return;
-    if (active !== undefined) {
-      clearTimeout(active.timer);
-      active.complete();
-      this.pendingRefusalAuditFlushes.delete(route);
+  private refusalAuditRoute(route: AuthRoute): RefusalAuditCoordinator {
+    let coordinator = this.refusalAuditRoutes.get(route);
+    if (coordinator === undefined) {
+      coordinator = { queue: [], active: undefined, writer: undefined };
+      this.refusalAuditRoutes.set(route, coordinator);
     }
+    return coordinator;
+  }
 
-    let complete!: () => void;
-    const completion = new Promise<void>((resolve) => { complete = resolve; });
+  /**
+   * Cleanup is allowed ONLY once this route owns nothing: no accumulating
+   * window, no aggregate still awaiting its row, no write in flight. Dropping
+   * the coordinator any earlier would drop the only copy of that evidence.
+   */
+  private releaseRefusalAuditRoute(route: AuthRoute): void {
+    const coordinator = this.refusalAuditRoutes.get(route);
+    if (coordinator !== undefined && coordinator.active === undefined
+      && coordinator.queue.length === 0 && coordinator.writer === undefined) {
+      this.refusalAuditRoutes.delete(route);
+    }
+  }
+
+  /**
+   * Hands one finalized window to the route coordinator, in window order so a
+   * recovery writes retained windows deterministically oldest-first.
+   */
+  private enqueueRefusalAggregate(route: AuthRoute, aggregate: Readonly<RefusalAggregate>): void {
+    const { queue } = this.refusalAuditRoute(route);
+    const at = queue.findIndex((queued) => queued.windowStartedAt > aggregate.windowStartedAt);
+    if (at < 0) queue.push(aggregate);
+    else queue.splice(at, 0, aggregate);
+  }
+
+  /**
+   * Finalizes `windowStartedAt` INTO the queue, exactly once.
+   *
+   * The guard is the whole point: a timer that fires for a window which is no
+   * longer the active one has already been superseded — its aggregate left the
+   * limiter as the rollover snapshot and is queued — so it must not finalize
+   * anything, or it would enqueue a second copy and cancel the successor's
+   * deadline along the way.
+   */
+  private finalizeRefusalWindow(route: AuthRoute, windowStartedAt: number): void {
+    const coordinator = this.refusalAuditRoutes.get(route);
+    if (coordinator?.active?.windowStartedAt !== windowStartedAt) return;
+    clearTimeout(coordinator.active.timer);
+    coordinator.active = undefined;
+    // The limiter releases its copy HERE; the queue is the only copy from now on.
+    const aggregate = this.dependencies.limiter.finalizeRefusalAggregate(route, windowStartedAt);
+    if (aggregate !== null) this.enqueueRefusalAggregate(route, aggregate);
+  }
+
+  /**
+   * Returns THE route writer, starting it only if none is running.
+   *
+   * The running writer drains the whole queue, so an aggregate enqueued while
+   * it works is picked up by that same writer instead of by a second one. A
+   * caller therefore always gets a promise that covers everything this route
+   * currently owes, and every caller gets the SAME promise.
+   */
+  private startRefusalAuditPump(route: AuthRoute): Promise<void> {
+    const coordinator = this.refusalAuditRoute(route);
+    if (coordinator.writer !== undefined) return coordinator.writer;
+    if (coordinator.queue.length === 0) {
+      this.releaseRefusalAuditRoute(route);
+      return Promise.resolve();
+    }
+    const writer = this.pumpRefusalAuditQueue(route, coordinator);
+    coordinator.writer = writer;
+    return writer;
+  }
+
+  private async pumpRefusalAuditQueue(
+    route: AuthRoute,
+    coordinator: RefusalAuditCoordinator
+  ): Promise<void> {
+    try {
+      // Dequeued one at a time and only AFTER its own write lands, so a failure
+      // part-way through neither loses an unwritten window nor rewrites a
+      // durable one — the rejected head stays at the front for the retry.
+      //
+      // Removal is by IDENTITY, never by position: the queue is ordered by
+      // window, so a window finalized while this write is in flight — after a
+      // backward wall-clock step, a real refusal can open an OLDER window — is
+      // sorted in front of the aggregate being written. A positional shift()
+      // would then discard that never-written window and re-attempt the one
+      // that just landed, and `recordRateLimitRefusal` has no dedup key.
+      while (coordinator.queue.length > 0) {
+        const writing = coordinator.queue[0]!;
+        await this.recordRefusalAggregate(route, writing);
+        const at = coordinator.queue.indexOf(writing);
+        if (at >= 0) coordinator.queue.splice(at, 1);
+      }
+    } finally {
+      coordinator.writer = undefined;
+      this.releaseRefusalAuditRoute(route);
+    }
+  }
+
+  /**
+   * Opens `windowStartedAt` as this route's active window and arms its
+   * aggregation deadline. Rollover ADVANCES the window: the queue and the
+   * writer are untouched, so a predecessor still being persisted keeps its one
+   * owner.
+   */
+  private scheduleRefusalAuditFlush(route: AuthRoute, windowStartedAt: number, now: Date): void {
+    const coordinator = this.refusalAuditRoute(route);
+    if (coordinator.active?.windowStartedAt === windowStartedAt) return;
+    if (coordinator.active !== undefined) clearTimeout(coordinator.active.timer);
+
     const delay = Math.max(0,
       windowStartedAt + this.dependencies.policy.rateLimitRefusalAuditIntervalMs - now.getTime()
     );
     const timer = setTimeout(() => {
-      void (async () => {
-        const aggregate = this.dependencies.limiter.finalizeRefusalAggregate(route, windowStartedAt);
-        if (aggregate !== null) await this.recordRefusalAggregate(route, aggregate);
-      })().catch(() => {
+      // The ORDINARY deadline path stays fire-and-forget: it logs, leaves the
+      // unwritten window queued for a later drain, and never touches a request.
+      this.finalizeRefusalWindow(route, windowStartedAt);
+      void this.startRefusalAuditPump(route).catch(() => {
         console.error(
           `[AUTH_RATE_LIMIT_AUDIT_RECORD_FAILED] route=${route} window=${new Date(windowStartedAt).toISOString()}`
         );
-      }).finally(() => {
-        if (this.pendingRefusalAuditFlushes.get(route)?.windowStartedAt === windowStartedAt) {
-          this.pendingRefusalAuditFlushes.delete(route);
-        }
-        complete();
       });
     }, delay);
     timer.unref();
-    this.pendingRefusalAuditFlushes.set(route, { windowStartedAt, timer, completion, complete });
+    coordinator.active = Object.freeze({ windowStartedAt, timer });
   }
 
+  /**
+   * Awaits every pending refusal-audit window, firing each one NOW rather than
+   * waiting out its aggregation deadline.
+   *
+   * That deadline is the ruled `rateLimitRefusalAuditIntervalMs` aggregation
+   * window, so simply awaiting it would stall a shutdown drain for up to a
+   * minute per route — and because the timer is unref'd, a process that exited
+   * first would lose the durable refusal row entirely. Firing early changes no
+   * aggregation semantics and no audit content: the same flush body runs, the
+   * same row is written, only the wait is removed.
+   *
+   * Unlike the ordinary deadline path, this drain OBSERVES persistence. It is
+   * the last chance to write the row before the process goes away, and its
+   * caller uses it to decide that the Argon2 surface may be torn down. So a
+   * failed write propagates here rather than being logged and forgotten: the
+   * retained aggregate stays pending and retryable, and shutdown is not told
+   * that work it never durably recorded is done.
+   */
   async drainRateLimitAuditFlushes(): Promise<void> {
-    while (this.pendingRefusalAuditFlushes.size > 0) {
-      await Promise.all([...this.pendingRefusalAuditFlushes.values()].map((pending) => pending.completion));
+    let failure: unknown;
+    let failed = false;
+    // Sequential rather than raced, so one route's failure never cancels
+    // another route's in-flight write half-way through.
+    for (const route of [...this.refusalAuditRoutes.keys()]) {
+      await this.drainRefusalAuditRoute(route).catch((error: unknown) => {
+        if (!failed) {
+          failed = true;
+          failure = error;
+        }
+      });
+    }
+    if (failed) throw failure;
+  }
+
+  private async drainRefusalAuditRoute(route: AuthRoute): Promise<void> {
+    for (;;) {
+      const coordinator = this.refusalAuditRoutes.get(route);
+      if (coordinator === undefined) return;
+      // Firing the active window early is what bounds the drain; the flush body
+      // and the row it produces are identical to the deadline path's.
+      if (coordinator.active !== undefined) {
+        this.finalizeRefusalWindow(route, coordinator.active.windowStartedAt);
+      }
+      if (coordinator.writer === undefined && coordinator.queue.length === 0) return;
+      // Joining THE route writer — never a private copy of the queue — is what
+      // stops this drain returning while a write it does not own is still in
+      // flight, and what coalesces concurrent drains onto one write per window.
+      // A rejection propagates: shutdown is never told that work it never
+      // durably recorded is done, and the rejected window stays queued.
+      await this.startRefusalAuditPump(route);
+      // The writer just joined may have been a PREDECESSOR's, finishing before
+      // this drain's own finalization was enqueued, so re-check rather than
+      // assume this route is now clear.
     }
   }
 
@@ -674,30 +1002,51 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
-  private reserveMailDispatchPermit(
-    correlationId: string,
-    minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs,
-    activationSpacingMs: number = this.dependencies.policy.channel.mailDispatchActivationSpacingMs
-  ): Promise<MailDispatchActivation> {
-    if (this.mailDispatchReservations < this.dependencies.policy.channel.maxConcurrentVerificationDispatches) {
+  /**
+   * The one shared reservation primitive, now taking an EXPLICIT named wait
+   * deadline rather than reading one global bound.
+   *
+   * Registration and resend share this queue, but they no longer share a
+   * deadline: registration passes the ruled 28,000 ms and everything else keeps
+   * the shipped 18,000 ms default. The deadline is a property of the CALL, not
+   * of the queue, so the FIFO, its 32/96 bounds and its arbitration are
+   * untouched — a 28-second registration waiter and an 18-second resend waiter
+   * sit in the same line, each on its own timer.
+   */
+  private reserveMailDispatchPermit(request: {
+    readonly correlationId: string;
+    readonly minimumReservationMs?: number;
+    readonly activationSpacingMs?: number;
+    readonly waitDeadlineMs?: number;
+  }): Promise<MailDispatchActivation> {
+    const channel = this.dependencies.policy.channel;
+    const minimumReservationMs = request.minimumReservationMs
+      ?? channel.mailDispatchMinimumReservationMs;
+    const activationSpacingMs = request.activationSpacingMs
+      ?? channel.mailDispatchActivationSpacingMs;
+    const waitDeadlineMs = request.waitDeadlineMs ?? channel.mailDispatchQueueWaitTimeoutMs;
+    if (this.mailDispatchReservations < channel.maxConcurrentVerificationDispatches) {
       this.mailDispatchReservations += 1;
       return Promise.resolve(() => this.scheduleMailDispatchActivation(
         false, minimumReservationMs, activationSpacingMs
       ));
     }
-    if (this.waitingMailDispatches.length >= this.dependencies.policy.channel.maxQueuedVerificationDispatches) {
-      this.signalMailCapacity(correlationId);
+    if (this.waitingMailDispatches.length >= channel.maxQueuedVerificationDispatches) {
+      this.signalMailCapacity(request.correlationId);
       throw new AuthFlowError("AUTH_MAIL_BUSY");
     }
     return new Promise<MailDispatchActivation>((resolve, reject) => {
       let waiting!: WaitingMailDispatch;
       const timeout = setTimeout(() => {
+        // Removal is by the EXACT waiter object: a handoff that already shifted
+        // this waiter out has cleared this timer, and a stale fire must never
+        // splice out whoever now occupies that position.
         const index = this.waitingMailDispatches.indexOf(waiting);
         if (index < 0) return;
         this.waitingMailDispatches.splice(index, 1);
-        this.signalMailCapacity(correlationId);
+        this.signalMailCapacity(request.correlationId);
         reject(new AuthFlowError("AUTH_MAIL_BUSY"));
-      }, this.dependencies.policy.channel.mailDispatchQueueWaitTimeoutMs);
+      }, waitDeadlineMs);
       waiting = Object.freeze({
         resolve, reject, timeout, minimumReservationMs, activationSpacingMs
       });
@@ -706,7 +1055,7 @@ export class RegistrationService implements RegistrationApplication {
   }
 
   private async reserveMailDispatch(correlationId: string): Promise<MailDispatchRelease> {
-    const activate = await this.reserveMailDispatchPermit(correlationId);
+    const activate = await this.reserveMailDispatchPermit({ correlationId });
     return activate();
   }
 
@@ -735,14 +1084,26 @@ export class RegistrationService implements RegistrationApplication {
   }): Promise<never> {
     const aggregate = this.dependencies.limiter.aggregateRefusal(input);
     if (aggregate.finalized !== null) {
-      await this.recordRefusalAggregate(input.route, aggregate.finalized).catch(() => {
+      // Rollover. The limiter has just released the previous window, so this
+      // snapshot is the only copy: it goes to the route coordinator ONCE, and
+      // the timer that armed that window will decline to finalize it again
+      // because it is no longer the active one.
+      this.enqueueRefusalAggregate(input.route, aggregate.finalized);
+    }
+    if (aggregate.startedWindow) {
+      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.now);
+    }
+    if (aggregate.finalized !== null) {
+      // FIRE-AND-FORGET, never awaited. A rate-limit refusal is a public path:
+      // an ordinary opaque 429 must not be gated on a database write. The
+      // shared route writer carries the snapshot in the background, and a
+      // shutdown drain joins this exact promise, so declining to wait here
+      // loses no evidence and hides no failure.
+      void this.startRefusalAuditPump(input.route).catch(() => {
         console.error(
           `[AUTH_RATE_LIMIT_AUDIT_RECORD_FAILED] route=${input.route} window=${new Date(aggregate.finalized!.windowStartedAt).toISOString()}`
         );
       });
-    }
-    if (aggregate.startedWindow) {
-      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.now);
     }
     throw new AuthFlowError("AUTH_RATE_LIMITED");
   }
@@ -928,103 +1289,163 @@ export class RegistrationService implements RegistrationApplication {
     let pendingPostwork: RegistrationPostwork | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
     let activateMailDispatch: MailDispatchActivation | undefined;
+    let releaseAdmission: (() => void) | undefined;
+    /**
+     * Who owes the release. `local` is the ordinary case and settles in the
+     * outermost `finally` below. It flips to `continuation` exactly once, on the
+     * one path where a reservation outlives this request, and the two owners are
+     * mutually exclusive from that moment on.
+     */
+    let admissionOwner: "local" | "continuation" = "local";
     try {
-      if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
-        || typeof input.password !== "string"
-        || input.password.length < this.dependencies.policy.password.minimumLength
-        || input.adultAffirmed !== true) {
-        throw new AuthFlowError("AUTH_INPUT_INVALID");
-      }
-      const source = sourceContext(rawSource);
-      const email = normalizeEmailForBlindIndex(input.email);
-      const recoveryEmail = normalizeEmailForBlindIndex(input.recoveryEmail);
-      const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
-      const existing = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
-      const limit = this.dependencies.limiter.consume({
-        route: "register",
-        ip: source.ip,
-        addressKey: emailBlindIndex.toString("hex"),
-        now: this.clock()
-      });
-      if (!limit.allowed) {
-        await this.refuseRateLimit({
+      try {
+        if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
+          || typeof input.password !== "string"
+          || input.password.length < this.dependencies.policy.password.minimumLength
+          || input.adultAffirmed !== true) {
+          throw new AuthFlowError("AUTH_INPUT_INVALID");
+        }
+        const source = sourceContext(rawSource);
+        // THE ADMISSION GATE. After the input and source-context validation,
+        // which must never consume budget, and before the first repository
+        // await, the limiter lookup, either KDF, the mail reservation, the token
+        // mint and every mutation. Nothing above this line has touched a
+        // dependency, so the 104th valid request is refused having done no work
+        // at all — it only pays the response clamp, like every other arm.
+        releaseAdmission = this.acquireRegistrationAdmission(correlationId);
+        const email = normalizeEmailForBlindIndex(input.email);
+        const recoveryEmail = normalizeEmailForBlindIndex(input.recoveryEmail);
+        const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
+        const existing = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
+        const limit = this.dependencies.limiter.consume({
           route: "register",
-          scope: limit.scope,
-          actorToken: existing?.auditToken ?? randomUUID(),
-          now: this.clock(),
-          source
+          ip: source.ip,
+          addressKey: emailBlindIndex.toString("hex"),
+          now: this.clock()
         });
-      }
+        if (!limit.allowed) {
+          await this.refuseRateLimit({
+            route: "register",
+            scope: limit.scope,
+            actorToken: existing?.auditToken ?? randomUUID(),
+            now: this.clock(),
+            source
+          });
+        }
 
-      const reservation = this.reserveMailDispatchPermit(
-        correlationId,
-        this.dependencies.policy.channel.registrationMailDispatchMinimumReservationMs,
-        this.dependencies.policy.channel.registrationMailDispatchActivationSpacingMs
-      );
-      const passwordHashWork = this.scheduleRegistrationHash(input.password);
-      let passwordHash: string;
-      try {
-        [activateMailDispatch, passwordHash] = await Promise.all([
-          reservation, passwordHashWork.promise
-        ]);
-      } catch (error) {
-        passwordHashWork.cancel();
-        void reservation.then(async (activate) => {
-          this.dispatchMailReservationHold(await activate());
-        })
-          .catch(() => undefined);
-        throw error;
-      }
-      try {
-        pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-          email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
-        }));
-      } catch (provisionError) {
-        console.error(
-          `[AUTH_REGISTRATION_PROVISION_FAILED] correlation=${correlationId} code=PROVISION_FAILED`
-        );
-        await this.dependencies.repository.recordRegistrationFailure({
+        const reservation = this.reserveMailDispatchPermit({
           correlationId,
-          occurredAt: requestedAt,
-          source
-        }).catch(() => {
-          console.error(
-            `[AUTH_REGISTRATION_FAILURE_AUDIT_FAILED] correlation=${correlationId} code=AUDIT_RECORD_FAILED`
-          );
+          minimumReservationMs:
+            this.dependencies.policy.channel.registrationMailDispatchMinimumReservationMs,
+          activationSpacingMs:
+            this.dependencies.policy.channel.registrationMailDispatchActivationSpacingMs,
+          // Registration alone waits the ruled 28,000 ms. Resend keeps 18,000.
+          waitDeadlineMs:
+            this.dependencies.policy.channel.registrationMailDispatchQueueWaitTimeoutMs
         });
-        if (activateMailDispatch !== undefined) {
-          releaseMailDispatch = await activateMailDispatch();
-          activateMailDispatch = undefined;
+        const passwordHashWork = this.scheduleRegistrationHash(input.password);
+        let passwordHash: string;
+        try {
+          [activateMailDispatch, passwordHash] = await Promise.all([
+            reservation, passwordHashWork.promise
+          ]);
+        } catch (error) {
+          // Cancellation only wins while the work is still QUEUED. If the KDF
+          // was already dispatched this returns having revoked nothing, and the
+          // password plus its closure are still live inside the pool — whose own
+          // execution timeout starts at dispatch, not at submission.
+          passwordHashWork.cancel();
+          // So the token is owed to the WORK, not to the caller. Whichever way
+          // the reservation ends, the slot goes back only once this settles:
+          // cancelled-and-never-run settles it at once, already-started settles
+          // it when the pool is finished with the secret. The admission budget
+          // therefore never has a secret-bearing unit outside it, and a
+          // shutdown drain cannot pass one.
+          const secretWorkSettled = passwordHashWork.settlement;
+          // The reservation OUTLIVES this request: it may still be granted long
+          // after the caller has its 503. So the admission release moves with it,
+          // atomically and exactly once, and the local `finally` below stops
+          // owning it from this synchronous assignment onward.
+          const admission = releaseAdmission;
+          admissionOwner = "continuation";
+          void reservation.then(
+            async (activate) => {
+              try {
+                // Register the hold in `pendingMailDispatches` FIRST, so a
+                // shutdown drain can see the work, and only then hand the budget
+                // back — without waiting out the reservation lease, which would
+                // hold an admission slot for seconds against a request that no
+                // longer exists.
+                this.dispatchMailReservationHold(await activate());
+              } finally {
+                await secretWorkSettled;
+                admission?.();
+              }
+            },
+            async () => {
+              await secretWorkSettled;
+              admission?.();
+            }
+          ).catch(() => undefined);
+          throw error;
         }
-        // A provisioning failure caused by the Argon2 pool takes the one shared
-        // retryable envelope; anything else keeps the existing registration
-        // failure code, whose response shape is unchanged.
-        throw provisionError instanceof Argon2InfrastructureError
-          ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: provisionError })
-          : new AuthFlowError("AUTH_REGISTRATION_FAILED");
-      }
-      return REGISTRATION_PUBLIC_RESPONSE;
-    } catch (error) {
-      // Password-hash and mail-reservation failures reach here; every Argon2
-      // pool failure among them leaves as the one constant 503 envelope.
-      throw asAuthFlowFailure(error);
-    } finally {
-      try {
-        await this.holdRegistrationEnumerationClamp(startedAt);
+        try {
+          pendingPostwork = await this.provisionPendingAccount(Object.freeze({
+            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
+          }));
+        } catch (provisionError) {
+          console.error(
+            `[AUTH_REGISTRATION_PROVISION_FAILED] correlation=${correlationId} code=PROVISION_FAILED`
+          );
+          await this.dependencies.repository.recordRegistrationFailure({
+            correlationId,
+            occurredAt: requestedAt,
+            source
+          }).catch(() => {
+            console.error(
+              `[AUTH_REGISTRATION_FAILURE_AUDIT_FAILED] correlation=${correlationId} code=AUDIT_RECORD_FAILED`
+            );
+          });
+          if (activateMailDispatch !== undefined) {
+            releaseMailDispatch = await activateMailDispatch();
+            activateMailDispatch = undefined;
+          }
+          // A provisioning failure caused by the Argon2 pool takes the one shared
+          // retryable envelope; anything else keeps the existing registration
+          // failure code, whose response shape is unchanged.
+          throw provisionError instanceof Argon2InfrastructureError
+            ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: provisionError })
+            : new AuthFlowError("AUTH_REGISTRATION_FAILED");
+        }
+        return REGISTRATION_PUBLIC_RESPONSE;
+      } catch (error) {
+        // Password-hash and mail-reservation failures reach here; every Argon2
+        // pool failure among them leaves as the one constant 503 envelope.
+        throw asAuthFlowFailure(error);
       } finally {
-        if (pendingPostwork !== undefined && activateMailDispatch !== undefined) {
-          releaseMailDispatch = await activateMailDispatch();
-          activateMailDispatch = undefined;
-        }
-        if (pendingPostwork !== undefined && releaseMailDispatch !== undefined) {
-          const release = releaseMailDispatch;
-          releaseMailDispatch = undefined;
-          this.dispatchVerification(pendingPostwork, release);
-        }
-        if (releaseMailDispatch !== undefined) {
-          this.dispatchMailReservationHold(releaseMailDispatch);
+        try {
+          await this.holdRegistrationEnumerationClamp(startedAt);
+        } finally {
+          if (pendingPostwork !== undefined && activateMailDispatch !== undefined) {
+            releaseMailDispatch = await activateMailDispatch();
+            activateMailDispatch = undefined;
+          }
+          if (pendingPostwork !== undefined && releaseMailDispatch !== undefined) {
+            const release = releaseMailDispatch;
+            releaseMailDispatch = undefined;
+            this.dispatchVerification(pendingPostwork, release);
+          }
+          if (releaseMailDispatch !== undefined) {
+            this.dispatchMailReservationHold(releaseMailDispatch);
+          }
         }
       }
+    } finally {
+      // The OUTERMOST release, after the clamp and after the handoff block has
+      // either given successful postwork to `dispatchVerification` or given the
+      // reservation to a continuation. Never at commit, never at clamp entry,
+      // never before handoff — and never here at all once ownership moved.
+      if (admissionOwner === "local") releaseAdmission?.();
     }
   }
 

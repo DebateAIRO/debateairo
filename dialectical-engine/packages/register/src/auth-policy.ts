@@ -186,7 +186,7 @@ const channelPolicySchema = z.object({
     minimum_reservation_ms: z.literal(5_700),
     queue_wait_timeout_ms: z.literal(18_000),
     release_semantics: z.literal("ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF"),
-    retained_payload: z.literal("ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT"),
+    retained_payload: z.literal("ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT"),
     operator_signal: z.object({
       payload: z.literal("OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE"),
       aggregation_window_ms: z.literal(60_000),
@@ -202,6 +202,112 @@ const channelPolicySchema = z.object({
       binding_headroom_ms: z.number().int().positive(),
       first_measured_unabsorbed_concurrency: z.number().int().positive(),
       beyond_n_star_protection: z.literal("EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION")
+    }).strict(),
+    /**
+     * decision_version 2, published as a new version beside the sealed one above
+     * rather than replacing it. `registration_clamp_absorption` remains the
+     * historical decision_version 1 (N*=2) exactly as it was sealed; that row is
+     * history, not a monotone lower bound, and nothing here rewrites it.
+     *
+     * Rework7 demoted this row to CONTRADICTED history. Its arrays are retained
+     * byte-for-byte — what changed is its status, not its numbers. `status` is a
+     * free string rather than a literal on purpose: a row that re-arms itself as
+     * CURRENT must be refused by the DERIVATION with a "contradicts" message, not
+     * silently rejected as a malformed member type.
+     */
+    current_registration_clamp_absorption: z.object({
+      decision_version: z.literal(2),
+      status: z.string().min(1),
+      superseded_by_decision_version: z.number().int().positive(),
+      capacity_status: z.string().min(1),
+      contradicting_observations: z.object({
+        burst_100_accepted_on_unchanged_code: z.array(z.number().int().positive()).length(2),
+        n3_hash_and_provisioning_maximum_ms_on_unchanged_code:
+          z.array(z.number().positive()).length(2),
+        ruled_hash_and_provisioning_upper_bound_ms: z.number().int().positive()
+      }).strict(),
+      supersedes_decision_version: z.literal(1),
+      supersession: z.literal("PUBLISHED_BESIDE_THE_SEALED_DECISION;_HISTORICAL_ROW_RETAINED_UNALTERED_AND_NOT_A_MONOTONE_LOWER_BOUND"),
+      registration_activation_spacing_ms: z.number().int().positive(),
+      maximum_unsaturated_concurrency: z.number().int().positive(),
+      measured_hash_and_provisioning_max_ms: z.number().positive(),
+      measurement_safety_percent: z.number().int().positive(),
+      ruled_hash_and_provisioning_upper_bound_ms: z.number().int().positive(),
+      response_clamp_ms: z.number().int().positive(),
+      binding_headroom_ms: z.number().int().positive(),
+      first_measured_unabsorbed_concurrency: z.number().int().positive(),
+      measured_accepted_request_capacity: z.number().int().positive(),
+      beyond_n_star_protection: z.literal("EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"),
+      evidence: z.object({
+        measurement: z.literal("THREE_FRESH_ISOLATED_REPEATS_UNCHANGED_RUNTIME_CADENCE_CAPS_AND_QUEUE_BYTES"),
+        repeats: z.literal(3),
+        n3_clamp_headroom_tenths_ms: z.array(z.number().int()).length(3),
+        n4_clamp_headroom_tenths_ms: z.array(z.number().int()).length(3),
+        raw_maximum_absorbed_concurrency_per_repeat: z.array(z.number().int().positive()).length(3),
+        first_unabsorbed_concurrency_per_repeat: z.array(z.number().int().positive()).length(3),
+        burst_100_accepted_per_repeat: z.array(z.number().int().positive()).length(3),
+        burst_128_accepted_per_repeat: z.array(z.number().int().positive()).length(3),
+        burst_160_accepted_per_repeat: z.array(z.number().int().positive()).length(3),
+        n3_characterization: z.literal("N3_CLAMP_HEADROOM_POSITIVE_IN_EVERY_REPEAT"),
+        n4_characterization: z.literal("N4_CLAMP_HEADROOM_STRADDLES_ZERO_ACROSS_REPEATS;_RAW_MAXIMUM_ABSORBED_UNSTABLE;_NOT_A_RATIFIABLE_ABSORPTION_LIMIT"),
+        conclusion: z.literal("N3_RATIFIED_ON_THREE_POSITIVE_N3_REPEATS_AT_UNCHANGED_45MS_CADENCE;_N4_DELIBERATELY_NOT_CLAIMED")
+      }).strict()
+    }).strict(),
+    /**
+     * decision_version 3 — the CURRENT decision. It says what 103 structurally
+     * is (an admission budget with no wait queue) rather than what v2 wrongly
+     * measured it to be, gives registration its own 28,000 ms mail-permit wait
+     * deadline while resend keeps 18,000 ms, and publishes what it does NOT
+     * know: the cadence stays 45 ms but is provisional, and there is no positive
+     * current N* at all.
+     *
+     * Nearly every field here is a plain type rather than a literal, because the
+     * derivation below has to be the thing that refuses a drifted value — a
+     * literal would reject it as a malformed member type and lose the reason.
+     */
+    registration_admission: z.object({
+      decision_version: z.literal(3),
+      status: z.literal("CURRENT"),
+      supersedes_decision_version: z.number().int().positive(),
+      structural_maximum_concurrent_registrations: z.number().int().positive(),
+      registration_mail_permit_wait_deadline_ms: z.number().int().positive(),
+      shared_mail_permit_wait_deadline_ms: z.number().int().positive(),
+      admission_semantics: z.string().min(1),
+      registration_cadence_ms: z.number().int().positive(),
+      registration_cadence_status: z.string().min(1),
+      /** Absent, never zero, and never a silent fallback to the historical N*=2. */
+      current_positive_clamp_absorption_n_star: z.number().int().positive().nullable(),
+      historical_n_star_2_is_a_fallback: z.boolean(),
+      scope: z.object({
+        mail_transport: z.literal("HEALTHY_MTA"),
+        host: z.literal("TARGET_HOST"),
+        shared_dispatcher_at_entry: z.literal("INITIALLY_EMPTY"),
+        burst: z.literal("REGISTER_ONLY_SIMULTANEOUS"),
+        hard_availability_requests: z.number().int().positive(),
+        mixed_register_and_resend_availability_guaranteed: z.boolean(),
+        route_partitioning: z.literal("NOT_AUTHORIZED_IN_REWORK7")
+      }).strict(),
+      evidence: z.object({
+        measurement: z.string().min(1),
+        repeats: z.literal(3),
+        successes_per_repeat: z.array(z.number().int().positive()).length(3),
+        commits_per_repeat: z.array(z.number().int().positive()).length(3),
+        sends_per_repeat: z.array(z.number().int().positive()).length(3),
+        busy_per_repeat: z.array(z.number().int().nonnegative()).length(3),
+        unexpected_per_repeat: z.array(z.number().int().nonnegative()).length(3),
+        /** Tenths of a millisecond, so 20,922.9 / 21,902.2 / 20,942.1 stay exact. */
+        reservation_wait_maximum_tenths_ms: z.array(z.number().int().positive()).length(3),
+        deadline_derivation: z.string().min(1),
+        /** Hundredths of a percent, so 25.28 / 21.78 / 25.21 stay exact. */
+        margin_hundredths_percent_per_repeat: z.array(z.number().int()).length(3)
+      }).strict(),
+      retention_disclosure: z.object({
+        maximum_admitted_registration_frames: z.number().int().positive(),
+        maximum_shared_mail_queue_waiters: z.number().int().positive(),
+        queued_registration_frame_retention_ms: z.number().int().positive(),
+        queued_registration_frame_contents: z.string().min(1),
+        raw_verification_token_minted_before_mail_grant: z.boolean()
+      }).strict()
     }).strict(),
     cadence_sensitivity: z.object({
       minus_15_ms: z.object({
@@ -231,7 +337,7 @@ const channelPolicySchema = z.object({
       conclusion: z.literal("CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING"),
       recalibration_trigger: z.literal("TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS")
     }).strict(),
-    sizing_derivation: z.string().regex(/45 ms.*N\*=2.*480 ms.*2 \* 45 ms.*570 ms.*600 ms.*30 ms.*equal-work distribution.*60 ms.*logical capacity permit.*durable provisioning.*response clamp.*lease activation.*32 accepted registration hashes.*5100 ms.*5000 ms.*100 ms.*5700 ms.*600 ms.*5000 ms.*100 ms.*18-second/i)
+    sizing_derivation: z.string().regex(/45 ms.*N\*=2.*480 ms.*2 \* 45 ms.*570 ms.*600 ms.*30 ms.*equal-work distribution.*60 ms.*logical capacity permit.*durable provisioning.*response clamp.*lease activation.*32 accepted registration hashes.*5100 ms.*5000 ms.*100 ms.*5700 ms.*600 ms.*5000 ms.*100 ms.*18-second.*decision_version 2.*unchanged 45 ms.*N\*=3.*three fresh isolated repeats.*389\.6 ms.*110 percent.*430 ms.*3 \* 45 ms.*565 ms.*600 ms.*35 ms.*\+113\.1, \+111\.2 and \+75\.4 ms.*N=4 is deliberately NOT claimed.*\+7\.0, \+9\.2 and -6\.5 ms.*\[4,4,3\].*\[8,8,4\].*retained unaltered as history.*not a monotone lower bound.*exactly 103.*128 and 160.*103\/103\/103.*100\/100\/100.*decision_version 3.*structural admission budget.*104th.*not a measured accepted-request capacity.*98.*96.*973\.0 ms.*28,000 ms.*18,000 ms.*1\.25.*21,902\.2 ms.*21\.78 percent.*45 ms cadence is provisional.*no positive current N\*/i)
   }).strict(),
   delivery_audit: z.object({
     public_result: z.literal("ENUMERATION_SAFE_GENERIC_RESPONSE"),
@@ -429,7 +535,7 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
         minimum_reservation_ms: 5_700,
         queue_wait_timeout_ms: 18_000,
         release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
-        retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
+        retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
         operator_signal: Object.freeze({
           payload: "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
           aggregation_window_ms: 60_000,
@@ -445,6 +551,95 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
           binding_headroom_ms: 30,
           first_measured_unabsorbed_concurrency: 3,
           beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"
+        }),
+        current_registration_clamp_absorption: Object.freeze({
+          decision_version: 2,
+          // Rework7. The numbers below are retained byte-for-byte; only the
+          // status changed. Unchanged code re-measured the same 100-request
+          // burst at 98 and then 96, and the same n=3 arm at 1,264.7 ms and
+          // 973.0 ms against this row's own ruled 430 ms bound.
+          status: "SUPERSEDED_BY_DECISION_VERSION_3;_CAPACITY_CLAIM_CONTRADICTED_BY_UNCHANGED_CODE_EVIDENCE",
+          superseded_by_decision_version: 3,
+          capacity_status: "STRUCTURAL_ADMISSION_BUDGET_UNDER_DECISION_VERSION_3;_NOT_A_MEASURED_COMPLETION_RATE",
+          contradicting_observations: Object.freeze({
+            burst_100_accepted_on_unchanged_code: Object.freeze([98, 96]),
+            n3_hash_and_provisioning_maximum_ms_on_unchanged_code:
+              Object.freeze([1_264.7, 973.0]),
+            ruled_hash_and_provisioning_upper_bound_ms: 430
+          }),
+          supersedes_decision_version: 1,
+          supersession: "PUBLISHED_BESIDE_THE_SEALED_DECISION;_HISTORICAL_ROW_RETAINED_UNALTERED_AND_NOT_A_MONOTONE_LOWER_BOUND",
+          registration_activation_spacing_ms: 45,
+          maximum_unsaturated_concurrency: 3,
+          measured_hash_and_provisioning_max_ms: 389.6,
+          measurement_safety_percent: 110,
+          ruled_hash_and_provisioning_upper_bound_ms: 430,
+          response_clamp_ms: 600,
+          binding_headroom_ms: 35,
+          first_measured_unabsorbed_concurrency: 4,
+          measured_accepted_request_capacity: 103,
+          beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION",
+          evidence: Object.freeze({
+            measurement: "THREE_FRESH_ISOLATED_REPEATS_UNCHANGED_RUNTIME_CADENCE_CAPS_AND_QUEUE_BYTES",
+            repeats: 3,
+            // Tenths of a millisecond, so the disclosed measurements stay exact
+            // integers: +113.1, +111.2, +75.4 ms.
+            n3_clamp_headroom_tenths_ms: Object.freeze([1_131, 1_112, 754]),
+            // +7.0, +9.2, -6.5 ms. This straddles zero, which is precisely why
+            // N*=4 is not claimed.
+            n4_clamp_headroom_tenths_ms: Object.freeze([70, 92, -65]),
+            raw_maximum_absorbed_concurrency_per_repeat: Object.freeze([4, 4, 3]),
+            first_unabsorbed_concurrency_per_repeat: Object.freeze([8, 8, 4]),
+            burst_100_accepted_per_repeat: Object.freeze([100, 100, 100]),
+            burst_128_accepted_per_repeat: Object.freeze([103, 103, 103]),
+            burst_160_accepted_per_repeat: Object.freeze([103, 103, 103]),
+            n3_characterization: "N3_CLAMP_HEADROOM_POSITIVE_IN_EVERY_REPEAT",
+            n4_characterization: "N4_CLAMP_HEADROOM_STRADDLES_ZERO_ACROSS_REPEATS;_RAW_MAXIMUM_ABSORBED_UNSTABLE;_NOT_A_RATIFIABLE_ABSORPTION_LIMIT",
+            conclusion: "N3_RATIFIED_ON_THREE_POSITIVE_N3_REPEATS_AT_UNCHANGED_45MS_CADENCE;_N4_DELIBERATELY_NOT_CLAIMED"
+          })
+        }),
+        registration_admission: Object.freeze({
+          decision_version: 3,
+          status: "CURRENT",
+          supersedes_decision_version: 2,
+          structural_maximum_concurrent_registrations: 103,
+          registration_mail_permit_wait_deadline_ms: 28_000,
+          shared_mail_permit_wait_deadline_ms: 18_000,
+          admission_semantics: "STRUCTURAL_PROCESS_OWNED_ADMISSION_BUDGET_WITH_NO_WAIT_QUEUE;_TAKEN_SYNCHRONOUSLY_BEFORE_THE_FIRST_REPOSITORY_AWAIT;_104TH_REFUSED_BEFORE_ANY_REPOSITORY_LIMITER_KDF_MAIL_TOKEN_OR_MUTATION_WORK;_NOT_A_MEASURED_COMPLETION_RATE",
+          registration_cadence_ms: 45,
+          registration_cadence_status: "PROVISIONAL;_RECALIBRATION_PENDING;_NOT_UNIQUELY_LOAD_BEARING",
+          current_positive_clamp_absorption_n_star: null,
+          historical_n_star_2_is_a_fallback: false,
+          scope: Object.freeze({
+            mail_transport: "HEALTHY_MTA",
+            host: "TARGET_HOST",
+            shared_dispatcher_at_entry: "INITIALLY_EMPTY",
+            burst: "REGISTER_ONLY_SIMULTANEOUS",
+            hard_availability_requests: 100,
+            mixed_register_and_resend_availability_guaranteed: false,
+            route_partitioning: "NOT_AUTHORIZED_IN_REWORK7"
+          }),
+          evidence: Object.freeze({
+            measurement: "THREE_FRESH_DIAGNOSTIC_PROCESSES_WITH_ONLY_THE_TEST_LOCAL_REGISTRATION_WAIT_CEILING_WIDENED_TO_DIAGNOSTIC_60000MS",
+            repeats: 3,
+            successes_per_repeat: Object.freeze([103, 103, 103]),
+            commits_per_repeat: Object.freeze([103, 103, 103]),
+            sends_per_repeat: Object.freeze([103, 103, 103]),
+            busy_per_repeat: Object.freeze([0, 0, 0]),
+            unexpected_per_repeat: Object.freeze([0, 0, 0]),
+            // 20,922.9 / 21,902.2 / 20,942.1 ms.
+            reservation_wait_maximum_tenths_ms: Object.freeze([209_229, 219_022, 209_421]),
+            deadline_derivation: "ceil_to_whole_second(1.25 * 21902.2 ms) = 28000 ms",
+            // 25.28% / 21.78% / 25.21%; the tightest is the binding margin.
+            margin_hundredths_percent_per_repeat: Object.freeze([2_528, 2_178, 2_521])
+          }),
+          retention_disclosure: Object.freeze({
+            maximum_admitted_registration_frames: 103,
+            maximum_shared_mail_queue_waiters: 96,
+            queued_registration_frame_retention_ms: 28_000,
+            queued_registration_frame_contents: "VALIDATED_EMAIL;_RECOVERY_EMAIL;_PASSWORD;_SOURCE_CONTEXT",
+            raw_verification_token_minted_before_mail_grant: false
+          })
         }),
         cadence_sensitivity: Object.freeze({
           minus_15_ms: Object.freeze({
@@ -474,7 +669,7 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
           conclusion: "CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING",
           recalibration_trigger: "TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS"
         }),
-        sizing_derivation: "The current 45 ms registration cadence has a measured clamp-absorption limit N*=2: the measured hash plus durable provisioning maximum is 436 ms; a ruled 110 percent safety factor rounded upward to 480 ms gives the binding inequality 480 ms + 2 * 45 ms = 570 ms < the 600 ms response clamp, leaving 30 ms ruled headroom. At N>=3 the clamp no longer absorbs the serialized work, so the frozen N=4/N=8 privacy result relies on measured equal-work distribution, not clamp absorption. Across three 30 ms observations the N=8 result was a noisy 2-of-3 RED rate, with median gaps from 59.6 to 115.8 ms and AUC from .620 to .774; the 60 ms result is one GREEN observation at 12.1 ms and .529. Central tendency orders in the safer direction as cadence rises, but run-to-run noise is comparable to the observed effect; 45 ms is the current value, is not claimed uniquely load-bearing, and has no ruled failure probability. Recalibrate on target-host or storage-class change, or the first unchanged-code RED at 45 ms. Resend retains the measured 60 ms cadence needed to keep its in-lease database work bounded. Registration first obtains one bounded logical capacity permit, then completes password hashing, durable provisioning, and the response clamp before lease activation; a full-capacity refusal therefore remains pre-hash and no branch-specific transaction or clamp tail occupies the measured lease. At saturation, at most 32 accepted registration hashes run concurrently. The registration reservation is 5100 ms, exactly the ruled 5000 ms transport-bound work plus 100 ms scheduler tolerance because provisioning and clamp are pre-activation. Resend retains the general 5700 ms reservation: its ruled 600 ms enumeration/pre-transport budget plus 5000 ms transport-bound work plus the same 100 ms tolerance. Delivery-result audit work follows handoff; the following reservation receives the route-derived guard. The 96-entry pre-mint queue retains opaque control nodes only. Suspended request frames necessarily retain validated plaintext email, recovery email, password, and source context until grant or the 18-second timeout; no raw verification token is minted before grant. Availability at healthy-transport bursts is measured separately for V rather than inferred from this arithmetic."
+        sizing_derivation: "The current 45 ms registration cadence has a measured clamp-absorption limit N*=2: the measured hash plus durable provisioning maximum is 436 ms; a ruled 110 percent safety factor rounded upward to 480 ms gives the binding inequality 480 ms + 2 * 45 ms = 570 ms < the 600 ms response clamp, leaving 30 ms ruled headroom. At N>=3 the clamp no longer absorbs the serialized work, so the frozen N=4/N=8 privacy result relies on measured equal-work distribution, not clamp absorption. Across three 30 ms observations the N=8 result was a noisy 2-of-3 RED rate, with median gaps from 59.6 to 115.8 ms and AUC from .620 to .774; the 60 ms result is one GREEN observation at 12.1 ms and .529. Central tendency orders in the safer direction as cadence rises, but run-to-run noise is comparable to the observed effect; 45 ms is the current value, is not claimed uniquely load-bearing, and has no ruled failure probability. Recalibrate on target-host or storage-class change, or the first unchanged-code RED at 45 ms. Resend retains the measured 60 ms cadence needed to keep its in-lease database work bounded. Registration first obtains one bounded logical capacity permit, then completes password hashing, durable provisioning, and the response clamp before lease activation; a full-capacity refusal therefore remains pre-hash and no branch-specific transaction or clamp tail occupies the measured lease. At saturation, at most 32 accepted registration hashes run concurrently. The registration reservation is 5100 ms, exactly the ruled 5000 ms transport-bound work plus 100 ms scheduler tolerance because provisioning and clamp are pre-activation. Resend retains the general 5700 ms reservation: its ruled 600 ms enumeration/pre-transport budget plus 5000 ms transport-bound work plus the same 100 ms tolerance. Delivery-result audit work follows handoff; the following reservation receives the route-derived guard. The 96-entry pre-mint queue retains opaque control nodes only. Suspended request frames necessarily retain validated plaintext email, recovery email, password, and source context until grant or the 18-second timeout; no raw verification token is minted before grant. Availability at healthy-transport bursts is measured separately for V rather than inferred from this arithmetic. A NEW versioned decision (decision_version 2) is published beside that sealed row without altering it: at the unchanged 45 ms registration cadence the current clamp-absorption limit is N*=3. Three fresh isolated repeats, with runtime, cadence, caps and queue bytes all unchanged, measured a worst N=3 hash-plus-provisioning maximum of 389.6 ms; the same ruled 110 percent safety factor rounded upward gives 430 ms, and 430 ms + 3 * 45 ms = 565 ms < the 600 ms response clamp, leaving 35 ms ruled headroom. N=3 clamp headroom was positive in every repeat at +113.1, +111.2 and +75.4 ms. N=4 is deliberately NOT claimed: its headroom straddled zero at +7.0, +9.2 and -6.5 ms, raw maximum absorbed concurrency was [4,4,3] and first unabsorbed was [8,8,4], so N=4 is not a stable absorption limit. The sealed N*=2 decision is retained unaltered as history and is not a monotone lower bound. Measured accepted-request capacity is exactly 103: bursts of 128 and 160 accepted 103/103/103 in every repeat, and a burst of 100 was 100/100/100 in every repeat. A THIRD versioned decision (decision_version 3) now supersedes decision_version 2 and republishes 103 as a structural admission budget: at most 103 validated registration requests may hold that budget at once, it has no wait queue, it is taken synchronously before the first repository await, and the 104th is refused before any repository, limiter, KDF, mail reservation, token or mutation work, with the existing opaque retryable busy envelope and the unchanged 600 ms response clamp. That number is not a measured accepted-request capacity, and Rework7 does not re-claim it as one: on unchanged code the same 100-request burst later accepted 98, and then 96, and the n=3 hash-plus-provisioning maximum re-measured at 1264.7 ms and 973.0 ms against decision_version 2's ruled 430 ms, so decision_version 2 is retained as contradicted history with every array unaltered. The registration mail-permit wait deadline becomes 28,000 ms while resend and every other route keep 18,000 ms, because three fresh diagnostic processes committed and sent 103/103/103 with zero busy and zero unexpected results once only the test-local registration wait ceiling was widened, at reservation wait maxima of 20,922.9, 21,902.2 and 20,942.1 ms; ceil_to_whole_second(1.25 * 21,902.2 ms) = 28,000 ms and the tightest margin is 21.78 percent. The 45 ms cadence is provisional and recalibration-pending, there is no positive current N* at all, and the sealed historical N*=2 is not a fallback. The decision is bounded to a healthy MTA on the target host with an initially empty shared dispatcher and a register-only simultaneous burst of 100; mixed register and resend availability is NOT guaranteed, because both routes still share the one 32-active/96-waiter FIFO and route partitioning is not authorized in Rework7. A queued registration frame therefore retains validated email, recovery email, password and source context for at most 28 seconds rather than the 18 seconds disclosed above; at most 103 admitted registration frames and at most 96 shared mail-queue waiters exist at once, and no raw verification token is minted before mail grant."
       }),
       delivery_audit: Object.freeze({
         public_result: "ENUMERATION_SAFE_GENERIC_RESPONSE",
@@ -483,7 +678,7 @@ export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
         duplicate_counting_instruction: "A duplicate registration writes the registration DENY and equal-work postwork DENY; operators must correlate them and do not double-count them as two refusal attempts."
       })
     }),
-    sourceRef: "AMENDMENTS.md#VR-5 own mail service, no relays + S3d D1/D4 delivery boundedness and honesty (2026-08-20)"
+    sourceRef: "AMENDMENTS.md#VR-5 own mail service, no relays + S3d D1/D4 delivery boundedness and honesty (2026-08-20) + T1 rework2 clamp-absorption decision_version 2 N*=3 at unchanged 45 ms from three fresh isolated repeats, sealed decision_version 1 N*=2 retained unaltered, N*=4 deliberately not claimed (2026-08-22) + T1 rework7-A decision_version 3 V-approved structural 103 admission budget and 28,000 ms registration mail-permit deadline with 18,000 ms retained for resend, decision_version 2 demoted to contradicted history and no positive current N* published (2026-08-22)"
   })
 ] satisfies readonly AuthPolicyRegisterRow[]);
 
@@ -535,11 +730,49 @@ export interface AuthPolicy {
     readonly mailDispatchHandoffSchedulerToleranceMs: 100;
     readonly registrationMailDispatchMinimumReservationMs: 5_100;
     readonly mailDispatchMinimumReservationMs: 5_700;
+    /** The SHARED wait deadline. Resend and every non-registration route use it. */
     readonly mailDispatchQueueWaitTimeoutMs: 18_000;
+    /**
+     * Registration alone waits this long for a mail permit. The shipped 18,000 ms
+     * bound was censoring admissions the system could serve: three fresh
+     * diagnostic processes completed all 103 at a worst reservation wait of
+     * 21,902.2 ms. Derived from the decision row's own evidence rather than
+     * pinned as a literal, so a drifted deadline is refused with its reason
+     * instead of as a malformed member type.
+     */
+    readonly registrationMailDispatchQueueWaitTimeoutMs: number;
     readonly mailCapacitySignalAggregationWindowMs: 60_000;
+    /**
+     * The SEALED historical clamp-absorption decision (version 1, N*=2). It is
+     * retained exactly as ruled and is NOT a monotone lower bound.
+     */
     readonly maximumClampAbsorbedRegistrationConcurrency: number;
     readonly registrationHashAndProvisioningUpperBoundMs: number;
     readonly registrationClampHeadroomMs: number;
+    /**
+     * decision_version 2 (N*=3 at the unchanged 45 ms cadence), retained as
+     * CONTRADICTED history. Unchanged code re-measured its n=3 arm at 973.0 ms
+     * against its own ruled 430 ms, and its "measured 103" at 98 and then 96.
+     */
+    readonly supersededClampAbsorptionDecisionVersion: number;
+    readonly supersededMaximumClampAbsorbedRegistrationConcurrency: number;
+    readonly supersededRegistrationHashAndProvisioningUpperBoundMs: number;
+    readonly supersededRegistrationClampHeadroomMs: number;
+    /** What decision_version 2 once published as a measured accepted-request capacity. */
+    readonly supersededMeasuredAcceptedRequestCapacity: number;
+    /** decision_version 3 — the current decision. */
+    readonly registrationAdmissionDecisionVersion: number;
+    /**
+     * The structural admission budget: at most this many registrations may be
+     * admitted at once. It is a budget size, not a measured completion rate.
+     */
+    readonly structuralMaximumConcurrentRegistrations: number;
+    /**
+     * `null`, deliberately. No repeat supports a positive N* under decision
+     * version 3, and the historical N*=2 is not a fallback. An absent value is
+     * the disclosure; a silent fallback would not be.
+     */
+    readonly currentPositiveClampAbsorptionNStar: number | null;
   };
 }
 
@@ -615,6 +848,125 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
       "Mail reservation derivation contradicts verification or transport policy"
     );
   }
+  // The CURRENT decision is derived by exactly the same arithmetic as the sealed
+  // one, from its own measurement, so publishing a new version can never smuggle
+  // in an unratified safety factor, upper bound or headroom.
+  const current = dispatch.current_registration_clamp_absorption;
+  const currentSafetyAdjustedWorkMs = Math.ceil(
+    current.measured_hash_and_provisioning_max_ms
+      * current.measurement_safety_percent / 100 / 10
+  ) * 10;
+  const currentClampHeadroomMs = derivedPreTransportBudgetMs - (
+    current.ruled_hash_and_provisioning_upper_bound_ms
+      + current.maximum_unsaturated_concurrency * dispatch.registration_activation_spacing_ms
+  );
+  const capacity = current.measured_accepted_request_capacity;
+  if (current.measurement_safety_percent !== absorption.measurement_safety_percent
+    || current.ruled_hash_and_provisioning_upper_bound_ms !== currentSafetyAdjustedWorkMs
+    || current.response_clamp_ms !== derivedPreTransportBudgetMs
+    || current.binding_headroom_ms !== currentClampHeadroomMs
+    || currentClampHeadroomMs <= 0
+    || current.first_measured_unabsorbed_concurrency
+      !== current.maximum_unsaturated_concurrency + 1
+    // The cadence is explicitly UNCHANGED by this decision.
+    || current.registration_activation_spacing_ms !== dispatch.registration_activation_spacing_ms
+    // A ratified N* may never exceed the WORST repeat's raw absorbed maximum.
+    // With raw maxima [4,4,3] this is what structurally forbids claiming N*=4.
+    || current.maximum_unsaturated_concurrency
+      > Math.min(...current.evidence.raw_maximum_absorbed_concurrency_per_repeat)
+    // ...and the ratified N must be supported by a positive headroom in EVERY
+    // repeat, not merely on average.
+    || current.evidence.n3_clamp_headroom_tenths_ms.some((headroom) => headroom <= 0)
+    || current.maximum_unsaturated_concurrency !== 3
+    // The published capacity is the one every repeat actually measured.
+    || current.evidence.burst_128_accepted_per_repeat.some((accepted) => accepted !== capacity)
+    || current.evidence.burst_160_accepted_per_repeat.some((accepted) => accepted !== capacity)
+    // The sealed decision must survive this publication byte-for-byte.
+    || absorption.maximum_unsaturated_concurrency !== 2
+    || absorption.ruled_hash_and_provisioning_upper_bound_ms !== 480
+    || absorption.binding_headroom_ms !== 30
+    // Rework7. This row is history now, and it must SAY so: a v2 row that
+    // re-arms itself as CURRENT, drops its successor, or hides the unchanged-code
+    // observations that contradicted it is refused here rather than by the
+    // member-type check, so the reason survives in the message.
+    || current.status !== "SUPERSEDED_BY_DECISION_VERSION_3;_CAPACITY_CLAIM_CONTRADICTED_BY_UNCHANGED_CODE_EVIDENCE"
+    || current.superseded_by_decision_version <= current.decision_version
+    || !/NOT_A_MEASURED_COMPLETION_RATE/.test(current.capacity_status)
+    || current.contradicting_observations.ruled_hash_and_provisioning_upper_bound_ms
+      !== current.ruled_hash_and_provisioning_upper_bound_ms
+    // The contradiction has to be a real one in both directions: fewer accepted
+    // than the published capacity, and slower than the published upper bound.
+    || current.contradicting_observations.burst_100_accepted_on_unchanged_code
+      .some((accepted) => accepted >= capacity)
+    || current.contradicting_observations.n3_hash_and_provisioning_maximum_ms_on_unchanged_code
+      .some((measured) => measured <= current.ruled_hash_and_provisioning_upper_bound_ms)) {
+    throw new TypedDomainError(
+      "AUTH_POLICY_INVALID",
+      "Current clamp-absorption decision contradicts its measured evidence or the sealed decision"
+    );
+  }
+  // decision_version 3. Every ruled number below is re-derived from the row's
+  // own disclosed evidence or from the shipped dispatch values it claims to
+  // describe, so publishing a new decision cannot smuggle in a cap the request
+  // path does not enforce, a deadline the diagnostic does not support, a
+  // settled-looking cadence, or a positive N* no repeat measured.
+  const admissionRow = dispatch.registration_admission;
+  const admissionEvidence = admissionRow.evidence;
+  const worstReservationWaitMs =
+    Math.max(...admissionEvidence.reservation_wait_maximum_tenths_ms) / 10;
+  const derivedRegistrationWaitDeadlineMs =
+    Math.ceil(1.25 * worstReservationWaitMs / 1_000) * 1_000;
+  const admissionMargin = (waitTenthsMs: number): number => Math.round(
+    (derivedRegistrationWaitDeadlineMs - waitTenthsMs / 10)
+      * 10_000 / derivedRegistrationWaitDeadlineMs
+  );
+  if (admissionRow.supersedes_decision_version !== current.decision_version
+    || current.superseded_by_decision_version !== admissionRow.decision_version
+    // 103 is exactly the number v2 mis-published as a measured capacity, kept as
+    // the structural budget, and it can never exceed what the shared FIFO holds.
+    || admissionRow.structural_maximum_concurrent_registrations !== capacity
+    || admissionRow.structural_maximum_concurrent_registrations
+      > dispatch.maximum_concurrent + dispatch.queue_capacity
+    || !/STRUCTURAL/.test(admissionRow.admission_semantics)
+    || !/NOT_A_MEASURED_COMPLETION_RATE/.test(admissionRow.admission_semantics)
+    || admissionRow.registration_mail_permit_wait_deadline_ms
+      !== derivedRegistrationWaitDeadlineMs
+    || admissionEvidence.deadline_derivation
+      !== `ceil_to_whole_second(1.25 * ${worstReservationWaitMs} ms) = ${derivedRegistrationWaitDeadlineMs} ms`
+    // Resend keeps the shipped shared bound; only registration moved.
+    || admissionRow.shared_mail_permit_wait_deadline_ms !== dispatch.queue_wait_timeout_ms
+    // The cadence is explicitly UNCHANGED and explicitly UNSETTLED.
+    || admissionRow.registration_cadence_ms !== dispatch.registration_activation_spacing_ms
+    || !/PROVISIONAL/.test(admissionRow.registration_cadence_status)
+    || !/RECALIBRATION_PENDING/.test(admissionRow.registration_cadence_status)
+    // Absent, not zero, and not the historical N*=2 wearing a new name.
+    || admissionRow.current_positive_clamp_absorption_n_star !== null
+    || admissionRow.historical_n_star_2_is_a_fallback !== false
+    || admissionRow.scope.mixed_register_and_resend_availability_guaranteed !== false
+    || admissionRow.scope.hard_availability_requests
+      > admissionRow.structural_maximum_concurrent_registrations
+    // The diagnostic really did complete the whole budget, with nothing refused
+    // and nothing unexpected, in every repeat.
+    || admissionEvidence.successes_per_repeat.some((count) => count !== capacity)
+    || admissionEvidence.commits_per_repeat.some((count) => count !== capacity)
+    || admissionEvidence.sends_per_repeat.some((count) => count !== capacity)
+    || admissionEvidence.busy_per_repeat.some((count) => count !== 0)
+    || admissionEvidence.unexpected_per_repeat.some((count) => count !== 0)
+    || admissionEvidence.margin_hundredths_percent_per_repeat.some((margin, index) =>
+      margin !== admissionMargin(admissionEvidence.reservation_wait_maximum_tenths_ms[index]!))
+    // The retention disclosure must describe THIS decision, not the old one.
+    || admissionRow.retention_disclosure.maximum_admitted_registration_frames
+      !== admissionRow.structural_maximum_concurrent_registrations
+    || admissionRow.retention_disclosure.maximum_shared_mail_queue_waiters
+      !== dispatch.queue_capacity
+    || admissionRow.retention_disclosure.queued_registration_frame_retention_ms
+      !== admissionRow.registration_mail_permit_wait_deadline_ms
+    || admissionRow.retention_disclosure.raw_verification_token_minted_before_mail_grant !== false) {
+    throw new TypedDomainError(
+      "AUTH_POLICY_INVALID",
+      "Registration admission decision contradicts its measured evidence or the shipped request path"
+    );
+  }
   return Object.freeze({
     password: Object.freeze({
       minimumLength: password.data.minimum_length,
@@ -670,6 +1022,9 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
         channel.data.verification_dispatch.registration_minimum_reservation_ms,
       mailDispatchMinimumReservationMs: channel.data.verification_dispatch.minimum_reservation_ms,
       mailDispatchQueueWaitTimeoutMs: channel.data.verification_dispatch.queue_wait_timeout_ms,
+      registrationMailDispatchQueueWaitTimeoutMs:
+        channel.data.verification_dispatch.registration_admission
+          .registration_mail_permit_wait_deadline_ms,
       mailCapacitySignalAggregationWindowMs:
         channel.data.verification_dispatch.operator_signal.aggregation_window_ms,
       maximumClampAbsorbedRegistrationConcurrency:
@@ -679,7 +1034,29 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
         channel.data.verification_dispatch.registration_clamp_absorption
           .ruled_hash_and_provisioning_upper_bound_ms,
       registrationClampHeadroomMs:
-        channel.data.verification_dispatch.registration_clamp_absorption.binding_headroom_ms
+        channel.data.verification_dispatch.registration_clamp_absorption.binding_headroom_ms,
+      supersededClampAbsorptionDecisionVersion:
+        channel.data.verification_dispatch.current_registration_clamp_absorption.decision_version,
+      supersededMaximumClampAbsorbedRegistrationConcurrency:
+        channel.data.verification_dispatch.current_registration_clamp_absorption
+          .maximum_unsaturated_concurrency,
+      supersededRegistrationHashAndProvisioningUpperBoundMs:
+        channel.data.verification_dispatch.current_registration_clamp_absorption
+          .ruled_hash_and_provisioning_upper_bound_ms,
+      supersededRegistrationClampHeadroomMs:
+        channel.data.verification_dispatch.current_registration_clamp_absorption
+          .binding_headroom_ms,
+      supersededMeasuredAcceptedRequestCapacity:
+        channel.data.verification_dispatch.current_registration_clamp_absorption
+          .measured_accepted_request_capacity,
+      registrationAdmissionDecisionVersion:
+        channel.data.verification_dispatch.registration_admission.decision_version,
+      structuralMaximumConcurrentRegistrations:
+        channel.data.verification_dispatch.registration_admission
+          .structural_maximum_concurrent_registrations,
+      currentPositiveClampAbsorptionNStar:
+        channel.data.verification_dispatch.registration_admission
+          .current_positive_clamp_absorption_n_star
     })
   });
 }

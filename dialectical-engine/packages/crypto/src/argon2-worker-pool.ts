@@ -140,7 +140,14 @@ export const ARGON2_PROVISIONAL_BOUNDS = Object.freeze({
   // NEW in rework 1, and provisional on exactly the same terms as the values
   // above: without it a worker that never completes its handshake leaves
   // `ready()` and every queued job pending forever.
-  readyHandshakeTimeoutMs: 10_000
+  readyHandshakeTimeoutMs: 10_000,
+  // NEW in rework 2, provisional on the same terms. How long the pool waits for
+  // a worker to actually DIE after termination has been requested. A rejected
+  // or ignored `terminate()` proves nothing about the thread, so custody is
+  // held until an `exit` (or a resolved termination) confirms death; when this
+  // deadline passes with no confirmation the pool fails closed instead of
+  // guessing.
+  terminationConfirmTimeoutMs: 10_000
 });
 
 /** Minimal surface the pool needs, so tests can inject barrier/fault fixtures. */
@@ -165,6 +172,7 @@ export interface Argon2WorkerPoolOptions {
   readonly restartWindowMs?: number;
   readonly closeDrainMs?: number;
   readonly readyHandshakeTimeoutMs?: number;
+  readonly terminationConfirmTimeoutMs?: number;
   readonly spawn?: (index: number) => Argon2WorkerHandle;
   readonly now?: () => number;
 }
@@ -206,13 +214,40 @@ export interface Argon2AuditParameters {
   readonly hashLength: number;
 }
 
+/**
+ * The single answer this job can lawfully receive, described in NON-SECRET
+ * terms only.
+ *
+ * Operation and digest length are not enough. A faulty or hostile worker can
+ * answer a 64 MiB / t=3 / p=1 request with a *different* Argon2id encoding that
+ * is still inside the global envelope — a 19 MiB / t=2 encoding, or one over a
+ * salt the request never supplied — and that weaker encoding would then be
+ * persisted as the user's password hash. So the descriptor pins every parameter
+ * the request itself chose. The salt is part of it and is not a secret: it is
+ * published verbatim inside the encoding the worker returns. It is captured
+ * before dispatch, because the transfer that hands the payload to the worker
+ * detaches the parent's view of those bytes.
+ */
+type ExpectedResponse =
+  | {
+    readonly kind: "password-hash";
+    readonly memoryCostKiB: number;
+    readonly timeCost: number;
+    readonly parallelism: number;
+    readonly hashLength: number;
+    /** Unpadded standard base64, exactly as Argon2 encodes a salt. */
+    readonly saltBase64: string;
+  }
+  | { readonly kind: "audit-hash"; readonly hashLength: number }
+  | { readonly kind: "verification" };
+
 interface QueuedJob {
   readonly id: string;
   readonly lane: Argon2Lane;
   /** The operation this job's response frame must answer, and nothing else. */
   readonly op: Argon2WorkerRequest["op"];
-  /** Expected digest byte length for a hash op; 0 for verification. */
-  readonly hashLength: number;
+  /** The exact result this job's response frame must carry, and nothing else. */
+  readonly expected: ExpectedResponse;
   /** Single live owner of the plaintext until dispatch; cleared at handoff. */
   request: Argon2WorkerRequest | undefined;
   readonly resolve: (value: string | boolean) => void;
@@ -292,19 +327,88 @@ type FrameVerdict =
   | { readonly kind: "stale" }
   | { readonly kind: "fault" };
 
+/**
+ * What ONE bounded observation of a retirement saw before its own deadline.
+ * `unconfirmed` is never treated as death: it releases no custody, permits no
+ * replacement, and fails that caller closed. It is a statement about the
+ * observation, not about the thread, so it never closes the question.
+ */
+type TerminationVerdict = "confirmed" | "unconfirmed";
+
+/**
+ * The PERSISTENT physical-death record for one retired handle, deliberately
+ * separate from any caller's bounded observation of it.
+ *
+ * Physical death is a permanent fact about a thread; a deadline is one caller
+ * giving up on waiting for it. Fusing the two is rework3 RED 1: a single
+ * settle-once guard shared by both meant that once any deadline expired, the
+ * worker's own later `exit` — and a later termination attempt that actually
+ * fulfilled — were discarded, custody was never released, and the pool reported
+ * a retiring handle forever after its death had been authoritatively proven.
+ *
+ * So `confirm` is latched here, once, by an authoritative signal only, and each
+ * caller gets its own independent bounded observation of `death` below.
+ */
+interface RetirementRecord {
+  /** Resolves exactly once, when physical death is authoritatively confirmed. */
+  readonly death: Promise<void>;
+  /** Latches the death above. Idempotent; only an authoritative signal calls it. */
+  readonly confirm: () => void;
+  confirmed: boolean;
+}
+
 const ENCODED_HASH_SHAPE = ARGON2ID_ENCODING;
 const HEX_DIGEST = /^[0-9a-f]+$/;
 
 /**
- * Operation-bound protocol validation.
+ * The ONE failure code a lawful worker may report.
+ *
+ * DELIBERATE MIRROR of `ARGON2_WORKER_JOB_FAILED` in ./argon2-worker.ts, for
+ * the same reason `parseEncodedArgon2id` is mirrored: importing the value from
+ * there would pull hash-wasm onto the main thread. Any other code — a typo, an
+ * empty string, a borrowed pool code, an invented one — means the sender is not
+ * speaking this protocol, so it is a fault rather than a job failure.
+ * tests/unit/argon2-worker-pool.test.ts pins the two constants together.
+ */
+export const ARGON2_LAWFUL_WORKER_FAILURE_CODE = "ARGON2_WORKER_JOB_FAILED";
+
+/** Unpadded standard base64 of a salt, exactly as an Argon2 encoding carries it. */
+function encodeSalt(salt: Uint8Array): string {
+  return Buffer.from(salt).toString("base64").replace(/=+$/, "");
+}
+
+/**
+ * True only for the encoding this exact request could have produced: same
+ * version, same memory cost, same time cost, same parallelism, same salt, same
+ * digest length. A different-but-in-envelope encoding fails here, which is the
+ * whole point — it is the one a faulty worker could otherwise get persisted.
+ */
+function answersRequestedEncoding(
+  digest: string,
+  expected: Extract<ExpectedResponse, { kind: "password-hash" }>
+): boolean {
+  const match = ENCODED_HASH_SHAPE.exec(digest);
+  if (match === null) return false;
+  if (Number(match[1]) !== ARGON2ID_ENCODING_BOUNDS.version) return false;
+  if (Number(match[2]) !== expected.memoryCostKiB) return false;
+  if (Number(match[3]) !== expected.timeCost) return false;
+  if (Number(match[4]) !== expected.parallelism) return false;
+  if (match[5] !== expected.saltBase64) return false;
+  return base64Bytes(match[6]!) === expected.hashLength;
+}
+
+/**
+ * Request-bound protocol validation.
  *
  * A frame is only accepted if it answers the in-flight job's own id AND carries
- * the exact response shape that job's operation can produce: an encoded
- * Argon2id string inside the ruled envelope for `hash-password`, a lowercase
- * hex digest of exactly the requested length for `hash-audit`, a boolean for
- * `verify-password`. A wrong-operation frame, an arbitrary string payload, or
- * an unsolicited frame is a protocol fault — the worker is no longer
- * trustworthy, so it is lost and replaced rather than believed.
+ * the exact result that job asked for: for `hash-password` an encoded Argon2id
+ * string that is inside the ruled envelope AND matches the request's own cost
+ * parameters, salt and digest length; for `hash-audit` a lowercase hex digest of
+ * exactly the requested length; for `verify-password` a boolean; for a failure
+ * the one lawful worker failure code. A wrong-operation frame, a weaker or
+ * different encoding, an arbitrary payload, an invented failure code or an
+ * unsolicited frame is a protocol fault — the worker is no longer trustworthy,
+ * so it is lost and replaced rather than believed.
  */
 function readFrame(value: unknown, expected: ActiveJob | undefined,
   lastSettledId: string | undefined): FrameVerdict {
@@ -318,22 +422,24 @@ function readFrame(value: unknown, expected: ActiveJob | undefined,
     return frame.id === lastSettledId ? { kind: "stale" } : { kind: "fault" };
   }
   if (frame.kind === "failed") {
-    return typeof frame.code === "string" ? { kind: "failed" } : { kind: "fault" };
+    return frame.code === ARGON2_LAWFUL_WORKER_FAILURE_CODE
+      ? { kind: "failed" }
+      : { kind: "fault" };
   }
-  const job = expected.job;
-  if (job.op === "verify-password") {
+  const wanted = expected.job.expected;
+  if (wanted.kind === "verification") {
     return frame.kind === "verified" && typeof frame.matches === "boolean"
       ? { kind: "verified", matches: frame.matches }
       : { kind: "fault" };
   }
   if (frame.kind !== "result" || typeof frame.digest !== "string") return { kind: "fault" };
   const digest = frame.digest;
-  if (job.op === "hash-password") {
-    return parseEncodedArgon2id(digest) !== undefined && ENCODED_HASH_SHAPE.test(digest)
+  if (wanted.kind === "password-hash") {
+    return parseEncodedArgon2id(digest) !== undefined && answersRequestedEncoding(digest, wanted)
       ? { kind: "result", digest }
       : { kind: "fault" };
   }
-  return digest.length === job.hashLength * 2 && HEX_DIGEST.test(digest)
+  return digest.length === wanted.hashLength * 2 && HEX_DIGEST.test(digest)
     ? { kind: "result", digest }
     : { kind: "fault" };
 }
@@ -348,6 +454,7 @@ export class Argon2WorkerPool {
   private readonly restartWindowMs: number;
   private readonly closeDrainMs: number;
   private readonly readyHandshakeTimeoutMs: number;
+  private readonly terminationConfirmMs: number;
   private readonly spawnWorker: (index: number) => Argon2WorkerHandle;
   private readonly now: () => number;
 
@@ -357,7 +464,7 @@ export class Argon2WorkerPool {
    * and `close()` awaits every entry, so the physical worker count never
    * transiently exceeds the ruled bound and close leaves nothing behind.
    */
-  private readonly retiring = new Map<Argon2WorkerHandle, Promise<void>>();
+  private readonly retiring = new Map<Argon2WorkerHandle, RetirementRecord>();
   private readonly slots: Slot[] = [];
   private readonly queues: Record<Argon2Lane, QueuedJob[]> = { credential: [], audit: [] };
   private nextLane: Argon2Lane = "credential";
@@ -379,6 +486,8 @@ export class Argon2WorkerPool {
     this.closeDrainMs = options.closeDrainMs ?? ARGON2_PROVISIONAL_BOUNDS.closeDrainMs;
     this.readyHandshakeTimeoutMs = options.readyHandshakeTimeoutMs
       ?? ARGON2_PROVISIONAL_BOUNDS.readyHandshakeTimeoutMs;
+    this.terminationConfirmMs = options.terminationConfirmTimeoutMs
+      ?? ARGON2_PROVISIONAL_BOUNDS.terminationConfirmTimeoutMs;
     this.now = options.now ?? Date.now;
     this.spawnWorker = options.spawn ?? ((index) => Argon2WorkerPool.spawnRealWorker(index));
     if (!Number.isInteger(this.workerCount) || this.workerCount < 1) {
@@ -469,23 +578,97 @@ export class Argon2WorkerPool {
   }
 
   /**
-   * Takes physical custody of a handle that is going away. The returned promise
-   * is what gates this slot's replacement and what `close()` awaits.
+   * Takes physical custody of a handle that is going away and waits for the
+   * worker to actually DIE. The returned promise is what gates this slot's
+   * replacement and what `close()` awaits, and it never rejects.
+   *
+   * A termination REQUEST is not a death. `terminate()` can reject or throw
+   * while the thread keeps running — a torn-down handle, a wedged thread, a
+   * platform error — and the old worker still owns its 64 MiB Argon arena.
+   * Believing such a rejection would let a replacement start beside a live
+   * worker and would let `close()` report zero. So only two things count as
+   * confirmation: the worker's explicit `exit`, or a termination that actually
+   * resolves. Anything else is `unconfirmed`, custody is NOT released, and the
+   * caller fails closed.
    */
-  private retire(handle: Argon2WorkerHandle): Promise<void> {
+  private retire(handle: Argon2WorkerHandle): Promise<TerminationVerdict> {
+    const record = this.trackRetirement(handle);
+    // Every retirement request issues its own termination attempt. Attempts are
+    // cheap and a real Worker's `terminate()` is idempotent, while a REFUSED
+    // one proved nothing — so a later attempt that fulfils is a second chance
+    // at authoritative confirmation, not a repeat of a settled question.
+    this.attemptTermination(handle, record);
+    return this.observeDeath(record);
+  }
+
+  /**
+   * The one persistent death record per handle. Registering it also attaches
+   * the `exit` listener exactly once, so the authoritative death signal is
+   * honoured whenever it arrives — including long after every bounded
+   * observation of this handle has already given up.
+   */
+  private trackRetirement(handle: Argon2WorkerHandle): RetirementRecord {
     const existing = this.retiring.get(handle);
     if (existing !== undefined) return existing;
-    const confirmed = (async () => {
-      try {
-        await handle.terminate();
-      } catch {
-        // A worker that is already gone is a confirmed termination.
+    let confirm!: () => void;
+    const death = new Promise<void>((resolve) => { confirm = resolve; });
+    const record: RetirementRecord = {
+      death,
+      confirmed: false,
+      confirm: () => {
+        if (record.confirmed) return;
+        record.confirmed = true;
+        // Custody is released ONLY here, on a proven death, so `liveHandles`
+        // and `retiringHandles` keep counting a worker that may still be
+        // running — and stop counting one that provably is not.
+        this.retiring.delete(handle);
+        confirm();
       }
-    })().finally(() => {
-      this.retiring.delete(handle);
+    };
+    // The authoritative death signal, honoured for the lifetime of the handle.
+    handle.on("exit", () => { record.confirm(); });
+    this.retiring.set(handle, record);
+    return record;
+  }
+
+  /** Requests termination. Only a FULFILLED attempt is allowed to prove death. */
+  private attemptTermination(handle: Argon2WorkerHandle, record: RetirementRecord): void {
+    try {
+      void Promise.resolve(handle.terminate()).then(
+        // A termination that resolves means the thread really stopped.
+        () => { record.confirm(); },
+        // A REFUSED request tells us nothing. Keep waiting for `exit` or for a
+        // later attempt to fulfil.
+        () => undefined
+      );
+    } catch {
+      // A synchronous throw tells us nothing either.
+    }
+  }
+
+  /**
+   * ONE caller's bounded look at the death record. Its deadline bounds only
+   * this observation: it hands back `unconfirmed` so the caller can fail
+   * closed, and leaves the record above free to confirm later.
+   */
+  private observeDeath(record: RetirementRecord): Promise<TerminationVerdict> {
+    if (record.confirmed) return Promise.resolve<TerminationVerdict>("confirmed");
+    return new Promise<TerminationVerdict>((resolve) => {
+      let settled = false;
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const finish = (verdict: TerminationVerdict): void => {
+        if (settled) return;
+        settled = true;
+        if (deadline !== undefined) clearTimeout(deadline);
+        resolve(verdict);
+      };
+      void record.death.then(() => { finish("confirmed"); });
+      // Deliberately ref'd: this deadline IS the bounded failure path. An
+      // unref'd timer would let an otherwise-idle process exit with close()
+      // pending, which is the hang this exists to prevent. In the ordinary
+      // case termination confirms in microseconds and the timer is cleared.
+      deadline = setTimeout(() => { finish("unconfirmed"); }, this.terminationConfirmMs);
     });
-    this.retiring.set(handle, confirmed);
-    return confirmed;
   }
 
   /**
@@ -560,7 +743,19 @@ export class Argon2WorkerPool {
     parameters: Argon2PasswordParameters
   ): Promise<string> {
     const id = Argon2WorkerPool.newJobId();
-    const result = await this.submit("credential", parameters.hashLength, {
+    // The salt is captured HERE, before dispatch transfers the payload and
+    // detaches this view. It is not a secret: the worker publishes it verbatim
+    // inside the encoding it returns, and that is exactly what makes it usable
+    // as a binding between the request and its one lawful answer.
+    const expected: ExpectedResponse = {
+      kind: "password-hash",
+      memoryCostKiB: parameters.memoryCostKiB,
+      timeCost: parameters.timeCost,
+      parallelism: parameters.parallelism,
+      hashLength: parameters.hashLength,
+      saltBase64: encodeSalt(salt)
+    };
+    const result = await this.submitArgon2Job("credential", expected, {
       id,
       op: "hash-password",
       password,
@@ -584,7 +779,7 @@ export class Argon2WorkerPool {
       return false;
     }
     const id = Argon2WorkerPool.newJobId();
-    const result = await this.submit("credential", 0, {
+    const result = await this.submitArgon2Job("credential", { kind: "verification" }, {
       id,
       op: "verify-password",
       password,
@@ -600,7 +795,9 @@ export class Argon2WorkerPool {
     parameters: Argon2AuditParameters
   ): Promise<string> {
     const id = Argon2WorkerPool.newJobId();
-    const result = await this.submit("audit", parameters.hashLength, {
+    const result = await this.submitArgon2Job("audit", {
+      kind: "audit-hash", hashLength: parameters.hashLength
+    }, {
       id,
       op: "hash-audit",
       value,
@@ -628,9 +825,9 @@ export class Argon2WorkerPool {
     return lane === "credential" ? stats.outstandingCredential : stats.outstandingAudit;
   }
 
-  private submit(
+  private submitArgon2Job(
     lane: Argon2Lane,
-    hashLength: number,
+    expected: ExpectedResponse,
     request: Argon2WorkerRequest
   ): Promise<string | boolean> {
     // Capacity and liveness are decided BEFORE the payload is retained anywhere.
@@ -646,7 +843,7 @@ export class Argon2WorkerPool {
     }
     return new Promise<string | boolean>((resolve, reject) => {
       const job: QueuedJob = {
-        id: request.id, lane, op: request.op, hashLength, request, resolve, reject, settled: false
+        id: request.id, lane, op: request.op, expected, request, resolve, reject, settled: false
       };
       this.queues[lane].push(job);
       this.pump();
@@ -676,7 +873,12 @@ export class Argon2WorkerPool {
   }
 
   private pump(): void {
-    if (this.state === "CLOSED" || this.breakerTripped) return;
+    // ONLY an open pool dispatches. Once `close()` has moved the pool to
+    // CLOSING the contract is: refuse new work, let already-active jobs drain
+    // to the deadline, cancel and zero what is still queued. Handing a queued
+    // password or audit value to a worker after that point would put a secret
+    // on a thread the close is about to terminate.
+    if (this.state !== "OPEN" || this.breakerTripped) return;
     for (const slot of this.slots) {
       // One in-flight job per worker.
       if (slot.active !== undefined || !slot.ready || slot.handle === undefined) continue;
@@ -814,7 +1016,16 @@ export class Argon2WorkerPool {
       return;
     }
     slot.retiring = true;
-    void this.retire(dead).then(() => {
+    void this.retire(dead).then((verdict) => {
+      if (verdict !== "confirmed") {
+        // Death was NOT confirmed, so the old worker may still be running with
+        // its 64 MiB arena mapped. This slot therefore never gets a
+        // replacement — `slot.retiring` stays true — and the pool fails closed
+        // rather than quietly running three physical workers behind a
+        // two-worker bound.
+        this.tripBreaker();
+        return;
+      }
       slot.retiring = false;
       if (!budgetRemains || this.state !== "OPEN" || this.breakerTripped) return;
       this.startSlot(slot);
@@ -867,9 +1078,22 @@ export class Argon2WorkerPool {
 
   // ------------------------------------------------------------------ close --
 
-  /** Idempotent OPEN -> CLOSING -> CLOSED. Returns promptly and bounded. */
+  /**
+   * Idempotent OPEN -> CLOSING -> CLOSED. Returns promptly and bounded.
+   *
+   * It rejects with a typed `ARGON2_POOL_UNAVAILABLE` — it does NOT hang, and
+   * it does NOT report success — when a worker's death could not be confirmed
+   * within the ruled deadline. In that case the pool stays CLOSING and
+   * `stats()` keeps counting the handle it could not account for.
+   */
   close(): Promise<void> {
-    this.closePromise ??= this.runClose();
+    if (this.closePromise === undefined) {
+      this.closePromise = this.runClose();
+      // That typed failure is a legitimate outcome of close, so mark it handled
+      // here: a caller that inspects stats() instead of awaiting must not trip
+      // an unhandled rejection. The promise returned below still rejects.
+      this.closePromise.catch(() => undefined);
+    }
     return this.closePromise;
   }
 
@@ -899,24 +1123,39 @@ export class Argon2WorkerPool {
     // 4. Take custody of every occupied slot, and force one more terminate on
     //    anything already retiring from an earlier replacement so a lost
     //    termination cannot leave a worker behind.
+    const confirmations: Promise<TerminationVerdict>[] = [];
+    const taken = new Set<Argon2WorkerHandle>();
     for (const slot of this.slots) {
       const handle = slot.handle;
       slot.handle = undefined;
       slot.ready = false;
       slot.generation += 1;
       this.clearReadyTimer(slot);
-      if (handle !== undefined) void this.retire(handle);
-    }
-    for (const handle of [...this.retiring.keys()]) {
-      try {
-        void Promise.resolve(handle.terminate()).catch(() => undefined);
-      } catch {
-        // Already gone; the pending retirement below still governs.
+      if (handle !== undefined) {
+        taken.add(handle);
+        confirmations.push(this.retire(handle));
       }
     }
-    // 5. Await BOTH the just-terminated handles and every still-retiring one,
-    //    so close leaves zero workers and zero outstanding jobs.
-    await Promise.all([...this.retiring.values()]);
+    // Anything already retiring from an earlier replacement gets one more
+    // termination attempt AND a FRESH bounded observation. Reusing the verdict
+    // an earlier deadline produced would discard this attempt's answer: a
+    // fulfilled retry here is authoritative proof of death, and close must be
+    // able to act on it rather than stay CLOSING forever on a stale
+    // `unconfirmed`.
+    for (const handle of [...this.retiring.keys()]) {
+      if (taken.has(handle)) continue;
+      confirmations.push(this.retire(handle));
+    }
+    // 5. Await BOTH the just-terminated handles and every still-retiring one.
+    const verdicts = await Promise.all(confirmations);
+    if (verdicts.some((verdict) => verdict !== "confirmed") || this.retiring.size > 0) {
+      // A worker whose death was never confirmed may still be running with its
+      // 64 MiB arena mapped. Reporting CLOSED here would claim zero live
+      // handles for a live thread, so close fails TYPED and bounded instead,
+      // and `stats()` keeps counting what could not be accounted for.
+      throw new Argon2InfrastructureError("ARGON2_POOL_UNAVAILABLE");
+    }
+    // Only now is it true that close left zero workers and zero outstanding jobs.
     this.state = "CLOSED";
   }
 }

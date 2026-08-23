@@ -136,6 +136,23 @@ const api = buildApi({
 // Close primitive only. Kanban T3 (t_de2be7d1) owns graceful signal shutdown
 // and must later consume this; deliberately no signal orchestration here.
 api.addHook("onClose", async () => {
+  // Post-response work OUTLIVES the HTTP response, and all of it calls back
+  // into the repository's audit-context hashing, which runs on this very pool:
+  // verification mail delivery, duplicate-registration postwork, and the
+  // deferred rate-limit refusal audit. Closing the hasher or the pool first
+  // would cut that work off after a mail send or after a registration response
+  // and lose the durable audit row. So the post-response work is drained to
+  // completion first, and the Argon2 surface is torn down only once nothing
+  // can still need it.
+  //
+  // The registration admission drain runs BEFORE the mail drain, and that order
+  // is load-bearing: an admitted registration has not yet enqueued its mail or
+  // audit work, so a mail drain that ran first would report complete a queue the
+  // very next registration is about to add to. Closing admission and joining the
+  // in-flight requests first is what makes the drains below exhaustive.
+  await registration.drainRegistrationAdmissions();
+  await registration.drainMailDispatches();
+  await registration.drainRateLimitAuditFlushes();
   auditContextHasher.close();
   await argon2Pool.close();
 });

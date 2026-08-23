@@ -1,9 +1,12 @@
+import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { runInNewContext } from "node:vm";
 import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
@@ -17,6 +20,8 @@ import {
   generateDek,
   generateVerificationToken,
   hashVerificationToken,
+  Argon2WorkerPool,
+  AuditContextHasher,
   hashAuditSourceIp,
   hashAuditUserAgent,
   loadKek,
@@ -54,6 +59,15 @@ let secretRoot: string;
 const blindIndexKey = Buffer.alloc(32, 0x3c);
 const sourceIpSalt = Buffer.alloc(32, 0x6e);
 const basePolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+
+// Exactly one process-owned Argon2 worker pool for the whole file, mirroring
+// the production topology in apps/api/src/main.ts: no pool-per-test,
+// pool-per-repository or module singleton constructed at import time.
+let argon2Pool: Argon2WorkerPool | undefined;
+function sharedArgon2Pool(): Argon2WorkerPool {
+  if (argon2Pool === undefined) argon2Pool = new Argon2WorkerPool();
+  return argon2Pool;
+}
 
 function withPolicy(overrides: Partial<AuthPolicy>): AuthPolicy {
   return Object.freeze({ ...basePolicy, ...overrides });
@@ -316,7 +330,8 @@ function buildService(input: {
   const policy = input.policy ?? basePolicy;
   const mail = input.mail ?? new MemoryMailSender();
   const repository = new PostgresIdentityRepository(
-    database.pool, sourceIpSalt, policy.auditSourceIpKdf
+    database.pool,
+    new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, policy.auditSourceIpKdf)
   );
   const limiter = new InProcessAuthRateLimiter(
     policy.rateLimits,
@@ -331,6 +346,7 @@ function buildService(input: {
     blindIndexKey,
     policy,
     limiter,
+    argon2: sharedArgon2Pool(),
     clock: input.clock ?? (() => now),
     ...(input.verificationTokenFactory === undefined
       ? {}
@@ -466,14 +482,335 @@ async function readAuditChain(): Promise<Readonly<{
   });
 }
 
+
+// --------------------------------------------------------------------------
+// S3d rework1 — the isolated RSS plateau detector.
+//
+// The detector body is byte-for-byte the pre-existing one (prime 512 sources,
+// eight null samples, sixteen 500-refusal waves, plateau = spread of the last
+// four, ceiling 2.000 MiB). It runs in a child so that what it measures is one
+// production-configured Argon2 pool under load, not the residue of every test
+// that happened to run before it in file order.
+// --------------------------------------------------------------------------
+interface PlateauChildReport {
+  readonly nullSamplesMib: readonly number[];
+  readonly nullEnvelopeMib: number;
+  readonly waveRssMib: readonly number[];
+  readonly waveHeapUsedMib: readonly number[];
+  readonly waveHeapTotalMib: readonly number[];
+  readonly waveExternalMib: readonly number[];
+  readonly plateauSpreadMib: number;
+  readonly tunedCeilingMib: number;
+  readonly platformPageSizeBytes: number;
+  readonly inFlightPeakRssMib: number;
+  readonly inFlightSamples: number;
+  readonly workerCount: number;
+  readonly workerRestartsInWindow: number;
+  readonly liveHandlesAfterClose: number;
+  readonly outstandingAfterClose: number;
+  readonly closeMs: number;
+  readonly quiesceWaitMs: number;
+  readonly retainedTotalMib: number;
+  readonly capacityCounts: readonly number[];
+  readonly measuredCapacityCount: number;
+  readonly unrelatedSignals: number;
+}
+
+const S3D_PLATEAU_REPORT_MARKER = "[S3D_PLATEAU_CHILD_REPORT]";
+
+function s3dPlateauChildSource(): string {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const cryptoIndex = JSON.stringify(pathToFileURL(join(root, "packages/crypto/src/index.ts")).href);
+  const dbIndex = JSON.stringify(pathToFileURL(join(root, "packages/db/src/index.ts")).href);
+  const authPolicy = JSON.stringify(
+    pathToFileURL(join(root, "packages/register/src/auth-policy.ts")).href
+  );
+  const registrationModule = JSON.stringify(
+    pathToFileURL(join(root, "apps/api/src/registration.ts")).href
+  );
+  return `
+import { setFlagsFromString } from "node:v8";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
+import { runInNewContext } from "node:vm";
+import { performance } from "node:perf_hooks";
+const { Argon2WorkerPool, AuditContextHasher, FileUserDekStore, loadKek } = await import(${cryptoIndex});
+const { createPool, PostgresIdentityRepository } = await import(${dbIndex});
+const { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } = await import(${authPolicy});
+const { InProcessAuthRateLimiter, RegistrationService } = await import(${registrationModule});
+
+const [connectionString, secretRoot, retainMibRaw, runLabel] = process.argv.slice(2);
+const retainMibPerWave = Number(retainMibRaw);
+// Accounts created by the saturation set persist in the shared database, so
+// each child run needs its own address namespace. A duplicate address takes the
+// duplicate-postwork branch instead of a delivery, which would never saturate.
+const address = (kind, index) => "s3d-rss-" + kind + "-" + runLabel + "-" + index + "@example.test";
+
+async function forceGarbageCollection() {
+  setFlagsFromString("--expose_gc");
+  const collect = runInNewContext("gc");
+  const options = Object.freeze({ type: "major", execution: "sync", flavor: "last-resort" });
+  collect(options);
+  collect(options);
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+// The detector samples process RSS, but two worker threads own 64 MiB Argon2
+// arenas that a main-thread-only forced GC cannot quiesce and cannot even see.
+// Sampling with jobs still in flight therefore reads arena churn, not
+// retention. Every sample point below is taken only once the pool reports zero
+// outstanding work, which is what makes the reading order-independent.
+let quiesceWaitMs = 0;
+async function quiescePool() {
+  const startedAt = performance.now();
+  while (argon2Pool.stats().outstandingTotal > 0) {
+    if (performance.now() - startedAt > 120000) {
+      throw new Error("S3D_RSS_QUIESCE_TIMEOUT:" + JSON.stringify(argon2Pool.stats()));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  quiesceWaitMs += performance.now() - startedAt;
+  await forceGarbageCollection();
+}
+
+const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+const blindIndexKey = Buffer.alloc(32, 0x3c);
+const sourceIpSalt = Buffer.alloc(32, 0x6e);
+const database = createPool(connectionString);
+
+// EXACTLY ONE production-configured pool, mirroring apps/api/src/main.ts. No
+// overrides: the shipped 2 workers / 32 / 96 / 128 / 10s / 3-per-60s bounds.
+const argon2Pool = new Argon2WorkerPool();
+await argon2Pool.ready();
+
+// DETERMINISTIC WARM-UP. Both WASM arenas are compiled and first-touched here,
+// before any sample is taken, so arena allocation can never be read as growth.
+await Promise.all([0, 1].map((index) => argon2Pool.hashPassword(
+  new TextEncoder().encode("warm-" + index), new Uint8Array(16).fill(index + 1),
+  policy.password.argon2id
+)));
+await Promise.all([0, 1].map((index) => argon2Pool.hashAuditContext(
+  new TextEncoder().encode("warm-audit-" + index), new Uint8Array(32).fill(index + 1),
+  {
+    memoryCostKiB: policy.auditSourceIpKdf.memoryCostKiB,
+    iterations: policy.auditSourceIpKdf.iterations,
+    parallelism: policy.auditSourceIpKdf.parallelism,
+    hashLength: policy.auditSourceIpKdf.hashLength
+  }
+)));
+
+const auditHasher = new AuditContextHasher(argon2Pool, sourceIpSalt, policy.auditSourceIpKdf);
+const repository = new PostgresIdentityRepository(database, auditHasher);
+const limiter = new InProcessAuthRateLimiter(
+  policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
+);
+
+class HangingMailSender {
+  constructor() { this.releases = []; this.passThrough = false; this.active = 0; }
+  async sendVerification() {
+    this.active += 1;
+    if (!this.passThrough) await new Promise((resolve) => this.releases.push(resolve));
+    this.active -= 1;
+  }
+  releaseAll() {
+    this.passThrough = true;
+    for (const release of this.releases.splice(0)) release();
+  }
+}
+const mail = new HangingMailSender();
+const service = new RegistrationService({
+  repository, mail,
+  dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
+  blindIndexKey, policy, limiter, argon2: argon2Pool,
+  clock: () => new Date("2026-08-19T12:00:00.000Z"),
+  sleep: async () => undefined
+});
+
+// Capture the capacity signals exactly as the in-process spy did.
+const capacitySignals = [];
+const realError = console.error;
+console.error = (...args) => { capacitySignals.push(String(args[0])); };
+
+// The structural admission budget caps registrations at 103, so registration
+// alone cannot fill the shared 32-active/96-waiter dispatcher any more. The
+// remaining 25 waiter slots come from the resend route, which shares that FIFO.
+const saturationCount = policy.channel.structuralMaximumConcurrentRegistrations;
+const resendTopUp = policy.channel.maxConcurrentVerificationDispatches
+  + policy.channel.maxQueuedVerificationDispatches - saturationCount;
+const saturation = Array.from({ length: saturationCount }, (_, index) =>
+  service.register({
+    email: address("saturation", index),
+    password: "correct horse battery staple",
+    recoveryEmail: address("saturation-recovery", index),
+    adultAffirmed: true
+  }, {
+    ip: "2001:db8:3d:455::" + (index + 1),
+    userAgent: "vitest-s3d-rss-saturation",
+    requestId: "request:s3d:rss:saturation:" + index
+  }).catch(() => undefined)
+);
+const saturationTopUp = Array.from({ length: resendTopUp }, (_, index) =>
+  service.resendVerification({
+    email: address("saturation-topup", index)
+  }, {
+    ip: "2001:db8:3d:457::" + (index + 1),
+    userAgent: "vitest-s3d-rss-saturation-topup",
+    requestId: "request:s3d:rss:saturation:topup:" + index
+  }).catch(() => undefined)
+);
+const saturationStartedAt = performance.now();
+while (service.mailDispatchOccupancy().queued !== policy.channel.maxQueuedVerificationDispatches
+  || service.mailDispatchOccupancy().inFlight
+    !== policy.channel.maxConcurrentVerificationDispatches) {
+  if (performance.now() - saturationStartedAt > 120000) {
+    throw new Error("S3D_RSS_SATURATION_TIMEOUT:" + JSON.stringify(service.mailDispatchOccupancy()));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+const refuseWave = async (offset, count) => {
+  let busy = 0;
+  for (let index = 0; index < count; index += 1) {
+    try {
+      await service.register({
+        email: address("refusal", offset + index),
+        password: "correct horse battery staple",
+        recoveryEmail: address("refusal-recovery", offset + index),
+        adultAffirmed: true
+      }, {
+        ip: "2001:db8:3d:456::" + (((offset + index) % 512) + 1),
+        userAgent: "vitest-s3d-rss-refusal",
+        requestId: "request:s3d:rss:refusal:" + (offset + index)
+      });
+    } catch (error) {
+      if (error?.code === "AUTH_MAIL_BUSY") busy += 1;
+    }
+  }
+  if (busy !== count) throw new Error("S3D_RSS_REFUSAL_SHORTFALL:" + busy + "/" + count);
+};
+
+await refuseWave(0, 512);
+await quiescePool();
+const nullSamplesMib = [];
+for (let sample = 0; sample < 8; sample += 1) {
+  await quiescePool();
+  nullSamplesMib.push(process.memoryUsage().rss / 1024 / 1024);
+}
+const nullEnvelopeMib = Math.max(...nullSamplesMib) - Math.min(...nullSamplesMib);
+const confirmedPlatformPageSizeBytes = 16 * 1024;
+const tunedSecondaryPlateauCeilingMib = 2;
+
+// In-flight peak capture: sampled while refusals and their Argon2 jobs are
+// running, not only at the quiesced points between waves.
+let inFlightSamples = 0;
+let inFlightPeakRss = process.memoryUsage().rss;
+const sampler = setInterval(() => {
+  inFlightSamples += 1;
+  inFlightPeakRss = Math.max(inFlightPeakRss, process.memoryUsage().rss);
+}, 25);
+
+// The deliberate positive-control retention, if any. Filled so the pages are
+// genuinely resident rather than lazily reserved.
+const retained = [];
+const waveRssMib = [];
+const waveHeapUsedMib = [];
+const waveHeapTotalMib = [];
+const waveExternalMib = [];
+for (let wave = 0; wave < 16; wave += 1) {
+  await refuseWave(512 + wave * 500, 500);
+  if (retainMibPerWave > 0) {
+    retained.push(Buffer.alloc(retainMibPerWave * 1024 * 1024, wave + 1));
+  }
+  await quiescePool();
+  const memory = process.memoryUsage();
+  waveRssMib.push(memory.rss / 1024 / 1024);
+  waveHeapUsedMib.push(memory.heapUsed / 1024 / 1024);
+  waveHeapTotalMib.push(memory.heapTotal / 1024 / 1024);
+  waveExternalMib.push(memory.external / 1024 / 1024);
+}
+clearInterval(sampler);
+const plateauSamples = waveRssMib.slice(12);
+const plateauSpreadMib = Math.max(...plateauSamples) - Math.min(...plateauSamples);
+
+service.drainMailCapacitySignals();
+const capacityCounts = capacitySignals.flatMap((signal) => {
+  const match = /^\\[AUTH_MAIL_CAPACITY_EXHAUSTED\\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=[^ ]+ count=(\\d+)$/.exec(signal);
+  return match === null ? [] : [Number(match[1])];
+});
+const measuredCapacityCount = capacityCounts.reduce((sum, count) => sum + count, 0);
+mail.releaseAll();
+await Promise.all([...saturation, ...saturationTopUp]);
+await service.drainMailDispatches();
+
+const statsBeforeClose = argon2Pool.stats();
+auditHasher.close();
+const closeStart = performance.now();
+await argon2Pool.close();
+const closeMs = performance.now() - closeStart;
+const closed = argon2Pool.stats();
+await database.end();
+console.error = realError;
+
+// Keep the control allocation observably alive right to the end.
+const retainedTotalMib = retained.reduce((sum, buffer) => sum + buffer.byteLength, 0) / 1024 / 1024;
+process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}" + JSON.stringify({
+  nullSamplesMib, nullEnvelopeMib, waveRssMib, waveHeapUsedMib, waveHeapTotalMib, waveExternalMib,
+  plateauSpreadMib,
+  tunedCeilingMib: tunedSecondaryPlateauCeilingMib,
+  platformPageSizeBytes: confirmedPlatformPageSizeBytes,
+  inFlightPeakRssMib: inFlightPeakRss / 1024 / 1024,
+  inFlightSamples,
+  workerCount: statsBeforeClose.workers,
+  workerRestartsInWindow: statsBeforeClose.restartsInWindow,
+  liveHandlesAfterClose: closed.liveHandles,
+  outstandingAfterClose: closed.outstandingTotal,
+  closeMs,
+  quiesceWaitMs,
+  retainedTotalMib,
+  capacityCounts, measuredCapacityCount,
+  unrelatedSignals: capacitySignals.length - capacityCounts.length
+}) + "\\n");
+`;
+}
+
+async function runPlateauDetectorChild(
+  childPath: string,
+  scratch: string,
+  retainMibPerWave: number
+): Promise<PlateauChildReport & { readonly childExitMs: number }> {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const childSecretRoot = await mkdtemp(join(scratch, `secrets-${retainMibPerWave}-`));
+  const startedAt = performance.now();
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      "--import", "tsx", childPath,
+      database.connectionString, childSecretRoot, String(retainMibPerWave),
+      `r${retainMibPerWave}-${randomUUID()}`
+    ],
+    { cwd: root, maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }
+  );
+  // The child is measured from spawn to exit, so "prompt exit" is a fact about
+  // the process, not an assumption about close().
+  const childExitMs = performance.now() - startedAt;
+  const line = stdout.split("\n").find((candidate) => candidate.startsWith(S3D_PLATEAU_REPORT_MARKER));
+  if (line === undefined) throw new Error(`S3D_PLATEAU_CHILD_NO_REPORT:${stdout.slice(-2_000)}`);
+  return Object.freeze({
+    ...JSON.parse(line.slice(S3D_PLATEAU_REPORT_MARKER.length)) as PlateauChildReport,
+    childExitMs
+  });
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   secretRoot = await mkdtemp(join(tmpdir(), "debateai-s3-registration-"));
+  await sharedArgon2Pool().ready();
 }, 120_000);
 
 afterAll(async () => {
   await database?.stop();
+  await argon2Pool?.close();
   if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
 });
 
@@ -607,8 +944,8 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         .resolves.toEqual(RESEND_PUBLIC_RESPONSE);
 
       const [ipArgon2id, unknownUserAgentArgon2id] = await Promise.all([
-        hashAuditSourceIp(ip, sourceIpSalt, basePolicy.auditSourceIpKdf),
-        hashAuditUserAgent("unknown", sourceIpSalt, basePolicy.auditSourceIpKdf)
+        hashAuditSourceIp(sharedArgon2Pool(), ip, sourceIpSalt, basePolicy.auditSourceIpKdf),
+        hashAuditUserAgent(sharedArgon2Pool(), "unknown", sourceIpSalt, basePolicy.auditSourceIpKdf)
       ]);
       const audit = await database.pool.query<{
         event_type: string;
@@ -887,8 +1224,8 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       source: { ip: "", userAgent: "  \t", requestId: "" }
     })).resolves.toBeUndefined();
     const [unknownIpArgon2id, unknownUserAgentArgon2id] = await Promise.all([
-      hashAuditSourceIp("unknown", sourceIpSalt, basePolicy.auditSourceIpKdf),
-      hashAuditUserAgent("unknown", sourceIpSalt, basePolicy.auditSourceIpKdf)
+      hashAuditSourceIp(sharedArgon2Pool(), "unknown", sourceIpSalt, basePolicy.auditSourceIpKdf),
+      hashAuditUserAgent(sharedArgon2Pool(), "unknown", sourceIpSalt, basePolicy.auditSourceIpKdf)
     ]);
     const audit = await database.pool.query<{
       ip_argon2id: string;
@@ -1060,7 +1397,14 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     const baselineTokenStrings = await quotedVerificationTokensInHeap(baselineSnapshotPath);
     await rm(baselineSnapshotPath, { force: true });
     expect(baselineTokenStrings.has(heapCanary)).toBe(true);
-    const initialAttempts = ruledMaximum + ruledQueueMaximum;
+    // Saturating the shared 32-active/96-waiter dispatcher takes 128 requests,
+    // but registration alone can no longer supply them: the structural
+    // admission budget is 103, so registrations can occupy at most 32 permits
+    // and 71 waiter slots. The remaining 25 waiters come from the resend route,
+    // which is exactly the shared-FIFO property decision v3 declines to
+    // partition — and it keeps this test measuring a genuinely full queue.
+    const initialAttempts = basePolicy.channel.structuralMaximumConcurrentRegistrations;
+    const resendTopUp = ruledMaximum + ruledQueueMaximum - initialAttempts;
     const outcomes: Array<string | undefined> = Array.from({ length: initialAttempts });
     const registerAt = async (index: number): Promise<void> => {
       try {
@@ -1080,6 +1424,14 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       }
     };
     const initial = Array.from({ length: initialAttempts }, (_, index) => registerAt(index));
+    const topUp = Array.from({ length: resendTopUp }, (_, index) =>
+      flow.service.resendVerification({
+        email: `s3d-hang-topup-${index}@example.test`
+      }, {
+        ip: `2001:db8:3d:7::${index + 1}`,
+        userAgent: "vitest-s3d-hanging-transport-topup",
+        requestId: `request:s3d:hang:topup:${index}`
+      }).catch(() => undefined));
     const saturationStartedAt = performance.now();
     while (true) {
       const state = flow.service.mailDispatchOccupancy();
@@ -1201,7 +1553,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         || signal.includes("2001:db8") || signal.includes("vitest-s3d"))).toBe(false);
     } finally {
       mail.releaseAndPassThrough();
-      await Promise.all(initial);
+      await Promise.all([...initial, ...topUp]);
       await flow.service.drainMailDispatches();
       capacityError.mockRestore();
     }
@@ -1272,8 +1624,12 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     const mail = new HangingMailSender();
     const flow = buildService({ mail, sleep: async () => undefined });
     const capacityError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const saturationCount = basePolicy.channel.maxConcurrentVerificationDispatches
-      + basePolicy.channel.maxQueuedVerificationDispatches;
+    // Registration alone stops at the structural admission budget of 103, so
+    // the last 25 waiter slots of the shared 96-deep queue are filled from the
+    // resend route. The queue under measurement is still exactly 96 deep.
+    const saturationCount = basePolicy.channel.structuralMaximumConcurrentRegistrations;
+    const resendTopUp = basePolicy.channel.maxConcurrentVerificationDispatches
+      + basePolicy.channel.maxQueuedVerificationDispatches - saturationCount;
     const saturation = Array.from({ length: saturationCount }, (_, index) =>
       flow.service.register({
         email: `s3d-retained-saturation-${index}@example.test`,
@@ -1286,10 +1642,20 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         requestId: `request:s3d:retained:saturation:${index}`
       }).catch(() => undefined)
     );
+    const saturationTopUp = Array.from({ length: resendTopUp }, (_, index) =>
+      flow.service.resendVerification({
+        email: `s3d-retained-topup-${index}@example.test`
+      }, {
+        ip: `2001:db8:3d:4f::${index + 1}`,
+        userAgent: "vitest-s3d-retained-saturation-topup",
+        requestId: `request:s3d:retained:saturation:topup:${index}`
+      }).catch(() => undefined)
+    );
     const saturationStartedAt = performance.now();
     while (flow.service.mailDispatchOccupancy().queued
-      !== basePolicy.channel.maxQueuedVerificationDispatches || mail.active
-      !== basePolicy.channel.maxConcurrentVerificationDispatches) {
+      !== basePolicy.channel.maxQueuedVerificationDispatches
+      || flow.service.mailDispatchOccupancy().inFlight
+        !== basePolicy.channel.maxConcurrentVerificationDispatches) {
       if (performance.now() - saturationStartedAt > 60_000) {
         throw new Error(`S3D_RETAINED_SATURATION_TIMEOUT:${JSON.stringify(
           flow.service.mailDispatchOccupancy()
@@ -1369,7 +1735,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       return match === null ? [] : [Number(match[1])];
     });
     mail.releaseAll();
-    await Promise.all(saturation);
+    await Promise.all([...saturation, ...saturationTopUp]);
     await flow.service.drainMailDispatches();
     capacityError.mockRestore();
 
@@ -1471,11 +1837,12 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     type InstrumentedDispatcher = {
       activateMailDispatch(enforceMinimum?: boolean, minimumReservationMs?: number): Release;
       reserveMailDispatch(correlationId: string): Promise<Release>;
-      reserveMailDispatchPermit(
-        correlationId: string,
-        minimumReservationMs?: number,
-        activationSpacingMs?: number
-      ): Promise<() => Promise<Release>>;
+      reserveMailDispatchPermit(request: {
+        readonly correlationId: string;
+        readonly minimumReservationMs?: number;
+        readonly activationSpacingMs?: number;
+        readonly waitDeadlineMs?: number;
+      }): Promise<() => Promise<Release>>;
     };
 
     class RuledTimeoutMailSender implements MailSender {
@@ -1521,13 +1888,9 @@ describe("S3 registration and verification on real PostgreSQL", () => {
           }));
         }
       };
-      inspected.reserveMailDispatchPermit = (
-        correlationId: string,
-        minimumReservationMs?: number,
-        activationSpacingMs?: number
-      ) => {
+      inspected.reserveMailDispatchPermit = (request) => {
         captureReservation();
-        return originalPermit(correlationId, minimumReservationMs, activationSpacingMs);
+        return originalPermit(request);
       };
       return Object.freeze({
         inspected,
@@ -2218,11 +2581,12 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         enforceMinimum?: boolean,
         minimumReservationMs?: number
       ): () => Promise<void>;
-      reserveMailDispatchPermit(
-        correlationId: string,
-        minimumReservationMs?: number,
-        activationSpacingMs?: number
-      ): Promise<() => Promise<() => Promise<void>>>;
+      reserveMailDispatchPermit(request: {
+        readonly correlationId: string;
+        readonly minimumReservationMs?: number;
+        readonly activationSpacingMs?: number;
+        readonly waitDeadlineMs?: number;
+      }): Promise<() => Promise<() => Promise<void>>>;
     };
     const originalActivate = instrumentedService.activateMailDispatch.bind(flow.service);
     const originalReserve = instrumentedService.reserveMailDispatchPermit.bind(flow.service);
@@ -2235,11 +2599,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       capturedGrantTimes?.push(performance.now());
       return originalActivate(enforceMinimum, minimumReservationMs);
     };
-    instrumentedService.reserveMailDispatchPermit = (
-      correlationId: string,
-      minimumReservationMs?: number,
-      activationSpacingMs?: number
-    ) => originalReserve(correlationId, minimumReservationMs, activationSpacingMs)
+    instrumentedService.reserveMailDispatchPermit = (request) => originalReserve(request)
       .then((activate) => {
         capturedPermitTimes?.push(performance.now());
         return activate;
@@ -2428,7 +2788,13 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     expect(classifier).toBeLessThanOrEqual(nullClassifier);
   }, 360_000);
 
-  it("S3d rework2 B4 measures healthy-MTA burst cost and the frozen S3b margin", async () => {
+  // The burst arms are 100 / 103 / 104 / 128 / 160 because those are the four
+  // structurally distinct cases plus the hard-availability requirement: below
+  // the cap, exactly at it, one over it, and far over it. Under decision v3 the
+  // expected shape is 100 / 103 / 103 / 103 / 103 — not because a completion
+  // rate was measured at 103, but because 103 registrations may hold the
+  // admission budget and the rest are refused before doing any work.
+  it("S3d rework7 B4 measures healthy-MTA availability against the structural 103 cap", async () => {
     class HealthyMailSender implements MailSender {
       sends = 0;
       async sendVerification(): Promise<void> {
@@ -2443,39 +2809,51 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       p50Ms: number;
       p99Ms: number;
       maximumAcceptedWaitMs: number;
-      queueDeadlineMarginMs: number;
+      /**
+       * REWORK8 F4. Two DIFFERENT deadlines exist and only one of them is the
+       * registration route's. Rework7 published a single unqualified
+       * `queueDeadlineMarginMs` computed against the SHARED 18,000 ms value
+       * even though every registration in this burst arms 28,000 ms, so the
+       * published number understated the real margin by exactly the 10,000 ms
+       * between them. Both are now named for the deadline they are actually
+       * measured against, and the registration one is the one with meaning
+       * here; the shared one is retained only as a diagnostic.
+       */
+      registrationDeadlineMarginMs: number;
+      sharedDeadlineDiagnosticMarginMs: number;
       committed: number;
       sends: number;
+      peakAdmitted: number;
+      admittedAfterDrain: number;
     }>;
     const measurements: BurstMeasurement[] = [];
-    for (const size of [100, 128, 160]) {
+    for (const size of [100, 103, 104, 128, 160]) {
       const mail = new HealthyMailSender();
       const flow = buildService({ mail });
       const inspectedService = flow.service as unknown as {
-        reserveMailDispatchPermit(
-          correlationId: string,
-          minimumReservationMs?: number,
-          activationSpacingMs?: number
-        ): Promise<() => Promise<() => Promise<void>>>;
+        reserveMailDispatchPermit(request: {
+          readonly correlationId: string;
+          readonly minimumReservationMs?: number;
+          readonly activationSpacingMs?: number;
+          readonly waitDeadlineMs?: number;
+        }): Promise<() => Promise<() => Promise<void>>>;
+        registrationAdmissionOccupancy(): Readonly<{ admitted: number; maximum: number }>;
       };
       const reserveMailDispatchPermit = inspectedService.reserveMailDispatchPermit.bind(flow.service);
       const acceptedWaits: number[] = [];
-      inspectedService.reserveMailDispatchPermit = (
-        correlationId: string,
-        minimumReservationMs?: number,
-        activationSpacingMs?: number
-      ) => {
+      const registrationWaitDeadlines: number[] = [];
+      inspectedService.reserveMailDispatchPermit = (request) => {
         const startedAt = performance.now();
-        const reservation = reserveMailDispatchPermit(
-          correlationId, minimumReservationMs, activationSpacingMs
-        );
+        registrationWaitDeadlines.push(request.waitDeadlineMs ?? -1);
+        const reservation = reserveMailDispatchPermit(request);
         return reservation.then((release) => {
           acceptedWaits.push(performance.now() - startedAt);
           return release;
         });
       };
       const indexes: Buffer[] = [];
-      const outcomes = await Promise.all(Array.from({ length: size }, async (_, index) => {
+      let peakAdmitted = 0;
+      const attempts = Array.from({ length: size }, async (_, index) => {
         const email = `s3d-b4-${size}-${index}@example.test`;
         indexes.push(createEmailBlindIndex(blindIndexKey, email));
         const startedAt = performance.now();
@@ -2497,7 +2875,12 @@ describe("S3 registration and verification on real PostgreSQL", () => {
             elapsedMs: performance.now() - startedAt
           });
         }
-      }));
+      });
+      // Read straight after the synchronous launch loop: the admission gate is
+      // taken before the first repository await, so the ceiling is decided by
+      // the time every attempt has been started.
+      peakAdmitted = inspectedService.registrationAdmissionOccupancy().admitted;
+      const outcomes = await Promise.all(attempts);
       const successes = outcomes.filter((outcome) => outcome.code === "SUCCESS");
       const busy = outcomes.filter((outcome) => outcome.code === "AUTH_MAIL_BUSY");
       const unexpected = outcomes.filter((outcome) =>
@@ -2517,15 +2900,25 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         p50Ms: empiricalQuantile(acceptedLatencies, 0.5),
         p99Ms: empiricalQuantile(acceptedLatencies, 0.99),
         maximumAcceptedWaitMs,
-        queueDeadlineMarginMs:
+        registrationDeadlineMarginMs:
+          basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs
+          - maximumAcceptedWaitMs,
+        sharedDeadlineDiagnosticMarginMs:
           basePolicy.channel.mailDispatchQueueWaitTimeoutMs - maximumAcceptedWaitMs,
         committed: Number(committed.rows[0]!.count),
-        sends: mail.sends
+        sends: mail.sends,
+        peakAdmitted,
+        admittedAfterDrain: inspectedService.registrationAdmissionOccupancy().admitted
       }));
       expect(unexpected).toHaveLength(0);
       expect(successes.length + busy.length).toBe(size);
       expect(Number(committed.rows[0]!.count)).toBe(successes.length);
       expect(mail.sends).toBe(successes.length);
+      // Every admitted registration asked for the 28-second registration
+      // deadline, never the shared 18-second one.
+      expect(registrationWaitDeadlines).toHaveLength(successes.length);
+      expect([...new Set(registrationWaitDeadlines)])
+        .toEqual([basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs]);
       expect(flow.service.mailDispatchOccupancy()).toEqual({
         inFlight: 0,
         activeSends: 0,
@@ -2537,23 +2930,101 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     }
     const hundred = measurements.find((measurement) => measurement.size === 100)!;
     console.info(
-      `[S3d REWORK2 B4 AVAILABILITY] backend=postgres production_policy=true healthy_mta_ms=5 `
-      + `production_equivalent_100_request_success_margin=${hundred.successes - 100} `
+      `[T1 REWORK7 B4 AVAILABILITY] backend=postgres production_policy=true healthy_mta_ms=5 `
+      + `structural_cap=${basePolicy.channel.structuralMaximumConcurrentRegistrations} `
+      + `registration_wait_deadline_ms=`
+      + `${basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs} `
+      + `shared_wait_deadline_ms=${basePolicy.channel.mailDispatchQueueWaitTimeoutMs} `
+      + `hard_availability_margin=${hundred.successes - 100} `
       + measurements.map((measurement) =>
         `burst=${measurement.size} success=${measurement.successes} busy=${measurement.busy} `
+        + `peak_admitted=${measurement.peakAdmitted} `
+        + `admitted_after_drain=${measurement.admittedAfterDrain} `
         + `p50_ms=${measurement.p50Ms.toFixed(1)} p99_ms=${measurement.p99Ms.toFixed(1)} `
         + `max_queue_wait_ms=${measurement.maximumAcceptedWaitMs.toFixed(1)} `
-        + `deadline_margin_ms=${measurement.queueDeadlineMarginMs.toFixed(1)} `
+        + `registration_28s_margin_ms=`
+        + `${measurement.registrationDeadlineMarginMs.toFixed(1)} `
+        + `shared_18s_diagnostic_margin_ms=`
+        + `${measurement.sharedDeadlineDiagnosticMarginMs.toFixed(1)} `
         + `committed=${measurement.committed} sends=${measurement.sends}`
       ).join(" | ")
     );
+    // Hard availability: 100 eligible simultaneous register requests on a
+    // healthy MTA with an initially empty dispatcher all commit and all send.
     expect(hundred.successes).toBe(100);
     expect(hundred.committed).toBe(100);
-    expect(hundred.queueDeadlineMarginMs).toBeGreaterThanOrEqual(0);
-  }, 420_000);
+    expect(hundred.sends).toBe(100);
+    expect(hundred.busy).toBe(0);
+    expect(hundred.peakAdmitted).toBe(100);
+    expect(hundred.registrationDeadlineMarginMs).toBeGreaterThan(0);
 
+    // The STRUCTURAL admission cap. This is NOT a measured completion rate —
+    // decision_version 2 published it as one, and unchanged code then measured
+    // 98 and 96 for the same burst. It is the size of the admission budget, so
+    // the burst that exactly fills it succeeds completely and every request
+    // beyond it is refused before it does any work.
+    const capacity = basePolicy.channel.structuralMaximumConcurrentRegistrations;
+    expect(capacity).toBe(103);
+    const atCap = measurements.find((measurement) => measurement.size === capacity)!;
+    expect(atCap.successes).toBe(capacity);
+    expect(atCap.committed).toBe(capacity);
+    expect(atCap.sends).toBe(capacity);
+    expect(atCap.busy).toBe(0);
+    expect(atCap.peakAdmitted).toBe(capacity);
+
+    for (const size of [104, 128, 160]) {
+      const overload = measurements.find((measurement) => measurement.size === size)!;
+      expect(overload.successes).toBe(capacity);
+      expect(overload.committed).toBe(capacity);
+      expect(overload.sends).toBe(capacity);
+      // Everything above the cap is a typed retryable refusal, never a silent
+      // drop and never an uncommitted "success".
+      expect(overload.busy).toBe(size - capacity);
+      expect(overload.peakAdmitted).toBe(capacity);
+      expect(overload.registrationDeadlineMarginMs).toBeGreaterThan(0);
+    }
+    // Nothing leaks: every burst ends with the whole budget returned.
+    for (const measurement of measurements) {
+      expect(measurement.admittedAfterDrain).toBe(0);
+    }
+    // REWORK8 F4. Every admitted registration in this test armed the 28,000 ms
+    // registration deadline, so the margin that describes THIS route must be
+    // measured against that deadline and must be positive. The 18,000 ms value
+    // is kept beside it, under a name that says what it is: a diagnostic
+    // against the SHARED deadline, which no registration here ever armed.
+    for (const measurement of measurements) {
+      expect(measurement.registrationDeadlineMarginMs).toBe(
+        basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs
+        - measurement.maximumAcceptedWaitMs
+      );
+      expect(measurement.registrationDeadlineMarginMs).toBeGreaterThan(0);
+      expect(measurement.sharedDeadlineDiagnosticMarginMs).toBe(
+        basePolicy.channel.mailDispatchQueueWaitTimeoutMs
+        - measurement.maximumAcceptedWaitMs
+      );
+      // The two are genuinely different numbers, which is the whole point: a
+      // single unqualified "deadline margin" cannot describe both routes.
+      expect(
+        measurement.registrationDeadlineMarginMs
+        - measurement.sharedDeadlineDiagnosticMarginMs
+      ).toBeCloseTo(
+        basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs
+        - basePolicy.channel.mailDispatchQueueWaitTimeoutMs,
+        6
+      );
+    }
+  }, 900_000);
+
+  // Every request this test queues is a REGISTRATION, so under Rework7 its ruled
+  // deadline is the route-specific 28,000 ms, not the shared 18,000 ms. What the
+  // test proves is unchanged and is not about the constant: both address arms
+  // must wait out the SAME ruled deadline and be indistinguishable at it. The
+  // spy below now also records the deadline the service actually armed, so
+  // "registration asked for its own deadline, never the shared one" is proven on
+  // the real PostgreSQL-backed service and not only in the unit harness.
   it("S3d rework2 fold-in gives both queued address arms the same ruled deadline", async () => {
-    const expectedWaitTimeoutMs = basePolicy.channel.mailDispatchQueueWaitTimeoutMs;
+    const expectedWaitTimeoutMs =
+      basePolicy.channel.registrationMailDispatchQueueWaitTimeoutMs;
     const samplesPerArm = 24;
     class HangingMailSender implements MailSender {
       private readonly releases: Array<() => void> = [];
@@ -2611,21 +3082,20 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     }
 
     const inspectedService = flow.service as unknown as {
-      reserveMailDispatchPermit(
-        correlationId: string,
-        minimumReservationMs?: number,
-        activationSpacingMs?: number
-      ): Promise<() => Promise<() => Promise<void>>>;
+      reserveMailDispatchPermit(request: {
+        readonly correlationId: string;
+        readonly minimumReservationMs?: number;
+        readonly activationSpacingMs?: number;
+        readonly waitDeadlineMs?: number;
+      }): Promise<() => Promise<() => Promise<void>>>;
     };
     const reserveMailDispatchPermit = inspectedService.reserveMailDispatchPermit.bind(flow.service);
     const reservationWaits: number[] = [];
+    const armedWaitDeadlines: number[] = [];
     const schedulerDrainNulls: Array<Promise<number>> = [];
-    inspectedService.reserveMailDispatchPermit = (
-      correlationId: string,
-      minimumReservationMs?: number,
-      activationSpacingMs?: number
-    ) => {
+    inspectedService.reserveMailDispatchPermit = (request) => {
       const reservationStartedAt = performance.now();
+      armedWaitDeadlines.push(request.waitDeadlineMs ?? -1);
       // A timeout callback is not the end of an expiry wave: the product timer
       // removes its queue node and rejects the suspended request. Measure the
       // null after the same due-timer batch has drained instead of comparing
@@ -2634,9 +3104,7 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         () => setImmediate(() => resolve(performance.now() - reservationStartedAt)),
         expectedWaitTimeoutMs
       )));
-      const reservation = reserveMailDispatchPermit(
-        correlationId, minimumReservationMs, activationSpacingMs
-      );
+      const reservation = reserveMailDispatchPermit(request);
       return reservation.catch((error) => {
         reservationWaits.push(performance.now() - reservationStartedAt);
         throw error;
@@ -2716,6 +3184,12 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     expect(outcomes.every((outcome) => outcome.code === "AUTH_MAIL_BUSY"
       && outcome.statusCode === 503)).toBe(true);
     expect(reservationWaits).toHaveLength(samplesPerArm * 2);
+    // Route-specific arming on the real service: every queued registration asked
+    // for its own 28,000 ms deadline, and none of them fell back to the shared
+    // 18,000 ms one that resend keeps.
+    expect(expectedWaitTimeoutMs).toBe(28_000);
+    expect([...new Set(armedWaitDeadlines)]).toEqual([expectedWaitTimeoutMs]);
+    expect(armedWaitDeadlines).not.toContain(basePolicy.channel.mailDispatchQueueWaitTimeoutMs);
     expect(Math.min(...reservationWaits)).toBeGreaterThanOrEqual(expectedWaitTimeoutMs - 250);
     expect(Math.max(...reservationWaits)).toBeLessThanOrEqual(deadlineCeiling);
     expect(auc).toBeLessThanOrEqual(aucCeiling);
@@ -2725,140 +3199,102 @@ describe("S3 registration and verification on real PostgreSQL", () => {
       statusCode: 503
     }));
     flow.service.drainMailCapacitySignals();
-  }, 60_000);
+    // The ruled wait this test sits through grew from 18 s to 28 s, so the
+    // harness budget grows with it. No product bound, threshold or tolerance in
+    // this test changed.
+  }, 120_000);
 
   it("S3d rework3 fold-in plateaus RSS under a fixed ceiling and preserves the total aggregate count", async () => {
-    class HangingMailSender implements MailSender {
-      private readonly releases: Array<() => void> = [];
-      private passThrough = false;
-      active = 0;
+    // ROUTER EVIDENCE RULING (rework 1). The 2.000 MiB plateau limit is
+    // UNCHANGED — it is not raised, softened or deleted. What changed is
+    // hermeticity. Run in file order behind 55 other tests, this detector was
+    // reading a process whose RSS oscillates by ~100 MiB because two live
+    // Argon2 worker arenas cannot be quiesced by a main-thread-only forced GC,
+    // and its own null envelope had grown to 64x its ceiling. The exact
+    // pre-T1 full-suite baseline (logs/T9-router-full-suite-attempt2.log,
+    // integration hash c0a17739..., plateau 0.094 MiB, null envelope 0.109 MiB)
+    // and a direct 240-job pool probe (0.6 MiB drift, zero restarts) together
+    // establish there is no retention to find. So the repair is to give the
+    // detector a process it can actually measure: a fresh child with one
+    // production-configured pool, a deterministic warm-up, in-flight peak
+    // capture, an explicit close() and a prompt exit.
+    //
+    // The green run below is only meaningful because of the positive control
+    // beneath it, which retains real memory in an otherwise identical child and
+    // must drive the SAME assertion RED.
+    const scratch = await mkdtemp(join(tmpdir(), "s3d-rss-plateau-"));
+    try {
+      const childPath = join(scratch, "s3d-rss-plateau-child.mts");
+      await writeFile(childPath, s3dPlateauChildSource(), "utf8");
 
-      async sendVerification(): Promise<void> {
-        this.active += 1;
-        if (!this.passThrough) {
-          await new Promise<void>((resolve) => this.releases.push(resolve));
-        }
-        this.active -= 1;
-      }
+      const detector = await runPlateauDetectorChild(childPath, scratch, 0);
+      console.info(
+        `[S3d REWORK1 ISOLATED RSS PLATEAU] backend=postgres hermetic=child `
+        + `refusals=8000 sources=512 retained_mib_per_wave=0 `
+        + `null_mib=[${detector.nullSamplesMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `waves_mib=[${detector.waveRssMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `heap_used_mib=[${detector.waveHeapUsedMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `heap_total_mib=[${detector.waveHeapTotalMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `external_mib=[${detector.waveExternalMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `null_envelope_mib=${detector.nullEnvelopeMib.toFixed(3)} `
+        + `platform_page_size_bytes=${detector.platformPageSizeBytes} `
+        + `threshold_kind=tuned_secondary_tripwire `
+        + `tuned_ceiling_mib=${detector.tunedCeilingMib.toFixed(3)} `
+        + `plateau_spread_mib=${detector.plateauSpreadMib.toFixed(3)} `
+        + `in_flight_peak_mib=${detector.inFlightPeakRssMib.toFixed(1)} `
+        + `in_flight_samples=${detector.inFlightSamples} `
+        + `worker_count=${detector.workerCount} worker_restarts=${detector.workerRestartsInWindow} `
+        + `live_handles_after_close=${detector.liveHandlesAfterClose} `
+        + `close_ms=${detector.closeMs.toFixed(1)} quiesce_wait_ms=${detector.quiesceWaitMs.toFixed(1)} `
+        + `child_exit_ms=${detector.childExitMs.toFixed(1)} `
+        + `measured_aggregates=${detector.capacityCounts.length} `
+        + `measured_total_count=${detector.measuredCapacityCount} `
+        + `unrelated_signals=${detector.unrelatedSignals}`
+      );
 
-      releaseAll(): void {
-        this.passThrough = true;
-        for (const release of this.releases.splice(0)) release();
-      }
-    }
-    const mail = new HangingMailSender();
-    const flow = buildService({ mail, sleep: async () => undefined });
-    const capacityError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const saturationCount = basePolicy.channel.maxConcurrentVerificationDispatches
-      + basePolicy.channel.maxQueuedVerificationDispatches;
-    const saturation = Array.from({ length: saturationCount }, (_, index) =>
-      flow.service.register({
-        email: `s3d-rss-saturation-${index}@example.test`,
-        password: "correct horse battery staple",
-        recoveryEmail: `s3d-rss-saturation-${index}-recovery@example.test`,
-        adultAffirmed: true
-      }, {
-        ip: `2001:db8:3d:455::${index + 1}`,
-        userAgent: "vitest-s3d-rss-saturation",
-        requestId: `request:s3d:rss:saturation:${index}`
-      }).catch(() => undefined)
-    );
-    const saturationStartedAt = performance.now();
-    while (flow.service.mailDispatchOccupancy().queued
-      !== basePolicy.channel.maxQueuedVerificationDispatches || mail.active
-      !== basePolicy.channel.maxConcurrentVerificationDispatches) {
-      if (performance.now() - saturationStartedAt > 60_000) {
-        throw new Error(`S3D_RSS_SATURATION_TIMEOUT:${JSON.stringify(
-          flow.service.mailDispatchOccupancy()
-        )}`);
-      }
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
-    }
-    const refuseWave = async (offset: number, count: number): Promise<void> => {
-      let busy = 0;
-      for (let index = 0; index < count; index += 1) {
-        try {
-          await flow.service.register({
-            email: `s3d-rss-refusal-${offset + index}@example.test`,
-            password: "correct horse battery staple",
-            recoveryEmail: `s3d-rss-refusal-${offset + index}-recovery@example.test`,
-            adultAffirmed: true
-          }, {
-            // Keep the D1 pressure source set fixed so the frozen S3c sketch's
-            // demand-paged backing store cannot masquerade as dispatcher growth.
-            ip: `2001:db8:3d:456::${((offset + index) % 512) + 1}`,
-            userAgent: "vitest-s3d-rss-refusal",
-            requestId: `request:s3d:rss:refusal:${offset + index}`
-          });
-        } catch (error) {
-          if ((error as { code?: string }).code === "AUTH_MAIL_BUSY") busy += 1;
-        }
-      }
-      expect(busy).toBe(count);
-    };
+      // The child really was hermetic: its own null envelope is small again,
+      // so the tripwire is measuring the pool rather than process history.
+      expect(detector.nullEnvelopeMib).toBeLessThanOrEqual(detector.tunedCeilingMib);
+      // One production-configured pool, explicitly closed, nothing left behind.
+      expect(detector.workerCount).toBe(2);
+      expect(detector.workerRestartsInWindow).toBe(0);
+      expect(detector.liveHandlesAfterClose).toBe(0);
+      expect(detector.outstandingAfterClose).toBe(0);
+      // The peak was taken while jobs were in flight, not after they settled.
+      expect(detector.inFlightSamples).toBeGreaterThan(1);
+      expect(detector.inFlightPeakRssMib)
+        .toBeGreaterThanOrEqual(Math.max(...detector.waveRssMib) - 1);
+      // Prompt exit: no worker holds the child open once close() has run.
+      expect(detector.childExitMs).toBeLessThan(30_000);
 
-    // Prime every source before the baseline, then stay below 20 admissions per
-    // source while proving twice the prior refusal load without demand-paging
-    // new S3c slots during the measured waves.
-    await refuseWave(0, 512);
-    await forceGarbageCollection();
-    const nullSamplesMib: number[] = [];
-    for (let sample = 0; sample < 8; sample += 1) {
-      await forceGarbageCollection();
-      nullSamplesMib.push(process.memoryUsage().rss / 1024 / 1024);
+      // THE UNCHANGED THRESHOLD.
+      expect(detector.tunedCeilingMib).toBe(2);
+      expect(detector.plateauSpreadMib).toBeLessThanOrEqual(detector.tunedCeilingMib);
+      expect(detector.capacityCounts.length).toBeGreaterThanOrEqual(1);
+      expect(detector.measuredCapacityCount).toBe(8_512);
+
+      // POSITIVE CONTROL. Identical child, identical detector, identical
+      // threshold — plus a deliberate retention of 4 MiB per wave. If this does
+      // not go RED on the very assertion above, the green result is worthless.
+      const control = await runPlateauDetectorChild(childPath, scratch, 4);
+      console.info(
+        `[S3d REWORK1 ISOLATED RSS POSITIVE CONTROL] retained_mib_per_wave=4 `
+        + `waves_mib=[${control.waveRssMib.map((value) => value.toFixed(1)).join(",")}] `
+        + `null_envelope_mib=${control.nullEnvelopeMib.toFixed(3)} `
+        + `tuned_ceiling_mib=${control.tunedCeilingMib.toFixed(3)} `
+        + `plateau_spread_mib=${control.plateauSpreadMib.toFixed(3)} `
+        + `retained_total_mib=${control.retainedTotalMib} `
+        + `measured_total_count=${control.measuredCapacityCount}`
+      );
+      expect(control.retainedTotalMib).toBeGreaterThan(control.tunedCeilingMib);
+      expect(control.tunedCeilingMib).toBe(2);
+      // The intended assertion, and only that assertion, fails.
+      expect(control.plateauSpreadMib).toBeGreaterThan(control.tunedCeilingMib);
+      expect(control.measuredCapacityCount).toBe(8_512);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
     }
-    const nullEnvelopeMib = Math.max(...nullSamplesMib) - Math.min(...nullSamplesMib);
-    const confirmedPlatformPageSizeBytes = 16 * 1024;
-    // This is a tuned secondary regression tripwire, not the primary security
-    // bound. Its broad 2 MiB ceiling detects renewed linear growth without
-    // pretending scheduler/RSS noise is a derived quantum; the heap-shape
-    // proof above supplies the N-independent guarantee.
-    const tunedSecondaryPlateauCeilingMib = 2;
-    const waveRssMib: number[] = [];
-    const waveHeapUsedMib: number[] = [];
-    const waveHeapTotalMib: number[] = [];
-    const waveExternalMib: number[] = [];
-    for (let wave = 0; wave < 16; wave += 1) {
-      await refuseWave(512 + wave * 500, 500);
-      await forceGarbageCollection();
-      const memory = process.memoryUsage();
-      waveRssMib.push(memory.rss / 1024 / 1024);
-      waveHeapUsedMib.push(memory.heapUsed / 1024 / 1024);
-      waveHeapTotalMib.push(memory.heapTotal / 1024 / 1024);
-      waveExternalMib.push(memory.external / 1024 / 1024);
-    }
-    const plateauSamples = waveRssMib.slice(12);
-    const plateauSpreadMib = Math.max(...plateauSamples) - Math.min(...plateauSamples);
-    flow.service.drainMailCapacitySignals();
-    const allCapacitySignals = capacityError.mock.calls.map(([message]) => String(message));
-    const capacityCounts = allCapacitySignals.flatMap((signal) => {
-      const match = /^\[AUTH_MAIL_CAPACITY_EXHAUSTED\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=[^ ]+ count=(\d+)$/.exec(signal);
-      return match === null ? [] : [Number(match[1])];
-    });
-    const measuredCapacityCount = capacityCounts.reduce((sum, count) => sum + count, 0);
-    mail.releaseAll();
-    await Promise.all(saturation);
-    await flow.service.drainMailDispatches();
-    capacityError.mockRestore();
-    console.info(
-      `[S3d REWORK2 COUNTED RSS PLATEAU] backend=postgres refusals=8000 sources=512 `
-      + `null_mib=[${nullSamplesMib.map((value) => value.toFixed(1)).join(",")}] `
-      + `waves_mib=[${waveRssMib.map((value) => value.toFixed(1)).join(",")}] `
-      + `heap_used_mib=[${waveHeapUsedMib.map((value) => value.toFixed(1)).join(",")}] `
-      + `heap_total_mib=[${waveHeapTotalMib.map((value) => value.toFixed(1)).join(",")}] `
-      + `external_mib=[${waveExternalMib.map((value) => value.toFixed(1)).join(",")}] `
-      + `null_envelope_mib=${nullEnvelopeMib.toFixed(3)} `
-      + `platform_page_size_bytes=${confirmedPlatformPageSizeBytes} `
-      + `threshold_kind=tuned_secondary_tripwire `
-      + `tuned_ceiling_mib=${tunedSecondaryPlateauCeilingMib.toFixed(3)} `
-      + `plateau_spread_mib=${plateauSpreadMib.toFixed(3)} `
-      + `measured_aggregates=${capacityCounts.length} measured_total_count=${measuredCapacityCount} `
-      + `unrelated_signals=${allCapacitySignals.length - capacityCounts.length}`
-    );
-    expect(plateauSpreadMib).toBeLessThanOrEqual(tunedSecondaryPlateauCeilingMib);
-    expect(capacityCounts.length).toBeGreaterThanOrEqual(1);
-    expect(measuredCapacityCount).toBe(8_512);
-  }, 180_000);
+  }, 900_000);
 
   it("S3d D2 preserves the owner's first verification credential across the full resend allowance", async () => {
     const initialNow = new Date("2026-08-20T09:00:00.000Z");
@@ -3670,18 +4106,6 @@ describe("S3 registration and verification on real PostgreSQL", () => {
     }
     const filesystemWrites = hostLoad?.filesystemWrites() ?? 0;
     await hostLoad?.stop();
-    if (registrationCadenceMs === 45) {
-      const absorbed = measurements.find((measurement) => measurement.concurrency === 2)!;
-      const firstUnabsorbed = measurements.find((measurement) => measurement.concurrency === 3)!;
-      expect(absorbed.hashAndProvisioningMaximumMs).toBeLessThanOrEqual(
-        basePolicy.channel.registrationHashAndProvisioningUpperBoundMs
-      );
-      expect(absorbed.clampHeadroomMs).toBeGreaterThanOrEqual(
-        basePolicy.channel.registrationClampHeadroomMs
-      );
-      expect(firstUnabsorbed.clampHeadroomMs).toBeLessThan(0);
-      expect(basePolicy.channel.maximumClampAbsorbedRegistrationConcurrency).toBe(2);
-    }
     console.info(
       `[S3b REWORK1 LIVE TIMING] backend=postgres mail=live password_argon2id_kib=${basePolicy.password.argon2id.memoryCostKiB} `
         + `password_argon2id_time=${basePolicy.password.argon2id.timeCost} `
@@ -3703,6 +4127,108 @@ describe("S3 registration and verification on real PostgreSQL", () => {
         measurement.concurrency * measurement.waves
       );
       expect(measurement.mailCount).toBe(measurement.expectedMailCount);
+    }
+    // The clamp-absorption disclosure runs LAST, and only last: vitest abandons
+    // a test at its first failed expect, so holding this block earlier would
+    // suppress the metrics log and every opacity/audit/postwork/mail assertion
+    // above and leave the calibration with nothing measured. Reaching this line
+    // is itself the proof that everything above it passed.
+    //
+    // Under decision_version 3 this block DISCLOSES rather than gates. v2
+    // ratified N*=3 against a ruled 430 ms upper bound; unchanged code then
+    // measured that same n=3 arm at 1,264.7 ms and 973.0 ms, so the ratified
+    // bound is contradicted evidence, not a live threshold. Asserting it again
+    // here would be re-claiming a number Rework7 explicitly retired — and
+    // silently substituting the historical N*=2 would be worse. So the measured
+    // value is logged, the policy is asserted to publish NO positive current
+    // N*, and the historical rows are asserted to survive unaltered.
+    if (registrationCadenceMs === 45) {
+      const channelRow = AUTH_POLICY_REGISTER_ROWS
+        .find((row) => row.rowKey === "channelPolicy")!;
+      const dispatch = (channelRow.value as {
+        verification_dispatch: {
+          sizing_derivation: string;
+          registration_clamp_absorption: Readonly<Record<string, unknown>>;
+          current_registration_clamp_absorption: {
+            decision_version: number;
+            registration_activation_spacing_ms: number;
+            measured_hash_and_provisioning_max_ms: number;
+            evidence: {
+              n3_clamp_headroom_tenths_ms: readonly number[];
+              n4_clamp_headroom_tenths_ms: readonly number[];
+              raw_maximum_absorbed_concurrency_per_repeat: readonly number[];
+            };
+          };
+        };
+      }).verification_dispatch;
+      const current = dispatch.current_registration_clamp_absorption;
+      const absorbed = measurements.find((measurement) => measurement.concurrency === 3)!;
+      const notClaimed = measurements.find((measurement) => measurement.concurrency === 4)!;
+
+      // 1. The superseded v2 numbers survive unaltered, and this run DISCLOSES
+      //    its own n=3 observation against them rather than gating on a bound
+      //    Rework7 retired. The policy publishes NO positive current N*, so
+      //    there is nothing here to silently fall back to.
+      expect(basePolicy.channel.supersededClampAbsorptionDecisionVersion).toBe(2);
+      expect(basePolicy.channel.supersededMaximumClampAbsorbedRegistrationConcurrency).toBe(3);
+      expect(basePolicy.channel.supersededRegistrationHashAndProvisioningUpperBoundMs).toBe(430);
+      expect(basePolicy.channel.supersededRegistrationClampHeadroomMs).toBe(35);
+      expect(basePolicy.channel.currentPositiveClampAbsorptionNStar).toBeNull();
+      expect(basePolicy.channel.registrationAdmissionDecisionVersion).toBe(3);
+
+      // 2. The cadence is UNCHANGED by this decision.
+      expect(registrationCadenceMs).toBe(45);
+      expect(current.registration_activation_spacing_ms).toBe(45);
+      expect(basePolicy.channel.registrationMailDispatchActivationSpacingMs).toBe(45);
+
+      // 3. N*=4 is deliberately NOT claimed. Its headroom straddled zero across
+      //    the three ratifying repeats (+7.0, +9.2, -6.5 ms) and raw maximum
+      //    absorbed was [4,4,3], so this run DISCLOSES the N=4 measurement
+      //    rather than asserting a sign it does not have.
+      expect(current.evidence.n4_clamp_headroom_tenths_ms).toEqual([70, 92, -65]);
+      expect(current.evidence.raw_maximum_absorbed_concurrency_per_repeat).toEqual([4, 4, 3]);
+      expect(basePolicy.channel.supersededMaximumClampAbsorbedRegistrationConcurrency)
+        .toBeLessThan(4);
+      expect(current.evidence.n3_clamp_headroom_tenths_ms).toEqual([1_131, 1_112, 754]);
+      expect(current.evidence.n3_clamp_headroom_tenths_ms.every((tenths) => tenths > 0))
+        .toBe(true);
+
+      // 4. The sealed historical decision survives this publication unaltered.
+      expect(basePolicy.channel.maximumClampAbsorbedRegistrationConcurrency).toBe(2);
+      expect(basePolicy.channel.registrationHashAndProvisioningUpperBoundMs).toBe(480);
+      expect(basePolicy.channel.registrationClampHeadroomMs).toBe(30);
+      expect(dispatch.registration_clamp_absorption).toMatchObject({
+        maximum_unsaturated_concurrency: 2,
+        measured_hash_and_provisioning_max_ms: 436,
+        ruled_hash_and_provisioning_upper_bound_ms: 480,
+        binding_headroom_ms: 30,
+        first_measured_unabsorbed_concurrency: 3
+      });
+
+      // 5. The published sizing derivation discloses the three-repeat evidence
+      //    and the N=4 instability, rather than only the conclusion.
+      for (const disclosure of [
+        "decision_version 2", "N*=3", "unchanged 45 ms", "Three fresh isolated repeats",
+        "389.6 ms", "430 ms", "3 * 45 ms", "565 ms", "35 ms ruled headroom",
+        "+113.1, +111.2 and +75.4 ms", "N=4 is deliberately NOT claimed",
+        "+7.0, +9.2 and -6.5 ms", "[4,4,3]", "[8,8,4]",
+        "not a monotone lower bound", "exactly 103", "103/103/103", "100/100/100"
+      ]) {
+        expect(dispatch.sizing_derivation).toContain(disclosure);
+      }
+
+      console.info(
+        `[T1 REWORK7 SUPERSEDED CLAMP ABSORPTION decision_version=2 status=CONTRADICTED] `
+        + `cadence_ms=${registrationCadenceMs} `
+        + `current_positive_n_star=${String(basePolicy.channel.currentPositiveClampAbsorptionNStar)} `
+        + `superseded_n_star=${basePolicy.channel.supersededMaximumClampAbsorbedRegistrationConcurrency} `
+        + `superseded_upper_ms=${basePolicy.channel.supersededRegistrationHashAndProvisioningUpperBoundMs} `
+        + `superseded_headroom_ms=${basePolicy.channel.supersededRegistrationClampHeadroomMs} `
+        + `observed_n3_hash_provision_max_ms=${absorbed.hashAndProvisioningMaximumMs.toFixed(1)} `
+        + `observed_n3_clamp_headroom_ms=${absorbed.clampHeadroomMs.toFixed(1)} `
+        + `observed_n4_clamp_headroom_ms=${notClaimed.clampHeadroomMs.toFixed(1)} `
+        + `n4_claimed=false sealed_decision_version=1 sealed_n_star=2 sealed_retained=true`
+      );
     }
   }, 300_000);
 
@@ -4726,121 +5252,508 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     }
   }, 300_000);
 
-  it("T9 holds mixed-contention resend arms at or below the n=32 same-arm null q99", async () => {
-    const samplesPerArm = 32;
-    const initialNow = new Date("2026-08-21T13:00:00.000Z");
-    const mail = new MemoryMailSender();
-    const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
-    try {
-      const registered = await registerAccount(flow.service, "t9-equivalence-existing");
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
-      const deadlocksBefore = await databaseDeadlockCount();
-
-      // One window, both labels alternating, every request from its own source.
-      // The window is issued at a cadence the ruled verification dispatcher
-      // sustains — every request occupies one of the 32 ruled concurrent
-      // reservations for the ruled 5 700 ms minimum, so half-capacity steady
-      // state is one request per (minimum reservation / half the ruled
-      // concurrency). Exceeding that cap would split BOTH arms across an
-      // immediate-grant mode and a queued-grant mode; that queueing mode is a
-      // ruled availability property covered by S3d, it is assigned by arrival
-      // order rather than by address, and on a bimodal mixture a median is a
-      // knife-edge estimator of the mode split rather than of address
-      // existence. The saturated 32-at-once case is separately covered by the
-      // deterministic race test above.
-      const windowCadenceMs = Math.ceil(
-        basePolicy.channel.mailDispatchMinimumReservationMs
-        / (basePolicy.channel.maxConcurrentVerificationDispatches / 2)
-      );
-      const issued: Array<Promise<ResendObservation>> = [];
-      for (let index = 0; index < samplesPerArm * 2; index += 1) {
-        const arm = index % 2 === 0 ? "existing" as const : "missing" as const;
-        const slot = Math.floor(index / 2);
-        issued.push(injectResend(
-          api,
-          arm,
-          slot,
-          arm === "existing"
-            ? registered.email
-            : `t9-equivalence-missing-${slot}@example.test`,
-          `198.51.${arm === "existing" ? 10 : 20}.${slot + 1}`
-        ));
-        await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
-      }
-      const window = await Promise.all(issued);
-      await flow.service.drainMailDispatches();
-      await settleDatabaseStatistics();
-      const deadlocksAfter = await databaseDeadlockCount();
-
-      const armScores = (arm: "existing" | "missing"): number[] => window
-        .filter((observation) => observation.arm === arm)
-        .map((observation) => observation.elapsedMs);
-      const existingScores = armScores("existing");
-      const missingScores = armScores("missing");
-      expect(existingScores).toHaveLength(samplesPerArm);
-      expect(missingScores).toHaveLength(samplesPerArm);
-
-      const auc = aucSeparability(existingScores, missingScores);
-      const classifier = bestSingleThresholdClassifierAccuracy(existingScores, missingScores);
-      // Both nulls are drawn at the exact scored group size, from the same-arm
-      // series only, so the ceiling carries this window's own dispersion.
-      const existingNull = sameArmRelabelingNull(existingScores, samplesPerArm, 0x7c91);
-      const missingNull = sameArmRelabelingNull(missingScores, samplesPerArm, 0x7c92);
-      const aucCeiling = empiricalQuantile([...existingNull.auc, ...missingNull.auc], 0.99);
-      const classifierCeiling = empiricalQuantile(
-        [...existingNull.classifier, ...missingNull.classifier], 0.99
-      );
-
-      // Separated-series positive control: the same estimators must saturate
-      // and clear both ceilings, so a passing window is not a dead measurement.
-      const controlExisting = Array.from({ length: samplesPerArm }, (_, index) => 100 + index);
-      const controlMissing = Array.from({ length: samplesPerArm }, (_, index) => 10_000 + index);
-      const controlAuc = aucSeparability(controlExisting, controlMissing);
-      const controlClassifier = bestSingleThresholdClassifierAccuracy(
-        controlExisting, controlMissing
-      );
-
-      const medianGap = Math.abs(median(existingScores) - median(missingScores));
-      console.info(
-        `[T9 ENUMERATION EQUIVALENCE RED/GREEN] backend=postgres n_per_arm=${samplesPerArm} `
-        + `window_cadence_ms=${windowCadenceMs} `
-        + `null_group_size=${existingNull.groupSize}/${missingNull.groupSize} null_draws=2048 `
-        + `cross_auc=${auc.toFixed(4)} null_auc_q99=${aucCeiling.toFixed(4)} `
-        + `cross_accuracy=${classifier.toFixed(4)} null_accuracy_q99=${classifierCeiling.toFixed(4)} `
-        + `control_auc=${controlAuc.toFixed(4)} control_accuracy=${controlClassifier.toFixed(4)} `
-        + `existing_median_ms=${median(existingScores).toFixed(1)} `
-        + `missing_median_ms=${median(missingScores).toFixed(1)} `
-        + `median_gap_ms=${medianGap.toFixed(1)} tolerance_ms=${basePolicy.verification.enumerationToleranceMs} `
-        + `statuses=${JSON.stringify([...new Set(window.map((observation) => observation.status))])} `
-        + `deadlock_delta=${deadlocksAfter - deadlocksBefore} `
-        + `existing_ms=${existingScores.map((score) => score.toFixed(1)).join(",")} `
-        + `missing_ms=${missingScores.map((score) => score.toFixed(1)).join(",")}`
-      );
-
-      for (const observation of window) {
-        expect(observation.status).toBe(202);
-        expect(observation.body).toBe(RESEND_BODY);
-        expect(observation.rejection).toBeNull();
-      }
-      expect(deadlocksAfter - deadlocksBefore).toBe(0);
-      expect(existingNull.groupSize).toBe(samplesPerArm);
-      expect(missingNull.groupSize).toBe(samplesPerArm);
-      expect(aucCeiling).toBeLessThan(1);
-      expect(classifierCeiling).toBeLessThan(1);
-      expect(auc).toBeLessThanOrEqual(aucCeiling);
-      expect(classifier).toBeLessThanOrEqual(classifierCeiling);
-      expect(controlAuc).toBe(1);
-      expect(controlClassifier).toBe(1);
-      expect(controlAuc).toBeGreaterThan(aucCeiling);
-      expect(controlClassifier).toBeGreaterThan(classifierCeiling);
-      // Secondary policy check only; the null-calibrated metrics above gate.
-      expect(medianGap).toBeLessThanOrEqual(basePolicy.verification.enumerationToleranceMs);
-    } finally {
-      await flow.service.drainMailDispatches();
-      await api.close();
+  it("T9 counterbalances six resend windows with cadence-blocked family-wise equivalence", async () => {
+    type T9Arm = "existing" | "missing";
+    type T9Order = "AB" | "BA";
+    type T9Classification =
+      | "T9_RESEND_EQUIVALENCE_GREEN"
+      | "T9_RESEND_PRODUCT_REPAIR_REQUIRED"
+      | "T9_TEST_CONTRACT_INCONCLUSIVE";
+    interface T9Score {
+      readonly arm: T9Arm;
+      readonly slot: number;
+      readonly firstPosition: boolean;
+      readonly score: number;
     }
-  }, 300_000);
+    interface T9Window {
+      readonly order: T9Order;
+      readonly scores: readonly T9Score[];
+      readonly medianGapMs: number;
+    }
+    interface T9Pair {
+      readonly replicate: number;
+      readonly ab: T9Window;
+      readonly ba: T9Window;
+    }
+    interface T9Evaluation {
+      readonly classification: T9Classification;
+      readonly rawPValues: readonly number[];
+      readonly familyPValue: number;
+      readonly endpointObserved: readonly number[];
+      readonly endpointQ99: readonly number[];
+      readonly duplicateMaskCount: readonly number[];
+      readonly duplicateTransformationCount: number;
+      readonly localRejects: readonly boolean[];
+      readonly directedSigns: readonly number[];
+      readonly constituentSigns: readonly Readonly<{ ab: number; ba: number }>[];
+      readonly pairMedianGapsMs: readonly number[];
+    }
+
+    const GREEN: T9Classification = "T9_RESEND_EQUIVALENCE_GREEN";
+    const PRODUCT_REPAIR: T9Classification = "T9_RESEND_PRODUCT_REPAIR_REQUIRED";
+    const INCONCLUSIVE: T9Classification = "T9_TEST_CONTRACT_INCONCLUSIVE";
+    const samplesPerArm = 32;
+    const randomizationDraws = 4_095;
+    const transformationCount = 4_096;
+    const seeds = Object.freeze([0x79a0b001, 0x79a0b002, 0x79a0b003] as const);
+    const endpointKinds = Object.freeze(["auc", "accuracy"] as const);
+    const windowCadenceMs = Math.ceil(
+      basePolicy.channel.mailDispatchMinimumReservationMs
+      / (basePolicy.channel.maxConcurrentVerificationDispatches / 2)
+    );
+
+    // This order function is shared by the immutable controls and the live
+    // issuer. The RED-first legacy wiring deliberately returned AB for both
+    // branches; the cadence-only fixture killed it before any live request ran.
+    const armsForOrder = (order: T9Order): readonly [T9Arm, T9Arm] => order === "AB"
+      ? Object.freeze(["existing", "missing"] as const)
+      : Object.freeze(["missing", "existing"] as const);
+
+    const directedAuc = (existing: readonly number[], missing: readonly number[]): number => {
+      let missingWins = 0;
+      let ties = 0;
+      for (const existingValue of existing) {
+        for (const missingValue of missing) {
+          if (missingValue > existingValue) missingWins += 1;
+          if (missingValue === existingValue) ties += 1;
+        }
+      }
+      return (missingWins + 0.5 * ties) / (existing.length * missing.length);
+    };
+    const direction = (auc: number): number => Math.sign(auc - 0.5);
+
+    const scoresByArm = (
+      scores: readonly T9Score[], arm: T9Arm
+    ): readonly number[] => scores
+      .filter((observation) => observation.arm === arm)
+      .map((observation) => observation.score);
+
+    const assertWindowIntegrity = (window: T9Window): void => {
+      const existing = scoresByArm(window.scores, "existing");
+      const missing = scoresByArm(window.scores, "missing");
+      expect(existing, `T9 ${window.order} exact existing cardinality`).toHaveLength(32);
+      expect(missing, `T9 ${window.order} exact missing cardinality`).toHaveLength(32);
+      expect(window.scores, `T9 ${window.order} exact total cardinality`).toHaveLength(64);
+      expect(new Set(window.scores.map((observation) => observation.slot)).size).toBe(32);
+      for (let slot = 0; slot < samplesPerArm; slot += 1) {
+        const block = window.scores.filter((observation) => observation.slot === slot);
+        expect(block, `T9 ${window.order} slot ${slot} cardinality`).toHaveLength(2);
+        expect(block.filter((observation) => observation.firstPosition)).toHaveLength(1);
+        expect(block.filter((observation) => !observation.firstPosition)).toHaveLength(1);
+        expect(new Set(block.map((observation) => observation.arm))).toEqual(
+          new Set<T9Arm>(["existing", "missing"])
+        );
+      }
+    };
+
+    const xorshiftMasks = (seed: number): readonly number[] => {
+      let state = seed >>> 0;
+      return Object.freeze(Array.from({ length: randomizationDraws }, () => {
+        state ^= state << 13;
+        state ^= state >>> 17;
+        state ^= state << 5;
+        state >>>= 0;
+        return state;
+      }));
+    };
+
+    const transformedScores = (
+      pair: T9Pair,
+      mask: number
+    ): Readonly<{ existing: readonly number[]; missing: readonly number[] }> => {
+      const existing: number[] = [];
+      const missing: number[] = [];
+      for (let slot = 0; slot < samplesPerArm; slot += 1) {
+        const flip = (mask & (2 ** slot)) !== 0;
+        const block = [...pair.ab.scores, ...pair.ba.scores]
+          .filter((observation) => observation.slot === slot);
+        expect(block, `T9 replicate ${pair.replicate} cadence block ${slot}`).toHaveLength(4);
+        for (const observation of block) {
+          const arm: T9Arm = flip
+            ? (observation.arm === "existing" ? "missing" : "existing")
+            : observation.arm;
+          (arm === "existing" ? existing : missing).push(observation.score);
+        }
+      }
+      expect(existing).toHaveLength(64);
+      expect(missing).toHaveLength(64);
+      return Object.freeze({ existing: Object.freeze(existing), missing: Object.freeze(missing) });
+    };
+
+    const evaluate = (pairs: readonly T9Pair[], label: string): T9Evaluation => {
+      expect(pairs, "T9 exact replicate-pair count").toHaveLength(3);
+      expect(endpointKinds, "T9 family includes AUC and accuracy").toHaveLength(2);
+      for (const pair of pairs) {
+        expect(pair.ab.order).toBe("AB");
+        expect(pair.ba.order).toBe("BA");
+        assertWindowIntegrity(pair.ab);
+        assertWindowIntegrity(pair.ba);
+      }
+
+      const masks = seeds.map(xorshiftMasks);
+      for (const replicateMasks of masks) {
+        expect(replicateMasks).toHaveLength(randomizationDraws);
+        expect(replicateMasks.every((mask) => Number.isInteger(mask)
+          && mask >= 0 && mask <= 0xffff_ffff)).toBe(true);
+      }
+      const duplicateMaskCount = Object.freeze(masks.map(
+        (replicateMasks) => replicateMasks.length - new Set(replicateMasks).size
+      ));
+      const transformationKeys = Array.from({ length: randomizationDraws }, (_, draw) =>
+        masks.map((replicateMasks) => replicateMasks[draw]!).join(":"));
+      const duplicateTransformationCount = transformationKeys.length
+        - new Set(transformationKeys).size;
+
+      const endpointStatistics: number[][] = [];
+      const directedSigns: number[] = [];
+      const constituentSigns: Array<Readonly<{ ab: number; ba: number }>> = [];
+      const pairMedianGapsMs: number[] = [];
+      for (const pair of pairs) {
+        const original = transformedScores(pair, 0);
+        const abExisting = scoresByArm(pair.ab.scores, "existing");
+        const abMissing = scoresByArm(pair.ab.scores, "missing");
+        const baExisting = scoresByArm(pair.ba.scores, "existing");
+        const baMissing = scoresByArm(pair.ba.scores, "missing");
+        directedSigns.push(direction(directedAuc(original.existing, original.missing)));
+        constituentSigns.push(Object.freeze({
+          ab: direction(directedAuc(abExisting, abMissing)),
+          ba: direction(directedAuc(baExisting, baMissing))
+        }));
+        pairMedianGapsMs.push(Math.abs(median(original.existing) - median(original.missing)));
+        for (const endpointKind of endpointKinds) {
+          endpointStatistics.push(Array.from({ length: transformationCount }, (_, transform) => {
+            const transformed = transformedScores(
+              pair,
+              transform === 0 ? 0 : masks[pair.replicate]![transform - 1]!
+            );
+            return endpointKind === "auc"
+              ? aucSeparability(transformed.existing, transformed.missing)
+              : bestSingleThresholdClassifierAccuracy(
+                transformed.existing, transformed.missing
+              );
+          }));
+        }
+      }
+      expect(endpointStatistics, "T9 six-endpoint family").toHaveLength(6);
+      expect(endpointStatistics.every((statistics) =>
+        statistics.length === transformationCount)).toBe(true);
+
+      // Exact conservative tail ranks for every endpoint and every member of
+      // the transformation multiset. Values are binary-rational ranks, so the
+      // Map keys preserve equality (including duplicate masks) exactly.
+      const permutationPValues = endpointStatistics.map((statistics) => {
+        const multiplicity = new Map<number, number>();
+        for (const statistic of statistics) {
+          multiplicity.set(statistic, (multiplicity.get(statistic) ?? 0) + 1);
+        }
+        let tail = 0;
+        const tailByStatistic = new Map<number, number>();
+        for (const statistic of [...multiplicity.keys()].sort((left, right) => right - left)) {
+          tail += multiplicity.get(statistic)!;
+          tailByStatistic.set(statistic, tail / transformationCount);
+        }
+        return statistics.map((statistic) => tailByStatistic.get(statistic)!);
+      });
+      const rawPValues = Object.freeze(permutationPValues.map((values) => values[0]!));
+      const minP = Array.from({ length: transformationCount }, (_, transform) =>
+        Math.min(...permutationPValues.map((values) => values[transform]!)));
+      const observedMinP = minP[0]!;
+      const familyPValue = minP.filter((value) => value <= observedMinP).length
+        / transformationCount;
+      const endpointObserved = Object.freeze(endpointStatistics.map((values) => values[0]!));
+      const endpointQ99 = Object.freeze(endpointStatistics.map((values) =>
+        empiricalQuantile(values.slice(1), 0.99)));
+
+      // Holm within a replicate has two endpoints. At least one survives iff
+      // the smaller raw p-value is <= .05/2.
+      const localRejects = Object.freeze(pairs.map((_, replicate) =>
+        Math.min(rawPValues[replicate * 2]!, rawPValues[replicate * 2 + 1]!) <= 0.025));
+      const replicatedDirection = [-1, 1].some((sign) => pairs.filter((_, replicate) =>
+        localRejects[replicate]
+        && directedSigns[replicate] === sign
+        && constituentSigns[replicate]!.ab === sign
+        && constituentSigns[replicate]!.ba === sign
+      ).length >= 2);
+      const classification: T9Classification = familyPValue > 0.01
+        ? GREEN
+        : localRejects.filter(Boolean).length >= 2 && replicatedDirection
+          ? PRODUCT_REPAIR
+          : INCONCLUSIVE;
+
+      console.info(
+        `[T9 BLOCKED EVALUATOR] label=${label} classification=${classification} `
+        + `seeds=${seeds.map((seed) => `0x${seed.toString(16)}`).join(",")} `
+        + `draws=${randomizationDraws} transformations=${transformationCount} `
+        + `duplicate_masks=${duplicateMaskCount.join(",")} `
+        + `duplicate_transformations=${duplicateTransformationCount} endpoints=6 `
+        + `raw_p=${rawPValues.map((value) => value.toFixed(6)).join(",")} `
+        + `p_fwer=${familyPValue.toFixed(6)} `
+        + `observed=${endpointObserved.map((value) => value.toFixed(6)).join(",")} `
+        + `q99=${endpointQ99.map((value) => value.toFixed(6)).join(",")} `
+        + `holm_local=${localRejects.join(",")} directed_signs=${directedSigns.join(",")} `
+        + `constituent_signs=${constituentSigns.map((one) => `${one.ab}/${one.ba}`).join(",")} `
+        + `pair_median_gap_ms=${pairMedianGapsMs.map((value) => value.toFixed(3)).join(",")}`
+      );
+      expect(transformationCount).toBe(randomizationDraws + 1);
+      expect(seeds).toEqual([0x79a0b001, 0x79a0b002, 0x79a0b003]);
+      expect(rawPValues).toHaveLength(6);
+      expect(minP).toHaveLength(4_096);
+      expect(familyPValue).toBeGreaterThanOrEqual(1 / 4_096);
+      expect(familyPValue).toBeLessThanOrEqual(1);
+      return Object.freeze({
+        classification,
+        rawPValues,
+        familyPValue,
+        endpointObserved,
+        endpointQ99,
+        duplicateMaskCount,
+        duplicateTransformationCount,
+        localRejects,
+        directedSigns: Object.freeze(directedSigns),
+        constituentSigns: Object.freeze(constituentSigns),
+        pairMedianGapsMs: Object.freeze(pairMedianGapsMs)
+      });
+    };
+
+    const syntheticPairs = (
+      score: (slot: number, firstPosition: boolean, arm: T9Arm) => number
+    ): readonly T9Pair[] => Object.freeze(Array.from({ length: 3 }, (_, replicate) => {
+      const window = (order: T9Order): T9Window => {
+        const arms = armsForOrder(order);
+        const scores = Object.freeze(Array.from({ length: samplesPerArm }, (_, slot) =>
+          arms.map((arm, position) => Object.freeze({
+            arm,
+            slot,
+            firstPosition: position === 0,
+            score: score(slot, position === 0, arm)
+          }))).flat());
+        return Object.freeze({
+          order,
+          scores,
+          medianGapMs: Math.abs(
+            median(scoresByArm(scores, "existing")) - median(scoresByArm(scores, "missing"))
+          )
+        });
+      };
+      return Object.freeze({ replicate, ab: window("AB"), ba: window("BA") });
+    }));
+
+    // Immutable deterministic controls execute the exact evaluator used for
+    // live data. They remain inside this one top-level test.
+    const cadenceOnly = syntheticPairs((slot, firstPosition) =>
+      500 + (slot % 4) + (firstPosition ? 32 : 0));
+    const armEffect = syntheticPairs((slot, firstPosition, arm) =>
+      500 + (slot % 4) + (firstPosition ? 8 : 0) + (arm === "missing" ? 32 : 0));
+    const blockedPower = syntheticPairs((slot, _firstPosition, arm) =>
+      500 + 1_000 * slot + (arm === "missing" ? 10 : 0));
+    expect(Object.isFrozen(cadenceOnly)).toBe(true);
+    expect(cadenceOnly.every((pair) => Object.isFrozen(pair)
+      && Object.isFrozen(pair.ab) && Object.isFrozen(pair.ba)
+      && Object.isFrozen(pair.ab.scores) && Object.isFrozen(pair.ba.scores)
+      && pair.ab.scores.every(Object.isFrozen) && pair.ba.scores.every(Object.isFrozen))).toBe(true);
+    const cadenceControl = evaluate(cadenceOnly, "cadence-only");
+    expect(cadenceControl.classification).toBe(GREEN);
+    const blockedControl = evaluate(blockedPower, "blocked-power");
+    expect(blockedControl.familyPValue).toBeLessThanOrEqual(0.01);
+    expect(blockedControl.classification).toBe(PRODUCT_REPAIR);
+    const armControl = evaluate(armEffect, "arm-effect");
+    expect(armControl.endpointObserved).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(armControl.familyPValue).toBeLessThanOrEqual(0.01);
+    expect(armControl.pairMedianGapsMs.every((gap) => gap < 100)).toBe(true);
+    expect(armControl.classification).toBe(PRODUCT_REPAIR);
+
+    const runWindow = async (replicate: number, order: T9Order): Promise<T9Window> => {
+      const windowIndex = replicate * 2 + (order === "AB" ? 0 : 1);
+      const initialNow = new Date(Date.UTC(2026, 7, 24 + windowIndex, 13, 0, 0));
+      const occurredAt = new Date(
+        initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
+      );
+      const namespace = `t9-rework9-r${replicate + 1}-${order.toLowerCase()}`;
+      const mail = new MemoryMailSender();
+      const flow = buildService({ mail, initialNow });
+      const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+      try {
+        const registered = await registerAccount(flow.service, `${namespace}-existing`);
+        await flow.service.drainMailDispatches();
+        const seededToken = mail.messages[0]!.token;
+        const seededCredentials = await database.pool.query<{
+          token_hash: string; channel_binding_id: string; issued_at: Date;
+          expires_at: Date; consumed_at: Date | null;
+        }>(`
+          SELECT credential.token_hash,credential.channel_binding_id,
+            credential.issued_at,credential.expires_at,credential.consumed_at
+          FROM identity.verification_token_credential credential
+          JOIN identity.channel_binding binding USING (channel_binding_id)
+          WHERE binding.user_id=$1 ORDER BY credential.issued_at,credential.token_hash
+        `, [registered.user.user_id]);
+        expect(mail.messages, `T9 ${namespace} bootstrap mail`).toHaveLength(1);
+        expect(seededCredentials.rows, `T9 ${namespace} bootstrap credential`).toHaveLength(1);
+
+        flow.advance(basePolicy.verification.resendCooldownMs + 1);
+        const deadlocksBefore = await databaseDeadlockCount();
+        const issued: Array<Promise<T9Score & ResendObservation>> = [];
+        const arms = armsForOrder(order);
+        for (let position = 0; position < samplesPerArm * 2; position += 1) {
+          const arm = arms[position % 2]!;
+          const slot = Math.floor(position / 2);
+          const email = arm === "existing"
+            ? registered.email
+            : `${namespace}-missing-${slot}@example.test`;
+          issued.push(injectResend(
+            api,
+            arm,
+            slot,
+            email,
+            `198.18.${windowIndex + 1}.${position + 1}`
+          ).then((observation) => Object.freeze({
+            ...observation,
+            slot,
+            firstPosition: position % 2 === 0,
+            score: observation.elapsedMs
+          })));
+          await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
+        }
+        const observations = await Promise.all(issued);
+        await flow.service.drainMailDispatches();
+        await settleDatabaseStatistics();
+        const deadlocksAfter = await databaseDeadlockCount();
+
+        const existingObservations = observations.filter((one) => one.arm === "existing");
+        const missingObservations = observations.filter((one) => one.arm === "missing");
+        expect(existingObservations, `T9 ${namespace} exact existing cardinality`).toHaveLength(32);
+        expect(missingObservations, `T9 ${namespace} exact missing cardinality`).toHaveLength(32);
+        expect(new Set(observations.map((one) => one.ip)).size).toBe(64);
+        expect(existingObservations.map((one) => one.status)).toEqual(
+          Array.from({ length: 32 }, () => 202)
+        );
+        expect(missingObservations.map((one) => one.status)).toEqual(
+          Array.from({ length: 32 }, () => 202)
+        );
+        for (const observation of observations) {
+          expect(observation.body).toBe(RESEND_BODY);
+          expect(observation.rejection).toBeNull();
+          expect(databaseErrorLeak(observation.body)).toBe(false);
+        }
+        expect(deadlocksAfter - deadlocksBefore).toBe(0);
+
+        const resendAudit = await database.pool.query<{
+          actor_key_ref: string; decision: string; success: boolean; justification: string | null;
+        }>(`
+          SELECT actor_key_ref,decision,success,justification
+          FROM identity.audit_event
+          WHERE event_type='identity.verification.resend_requested' AND occurred_at=$1
+        `, [occurredAt]);
+        const existingAudit = resendAudit.rows.filter(
+          (row) => row.actor_key_ref === registered.user.audit_token
+        );
+        const missingAudit = resendAudit.rows.filter(
+          (row) => row.actor_key_ref !== registered.user.audit_token
+        );
+        expect(resendAudit.rows).toHaveLength(64);
+        expect(existingAudit).toHaveLength(32);
+        expect(existingAudit.filter((row) => row.decision === "ALLOW" && row.success
+          && row.justification === null)).toHaveLength(1);
+        expect(existingAudit.filter((row) => row.decision === "DENY" && !row.success
+          && row.justification === "RESEND_COOLDOWN")).toHaveLength(31);
+        expect(missingAudit).toHaveLength(32);
+        expect(missingAudit.every((row) => row.decision === "DENY" && !row.success
+          && row.justification === "RESEND_NOT_APPLICABLE")).toBe(true);
+        expect(new Set(missingAudit.map((row) => row.actor_key_ref)).size).toBe(32);
+
+        const rateLimitAudit = await database.pool.query<{ refusals: string }>(`
+          SELECT count(*)::text AS refusals FROM identity.audit_event
+          WHERE event_type='identity.auth.rate_limit_refused' AND occurred_at=$1
+        `, [occurredAt]);
+        expect(rateLimitAudit.rows[0]!.refusals).toBe("0");
+        const deliveryAudit = await database.pool.query<{ event_type: string }>(`
+          SELECT event_type FROM identity.audit_event
+          WHERE actor_key_ref=$1 AND event_type IN (
+            'identity.verification.sent','identity.verification.delivery_record_failed'
+          )
+        `, [registered.user.audit_token]);
+        expect(deliveryAudit.rows.filter((row) =>
+          row.event_type === "identity.verification.sent")).toHaveLength(2);
+        expect(deliveryAudit.rows.filter((row) =>
+          row.event_type === "identity.verification.delivery_record_failed")).toEqual([]);
+        const credentials = await database.pool.query<{
+          token_hash: string; channel_binding_id: string; issued_at: Date;
+          expires_at: Date; consumed_at: Date | null;
+        }>(`
+          SELECT credential.token_hash,credential.channel_binding_id,
+            credential.issued_at,credential.expires_at,credential.consumed_at
+          FROM identity.verification_token_credential credential
+          JOIN identity.channel_binding binding USING (channel_binding_id)
+          WHERE binding.user_id=$1 ORDER BY credential.issued_at,credential.token_hash
+        `, [registered.user.user_id]);
+        expect(mail.messages).toHaveLength(2);
+        expect(new Set(mail.messages.map((message) => message.token)).size).toBe(2);
+        expect(credentials.rows).toHaveLength(2);
+        expect(credentials.rows).toContainEqual(seededCredentials.rows[0]);
+        expect(credentials.rows.every((credential) => credential.consumed_at === null
+          && credential.expires_at.getTime() - credential.issued_at.getTime()
+            === basePolicy.verification.tokenTtlMs)).toBe(true);
+
+        const scores: readonly T9Score[] = Object.freeze(observations.map((observation) =>
+          Object.freeze({
+            arm: observation.arm,
+            slot: observation.slot,
+            firstPosition: observation.firstPosition,
+            score: observation.score
+          })));
+        const existingScores = scoresByArm(scores, "existing");
+        const missingScores = scoresByArm(scores, "missing");
+        const medianGapMs = Math.abs(median(existingScores) - median(missingScores));
+        expect(medianGapMs).toBeLessThanOrEqual(100);
+
+        await expect(flow.service.verifyEmail({ token: seededToken }, {
+          ip: `203.0.113.${windowIndex + 1}`,
+          userAgent: "vitest-t9-rework9-owner",
+          requestId: `request:${namespace}:owner-verify`
+        })).resolves.toEqual({ status: "active" });
+        const activationAudit = await database.pool.query<{ activations: string }>(`
+          SELECT count(*)::text AS activations FROM identity.audit_event
+          WHERE event_type='identity.verification.consumed' AND actor_key_ref=$1
+            AND decision='ALLOW' AND success
+        `, [registered.user.audit_token]);
+        expect(activationAudit.rows[0]!.activations).toBe("1");
+        // This chain read is intentionally after the seeded-token activation
+        // audit, so the verified depth includes the final security event.
+        const audit = await readAuditChain();
+        expect(audit.rootCount).toBe(1);
+        expect(audit.chain).toHaveLength(audit.totalRows);
+        expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
+
+        console.info(
+          `[T9 LIVE WINDOW] replicate=${replicate + 1} order=${order} namespace=${namespace} `
+          + `cadence_ms=${windowCadenceMs} existing_202=${existingObservations.length}/32 `
+          + `missing_202=${missingObservations.length}/32 deadlock_delta=${deadlocksAfter - deadlocksBefore} `
+          + `mails=${mail.messages.length} credentials=${credentials.rowCount} `
+          + `audit_existing=${existingAudit.length} audit_missing=${missingAudit.length} `
+          + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows} `
+          + `existing_median_ms=${median(existingScores).toFixed(3)} `
+          + `missing_median_ms=${median(missingScores).toFixed(3)} `
+          + `median_gap_ms=${medianGapMs.toFixed(3)} `
+          + `existing_ms=${existingScores.map((value) => value.toFixed(3)).join(",")} `
+          + `missing_ms=${missingScores.map((value) => value.toFixed(3)).join(",")}`
+        );
+        return Object.freeze({ order, scores, medianGapMs });
+      } finally {
+        await flow.service.drainMailDispatches();
+        await api.close();
+      }
+    };
+
+    const livePairs: T9Pair[] = [];
+    for (let replicate = 0; replicate < 3; replicate += 1) {
+      const ab = await runWindow(replicate, "AB");
+      const ba = await runWindow(replicate, "BA");
+      livePairs.push(Object.freeze({ replicate, ab, ba }));
+    }
+    const live = evaluate(Object.freeze(livePairs), "live-six-window");
+    expect(live.pairMedianGapsMs.every((gap) => gap <= 100)).toBe(true);
+    console.info(live.classification);
+    expect(live.classification).toBe(GREEN);
+  }, 420_000);
 
   it("T9-A serializes expired-token verification against an eligible resend without deadlock", async () => {
     const initialNow = new Date("2026-08-21T17:00:00.000Z");
@@ -5477,7 +6390,8 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
 
     const rotatedActor = randomUUID();
     const rotatedRepository = new PostgresIdentityRepository(
-      database.pool, rotatedSalt, basePolicy.auditSourceIpKdf
+      database.pool,
+      new AuditContextHasher(sharedArgon2Pool(), rotatedSalt, basePolicy.auditSourceIpKdf)
     );
     const startedAt = performance.now();
     await rotatedRepository.recordRateLimitRefusal({
