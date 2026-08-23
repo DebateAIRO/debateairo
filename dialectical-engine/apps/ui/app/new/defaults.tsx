@@ -16,12 +16,8 @@ export function dateTimeLocalValue(date: Date): string {
 
 export function deriveSessionAskDefaults(session: Session, now: Date = new Date()) {
   return Object.freeze({
-    decisionOwner: session.asker_id,
-    actionOwner: session.asker_id,
     decisionScope: DECISION_SCOPE_DEFAULT,
     asOf: dateTimeLocalValue(now),
-    decisionOwnerProvenance: "authenticated session asker identity",
-    actionOwnerProvenance: "authenticated session asker identity",
     decisionScopeProvenance: "V ruling DR-166",
     asOfProvenance: "ask time (refreshed when Start is clicked)"
   });
@@ -49,8 +45,6 @@ export function askDefaultFailureMessage(failure: unknown, fallbackCode: string)
 export type NewDebateAskDefaults = {
   readonly riskTier: RiskTier;
   readonly budgetTier: CompositionBudgetTier;
-  readonly decisionOwner: string;
-  readonly actionOwner: string;
   readonly decisionScope: string;
   readonly asOf: string;
   readonly depth: number;
@@ -69,8 +63,6 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:deployment-floor",
     composition_budget_tier: defaults.budgetTier,
     depth: defaults.depth,
-    decision_owner: defaults.decisionOwner.trim(),
-    action_owner: defaults.actionOwner.trim(),
     decision_scope: defaults.decisionScope.trim(),
     as_of: asOf.toISOString()
   };

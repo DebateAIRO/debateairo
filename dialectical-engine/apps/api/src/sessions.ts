@@ -33,6 +33,7 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export interface AuthenticatedSession {
   readonly session: Session;
   readonly userId: string;
+  readonly ownerRef: string;
   readonly tokenHash: string;
   readonly csrfTokenHash: string;
   readonly authKind: "cookie";
@@ -98,9 +99,9 @@ function asAuthFailure(error: unknown): unknown {
     : error;
 }
 
-function sessionFor(userId: string, sessionId: string): Session {
+function sessionFor(ownerRef: string, sessionId: string): Session {
   return Object.freeze({
-    asker_id: `user:${userId}`,
+    asker_id: `owner:${ownerRef}`,
     session_id: sessionId,
     caller_scope: "ASKER" as const,
     ownership_provenance: "server_session" as const,
@@ -216,8 +217,9 @@ export class SessionService implements SessionApplication {
       idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs)
     });
     return record === null ? null : Object.freeze({
-      session: sessionFor(record.userId, record.sessionId),
+      session: sessionFor(record.ownerRef, record.sessionId),
       userId: record.userId,
+      ownerRef: record.ownerRef,
       tokenHash,
       csrfTokenHash: record.csrfTokenHash,
       authKind: "cookie" as const
@@ -399,7 +401,7 @@ export class SessionService implements SessionApplication {
         status: "authenticated" as const,
         sessionToken: material.sessionToken,
         csrfToken: material.csrfToken,
-        session: sessionFor(challenge.userId, material.sessionId),
+        session: sessionFor(challenge.ownerRef, material.sessionId),
         ...(replacementRecoveryCode === undefined ? {} : { replacementRecoveryCode })
       });
     } catch (error) {

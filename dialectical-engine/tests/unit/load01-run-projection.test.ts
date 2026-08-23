@@ -25,7 +25,7 @@ describe("LOAD-01 persisted run projection", () => {
       state: "FAILED",
       terminalReason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
     });
-    expect(calls[0]?.values).toEqual(["run:failed", "asker:owner"]);
-    expect(calls[0]?.text).toMatch(/run\.asker_id = \$2/);
+    expect(calls[0]?.values).toEqual(["run:failed", null, "asker:owner"]);
+    expect(calls[0]?.text).toMatch(/core\.run_is_owned_by\(run\.run_id,\$2,\$3\)/);
   });
 });

@@ -113,7 +113,7 @@ function isGrounded([score, evidence]: DecisionInput["signals"]): boolean {
     ].every((value) => value !== null);
 }
 
-export function decide(input: DecisionInput): DecisionOutcome {
+export function decideSplitClassification(input: DecisionInput): DecisionOutcome {
   const grounded = isGrounded(input.signals);
   const reasons = input.signals.flatMap((signal) => signal.firingReasons);
   const firingReasons = normalizedUnique(reasons.map((reason) => reason.code));

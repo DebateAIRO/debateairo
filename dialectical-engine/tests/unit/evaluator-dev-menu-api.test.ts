@@ -78,7 +78,7 @@ describe("dev-only evaluator API", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(routes.slice(start, end)).toBe(
-      "├── /v1/dev/evaluator (GET, HEAD)\n" +
+      "├── /v1/dev/evaluator (GET)\n" +
       "│   └── /consumer-selection (POST)\n"
     );
 
@@ -97,19 +97,25 @@ describe("dev-only evaluator API", () => {
       application: askApplication(),
       evaluatorDevMenu,
       evaluatorDevMenuRegisterVersion: 1,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "token" })
+      legacyDevSessionResolver: createLegacyDevSessionResolver({
+        userToken: "user-token",
+        operatorToken: "operator-token"
+      })
     });
 
     expect((await api.inject({ method: "GET", url: "/v1/dev/evaluator" })).statusCode).toBe(401);
+    expect((await api.inject({
+      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "user-token" }
+    })).statusCode).toBe(403);
     const read = await api.inject({
-      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "token" }
+      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "operator-token" }
     });
     expect(read.statusCode).toBe(200);
     expect(read.json()).toMatchObject({ catalog: { state: "UNAVAILABLE" }, dispatchBinding: { state: "UNBOUND" } });
 
     const selected = await api.inject({
       method: "POST", url: "/v1/dev/evaluator/consumer-selection",
-      headers: { "x-user-dev-token": "token" }, payload: { model_id: "consumer:alpha" }
+      headers: { "x-user-dev-token": "operator-token" }, payload: { model_id: "consumer:alpha" }
     });
     expect(selected.statusCode).toBe(201);
     expect(selectConsumerModel).toHaveBeenCalledWith(expect.objectContaining({

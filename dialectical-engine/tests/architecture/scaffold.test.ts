@@ -108,7 +108,7 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
       expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount" }),
       expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement" }),
       expect.objectContaining({ package: "packages/judgement.createTypedNonAnswer" }),
-      expect.objectContaining({ package: "packages/battery/decision.decide" }),
+      expect.objectContaining({ package: "packages/battery/decision.decideSplitClassification" }),
       expect.objectContaining({ package: "packages/ledger.LedgerRepository.recordDecision" }),
       expect.objectContaining({ package: "packages/graph.GraphWriter.spawnPendingChild" }),
       expect.objectContaining({ package: "packages/valuation.resolveDeepeningReentry" }),
@@ -136,7 +136,7 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
     ]);
     expect(report.s06Surface).toHaveLength(9);
     expect(report.s07Surface).toEqual([
-      expect.objectContaining({ package: "packages/battery/decision.decide", attachment: "UNATTACHED" }),
+      expect.objectContaining({ package: "packages/battery/decision.decideSplitClassification", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/ledger.LedgerRepository.recordDecision", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/graph.GraphWriter.spawnPendingChild", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/graph.GraphRepository.readNodeLifecycleEvents", attachment: "ATTACHED" }),

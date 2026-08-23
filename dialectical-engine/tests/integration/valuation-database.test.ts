@@ -24,7 +24,7 @@ describe("S10 / P17 / DR-053 — real PostgreSQL value-overlay carriers", () => 
   it("persists phase, hinge, reversal, detachment, and post-propagation sensitivity receipts", async () => {
     const runId = await new RunRepository(database.pool).startRun({
       questionLine: "Test-layer mixed travel choice",
-      askerId: "asker:s10-test-layer",
+      principal: { kind: "legacy", legacyAskerId: "asker:s10-test-layer" },
       sessionId: "session:s10-test-layer",
       callerScope: "ASKER",
       asOf: new Date("2026-08-08T00:00:00Z"),

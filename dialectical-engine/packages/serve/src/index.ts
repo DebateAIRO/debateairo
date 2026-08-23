@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
-import { allocateSequence, RunRepository, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  normalizeRunOwnership,
+  RunRepository,
+  withWriteTransaction,
+  type RunOwnershipInput
+} from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -881,7 +887,7 @@ export class ServeRepository {
     this.#memory = new MemoryRepository(pool);
   }
 
-  async recordMemoryQuestion(input: MemoryQuestionRegistration): Promise<void> {
+  async recordMemoryQuestion(input: MemoryQuestionRegistration, ownership: RunOwnershipInput): Promise<void> {
     await this.#memory.recordQuestionAndMatch({
       key: {
         runId: input.runId,
@@ -899,12 +905,13 @@ export class ServeRepository {
         keyVersion: 1
       },
       decidedBy: "memory:database-predicate",
-      ...(input.pullPolicy === undefined ? {} : { pullPolicy: input.pullPolicy })
+      ...(input.pullPolicy === undefined ? {} : { pullPolicy: input.pullPolicy }),
+      ownership
     });
   }
 
-  unlinkMemoryForAnswer(answerId: string, askerScope: string, actorRef: string): Promise<{ readonly memoryLinkId: string }> {
-    return this.#memory.unlinkForAnswer(answerId, askerScope, actorRef);
+  unlinkMemoryForAnswer(answerId: string, ownership: RunOwnershipInput, actorRef: string): Promise<{ readonly memoryLinkId: string } | null> {
+    return this.#memory.unlinkForAnswer(answerId, ownership, actorRef);
   }
 
   async recordReplayEviction(servedNumberId: string): Promise<void> {
@@ -1206,7 +1213,9 @@ export class ServeRepository {
 
   async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {
     const head = await this.pool.query<{
-      asker_id: string;
+      effective_asker_id: string;
+      owner_ref: string | null;
+      legacy_asker_id: string | null;
       answer_id: string;
       answer_version: number;
       work_item_id: string;
@@ -1228,7 +1237,12 @@ export class ServeRepository {
       replay_handle: string | null;
       propagation_run_id: string | null;
     }>(
-      `SELECT run.asker_id, answer.answer_id::text, answer.answer_version,
+      `SELECT CASE WHEN latest_owner.owner_ref IS NULL
+                THEN run.asker_id ELSE 'owner:' || latest_owner.owner_ref::text
+              END AS effective_asker_id,
+              latest_owner.owner_ref,
+              CASE WHEN latest_owner.owner_ref IS NULL THEN run.asker_id ELSE NULL END AS legacy_asker_id,
+              answer.answer_id::text, answer.answer_version,
               answer.work_item_id::text, facts.facts, facts.residual_objections,
               facts.content_hash, facts.version AS fact_bundle_version,
               answer.badges, answer.condition_marks, answer.reversal_point,
@@ -1238,6 +1252,12 @@ export class ServeRepository {
               number.provenance_ref::text AS propagation_run_id
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id=answer.run_id
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id=run.run_id
+         ORDER BY event.at_seq DESC LIMIT 1
+       ) AS latest_owner ON true
        JOIN serve.fact_bundle AS facts ON facts.fact_bundle_id=answer.fact_bundle_id
        LEFT JOIN serve.served_number AS number
          ON number.answer_id=answer.answer_id AND number.answer_version=answer.answer_version
@@ -1250,10 +1270,13 @@ export class ServeRepository {
     );
     const row = head.rows[0];
     if (row === undefined) throw new TypedDomainError("CATCH_UP_ANSWER_NOT_FOUND", runId);
-    const answer = await this.readAnswerProjection(row.answer_id, row.asker_id, Number(row.answer_version));
+    const ownership = row.owner_ref === null
+      ? Object.freeze({ ownerRef: null, legacyAskerId: row.legacy_asker_id })
+      : Object.freeze({ ownerRef: row.owner_ref, legacyAskerId: null });
+    const answer = await this.readAnswerProjection(row.answer_id, ownership, Number(row.answer_version));
     if (answer === null) throw new TypedDomainError("CATCH_UP_ANSWER_NOT_FOUND", runId);
     return Object.freeze({
-      askerId: row.asker_id,
+      askerId: row.effective_asker_id,
       answerId: row.answer_id,
       answerVersion: Number(row.answer_version),
       workItemId: row.work_item_id,
@@ -1282,7 +1305,8 @@ export class ServeRepository {
     });
   }
 
-  async readAnswerProjection(answerId: string, askerId: string, version?: number): Promise<Answer | null> {
+  async readAnswerProjection(answerId: string, ownership: RunOwnershipInput, version?: number): Promise<Answer | null> {
+    const access = normalizeRunOwnership(ownership);
     const answer = await this.pool.query<{
       answer_id: string;
       answer_version: number;
@@ -1337,10 +1361,10 @@ export class ServeRepository {
        LEFT JOIN serve.composed_text AS composed ON composed.composed_text_id = answer.composed_text_id
        LEFT JOIN serve.conformance_record AS conformance
          ON conformance.conformance_record_id = answer.conformance_record_id
-       WHERE answer.answer_id = $1 AND run.asker_id = $2
-         AND ($3::integer IS NULL OR answer.answer_version = $3)
+       WHERE answer.answer_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
+         AND ($4::integer IS NULL OR answer.answer_version = $4)
        ORDER BY answer.answer_version DESC LIMIT 1`,
-      [answerId, askerId, version ?? null]
+      [answerId, access.ownerRef, access.legacyAskerId, version ?? null]
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
@@ -1560,7 +1584,8 @@ export class ServeRepository {
     };
   }
 
-  async readAnswerIndex(askerId: string, limit: number, offset: number): Promise<AnswerIndex> {
+  async readAnswerIndex(ownership: RunOwnershipInput, limit: number, offset: number): Promise<AnswerIndex> {
+    const access = normalizeRunOwnership(ownership);
     if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
       throw new TypedDomainError("ANSWER_INDEX_PAGE_INVALID", "An explicit positive limit and nonnegative offset are required");
     }
@@ -1581,7 +1606,7 @@ export class ServeRepository {
              run.created_at_seq AS created_at_sequence
            FROM core.run AS run
            JOIN serve.answer AS answer ON answer.run_id = run.run_id
-           WHERE run.asker_id = $1
+           WHERE core.run_is_owned_by(run.run_id,$1,$2)
            ORDER BY run.run_id, answer.sealed_at_seq DESC
          ), open_run AS (
            SELECT
@@ -1591,28 +1616,29 @@ export class ServeRepository {
              run.question_line,
              run.created_at_seq AS created_at_sequence
            FROM core.run AS run
-           WHERE run.asker_id = $1
+           WHERE core.run_is_owned_by(run.run_id,$1,$2)
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
          ORDER BY created_at_sequence DESC
-         LIMIT $2 OFFSET $3`, [askerId, limit, offset]
+         LIMIT $3 OFFSET $4`, [access.ownerRef, access.legacyAskerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM core.run WHERE asker_id=$1`, [askerId]
+        `SELECT count(*)::text AS count FROM core.run
+         WHERE core.run_is_owned_by(run_id,$1,$2)`, [access.ownerRef, access.legacyAskerId]
       )
     ]);
     const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
     const answers = await Promise.all(answerRows.map(async (row) => ({
       row,
-      answer: await this.readAnswerProjection(row.answer_id, askerId)
+      answer: await this.readAnswerProjection(row.answer_id, access)
     })));
     const runRepository = new RunRepository(this.pool);
     const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
     const openRuns = await Promise.all(openRows.map(async (row) => ({
       row,
-      projection: await runRepository.readLoadingProjection(row.run_ref, askerId)
+      projection: await runRepository.readLoadingProjection(row.run_ref, access)
     })));
     return AnswerIndexSchema.parse({
       items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
@@ -1640,36 +1666,58 @@ export class ServeRepository {
     });
   }
 
-  async readRunAnswerProjection(runId: string, askerId: string): Promise<Answer | null> {
+  async readRunAnswerProjection(runId: string, ownership: RunOwnershipInput): Promise<Answer | null> {
+    const access = normalizeRunOwnership(ownership);
     const result = await this.pool.query<{ answer_id: string }>(
       `SELECT answer.answer_id FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id=answer.run_id
-       WHERE answer.run_id=$1 AND run.asker_id=$2
-       ORDER BY answer.answer_version DESC LIMIT 1`, [runId, askerId]
+       WHERE answer.run_id=$1 AND core.run_is_owned_by(run.run_id,$2,$3)
+       ORDER BY answer.answer_version DESC LIMIT 1`, [runId, access.ownerRef, access.legacyAskerId]
     );
     const answerId = result.rows[0]?.answer_id;
-    return answerId === undefined ? null : this.readAnswerProjection(answerId, askerId);
+    return answerId === undefined ? null : this.readAnswerProjection(answerId, access);
   }
 
   async recordInvestigationRequest(input: {
     readonly answerId: string;
     readonly gapRef: string;
-    readonly askerId: string;
+    readonly ownership: RunOwnershipInput;
     readonly userInput: string | null;
   }): Promise<InvestigationAccepted | null> {
+    const access = normalizeRunOwnership(input.ownership);
     return withWriteTransaction(this.pool, async (client) => {
-      const owned = await client.query<{ answer_version: number; run_id: string }>(
-        `SELECT answer.answer_version, answer.run_id
-         FROM serve.answer AS answer JOIN core.run AS run ON run.run_id=answer.run_id
-         WHERE answer.answer_id=$1 AND run.asker_id=$2
+      const located = await client.query<{ answer_version: number; run_id: string }>(
+        `SELECT answer.answer_version,answer.run_id
+         FROM serve.answer AS answer
+         WHERE answer.answer_id=$1
+         ORDER BY answer.answer_version DESC LIMIT 1`,
+        [input.answerId]
+      );
+      const candidate = located.rows[0];
+      if (candidate === undefined) return null;
+      const locked = await client.query<{ run_id: string }>(
+        `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [candidate.run_id]
+      );
+      if (locked.rows[0] === undefined) return null;
+      // Separate post-lock statement: a concurrent owner-event insert takes the
+      // same run lock, so this is the authoritative mutation decision.
+      const owned = await client.query<{ owned: boolean }>(
+        `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+        [candidate.run_id, access.ownerRef, access.legacyAskerId]
+      );
+      if (owned.rows[0]?.owned !== true) return null;
+      const answer = (await client.query<{ answer_version: number; run_id: string }>(
+        `SELECT answer.answer_version,answer.run_id
+         FROM serve.answer AS answer
+         WHERE answer.answer_id=$1 AND answer.run_id=$2
            AND EXISTS (
              SELECT 1 FROM core.run_progress_event AS event
              WHERE event.run_id=answer.run_id AND event.kind='honesty.investigation_gap_opened'
                AND event.value_json->>'gap_ref'=$3
            )
-         ORDER BY answer.answer_version DESC LIMIT 1`, [input.answerId, input.askerId, input.gapRef]
-      );
-      const answer = owned.rows[0];
+         ORDER BY answer.answer_version DESC LIMIT 1`,
+        [input.answerId, candidate.run_id, input.gapRef]
+      )).rows[0];
       if (answer === undefined) return null;
       const requestRef = randomUUID();
       const replayHandle = `investigation-request:${requestRef}`;
@@ -1685,11 +1733,13 @@ export class ServeRepository {
     });
   }
 
-  async readExecutionLedgerDigest(answerId: string, askerId: string): Promise<ExecutionLedgerDigest | null> {
+  async readExecutionLedgerDigest(answerId: string, ownership: RunOwnershipInput): Promise<ExecutionLedgerDigest | null> {
+    const access = normalizeRunOwnership(ownership);
     const owner = await this.pool.query<{ run_id: string }>(
       `SELECT answer.run_id FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id=answer.run_id
-       WHERE answer.answer_id=$1 AND run.asker_id=$2 LIMIT 1`, [answerId, askerId]
+       WHERE answer.answer_id=$1 AND core.run_is_owned_by(run.run_id,$2,$3) LIMIT 1`,
+      [answerId, access.ownerRef, access.legacyAskerId]
     );
     const runId = owner.rows[0]?.run_id;
     if (runId === undefined) return null;
@@ -1753,7 +1803,8 @@ export class ServeRepository {
     });
   }
 
-  async readInspectionProjection(answerId: string, askerId: string, version?: number): Promise<Inspection | null> {
+  async readInspectionProjection(answerId: string, ownership: RunOwnershipInput, version?: number): Promise<Inspection | null> {
+    const access = normalizeRunOwnership(ownership);
     const result = await this.pool.query<{
       answer_id: string;
       answer_version: number;
@@ -1767,10 +1818,10 @@ export class ServeRepository {
        JOIN core.run AS run ON run.run_id = answer.run_id
        LEFT JOIN serve.conformance_record AS conformance
          ON conformance.conformance_record_id = answer.conformance_record_id
-       WHERE answer.answer_id = $1 AND run.asker_id = $2
-         AND ($3::integer IS NULL OR answer.answer_version = $3)
+       WHERE answer.answer_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
+         AND ($4::integer IS NULL OR answer.answer_version = $4)
        ORDER BY answer.answer_version DESC LIMIT 1`,
-      [answerId, askerId, version ?? null]
+      [answerId, access.ownerRef, access.legacyAskerId, version ?? null]
     );
     const row = result.rows[0];
     if (row === undefined) return null;
@@ -1805,13 +1856,14 @@ export class ServeRepository {
     };
   }
 
-  async readNodeProjection(answerId: string, nodeId: string, askerId: string): Promise<Node | null> {
+  async readNodeProjection(answerId: string, nodeId: string, ownership: RunOwnershipInput): Promise<Node | null> {
+    const access = normalizeRunOwnership(ownership);
     const owner = await this.pool.query<{ run_id: string; answer_version: number }>(
       `SELECT answer.run_id, answer.answer_version FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
-       WHERE answer.answer_id = $1 AND run.asker_id = $2 LIMIT 1`,
-      [answerId, askerId]
+       WHERE answer.answer_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) LIMIT 1`,
+      [answerId, access.ownerRef, access.legacyAskerId]
     );
     const runId = owner.rows[0]?.run_id;
     if (runId === undefined) return null;

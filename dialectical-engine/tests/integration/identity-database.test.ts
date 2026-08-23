@@ -50,7 +50,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
-      "audit_event", "channel_binding", "mfa_factor", "recovery_code", "session", "user",
+      "audit_event", "channel_binding", "login_challenge", "mfa_factor", "recovery_code", "session", "user",
       "verification_token_credential"
     ]);
 

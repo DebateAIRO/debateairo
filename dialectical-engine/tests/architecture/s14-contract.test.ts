@@ -51,14 +51,20 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   });
 
   it("W7 removes the obsolete source-text test corpus and W16 persists verbatim steering", async () => {
-    const [migration, api, askPage] = await Promise.all([
+    const [migration, api, askPage, askForm, serverDefaults] = await Promise.all([
       readFile(new URL("../../migrations/0017_s14.sql", import.meta.url), "utf8"),
       readFile(new URL("../../apps/api/src/index.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/app/new/page.tsx", import.meta.url), "utf8")
+      readFile(new URL("../../web/app/new/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../../web/app/new/NewQuestionForm.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../../web/lib/serverAskDefaults.ts", import.meta.url), "utf8")
     ]);
     expect(migration).toContain("ask_contract");
     expect(api).toContain("steering_annotations: ask.steering_annotations");
-    expect(askPage).toContain("logged verbatim");
-    expect(askPage).not.toContain("new Date().toISOString()");
+    expect(askForm).toContain("logged verbatim");
+    expect(askPage).toContain('dynamic = "force-dynamic"');
+    expect(askPage).toContain("deriveMachineAskAsOf()");
+    expect(serverDefaults).toContain('import "server-only"');
+    expect(askForm).toContain("as_of: machineAsOf");
+    expect(askForm).not.toMatch(/\b(?:new\s+Date|Date\.now)\b/);
   });
 });

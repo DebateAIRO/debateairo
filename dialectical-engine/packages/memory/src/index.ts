@@ -1,5 +1,10 @@
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  normalizeRunOwnership,
+  withWriteTransaction,
+  type RunOwnershipInput
+} from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const MEMORY_MATCH_TIERS = ["EXACT_QUESTION", "SAME_BINDING", "PARTIAL_BINDING", "TERM_OVERLAP"] as const;
@@ -272,27 +277,45 @@ export class MemoryRepository {
     readonly decidedBy: string;
     readonly confirmedAliases?: readonly { readonly surface: string; readonly canonical: string; readonly confirmedBy: string }[];
     readonly pullPolicy?: MemoryPullPolicy;
+    readonly ownership: RunOwnershipInput;
   }): Promise<MemoryDisclosure | null> {
     if (input.key.canonicalQuestionText !== canonicalizeQuestionText(input.key.canonicalQuestionText)) {
       throw new TypedDomainError("MEMORY_QUESTION_NOT_CANONICAL", "Question keys must arrive canonicalized");
     }
-    await withWriteTransaction(this.pool, async (client) => {
-      await client.query(
-        `INSERT INTO memory.question_key (
-           run_id, canonical_question_text, caller_scope, asker_scope, settlement_act,
-           question_type, declared_field, normalized_binding, frozen_terms,
-           frozen_query_set_hash, as_of, policy_version, key_version, at_seq
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14)`,
-        [input.key.runId, input.key.canonicalQuestionText, input.key.callerScope, input.key.askerScope,
-          input.key.settlementAct, input.key.questionType, input.key.declaredField,
-          JSON.stringify(input.key.normalizedBinding), JSON.stringify(input.key.frozenTerms),
-          input.key.frozenQuerySetHash, new Date(input.key.asOf), input.key.policyVersion,
-          input.key.keyVersion, await allocateSequence(client)]
+    const access = normalizeRunOwnership(input.ownership);
+    const askerScope = access.ownerRef === null
+      ? access.legacyAskerId!
+      : `owner:${access.ownerRef}`;
+    if (input.key.askerScope !== askerScope) {
+      throw new TypedDomainError(
+        "MEMORY_ASKER_SCOPE_MISMATCH",
+        "The immutable memory scope must be derived from the authenticated run owner"
       );
-      const candidates = await client.query<QuestionKeyRow & { answer_id: string; db_match_tier: MemoryMatchTier }>(
-        `SELECT key.*, outcome.answer_id, matched.match_tier AS db_match_tier
-         FROM memory.question_key AS current
-         JOIN memory.question_key AS key ON key.asker_scope=current.asker_scope AND key.run_id<>current.run_id
+    }
+    await withWriteTransaction(this.pool, async (client) => {
+      const candidates = await client.query<QuestionKeyRow & {
+        answer_id: string;
+        db_match_tier: MemoryMatchTier;
+        effective_asker_scope: string;
+        current_effective_asker_scope: string;
+      }>(
+        `WITH current AS (
+           SELECT $1::uuid AS run_id, $2::text AS canonical_question_text,
+             $3::text AS caller_scope, $4::text AS asker_scope,
+             $5::text AS settlement_act, $6::text AS question_type,
+             $7::text AS declared_field, $8::jsonb AS normalized_binding,
+             $9::jsonb AS frozen_terms
+         )
+         SELECT key.*, outcome.answer_id, matched.match_tier AS db_match_tier,
+           CASE WHEN key_owner.owner_ref IS NULL THEN key.asker_scope
+                ELSE 'owner:' || key_owner.owner_ref::text END AS effective_asker_scope,
+           current.asker_scope AS current_effective_asker_scope
+         FROM current
+         JOIN memory.question_key AS key ON key.run_id<>current.run_id
+         LEFT JOIN LATERAL (
+           SELECT event.owner_ref FROM core.run_ownership_event AS event
+           WHERE event.run_id=key.run_id ORDER BY event.at_seq DESC LIMIT 1
+         ) AS key_owner ON true
          JOIN scorecard.answer_outcome AS outcome ON outcome.run_id=key.run_id AND outcome.accepted
          CROSS JOIN LATERAL (
            SELECT CASE
@@ -325,17 +348,71 @@ export class MemoryRepository {
              ELSE NULL
            END AS match_tier
          ) AS matched
-         WHERE current.asker_scope=$1 AND current.run_id=$2 AND matched.match_tier IS NOT NULL
+         WHERE matched.match_tier IS NOT NULL
+           AND (
+             (key_owner.owner_ref IS NOT NULL
+               AND current.asker_scope='owner:' || key_owner.owner_ref::text)
+             OR (key_owner.owner_ref IS NULL AND current.asker_scope=key.asker_scope)
+           )
            AND EXISTS (SELECT 1 FROM core.run_progress_event WHERE run_id=key.run_id AND kind='TERMINAL')
          ORDER BY CASE matched.match_tier
            WHEN 'EXACT_QUESTION' THEN 1 WHEN 'SAME_BINDING' THEN 2
            WHEN 'PARTIAL_BINDING' THEN 3 WHEN 'TERM_OVERLAP' THEN 4 END,
            key.at_seq DESC
          LIMIT 1`,
-        [input.key.askerScope, input.key.runId]
+        [input.key.runId, input.key.canonicalQuestionText, input.key.callerScope, askerScope,
+          input.key.settlementAct, input.key.questionType, input.key.declaredField,
+          JSON.stringify(input.key.normalizedBinding), JSON.stringify(input.key.frozenTerms)]
       );
-      const candidate = candidates.rows[0];
-      const match = candidate === undefined ? null : matchQuestionKeys(input.key, fromRow(candidate));
+      let candidate = candidates.rows[0];
+      // Select without mutable writes, then lock every involved run in one
+      // deterministic order before any global sequence allocation. This keeps
+      // memory matching on the same run->identity->allocator order as claims
+      // and prevents cross-run matching from forming a lock cycle.
+      const runIds = candidate === undefined
+        ? [input.key.runId]
+        : [input.key.runId, candidate.run_id].sort();
+      const locked = await client.query<{ run_id: string }>(
+        `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
+        [runIds]
+      );
+      if (!locked.rows.some((row) => row.run_id === input.key.runId)) {
+        throw new TypedDomainError("MEMORY_RUN_NOT_FOUND", "The memory question run does not exist");
+      }
+      const owned = await client.query<{ owned: boolean }>(
+        `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+        [input.key.runId, access.ownerRef, access.legacyAskerId]
+      );
+      if (owned.rows[0]?.owned !== true) {
+        throw new TypedDomainError("MEMORY_RUN_NOT_OWNED", "The run owner changed before memory persistence");
+      }
+      if (candidate !== undefined) {
+        if (!locked.rows.some((row) => row.run_id === candidate!.run_id)) {
+          candidate = undefined;
+        } else {
+          const stillOwned = await client.query<{ owned: boolean }>(
+            `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+            [candidate.run_id, access.ownerRef, access.legacyAskerId]
+          );
+          if (stillOwned.rows[0]?.owned !== true) candidate = undefined;
+        }
+      }
+      await client.query(
+        `INSERT INTO memory.question_key (
+           run_id, canonical_question_text, caller_scope, asker_scope, settlement_act,
+           question_type, declared_field, normalized_binding, frozen_terms,
+           frozen_query_set_hash, as_of, policy_version, key_version, at_seq
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14)`,
+        [input.key.runId, input.key.canonicalQuestionText, input.key.callerScope, askerScope,
+          input.key.settlementAct, input.key.questionType, input.key.declaredField,
+          JSON.stringify(input.key.normalizedBinding), JSON.stringify(input.key.frozenTerms),
+          input.key.frozenQuerySetHash, new Date(input.key.asOf), input.key.policyVersion,
+          input.key.keyVersion, await allocateSequence(client)]
+      );
+      const match = candidate === undefined ? null : matchQuestionKeys(
+        Object.freeze({ ...input.key, askerScope: candidate.current_effective_asker_scope }),
+        fromRow(Object.freeze({ ...candidate, asker_scope: candidate.effective_asker_scope }))
+      );
       if (candidate !== undefined && match?.tier !== candidate.db_match_tier) {
         throw new TypedDomainError("MEMORY_MATCH_PREDICATE_DRIFT", "Database and domain match predicates disagree");
       }
@@ -383,7 +460,7 @@ export class MemoryRepository {
         [memoryLinkId, input.decidedBy, await allocateSequence(client)]
       );
       if (input.pullPolicy !== undefined && input.pullPolicy.bound > 0) {
-        await this.#recordAnswerPull(client, memoryLinkId, input.key.askerScope, selected.row.answer_id, input.pullPolicy);
+        await this.#recordAnswerPull(client, memoryLinkId, askerScope, selected.row.answer_id, input.pullPolicy);
       }
     });
     return this.readDisclosure(input.key.runId);
@@ -479,19 +556,42 @@ export class MemoryRepository {
     });
   }
 
-  async unlinkForAnswer(answerId: string, askerScope: string, actorRef: string): Promise<{ readonly memoryLinkId: string }> {
+  async unlinkForAnswer(answerId: string, ownership: RunOwnershipInput, actorRef: string): Promise<{ readonly memoryLinkId: string } | null> {
+    const access = normalizeRunOwnership(ownership);
     return withWriteTransaction(this.pool, async (client) => {
+      const located = await client.query<{ run_id: string }>(
+        `SELECT run_id FROM serve.answer WHERE answer_id=$1
+         ORDER BY answer_version DESC LIMIT 1`, [answerId]
+      );
+      const runId = located.rows[0]?.run_id;
+      if (runId === undefined) return null;
+      const lockedRun = await client.query<{ run_id: string }>(
+        `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [runId]
+      );
+      if (lockedRun.rows[0] === undefined) return null;
+      const owned = await client.query<{ owned: boolean }>(
+        `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+        [runId, access.ownerRef, access.legacyAskerId]
+      );
+      if (owned.rows[0]?.owned !== true) return null;
       const link = await client.query<{ memory_link_id: string }>(
-        `SELECT link.memory_link_id FROM serve.answer AS answer
-         JOIN core.run AS run ON run.run_id=answer.run_id
-         JOIN memory.memory_link AS link ON link.source_run_id=answer.run_id
-         JOIN LATERAL (SELECT state FROM memory.memory_link_event WHERE memory_link_id=link.memory_link_id ORDER BY at_seq DESC LIMIT 1) AS event ON true
-         WHERE answer.answer_id=$1 AND run.asker_id=$2 AND event.state='LINKED'
-         ORDER BY link.at_seq DESC LIMIT 1 FOR UPDATE OF link`,
-        [answerId, askerScope]
+        `SELECT link.memory_link_id
+         FROM memory.memory_link AS link
+         WHERE link.source_run_id=$1
+         ORDER BY link.at_seq DESC LIMIT 1
+         FOR UPDATE`,
+        [runId]
       );
       const row = link.rows[0];
-      if (row === undefined) throw new TypedDomainError("MEMORY_LINK_NOT_FOUND", "No active asker-owned memory link exists for this answer");
+      if (row === undefined) return null;
+      // Re-read latest state after taking the link lock; a concurrent unlink
+      // cannot leave this decision based on a stale LATERAL snapshot.
+      const state = await client.query<{ state: string }>(
+        `SELECT state FROM memory.memory_link_event
+         WHERE memory_link_id=$1 ORDER BY at_seq DESC LIMIT 1`,
+        [row.memory_link_id]
+      );
+      if (state.rows[0]?.state !== "LINKED") return null;
       await client.query(
         `INSERT INTO memory.memory_link_event (memory_link_id, state, actor_ref, reason, at_seq)
          VALUES ($1,'UNLINKED',$2,'ASKER_UNLINK_CONTROL',$3)`,

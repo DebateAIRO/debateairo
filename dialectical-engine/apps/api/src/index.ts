@@ -30,7 +30,11 @@ import {
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
-import { RunRepository, type DiscoveredPanelMember } from "@debateai/db";
+import {
+  RunRepository,
+  type DiscoveredPanelMember,
+  type RunOwnershipAccess
+} from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
@@ -50,14 +54,75 @@ import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
-type RouteAuthPolicy = "public" | "user";
+type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
+
+export const authorizationPolicyInventory = Object.freeze([
+  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
+  { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
+  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
+  { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
+  { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
+  { route: "POST /v1/auth/login", auth: "public", origin: "trusted", resource: "identity", action: "login" },
+  { route: "POST /v1/auth/logout", auth: "user", resource: "session-self", action: "logout" },
+  { route: "GET /v1/auth/sessions", auth: "user", resource: "session-owner", action: "list" },
+  { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
+  { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
+  { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+  { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+  { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+  { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
+  { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
+  { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
+  { route: "GET /v1/answers/{id}", auth: "user", resource: "run-owner", action: "read-answer" },
+  { route: "GET /v1/answers/{id}/inspection", auth: "user", resource: "run-owner", action: "read-inspection" },
+  { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
+  { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
+  { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
+  { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
+  { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
+  { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
+  { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" }
+] as const satisfies readonly Readonly<{
+  route: string;
+  auth: RouteAuthPolicy;
+  origin?: RouteOriginPolicy;
+  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "deployment" | "evaluator";
+  action: string;
+}>[]);
+
+type AuthorizationRoute = typeof authorizationPolicyInventory[number]["route"];
+const authorizationPolicies = new Map<string, typeof authorizationPolicyInventory[number]>(
+  authorizationPolicyInventory.map((policy) => [policy.route, policy])
+);
+
+function routePolicy(route: AuthorizationRoute): { readonly config: {
+  readonly auth: RouteAuthPolicy;
+  readonly origin?: RouteOriginPolicy;
+} } {
+  const policy = authorizationPolicies.get(route);
+  if (policy === undefined) throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${route}`);
+  return Object.freeze({
+    config: Object.freeze({
+      auth: policy.auth,
+      ...("origin" in policy ? { origin: policy.origin } : {})
+    })
+  });
+}
+
+function canonicalRoute(method: string, url: string): string {
+  return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
+}
 
 export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const SessionIdSchema = z.uuid();
+const ResourceIdSchema = z.uuid();
+const SessionIdSchema = ResourceIdSchema;
 const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
   "strict-transport-security": "max-age=31536000; includeSubDomains",
@@ -81,19 +146,23 @@ declare module "fastify" {
 }
 
 export interface AskApplication {
-  submit(ask: AskRequest, session: Session): Promise<AskAccepted>;
-  readAnswer(answerId: string, session: Session, version?: number): Promise<Answer | null>;
-  readRunAnswer(runId: string, session: Session): Promise<Answer | null>;
-  readRun(runId: string, session: Session): Promise<RunProjection | null>;
-  readAnswerIndex(session: Session, limit: number, offset: number): Promise<AnswerIndex>;
-  readInspection(answerId: string, session: Session, version?: number): Promise<Inspection | null>;
-  readLedgerDigest(answerId: string, session: Session): Promise<ExecutionLedgerDigest | null>;
-  readNode(answerId: string, nodeId: string, session: Session): Promise<Node | null>;
-  recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session): Promise<InvestigationAccepted | null>;
-  unlinkMemoryLink(answerId: string, session: Session): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" }>;
+  submit(ask: AskRequest, session: Session, principal: AskPrincipal): Promise<AskAccepted>;
+  readAnswer(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null>;
+  readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
+  readRun(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null>;
+  readAnswerIndex(session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex>;
+  readInspection(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null>;
+  readLedgerDigest(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<ExecutionLedgerDigest | null>;
+  readNode(answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess): Promise<Node | null>;
+  recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null>;
+  unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
   readDeployment(session: Session): Promise<Deployment>;
-  events(runId: string, session: Session): AsyncIterable<unknown>;
+  events(runId: string, session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown>;
 }
+
+export type AskPrincipal =
+  | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
+  | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
 export interface ApiOptions {
   readonly application: AskApplication;
@@ -243,7 +312,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ? undefined : new URL(options.allowedOrigin).origin;
   const api = Fastify({
     logger: false,
-    trustProxy: [...TRUSTED_UI_PROXY_NETWORKS]
+    trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
+    exposeHeadRoutes: false
+  });
+  api.addHook("onRoute", (route) => {
+    for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
+      const key = canonicalRoute(method, route.url);
+      const policy = authorizationPolicies.get(key);
+      if (policy === undefined
+        || route.config?.auth !== policy.auth
+        || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)) {
+        throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${key}`);
+      }
+    }
   });
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
@@ -263,6 +344,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : "unknown",
     requestId: request.id
   });
+  const ownershipFor = (request: Readonly<{
+    session: Session;
+    authenticatedSession?: AuthenticatedSession;
+  }>): RunOwnershipAccess => request.authenticatedSession === undefined
+    ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
+    : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
   api.addHook("onSend", async (request, reply, payload) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
     reply.header("cache-control", "no-store");
@@ -285,7 +372,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    if (authPolicy !== "user") {
+    if (authPolicy !== "user" && authPolicy !== "operator") {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     const rawCookie = request.headers.cookie;
@@ -313,11 +400,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }
       }
       request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
+      if (authPolicy === "operator") {
+        return reply.status(403).send({ error: "OPERATOR_REQUIRED" });
+      }
       return;
     }
     const legacy = options.legacyDevSessionResolver?.(request.headers["x-user-dev-token"]) ?? null;
     if (legacy === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
     request.session = legacy;
+    if (authPolicy === "operator" && legacy.caller_scope !== "OPERATOR") {
+      return reply.status(403).send({ error: "OPERATOR_REQUIRED" });
+    }
   });
   api.setErrorHandler((error, _request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
@@ -366,7 +459,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   if (options.sessions !== undefined) {
-    api.post("/v1/auth/login", { config: { auth: "public", origin: "trusted" } }, async (request, reply) => {
+    api.post("/v1/auth/login", routePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
       if (typeof body.challenge_token === "string") {
@@ -392,19 +485,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
     });
-    api.post("/v1/auth/logout", { config: { auth: "user" } }, async (request, reply) => {
+    api.post("/v1/auth/logout", routePolicy("POST /v1/auth/logout"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       await options.sessions!.logout(authenticated, sourceFor(request));
       reply.header("set-cookie", expiredCookies());
       return reply.status(204).send();
     });
-    api.get("/v1/auth/sessions", { config: { auth: "user" } }, async (request, reply) => {
+    api.get("/v1/auth/sessions", routePolicy("GET /v1/auth/sessions"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       return reply.send({ sessions: await options.sessions!.listSessions(authenticated) });
     });
-    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", { config: { auth: "user" } }, async (request, reply) => {
+    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", routePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const parsedSessionId = SessionIdSchema.safeParse(request.params.id);
@@ -414,14 +507,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (parsedSessionId.data === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
       return reply.status(204).send();
     });
-    api.delete("/v1/auth/sessions", { config: { auth: "user" } }, async (request, reply) => {
+    api.delete("/v1/auth/sessions", routePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
       reply.header("set-cookie", expiredCookies());
       return reply.send({ revoked });
     });
-    api.post("/v1/auth/step-up", { config: { auth: "user" } }, async (request, reply) => {
+    api.post("/v1/auth/step-up", routePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
@@ -439,7 +532,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   }
   if (options.registration !== undefined) {
-    api.post("/v1/auth/register", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/register", routePolicy("POST /v1/auth/register"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -451,7 +544,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send(response);
     });
-    api.post("/v1/auth/verify-email", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/verify-email", routePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -460,7 +553,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.send(response);
     });
-    api.post("/v1/auth/resend-verification", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/resend-verification", routePolicy("POST /v1/auth/resend-verification"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -472,7 +565,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   if (options.mfa !== undefined) {
-    api.post("/v1/auth/mfa/totp/begin", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/begin", routePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -480,7 +573,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/totp/verify", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/verify", routePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -489,7 +582,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         code: typeof body.code === "string" ? body.code : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/generate", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/generate", routePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -497,7 +590,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/confirm", { config: { auth: "public" } }, async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/confirm", routePolicy("POST /v1/auth/mfa/recovery-codes/confirm"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -508,11 +601,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   }
 
-  api.get("/v1/session", { config: { auth: "user" } }, async (request, reply) => {
+  api.get("/v1/session", routePolicy("GET /v1/session"), async (request, reply) => {
     return reply.send(request.session);
   });
 
-  api.get("/v1/deployment", { config: { auth: "user" } }, async (request, reply) => {
+  api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
   });
 
@@ -521,11 +614,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       || options.evaluatorDevMenuRegisterVersion! < 1) {
       throw new TypeError("EVALUATOR_DEV_MENU_REGISTER_VERSION_REQUIRED");
     }
-    api.get("/v1/dev/evaluator", { config: { auth: "user" } }, async (_request, reply) => {
+    api.get("/v1/dev/evaluator", routePolicy("GET /v1/dev/evaluator"), async (_request, reply) => {
       return reply.send(await options.evaluatorDevMenu!.readView(options.evaluatorDevMenuRegisterVersion!));
     });
 
-    api.post("/v1/dev/evaluator/consumer-selection", { config: { auth: "user" } }, async (request, reply) => {
+    api.post("/v1/dev/evaluator/consumer-selection", routePolicy("POST /v1/dev/evaluator/consumer-selection"), async (request, reply) => {
       const body = request.body;
       if (typeof body !== "object" || body === null || !("model_id" in body)
         || typeof body.model_id !== "string" || body.model_id.trim() === "") {
@@ -551,60 +644,93 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   }
 
-  api.post("/v1/asks", { config: { auth: "user" } }, async (request, reply) => {
+  api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
     const ask = parseRequest(AskRequestSchema, request.body);
-    const accepted = AskAcceptedSchema.parse(await options.application.submit(ask, request.session));
+    const accepted = AskAcceptedSchema.parse(await options.application.submit(
+      ask,
+      request.session,
+      request.authenticatedSession === undefined
+        ? Object.freeze({ kind: "legacy" as const, legacyAskerId: request.session.asker_id })
+        : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
+          ownerRef: request.authenticatedSession.ownerRef })
+    ));
     return reply.status(202).send(accepted);
   });
 
-  api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", { config: { auth: "user" } }, async (request, reply) => {
+  api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", routePolicy("GET /v1/answers"), async (request, reply) => {
     const limit = Number(request.query.limit);
     const offset = Number(request.query.offset);
     if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST" });
     }
-    return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(request.session, limit, offset)));
+    return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
+      request.session, limit, offset, ownershipFor(request)
+    )));
   });
 
-  api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id", { config: { auth: "user" } }, async (request, reply) => {
+  api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id", routePolicy("GET /v1/answers/{id}"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    if (!answerId.success) return reply.status(404).send({ error: "ANSWER_NOT_FOUND" });
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST" });
     }
-    const answer = await options.application.readAnswer(request.params.id, request.session, version);
+    const answer = await options.application.readAnswer(
+      answerId.data, request.session, version, ownershipFor(request)
+    );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(AnswerSchema.parse(answer));
   });
 
-  api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id/inspection", { config: { auth: "user" } }, async (request, reply) => {
+  api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id/inspection", routePolicy("GET /v1/answers/{id}/inspection"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    if (!answerId.success) return reply.status(404).send({ error: "INSPECTION_NOT_FOUND" });
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST" });
     }
-    const inspection = await options.application.readInspection(request.params.id, request.session, version);
+    const inspection = await options.application.readInspection(
+      answerId.data, request.session, version, ownershipFor(request)
+    );
     return inspection === null
       ? reply.status(404).send({ error: "INSPECTION_NOT_FOUND" })
       : reply.send(InspectionSchema.parse(inspection));
   });
 
-  api.get<{ Params: { id: string } }>("/v1/answers/:id/ledger-digest", { config: { auth: "user" } }, async (request, reply) => {
-    const digest = await options.application.readLedgerDigest(request.params.id, request.session);
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/ledger-digest", routePolicy("GET /v1/answers/{id}/ledger-digest"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    if (!answerId.success) return reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" });
+    const digest = await options.application.readLedgerDigest(answerId.data, request.session, ownershipFor(request));
     return digest === null ? reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" }) : reply.send(ExecutionLedgerDigestSchema.parse(digest));
   });
 
-  api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", { config: { auth: "user" } }, async (request, reply) => {
-    const node = await options.application.readNode(request.params.id, request.params.nodeId, request.session);
+  api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const nodeId = ResourceIdSchema.safeParse(request.params.nodeId);
+    if (!answerId.success || !nodeId.success) return reply.status(404).send({ error: "NODE_NOT_FOUND" });
+    const node = await options.application.readNode(
+      answerId.data, nodeId.data, request.session, ownershipFor(request)
+    );
     return node === null ? reply.status(404).send({ error: "NODE_NOT_FOUND" }) : reply.send(NodeSchema.parse(node));
   });
 
-  api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", { config: { auth: "user" } }, async (request, reply) => {
+  api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", routePolicy("POST /v1/answers/{id}/investigations/{gapRef}"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
     const input = parseRequest(InvestigationRequestSchema, request.body);
-    const accepted = await options.application.recordInvestigation(request.params.id, request.params.gapRef, input.user_input, request.session);
+    const accepted = await options.application.recordInvestigation(
+      answerId.data, request.params.gapRef, input.user_input, request.session, ownershipFor(request)
+    );
     return accepted === null ? reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" }) : reply.status(202).send(InvestigationAcceptedSchema.parse(accepted));
   });
 
-  api.get<{ Params: { id: string } }>("/v1/runs/:id/events", { config: { auth: "user" } }, async (request, reply) => {
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const ownership = ownershipFor(request);
+    if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {
+      return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    }
     reply.raw.writeHead(200, {
       ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
@@ -613,22 +739,33 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
-    for await (const candidate of options.application.events(request.params.id, request.session)) {
+    for await (const candidate of options.application.events(runId.data, request.session, ownership)) {
       const event = RunEventSchema.parse(candidate);
       reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
     }
     reply.raw.end();
   });
-  api.get<{ Params: { id: string } }>("/v1/runs/:id", { config: { auth: "user" } }, async (request, reply) => {
-    const run = await options.application.readRun(request.params.id, request.session);
+  api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    if (!runId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const run = await options.application.readRun(runId.data, request.session, ownershipFor(request));
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(RunProjectionSchema.parse(run));
   });
-  api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", { config: { auth: "user" } }, async (request, reply) => {
-    const answer = await options.application.readRunAnswer(request.params.id, request.session);
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
+    const answer = await options.application.readRunAnswer(runId.data, request.session, ownershipFor(request));
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(AnswerSchema.parse(answer));
   });
-  api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", { config: { auth: "user" } }, async (request, reply) => {
-    return reply.send(await options.application.unlinkMemoryLink(request.params.id, request.session));
+  api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    if (!answerId.success) return reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" });
+    const unlinked = await options.application.unlinkMemoryLink(
+      answerId.data, request.session, ownershipFor(request)
+    );
+    return unlinked === null
+      ? reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" })
+      : reply.send(unlinked);
   });
   return api;
 }
@@ -732,29 +869,44 @@ export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
   readonly #serve: ServeRepository;
-  readonly #splitLifecycle: SplitLifecycleProjection;
+  readonly #splitLifecycle: Pick<SplitLifecycleProjection, "read">;
   readonly #liveness: LivenessRepository;
 
   constructor(
     private readonly pool: Pool,
     private readonly dispatcher: Dispatcher,
-    private readonly settings: RunCreationSettings
+    private readonly settings: RunCreationSettings,
+    splitLifecycle?: Pick<SplitLifecycleProjection, "read">
   ) {
     this.#runs = new RunRepository(pool);
     this.#work = new WorkItemRepository(pool);
     this.#serve = new ServeRepository(pool);
-    this.#splitLifecycle = new SplitLifecycleProjection(pool);
+    this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
   }
 
-  async submit(ask: AskRequest, session: Session): Promise<AskAccepted> {
-    await this.#liveness.recordQuery(ask.question_line, session.asker_id, new Date(ask.as_of));
+  async submit(
+    ask: AskRequest,
+    session: Session,
+    principal: AskPrincipal
+  ): Promise<AskAccepted> {
+    if (principal.kind === "server") {
+      if (session.ownership_provenance !== "server_session" || session.asker_id !== `owner:${principal.ownerRef}`) {
+        throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "The server session and opaque run owner must match");
+      }
+    } else if (session.ownership_provenance === "server_session" || session.asker_id !== principal.legacyAskerId) {
+      throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "Legacy scope is valid only for an exact legacy session");
+    }
+    const ownership: RunOwnershipAccess = principal.kind === "legacy"
+      ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
+      : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
+    await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const runId = await this.#runs.startRun({
       questionLine: ask.question_line,
-      askerId: session.asker_id,
+      principal,
       sessionId: session.session_id,
-      callerScope: ask.caller_scope,
+      callerScope: session.caller_scope,
       asOf: new Date(ask.as_of),
       askerRiskTier: ask.risk_tier,
       effectiveRiskTier: risk.effectiveRiskTier,
@@ -768,8 +920,6 @@ export class PostgresAskApplication implements AskApplication {
       registerVersion: this.settings.registerVersion,
       batteryVersion: this.settings.batteryVersion,
       askContract: {
-        decision_owner: ask.decision_owner,
-        action_owner: ask.action_owner,
         decision_scope: ask.decision_scope,
         steering_presets: ask.steering_presets,
         steering_annotations: ask.steering_annotations,
@@ -780,12 +930,12 @@ export class PostgresAskApplication implements AskApplication {
     await this.#serve.recordMemoryQuestion({
       runId,
       questionLine: ask.question_line,
-      callerScope: ask.caller_scope,
+      callerScope: session.caller_scope,
       askerScope: session.asker_id,
       asOf: ask.as_of,
       policyVersion: this.settings.registerVersion,
       ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
-    });
+    }, ownership);
     const workItemId = await this.#work.enqueue({
       runId,
       batteryRowId: "Q1",
@@ -796,21 +946,21 @@ export class PostgresAskApplication implements AskApplication {
     return { run_ref: runId, status: "QUEUED" };
   }
 
-  async unlinkMemoryLink(answerId: string, session: Session): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" }> {
-    const result = await this.#serve.unlinkMemoryForAnswer(answerId, session.asker_id, `asker:${session.asker_id}`);
-    return Object.freeze({ memory_link_id: result.memoryLinkId, state: "UNLINKED" });
+  async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {
+    const result = await this.#serve.unlinkMemoryForAnswer(answerId, ownership, `asker:${session.asker_id}`);
+    return result === null ? null : Object.freeze({ memory_link_id: result.memoryLinkId, state: "UNLINKED" });
   }
 
-  readAnswer(answerId: string, session: Session, version?: number): Promise<Answer | null> {
-    return this.#serve.readAnswerProjection(answerId, session.asker_id, version);
+  readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {
+    return this.#serve.readAnswerProjection(answerId, ownership, version);
   }
 
-  readRunAnswer(runId: string, session: Session): Promise<Answer | null> {
-    return this.#serve.readRunAnswerProjection(runId, session.asker_id);
+  readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {
+    return this.#serve.readRunAnswerProjection(runId, ownership);
   }
 
-  async readRun(runId: string, session: Session): Promise<RunProjection | null> {
-    const run = await this.#runs.readLoadingProjection(runId, session.asker_id);
+  async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
+    const run = await this.#runs.readLoadingProjection(runId, ownership);
     return run === null ? null : RunProjectionSchema.parse({
       run_ref: run.runRef,
       question_line: run.questionLine,
@@ -820,24 +970,24 @@ export class PostgresAskApplication implements AskApplication {
     });
   }
 
-  readAnswerIndex(session: Session, limit: number, offset: number): Promise<AnswerIndex> {
-    return this.#serve.readAnswerIndex(session.asker_id, limit, offset);
+  readAnswerIndex(_session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex> {
+    return this.#serve.readAnswerIndex(ownership, limit, offset);
   }
 
-  readInspection(answerId: string, session: Session, version?: number): Promise<Inspection | null> {
-    return this.#serve.readInspectionProjection(answerId, session.asker_id, version);
+  readInspection(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null> {
+    return this.#serve.readInspectionProjection(answerId, ownership, version);
   }
 
-  readLedgerDigest(answerId: string, session: Session): Promise<ExecutionLedgerDigest | null> {
-    return this.#serve.readExecutionLedgerDigest(answerId, session.asker_id);
+  readLedgerDigest(answerId: string, _session: Session, ownership: RunOwnershipAccess): Promise<ExecutionLedgerDigest | null> {
+    return this.#serve.readExecutionLedgerDigest(answerId, ownership);
   }
 
-  readNode(answerId: string, nodeId: string, session: Session): Promise<Node | null> {
-    return this.#serve.readNodeProjection(answerId, nodeId, session.asker_id);
+  readNode(answerId: string, nodeId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Node | null> {
+    return this.#serve.readNodeProjection(answerId, nodeId, ownership);
   }
 
-  recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session): Promise<InvestigationAccepted | null> {
-    return this.#serve.recordInvestigationRequest({ answerId, gapRef, askerId: session.asker_id, userInput });
+  recordInvestigation(answerId: string, gapRef: string, userInput: string | null, _session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null> {
+    return this.#serve.recordInvestigationRequest({ answerId, gapRef, ownership, userInput });
   }
 
   async readDeployment(session: Session): Promise<Deployment> {
@@ -891,7 +1041,8 @@ export class PostgresAskApplication implements AskApplication {
     });
   }
 
-  async *events(runId: string, session: Session): AsyncIterable<unknown> {
+  async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {
+    const access = ownership;
     const [result, failedWork] = await Promise.all([this.pool.query<{
       event_id: string;
       kind: string;
@@ -901,8 +1052,8 @@ export class PostgresAskApplication implements AskApplication {
       `SELECT event.event_id, event.kind, event.at_seq, event.value_json
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
-      WHERE event.run_id = $1 AND run.asker_id = $2 ORDER BY event.at_seq`,
-      [runId, session.asker_id]
+      WHERE event.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) ORDER BY event.at_seq`,
+      [runId, access.ownerRef, access.legacyAskerId]
     ), this.pool.query<{
       work_item_id: string;
       created_at_seq: string;
@@ -911,12 +1062,21 @@ export class PostgresAskApplication implements AskApplication {
       `SELECT work.work_item_id, work.created_at_seq, work.terminal_reason
        FROM core.work_item AS work
        JOIN core.run AS run ON run.run_id = work.run_id
-       WHERE work.run_id = $1 AND run.asker_id = $2 AND work.state = 'FAILED'
+       WHERE work.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) AND work.state = 'FAILED'
        ORDER BY work.created_at_seq`,
-      [runId, session.asker_id]
+      [runId, access.ownerRef, access.legacyAskerId]
     )]);
     if (result.rows.length === 0 && failedWork.rows.length === 0) return;
     const projected = await this.#splitLifecycle.read(runId);
+    // Lifecycle projection performs additional ungated reads. Revalidate after
+    // every source snapshot and before yielding any bytes so a claim committed
+    // between the stored-event query and projection cannot disclose data to the
+    // superseded owner.
+    const stillOwned = await this.pool.query<{ owned: boolean }>(
+      `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+      [runId, access.ownerRef, access.legacyAskerId]
+    );
+    if (stillOwned.rows[0]?.owned !== true) return;
     const storedEvents = result.rows.flatMap((row) => {
       const direct = EventTypeSchema.safeParse(row.kind);
       const eventType = direct.success

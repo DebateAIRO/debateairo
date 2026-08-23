@@ -34,7 +34,12 @@ import {
 import { evaluate } from "@debateai/propagation";
 import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
-import { buildApi, PostgresAskApplication, type AskApplication } from "@debateai/api";
+import {
+  buildApi,
+  createLegacyDevSessionResolver,
+  PostgresAskApplication,
+  type AskApplication
+} from "@debateai/api";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 
@@ -117,7 +122,8 @@ async function createRun(
   askerId = `asker:${questionLine}`
 ): Promise<string> {
   return new RunRepository(database.pool).startRun({
-    questionLine, askerId, sessionId: `session:${questionLine}`, callerScope: "ASKER",
+    questionLine, principal: { kind: "legacy", legacyAskerId: askerId },
+    sessionId: `session:${questionLine}`, callerScope: "ASKER",
     asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
     depthParams: { depth }, discoveredPanel: fixtureDiscoveredPanel(agentCount), strangerSampleRate: 1,
@@ -558,7 +564,10 @@ describe("LOAD-01 run projection ownership boundary", () => {
     });
 
     const application = new PostgresAskApplication(database.pool, {} as never, {} as never);
-    const api = buildApi({ application });
+    const api = buildApi({
+      application,
+      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: ownerToken })
+    });
     try {
       const response = await api.inject({
         method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}/events`,
@@ -626,7 +635,10 @@ describe("LOAD-01 run projection ownership boundary", () => {
     });
     const repository = new RunRepository(database.pool);
     const readRun: AskApplication["readRun"] = async (candidateRunId, session) => {
-      const run = await repository.readLoadingProjection(candidateRunId, session.asker_id);
+      const run = await repository.readLoadingProjection(candidateRunId, {
+        ownerRef: null,
+        legacyAskerId: session.asker_id
+      });
       return run === null ? null : {
         run_ref: run.runRef,
         question_line: run.questionLine,
@@ -638,12 +650,19 @@ describe("LOAD-01 run projection ownership boundary", () => {
     const application = {
       readRun
     } as unknown as AskApplication;
-    const api = buildApi({ application });
+    const api = buildApi({
+      application,
+      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: ownerToken })
+    });
+    const foreignApi = buildApi({
+      application,
+      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "load01-foreign-token" })
+    });
     try {
       const anonymous = await api.inject({ method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}` });
       expect(anonymous.statusCode).toBe(401);
 
-      const foreign = await api.inject({
+      const foreign = await foreignApi.inject({
         method: "GET",
         url: `/v1/runs/${encodeURIComponent(runId)}`,
         headers: { "x-user-dev-token": "load01-foreign-token" }
@@ -663,6 +682,7 @@ describe("LOAD-01 run projection ownership boundary", () => {
         workItemId,
         reason: "TEST_FIXTURE_CLEANUP"
       });
+      await foreignApi.close();
       await api.close();
     }
   });
@@ -915,7 +935,8 @@ describe("S07 / FX-LED-06 / FX-LG-17 / FX-LG-18 — SPLIT persistence and termin
 
   it("rejects TERMINAL over a latest WAIT, then accepts it after real ledgered drain transitions", async () => {
     const runId = await new RunRepository(database.pool).startRun({
-      questionLine: "s07-wait-drain", askerId: "asker:s07-wait-drain", sessionId: "session:s07-wait-drain",
+      questionLine: "s07-wait-drain", principal: { kind: "legacy", legacyAskerId: "asker:s07-wait-drain" },
+      sessionId: "session:s07-wait-drain",
       callerScope: "ASKER", asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual",
       effectiveRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker-declaration:s07-wait-drain",
       compositionBudgetTier: "low", depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
@@ -994,7 +1015,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
     const repository = new RunRepository(database.pool);
     const runId = await repository.startRun({
       questionLine: "Test-layer question",
-      askerId: "asker:test",
+      principal: { kind: "legacy", legacyAskerId: "asker:test" },
       sessionId: "session:test",
       callerScope: "ASKER",
       asOf: new Date("2026-08-07T00:00:00.000Z"),
@@ -1207,7 +1228,7 @@ describe("P7 — graph aggregate write seam", () => {
     const run = new RunRepository(database.pool);
     const runId = await run.startRun({
       questionLine: "Graph aggregate fixture",
-      askerId: "asker:graph",
+      principal: { kind: "legacy", legacyAskerId: "asker:graph" },
       sessionId: "session:graph",
       callerScope: "ASKER",
       asOf: new Date("2026-08-07T00:00:00.000Z"),

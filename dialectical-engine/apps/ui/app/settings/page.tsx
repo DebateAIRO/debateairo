@@ -33,10 +33,29 @@ const READ_ONLY_REASON =
 const MONEY_ABSENCE_REASON = "V3 records no monthly spend or cap accounting for this model.";
 
 export default function SettingsPage() {
-  return <AuthGate>{(token) => <SettingsScreen token={token} />}</AuthGate>;
+  return <AuthGate>{() => <AccountSettingsScreen />}</AuthGate>;
 }
 
-function SettingsScreen({ token }: { token: string }) {
+function AccountSettingsScreen() {
+  return (
+    <div className="screen scroll">
+      <div className="screenInner medium">
+        <h1 className="display sm">Account settings</h1>
+        <p className="lede" style={{ marginTop: 6 }}>
+          Review and revoke your signed-in browser sessions. Deployment and model administration are operator-only.
+        </p>
+        <SessionControls />
+        <div className="pill pillGen" style={{ marginTop: 24 }}>
+          <span className="dot" />
+          Deployment controls unavailable for user sessions
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Kept as the read-only operator projection used by an operator-capable host. */
+export function OperatorSettingsScreen({ token }: { token: string }) {
   const [view, setView] = useState<SettingsView | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

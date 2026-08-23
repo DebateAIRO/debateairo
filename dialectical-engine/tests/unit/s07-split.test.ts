@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   certifyDefeaterCompleteness,
-  decide,
+  decideSplitClassification,
   resolveRegeneration,
   selectRivalCarver,
   type DecisionInput
@@ -50,7 +50,7 @@ describe("S07 / FX-LED-06 — pure categorical-only decision law", () => {
       }, base.signals[1]]
     });
 
-    expect(decide(input)).toEqual({
+    expect(decideSplitClassification(input)).toEqual({
       grounded: true,
       classification: "categorical",
       action: "challenge",
@@ -68,7 +68,7 @@ describe("S07 / FX-LED-06 — pure categorical-only decision law", () => {
         firingReasons: [{ code: "opaque signal", action: "challenge", grounding: "unclassified" }]
       }, decisionInput().signals[1]]
     });
-    expect(decide(unclassified)).toMatchObject({ classification: "scalar", spawnCount: 0 });
+    expect(decideSplitClassification(unclassified)).toMatchObject({ classification: "scalar", spawnCount: 0 });
 
     const absentEvidence = decisionInput({
       signals: [decisionInput().signals[0], {
@@ -76,14 +76,14 @@ describe("S07 / FX-LED-06 — pure categorical-only decision law", () => {
         evidenceSnapshotId: null, reasonCodes: ["evidence absent"]
       }]
     });
-    expect(decide(absentEvidence)).toMatchObject({
+    expect(decideSplitClassification(absentEvidence)).toMatchObject({
       grounded: false, action: "continue", classification: "scalar", spawnCount: 0
     });
   });
 
   it("records blockers without letting them ground or authorize abandonment", () => {
     const base = decisionInput();
-    const result = decide(decisionInput({
+    const result = decideSplitClassification(decisionInput({
       signals: [{
         ...base.signals[0],
         firingReasons: [{ code: "low scalar", action: "abandon", grounding: "scalar" }],

@@ -200,7 +200,7 @@ export interface InitialBatteryRow {
 
 export interface StartRunInput {
   readonly questionLine: string;
-  readonly askerId: string;
+  readonly principal: RunCreationPrincipal;
   readonly sessionId: string;
   readonly callerScope: "ASKER" | "OPERATOR";
   readonly asOf: Date;
@@ -217,6 +217,37 @@ export interface StartRunInput {
   readonly batteryVersion: string;
   readonly batteryRows: readonly InitialBatteryRow[];
   readonly askContract?: Readonly<Record<string, unknown>>;
+}
+
+export type RunCreationPrincipal =
+  | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
+  | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
+
+export interface RunOwnershipAccess {
+  readonly ownerRef: string | null;
+  readonly legacyAskerId: string | null;
+}
+
+export type RunOwnershipInput = RunOwnershipAccess | string;
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const RAW_USER_ASKER = /^user:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESERVED_IDENTITY_ASKER = /^(?:user|owner):/i;
+
+export function normalizeRunOwnership(input: RunOwnershipInput): RunOwnershipAccess {
+  const candidate = typeof input === "string"
+    ? { ownerRef: null, legacyAskerId: input }
+    : input;
+  const ownerRef = candidate.ownerRef;
+  const legacyAskerId = candidate.legacyAskerId;
+  const hasOwner = ownerRef !== null;
+  const hasLegacy = legacyAskerId !== null;
+  if (hasOwner === hasLegacy) throw new TypeError("RUN_OWNERSHIP_PRINCIPAL_INVALID");
+  if (hasOwner && !UUID_V4.test(ownerRef)) throw new TypeError("RUN_OWNER_REF_INVALID");
+  if (hasLegacy && (legacyAskerId.trim() === "" || RESERVED_IDENTITY_ASKER.test(legacyAskerId))) {
+    throw new TypeError("RUN_LEGACY_ASKER_INVALID");
+  }
+  return Object.freeze({ ownerRef, legacyAskerId });
 }
 
 export interface DiscoveredPanelMember {
@@ -349,6 +380,32 @@ export class RunRepository {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const askerId = input.principal.kind === "server"
+        ? `owner:${input.principal.ownerRef}`
+        : input.principal.legacyAskerId;
+      if (input.principal.kind === "legacy") {
+        if (RAW_USER_ASKER.test(askerId)) {
+          throw new TypedDomainError("RUN_OWNER_RAW_ID_FORBIDDEN", "Raw user identifiers cannot enter immutable run rows");
+        }
+        try {
+          normalizeRunOwnership(Object.freeze({ ownerRef: null, legacyAskerId: askerId }));
+        } catch {
+          throw new TypedDomainError("RUN_LEGACY_ASKER_INVALID", "Legacy runs cannot use a reserved identity scope");
+        }
+      } else {
+        if (!UUID_V4.test(input.principal.ownerRef)) {
+          throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
+        }
+        const activeOwner = await client.query<{ owner_ref: string }>(
+          `SELECT owner_ref FROM identity."user"
+           WHERE user_id=$1 AND owner_ref=$2 AND state='active'
+           FOR UPDATE`,
+          [input.principal.userId, input.principal.ownerRef]
+        );
+        if (activeOwner.rows[0]?.owner_ref !== input.principal.ownerRef) {
+          throw new TypedDomainError("RUN_OWNER_INVALID", "The authenticated owner mapping is no longer active");
+        }
+      }
       const createdAtSeq = await allocateSequence(client);
       const inserted = await client.query<{ run_id: string }>(
         `INSERT INTO core.run (
@@ -362,7 +419,7 @@ export class RunRepository {
           $11::jsonb, jsonb_array_length($12::jsonb), $12::jsonb, $13, $14::jsonb, $15, $16, $17::jsonb, $18
         ) RETURNING run_id`,
         [
-          input.questionLine, input.askerId, input.sessionId, input.callerScope, input.asOf,
+          input.questionLine, askerId, input.sessionId, input.callerScope, input.asOf,
           input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
           input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
           input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
@@ -370,6 +427,13 @@ export class RunRepository {
         ]
       );
       const runId = inserted.rows[0]!.run_id;
+
+      if (input.principal.kind === "server") {
+        await client.query(
+          `SELECT core.append_run_ownership_event($1,$2) AS at_seq`,
+          [runId, input.principal.ownerRef]
+        );
+      }
 
       await client.query(
         `INSERT INTO core.question_liveness_event (run_id, kind, occurred_at, at_seq)
@@ -416,7 +480,8 @@ export class RunRepository {
     }
   }
 
-  async readLoadingProjection(runId: string, askerId: string): Promise<RunLoadingProjection | null> {
+  async readLoadingProjection(runId: string, ownership: RunOwnershipInput): Promise<RunLoadingProjection | null> {
+    const access = normalizeRunOwnership(ownership);
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
@@ -449,9 +514,9 @@ export class RunRepository {
           ORDER BY event.at_seq DESC LIMIT 1) AS hold_until
        FROM core.run AS run
        LEFT JOIN core.work_item AS work ON work.run_id = run.run_id
-       WHERE run.run_id = $1 AND run.asker_id = $2
+       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
        GROUP BY run.run_id, run.question_line`,
-      [runId, askerId]
+      [runId, access.ownerRef, access.legacyAskerId]
     );
     const row = result.rows[0];
     if (row === undefined) return null;

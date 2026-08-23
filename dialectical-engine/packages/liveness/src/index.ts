@@ -1,5 +1,10 @@
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  normalizeRunOwnership,
+  withWriteTransaction,
+  type RunOwnershipInput
+} from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 
 export type ProjectedStalenessState = "FRESH" | "UNDER_REVIEW" | "STALE" | "ARCHIVED_REVIVED";
@@ -118,14 +123,36 @@ export function decideRetirement(input: {
 export class LivenessRepository {
   constructor(private readonly pool: Pool) {}
 
-  async recordQuery(questionLine: string, askerId: string, queriedAt = new Date()): Promise<number> {
-    if (questionLine.trim() === "" || askerId.trim() === "") throw new TypedDomainError("LIVENESS_QUERY_INVALID", "Question and asker are required");
+  async recordQuery(questionLine: string, ownership: RunOwnershipInput, queriedAt = new Date()): Promise<number> {
+    if (questionLine.trim() === "") throw new TypedDomainError("LIVENESS_QUERY_INVALID", "Question and owner are required");
+    const access = normalizeRunOwnership(ownership);
     return withWriteTransaction(this.pool, async (client) => {
       const matches = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE question_line = $1 AND asker_id = $2 ORDER BY created_at_seq`,
-        [questionLine, askerId]
+        `SELECT run_id FROM core.run
+         WHERE question_line=$1 AND core.run_is_owned_by(run_id,$2,$3)
+         ORDER BY created_at_seq`,
+        [questionLine, access.ownerRef, access.legacyAskerId]
       );
+      const runIds = matches.rows.map((row) => row.run_id).sort();
+      const locked = runIds.length === 0
+        ? { rows: [] as { run_id: string }[] }
+        : await client.query<{ run_id: string }>(
+          `SELECT run_id FROM core.run
+           WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
+          [runIds]
+        );
+      const lockedRunIds = new Set(locked.rows.map((row) => row.run_id));
+      let recorded = 0;
       for (const row of matches.rows) {
+        if (!lockedRunIds.has(row.run_id)) continue;
+        // Claims take the same run locks. Acquire the complete sorted set
+        // before the first allocator write, then re-read each owner in a later
+        // statement to close both the claim race and multi-run deadlock cycle.
+        const owned = await client.query<{ owned: boolean }>(
+          `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
+          [row.run_id, access.ownerRef, access.legacyAskerId]
+        );
+        if (owned.rows[0]?.owned !== true) continue;
         await client.query(
           `INSERT INTO core.question_liveness_event (run_id, kind, occurred_at, at_seq)
            VALUES ($1,'QUERY',$2,$3)`,
@@ -156,8 +183,9 @@ export class LivenessRepository {
            VALUES ($1,'REVIVED',$2,$3)`,
           [row.run_id, queriedAt, await allocateSequence(client)]
         );
+        recorded += 1;
       }
-      return matches.rows.length;
+      return recorded;
     });
   }
 

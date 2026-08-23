@@ -20,7 +20,8 @@ let database: TestDatabase;
 
 async function createRunAndNode(label: string): Promise<{ runId: string; nodeId: string }> {
   const runId = await new RunRepository(database.pool).startRun({
-    questionLine: label, askerId: `asker:${label}`, sessionId: `session:${label}`, callerScope: "ASKER",
+    questionLine: label, principal: { kind: "legacy", legacyAskerId: `asker:${label}` },
+    sessionId: `session:${label}`, callerScope: "ASKER",
     asOf: new Date("2026-08-08T00:00:00Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
     depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,

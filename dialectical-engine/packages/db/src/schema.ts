@@ -24,6 +24,7 @@ export const identityUser = identity.table("user", {
   passwordHash: text("password_hash").notNull(),
   pseudonym: text("pseudonym").notNull().unique(),
   auditToken: uuid("audit_token").notNull().defaultRandom().unique(),
+  ownerRef: uuid("owner_ref").notNull().defaultRandom().unique(),
   state: text("state").notNull().default("pending_verification"),
   adultAffirmedAt: timestamp("adult_affirmed_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
@@ -119,6 +120,15 @@ export const run = core.table("run", {
   batteryVersion: text("battery_version").notNull(),
   askContract: jsonb("ask_contract").notNull(),
   createdAtSeq: bigint("created_at_seq", { mode: "number" }).notNull()
+});
+
+export const runOwnershipEvent = core.table("run_ownership_event", {
+  runOwnershipEventId: uuid("run_ownership_event_id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  // Deliberately no identity FK: deleting the mutable mapping must sever the
+  // person while immutable ownership history remains byte-for-byte intact.
+  ownerRef: uuid("owner_ref").notNull(),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull().unique()
 });
 
 export const workItem = core.table("work_item", {

@@ -30,7 +30,8 @@ const calibration: CalibrationStrategy = Object.freeze({
 
 async function createRun(label: string, questionLine: string): Promise<string> {
   return new RunRepository(database.pool).startRun({
-    questionLine, askerId: "asker:s13-test-layer", sessionId: `session:${label}`, callerScope: "ASKER",
+    questionLine, principal: { kind: "legacy", legacyAskerId: "asker:s13-test-layer" },
+    sessionId: `session:${label}`, callerScope: "ASKER",
     asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
     depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
@@ -55,12 +56,27 @@ beforeAll(async () => {
 afterAll(async () => database?.stop());
 
 describe("S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path", () => {
+  it("derives immutable memory scope from authenticated ownership and rejects a raw user carrier", async () => {
+    const question = `Can a raw identity enter memory ${randomUUID()}?`;
+    const runId = await createRun("raw-scope", question);
+    const rawScope = `user:${randomUUID()}`;
+    await expect(new MemoryRepository(database.pool).recordQuestionAndMatch({
+      key: Object.freeze({ ...questionKey(runId, question), askerScope: rawScope }),
+      decidedBy: "test-layer:raw-scope",
+      ownership: "asker:s13-test-layer"
+    })).rejects.toMatchObject({ code: "MEMORY_ASKER_SCOPE_MISMATCH" });
+    expect((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.question_key WHERE run_id=$1`, [runId]
+    )).rows[0]!.count).toBe("0");
+  });
+
   it("links one settled exact question, pins the pull, serves disclosure, never closes transitively, and unlinks append-only", async () => {
     const question = "Should the city build a tram?";
     const memory = new MemoryRepository(database.pool);
     const priorRunId = await createRun("prior", question);
     await expect(memory.recordQuestionAndMatch({
-      key: questionKey(priorRunId, question), decidedBy: "test-layer:matcher"
+      key: questionKey(priorRunId, question), decidedBy: "test-layer:matcher",
+      ownership: "asker:s13-test-layer"
     })).resolves.toBeNull();
     const priorAnswerId = (await persistTerminalRun({
       pool: database.pool,
@@ -86,6 +102,7 @@ describe("S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path", () => {
     const currentRunId = await createRun("current", question);
     const disclosure = await memory.recordQuestionAndMatch({
       key: questionKey(currentRunId, question), decidedBy: "test-layer:matcher",
+      ownership: "asker:s13-test-layer",
       pullPolicy: {
         bound: 1, rowKey: "test-layer:memory-pull-cap", registerVersion: 404_013,
         sourceRef: "test-layer:FX-S22-04"
@@ -122,12 +139,108 @@ describe("S13 / FX-S22-04 / FX-PT-MEM — real PostgreSQL memory path", () => {
     expect(direct.rows[0]).toEqual({ count: "1", transitive: "0" });
 
     const unlinked = await memory.unlinkForAnswer(currentAnswerId, "asker:s13-test-layer", "asker:s13-test-layer");
-    expect(unlinked.memoryLinkId).toBe(disclosure!.memory_link_id);
+    expect(unlinked).not.toBeNull();
+    expect(unlinked!.memoryLinkId).toBe(disclosure!.memory_link_id);
     const after = await new ServeRepository(database.pool).readAnswerProjection(currentAnswerId, "asker:s13-test-layer");
     expect(after?.memory_disclosure).toBeNull();
     expect(after?.builds_on_previous).toEqual({ value: false, answer_ref: null });
     await expect(database.pool.query(
-      "UPDATE memory.memory_link SET relation='RELATED_ONLY' WHERE memory_link_id=$1", [unlinked.memoryLinkId]
+      "UPDATE memory.memory_link SET relation='RELATED_ONLY' WHERE memory_link_id=$1", [unlinked!.memoryLinkId]
     )).rejects.toThrow(/append-only|immutable/);
   });
+
+  it("does not link a legacy candidate after an ownership claim changes its effective scope", async () => {
+    const question = `Can a claimed prior run leak through memory ${randomUUID()}?`;
+    const memory = new MemoryRepository(database.pool);
+    const priorRunId = await createRun("claimed-prior", question);
+    await expect(memory.recordQuestionAndMatch({
+      key: questionKey(priorRunId, question),
+      decidedBy: "test-layer:matcher",
+      ownership: "asker:s13-test-layer"
+    })).resolves.toBeNull();
+    const priorAnswerId = (await persistTerminalRun({
+      pool: database.pool,
+      runId: priorRunId,
+      fixtureKey: "s7-claimed-prior",
+      factBundle: {
+        facts: ["fact:claimed-prior"], residualObjections: [], badges: [], conditionMarks: [],
+        reversalPoint: "reversal:claimed-prior", buildsOnPrevious: { value: false, answerRef: null },
+        memoryDisclosure: null
+      }
+    })).answerId;
+    await new SettlementRepository(database.pool).settle({
+      outcomeAttemptId: randomUUID(), answerId: priorAnswerId, answerVersion: 1,
+      asOf: new Date("2026-08-08T00:00:00.000Z"), runId: priorRunId,
+      modelId: "model:s7-claim", modelVersion: "v1", provider: "provider:s7-claim",
+      taskClass: "class:s7-claim", prior: 0.5, posterior: 0.7,
+      basis: "test-layer:resolver", resolverRef: "resolver:s7-claim", resolverIsExternal: true,
+      resolvedOutcome: true, resolvedAt: new Date("2026-08-08T01:00:00.000Z"),
+      provenanceRef: "artifact:s7-claim", scoreability: "PERMANENTLY_UNSCOREABLE",
+      actorRef: "settlement-watch:s7-claim"
+    }, { properScore, calibration, metric: "judge_weight" });
+
+    const ownerRef = randomUUID();
+    const auditToken = randomUUID();
+    await database.pool.query(
+      `INSERT INTO identity."user" (
+         email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,
+         password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+       ) VALUES ($1,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$2,$3,$4,'active',now(),now())`,
+      [Buffer.alloc(32, 0x4d), `s7-memory-claim-${randomUUID()}`, auditToken, ownerRef]
+    );
+    const currentRunId = await createRun("claim-current", question);
+    const blocker = await database.pool.connect();
+    const claimant = await database.pool.connect();
+    let disclosure: Awaited<ReturnType<MemoryRepository["recordQuestionAndMatch"]>> | undefined;
+    let claim: Promise<unknown> | undefined;
+    let matching: Promise<Awaited<ReturnType<MemoryRepository["recordQuestionAndMatch"]>>> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [priorRunId]);
+      await claimant.query("BEGIN");
+      const claimantPid = (await claimant.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+      claim = claimant.query(
+        `SELECT core.append_run_ownership_event($1,$2) AS at_seq`, [priorRunId, ownerRef]
+      );
+      let claimWait: string | null = null;
+      for (let attempt = 0; attempt < 30 && claimWait !== "Lock"; attempt += 1) {
+        claimWait = (await database.pool.query<{ wait_event_type: string | null }>(
+          "SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1", [claimantPid]
+        )).rows[0]?.wait_event_type ?? null;
+        if (claimWait !== "Lock") await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(claimWait).toBe("Lock");
+
+      matching = memory.recordQuestionAndMatch({
+        key: questionKey(currentRunId, question),
+        decidedBy: "test-layer:matcher",
+        ownership: "asker:s13-test-layer"
+      });
+      let lockWaiters = 0;
+      for (let attempt = 0; attempt < 30 && lockWaiters < 2; attempt += 1) {
+        lockWaiters = Number((await database.pool.query<{ count: string }>(
+          `SELECT count(*) FROM pg_stat_activity
+           WHERE wait_event_type='Lock'
+             AND (query LIKE '%run_ownership_event%' OR query LIKE '%core.run WHERE run_id%FOR UPDATE%')`
+        )).rows[0]!.count);
+        if (lockWaiters < 2) await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(lockWaiters).toBeGreaterThanOrEqual(2);
+      await blocker.query("COMMIT");
+      await claim;
+      await claimant.query("COMMIT");
+      disclosure = await matching;
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      await claimant.query("ROLLBACK").catch(() => undefined);
+      await claim?.catch(() => undefined);
+      await matching?.catch(() => undefined);
+      blocker.release();
+      claimant.release();
+    }
+    expect(disclosure).toBeNull();
+    expect((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.memory_link WHERE source_run_id=$1`, [currentRunId]
+    )).rows[0]!.count).toBe("0");
+  }, 60_000);
 });

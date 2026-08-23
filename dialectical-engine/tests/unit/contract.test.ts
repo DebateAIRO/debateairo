@@ -31,10 +31,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       tier_provenance_ref: "asker-declaration:test",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      decision_owner: "asker:test",
-      action_owner: "asker:test",
       decision_scope: "test-layer scope",
-      caller_scope: "ASKER",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
       steering_annotations: []
@@ -46,15 +43,18 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       tier_provenance_ref: "machine:deployment-floor",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      decision_owner: "asker:test",
-      action_owner: "asker:test",
       decision_scope: "test-layer scope",
-      caller_scope: "ASKER",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
       steering_annotations: []
     }).tier_source).toBe("MACHINE_DEFAULT");
     expect(TierSourceSchema.options).toEqual(["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"]);
+    expect(() => AskRequestSchema.parse({
+      question_line: "Forged scope", risk_tier: "casual", tier_source: "ASKER",
+      tier_provenance_ref: "test", composition_budget_tier: "low", depth_params: { depth: 1 },
+      decision_scope: "test", as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [], steering_annotations: [], caller_scope: "OPERATOR"
+    })).toThrow();
     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
   });
 

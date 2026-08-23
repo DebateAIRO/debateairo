@@ -27,7 +27,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
           <Link className="button primary" href="/new">Ask a question</Link>
           <Link className="button" href="/settings">Identity &amp; settings</Link>
-          <Link className="button" href="/admin/workers">Fleet</Link>
         </div>
         <section className="card" style={{ marginTop: 28 }}><h2>Your answers</h2>
           <form method="get" style={{ display: "flex", gap: 12 }}><label>Page size<input name="limit" inputMode="numeric" required /></label><label>Offset<input name="offset" inputMode="numeric" required /></label><button className="button">Read page</button></form>

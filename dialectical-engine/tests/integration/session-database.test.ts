@@ -43,19 +43,21 @@ function hash(symbol: string): string {
 
 async function fixtureUser(label: string): Promise<Readonly<{
   userId: string;
+  ownerRef: string;
   auditToken: string;
   factorId: string;
   passwordHash: string;
 }>> {
   const userId = randomUUID();
+  const ownerRef = randomUUID();
   const auditToken = randomUUID();
   const passwordHash = "$argon2id$v=19$m=65536,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   await database.pool.query(`
     INSERT INTO identity."user" (
       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
-      phone_ciphertext,password_hash,pseudonym,audit_token,state,adult_affirmed_at,created_at
-    ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,'active',now(),now())
-  `, [userId, Buffer.alloc(32, label.charCodeAt(0)), passwordHash, `s5-${label}`, auditToken]);
+      phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+    ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,$6,'active',now(),now())
+  `, [userId, Buffer.alloc(32, label.charCodeAt(0)), passwordHash, `s5-${label}`, auditToken, ownerRef]);
   const factorId = randomUUID();
   await database.pool.query(`
     INSERT INTO identity.mfa_factor (
@@ -63,7 +65,7 @@ async function fixtureUser(label: string): Promise<Readonly<{
       state,created_at,verified_at,last_accepted_step
     ) VALUES ($1,$2,'totp','{}'::jsonb,NULL,NULL,'active',now(),now(),10)
   `, [factorId, userId]);
-  return Object.freeze({ userId, auditToken, factorId, passwordHash });
+  return Object.freeze({ userId, ownerRef, auditToken, factorId, passwordHash });
 }
 
 async function fixtureSession(userId: string, tokenHash: string, csrfHash: string, input: Readonly<{
@@ -100,6 +102,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     const identity = await fixtureUser("refresh");
     const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
     const now = new Date();
+    const refreshAt = new Date(now.getTime() + 1_000);
     const absolute = new Date(now.getTime() + 60_000);
     const sessionId = await fixtureSession(identity.userId, hash("a"), hash("c"), {
       bindingHash: hash("b"),
@@ -107,10 +110,12 @@ describe("S5 sessions on real PostgreSQL", () => {
       absoluteExpiresAt: absolute
     });
     const refreshed = await repository.authenticateSession({
-      tokenHash: hash("a"), bindingHash: hash("b"), occurredAt: now,
+      tokenHash: hash("a"), bindingHash: hash("b"), occurredAt: refreshAt,
       idleExpiresAt: new Date(now.getTime() + 14 * 86_400_000)
     });
-    expect(refreshed).toMatchObject({ sessionId, userId: identity.userId, csrfTokenHash: hash("c") });
+    expect(refreshed).toMatchObject({
+      sessionId, userId: identity.userId, ownerRef: identity.ownerRef, csrfTokenHash: hash("c")
+    });
     expect(refreshed!.idleExpiresAt.getTime()).toBe(absolute.getTime());
 
     const boundaryId = await fixtureSession(identity.userId, hash("d"), hash("e"), {
@@ -172,6 +177,7 @@ describe("S5 sessions on real PostgreSQL", () => {
       expiresAt: new Date(now.getTime() + 300_000),
       consumedAt: null,
       userId: identity.userId,
+      ownerRef: identity.ownerRef,
       auditToken: identity.auditToken,
       passwordHash: identity.passwordHash,
       factorId: identity.factorId,
@@ -276,6 +282,7 @@ describe("S5 sessions on real PostgreSQL", () => {
       expiresAt: boundary,
       consumedAt: null,
       userId: identity.userId,
+      ownerRef: identity.ownerRef,
       auditToken: identity.auditToken,
       passwordHash: identity.passwordHash,
       factorId: identity.factorId,
@@ -312,6 +319,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     const email = `s5-login-${randomUUID()}@example.test`;
     const password = "correct horse battery staple for S5";
     const userId = randomUUID();
+    const ownerRef = randomUUID();
     const auditToken = randomUUID();
     const factorId = randomUUID();
     const blindIndexKey = Buffer.alloc(32, 0x51);
@@ -330,9 +338,9 @@ describe("S5 sessions on real PostgreSQL", () => {
       await database.pool.query(`
         INSERT INTO identity."user" (
           user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
-          phone_ciphertext,password_hash,pseudonym,audit_token,state,adult_affirmed_at,created_at
-        ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,'active',$6,$6)
-      `, [userId, createEmailBlindIndex(blindIndexKey, email), passwordHash, "s5-real-login", auditToken, now]);
+          phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+        ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,$6,'active',$7,$7)
+      `, [userId, createEmailBlindIndex(blindIndexKey, email), passwordHash, "s5-real-login", auditToken, ownerRef, now]);
       await database.pool.query(`
         INSERT INTO identity.mfa_factor (
           mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
@@ -397,6 +405,7 @@ describe("S5 sessions on real PostgreSQL", () => {
         code: totpCodeAtStep(secret, step)
       }, source);
       expect(completed.session).toMatchObject({
+        asker_id: `owner:${ownerRef}`,
         ownership_provenance: "server_session",
         provisional_identity_model: false
       });
@@ -419,7 +428,7 @@ describe("S5 sessions on real PostgreSQL", () => {
       });
       expect(JSON.stringify(persisted.rows[0])).not.toContain(completed.sessionToken);
       const authenticated = await service.authenticate(completed.sessionToken, source);
-      expect(authenticated).toMatchObject({ userId });
+      expect(authenticated).toMatchObject({ userId, ownerRef, session: { asker_id: `owner:${ownerRef}` } });
       if (authenticated === null) throw new Error("expected the new session to authenticate");
 
       await expect(service.stepUp({
@@ -446,7 +455,9 @@ describe("S5 sessions on real PostgreSQL", () => {
       expect(rotated.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(rotated.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
       await expect(service.authenticate(completed.sessionToken, source)).resolves.toBeNull();
-      await expect(service.authenticate(rotated.sessionToken, source)).resolves.toMatchObject({ userId });
+      await expect(service.authenticate(rotated.sessionToken, source)).resolves.toMatchObject({
+        userId, ownerRef, session: { asker_id: `owner:${ownerRef}` }
+      });
       await expect(service.completeLogin({
         challengeToken: challenge.challengeToken,
         code: totpCodeAtStep(secret, step)

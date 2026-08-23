@@ -111,10 +111,7 @@ export const AskRequestSchema = z.object({
   tier_provenance_ref: z.string().trim().min(1),
   composition_budget_tier: CompositionBudgetTierSchema,
   depth_params: z.record(z.string(), z.unknown()),
-  decision_owner: z.string().trim().min(1),
-  action_owner: z.string().trim().min(1),
   decision_scope: z.string().trim().min(1),
-  caller_scope: z.enum(["ASKER", "OPERATOR"]),
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),
   steering_annotations: z.array(z.string().min(1))
@@ -155,7 +152,7 @@ const LegacyDevelopmentSessionSchema = z.object({
 }).strict();
 
 const ServerSessionSchema = z.object({
-  asker_id: z.string().regex(/^user:[0-9a-f-]{36}$/i),
+  asker_id: z.string().regex(/^owner:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
   session_id: z.uuid(),
   caller_scope: z.literal("ASKER"),
   ownership_provenance: z.literal("server_session"),
@@ -551,6 +548,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/asks",
     "GET /v1/session",
     "GET /v1/deployment",
+    "GET /v1/dev/evaluator",
+    "POST /v1/dev/evaluator/consumer-selection",
     "GET /v1/answers",
     "GET /v1/answers/{id}",
     "GET /v1/answers/{id}/inspection",

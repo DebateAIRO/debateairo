@@ -122,10 +122,7 @@ describe("DR-182 live mono-panel composition", () => {
         tier_provenance_ref: "acceptance:mono-panel:asker",
         composition_budget_tier: "low",
         depth_params: { depth: 4 },
-        decision_owner: "mono-panel-owner",
-        action_owner: "mono-panel-owner",
         decision_scope: "acceptance-test",
-        caller_scope: "ASKER",
         as_of: "2026-08-14T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []

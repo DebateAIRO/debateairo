@@ -241,10 +241,7 @@ describe("ACC-01 dry-run ceremony", () => {
         tier_provenance_ref: "acceptance:test-layer:asker",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        decision_owner: "acceptance-test-owner",
-        action_owner: "acceptance-test-owner",
         decision_scope: "acceptance-test",
-        caller_scope: "ASKER",
         as_of: "2026-08-09T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []

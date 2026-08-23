@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   AskRefusal,
   buildApi as buildApiBase,
+  createLegacyDevSessionResolver,
   evaluateAskAdmission,
   preserveSubmittedTierSource,
   type AskApplication,
@@ -11,6 +12,11 @@ import {
 import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+
+const RUN_ID = "11111111-1111-4111-8111-111111111111";
+const QUEUED_RUN_ID = "22222222-2222-4222-8222-222222222222";
+const MISSING_RUN_ID = "33333333-3333-4333-8333-333333333333";
+const ANSWER_ID = "44444444-4444-4444-8444-444444444444";
 
 /** Explicit test-only S9 rollback seam; production buildApi has no fallback. */
 function buildApi(options: Parameters<typeof buildApiBase>[0]) {
@@ -30,9 +36,16 @@ function buildApi(options: Parameters<typeof buildApiBase>[0]) {
   });
 }
 
+function buildOperatorApi(options: Parameters<typeof buildApiBase>[0]) {
+  return buildApiBase({
+    ...options,
+    legacyDevSessionResolver: createLegacyDevSessionResolver({ operatorToken: "operator-token" })
+  });
+}
+
 function fixtureApplication(): AskApplication {
   return {
-    submit: async () => ({ run_ref: "run:test", status: "QUEUED" }),
+    submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
     readRun: async () => null,
@@ -45,7 +58,7 @@ function fixtureApplication(): AskApplication {
     recordInvestigation: async () => ({ request_ref: "request:test", status: "RECORDED", replay_handle: "replay:test" }),
     unlinkMemoryLink: async () => ({ memory_link_id: "memory:test", state: "UNLINKED" }),
     readInspection: async () => ({
-      answer_id: "answer:test",
+      answer_id: ANSWER_ID,
       answer_version: 1,
       conformance: {
         outcome: "PASS",
@@ -55,9 +68,9 @@ function fixtureApplication(): AskApplication {
       segment_suppressions: [],
       shadow_suppressions: []
     }),
-    readLedgerDigest: async () => ({ answer_id: "answer:test", run_ref: "run:test", work_items: [], entries: [] }),
+    readLedgerDigest: async () => ({ answer_id: ANSWER_ID, run_ref: RUN_ID, work_items: [], entries: [] }),
     events: async function* () {
-      yield { event_id: "event:test", event_type: "run.accepted", run_ref: "run:test", at_sequence: 1, payload: {} };
+      yield { event_id: "event:test", event_type: "run.accepted", run_ref: RUN_ID, at_sequence: 1, payload: {} };
     }
   };
 }
@@ -118,10 +131,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       tier_provenance_ref: "machine:deployment-floor",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      decision_owner: "asker:test",
-      action_owner: "asker:test",
       decision_scope: "test-layer scope",
-      caller_scope: "ASKER",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
       steering_annotations: []
@@ -143,10 +153,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       tier_provenance_ref: "asker:test",
       composition_budget_tier: "low",
       depth_params: { depth: 3 },
-      decision_owner: "asker:test",
-      action_owner: "asker:test",
       decision_scope: "test-layer scope",
-      caller_scope: "ASKER",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
       steering_annotations: []
@@ -198,52 +205,18 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
 
   it("denies routes that omit an explicit authentication policy", async () => {
     const api = buildApi({ application: fixtureApplication() });
-    api.get("/test/undeclared-auth-policy", async () => ({ exposed: true }));
-
-    const response = await api.inject({
-      method: "GET",
-      url: "/test/undeclared-auth-policy",
-      headers: { "x-user-dev-token": "test-token" }
-    });
-
-    expect(response.statusCode).toBe(401);
-    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
+    expect(() => api.get("/test/undeclared-auth-policy", async () => ({ exposed: true })))
+      .toThrow("AUTHORIZATION_POLICY_UNDECLARED:GET /test/undeclared-auth-policy");
     await api.close();
   });
 
-  it("decorates authenticated requests with the resolved session", async () => {
-    const api = buildApi({ application: fixtureApplication() });
-    api.get(
-      "/test/request-session",
-      { config: { auth: "user" } },
-      async (request) => request.session
-    );
-
-    const response = await api.inject({
-      method: "GET",
-      url: "/test/request-session",
-      headers: { "x-user-dev-token": "test-token" }
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      caller_scope: "ASKER",
-      ownership_provenance: "user_dev_token",
-      provisional_identity_model: true
-    });
-    await api.close();
-  });
-
-  it("serves the deployment register, scorecard, model ledger and honest fleet state", async () => {
+  it("does not expose deployment state to an ordinary user", async () => {
     const api = buildApi({ application: fixtureApplication() });
     const response = await api.inject({
       method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
     });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
-      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
-    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "OPERATOR_REQUIRED" });
     await api.close();
   });
 
@@ -252,7 +225,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     const application = fixtureApplication();
     application.submit = async (_ask, session) => {
       observedAsker = session.asker_id;
-      return { run_ref: "run:test", status: "QUEUED" };
+      return { run_ref: RUN_ID, status: "QUEUED" };
     };
     const api = buildApi({ application });
     const response = await api.inject({
@@ -266,17 +239,14 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        decision_owner: "asker:test",
-        action_owner: "asker:test",
         decision_scope: "test-layer scope",
-        caller_scope: "ASKER",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []
       }
     });
     expect(response.statusCode).toBe(202);
-    expect(response.json()).toEqual({ run_ref: "run:test", status: "QUEUED" });
+    expect(response.json()).toEqual({ run_ref: RUN_ID, status: "QUEUED" });
     expect(observedAsker).toMatch(/^asker:/);
     await api.close();
   });
@@ -301,10 +271,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 3 },
-        decision_owner: "asker:test",
-        action_owner: "asker:test",
         decision_scope: "test-layer scope",
-        caller_scope: "ASKER",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []
@@ -339,10 +306,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        decision_owner: "asker:test",
-        action_owner: "asker:test",
         decision_scope: "test-layer scope",
-        caller_scope: "ASKER",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []
@@ -360,9 +324,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     typedApplication.readDeployment = async () => {
       throw new TypedDomainError("DEPLOYMENT_REGISTER_UNAVAILABLE", "No sealed V3 deployment register exists");
     };
-    const typedApi = buildApi({ application: typedApplication });
+    const typedApi = buildOperatorApi({ application: typedApplication });
     const typedResponse = await typedApi.inject({
-      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
+      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "operator-token" }
     });
     expect(typedResponse.statusCode).toBe(500);
     expect(typedResponse.json()).toEqual({
@@ -374,9 +338,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
 
     const crashedApplication = fixtureApplication();
     crashedApplication.readDeployment = async () => { throw new Error("database connection lost"); };
-    const crashedApi = buildApi({ application: crashedApplication });
+    const crashedApi = buildOperatorApi({ application: crashedApplication });
     const crashedResponse = await crashedApi.inject({
-      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
+      method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "operator-token" }
     });
     expect(crashedResponse.statusCode).toBe(500);
     expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
@@ -414,10 +378,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         tier_provenance_ref: "asker-declaration:test",
         composition_budget_tier: "low",
         depth_params: { depth: 1 },
-        decision_owner: "asker:test",
-        action_owner: "asker:test",
         decision_scope: "test-layer scope",
-        caller_scope: "ASKER",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
         steering_annotations: []
@@ -450,7 +411,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     const api = buildApi({ application });
     const response = await api.inject({
       method: "GET",
-      url: "/v1/answers/answer:test?version=7",
+      url: `/v1/answers/${ANSWER_ID}?version=7`,
       headers: { "x-user-dev-token": "test-token" }
     });
     expect(response.statusCode).toBe(404);
@@ -469,7 +430,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
 
   it("projects an asker-owned queued run and distinguishes a nonexistent id", async () => {
     const application = fixtureApplication();
-    application.readRun = async (runId, session) => runId === "run:queued" ? {
+    application.readRun = async (runId, session) => runId === QUEUED_RUN_ID ? {
       run_ref: runId,
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
@@ -479,12 +440,12 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     const api = buildApi({ application });
     const queued = await api.inject({
       method: "GET",
-      url: "/v1/runs/run:queued",
+      url: `/v1/runs/${QUEUED_RUN_ID}`,
       headers: { "x-user-dev-token": "test-token" }
     });
     expect(queued.statusCode).toBe(200);
     expect(queued.json()).toEqual({
-      run_ref: "run:queued",
+      run_ref: QUEUED_RUN_ID,
       question_line: "Messi or Ronaldo?",
       state: "QUEUED",
       terminal_reason: null,
@@ -492,7 +453,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     });
     expect((await api.inject({
       method: "GET",
-      url: "/v1/runs/run:missing",
+      url: `/v1/runs/${MISSING_RUN_ID}`,
       headers: { "x-user-dev-token": "test-token" }
     })).statusCode).toBe(404);
     await api.close();
@@ -510,16 +471,16 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     const api = buildApi({ application });
     const response = await api.inject({
       method: "POST",
-      url: "/v1/answers/answer:test/memory-link/unlink",
+      url: `/v1/answers/${ANSWER_ID}/memory-link/unlink`,
       headers: { "x-user-dev-token": "asker-token" }
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ memory_link_id: "memory:test", state: "UNLINKED" });
-    expect(observedAnswerId).toBe("answer:test");
+    expect(observedAnswerId).toBe(ANSWER_ID);
     expect(observedAsker).toMatch(/^asker:/);
     expect((await api.inject({
       method: "POST",
-      url: "/v1/answers/answer:test/memory-link/unlink"
+      url: `/v1/answers/${ANSWER_ID}/memory-link/unlink`
     })).statusCode).toBe(401);
     await api.close();
   });
@@ -533,7 +494,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     };
     const api = buildApi({ application });
     const response = await api.inject({
-      method: "POST", url: "/v1/answers/answer:test/investigations/gap:test",
+      method: "POST", url: `/v1/answers/${ANSWER_ID}/investigations/gap:test`,
       headers: { "x-user-dev-token": "asker-token" },
       payload: { user_input: "Keep this verbatim.", human_steer_input: true }
     });
@@ -547,24 +508,24 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     let observedScope: string | undefined;
     const application = fixtureApplication();
     const readInspection = application.readInspection;
-    application.readInspection = async (answerId, session, version) => {
+    application.readInspection = async (answerId, session, version, ownership) => {
       observedScope = session.caller_scope;
-      return readInspection(answerId, session, version);
+      return readInspection(answerId, session, version, ownership);
     };
     const api = buildApi({ application });
     const asker = await api.inject({
       method: "GET",
-      url: "/v1/answers/answer:test/inspection?version=1",
+      url: `/v1/answers/${ANSWER_ID}/inspection?version=1`,
       headers: { "x-user-dev-token": "asker-token" }
     });
     expect(asker.statusCode).toBe(200);
     expect(observedScope).toBe("ASKER");
     expect(asker.body).not.toContain("raw_text");
-    expect(asker.json()).toMatchObject({ answer_id: "answer:test", answer_version: 1 });
+    expect(asker.json()).toMatchObject({ answer_id: ANSWER_ID, answer_version: 1 });
 
     const operator = await api.inject({
       method: "GET",
-      url: "/v1/answers/answer:test/inspection?version=1",
+      url: `/v1/answers/${ANSWER_ID}/inspection?version=1`,
       headers: { "x-operator-dev-token": "operator-token" }
     });
     expect(operator.statusCode).toBe(401);
@@ -572,23 +533,38 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
   });
 
   it("serves only the closed SSE vocabulary through the asker-scoped facade", async () => {
-    const api = buildApi({ application: fixtureApplication() });
+    const application = fixtureApplication();
+    application.readRun = async (runId) => ({
+      run_ref: runId,
+      question_line: "A streamed run",
+      state: "QUEUED",
+      terminal_reason: null,
+      hold_until: null
+    });
+    const api = buildApi({ application });
     const response = await api.inject({
       method: "GET",
-      url: "/v1/runs/run:test/events",
+      url: `/v1/runs/${RUN_ID}/events`,
       headers: { "x-user-dev-token": "asker-token" }
     });
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("event: run.accepted");
     expect(response.body).toContain('"event_type":"run.accepted"');
-    expect((await api.inject({ method: "GET", url: "/v1/runs/run:test/events" })).statusCode).toBe(401);
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${RUN_ID}/events` })).statusCode).toBe(401);
     await api.close();
   });
 
   it("aborts a stale SSE connection without killing subsequent API requests", async () => {
     const application = fixtureApplication();
+    application.readRun = async (runId) => ({
+      run_ref: runId,
+      question_line: "Stale run",
+      state: "QUEUED",
+      terminal_reason: null,
+      hold_until: null
+    });
     application.events = async function* (runId) {
-      expect(runId).toBe("run:missing-from-reseed");
+      expect(runId).toBe(MISSING_RUN_ID);
       throw new TypedDomainError("RUN_NOT_FOUND", "No run exists for this stale EventSource");
     };
     const api = buildApi({ application });
@@ -598,7 +574,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
 
     const abort = new AbortController();
     const streamOutcome = await Promise.race([
-      fetch(`http://127.0.0.1:${address.port}/v1/runs/run:missing-from-reseed/events`, {
+      fetch(`http://127.0.0.1:${address.port}/v1/runs/${MISSING_RUN_ID}/events`, {
         headers: { "x-user-dev-token": "stale-tab-token" },
         signal: abort.signal
       }).then(async (stream) => {

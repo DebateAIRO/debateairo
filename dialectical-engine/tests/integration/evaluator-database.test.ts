@@ -1034,10 +1034,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     tier_provenance_ref: "test:asker",
     composition_budget_tier: "medium",
     depth_params: { depth: 2 },
-    decision_owner: "asker:test",
-    action_owner: "asker:test",
     decision_scope: "test",
-    caller_scope: "ASKER",
     as_of: "2026-08-14T00:00:00.000Z",
     steering_presets: [],
     steering_annotations: []
@@ -1108,7 +1105,9 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
       { dispatch: async () => undefined },
       settings
     );
-    const accepted = await application.submit(ask, session);
+    const accepted = await application.submit(ask, session, {
+      kind: "legacy", legacyAskerId: session.asker_id
+    });
     const result = await database.pool.query<{
       panel_bytes: string;
       discovered_panel: readonly { readonly provider_ref: string; readonly maker: string }[];

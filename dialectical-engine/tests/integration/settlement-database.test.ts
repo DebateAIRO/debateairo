@@ -38,7 +38,7 @@ const calibration: CalibrationStrategy = Object.freeze({
 async function createCompletedAnswer(label: string): Promise<{ readonly runId: string; readonly answerId: string }> {
   const runId = await new RunRepository(database.pool).startRun({
     questionLine: `Settlement fixture ${label}`,
-    askerId: `asker:${label}`,
+    principal: { kind: "legacy", legacyAskerId: `asker:${label}` },
     sessionId: `session:${label}`,
     callerScope: "ASKER",
     asOf: new Date("2026-08-08T00:00:00.000Z"),
@@ -154,7 +154,8 @@ describe("S12 / AC-40..43 / AC-73 — real PostgreSQL settlement carriers", () =
 
   it("does not fire against an incomplete run", async () => {
     const runId = await new RunRepository(database.pool).startRun({
-      questionLine: "Incomplete settlement fixture", askerId: "asker:incomplete", sessionId: "session:incomplete",
+      questionLine: "Incomplete settlement fixture",
+      principal: { kind: "legacy", legacyAskerId: "asker:incomplete" }, sessionId: "session:incomplete",
       callerScope: "ASKER", asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual",
       effectiveRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker:incomplete",
       compositionBudgetTier: "low", depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,

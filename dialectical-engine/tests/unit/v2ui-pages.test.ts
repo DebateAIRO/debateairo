@@ -25,6 +25,10 @@ function source(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../../apps/ui/${relativePath}`, import.meta.url)), "utf8");
 }
 
+function duplicateWebSource(relativePath: string): string {
+  return readFileSync(fileURLToPath(new URL(`../../web/${relativePath}`, import.meta.url)), "utf8");
+}
+
 function region(text: string, start: string, end: string): string {
   const startIndex = text.indexOf(start);
   expect(startIndex, `missing region start: ${start}`).toBeGreaterThanOrEqual(0);
@@ -44,7 +48,7 @@ const USER_ASK_FIELDS = [
   { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(event.target.value" }
 ] as const;
 
-const MACHINE_ASK_FIELDS = ["decisionOwner", "actionOwner", "decisionScope", "asOf"] as const;
+const MACHINE_ASK_FIELDS = ["decisionScope", "asOf"] as const;
 
 describe("v2-ui /new collects every value the V3 ask requires", () => {
   const newPage = source("app/new/page.tsx");
@@ -85,11 +89,30 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
   });
 
   it("offers the ruled depth range without exposing the computed tripwire", () => {
-    expect(newPage).toContain("contractClient.readDeployment");
+    expect(newPage).not.toContain("contractClient.readDeployment");
     expect(newPage).toContain("[1, 2, 3, 4, 5].map");
     expect(newPage).not.toContain("runCostEnvelope");
     expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");
+  });
+});
+
+describe("duplicate web /new follows DR-180 machine-owned fields", () => {
+  const newPage = duplicateWebSource("app/new/page.tsx");
+  const newForm = duplicateWebSource("app/new/NewQuestionForm.tsx");
+  const serverDefaults = duplicateWebSource("lib/serverAskDefaults.ts");
+
+  it("computes scope and as-of without rendering asker controls", () => {
+    expect(newPage).toContain('dynamic = "force-dynamic"');
+    expect(newPage).toContain("deriveMachineAskAsOf()");
+    expect(serverDefaults).toContain('import "server-only"');
+    expect(newForm).toContain('decision_scope: "personal"');
+    expect(newForm).toContain("as_of: machineAsOf");
+    expect(newForm).not.toMatch(/\b(?:new\s+Date|Date\.now)\b/);
+    expect(newForm).not.toContain('name="decision_scope"');
+    expect(newForm).not.toContain('name="as_of"');
+    expect(newForm).not.toContain('data.get("decision_scope")');
+    expect(newForm).not.toContain('data.get("as_of")');
   });
 });
 
@@ -131,6 +154,15 @@ describe("v2-ui export never claims a ledger it does not carry (S14 dual gate)",
     // decision, not from a fixed string.
     expect(drawer).not.toContain("Export becomes available once the ledger digest loads.");
     expect(drawer).toMatch(/answerExport\.message/);
+  });
+});
+
+describe("ordinary debate UI does not probe operator deployment state", () => {
+  const client = source("app/debate/[id]/DebatePageClient.tsx");
+
+  it("leaves the privileged hidden-node threshold unavailable without a forbidden request", () => {
+    expect(client).not.toContain("contractClient.readDeployment");
+    expect(client).not.toContain("hiddenNodeScoreThresholdFromDeployment");
   });
 });
 
@@ -232,19 +264,17 @@ describe("UI-02a: the node card shows V3's recorded numbers, in V2's own vocabul
   });
 });
 
-describe("v2-ui /admin/workers never states a count it could not read", () => {
+describe("v2-ui /admin/workers does not probe operator deployment state", () => {
   const workersPage = source("app/admin/workers/page.tsx");
+  const duplicateWorkersPage = duplicateWebSource("app/admin/workers/page.tsx");
+  const duplicateHomePage = duplicateWebSource("app/page.tsx");
 
-  it("gates every fleet tally behind a read that actually succeeded (DR-115)", () => {
-    // Found live: with fleet state UNAVAILABLE the page still printed
-    // Online 0 / Degraded 0 / Offline 0 / "0 total" / "No workers registered."
-    // — five assertions of fact next to a loud refusal to supply the fact.
-    expect(workersPage).toContain("const fleetKnown =");
-    for (const tally of ["online", "degraded", "offline", "capabilities"]) {
-      expect(workersPage).toMatch(new RegExp(`value: count\\(${tally}\\)`));
+  it("keeps both ordinary routes honest without invoking operator APIs", () => {
+    for (const page of [workersPage, duplicateWorkersPage]) {
+      expect(page).toContain("Operator-only view");
+      expect(page).not.toMatch(/backendStatus|readDeployment|contractClient|setInterval/);
     }
-    expect(workersPage).toContain('fleetKnown ? `${workers.length} total` : "— total"');
-    expect(workersPage).toContain("worker count is unknown");
+    expect(duplicateHomePage).not.toContain('href="/admin/workers"');
   });
 });
 

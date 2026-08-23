@@ -191,7 +191,6 @@ Ask-input defaults (all overrideable by the named CLI flag) are:
 - `--tier-provenance-ref`: `acceptance:cli-default`
 - `--composition-budget-tier`: `low`
 - `--depth-params`: `{"depth":1}`
-- `--decision-owner` and `--action-owner`: `acceptance-user`
 - `--decision-scope`: `prototype-acceptance`
 - `--as-of`: invocation time in ISO-8601 form
 - `--steering-presets` and `--steering-annotations`: `[]`

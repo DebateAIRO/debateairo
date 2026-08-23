@@ -46,7 +46,7 @@ import { getDebateServer } from "../../apps/ui/lib/serverApi.js";
 import { statusLabel } from "../../apps/ui/lib/format.js";
 
 const sessionFixture: Session = {
-  asker_id: "user:11111111-1111-4111-8111-111111111111",
+  asker_id: "owner:33333333-3333-4333-8333-333333333333",
   session_id: "22222222-2222-4222-8222-222222222222",
   caller_scope: "ASKER",
   ownership_provenance: "server_session",
@@ -698,8 +698,6 @@ describe("v2-ui data access over the V3 contract client", () => {
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
         depth: 1,
-        decision_owner: "owner",
-        action_owner: "actor",
         decision_scope: "scope",
         as_of: "2026-08-10T00:00:00.000Z"
       },
@@ -712,7 +710,6 @@ describe("v2-ui data access over the V3 contract client", () => {
       risk_tier: "casual",
       tier_source: "MACHINE_DEFAULT",
       tier_provenance_ref: "machine:deployment-floor",
-      caller_scope: "ASKER",
       depth_params: { depth: 1 }
     });
   });

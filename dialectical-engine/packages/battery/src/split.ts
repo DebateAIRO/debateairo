@@ -1,5 +1,9 @@
 import type { Pool } from "pg";
-import { decide, type DecisionInput, type DecisionOutcome } from "@debateai/battery-decision";
+import {
+  decideSplitClassification,
+  type DecisionInput,
+  type DecisionOutcome
+} from "@debateai/battery-decision";
 import {
   GraphRepository,
   type SpawnPendingChildInput,
@@ -36,7 +40,7 @@ export class SplitStageRunner {
   }
 
   async execute(input: SplitStageInput): Promise<SplitStageResult> {
-    const decision = decide(input.decisionInput);
+    const decision = decideSplitClassification(input.decisionInput);
     const decisionRecord = await this.#ledger.recordDecision({
       runId: input.runId,
       parentNodeId: input.parentNodeId,

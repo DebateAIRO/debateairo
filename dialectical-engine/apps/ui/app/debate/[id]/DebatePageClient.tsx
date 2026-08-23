@@ -21,7 +21,6 @@ import {
 } from "@debateai/contract";
 import {
   contractNodesById,
-  hiddenNodeScoreThresholdFromDeployment,
   liveDebateDetail
 } from "@/lib/v3/adapter";
 import { buildAnswerExport } from "@/lib/v3/answerExport";
@@ -358,7 +357,7 @@ export default function DebatePageClient({
   const [inspectionError, setInspectionError] = useState<string | null>(null);
   const [honestyOpen, setHonestyOpen] = useState(false);
   const [honestyActionState, setHonestyActionState] = useState<string | null>(null);
-  const [lowStrengthThreshold, setLowStrengthThreshold] = useState<number | undefined>(undefined);
+  const lowStrengthThreshold: number | undefined = undefined;
   const [investigationInput, setInvestigationInput] = useState<Record<string, string>>({});
   const liveRef = useRef<LiveRunState>(createLiveRunState());
   const answerRef = useRef<Answer | null>(initialAnswer);
@@ -478,25 +477,6 @@ export default function DebatePageClient({
       active = false;
     };
   }, [id]);
-
-  useEffect(() => {
-    let active = true;
-    contractClient.readDeployment(COOKIE_SESSION_MARKER)
-      .then((deployment) => {
-        if (!active) return;
-        setLowStrengthThreshold(hiddenNodeScoreThresholdFromDeployment(deployment).value);
-      })
-      .catch((failure) => {
-        if (!active) return;
-        setLowStrengthThreshold(undefined);
-        setHonestyActionState(
-          failure instanceof Error
-            ? `Hidden-node threshold unavailable: ${failure.message}`
-            : "Hidden-node threshold unavailable"
-        );
-      });
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     let active = true;

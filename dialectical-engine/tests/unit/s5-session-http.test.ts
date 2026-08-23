@@ -17,13 +17,18 @@ import { createServerContractClient as createWebServerClient } from "../../web/l
 const SESSION_TOKEN = "s".repeat(43);
 const CSRF_TOKEN = "c".repeat(43);
 const ORIGIN = "https://app.debateai.test";
+const RUN_ID = "11111111-1111-4111-8111-111111111111";
+const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
 
 function application(): AskApplication {
   return {
-    submit: async () => ({ run_ref: "run:s5", status: "QUEUED" }),
+    submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
-    readRun: async () => null,
+    readRun: async (runId) => ({
+      run_ref: runId, question_line: "S5 stream", state: "QUEUED",
+      terminal_reason: null, hold_until: null
+    }),
     readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
     readDeployment: async () => ({
       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
@@ -39,15 +44,17 @@ function application(): AskApplication {
 }
 
 function authenticated(): AuthenticatedSession {
+  const ownerRef = "33333333-3333-4333-8333-333333333333";
   return Object.freeze({
     session: Object.freeze({
-      asker_id: "user:11111111-1111-4111-8111-111111111111",
+      asker_id: `owner:${ownerRef}`,
       session_id: "22222222-2222-4222-8222-222222222222",
       caller_scope: "ASKER" as const,
       ownership_provenance: "server_session" as const,
       provisional_identity_model: false as const
     }),
     userId: "11111111-1111-4111-8111-111111111111",
+    ownerRef,
     tokenHash: "sha256:session",
     csrfTokenHash: "sha256:csrf",
     authKind: "cookie" as const
@@ -89,6 +96,24 @@ const csrfHeaders = Object.freeze({
   "x-csrf-token": CSRF_TOKEN,
   "user-agent": "s5-test-browser"
 });
+const ownedMutationCases = Object.freeze([
+  {
+    label: "investigation",
+    url: `/v1/answers/${ANSWER_ID}/investigations/gap:test`,
+    payload: { user_input: null, human_steer_input: true }
+  },
+  {
+    label: "memory unlink",
+    url: `/v1/answers/${ANSWER_ID}/memory-link/unlink`,
+    payload: undefined
+  }
+]);
+const rejectedCsrfCases = Object.freeze([
+  ["missing origin", { cookie, "x-csrf-token": CSRF_TOKEN }],
+  ["foreign origin", { cookie, origin: "https://evil.test", "x-csrf-token": CSRF_TOKEN }],
+  ["missing csrf", { cookie, origin: ORIGIN }],
+  ["mismatched double-submit", { cookie, origin: ORIGIN, "x-csrf-token": "x".repeat(43) }]
+] as const);
 
 describe("S5 HTTP session boundary", () => {
   it("keeps the legacy rollback credential default-off and exact when explicitly configured", async () => {
@@ -140,6 +165,50 @@ describe("S5 HTTP session boundary", () => {
     await api.close();
   });
 
+  it("keeps a real cookie ASKER out of every transitional operator route", async () => {
+    const selectConsumerModel = vi.fn().mockResolvedValue({
+      consumerSelectionId: "selection:test",
+      modelId: "model:test",
+      selectedAt: new Date("2026-08-23T00:00:00.000Z")
+    });
+    const api = buildApi({
+      application: application(),
+      sessions: sessions(),
+      allowedOrigin: ORIGIN,
+      evaluatorDevMenuRegisterVersion: 1,
+      evaluatorDevMenu: {
+        readView: async () => ({
+          catalog: { state: "UNAVAILABLE", probeId: null, failureCode: "TEST", models: [] },
+          selectedConsumer: null,
+          dispatchBinding: {
+            state: "UNBOUND", reason: "ROW_ABSENT", registerVersion: 1, sourceRef: null
+          },
+          harvestedRows: 0,
+          domains: [],
+          profiles: [],
+          parkedRuns: []
+        }),
+        selectConsumerModel
+      }
+    });
+    for (const request of [
+      { method: "GET" as const, url: "/v1/deployment", headers: { cookie, "user-agent": "s5-test-browser" } },
+      { method: "GET" as const, url: "/v1/dev/evaluator", headers: { cookie, "user-agent": "s5-test-browser" } },
+      {
+        method: "POST" as const,
+        url: "/v1/dev/evaluator/consumer-selection",
+        headers: csrfHeaders,
+        payload: { model_id: "model:test" }
+      }
+    ]) {
+      const response = await api.inject(request);
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "OPERATOR_REQUIRED" });
+    }
+    expect(selectConsumerModel).not.toHaveBeenCalled();
+    await api.close();
+  });
+
   it("accepts only the HttpOnly-cookie session and flips the identity model", async () => {
     const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
     const response = await api.inject({ method: "GET", url: "/v1/session", headers: { cookie, "user-agent": "s5-test-browser" } });
@@ -165,7 +234,7 @@ describe("S5 HTTP session boundary", () => {
     const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
     const response = await api.inject({
       method: "GET",
-      url: "/v1/runs/run:s5/events",
+      url: `/v1/runs/${RUN_ID}/events`,
       headers: { cookie, "user-agent": "s5-test-browser" }
     });
     expect(response.statusCode).toBe(200);
@@ -199,9 +268,39 @@ describe("S5 HTTP session boundary", () => {
   it("allows the exact trusted Origin and session-bound CSRF proof on an existing mutation", async () => {
     const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
     const response = await api.inject({
-      method: "POST", url: "/v1/answers/answer:s5/memory-link/unlink", headers: csrfHeaders
+      method: "POST", url: `/v1/answers/${ANSWER_ID}/memory-link/unlink`, headers: csrfHeaders
     });
     expect(response.statusCode).toBe(200);
+    await api.close();
+  });
+
+  it.each(ownedMutationCases.flatMap((mutation) => rejectedCsrfCases.map(([csrfCase, headers]) => ({
+    ...mutation, csrfCase, headers
+  }))))("rejects $label with $csrfCase before the application owner check", async ({ url, payload, headers }) => {
+    const candidate = application();
+    const recordInvestigation = vi.fn().mockResolvedValue(null);
+    const unlinkMemoryLink = vi.fn().mockResolvedValue(null);
+    candidate.recordInvestigation = recordInvestigation;
+    candidate.unlinkMemoryLink = unlinkMemoryLink;
+    const api = buildApi({ application: candidate, sessions: sessions(), allowedOrigin: ORIGIN });
+    const response = await api.inject({ method: "POST", url, headers, ...(payload === undefined ? {} : { payload }) });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "CSRF_VALIDATION_FAILED" });
+    expect(recordInvestigation).not.toHaveBeenCalled();
+    expect(unlinkMemoryLink).not.toHaveBeenCalled();
+    await api.close();
+  });
+
+  it.each(ownedMutationCases)("lets valid cookie CSRF reach the $label owner check", async ({ url, payload }) => {
+    const candidate = application();
+    const recordInvestigation = vi.fn().mockResolvedValue(null);
+    const unlinkMemoryLink = vi.fn().mockResolvedValue(null);
+    candidate.recordInvestigation = recordInvestigation;
+    candidate.unlinkMemoryLink = unlinkMemoryLink;
+    const api = buildApi({ application: candidate, sessions: sessions(), allowedOrigin: ORIGIN });
+    const response = await api.inject({ method: "POST", url, headers: csrfHeaders, ...(payload === undefined ? {} : { payload }) });
+    expect(response.statusCode).toBe(404);
+    expect(recordInvestigation.mock.calls.length + unlinkMemoryLink.mock.calls.length).toBe(1);
     await api.close();
   });
 
@@ -262,12 +361,12 @@ describe("S5 HTTP session boundary", () => {
 
   it("keeps generic 500 envelopes constant and excludes database messages", async () => {
     const broken = application();
-    broken.readDeployment = async () => {
+    broken.readAnswer = async () => {
       throw new Error("invalid input syntax for type uuid: secret-driver-detail");
     };
     const api = buildApi({ application: broken, sessions: sessions(), allowedOrigin: ORIGIN });
     const response = await api.inject({
-      method: "GET", url: "/v1/deployment", headers: { cookie, "user-agent": "s5-test-browser" }
+      method: "GET", url: `/v1/answers/${ANSWER_ID}`, headers: { cookie, "user-agent": "s5-test-browser" }
     });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });

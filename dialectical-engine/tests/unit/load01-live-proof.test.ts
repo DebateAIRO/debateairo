@@ -14,27 +14,25 @@ const ASK: AskRequest = {
   tier_provenance_ref: "asker:test",
   composition_budget_tier: "low",
   depth_params: { depth: 1 },
-  decision_owner: "asker:test",
-  action_owner: "asker:test",
   decision_scope: "test provider-double composition",
-  caller_scope: "ASKER",
   as_of: "2026-08-13T00:00:00.000Z",
   steering_presets: [],
   steering_annotations: []
 };
+const RUN_REF = "11111111-1111-4111-8111-111111111111";
 
 function providerDoubleApplication(): AskApplication {
   const runs = new Map<string, RunProjection>();
   return {
     submit: async (ask) => {
-      runs.set("run:load01", {
-        run_ref: "run:load01",
+      runs.set(RUN_REF, {
+        run_ref: RUN_REF,
         question_line: ask.question_line,
         state: "QUEUED",
         terminal_reason: null,
         hold_until: null
       });
-      return { run_ref: "run:load01", status: "QUEUED" };
+      return { run_ref: RUN_REF, status: "QUEUED" };
     },
     readRun: async (runId) => runs.get(runId) ?? null,
     readAnswer: async () => null,
@@ -80,14 +78,14 @@ describe("LOAD-01 provider-double composition proof", () => {
     });
     const client = createContractClient("http://load01.test", injectedFetch(api));
     const accepted = await client.submitAsk(ASK, "cookie-session");
-    expect(accepted).toEqual({ run_ref: "run:load01", status: "QUEUED" });
+    expect(accepted).toEqual({ run_ref: RUN_REF, status: "QUEUED" });
 
     const page = await getDebateServer(accepted.run_ref, "cookie-session", client);
     expect(page).toMatchObject({
       ok: false,
       kind: "loading",
       run: {
-        run_ref: "run:load01",
+        run_ref: RUN_REF,
         question_line: "Messi or Ronaldo?",
         state: "QUEUED",
         terminal_reason: null,

@@ -9,6 +9,7 @@ import type { AuthSourceContext } from "./identity.js";
 
 export interface LoginIdentityRecord {
   readonly userId: string;
+  readonly ownerRef: string;
   readonly auditToken: string;
   readonly passwordHash: string;
   readonly factorId: string;
@@ -27,6 +28,7 @@ export interface LoginChallengeRecord extends LoginIdentityRecord {
 export interface SessionAuthenticationRecord {
   readonly sessionId: string;
   readonly userId: string;
+  readonly ownerRef: string;
   readonly csrfTokenHash: string;
   readonly createdAt: Date;
   readonly lastSeenAt: Date;
@@ -161,13 +163,14 @@ export class PostgresSessionRepository {
   async findLoginIdentity(emailBlindIndex: Buffer): Promise<LoginIdentityRecord | null> {
     const result = await this.pool.query<{
       user_id: string;
+      owner_ref: string;
       audit_token: string;
       password_hash: string;
       mfa_factor_id: string;
       secret_ciphertext: CryptoEnvelope;
       last_accepted_step: string | number | null;
     }>(`
-      SELECT u.user_id,u.audit_token,u.password_hash,f.mfa_factor_id,
+      SELECT u.user_id,u.owner_ref,u.audit_token,u.password_hash,f.mfa_factor_id,
         f.secret_ciphertext,f.last_accepted_step
       FROM identity."user" u
       JOIN LATERAL (
@@ -181,6 +184,7 @@ export class PostgresSessionRepository {
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
       userId: row.user_id,
+      ownerRef: row.owner_ref,
       auditToken: row.audit_token,
       passwordHash: row.password_hash,
       factorId: row.mfa_factor_id,
@@ -203,11 +207,11 @@ export class PostgresSessionRepository {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
       // Lock/revalidate parent before its active factor and challenge child.
-      const user = (await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user"
-        WHERE user_id=$1 AND state='active' AND password_hash=$2
+      const user = (await client.query<{ audit_token: string; owner_ref: string }>(`
+        SELECT audit_token,owner_ref FROM identity."user"
+        WHERE user_id=$1 AND owner_ref=$2 AND state='active' AND password_hash=$3
         FOR UPDATE
-      `, [input.identity.userId, input.identity.passwordHash])).rows[0];
+      `, [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash])).rows[0];
       const factor = user === undefined ? undefined : (await client.query<{ mfa_factor_id: string }>(`
         SELECT mfa_factor_id FROM identity.mfa_factor
         WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp' AND state='active'
@@ -284,6 +288,7 @@ export class PostgresSessionRepository {
     const result = await this.pool.query<{
       login_challenge_id: string;
       user_id: string;
+      owner_ref: string;
       audit_token: string;
       password_hash_snapshot: string;
       mfa_factor_id: string;
@@ -293,7 +298,7 @@ export class PostgresSessionRepository {
       expires_at: Date;
       consumed_at: Date | null;
     }>(`
-      SELECT c.login_challenge_id,c.user_id,u.audit_token,c.password_hash_snapshot,
+      SELECT c.login_challenge_id,c.user_id,u.owner_ref,u.audit_token,c.password_hash_snapshot,
         f.mfa_factor_id,f.secret_ciphertext,f.last_accepted_step,
         c.binding_hash,c.expires_at,c.consumed_at
       FROM identity.login_challenge c
@@ -307,6 +312,7 @@ export class PostgresSessionRepository {
       challengeId: row.login_challenge_id,
       challengeTokenHash,
       userId: row.user_id,
+      ownerRef: row.owner_ref,
       auditToken: row.audit_token,
       passwordHash: row.password_hash_snapshot,
       factorId: row.mfa_factor_id,
@@ -336,10 +342,10 @@ export class PostgresSessionRepository {
     assertCredentialHash(input.csrfTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const user = (await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user"
-        WHERE user_id=$1 AND state='active' AND password_hash=$2 FOR UPDATE
-      `, [input.challenge.userId, input.challenge.passwordHash])).rows[0];
+      const user = (await client.query<{ audit_token: string; owner_ref: string }>(`
+        SELECT audit_token,owner_ref FROM identity."user"
+        WHERE user_id=$1 AND owner_ref=$2 AND state='active' AND password_hash=$3 FOR UPDATE
+      `, [input.challenge.userId, input.challenge.ownerRef, input.challenge.passwordHash])).rows[0];
       const factor = user === undefined ? undefined : (await client.query<{
         last_accepted_step: string | number | null;
       }>(`
@@ -442,10 +448,10 @@ export class PostgresSessionRepository {
   }>): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const user = (await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user"
-        WHERE user_id=$1 AND state='active' AND password_hash=$2 FOR UPDATE
-      `, [input.challenge.userId, input.challenge.passwordHash])).rows[0];
+      const user = (await client.query<{ audit_token: string; owner_ref: string }>(`
+        SELECT audit_token,owner_ref FROM identity."user"
+        WHERE user_id=$1 AND owner_ref=$2 AND state='active' AND password_hash=$3 FOR UPDATE
+      `, [input.challenge.userId, input.challenge.ownerRef, input.challenge.passwordHash])).rows[0];
       const factor = user === undefined ? undefined : (await client.query<{ mfa_factor_id: string }>(`
         SELECT mfa_factor_id FROM identity.mfa_factor
         WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp' AND state='active'
@@ -515,14 +521,14 @@ export class PostgresSessionRepository {
     // MATERIALIZED forces the active parent lock to complete before the child
     // UPDATE. The UPDATE predicate is the sole authorization/refresh decision.
     const result = await this.pool.query<{
-      session_id: string; user_id: string; csrf_token_hash: string;
+      session_id: string; user_id: string; owner_ref: string; csrf_token_hash: string;
       created_at: Date; last_seen_at: Date; idle_expires_at: Date;
       absolute_expires_at: Date; last_mfa_at: Date;
     }>(`
       WITH located AS MATERIALIZED (
         SELECT user_id FROM identity.session WHERE token_hash=$1
       ), locked_user AS MATERIALIZED (
-        SELECT u.user_id FROM identity."user" u
+        SELECT u.user_id,u.owner_ref FROM identity."user" u
         JOIN located ON located.user_id=u.user_id
         WHERE u.state='active' FOR UPDATE
       ), refreshed AS (
@@ -535,12 +541,14 @@ export class PostgresSessionRepository {
           AND s.binding_context->>'user_agent_hash'=$2
         RETURNING s.session_id,s.user_id,s.csrf_token_hash,s.created_at,
           s.last_seen_at,s.idle_expires_at,s.absolute_expires_at,s.last_mfa_at
-      ) SELECT * FROM refreshed
+      ) SELECT refreshed.*,locked_user.owner_ref
+        FROM refreshed JOIN locked_user USING (user_id)
     `, [input.tokenHash, input.bindingHash, input.occurredAt, input.idleExpiresAt]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
       sessionId: row.session_id,
       userId: row.user_id,
+      ownerRef: row.owner_ref,
       csrfTokenHash: row.csrf_token_hash,
       createdAt: row.created_at,
       lastSeenAt: row.last_seen_at,
@@ -640,10 +648,10 @@ export class PostgresSessionRepository {
 
   async readStepUpIdentity(userId: string): Promise<LoginIdentityRecord | null> {
     const result = await this.pool.query<{
-      user_id: string; audit_token: string; password_hash: string;
+      user_id: string; owner_ref: string; audit_token: string; password_hash: string;
       mfa_factor_id: string; secret_ciphertext: CryptoEnvelope; last_accepted_step: string | number | null;
     }>(`
-      SELECT u.user_id,u.audit_token,u.password_hash,f.mfa_factor_id,
+      SELECT u.user_id,u.owner_ref,u.audit_token,u.password_hash,f.mfa_factor_id,
         f.secret_ciphertext,f.last_accepted_step
       FROM identity."user" u
       JOIN LATERAL (
@@ -656,7 +664,8 @@ export class PostgresSessionRepository {
     `, [userId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
-      userId: row.user_id, auditToken: row.audit_token, passwordHash: row.password_hash,
+      userId: row.user_id, ownerRef: row.owner_ref,
+      auditToken: row.audit_token, passwordHash: row.password_hash,
       factorId: row.mfa_factor_id, secretCiphertext: row.secret_ciphertext,
       lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step)
     });
@@ -676,10 +685,10 @@ export class PostgresSessionRepository {
   }>): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const user = (await client.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user"
-        WHERE user_id=$1 AND state='active' AND password_hash=$2 FOR UPDATE
-      `, [input.identity.userId, input.identity.passwordHash])).rows[0];
+      const user = (await client.query<{ audit_token: string; owner_ref: string }>(`
+        SELECT audit_token,owner_ref FROM identity."user"
+        WHERE user_id=$1 AND owner_ref=$2 AND state='active' AND password_hash=$3 FOR UPDATE
+      `, [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash])).rows[0];
       const factor = user === undefined ? undefined : (await client.query<{ last_accepted_step: string | number | null }>(`
         SELECT last_accepted_step FROM identity.mfa_factor
         WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp' AND state='active' FOR UPDATE

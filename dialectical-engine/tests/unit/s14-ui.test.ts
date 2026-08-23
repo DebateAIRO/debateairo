@@ -232,7 +232,7 @@ describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
     const client = createBrowserContractClient(async (input, init) => {
       calls.push({ input: String(input), headers: new Headers(init?.headers), credentials: init?.credentials });
       return new Response(JSON.stringify({
-        asker_id: "user:11111111-1111-4111-8111-111111111111",
+        asker_id: "owner:33333333-3333-4333-8333-333333333333",
         session_id: "22222222-2222-4222-8222-222222222222",
         caller_scope: "ASKER",
         ownership_provenance: "server_session",

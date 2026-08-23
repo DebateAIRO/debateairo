@@ -379,10 +379,7 @@ export async function createDebate(
     tier_provenance_ref: tierProvenanceRef,
     composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
     depth_params: { depth: requiredInteger(config, "depth", 0) },
-    decision_owner: requiredString(config, "decision_owner"),
-    action_owner: requiredString(config, "action_owner"),
     decision_scope: requiredString(config, "decision_scope"),
-    caller_scope: "ASKER",
     as_of: asOf.toISOString(),
     steering_presets: optionalLines(config, "steering_presets"),
     steering_annotations: optionalLines(config, "steering_annotations")

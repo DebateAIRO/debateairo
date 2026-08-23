@@ -7,10 +7,8 @@ import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
 import {
   buildNewDebateAskConfig,
-  askDefaultFailureMessage,
   DECISION_SCOPE_DEFAULT,
   dateTimeLocalValue,
-  deriveRiskTierDefault,
   deriveSessionAskDefaults,
   PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
   type CompositionBudgetTier,
@@ -49,39 +47,17 @@ function NewDebateForm({ token }: { token: string }) {
   const [riskTier, setRiskTier] = useState("");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
-  const [decisionOwner, setDecisionOwner] = useState("");
-  const [actionOwner, setActionOwner] = useState("");
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
-  const [riskTierDefault, setRiskTierDefault] = useState<ReturnType<typeof deriveRiskTierDefault> | null>(null);
-  const [riskTierDefaultError, setRiskTierDefaultError] = useState<string | null>(null);
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void contractClient.readDeployment(token).then((deployment) => {
-      if (!active) return;
-      try {
-        const defaults = deriveRiskTierDefault(deployment);
-        setRiskTierDefault(defaults);
-        setRiskTier((current) => current.length > 0 ? current : defaults.riskTier);
-        setRiskTierDefaultError(null);
-      } catch (failure) {
-        setRiskTierDefault(null);
-        setRiskTierDefaultError(askDefaultFailureMessage(failure, "ASK_RISK_TIER_DEFAULT_UNAVAILABLE"));
-      }
-    }).catch((failure: unknown) => {
-      if (!active) return;
-      setRiskTierDefault(null);
-      setRiskTierDefaultError(`ASK_RISK_TIER_DEFAULT_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Deployment read failed"}`);
-    });
     void contractClient.readSession(token).then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session);
-      setDecisionOwner((current) => current.trim().length > 0 ? current : defaults.decisionOwner);
-      setActionOwner((current) => current.trim().length > 0 ? current : defaults.actionOwner);
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
       setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
@@ -100,8 +76,6 @@ function NewDebateForm({ token }: { token: string }) {
     depth >= 1 && depth <= 5 &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
-    decisionOwner.trim().length > 0 &&
-    actionOwner.trim().length > 0 &&
     decisionScope.trim().length > 0 &&
     asOf.trim().length > 0 &&
     !Number.isNaN(askAsOf.valueOf());
@@ -117,8 +91,6 @@ function NewDebateForm({ token }: { token: string }) {
       const config = buildNewDebateAskConfig({
         riskTier: riskTier as RiskTier,
         budgetTier: budgetTier as CompositionBudgetTier,
-        decisionOwner,
-        actionOwner,
         decisionScope,
         asOf,
         depth,
@@ -167,7 +139,7 @@ function NewDebateForm({ token }: { token: string }) {
                   Risk tier
                 </label>
                 <div className="optionHint">How much is riding on the answer</div>
-                {riskTierDefault ? <div className="optionHint">Machine default: {riskTierDefault.riskTierProvenance}</div> : null}
+                <div className="optionHint">Explicit asker selection</div>
               </div>
               <div className="optionControl">
                 <select
@@ -226,7 +198,6 @@ function NewDebateForm({ token }: { token: string }) {
             </div>
           </div>
 
-          {riskTierDefaultError ? <div className="error" style={{ marginTop: 14 }}>{riskTierDefaultError}</div> : null}
           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
 
           <button

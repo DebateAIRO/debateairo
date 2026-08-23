@@ -1,11 +1,10 @@
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Deployment, Session } from "@debateai/contract";
+import type { Session } from "@debateai/contract";
 import {
   PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
   buildNewDebateAskConfig,
-  deriveRiskTierDefault,
   deriveSessionAskDefaults
 } from "../../apps/ui/app/new/defaults.js";
 
@@ -73,16 +72,6 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   createDebate: pageMocks.createDebate
 }));
 
-const deployment = {
-  register: {
-    register_version: 8,
-    rows: [{ row_key: "riskTier", value: "standard", source_ref: "register:test:risk" }]
-  },
-  scorecards: [],
-  model_ledger: [],
-  fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
-} as Deployment;
-
 const session: Session = {
   asker_id: "asker:test-user-alpha",
   session_id: "session:test-user-alpha",
@@ -129,7 +118,14 @@ async function renderRealNewDebatePageState(): Promise<{ html: string; tree: Rea
 }
 
 async function submitRenderedPage(): Promise<Record<string, unknown>> {
-  const rendered = await renderRealNewDebatePageState();
+  const initial = await renderRealNewDebatePageState();
+  const riskSelect = findElement(initial.tree, (element) => element.type === "select" && element.props.id === "riskTier");
+  expect(riskSelect).not.toBeNull();
+  (riskSelect!.props as { onChange: (event: { target: { value: string } }) => void })
+    .onChange({ target: { value: "standard" } });
+  hooks.beginRender();
+  const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+  const rendered = { tree: evaluateElementTree(<NewDebatePage />) };
   const form = findElement(rendered.tree, (element) => element.type === "form");
   expect(form).not.toBeNull();
   await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
@@ -143,7 +139,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     hooks.reset();
     pageMocks.authToken = "token:test-user-alpha";
     pageMocks.createDebate.mockReset().mockResolvedValue({ id: "run:new" });
-    pageMocks.readDeployment.mockReset().mockResolvedValue(deployment);
+    pageMocks.readDeployment.mockReset();
     pageMocks.readSession.mockReset().mockResolvedValue(session);
     pageMocks.push.mockReset();
   });
@@ -152,25 +148,19 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     const config = await submitRenderedPage();
     expect(config).toMatchObject({
       risk_tier: "standard",
-      tier_source: "MACHINE_DEFAULT",
-      tier_provenance_ref: "machine:deployment-floor",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",
       depth: 1,
-      decision_owner: "asker:test-user-alpha",
-      action_owner: "asker:test-user-alpha",
       decision_scope: "personal"
     });
     expect(config).not.toHaveProperty("agent_count");
+    expect(config).not.toHaveProperty("decision_owner");
+    expect(config).not.toHaveProperty("action_owner");
+    expect(pageMocks.readDeployment).not.toHaveBeenCalled();
   });
 
-  it("PROV-01 keeps untouched risk machine-defaulted and edited risk asker-owned through the real page", async () => {
-    const untouched = await submitRenderedPage();
-    expect(untouched).toMatchObject({
-      tier_source: "MACHINE_DEFAULT",
-      tier_provenance_ref: "machine:deployment-floor"
-    });
-
-    pageMocks.createDebate.mockClear();
+  it("keeps the visible risk choice asker-owned through the real page", async () => {
     const initial = await renderRealNewDebatePageState();
     const riskSelect = findElement(initial.tree, (element) => element.type === "select" && element.props.id === "riskTier");
     expect(riskSelect).not.toBeNull();
@@ -190,7 +180,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     });
   });
 
-  it("DR-166-A derives distinct decision and action owners for two authenticated tokens through the real page", async () => {
+  it("does not emit caller-supplied owner or privilege claims for any authenticated token", async () => {
     const sessionsByToken: Record<string, Session> = {
       "token:test-user-alpha": session,
       "token:test-user-beta": { ...session, asker_id: "asker:test-user-beta", session_id: "session:test-user-beta" }
@@ -204,16 +194,17 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     };
     const alpha = await submitFor("token:test-user-alpha");
     const beta = await submitFor("token:test-user-beta");
-    expect(alpha).toMatchObject({ decision_owner: "asker:test-user-alpha", action_owner: "asker:test-user-alpha" });
-    expect(beta).toMatchObject({ decision_owner: "asker:test-user-beta", action_owner: "asker:test-user-beta" });
-    expect(alpha.decision_owner).not.toBe(beta.decision_owner);
-    expect(alpha.action_owner).not.toBe(beta.action_owner);
+    for (const config of [alpha, beta]) {
+      expect(config).not.toHaveProperty("decision_owner");
+      expect(config).not.toHaveProperty("action_owner");
+      expect(config).not.toHaveProperty("caller_scope");
+    }
   });
 
   it("B6 refreshes untouched as-of at submit and preserves an explicitly edited value", () => {
     const defaults = {
-      ...deriveRiskTierDefault(deployment),
       ...deriveSessionAskDefaults(session, new Date("2026-08-13T05:00:00.000Z")),
+      riskTier: "standard" as const,
       budgetTier: PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
       depth: 1
     };

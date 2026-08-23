@@ -52,8 +52,6 @@ describe("POL-01 register-owned deployment floor", () => {
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",
       depth: 3,
-      decision_owner: "asker:test",
-      action_owner: "asker:test",
       decision_scope: "POL-01 UI disclosure",
       as_of: "2026-08-12T08:00:00.000Z"
     }, "test-token", client)).rejects.toThrow(

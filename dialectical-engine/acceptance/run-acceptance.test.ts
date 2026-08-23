@@ -17,10 +17,7 @@ describe("ACC-01 one-shot ceremony arguments", () => {
       tier_provenance_ref: "acceptance:cli-default",
       composition_budget_tier: "low",
       depth_params: { depth: 1 },
-      decision_owner: "acceptance-user",
-      action_owner: "acceptance-user",
       decision_scope: "prototype-acceptance",
-      caller_scope: "ASKER",
       as_of: "2026-08-09T00:00:00.000Z",
       steering_presets: [],
       steering_annotations: []
@@ -31,6 +28,14 @@ describe("ACC-01 one-shot ceremony arguments", () => {
     expect(() => parseAcceptanceArguments(["--token", "owner", "--mystery", "value"]))
       .toThrow("UNKNOWN_ACCEPTANCE_ARGUMENT:--mystery");
   });
+
+  it.each(["--decision-owner", "--action-owner"])(
+    "rejects retired ownership input %s instead of silently dropping it",
+    (argument) => {
+      expect(() => parseAcceptanceArguments(["--token", "owner", argument, "acceptance-user"]))
+        .toThrow(`UNKNOWN_ACCEPTANCE_ARGUMENT:${argument}`);
+    }
+  );
 
   it("parses the --serve standing flag anywhere in the argument list", () => {
     expect(parseAcceptanceArguments(["--serve", "--token", "owner"]).serve).toBe(true);

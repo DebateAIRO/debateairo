@@ -611,7 +611,7 @@ export async function auditOrphans(): Promise<{
       { package: "packages/judgement.applyDeclaredDisagreement", reason: "S04 proves declared disagreement decisions in the pure surface; the single-judge production shell records truthful NOT_MEASURED instead" },
       { package: "packages/judgement.createTypedNonAnswer", reason: "S04 enforces spec section 12.3 at the pure seam; ignorance-ledger production attachment belongs to the serving shell" },
       { package: "packages/serve.projectProvenance", reason: "DR-081 layer projection is pure and test-covered; the S14 enriched provenance read owns its production attachment once V supplies the flip row" },
-      { package: "packages/battery/decision.decide", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
+      { package: "packages/battery/decision.decideSplitClassification", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/ledger.LedgerRepository.recordDecision", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/graph.GraphWriter.spawnPendingChild", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/valuation.resolveDeepeningReentry", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
@@ -664,7 +664,7 @@ export async function auditOrphans(): Promise<{
       { package: "packages/evidence.certifyInstrument", evidence: "staged inside EvidenceRepository.recordInstrumentCertification, but no declared production entry point reaches EvidenceRepository" }
     ], reachableCallables),
     s07Surface: deriveSurfaceRows([
-      { package: "packages/battery/decision.decide", evidence: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
+      { package: "packages/battery/decision.decideSplitClassification", evidence: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/ledger.LedgerRepository.recordDecision", evidence: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/graph.GraphWriter.spawnPendingChild", evidence: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
       { package: "packages/graph.GraphRepository.readNodeLifecycleEvents", evidence: "PostgresAskApplication reaches the live fact projection through battery's SPLIT facade" },
