@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { BrandMark } from "@/components/TopBar";
 import { createServerContractClient, USER_TOKEN_COOKIE } from "@/lib/serverApi";
 import type { AnswerIndex } from "@/lib/types";
@@ -10,10 +10,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const offset = Number(query.offset);
   const pageRequested = Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0;
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const userAgent = (await headers()).get("user-agent") ?? undefined;
   let index: AnswerIndex | null = null;
   let indexError: string | null = null;
   if (pageRequested && token !== null) {
-    try { index = await createServerContractClient(fetch, token).readAnswerIndex("cookie-session", limit, offset); }
+    try { index = await createServerContractClient(fetch, token, userAgent).readAnswerIndex("cookie-session", limit, offset); }
     catch (failure) { indexError = failure instanceof Error ? failure.name : "INVALID_RESPONSE"; }
   }
   return (

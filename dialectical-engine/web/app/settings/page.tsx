@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import type { Deployment, Session } from "@/lib/types";
 import { ContractHttpError } from "@debateai/contract";
+import { SessionControls } from "@/components/SessionControls";
 
 export default function SettingsPage() {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -11,6 +12,21 @@ export default function SettingsPage() {
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [replacement, setReplacement] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void contractClient.readSession(COOKIE_SESSION_MARKER).then(async (currentSession) => {
+      const currentDeployment = await contractClient.readDeployment(COOKIE_SESSION_MARKER);
+      if (active) {
+        setSession(currentSession);
+        setDeployment(currentDeployment);
+      }
+    }).catch(() => {
+      // An absent/expired cookie leaves the sign-in form visible. The session
+      // controls render only after cookie-native authentication succeeds.
+    });
+    return () => { active = false; };
+  }, []);
 
   async function begin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,18 +75,14 @@ export default function SettingsPage() {
         <button className="button primary">Sign in</button>
       </form>
     ) : null}
-    {session ? <button className="button" type="button" onClick={() => {
-      void contractClient.logout().then(() => {
-        setSession(null);
-        setDeployment(null);
-        setError(null);
-      }).catch((failure) => {
-        setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
-      });
-    }}>Sign out</button> : null}
     {error ? <div className="error" role="alert">{error}</div> : null}
     {replacement ? <div className="error" role="status">Record your replacement recovery code once: {replacement}</div> : null}
     {session ? <dl className="card"><dt>Asker</dt><dd>{session.asker_id}</dd><dt>Scope</dt><dd>{session.caller_scope}</dd><dt>Identity model</dt><dd>Server session</dd></dl> : null}
+    {session ? <SessionControls onSessionEnded={() => {
+      setSession(null);
+      setDeployment(null);
+      setError(null);
+    }} /> : null}
     {deployment ? <section className="card"><h2>Deployment register v{deployment.register.register_version}</h2>{deployment.register.rows.map((row) => <dl key={row.row_key}><dt>{row.row_key}</dt><dd>{JSON.stringify(row.value)} · {row.source_ref}</dd></dl>)}</section> : null}
     {deployment ? <section className="card"><h2>Model scorecards</h2>{deployment.scorecards.length === 0 ? <p>No derived scorecard cells have been recorded.</p> : deployment.scorecards.map((cell) => <p key={`${cell.model_id}:${cell.task_class}:${cell.metric}`}>{cell.provider}/{cell.model_id}@{cell.model_version} · {cell.task_class}/{cell.metric}: {cell.value ?? "No measured value"} · {cell.basis}</p>)}</section> : null}
     {deployment ? <section className="card"><h2>Session model ledger</h2>{deployment.model_ledger.length === 0 ? <p>No model assignment has been recorded for this session.</p> : deployment.model_ledger.map((entry) => <p key={entry.routing_decision_ref}>{entry.task_class} · {entry.provider}/{entry.model_id}@{entry.model_version}</p>)}</section> : null}

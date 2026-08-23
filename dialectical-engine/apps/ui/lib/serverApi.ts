@@ -15,7 +15,8 @@ export const USER_TOKEN_COOKIE = "__Host-debateai-session";
 
 export function createServerContractClient(
   fetchImplementation: typeof fetch = fetch,
-  sessionCookie?: string
+  sessionCookie?: string,
+  userAgent?: string
 ): ContractClient {
   const baseUrl = process.env.DIALECTICAL_API_BASE?.trim();
   if (baseUrl === undefined || baseUrl.length === 0) {
@@ -25,7 +26,8 @@ export function createServerContractClient(
     mode: "cookie",
     ...(sessionCookie === undefined ? {} : {
       cookieHeader: `${USER_TOKEN_COOKIE}=${sessionCookie}`
-    })
+    }),
+    ...(userAgent === undefined ? {} : { userAgent })
   });
 }
 
@@ -44,9 +46,10 @@ export type DebateListPage = {
 
 export async function listDebatesPageServer(
   token: string,
-  client?: ContractClient
+  client?: ContractClient,
+  userAgent?: string
 ): Promise<DebateListPage> {
-  const index = await (client ?? createServerContractClient(fetch, token))
+  const index = await (client ?? createServerContractClient(fetch, token, userAgent))
     .readAnswerIndex("cookie-session", HOME_PAGE_SIZE, 0);
   return {
     summaries: debateSummariesFromIndex(index),
@@ -71,9 +74,10 @@ export type GetDebateServerResult =
 export async function getDebateServer(
   id: string,
   token: string,
-  client?: ContractClient
+  client?: ContractClient,
+  userAgent?: string
 ): Promise<GetDebateServerResult> {
-  const resolvedClient = client ?? createServerContractClient(fetch, token);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
   let answer: Answer;
   try {
     try {

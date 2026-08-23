@@ -285,7 +285,7 @@ export class PostgresSessionRepository {
       login_challenge_id: string;
       user_id: string;
       audit_token: string;
-      password_hash: string;
+      password_hash_snapshot: string;
       mfa_factor_id: string;
       secret_ciphertext: CryptoEnvelope;
       last_accepted_step: string | number | null;
@@ -293,14 +293,14 @@ export class PostgresSessionRepository {
       expires_at: Date;
       consumed_at: Date | null;
     }>(`
-      SELECT c.login_challenge_id,c.user_id,u.audit_token,u.password_hash,
+      SELECT c.login_challenge_id,c.user_id,u.audit_token,c.password_hash_snapshot,
         f.mfa_factor_id,f.secret_ciphertext,f.last_accepted_step,
         c.binding_hash,c.expires_at,c.consumed_at
       FROM identity.login_challenge c
       JOIN identity."user" u ON u.user_id=c.user_id AND u.state='active'
       JOIN identity.mfa_factor f ON f.mfa_factor_id=c.mfa_factor_id
         AND f.user_id=u.user_id AND f.factor_type='totp' AND f.state='active'
-      WHERE c.token_hash=$1
+      WHERE c.token_hash=$1 AND u.password_hash=c.password_hash_snapshot
     `, [challengeTokenHash]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -308,7 +308,7 @@ export class PostgresSessionRepository {
       challengeTokenHash,
       userId: row.user_id,
       auditToken: row.audit_token,
-      passwordHash: row.password_hash,
+      passwordHash: row.password_hash_snapshot,
       factorId: row.mfa_factor_id,
       secretCiphertext: row.secret_ciphertext,
       lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
@@ -351,8 +351,9 @@ export class PostgresSessionRepository {
         consumed_at: Date | null;
         expires_at: Date;
         binding_hash: string;
+        password_hash_snapshot: string;
       }>(`
-        SELECT consumed_at,expires_at,binding_hash FROM identity.login_challenge
+        SELECT consumed_at,expires_at,binding_hash,password_hash_snapshot FROM identity.login_challenge
         WHERE login_challenge_id=$1 AND token_hash=$2 AND user_id=$3 AND mfa_factor_id=$4
         FOR UPDATE
       `, [
@@ -365,6 +366,7 @@ export class PostgresSessionRepository {
         && challenge.consumed_at === null
         && challenge.expires_at.getTime() > input.occurredAt.getTime()
         && challenge.binding_hash === input.bindingHash
+        && challenge.password_hash_snapshot === input.challenge.passwordHash
         && (previousStep === null || input.acceptedStep > previousStep);
       if (valid) {
         await client.query(`UPDATE identity.mfa_factor SET last_accepted_step=$2 WHERE mfa_factor_id=$1`, [
@@ -450,9 +452,9 @@ export class PostgresSessionRepository {
         FOR UPDATE
       `, [input.challenge.factorId, input.challenge.userId])).rows[0];
       const challenge = factor === undefined ? undefined : (await client.query<{
-        consumed_at: Date | null; expires_at: Date; binding_hash: string;
+        consumed_at: Date | null; expires_at: Date; binding_hash: string; password_hash_snapshot: string;
       }>(`
-        SELECT consumed_at,expires_at,binding_hash FROM identity.login_challenge
+        SELECT consumed_at,expires_at,binding_hash,password_hash_snapshot FROM identity.login_challenge
         WHERE login_challenge_id=$1 AND token_hash=$2 AND user_id=$3 FOR UPDATE
       `, [input.challenge.challengeId, input.challenge.challengeTokenHash, input.challenge.userId])).rows[0];
       const code = challenge === undefined ? undefined : (await client.query<{ code_slot: number }>(`
@@ -463,7 +465,8 @@ export class PostgresSessionRepository {
       const valid = user !== undefined && factor !== undefined && challenge !== undefined && code !== undefined
         && challenge.consumed_at === null
         && challenge.expires_at.getTime() > input.occurredAt.getTime()
-        && challenge.binding_hash === input.bindingHash;
+        && challenge.binding_hash === input.bindingHash
+        && challenge.password_hash_snapshot === input.challenge.passwordHash;
       if (valid) {
         await client.query(`UPDATE identity.recovery_code SET consumed_at=$2 WHERE recovery_code_id=$1`, [
           input.recoveryCodeId, input.occurredAt

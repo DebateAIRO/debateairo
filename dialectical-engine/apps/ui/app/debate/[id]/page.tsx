@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Answer } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function DebatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const userAgent = (await headers()).get("user-agent") ?? undefined;
 
   // SSR reads the asker-scoped projection with the identity cookie (S05).
   // If no answer has been served, the typed run projection distinguishes a
@@ -21,7 +22,7 @@ export default async function DebatePage({ params }: { params: Promise<{ id: str
   let initialError: string | null = null;
 
   if (token !== null) {
-    const result = await getDebateServer(id, token);
+    const result = await getDebateServer(id, token, undefined, userAgent);
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;

@@ -178,9 +178,9 @@ describe("S5 sessions on real PostgreSQL", () => {
       secretCiphertext: {} as CryptoEnvelope,
       lastAcceptedStep: 10
     });
-    const completion = (symbol: string) => repository.completeTotpLogin({
+    const completion = (symbol: string, acceptedStep: number) => repository.completeTotpLogin({
       challenge,
-      acceptedStep: 11,
+      acceptedStep,
       bindingHash: hash("b"),
       sessionId: randomUUID(),
       sessionTokenHash: hash(symbol),
@@ -191,12 +191,77 @@ describe("S5 sessions on real PostgreSQL", () => {
       absoluteExpiresAt: new Date(now.getTime() + 7 * 86_400_000),
       source
     });
-    const outcomes = await Promise.all([completion("3"), completion("4")]);
+    const outcomes = await Promise.all([completion("3", 11), completion("4", 12)]);
     expect(outcomes.sort()).toEqual([false, true]);
     const sessions = await database.pool.query<{ count: string }>(
       `SELECT count(*) FROM identity.session WHERE user_id=$1 AND revoked_at IS NULL`, [identity.userId]
     );
     expect(Number(sessions.rows[0]!.count)).toBe(1);
+    // Non-vacuity guard: with the consumed predicate deleted, the strictly
+    // newer step remains eligible and would mint a second session.
+    await expect(completion("5", 13)).resolves.toBe(false);
+    const afterReplay = await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM identity.session WHERE user_id=$1 AND revoked_at IS NULL`, [identity.userId]
+    );
+    expect(Number(afterReplay.rows[0]!.count)).toBe(1);
+  });
+
+  it("revalidates the password snapshot under lock for TOTP and recovery completion", async () => {
+    const identity = await fixtureUser("password-snapshot-lock");
+    const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
+    const now = new Date();
+    const challengeId = randomUUID();
+    const recoveryCodeId = randomUUID();
+    await database.pool.query(`
+      INSERT INTO identity.login_challenge (
+        login_challenge_id,user_id,mfa_factor_id,token_hash,binding_hash,
+        password_hash_snapshot,created_at,expires_at,consumed_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL)
+    `, [
+      challengeId, identity.userId, identity.factorId, hash("9"), hash("b"),
+      identity.passwordHash, now, new Date(now.getTime() + 300_000)
+    ]);
+    await database.pool.query(`
+      INSERT INTO identity.recovery_code (
+        recovery_code_id,user_id,code_hash,created_at,consumed_at,revoked_at,code_slot
+      ) VALUES ($1,$2,$3,$4,NULL,NULL,1)
+    `, [recoveryCodeId, identity.userId, hash("r"), now]);
+
+    // Cache the valid first-leg record, then change the password. This forces
+    // both completion paths to prove they revalidate under their user lock.
+    const challenge = await repository.readLoginChallenge(hash("9"));
+    expect(challenge).not.toBeNull();
+    if (challenge === null) throw new Error("expected a readable login challenge");
+    await database.pool.query(`UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1`, [
+      identity.userId, `changed:${identity.passwordHash}`
+    ]);
+
+    const sessionInput = {
+      challenge,
+      bindingHash: hash("b"),
+      sessionId: randomUUID(),
+      sessionTokenHash: hashVerificationToken("locked-totp-session-token-material-01"),
+      csrfTokenHash: hashVerificationToken("locked-totp-csrf-token-material-002"),
+      sessionBindingContext: { user_agent_hash: hash("b") },
+      occurredAt: now,
+      idleExpiresAt: new Date(now.getTime() + 86_400_000),
+      absoluteExpiresAt: new Date(now.getTime() + 7 * 86_400_000),
+      source
+    } as const;
+    await expect(repository.completeTotpLogin({ ...sessionInput, acceptedStep: 11 })).resolves.toBe(false);
+    await expect(repository.completeRecoveryLogin({
+      ...sessionInput, recoveryCodeId,
+      replacementHash: hashVerificationToken("locked-recovery-replacement-material")
+    })).resolves.toBe(false);
+
+    const sessions = await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM identity.session WHERE user_id=$1`, [identity.userId]
+    );
+    const recovery = await database.pool.query<{ consumed_at: Date | null }>(
+      `SELECT consumed_at FROM identity.recovery_code WHERE recovery_code_id=$1`, [recoveryCodeId]
+    );
+    expect(Number(sessions.rows[0]!.count)).toBe(0);
+    expect(recovery.rows[0]!.consumed_at).toBeNull();
   });
 
   it("rejects a login challenge at its exact expiry boundary", async () => {
@@ -299,6 +364,27 @@ describe("S5 sessions on real PostgreSQL", () => {
         clock: () => currentTime
       });
 
+      const invalidatedChallenge = await service.beginLogin({ email, password }, source);
+      expect(invalidatedChallenge.challengeToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      const replacementPasswordHash = await hashPassword(
+        argon2, "replacement password after challenge", authPolicy.password.argon2id
+      );
+      await database.pool.query(`UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1`, [
+        userId, replacementPasswordHash
+      ]);
+      const step = Math.floor(now.getTime() / 30_000);
+      await expect(service.completeLogin({
+        challengeToken: invalidatedChallenge.challengeToken,
+        code: totpCodeAtStep(secret, step)
+      }, source)).rejects.toMatchObject({ code: "AUTH_CREDENTIALS_INVALID" });
+      const afterPasswordChange = await database.pool.query<{ count: string }>(
+        `SELECT count(*) FROM identity.session WHERE user_id=$1`, [userId]
+      );
+      expect(Number(afterPasswordChange.rows[0]!.count)).toBe(0);
+
+      await database.pool.query(`UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1`, [
+        userId, passwordHash
+      ]);
       const challenge = await service.beginLogin({ email, password }, source);
       expect(challenge.challengeToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
       const beforeMfa = await database.pool.query<{ count: string }>(
@@ -306,7 +392,6 @@ describe("S5 sessions on real PostgreSQL", () => {
       );
       expect(Number(beforeMfa.rows[0]!.count)).toBe(0);
 
-      const step = Math.floor(now.getTime() / 30_000);
       const completed = await service.completeLogin({
         challengeToken: challenge.challengeToken,
         code: totpCodeAtStep(secret, step)

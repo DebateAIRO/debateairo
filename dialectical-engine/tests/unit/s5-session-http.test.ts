@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildApi,
   createLegacyDevSessionResolver,
@@ -11,6 +11,8 @@ import type {
   SessionApplication
 } from "../../apps/api/src/sessions.js";
 import { createContractClient } from "@debateai/contract";
+import { createServerContractClient as createUiServerClient } from "../../apps/ui/lib/serverApi.js";
+import { createServerContractClient as createWebServerClient } from "../../web/lib/serverApi.js";
 
 const SESSION_TOKEN = "s".repeat(43);
 const CSRF_TOKEN = "c".repeat(43);
@@ -240,6 +242,66 @@ describe("S5 HTTP session boundary", () => {
     expect(setCookie).toContain(`${CSRF_COOKIE_NAME}=`);
     expect(setCookie).toContain("Max-Age=0");
     await api.close();
+  });
+
+  it("maps malformed revoke ids to foreign-safe 404 without reaching the repository", async () => {
+    const revokeSession = vi.fn().mockResolvedValue(true);
+    const api = buildApi({
+      application: application(),
+      sessions: { ...sessions(), revokeSession },
+      allowedOrigin: ORIGIN
+    });
+    const response = await api.inject({
+      method: "DELETE", url: "/v1/auth/sessions/not-a-uuid", headers: csrfHeaders
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "NOT_FOUND" });
+    expect(revokeSession).not.toHaveBeenCalled();
+    await api.close();
+  });
+
+  it("keeps generic 500 envelopes constant and excludes database messages", async () => {
+    const broken = application();
+    broken.readDeployment = async () => {
+      throw new Error("invalid input syntax for type uuid: secret-driver-detail");
+    };
+    const api = buildApi({ application: broken, sessions: sessions(), allowedOrigin: ORIGIN });
+    const response = await api.inject({
+      method: "GET", url: "/v1/deployment", headers: { cookie, "user-agent": "s5-test-browser" }
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    expect(response.body).not.toContain("uuid");
+    expect(response.body).not.toContain("driver");
+    await api.close();
+  });
+
+  it("forwards only the incoming browser User-Agent on both cookie-native SSR clients", async () => {
+    const originalBase = process.env.DIALECTICAL_API_BASE;
+    process.env.DIALECTICAL_API_BASE = "https://api.debateai.test";
+    const seen: Headers[] = [];
+    const boundFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      seen.push(headers);
+      return headers.get("user-agent") === "Bound Browser A"
+        ? Response.json(authenticated().session)
+        : Response.json({ error: "SESSION_REQUIRED" }, { status: 401 });
+    }) as typeof fetch;
+    try {
+      for (const createServerClient of [createUiServerClient, createWebServerClient]) {
+        await expect(createServerClient(boundFetch, SESSION_TOKEN, "Bound Browser A")
+          .readSession("cookie-session")).resolves.toMatchObject({ ownership_provenance: "server_session" });
+        await expect(createServerClient(boundFetch, SESSION_TOKEN, "Different Browser B")
+          .readSession("cookie-session")).rejects.toMatchObject({ code: "SESSION_REQUIRED" });
+      }
+      expect(seen).toHaveLength(4);
+      expect(seen[0]!.get("cookie")).toBe(`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}`);
+      expect(seen[0]!.get("user-agent")).toBe("Bound Browser A");
+      expect([...seen[0]!.keys()].sort()).toEqual(["cookie", "user-agent"]);
+    } finally {
+      if (originalBase === undefined) delete process.env.DIALECTICAL_API_BASE;
+      else process.env.DIALECTICAL_API_BASE = originalBase;
+    }
   });
 
   it("exposes the complete cookie-session lifecycle through the contract client", async () => {

@@ -97,6 +97,7 @@ async function requestJson<T>(
       headers.set("x-user-dev-token", token);
     } else {
       if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
       if (init.method !== undefined && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
         const csrf = auth.csrfToken?.() ?? browserCsrfToken();
         if (csrf !== null) headers.set("x-csrf-token", csrf);
@@ -132,6 +133,7 @@ async function requestNoContent(
     const headers = new Headers(init.headers);
     if (auth.mode === "cookie") {
       if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
       const csrf = auth.csrfToken?.() ?? browserCsrfToken();
       if (csrf !== null) headers.set("x-csrf-token", csrf);
     }
@@ -156,6 +158,8 @@ export type ContractClientAuth =
     mode: "cookie";
     /** Server-side rendering only; browser code relies on the cookie jar. */
     cookieHeader?: string;
+    /** Server-side rendering only; preserves the browser UA used to bind the session. */
+    userAgent?: string;
     csrfToken?: () => string | null;
   }>;
 
@@ -220,7 +224,10 @@ export function createContractClient(
     try {
       const headers = new Headers();
       if (auth.mode === "legacy") headers.set("x-user-dev-token", token);
-      else if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      else {
+        if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+        if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      }
       response = await fetchImplementation(new URL(`/v1/runs/${encodeURIComponent(runId)}/events`, root), {
         headers,
         cache: "no-store",
@@ -275,6 +282,7 @@ export function createContractClient(
       const headers = new Headers();
       if (auth.mode === "cookie") {
         if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+        if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
         const csrf = auth.csrfToken?.() ?? browserCsrfToken();
         if (csrf !== null) headers.set("x-csrf-token", csrf);
       }

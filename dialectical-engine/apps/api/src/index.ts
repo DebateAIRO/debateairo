@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
+import { z } from "zod";
 import {
   AnswerSchema,
   AnswerIndexSchema,
@@ -56,6 +57,7 @@ export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const SessionIdSchema = z.uuid();
 const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
   "strict-transport-security": "max-age=31536000; includeSubDomains",
@@ -359,7 +361,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           : askRefusal ? knownError.code : "INTERNAL_ERROR";
     return reply.status(statusCode).send({
       error: errorCode,
-      message: argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE : knownError.message
+      message: statusCode >= 500 ? errorCode : knownError.message
     });
   });
 
@@ -405,9 +407,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", { config: { auth: "user" } }, async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
-      const revoked = await options.sessions!.revokeSession(authenticated, request.params.id, sourceFor(request));
+      const parsedSessionId = SessionIdSchema.safeParse(request.params.id);
+      if (!parsedSessionId.success) return reply.status(404).send({ error: "NOT_FOUND" });
+      const revoked = await options.sessions!.revokeSession(authenticated, parsedSessionId.data, sourceFor(request));
       if (!revoked) return reply.status(404).send({ error: "NOT_FOUND" });
-      if (request.params.id === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
+      if (parsedSessionId.data === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
       return reply.status(204).send();
     });
     api.delete("/v1/auth/sessions", { config: { auth: "user" } }, async (request, reply) => {

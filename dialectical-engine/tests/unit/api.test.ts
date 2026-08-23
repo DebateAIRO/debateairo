@@ -351,8 +351,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(submitResponse.statusCode).toBe(500);
     expect(submitResponse.json()).toEqual({
       error: "INTERNAL_ERROR",
-      message: "Database and domain match predicates disagree"
+      message: "INTERNAL_ERROR"
     });
+    expect(submitResponse.body).not.toContain("Database and domain match predicates disagree");
     await submitApi.close();
 
     const typedApplication = fixtureApplication();
@@ -366,8 +367,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(typedResponse.statusCode).toBe(500);
     expect(typedResponse.json()).toEqual({
       error: "INTERNAL_ERROR",
-      message: "No sealed V3 deployment register exists"
+      message: "INTERNAL_ERROR"
     });
+    expect(typedResponse.body).not.toContain("No sealed V3 deployment register exists");
     await typedApi.close();
 
     const crashedApplication = fixtureApplication();
@@ -377,7 +379,8 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       method: "GET", url: "/v1/deployment", headers: { "x-user-dev-token": "test-token" }
     });
     expect(crashedResponse.statusCode).toBe(500);
-    expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "database connection lost" });
+    expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    expect(crashedResponse.body).not.toContain("database connection lost");
     await crashedApi.close();
   });
 

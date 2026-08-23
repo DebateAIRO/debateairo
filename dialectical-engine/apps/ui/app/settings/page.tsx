@@ -7,6 +7,7 @@ import { modelMeta } from "@/lib/models";
 import type { SettingsView } from "@/lib/v3/adapter";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 import { EvaluatorDevMenu } from "@/components/EvaluatorDevMenu";
+import { SessionControls } from "@/components/SessionControls";
 
 const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
   && process.env.NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED === "true";
@@ -71,6 +72,8 @@ function SettingsScreen({ token }: { token: string }) {
             {error}
           </div>
         ) : null}
+
+        <SessionControls />
 
         <div className="pill pillGen" style={{ marginTop: 24 }}>
           <span className="dot" />

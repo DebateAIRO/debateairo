@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer } from "@/components/DebatesBuffer";
@@ -11,6 +11,7 @@ export default async function HomePage() {
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const userAgent = (await headers()).get("user-agent") ?? undefined;
   let debates: DebateSummary[] = [];
   let total: number | null = null;
   let error: string | null = null;
@@ -18,7 +19,7 @@ export default async function HomePage() {
     error = "Sign in to list your asker-scoped debates.";
   } else {
     try {
-      const page = await listDebatesPageServer(token);
+      const page = await listDebatesPageServer(token, undefined, userAgent);
       debates = page.summaries;
       total = page.total;
     } catch (exc) {
