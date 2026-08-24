@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { cookies, headers } from "next/headers";
-import { USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
+import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer } from "@/components/DebatesBuffer";
+import type { ContractClient } from "@debateai/contract";
 import type { DebateSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,13 @@ export default async function HomePage() {
   let debates: DebateSummary[] = [];
   let total: number | null = null;
   let error: string | null = null;
+  let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
+  let publishedError: string | null = null;
+  try {
+    published = await createServerContractClient(fetch, undefined, userAgent).readPublicDebates(50, 0);
+  } catch {
+    publishedError = "Published debates are temporarily unavailable.";
+  }
   if (token === null) {
     error = "Sign in to list your asker-scoped debates.";
   } else {
@@ -48,7 +57,7 @@ export default async function HomePage() {
         ) : null}
 
         <div className="sectionHead">
-          <h2>Recent debates</h2>
+          <h2>Your debates</h2>
           <span className="count">
             {total === null
               ? `${debates.length} shown`
@@ -60,6 +69,28 @@ export default async function HomePage() {
 
         <div className="recentList">
           <DebatesBuffer debates={debates} />
+        </div>
+
+        <div className="sectionHead">
+          <h2>Published debates</h2>
+          <span className="count">
+            {published.total > published.items.length
+              ? `${published.items.length} shown of ${published.total} total`
+              : `${published.total} total`}
+          </span>
+        </div>
+        {publishedError ? <div className="error">{publishedError}</div> : null}
+        <div className="recentList">
+          {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
+          {published.items.map((debate) => (
+            <article className="debateCard" key={debate.public_ref}>
+              <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
+              <p>
+                By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
+                {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
+              </p>
+            </article>
+          ))}
         </div>
       </div>
     </div>

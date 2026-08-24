@@ -7,6 +7,9 @@ import {
   InspectionSchema,
   InvestigationAcceptedSchema,
   NodeSchema,
+  PublicationTransitionSchema,
+  PublicDebateListSchema,
+  PublicDebateSchema,
   RunEventSchema,
   RunProjectionSchema,
   RevokeAllSessionsSchema,
@@ -23,6 +26,7 @@ import {
   type InvestigationAccepted,
   type InvestigationRequest,
   type Node,
+  type PublicDebate,
   type RunEvent,
   type RunProjection,
   type Session,
@@ -186,7 +190,34 @@ export interface ContractClient {
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
   revokeAllSessions(): Promise<{ revoked: number }>;
-  stepUp(password: string, code: string): Promise<{ status: "step_up_complete"; csrf_token: string }>;
+  stepUp(password: string, code: string, authorization?: Readonly<{
+    action: "PUBLISH" | "UNPUBLISH";
+    target_run_id: string;
+  }>): Promise<{
+    status: "step_up_complete";
+    csrf_token: string;
+    step_up_grant?: {
+      token: string;
+      action: "PUBLISH" | "UNPUBLISH";
+      target_run_id: string;
+      expires_at: string;
+    } | undefined;
+  }>;
+  readPublicDebates(limit: number, offset: number): Promise<Readonly<{
+    items: readonly Readonly<{
+      public_ref: string;
+      author_pseudonym: string;
+      question: string;
+      published_at: string;
+      verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+      confidence_band: string | null;
+    }>[];
+    total: number;
+  }>>;
+  readPublicDebate(publicationRef: string): Promise<PublicDebate>;
+  readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   submitAsk(input: AskRequest, token: string): Promise<AskAccepted>;
   readSession(token: string): Promise<Session>;
   readDeployment(token: string): Promise<Deployment>;
@@ -307,9 +338,49 @@ export function createContractClient(
     revokeAllSessions: () => request(
       "/v1/auth/sessions", "", RevokeAllSessionsSchema, { method: "DELETE" }
     ),
-    stepUp: (password: string, code: string) => request(
+    stepUp: (password: string, code: string, authorization?: Readonly<{
+      action: "PUBLISH" | "UNPUBLISH";
+      target_run_id: string;
+    }>) => request(
       "/v1/auth/step-up", "", StepUpResponseSchema,
-      { method: "POST", body: JSON.stringify({ password, code }) }
+      { method: "POST", body: JSON.stringify({
+          password,
+          code,
+          ...(authorization === undefined ? {} : { authorization })
+        }) }
+    ),
+    readPublicDebates: (limit: number, offset: number) => request(
+      `/v1/public/debates?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`,
+      "",
+      PublicDebateListSchema
+    ),
+    readPublicDebate: (publicationRef: string) => request(
+      `/v1/public/debates/${encodeURIComponent(publicationRef)}`,
+      "",
+      PublicDebateSchema
+    ),
+    readRunVisibility: (runId: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/visibility`,
+      "",
+      PublicationTransitionSchema
+    ),
+    publishRun: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publish`,
+      "",
+      PublicationTransitionSchema,
+      { method: "POST", body: JSON.stringify({
+          step_up_grant: stepUpGrant,
+          warning_acknowledged: true
+        }) }
+    ),
+    unpublishRun: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/unpublish`,
+      "",
+      PublicationTransitionSchema,
+      { method: "POST", body: JSON.stringify({
+          step_up_grant: stepUpGrant,
+          copies_may_persist_acknowledged: true
+        }) }
     ),
     submitAsk: (input: AskRequest, token: string) => request("/v1/asks", token, AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     readSession: (token: string) => request("/v1/session", token, SessionSchema),

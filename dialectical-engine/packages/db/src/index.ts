@@ -19,6 +19,14 @@ export {
   type SessionListRecord
 } from "./sessions.js";
 
+export {
+  assertPublicationDatabaseRoleSeparation,
+  PostgresPublicationRepository,
+  type PublicationTransitionInput,
+  type PublishTransitionInput,
+  type PublicSnapshotRecord
+} from "./publication.js";
+
 const { Pool: PgPool } = pg;
 const writeTransaction = new AsyncLocalStorage<boolean>();
 const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";

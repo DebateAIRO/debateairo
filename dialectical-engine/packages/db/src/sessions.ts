@@ -682,42 +682,43 @@ export class PostgresSessionRepository {
     occurredAt: Date;
     idleExpiresAt: Date;
     source: AuthSourceContext;
+    grant?: Readonly<{
+      grantId: string;
+      grantTokenHash: string;
+      action: "PUBLISH" | "UNPUBLISH";
+      targetRunId: string;
+      expiresAt: Date;
+    }>;
   }>): Promise<boolean> {
+    if (input.grant !== undefined) assertCredentialHash(input.grant.grantTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const user = (await client.query<{ audit_token: string; owner_ref: string }>(`
-        SELECT audit_token,owner_ref FROM identity."user"
-        WHERE user_id=$1 AND owner_ref=$2 AND state='active' AND password_hash=$3 FOR UPDATE
-      `, [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash])).rows[0];
-      const factor = user === undefined ? undefined : (await client.query<{ last_accepted_step: string | number | null }>(`
-        SELECT last_accepted_step FROM identity.mfa_factor
-        WHERE mfa_factor_id=$1 AND user_id=$2 AND factor_type='totp' AND state='active' FOR UPDATE
-      `, [input.identity.factorId, input.identity.userId])).rows[0];
-      const session = factor === undefined ? undefined : (await client.query<{ absolute_expires_at: Date }>(`
-        SELECT absolute_expires_at FROM identity.session
-        WHERE session_id=$1 AND user_id=$2 AND token_hash=$3 AND revoked_at IS NULL
-          AND idle_expires_at>$4 AND absolute_expires_at>$4 FOR UPDATE
-      `, [input.currentSessionId, input.identity.userId, input.currentTokenHash, input.occurredAt])).rows[0];
-      const previousStep = factor?.last_accepted_step === null || factor?.last_accepted_step === undefined
-        ? null : Number(factor.last_accepted_step);
-      const valid = user !== undefined && factor !== undefined && session !== undefined
-        && (previousStep === null || input.acceptedStep > previousStep);
-      if (valid) {
-        await client.query(`UPDATE identity.mfa_factor SET last_accepted_step=$2 WHERE mfa_factor_id=$1`, [
-          input.identity.factorId, input.acceptedStep
-        ]);
-        await client.query(`
-          UPDATE identity.session
-          SET token_hash=$2,csrf_token_hash=$3,binding_context=$4::jsonb,
-            last_mfa_at=$5,last_seen_at=$5,idle_expires_at=LEAST(absolute_expires_at,$6)
-          WHERE session_id=$1
-        `, [
-          input.currentSessionId, input.replacementTokenHash, input.replacementCsrfHash,
-          JSON.stringify(input.bindingContext), input.occurredAt, input.idleExpiresAt
-        ]);
-      }
+      const rotated = await client.query<{ actor_token: string | null }>(`
+        SELECT identity.rotate_session_after_step_up(
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16
+        ) AS actor_token
+      `, [
+        input.identity.userId,
+        input.identity.ownerRef,
+        input.identity.passwordHash,
+        input.identity.factorId,
+        input.acceptedStep,
+        input.currentSessionId,
+        input.currentTokenHash,
+        input.replacementTokenHash,
+        input.replacementCsrfHash,
+        JSON.stringify(input.bindingContext),
+        input.idleExpiresAt,
+        input.grant?.grantId ?? null,
+        input.grant?.grantTokenHash ?? null,
+        input.grant?.action ?? null,
+        input.grant?.targetRunId ?? null,
+        input.grant?.expiresAt ?? null
+      ]);
+      const actorToken = rotated.rows[0]?.actor_token ?? null;
+      const valid = actorToken !== null;
       await this.appendAudit(client, prepared, {
-        actorToken: user?.audit_token ?? randomUUID(),
+        actorToken: actorToken ?? randomUUID(),
         eventType: "identity.session.step_up",
         targetType: "identity.session",
         targetId: input.currentSessionId,

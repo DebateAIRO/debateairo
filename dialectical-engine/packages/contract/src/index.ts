@@ -179,10 +179,71 @@ export const SessionListSchema = z.object({
 export type SessionList = z.infer<typeof SessionListSchema>;
 
 export const RevokeAllSessionsSchema = z.object({ revoked: z.number().int().nonnegative() }).strict();
+export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
+export const StepUpAuthorizationRequestSchema = z.object({
+  action: VisibilityGrantActionSchema,
+  target_run_id: z.uuid()
+}).strict();
 export const StepUpResponseSchema = z.object({
   status: z.literal("step_up_complete"),
-  csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+  csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  step_up_grant: z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: VisibilityGrantActionSchema,
+    target_run_id: z.uuid(),
+    expires_at: z.iso.datetime()
+  }).strict().optional()
 }).strict();
+
+export const PublishDebateRequestSchema = z.object({
+  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  warning_acknowledged: z.literal(true)
+}).strict();
+
+export const UnpublishDebateRequestSchema = z.object({
+  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  copies_may_persist_acknowledged: z.literal(true)
+}).strict();
+
+export const PublicationTransitionSchema = z.object({
+  state: z.enum(["PRIVATE", "PUBLISHED"]),
+  public_ref: z.uuid().nullable()
+}).strict();
+
+export const PublicDebateSummarySchema = z.object({
+  public_ref: z.uuid(),
+  author_pseudonym: z.string().trim().min(1),
+  question: z.string().trim().min(1),
+  published_at: z.iso.datetime(),
+  verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  confidence_band: z.string().trim().min(1).nullable()
+}).strict();
+export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
+
+export const PublicDebateSchema = z.object({
+  public_ref: z.uuid(),
+  author_pseudonym: z.string().trim().min(1),
+  question: z.string().trim().min(1),
+  published_at: z.iso.datetime(),
+  answer: z.object({
+    terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
+    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+    verdict_available: z.boolean(),
+    confidence_band: z.string().trim().min(1).nullable(),
+    summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
+    badges: z.array(z.string()),
+    residual_objections: z.array(z.string()),
+    reversal_point: z.string().min(1),
+    as_of: z.iso.datetime()
+  }).strict()
+}).strict();
+export type PublicDebate = z.infer<typeof PublicDebateSchema>;
+
+export const PublicDebateListSchema = z.object({
+  items: z.array(PublicDebateSummarySchema),
+  total: z.number().int().nonnegative()
+}).strict();
+export type PublicDebateList = z.infer<typeof PublicDebateListSchema>;
 
 export const DeploymentSchema = z.object({
   register: z.object({
@@ -545,6 +606,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/auth/sessions/{id}",
     "DELETE /v1/auth/sessions",
     "POST /v1/auth/step-up",
+    "GET /v1/public/debates",
+    "GET /v1/public/debates/{id}",
     "POST /v1/asks",
     "GET /v1/session",
     "GET /v1/deployment",
@@ -558,12 +621,18 @@ export const contractInventory = Object.freeze({
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
+    "GET /v1/runs/{id}/visibility",
     "GET /v1/runs/{id}/events",
-    "GET /v1/runs/{id}/answer"
+    "GET /v1/runs/{id}/answer",
+    "POST /v1/runs/{id}/publish",
+    "POST /v1/runs/{id}/unpublish"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
-    SessionListSchema, RevokeAllSessionsSchema, StepUpResponseSchema,
+    SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
+    StepUpAuthorizationRequestSchema, StepUpResponseSchema,
+    PublishDebateRequestSchema, UnpublishDebateRequestSchema,
+    PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,

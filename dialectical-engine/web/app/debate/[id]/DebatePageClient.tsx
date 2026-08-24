@@ -10,6 +10,7 @@ import { VerdictBanner } from "@/components/VerdictBanner";
 import { DebateCanvas } from "@/components/DebateCanvas";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
+import { PublicationControl } from "@/components/PublicationControl";
 
 const EMPTY_LIVE_STATE: LiveAnswerState = createEmptyLiveAnswerState();
 
@@ -122,6 +123,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
     {live.cycleRefusals.map((code, index) => <div className="error" key={`${code}:${index}`}>{code}: redirected to a shared crux.</div>)}
     {live.investigationGaps.length > 0 ? <section className="card"><h2>Investigate deeper</h2>{live.investigationGaps.map((gap) => <article key={gap.gap_ref}><span className="pill">Model-authored remediation · {gap.verdict}</span><h3>{gap.gap}</h3><p>{gap.why} · effort {gap.effort_grade}</p><pre>{gap.constructed_prompt}</pre>{gap.accepts_user_input ? <label>Optional verbatim input<textarea value={investigationInput[gap.gap_ref] ?? ""} onChange={(event) => setInvestigationInput((current) => ({ ...current, [gap.gap_ref]: event.target.value }))} /></label> : null}<button className="button" onClick={() => void recordInvestigation(gap.gap_ref, gap.accepts_user_input)}>Record investigate-deeper request</button></article>)}</section> : null}
     <DebateWorkspaceDrawer answer={surface} />
+    <PublicationControl runId={answer!.run_ref} />
     {surface.memoryDisclosure ? <section className="card"><h2>Builds on a previous answer</h2><p>{surface.memoryDisclosure.tier} · {surface.memoryDisclosure.relation}</p><p>Prior freshness: {surface.memoryDisclosure.prior?.staleness_state ?? "No linked prior answer"}</p>{surface.memoryDisclosure.unlink.available ? <button className="button" onClick={() => void unlinkMemory()}>Unlink prior answer</button> : null}</section> : <section className="card"><h2>Builds on a previous answer</h2><p>No matched prior answer.</p></section>}
     <section className="card"><h2>Authorized inspection</h2><p>Handle: {surface.inspectionHandle}</p><button className="button" onClick={() => void showInspection()}>Show me why</button>{inspection ? <pre>{JSON.stringify(inspection, null, 2)}</pre> : null}</section>
     {ledgerDigest ? <section className="card"><h2>Execution ledger digest</h2><p>{ledgerDigest.entries.length} executed ledger entries.</p>{ledgerDigest.work_items.map((item) => <p key={item.node_ref}>{item.node_ref} · {item.status}{item.reason ? ` · ${item.reason}` : ""}</p>)}</section> : null}

@@ -2,13 +2,16 @@ import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import {
   Argon2WorkerPool,
   AuditContextHasher,
+  assertPublicationSecretDomains,
   ContentCipher,
+  FilePublicationKeyStore,
   FileRunContentKeyStore,
   FileUserDekStore,
   loadKek,
-  loadSecretKey
+  loadSecretKey,
+  PublicationCipher
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, PostgresIdentityRepository, PostgresSessionRepository, ProviderProbeRepository } from "@debateai/db";
+import { assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresIdentityRepository, PostgresPublicationRepository, PostgresSessionRepository, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -37,15 +40,38 @@ import {
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
+import { PostgresPublicationApplication } from "./publications.js";
 import { SendmailMailSender } from "./mail-channel.js";
 import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 
 const environment = loadApiEnvironment();
 const kek = loadKek(environment.KEK_PATH);
+const corpusKek = environment.PUBLICATION_ENABLED === "true"
+  ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
+if (corpusKek !== undefined) {
+  assertPublicationSecretDomains({
+    privateKek: kek,
+    corpusKek,
+    privateKekPath: environment.KEK_PATH,
+    corpusKekPath: environment.CORPUS_KEK_PATH!,
+    privateStorePath: environment.USER_DEK_STORE_PATH,
+    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!
+  });
+}
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 const pool = createPool(environment.DATABASE_URL);
+const authorizationPool = environment.PUBLICATION_ENABLED === "true"
+  ? createPool(environment.AUTHORIZATION_DATABASE_URL!) : pool;
+if (environment.PUBLICATION_ENABLED === "true") {
+  try {
+    await assertPublicationDatabaseRoleSeparation(pool, authorizationPool);
+  } catch (error) {
+    await Promise.allSettled([pool.end(), authorizationPool.end()]);
+    throw error;
+  }
+}
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
 const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
@@ -121,7 +147,7 @@ const mfa = new MfaEnrollmentService({
   policy: mfaPolicy
 });
 const sessions = await SessionService.create({
-  repository: new PostgresSessionRepository(pool, auditContextHasher),
+  repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   dekStore,
   argon2: argon2Pool,
   authPolicy,
@@ -172,6 +198,16 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     return preserveSubmittedTierSource(resolved, askerTierSource);
   }
 });
+const publications = environment.PUBLICATION_ENABLED === "true"
+  ? new PostgresPublicationApplication(
+      new PostgresPublicationRepository(pool, auditContextHasher),
+      new PublicationCipher(new FilePublicationKeyStore(
+        environment.PUBLICATION_KEY_STORE_PATH!,
+        corpusKek!
+      ))
+    )
+  : undefined;
+if (publications !== undefined) await publications.reconcileKeyCleanup();
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)
   : undefined;
@@ -183,6 +219,7 @@ const api = buildApi({
   registration,
   mfa,
   sessions,
+  ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(
     environment.LEGACY_USER_DEV_TOKEN === undefined
@@ -205,7 +242,11 @@ const shutdown = installGracefulShutdown({
   registration,
   auditContextHasher,
   argon2Pool,
-  databasePools: [pool, ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])]
+  databasePools: [
+    pool,
+    ...(authorizationPool === pool ? [] : [authorizationPool]),
+    ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
+  ]
 });
 try {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });

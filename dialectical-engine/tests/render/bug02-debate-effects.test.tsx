@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
   streamEvents: vi.fn(),
   readEvents: vi.fn(),
   readDeployment: vi.fn(),
-  readLedgerDigest: vi.fn()
+  readLedgerDigest: vi.fn(),
+  readRunVisibility: vi.fn()
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -33,7 +34,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,
       readDeployment: mocks.readDeployment,
-      readLedgerDigest: mocks.readLedgerDigest
+      readLedgerDigest: mocks.readLedgerDigest,
+      readRunVisibility: mocks.readRunVisibility
     },
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
       actual.getDebateBundle(id, token, readClient as never, options as never)
@@ -121,6 +123,7 @@ describe("BUG-02 rendered refresh behaviour", () => {
       scorecards: [], model_ledger: [], fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
     });
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
+    mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef, _token, emit: (event: RunEvent) => void) => {
       mocks.emit = emit;
       await new Promise<void>(() => {});

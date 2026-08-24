@@ -8,9 +8,9 @@ import {
   randomInt,
   timingSafeEqual
 } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { chmod, mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
 import type {
@@ -124,6 +124,71 @@ function readKek(handle: KekHandle): Buffer {
   const material = kekMaterials.get(handle);
   if (material === undefined) throw new KekUnresolvedError();
   return Buffer.from(material);
+}
+
+function canonicalCandidatePath(candidate: string): string {
+  let cursor = resolve(candidate);
+  const suffix: string[] = [];
+  while (true) {
+    try {
+      return join(realpathSync(cursor), ...suffix);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const parent = dirname(cursor);
+      if (parent === cursor) throw error;
+      suffix.unshift(basename(cursor));
+      cursor = parent;
+    }
+  }
+}
+
+function pathsOverlap(left: string, right: string): boolean {
+  return left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`);
+}
+
+/** Fail closed if any configured secret path or store root aliases another. */
+export function assertPublicationSecretDomains(input: Readonly<{
+  privateKek: KekHandle;
+  corpusKek: KekHandle;
+  privateKekPath: string;
+  corpusKekPath: string;
+  privateStorePath: string;
+  publicationStorePath: string;
+}>): void {
+  const privateMaterial = readKek(input.privateKek);
+  const corpusMaterial = readKek(input.corpusKek);
+  try {
+    if (timingSafeEqual(privateMaterial, corpusMaterial)) {
+      throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+    }
+  } finally {
+    privateMaterial.fill(0);
+    corpusMaterial.fill(0);
+  }
+  const paths = [
+    canonicalCandidatePath(input.privateKekPath),
+    canonicalCandidatePath(input.privateStorePath),
+    canonicalCandidatePath(input.corpusKekPath),
+    canonicalCandidatePath(input.publicationStorePath)
+  ];
+  for (let leftIndex = 0; leftIndex < paths.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < paths.length; rightIndex += 1) {
+      const left = paths[leftIndex]!;
+      const right = paths[rightIndex]!;
+      if (pathsOverlap(left, right)) {
+        throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+      }
+      try {
+        const leftStat = statSync(left);
+        const rightStat = statSync(right);
+        if (leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino) {
+          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+  }
 }
 
 function validateAad(aad: AeadAad): void {
@@ -1442,5 +1507,303 @@ export class ContentCipher {
 
   destroyRunKey(runId: string): Promise<void> {
     return this.keys.destroy(runId);
+  }
+}
+
+export interface LoadedPublicationKey {
+  readonly publicationRef: string;
+  readonly key: Buffer;
+}
+
+export interface PublicationKeyStore {
+  store(publicationRef: string, key: Uint8Array): Promise<void>;
+  load(publicationRef: string): Promise<LoadedPublicationKey>;
+  destroy(publicationRef: string): Promise<void>;
+}
+
+export type PublicationKeyFileSystem = RunContentKeyFileSystem;
+
+export class PublicationKeyUnresolvedError extends CryptoError {
+  constructor() {
+    super("PUBLICATION_KEY_UNRESOLVED", "PUBLICATION_KEY_UNRESOLVED");
+    this.name = "PublicationKeyUnresolvedError";
+  }
+}
+
+type StoredPublicationKey = Readonly<{
+  version: 1;
+  publication_ref: string;
+  key_id: string;
+  wrapped_publication_key: CryptoEnvelope;
+}>;
+
+function assertPublicationRef(publicationRef: string): void {
+  if (!UUID_V4.test(publicationRef)) throw new PublicationKeyUnresolvedError();
+}
+
+function publicationKeyAad(publicationRef: string): AeadAad {
+  const keyId = `publication-key:${publicationRef}:v1`;
+  return [
+    "secret-store", "publication-key", publicationRef,
+    `publication:${publicationRef}`, "public-corpus", keyId, "1"
+  ];
+}
+
+function publicationSnapshotAad(publicationRef: string, runId: string): AeadAad {
+  if (!UUID_V4.test(runId)) throw new PublicationKeyUnresolvedError();
+  const keyId = `publication-snapshot:${publicationRef}:v1`;
+  return [
+    "serve", "publication_snapshot", publicationRef,
+    runId, "public-corpus", keyId, "1"
+  ];
+}
+
+function wrapPublicationKey(
+  corpusKek: KekHandle,
+  publicationRef: string,
+  key: Uint8Array
+): StoredPublicationKey {
+  assertPublicationRef(publicationRef);
+  const envelope = wrapDek(corpusKek, key, publicationKeyAad(publicationRef));
+  return Object.freeze({
+    version: 1,
+    publication_ref: publicationRef,
+    key_id: envelope.keyId,
+    wrapped_publication_key: envelope
+  });
+}
+
+function parseStoredPublicationKey(value: unknown, publicationRef: string): StoredPublicationKey {
+  assertPublicationRef(publicationRef);
+  if (typeof value !== "object" || value === null) throw new PublicationKeyUnresolvedError();
+  const record = value as Record<string, unknown>;
+  const envelope = record.wrapped_publication_key;
+  if (record.version !== 1 || record.publication_ref !== publicationRef
+    || record.key_id !== `publication-key:${publicationRef}:v1`
+    || typeof envelope !== "object" || envelope === null) {
+    throw new PublicationKeyUnresolvedError();
+  }
+  const candidate = envelope as Record<string, unknown>;
+  if (candidate.v !== 1 || candidate.keyId !== record.key_id
+    || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+    || typeof candidate.tag !== "string") {
+    throw new PublicationKeyUnresolvedError();
+  }
+  return Object.freeze({
+    version: 1,
+    publication_ref: publicationRef,
+    key_id: String(record.key_id),
+    wrapped_publication_key: candidate as unknown as CryptoEnvelope
+  });
+}
+
+function unwrapPublicationKey(
+  corpusKek: KekHandle,
+  record: StoredPublicationKey
+): LoadedPublicationKey {
+  try {
+    const key = unwrapDek(
+      corpusKek,
+      record.wrapped_publication_key,
+      publicationKeyAad(record.publication_ref)
+    );
+    return Object.freeze({ publicationRef: record.publication_ref, key });
+  } catch (error) {
+    if (error instanceof PublicationKeyUnresolvedError) throw error;
+    throw new PublicationKeyUnresolvedError();
+  }
+}
+
+export class MemoryPublicationKeyStore implements PublicationKeyStore {
+  readonly #records = new Map<string, StoredPublicationKey>();
+
+  constructor(private readonly corpusKek: KekHandle) {}
+
+  async store(publicationRef: string, key: Uint8Array): Promise<void> {
+    if (this.#records.has(publicationRef)) throw new TypeError("PUBLICATION_KEY_EXISTS");
+    this.#records.set(publicationRef, wrapPublicationKey(this.corpusKek, publicationRef, key));
+  }
+
+  async load(publicationRef: string): Promise<LoadedPublicationKey> {
+    const record = this.#records.get(publicationRef);
+    if (record === undefined) throw new PublicationKeyUnresolvedError();
+    return unwrapPublicationKey(this.corpusKek, record);
+  }
+
+  async destroy(publicationRef: string): Promise<void> {
+    assertPublicationRef(publicationRef);
+    this.#records.delete(publicationRef);
+  }
+}
+
+export class FilePublicationKeyStore implements PublicationKeyStore {
+  constructor(
+    private readonly root: string,
+    private readonly corpusKek: KekHandle,
+    private readonly fileSystem: PublicationKeyFileSystem = defaultRunContentKeyFileSystem
+  ) {
+    if (root.trim() === "") throw new TypeError("PUBLICATION_KEY_STORE_PATH_REQUIRED");
+  }
+
+  async store(publicationRef: string, key: Uint8Array): Promise<void> {
+    const record = wrapPublicationKey(this.corpusKek, publicationRef, key);
+    const publications = join(this.root, "publications");
+    const directory = join(publications, publicationRef);
+    const location = join(directory, "publication-key.v1.json");
+    const temporary = join(directory, "publication-key.v1.json.tmp");
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryCreated = false;
+    let published = false;
+    try {
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(this.root, 0o700);
+      await this.fileSystem.mkdir(publications, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(publications, 0o700);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      directoryCreated = true;
+      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      await file.writeFile(JSON.stringify(record), "utf8");
+      await file.sync();
+      await file.close();
+      file = undefined;
+      await this.fileSystem.rename(temporary, location);
+      published = true;
+      directoryHandle = await this.fileSystem.open(directory, "r");
+      await directoryHandle.sync();
+      await directoryHandle.close();
+      directoryHandle = undefined;
+    } catch (error) {
+      const cleanupFailures: unknown[] = [];
+      if (file !== undefined) {
+        try { await file.close(); } catch (closeError) { cleanupFailures.push(closeError); }
+        file = undefined;
+      }
+      if (directoryHandle !== undefined) {
+        try { await directoryHandle.close(); } catch (closeError) { cleanupFailures.push(closeError); }
+        directoryHandle = undefined;
+      }
+      if (published) {
+        throw new CryptoError(
+          "PUBLICATION_KEY_STORE_DURABILITY_UNCERTAIN",
+          "Publication key durability could not be confirmed"
+        );
+      }
+      if (directoryCreated) {
+        try {
+          await this.fileSystem.rm(directory, { recursive: true, force: true });
+        } catch (cleanupError) {
+          cleanupFailures.push(cleanupError);
+        }
+      }
+      if (cleanupFailures.length > 0) {
+        throw new CryptoError(
+          "PUBLICATION_KEY_STORE_CLEANUP_FAILED",
+          "Publication key publication cleanup did not complete"
+        );
+      }
+      throw error;
+    }
+  }
+
+  async load(publicationRef: string): Promise<LoadedPublicationKey> {
+    assertPublicationRef(publicationRef);
+    const location = join(this.root, "publications", publicationRef, "publication-key.v1.json");
+    try {
+      const metadata = await this.fileSystem.stat(location);
+      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+        throw new PublicationKeyUnresolvedError();
+      }
+      const record = parseStoredPublicationKey(
+        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        publicationRef
+      );
+      return unwrapPublicationKey(this.corpusKek, record);
+    } catch (error) {
+      if (error instanceof PublicationKeyUnresolvedError) throw error;
+      throw new PublicationKeyUnresolvedError();
+    }
+  }
+
+  async destroy(publicationRef: string): Promise<void> {
+    assertPublicationRef(publicationRef);
+    await this.fileSystem.rm(
+      join(this.root, "publications", publicationRef),
+      { recursive: true, force: true }
+    );
+  }
+}
+
+export interface PreparedPublicationCipher {
+  readonly publicationRef: string;
+  readonly runId: string;
+  encrypt(value: unknown): CryptoEnvelope;
+  decrypt<T = unknown>(envelope: CryptoEnvelope): T;
+  close(): void;
+}
+
+class PreparedPublicationCipherImpl implements PreparedPublicationCipher {
+  #key: Buffer | undefined;
+
+  constructor(readonly publicationRef: string, readonly runId: string, key: Buffer) {
+    this.#key = key;
+  }
+
+  encrypt(value: unknown): CryptoEnvelope {
+    const key = this.#key;
+    if (key === undefined) throw new PublicationKeyUnresolvedError();
+    const plaintext = Buffer.from(JSON.stringify(value), "utf8");
+    try {
+      return encrypt(key, plaintext, publicationSnapshotAad(this.publicationRef, this.runId));
+    } finally {
+      plaintext.fill(0);
+    }
+  }
+
+  decrypt<T = unknown>(envelope: CryptoEnvelope): T {
+    const key = this.#key;
+    if (key === undefined) throw new PublicationKeyUnresolvedError();
+    let plaintext: Buffer | undefined;
+    try {
+      plaintext = decrypt(key, envelope, publicationSnapshotAad(this.publicationRef, this.runId));
+      return JSON.parse(plaintext.toString("utf8")) as T;
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new CryptoAuthenticationError();
+      throw error;
+    } finally {
+      plaintext?.fill(0);
+    }
+  }
+
+  close(): void {
+    this.#key?.fill(0);
+    this.#key = undefined;
+  }
+}
+
+export class PublicationCipher {
+  constructor(private readonly keys: PublicationKeyStore) {}
+
+  async create(publicationRef: string, runId: string): Promise<PreparedPublicationCipher> {
+    assertPublicationRef(publicationRef);
+    if (!UUID_V4.test(runId)) throw new PublicationKeyUnresolvedError();
+    const key = generateDek();
+    try {
+      await this.keys.store(publicationRef, key);
+      return new PreparedPublicationCipherImpl(publicationRef, runId, key);
+    } catch (error) {
+      key.fill(0);
+      throw error;
+    }
+  }
+
+  async open(publicationRef: string, runId: string): Promise<PreparedPublicationCipher> {
+    if (!UUID_V4.test(runId)) throw new PublicationKeyUnresolvedError();
+    const loaded = await this.keys.load(publicationRef);
+    return new PreparedPublicationCipherImpl(publicationRef, runId, loaded.key);
+  }
+
+  destroy(publicationRef: string): Promise<void> {
+    return this.keys.destroy(publicationRef);
   }
 }

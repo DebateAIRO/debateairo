@@ -13,9 +13,15 @@ import {
   InvestigationAcceptedSchema,
   InvestigationRequestSchema,
   NodeSchema,
+  PublicationTransitionSchema,
+  PublicDebateListSchema,
+  PublicDebateSchema,
+  PublishDebateRequestSchema,
   RunEventSchema,
   RunProjectionSchema,
   SessionSchema,
+  StepUpAuthorizationRequestSchema,
+  UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
   type AskAccepted,
@@ -52,6 +58,7 @@ import {
 } from "./registration.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
+import type { PublicationApplication } from "./publications.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
@@ -71,6 +78,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
+  { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
@@ -84,13 +93,16 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
+  { route: "GET /v1/runs/{id}/visibility", auth: "user", resource: "run-owner", action: "read-visibility" },
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
-  { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" }
+  { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
+  { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
+  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
   origin?: RouteOriginPolicy;
-  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "deployment" | "evaluator";
+  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" | "deployment" | "evaluator";
   action: string;
 }>[]);
 
@@ -169,6 +181,7 @@ export interface ApiOptions {
   readonly registration?: RegistrationApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
+  readonly publications?: PublicationApplication;
   readonly allowedOrigin?: string;
   readonly legacyDevSessionResolver?: LegacyDevSessionResolver;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
@@ -519,18 +532,72 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
+      const authorization = body.authorization === undefined
+        ? undefined
+        : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
       const rotated = await options.sessions!.stepUp({
         session: authenticated,
         password: typeof body.password === "string" ? body.password : "",
-        code: typeof body.code === "string" ? body.code : ""
+        code: typeof body.code === "string" ? body.code : "",
+        ...(authorization === undefined ? {} : { authorization: {
+          action: authorization.action,
+          targetRunId: authorization.target_run_id
+        } })
       }, sourceFor(request));
       reply.header("set-cookie", [
         sessionCookie(rotated.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
         csrfCookie(rotated.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
       ]);
-      return reply.send({ status: "step_up_complete", csrf_token: rotated.csrfToken });
+      return reply.send({
+        status: "step_up_complete",
+        csrf_token: rotated.csrfToken,
+        ...(authorization === undefined
+          || rotated.grantToken === undefined
+          || rotated.grantExpiresAt === undefined
+          ? {}
+          : { step_up_grant: {
+              token: rotated.grantToken,
+              action: authorization.action,
+              target_run_id: authorization.target_run_id,
+              expires_at: rotated.grantExpiresAt.toISOString()
+            } })
+      });
     });
   }
+
+  api.get<{ Querystring: { limit?: string; offset?: string } }>(
+    "/v1/public/debates",
+    routePolicy("GET /v1/public/debates"),
+    async (request, reply) => {
+      const limit = Number(request.query.limit);
+      const offset = Number(request.query.offset);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100
+        || !Number.isInteger(offset) || offset < 0) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      }
+      if (options.publications === undefined) {
+        return reply.send(PublicDebateListSchema.parse({ items: [], total: 0 }));
+      }
+      return reply.send(PublicDebateListSchema.parse(
+        await options.publications.list(limit, offset)
+      ));
+    }
+  );
+
+  api.get<{ Params: { id: string } }>(
+    "/v1/public/debates/:id",
+    routePolicy("GET /v1/public/debates/{id}"),
+    async (request, reply) => {
+      const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+      if (!publicationRef.success || options.publications === undefined) {
+        return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+      }
+      const debate = await options.publications.readPublicDebate(publicationRef.data);
+      return debate === null
+        ? reply.status(404).send({ error: "DEBATE_NOT_FOUND" })
+        : reply.send(PublicDebateSchema.parse(debate));
+    }
+  );
   if (options.registration !== undefined) {
     api.post("/v1/auth/register", routePolicy("POST /v1/auth/register"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -751,12 +818,103 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const run = await options.application.readRun(runId.data, request.session, ownershipFor(request));
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(RunProjectionSchema.parse(run));
   });
+  api.get<{ Params: { id: string } }>(
+    "/v1/runs/:id/visibility",
+    routePolicy("GET /v1/runs/{id}/visibility"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined || options.publications === undefined) {
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      const visibility = await options.publications.readOwnedVisibility({
+        runId: runId.data,
+        authenticated
+      });
+      return visibility === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.send(PublicationTransitionSchema.parse(visibility));
+    }
+  );
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);
     if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
     const answer = await options.application.readRunAnswer(runId.data, request.session, ownershipFor(request));
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(AnswerSchema.parse(answer));
   });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/publish",
+    routePolicy("POST /v1/runs/{id}/publish"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) {
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      const input = parseRequest(PublishDebateRequestSchema, request.body);
+      if (options.publications === undefined) {
+        return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
+      }
+      if (!await options.publications.preflightGrant({
+        runId: runId.data,
+        authenticated,
+        grantToken: input.step_up_grant,
+        action: "PUBLISH"
+      })) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const answer = await options.application.readRunAnswer(
+        runId.data,
+        request.session,
+        ownershipFor(request)
+      );
+      if (answer === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const published = await options.publications.publish({
+        runId: runId.data,
+        answer,
+        authenticated,
+        grantToken: input.step_up_grant,
+        source: sourceFor(request)
+      });
+      return published === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.status(201).send(PublicationTransitionSchema.parse(published));
+    }
+  );
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/unpublish",
+    routePolicy("POST /v1/runs/{id}/unpublish"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) {
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      const input = parseRequest(UnpublishDebateRequestSchema, request.body);
+      if (options.publications === undefined) {
+        return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
+      }
+      if (!await options.publications.preflightGrant({
+        runId: runId.data,
+        authenticated,
+        grantToken: input.step_up_grant,
+        action: "UNPUBLISH"
+      })) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const owned = await options.application.readRun(
+        runId.data,
+        request.session,
+        ownershipFor(request)
+      );
+      if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const unpublished = await options.publications.unpublish({
+        runId: runId.data,
+        authenticated,
+        grantToken: input.step_up_grant,
+        source: sourceFor(request)
+      });
+      return unpublished === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.send(PublicationTransitionSchema.parse(unpublished));
+    }
+  );
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" });

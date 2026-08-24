@@ -68,6 +68,7 @@ import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { Toast } from "@/components/Toast";
+import { PublicationControl } from "@/components/PublicationControl";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import { computeLean, countClaims, renderStateOf, treeDepth } from "@/lib/debatePresentation";
 import type { PopoverState } from "@/lib/scrutiny";
@@ -1409,6 +1410,7 @@ export default function DebatePageClient({
         />
       ) : null}
 
+      {answer ? <PublicationControl runId={answer.run_ref} /> : null}
       {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
 
       {toast ? <Toast message={toast} /> : null}

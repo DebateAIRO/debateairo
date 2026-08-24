@@ -73,7 +73,16 @@ export interface SessionApplication {
     session: AuthenticatedSession;
     password: string;
     code: string;
-  }>, source: AuthSourceContext): Promise<Readonly<{ sessionToken: string; csrfToken: string }>>;
+    authorization?: Readonly<{
+      action: "PUBLISH" | "UNPUBLISH";
+      targetRunId: string;
+    }>;
+  }>, source: AuthSourceContext): Promise<Readonly<{
+    sessionToken: string;
+    csrfToken: string;
+    grantToken?: string;
+    grantExpiresAt?: Date;
+  }>>;
 }
 
 type SessionRepository = Pick<PostgresSessionRepository,
@@ -450,7 +459,16 @@ export class SessionService implements SessionApplication {
     session: AuthenticatedSession;
     password: string;
     code: string;
-  }>, source: AuthSourceContext): Promise<Readonly<{ sessionToken: string; csrfToken: string }>> {
+    authorization?: Readonly<{
+      action: "PUBLISH" | "UNPUBLISH";
+      targetRunId: string;
+    }>;
+  }>, source: AuthSourceContext): Promise<Readonly<{
+    sessionToken: string;
+    csrfToken: string;
+    grantToken?: string;
+    grantExpiresAt?: Date;
+  }>> {
     const now = this.now();
     let identity: LoginIdentityRecord | null = null;
     let rotationAttempted = false;
@@ -485,6 +503,11 @@ export class SessionService implements SessionApplication {
       if (acceptedStep === null) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       const replacementToken = generateVerificationToken();
       const replacementCsrf = generateVerificationToken();
+      const grantToken = input.authorization === undefined
+        ? undefined : generateVerificationToken();
+      const grantExpiresAt = input.authorization === undefined
+        ? undefined
+        : new Date(now.getTime() + this.dependencies.sessionPolicy.stepUpFreshnessMs);
       rotationAttempted = true;
       const rotated = await this.dependencies.repository.rotateAfterStepUp({
         identity,
@@ -496,11 +519,26 @@ export class SessionService implements SessionApplication {
         bindingContext: Object.freeze({ user_agent_hash: this.bindingHash(source) }),
         occurredAt: now,
         idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
-        source
+        source,
+        ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
+          ? {}
+          : { grant: {
+              grantId: randomUUID(),
+              grantTokenHash: hashVerificationToken(grantToken),
+              action: input.authorization.action,
+              targetRunId: input.authorization.targetRunId,
+              expiresAt: grantExpiresAt
+            } })
       });
       if (!rotated) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       this.limiter.clearEnrollment(rateKey);
-      return Object.freeze({ sessionToken: replacementToken, csrfToken: replacementCsrf });
+      return Object.freeze({
+        sessionToken: replacementToken,
+        csrfToken: replacementCsrf,
+        ...(grantToken === undefined || grantExpiresAt === undefined
+          ? {}
+          : { grantToken, grantExpiresAt })
+      });
     } catch (error) {
       if (!rotationAttempted && error instanceof AuthFlowError
         && error.code === "AUTH_CREDENTIALS_INVALID") {

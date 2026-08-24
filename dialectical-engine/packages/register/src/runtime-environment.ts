@@ -56,6 +56,10 @@ export function loadApiEnvironment() {
     USER_DEK_STORE_PATH: z.string().min(1),
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
+    PUBLICATION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CORPUS_KEK_PATH: z.string().min(1).optional(),
+    PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
+    AUTHORIZATION_DATABASE_URL: z.string().url().optional(),
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
@@ -81,6 +85,28 @@ export function loadApiEnvironment() {
   if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
     && environment.CONTENT_BLIND_INDEX_KEY_PATH === undefined) {
     throw new TypeError("CONTENT_BLIND_INDEX_KEY_PATH_REQUIRED");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && (environment.CORPUS_KEK_PATH === undefined
+      || environment.PUBLICATION_KEY_STORE_PATH === undefined)) {
+    throw new TypeError("PUBLICATION_KEY_PATHS_REQUIRED");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && environment.CONTENT_ENCRYPTION_ENABLED !== "true") {
+    throw new TypeError("PUBLICATION_REQUIRES_CONTENT_ENCRYPTION");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && environment.AUTHORIZATION_DATABASE_URL === undefined) {
+    throw new TypeError("AUTHORIZATION_DATABASE_URL_REQUIRED");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && environment.AUTHORIZATION_DATABASE_URL === environment.DATABASE_URL) {
+    throw new TypeError("AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && (environment.CORPUS_KEK_PATH === environment.KEK_PATH
+      || environment.PUBLICATION_KEY_STORE_PATH === environment.USER_DEK_STORE_PATH)) {
+    throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
   }
   return environment;
 }
