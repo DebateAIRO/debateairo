@@ -38,4 +38,59 @@ describe("S6 content-encryption architecture contract", () => {
     const runner = JSON.parse(await read("apps/runner/package.json")) as { dependencies?: Record<string, string> };
     expect(runner.dependencies?.["@debateai/crypto"]).toBe("workspace:*");
   });
+
+  it("keeps evaluator key preparation outside harvest transactions and add-on run locks", async () => {
+    const evaluator = await read("packages/evaluator/src/index.ts");
+    const harvest = evaluator.slice(
+      evaluator.indexOf("async harvestTerminalRun"),
+      evaluator.indexOf("private async recordPipelineEvent", evaluator.indexOf("async harvestTerminalRun"))
+    );
+    const readSnapshot = evaluator.slice(
+      evaluator.indexOf("private async readSnapshot"),
+      evaluator.indexOf("export const PROFILE_DERIVATION_VERSION", evaluator.indexOf("private async readSnapshot"))
+    );
+    const harvestPrepare = harvest.indexOf("prepareContentEncryptionForRun");
+    const harvestTransaction = harvest.indexOf("withWriteTransaction");
+    const harvestCallback = harvest.indexOf("async (client) =>", harvestTransaction);
+    expect(harvestPrepare).toBeGreaterThan(-1);
+    expect(harvestPrepare).toBeLessThan(harvestTransaction);
+    expect(harvestCallback).toBeGreaterThan(harvestTransaction);
+    expect(harvest.slice(harvestCallback, harvest.indexOf("});", harvestCallback) + 3))
+      .not.toContain("this.pool");
+    expect(harvest).toContain("preparedContent?.close()");
+    expect(readSnapshot).toContain("decryptPreparedContentForRun");
+    expect(readSnapshot).not.toContain("decryptContentForRun");
+    expect(readSnapshot).not.toContain("prepareContentEncryptionForRun");
+    expect(readSnapshot).not.toContain("this.pool");
+
+    const addonRunner = evaluator.slice(
+      evaluator.indexOf("export async function runEvaluatorJudgeAddon"),
+      evaluator.indexOf("function extractBlindJudgementReasons")
+    );
+    const addonCallback = addonRunner.slice(addonRunner.indexOf("withRunLock"));
+    expect(addonCallback).toContain("loadCandidate(input.runId, client, preparedContent)");
+    expect(addonCallback).toContain("preparedContent?.close()");
+    expect(addonCallback).not.toContain("prepareContentEncryptionForRun");
+    expect(addonCallback).not.toContain("decryptContentForRun");
+
+    const withRunLock = evaluator.slice(
+      evaluator.indexOf("async withRunLock<T>(", evaluator.indexOf("export class PostgresEvaluatorAddonRepository")),
+      evaluator.indexOf("async loadCandidate", evaluator.indexOf("export class PostgresEvaluatorAddonRepository"))
+    );
+    const addonPrepare = withRunLock.indexOf("prepareContentEncryptionForRun");
+    const addonConnect = withRunLock.indexOf("this.pool.connect");
+    expect(addonPrepare).toBeGreaterThan(-1);
+    expect(addonPrepare).toBeLessThan(addonConnect);
+    expect(withRunLock).toContain("work(client, preparedContent)");
+    expect(withRunLock).toContain("preparedContent?.close()");
+
+    const loadCandidate = evaluator.slice(
+      evaluator.indexOf("async #loadCandidate", evaluator.indexOf("export class PostgresEvaluatorAddonRepository")),
+      evaluator.indexOf("async recordPipelineEvent", evaluator.indexOf("export class PostgresEvaluatorAddonRepository"))
+    );
+    expect(loadCandidate).toContain("decryptPreparedContentForRun");
+    expect(loadCandidate).not.toContain("decryptContentForRun");
+    expect(loadCandidate).not.toContain("prepareContentEncryptionForRun");
+    expect(loadCandidate).not.toContain("this.pool");
+  });
 });

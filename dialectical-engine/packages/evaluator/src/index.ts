@@ -3,8 +3,10 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
   allocateSequence,
-  decryptContentForRun,
+  decryptPreparedContentForRun,
+  prepareContentEncryptionForRun,
   type CryptoEnvelope,
+  type PreparedRunContentCipher,
   withWriteTransaction
 } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
@@ -343,9 +345,16 @@ export interface EvaluatorAddonObservationInput {
 export interface EvaluatorAddonRepository {
   withRunLock<T>(
     runId: string,
-    work: (client?: PoolClient) => Promise<T>
+    work: (
+      client?: PoolClient,
+      preparedContent?: PreparedRunContentCipher | null
+    ) => Promise<T>
   ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }>;
-  loadCandidate(runId: string, client?: PoolClient): Promise<EvaluatorAddonCandidateResult>;
+  loadCandidate(
+    runId: string,
+    client?: PoolClient,
+    preparedContent?: PreparedRunContentCipher | null
+  ): Promise<EvaluatorAddonCandidateResult>;
   recordPipelineEvent(input: AddonPipelineEventInput, client?: PoolClient): Promise<string>;
   insertObservation(input: EvaluatorAddonObservationInput, client?: PoolClient): Promise<string>;
 }
@@ -457,13 +466,15 @@ export async function runEvaluatorJudgeAddon(input: {
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_PROVIDER_ISOLATION_FAILED" });
   }
 
-  const lockedResult = await input.repository.withRunLock(input.runId, async (client) => {
+  const lockedResult = await input.repository.withRunLock(input.runId, async (client, preparedContent) => {
   let candidateResult: EvaluatorAddonCandidateResult;
   try {
-    candidateResult = await input.repository.loadCandidate(input.runId, client);
+    candidateResult = await input.repository.loadCandidate(input.runId, client, preparedContent);
   } catch {
     await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED", client);
     return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  } finally {
+    preparedContent?.close();
   }
   const candidate = typeof candidateResult === "string" ? null : candidateResult;
   inputHash = addonInputHash(input.runId, candidate, policy);
@@ -630,44 +641,77 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
 
   async withRunLock<T>(
     runId: string,
-    work: (client?: PoolClient) => Promise<T>
+    work: (
+      client?: PoolClient,
+      preparedContent?: PreparedRunContentCipher | null
+    ) => Promise<T>
   ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }> {
-    const client = await this.pool.connect();
+    const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
+    let client: PoolClient | undefined;
     const lockKey = `evaluator-addon:${runId}`;
     let acquired = false;
     try {
+      client = await this.pool.connect();
       const lock = await client.query<{ acquired: boolean }>(
         "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
         [lockKey]
       );
       acquired = lock.rows[0]?.acquired === true;
       if (!acquired) return Object.freeze({ acquired: false as const });
-      return Object.freeze({ acquired: true as const, value: await work(client) });
+      return Object.freeze({
+        acquired: true as const,
+        value: await work(client, preparedContent)
+      });
     } finally {
-      if (!acquired) {
-        client.release();
-      } else {
-        try {
-          const unlock = await client.query<{ unlocked: boolean }>(
-            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
-            [lockKey]
-          );
-          if (unlock.rows[0]?.unlocked !== true) {
-            throw new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED");
+      try {
+        if (client !== undefined) {
+          if (!acquired) {
+            client.release();
+          } else {
+            try {
+              const unlock = await client.query<{ unlocked: boolean }>(
+                "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+                [lockKey]
+              );
+              if (unlock.rows[0]?.unlocked !== true) {
+                throw new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED");
+              }
+              client.release();
+            } catch (error) {
+              client.release(error instanceof Error
+                ? error
+                : new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED"));
+              throw error;
+            }
           }
-          client.release();
-        } catch (error) {
-          client.release(error instanceof Error
-            ? error
-            : new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED"));
-          throw error;
         }
+      } finally {
+        preparedContent?.close();
       }
     }
   }
 
-  async loadCandidate(runId: string, client?: PoolClient): Promise<EvaluatorAddonCandidateResult> {
-    const database = client ?? this.pool;
+  async loadCandidate(
+    runId: string,
+    client?: PoolClient,
+    preparedContent?: PreparedRunContentCipher | null
+  ): Promise<EvaluatorAddonCandidateResult> {
+    const ownsPreparedContent = client === undefined && preparedContent === undefined;
+    const activePreparedContent = ownsPreparedContent
+      ? await prepareContentEncryptionForRun(this.pool, runId)
+      : preparedContent ?? null;
+    try {
+      return await this.#loadCandidate(runId, client ?? this.pool, activePreparedContent);
+    } finally {
+      if (ownsPreparedContent) activePreparedContent?.close();
+    }
+  }
+
+  async #loadCandidate(
+    runId: string,
+    database: Pool | PoolClient,
+    preparedContent: PreparedRunContentCipher | null
+  ): Promise<EvaluatorAddonCandidateResult> {
     const existing = await database.query(`
       SELECT 1 FROM evaluator.observation
       WHERE run_id=$1 AND source_kind='BLIND_JUDGE_GRADE' LIMIT 1
@@ -718,20 +762,20 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
     `, [runId]);
     const row = result.rows[0];
     if (row === undefined) return "NO_JUDGEMENT";
-    const [runContent, nodeContent, artifactContent] = await Promise.all([
-      decryptContentForRun<{ questionLine: string }>(
-        this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+    const [runContent, nodeContent, artifactContent] = [
+      decryptPreparedContentForRun<{ questionLine: string }>(
+        preparedContent, "core.run", row.run_id, row.run_content_ciphertext,
         { questionLine: row.question_line }
       ),
-      decryptContentForRun<{ claimText: string }>(
-        this.pool, row.run_id, "core.node", row.node_id,
+      decryptPreparedContentForRun<{ claimText: string }>(
+        preparedContent, "core.node", row.node_id,
         row.node_content_ciphertext, { claimText: row.claim_text }
       ),
-      decryptContentForRun<{ rawText: string }>(
-        this.pool, row.run_id, "ledger.raw_artifact", row.raw_artifact_ref,
+      decryptPreparedContentForRun<{ rawText: string }>(
+        preparedContent, "ledger.raw_artifact", row.raw_artifact_ref,
         row.artifact_content_ciphertext, { rawText: row.raw_text }
       )
-    ]);
+    ];
     return Object.freeze({
       runId: row.run_id,
       runOrdinal: Number(row.run_ordinal),
@@ -1804,18 +1848,34 @@ export class EvaluatorHarvestRepository {
     try {
       requireNonblank(runId, "EVALUATOR_HARVEST_RUN_ID_INVALID");
       if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_HARVEST_TIME_INVALID");
-      const prepared = await withWriteTransaction(this.pool, async (client) => {
-        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
-        const terminal = await client.query(
-          "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1",
-          [runId]
-        );
-        if (terminal.rowCount === 0) return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
-        const snapshot = await this.readSnapshot(client, runId, observedAt);
-        inputHash = harvestInputHash(snapshot);
-        await this.recordPipelineEvent(client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash);
-        return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
-      });
+      const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
+      const prepared = await (async () => {
+        try {
+          return await withWriteTransaction(this.pool, async (client) => {
+            await client.query(
+              "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+              [`evaluator-harvest:${runId}`]
+            );
+            const terminal = await client.query(
+              "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1",
+              [runId]
+            );
+            if (terminal.rowCount === 0) {
+              return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
+            }
+            const snapshot = await this.readSnapshot(
+              client, runId, observedAt, preparedContent
+            );
+            inputHash = harvestInputHash(snapshot);
+            await this.recordPipelineEvent(
+              client, runId, attemptId, "STARTED", "TERMINAL_HARVEST_STARTED", inputHash
+            );
+            return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
+          });
+        } finally {
+          preparedContent?.close();
+        }
+      })();
       if (prepared.state === "NOT_TERMINAL") return prepared;
 
       return await withWriteTransaction(this.pool, async (client) => {
@@ -2010,7 +2070,8 @@ export class EvaluatorHarvestRepository {
   private async readSnapshot(
     client: PoolClient,
     runId: string,
-    observedAt: Date
+    observedAt: Date,
+    preparedContent: PreparedRunContentCipher | null
   ): Promise<EvaluatorHarvestSnapshot> {
     const domain = await client.query<{ domain_id: string }>(
       "SELECT domain_id FROM evaluator.question_domain WHERE run_id=$1",
@@ -2054,13 +2115,13 @@ export class EvaluatorHarvestRepository {
              content_ciphertext
       FROM ledger.node_review WHERE run_id=$1 ORDER BY node_review_id
     `, [runId]);
-    const decryptedReviews = await Promise.all(reviews.rows.map(async (row) => {
-      const content = await decryptContentForRun<{ reasons: unknown }>(
-        this.pool, runId, "ledger.node_review", row.node_review_id,
+    const decryptedReviews = reviews.rows.map((row) => {
+      const content = decryptPreparedContentForRun<{ reasons: unknown }>(
+        preparedContent, "ledger.node_review", row.node_review_id,
         row.content_ciphertext, { reasons: row.reasons }
       );
       return { ...row, reasons: content.reasons };
-    }));
+    });
     const judgements = await client.query<{
       reduced_judgement_id: string; raw_artifact_ref: string; tau: number;
       number_kind: string; producer: string;

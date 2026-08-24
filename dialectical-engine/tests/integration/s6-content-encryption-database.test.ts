@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pg from "pg";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ContentCipher,
@@ -27,6 +28,10 @@ import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import { MemoryRepository } from "@debateai/memory";
 import { ServeRepository } from "@debateai/serve";
+import {
+  EvaluatorHarvestRepository,
+  PostgresEvaluatorAddonRepository
+} from "../../packages/evaluator/src/index.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -36,6 +41,7 @@ const { Pool: PgPool } = pg;
 class TrackingRunContentKeyStore implements RunContentKeyStore {
   readonly storedRunIds: string[] = [];
   readonly destroyedRunIds: string[] = [];
+  readonly loadedKeys: Buffer[] = [];
   failNextDestroy = false;
   operationObserver: ((operation: "store" | "load" | "destroy") => void) | undefined;
 
@@ -47,9 +53,11 @@ class TrackingRunContentKeyStore implements RunContentKeyStore {
     this.storedRunIds.push(runId);
   }
 
-  load(runId: string): Promise<LoadedRunContentKey> {
+  async load(runId: string): Promise<LoadedRunContentKey> {
     this.operationObserver?.("load");
-    return this.delegate.load(runId);
+    const loaded = await this.delegate.load(runId);
+    this.loadedKeys.push(loaded.key);
+    return loaded;
   }
 
   async destroy(runId: string): Promise<void> {
@@ -67,6 +75,7 @@ let database: TestDatabase;
 let secretRoot: string;
 let userId: string;
 let ownerRef: string;
+let users: FileUserDekStore;
 let keys: TrackingRunContentKeyStore;
 let cipher: ContentCipher;
 let ownerResolverObserver: (() => void) | undefined;
@@ -179,6 +188,127 @@ async function persistAcceptedTerminal(runId: string, marker: string): Promise<s
   return terminal.answerId;
 }
 
+async function createBoundedEvaluatorFixture(pool: Pool, marker: string): Promise<{
+  readonly runId: string;
+  readonly questionLine: string;
+  readonly claimText: string;
+}> {
+  const questionLine = `s6 evaluator question ${marker}`;
+  const claimText = `s6 evaluator claim ${marker}`;
+  const rawText = JSON.stringify({ restatement_text: `s6 evaluator review ${marker}` });
+  const runId = await new RunRepository(pool).startRun(serverRunInput(questionLine));
+  const ledger = new LedgerRepository(pool);
+  const authorArtifactId = randomUUID();
+  const reviewerArtifactId = randomUUID();
+  await ledger.appendRawArtifact({
+    artifactId: authorArtifactId,
+    attemptId: randomUUID(),
+    runId,
+    providerRef: "provider:s6-evaluator-author",
+    provider: "test",
+    model: "model:s6-evaluator-author",
+    maker: "maker:s6-evaluator-author",
+    modelVersion: "v1",
+    rawText: JSON.stringify({ author: marker }),
+    metadata: {},
+    parseStatus: "PARSED",
+    inputHash: "8".repeat(64),
+    contractHash: "9".repeat(64),
+    contentHash: "a".repeat(64)
+  });
+  await ledger.appendRawArtifact({
+    artifactId: reviewerArtifactId,
+    attemptId: randomUUID(),
+    runId,
+    providerRef: "provider:s6-evaluator-reviewer",
+    provider: "test",
+    model: "model:s6-evaluator-reviewer",
+    maker: "maker:s6-evaluator-reviewer",
+    modelVersion: "v1",
+    rawText,
+    metadata: {},
+    parseStatus: "PARSED",
+    inputHash: "b".repeat(64),
+    contractHash: "c".repeat(64),
+    contentHash: "d".repeat(64)
+  });
+  const nodeId = await new GraphRepository(pool).withGraphWrite(runId, (writer) => writer.addNode({
+    runId,
+    statementText: claimText,
+    claimType: "unknown",
+    parentNodeId: null,
+    childKind: null,
+    siblingOrdinal: 0,
+    generationStatus: "complete",
+    pathStatus: "active",
+    explorationDecision: "continue",
+    provenanceRef: authorArtifactId,
+    wayOfKnowing: "REASONING",
+    locator: null,
+    valueLaden: false
+  }));
+  const judgement = new JudgementRepository(pool);
+  await judgement.recordNodeReview({
+    runId,
+    nodeId,
+    authorRawArtifactRef: authorArtifactId,
+    reviewRawArtifactRef: reviewerArtifactId,
+    outcome: "agree",
+    reasons: [`s6 evaluator reason ${marker}`]
+  });
+  await judgement.record({
+    runId,
+    nodeId,
+    rawArtifactRef: reviewerArtifactId,
+    tau: 0.75,
+    numberKind: "PROBABILITY",
+    producer: "judge:s6-evaluator",
+    wayOfKnowing: "REASONING"
+  });
+  await pool.query(
+    `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+     VALUES ($1,ledger.allocate_sequence(),'TERMINAL','{"state":"SETTLED"}'::jsonb)`,
+    [runId]
+  );
+  return { runId, questionLine, claimText };
+}
+
+function createBoundedEvaluatorPool(): {
+  readonly pool: Pool;
+  readonly cipher: ContentCipher;
+  readonly loadedKeys: readonly Buffer[];
+  readonly nestedResolverWaits: () => number;
+} {
+  const pool = new PgPool({
+    connectionString: database.connectionString,
+    max: 1,
+    connectionTimeoutMillis: 400
+  });
+  let nestedResolverWaits = 0;
+  const boundedKeys = new TrackingRunContentKeyStore(new FileRunContentKeyStore(
+    secretRoot, users, async (candidate) => {
+      const resolved = pool.query<{ user_id: string }>(
+        `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
+        [candidate]
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (pool.waitingCount > 0) nestedResolverWaits += 1;
+      const result = await resolved;
+      const resolvedUserId = result.rows[0]?.user_id;
+      if (resolvedUserId === undefined) throw new Error("OWNER_REF_UNRESOLVED");
+      return resolvedUserId;
+    }
+  ));
+  const boundedCipher = new ContentCipher(boundedKeys, Buffer.alloc(32, 0x6a));
+  configureContentEncryption(pool, boundedCipher);
+  return {
+    pool,
+    cipher: boundedCipher,
+    loadedKeys: boundedKeys.loadedKeys,
+    nestedResolverWaits: () => nestedResolverWaits
+  };
+}
+
 async function postgresDataContains(root: string, needle: string): Promise<boolean> {
   let entries;
   try {
@@ -204,7 +334,7 @@ beforeAll(async () => {
   await migrate(database.pool);
   secretRoot = await mkdtemp(join(tmpdir(), "debateai-s6-content-"));
   await createActiveUser();
-  const users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
+  users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
   await users.store(userId, generateDek());
   keys = new TrackingRunContentKeyStore(new FileRunContentKeyStore(
     secretRoot,
@@ -882,6 +1012,101 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       await boundedPool.end();
     }
   });
+
+  it("harvests an encrypted node review with a same-pool resolver and one connection", async () => {
+    const bounded = createBoundedEvaluatorPool();
+    try {
+      const fixture = await createBoundedEvaluatorFixture(
+        bounded.pool,
+        `harvest-${randomUUID()}`
+      );
+      const keyProbe = await bounded.cipher.prepareRun(fixture.runId);
+      keyProbe.close();
+
+      const harvested = await new EvaluatorHarvestRepository(bounded.pool)
+        .harvestTerminalRun(fixture.runId, new Date("2026-08-23T01:00:00.000Z"))
+        .catch((error: unknown) => ({
+          state: "ERROR" as const,
+          code: error !== null && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "UNKNOWN"
+        }));
+
+      expect({
+        keyExists: true,
+        nestedResolverWaits: bounded.nestedResolverWaits(),
+        harvested
+      }).toMatchObject({
+        keyExists: true,
+        nestedResolverWaits: 0,
+        harvested: { state: "HARVESTED", runId: fixture.runId }
+      });
+      expect(bounded.pool.totalCount).toBe(1);
+      expect(bounded.pool.waitingCount).toBe(0);
+      expect(bounded.loadedKeys.length).toBeGreaterThan(0);
+      expect(bounded.loadedKeys.every((key) => key.every((byte) => byte === 0))).toBe(true);
+    } finally {
+      await bounded.pool.end();
+    }
+  }, 30_000);
+
+  it("loads an encrypted add-on candidate under its run lock with a same-pool resolver and one connection", async () => {
+    const bounded = createBoundedEvaluatorPool();
+    try {
+      const fixture = await createBoundedEvaluatorFixture(
+        bounded.pool,
+        `addon-${randomUUID()}`
+      );
+      await bounded.pool.query(
+        `INSERT INTO evaluator.pipeline_event (
+           run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
+         ) VALUES ($1,'HARVEST',1,gen_random_uuid(),'SUCCEEDED','fixture',$2,
+           ledger.allocate_sequence())`,
+        [fixture.runId, "e".repeat(64)]
+      );
+      const keyProbe = await bounded.cipher.prepareRun(fixture.runId);
+      keyProbe.close();
+      const repository = new PostgresEvaluatorAddonRepository(bounded.pool);
+
+      const loaded = await repository.withRunLock(
+        fixture.runId,
+        (client, preparedContent) => repository.loadCandidate(
+          fixture.runId, client, preparedContent
+        )
+      ).catch((error: unknown) => ({
+        state: "ERROR" as const,
+        code: error !== null && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : "UNKNOWN"
+      }));
+
+      expect({
+        keyExists: true,
+        nestedResolverWaits: bounded.nestedResolverWaits(),
+        loaded
+      }).toMatchObject({
+        keyExists: true,
+        nestedResolverWaits: 0,
+        loaded: {
+          acquired: true,
+          value: {
+            runId: fixture.runId,
+            questionExcerpt: fixture.questionLine,
+            taskExcerpt: fixture.claimText,
+            reasons: expect.arrayContaining([
+              expect.stringMatching(/^s6 evaluator review addon-/)
+            ])
+          }
+        }
+      });
+      expect(bounded.pool.totalCount).toBe(1);
+      expect(bounded.pool.waitingCount).toBe(0);
+      expect(bounded.loadedKeys.length).toBeGreaterThan(0);
+      expect(bounded.loadedKeys.every((key) => key.every((byte) => byte === 0))).toBe(true);
+    } finally {
+      await bounded.pool.end();
+    }
+  }, 30_000);
 
   it("round-trips every physical carrier and shreds all eleven logical groups while rows persist", async () => {
     const marker = randomUUID();
