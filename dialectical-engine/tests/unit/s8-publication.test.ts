@@ -18,7 +18,10 @@ import {
 } from "../../packages/crypto/src/index.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
-import { PostgresPublicationRepository } from "@debateai/db";
+import {
+  assertPublicationDatabaseRoleSeparation,
+  PostgresPublicationRepository
+} from "@debateai/db";
 
 const roots: string[] = [];
 
@@ -45,6 +48,53 @@ afterEach(async () => {
 });
 
 describe("S8 publication crypto and projection", () => {
+  it("rejects superuser, SET ROLE, and grant-table capabilities independently in the boot witness", async () => {
+    const publication = {
+      session_principal: "publication_login",
+      principal: "publication_login",
+      session_principal_is_superuser: false,
+      principal_is_superuser: false,
+      can_transition: true,
+      can_rotate_after_step_up: false,
+      is_authorization_member: false,
+      can_select_grant: false,
+      can_insert_grant: false,
+      can_update_grant: false,
+      can_delete_grant: false
+    };
+    const authorization = {
+      ...publication,
+      session_principal: "authorization_login",
+      principal: "authorization_login",
+      can_rotate_after_step_up: true,
+      is_authorization_member: true
+    };
+    const pool = (row: typeof publication): Pool => ({
+      query: async () => ({ rows: [row] })
+    }) as unknown as Pool;
+    await expect(assertPublicationDatabaseRoleSeparation(
+      pool(publication), pool(authorization)
+    )).resolves.toBeUndefined();
+    for (const mutant of [
+      { ...publication, principal_is_superuser: true },
+      { ...publication, session_principal_is_superuser: true },
+      { ...publication, principal: "debateai_runtime" }
+    ]) await expect(assertPublicationDatabaseRoleSeparation(
+      pool(mutant), pool(authorization)
+    )).rejects.toThrow("PUBLICATION_DATABASE_ROLES_MUST_BE_SEPARATE");
+    for (const mutant of [
+      { ...authorization, principal_is_superuser: true },
+      { ...authorization, session_principal_is_superuser: true },
+      { ...authorization, principal: "debateai_authorization_runtime" },
+      { ...authorization, can_select_grant: true },
+      { ...authorization, can_insert_grant: true },
+      { ...authorization, can_update_grant: true },
+      { ...authorization, can_delete_grant: true }
+    ]) await expect(assertPublicationDatabaseRoleSeparation(
+      pool(publication), pool(mutant)
+    )).rejects.toThrow("PUBLICATION_DATABASE_ROLES_MUST_BE_SEPARATE");
+  });
+
   it("rejects equal material, inode aliases, and symlink-resolved secret-store overlap", async () => {
     const root = await mkdtemp(join(tmpdir(), "debateai-s8-domain-"));
     roots.push(root);
@@ -54,16 +104,74 @@ describe("S8 publication crypto and projection", () => {
     const equalKekPath = join(root, "equal.kek");
     const privateStorePath = join(root, "private-store");
     const publicationStorePath = join(root, "publication-store");
+    const blindIndexPath = join(root, "blind-index.key");
+    const contentBlindIndexPath = join(root, "content-blind-index.key");
+    const auditSourceSaltPath = join(root, "audit-source-salt.key");
+    const auditStorePath = join(root, "audit-store");
     const aliasedPublicationStore = join(root, "publication-store-alias");
     await writeFile(privateKekPath, Buffer.alloc(32, 0x11), { mode: 0o600 });
     await writeFile(corpusKekPath, Buffer.alloc(32, 0x22), { mode: 0o600 });
     await writeFile(equalKekPath, Buffer.alloc(32, 0x11), { mode: 0o600 });
     await mkdir(privateStorePath);
     await mkdir(publicationStorePath);
-    expect(() => assertPublicationSecretDomains({
+    await mkdir(auditStorePath);
+    await writeFile(blindIndexPath, Buffer.alloc(32, 0x33), { mode: 0o600 });
+    await writeFile(contentBlindIndexPath, Buffer.alloc(32, 0x44), { mode: 0o600 });
+    await writeFile(auditSourceSaltPath, Buffer.alloc(32, 0x55), { mode: 0o600 });
+    const additionalSecrets = [
+      { path: blindIndexPath, material: Buffer.alloc(32, 0x33) },
+      { path: contentBlindIndexPath, material: Buffer.alloc(32, 0x44) },
+      { path: auditSourceSaltPath, material: Buffer.alloc(32, 0x55) }
+    ];
+    const baseline = {
       privateKek: loadKek(privateKekPath), corpusKek: loadKek(corpusKekPath),
-      privateKekPath, corpusKekPath, privateStorePath, publicationStorePath
-    })).not.toThrow();
+      privateKekPath, corpusKekPath, privateStorePath, publicationStorePath,
+      additionalSecrets, additionalStorePaths: [auditStorePath]
+    };
+    expect(() => assertPublicationSecretDomains(baseline)).not.toThrow();
+
+    const equalAuxiliaryMaterial = {
+      ...baseline,
+      additionalSecrets: [
+        { path: blindIndexPath, material: Buffer.alloc(32, 0x22) },
+        ...additionalSecrets.slice(1)
+      ]
+    };
+    expect(() => assertPublicationSecretDomains(equalAuxiliaryMaterial))
+      .toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+
+    const auxiliaryHardlinkPath = join(root, "blind-index-hardlink.key");
+    await link(corpusKekPath, auxiliaryHardlinkPath);
+    const auxiliaryHardlink = {
+      ...baseline,
+      additionalSecrets: [
+        { path: auxiliaryHardlinkPath, material: Buffer.alloc(32, 0x66) },
+        ...additionalSecrets.slice(1)
+      ]
+    };
+    expect(() => assertPublicationSecretDomains(auxiliaryHardlink))
+      .toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+
+    const aliasedAuditStore = join(root, "audit-store-alias");
+    await symlink(publicationStorePath, aliasedAuditStore);
+    const auxiliaryStoreAlias = {
+      ...baseline,
+      additionalStorePaths: [aliasedAuditStore]
+    };
+    expect(() => assertPublicationSecretDomains(auxiliaryStoreAlias))
+      .toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+
+    const nestedAuditSaltPath = join(auditStorePath, "nested-audit-salt.key");
+    await writeFile(nestedAuditSaltPath, Buffer.alloc(32, 0x77), { mode: 0o600 });
+    const auxiliaryNesting = {
+      ...baseline,
+      additionalSecrets: [
+        ...additionalSecrets.slice(0, 2),
+        { path: nestedAuditSaltPath, material: Buffer.alloc(32, 0x77) }
+      ]
+    };
+    expect(() => assertPublicationSecretDomains(auxiliaryNesting))
+      .toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
 
     expect(() => assertPublicationSecretDomains({
       privateKek: loadKek(privateKekPath), corpusKek: loadKek(equalKekPath),
@@ -284,8 +392,10 @@ describe("S8 publication crypto and projection", () => {
       load: async () => { throw new PublicationKeyUnresolvedError(); },
       destroy: async () => undefined
     };
+    const auditPreflightDenial = vi.fn(async () => true);
     const application = new PostgresPublicationApplication({
       preflightGrant: async () => false,
+      auditAuthenticatedPreflightDenial: auditPreflightDenial,
       readAuthorPseudonym: async () => { throw new Error("must not resolve owner"); }
     } as unknown as PostgresPublicationRepository, new PublicationCipher(store));
     const runId = randomUUID();
@@ -300,6 +410,7 @@ describe("S8 publication crypto and projection", () => {
       source: { ip: "192.0.2.1", userAgent: "UA", requestId: "r" }
     })).resolves.toBeNull();
     expect(stores).toBe(0);
+    expect(auditPreflightDenial).toHaveBeenCalledOnce();
   });
 
   it("keeps failed unpublish key cleanup pending and makes reconciliation idempotently retryable", async () => {

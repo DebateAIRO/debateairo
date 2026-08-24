@@ -8,12 +8,15 @@ import {
 import type { AuthSourceContext } from "./identity.js";
 
 const PUBLICATION_TRANSITION_SIGNATURE =
-  "core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,jsonb)";
+  "core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,bytea,uuid,jsonb)";
 const STEP_UP_ROTATION_SIGNATURE =
   "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz)";
 
 type PublicationDatabaseRoleWitness = Readonly<{
+  sessionPrincipal: string;
   principal: string;
+  sessionPrincipalIsSuperuser: boolean;
+  principalIsSuperuser: boolean;
   canTransition: boolean;
   canRotateAfterStepUp: boolean;
   isAuthorizationMember: boolean;
@@ -25,7 +28,10 @@ type PublicationDatabaseRoleWitness = Readonly<{
 
 async function readPublicationDatabaseRoleWitness(pool: Pool): Promise<PublicationDatabaseRoleWitness> {
   const result = await pool.query<{
+    session_principal: string;
     principal: string;
+    session_principal_is_superuser: boolean;
+    principal_is_superuser: boolean;
     can_transition: boolean;
     can_rotate_after_step_up: boolean;
     is_authorization_member: boolean;
@@ -34,7 +40,16 @@ async function readPublicationDatabaseRoleWitness(pool: Pool): Promise<Publicati
     can_update_grant: boolean;
     can_delete_grant: boolean;
   }>(`
-    SELECT current_user AS principal,
+    SELECT session_user AS session_principal,
+      current_user AS principal,
+      COALESCE((
+        SELECT role.rolsuper FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname=session_user
+      ),true) AS session_principal_is_superuser,
+      COALESCE((
+        SELECT role.rolsuper FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname=current_user
+      ),true) AS principal_is_superuser,
       has_function_privilege(current_user,$1,'EXECUTE') AS can_transition,
       has_function_privilege(current_user,$2,'EXECUTE') AS can_rotate_after_step_up,
       pg_has_role(current_user,'debateai_authorization_runtime','MEMBER')
@@ -47,7 +62,10 @@ async function readPublicationDatabaseRoleWitness(pool: Pool): Promise<Publicati
   const row = result.rows[0];
   if (row === undefined) throw new TypeError("PUBLICATION_DATABASE_ROLE_ATTESTATION_FAILED");
   return Object.freeze({
+    sessionPrincipal: row.session_principal,
     principal: row.principal,
+    sessionPrincipalIsSuperuser: row.session_principal_is_superuser,
+    principalIsSuperuser: row.principal_is_superuser,
     canTransition: row.can_transition,
     canRotateAfterStepUp: row.can_rotate_after_step_up,
     isAuthorizationMember: row.is_authorization_member,
@@ -73,13 +91,24 @@ export async function assertPublicationDatabaseRoleSeparation(
     || publication.canInsertGrant
     || publication.canUpdateGrant
     || publication.canDeleteGrant;
-  if (publication.principal === authorization.principal
+  const authorizationCanTouchGrant = authorization.canSelectGrant
+    || authorization.canInsertGrant
+    || authorization.canUpdateGrant
+    || authorization.canDeleteGrant;
+  if (publication.sessionPrincipal !== publication.principal
+    || authorization.sessionPrincipal !== authorization.principal
+    || publication.sessionPrincipalIsSuperuser
+    || publication.principalIsSuperuser
+    || authorization.sessionPrincipalIsSuperuser
+    || authorization.principalIsSuperuser
+    || publication.principal === authorization.principal
     || !publication.canTransition
     || publication.canRotateAfterStepUp
     || publication.isAuthorizationMember
     || publicationCanTouchGrant
     || !authorization.canRotateAfterStepUp
-    || !authorization.isAuthorizationMember) {
+    || !authorization.isAuthorizationMember
+    || authorizationCanTouchGrant) {
     throw new TypeError("PUBLICATION_DATABASE_ROLES_MUST_BE_SEPARATE");
   }
 }
@@ -98,6 +127,13 @@ export type PublicationTransitionInput = Readonly<{
   grantTokenHash: string;
   occurredAt: Date;
   source: AuthSourceContext;
+}>;
+
+export type PublicationPreflightDenialInput = Readonly<{
+  userId: string;
+  sessionId: string;
+  occurredAt: Date;
+  requestId: string | undefined;
 }>;
 
 export type PublishTransitionInput = PublicationTransitionInput & Readonly<{
@@ -156,6 +192,78 @@ export class PostgresPublicationRepository {
       [input.grantTokenHash, input.sessionId, input.userId, action, input.runId]
     );
     return result.rows[0]?.live === true;
+  }
+
+  async auditAuthenticatedPreflightDenial(
+    input: PublicationPreflightDenialInput
+  ): Promise<boolean> {
+    const auditId = randomUUID();
+    const sourceContext = Object.freeze({
+      requestId: normalized(input.requestId, 128),
+      sourceCorrelation: "OMITTED_FOR_PREFLIGHT_DENIAL"
+    });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const seed = await this.pool.query<{
+        audit_token: string;
+        this_hash: Buffer | null;
+      }>(`
+        SELECT identity_user.audit_token,head.this_hash
+        FROM identity."user" AS identity_user
+        JOIN identity.session AS session
+          ON session.session_id=$2 AND session.user_id=identity_user.user_id
+            AND session.revoked_at IS NULL
+            AND session.idle_expires_at>clock_timestamp()
+            AND session.absolute_expires_at>clock_timestamp()
+        LEFT JOIN LATERAL (
+          SELECT parent.this_hash
+          FROM identity.audit_event AS parent
+          LEFT JOIN identity.audit_event AS child ON child.prev_hash=parent.this_hash
+          WHERE child.audit_id IS NULL
+          ORDER BY parent.occurred_at DESC,parent.audit_id DESC
+          LIMIT 1
+        ) AS head ON true
+        WHERE identity_user.user_id=$1 AND identity_user.state='active'
+      `, [input.userId, input.sessionId]);
+      const actorToken = seed.rows[0]?.audit_token;
+      if (actorToken === undefined) return false;
+      assertOpaqueAuditToken(actorToken);
+      const denied = appendAuditEvent(
+        seed.rows[0]?.this_hash?.toString("hex") ?? null,
+        Object.freeze({
+          auditId,
+          actorCiphertext: null,
+          actorKeyRef: actorToken,
+          eventType: "debate.publication.preflight_denied",
+          targetType: "debate.publication_attempt",
+          targetId: auditId,
+          occurredAt: input.occurredAt,
+          sourceContext,
+          decision: "DENY",
+          success: false,
+          justification: "PUBLICATION_GRANT_PREFLIGHT_DENIED"
+        })
+      );
+      try {
+        const result = await this.pool.query<{ appended: boolean }>(`
+          SELECT identity.audit_publication_preflight_denial(
+            $1,$2,$3,$4,$5,$6,$7,$8
+          ) AS appended
+        `, [
+          auditId,
+          input.userId,
+          input.sessionId,
+          input.occurredAt,
+          denied.prevHash === null ? null : Buffer.from(denied.prevHash, "hex"),
+          Buffer.from(denied.thisHash, "hex"),
+          actorToken,
+          sourceContext.requestId
+        ]);
+        return result.rows[0]?.appended === true;
+      } catch (error) {
+        if ((error as { code?: string }).code !== "40001" || attempt === 2) throw error;
+      }
+    }
+    return false;
   }
 
   private async transition(
@@ -217,10 +325,27 @@ export class PostgresPublicationRepository {
           justification: null
         })
       );
+      const deniedAuditId = randomUUID();
+      const denied = appendAuditEvent(
+        seed.rows[0]?.this_hash?.toString("hex") ?? null,
+        Object.freeze({
+          auditId: deniedAuditId,
+          actorCiphertext: null,
+          actorKeyRef: actorToken,
+          eventType: "debate.publication.denied",
+          targetType: "debate.publication_attempt",
+          targetId: deniedAuditId,
+          occurredAt: input.occurredAt,
+          sourceContext,
+          decision: "DENY",
+          success: false,
+          justification: "PUBLICATION_TRANSITION_DENIED"
+        })
+      );
       try {
         const result = await this.pool.query<{ publication_ref: string | null }>(`
           SELECT core.transition_run_publication(
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16::jsonb
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18::jsonb
           ) AS publication_ref
         `, [
           eventId,
@@ -237,6 +362,8 @@ export class PostgresPublicationRepository {
           chained.auditId,
           chained.prevHash === null ? null : Buffer.from(chained.prevHash, "hex"),
           Buffer.from(chained.thisHash, "hex"),
+          denied.auditId,
+          Buffer.from(denied.thisHash, "hex"),
           actorToken,
           JSON.stringify(sourceContext)
         ]);

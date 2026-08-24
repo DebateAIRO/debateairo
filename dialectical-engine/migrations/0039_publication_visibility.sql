@@ -182,6 +182,86 @@ AS $$
   ), false)
 $$;
 
+-- Authenticated grant-preflight failures are auditable without turning an
+-- invalid/random token into private run reads, external key I/O, or Argon2
+-- work. This capability deliberately accepts no run, publication, grant, or
+-- action identifier: the only target is its fresh opaque attempt id.
+CREATE OR REPLACE FUNCTION identity.audit_publication_preflight_denial(
+  p_denied_audit_id uuid,
+  p_user_id uuid,
+  p_session_id uuid,
+  p_presented_at timestamptz,
+  p_audit_prev_hash bytea,
+  p_audit_this_hash bytea,
+  p_audit_actor_token uuid,
+  p_request_id text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+  v_now timestamptz := clock_timestamp();
+  v_actor_token uuid;
+  v_audit_head bytea;
+  v_source_context jsonb := jsonb_build_object(
+    'requestId',left(COALESCE(NULLIF(btrim(p_request_id),''),'unknown'),128),
+    'sourceCorrelation','OMITTED_FOR_PREFLIGHT_DENIAL'
+  );
+BEGIN
+  IF p_denied_audit_id IS NULL
+    OR p_presented_at IS NULL
+    OR octet_length(p_audit_this_hash) <> 32 THEN
+    RETURN false;
+  END IF;
+
+  SELECT identity_user.audit_token
+  INTO v_actor_token
+  FROM identity."user" AS identity_user
+  WHERE identity_user.user_id=p_user_id
+    AND identity_user.state='active'
+  FOR KEY SHARE;
+  IF NOT FOUND OR v_actor_token <> p_audit_actor_token THEN
+    RETURN false;
+  END IF;
+
+  PERFORM 1 FROM identity.session AS session
+  WHERE session.session_id=p_session_id
+    AND session.user_id=p_user_id
+    AND session.revoked_at IS NULL
+    AND session.idle_expires_at>v_now
+    AND session.absolute_expires_at>v_now
+  FOR KEY SHARE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('identity:audit-chain',0));
+  SELECT parent.this_hash
+  INTO v_audit_head
+  FROM identity.audit_event AS parent
+  LEFT JOIN identity.audit_event AS child ON child.prev_hash=parent.this_hash
+  WHERE child.audit_id IS NULL
+  ORDER BY parent.occurred_at DESC,parent.audit_id DESC
+  LIMIT 1;
+  IF v_audit_head IS DISTINCT FROM p_audit_prev_hash THEN
+    RAISE EXCEPTION USING ERRCODE='40001', MESSAGE='PUBLICATION_AUDIT_HEAD_CHANGED';
+  END IF;
+  INSERT INTO identity.audit_event (
+    audit_id,prev_hash,this_hash,actor_ciphertext,actor_key_ref,event_type,
+    target_type,target_id,occurred_at,source_context,decision,success,justification
+  ) VALUES (
+    p_denied_audit_id,p_audit_prev_hash,p_audit_this_hash,NULL,v_actor_token::text,
+    'debate.publication.preflight_denied','debate.publication_attempt',
+    p_denied_audit_id::text,p_presented_at,v_source_context,'DENY',false,
+    'PUBLICATION_GRANT_PREFLIGHT_DENIED'
+  );
+  RETURN true;
+END;
+$$;
+
 -- Session rotation and optional grant minting are inseparable. Runtime has no
 -- direct step_up_grant DML, so it cannot reset consumed grants or insert one
 -- without satisfying the active identity/factor/session transition.
@@ -310,6 +390,8 @@ CREATE OR REPLACE FUNCTION core.transition_run_publication(
   p_audit_id uuid,
   p_audit_prev_hash bytea,
   p_audit_this_hash bytea,
+  p_denied_audit_id uuid,
+  p_denied_audit_this_hash bytea,
   p_audit_actor_token uuid,
   p_audit_source_context jsonb
 )
@@ -333,133 +415,170 @@ DECLARE
   v_audit_head bytea;
   v_event_type text;
   v_warning_version text;
+  v_run_eligible boolean := false;
 BEGIN
   IF p_action NOT IN ('PUBLISH','UNPUBLISH')
     OR p_presented_at IS NULL
     OR jsonb_typeof(p_audit_source_context) <> 'object'
-    OR octet_length(p_audit_this_hash) <> 32 THEN
+    OR octet_length(p_audit_this_hash) <> 32
+    OR octet_length(p_denied_audit_this_hash) <> 32 THEN
     RETURN NULL;
   END IF;
 
-  -- Global transition order begins with the governed run row.
-  SELECT run.content_encryption_version
-  INTO v_content_encryption_version
-  FROM core.run AS run
-  WHERE run.run_id=p_run_id
-  FOR UPDATE;
-  IF NOT FOUND OR v_content_encryption_version <> 1
-    OR NOT core.run_uses_content_encryption(p_run_id) THEN
-    RETURN NULL;
-  END IF;
+  <<authenticated_transition>>
+  BEGIN
+    -- Global transition order begins with the governed run row. Missing or
+    -- legacy runs are remembered until the actor and session are authenticated,
+    -- so any resulting denial is opaque and cannot expose the run identifier.
+    SELECT run.content_encryption_version
+    INTO v_content_encryption_version
+    FROM core.run AS run
+    WHERE run.run_id=p_run_id
+    FOR UPDATE;
+    v_run_eligible := FOUND AND COALESCE(v_content_encryption_version=1,false);
+    IF v_run_eligible THEN
+      v_run_eligible := core.run_uses_content_encryption(p_run_id);
+    END IF;
 
-  SELECT identity_user.audit_token,identity_user.pseudonym
-  INTO v_actor_token,v_pseudonym
-  FROM identity."user" AS identity_user
-  WHERE identity_user.user_id=p_user_id
-    AND identity_user.owner_ref=p_owner_ref
-    AND identity_user.state='active'
-  FOR KEY SHARE;
-  IF NOT FOUND OR v_actor_token <> p_audit_actor_token THEN
-    RETURN NULL;
-  END IF;
-
-  SELECT ownership.owner_ref
-  INTO v_latest_owner
-  FROM core.run_ownership_event AS ownership
-  WHERE ownership.run_id=p_run_id
-  ORDER BY ownership.at_seq DESC
-  LIMIT 1;
-  IF v_latest_owner IS DISTINCT FROM p_owner_ref THEN
-    RETURN NULL;
-  END IF;
-
-  PERFORM 1 FROM identity.session AS session
-  WHERE session.session_id=p_session_id
-    AND session.user_id=p_user_id
-    AND session.revoked_at IS NULL
-    AND session.idle_expires_at>v_now
-    AND session.absolute_expires_at>v_now
-  FOR KEY SHARE;
-  IF NOT FOUND THEN
-    RETURN NULL;
-  END IF;
-
-  SELECT event.state,event.publication_ref
-  INTO v_latest_state,v_latest_publication_ref
-  FROM core.run_visibility_event AS event
-  WHERE event.run_id=p_run_id
-  ORDER BY event.at_seq DESC
-  LIMIT 1;
-
-  SELECT step_grant.step_up_grant_id
-  INTO v_grant_id
-  FROM identity.step_up_grant AS step_grant
-  WHERE step_grant.token_hash=p_grant_token_hash
-    AND step_grant.session_id=p_session_id
-    AND step_grant.user_id=p_user_id
-    AND step_grant.action=p_action
-    AND step_grant.target_run_id=p_run_id
-    AND step_grant.consumed_at IS NULL
-    AND step_grant.issued_at<=v_now
-    AND step_grant.expires_at>v_now
-  FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN NULL;
-  END IF;
-
-  IF p_action='PUBLISH' THEN
-    IF v_latest_state='PUBLISHED'
-      OR p_publication_ref IS NULL
-      OR p_expected_pseudonym IS DISTINCT FROM v_pseudonym
-      OR p_content_ciphertext IS NULL THEN
+    SELECT identity_user.audit_token,identity_user.pseudonym
+    INTO v_actor_token,v_pseudonym
+    FROM identity."user" AS identity_user
+    WHERE identity_user.user_id=p_user_id
+      AND identity_user.owner_ref=p_owner_ref
+      AND identity_user.state='active'
+    FOR KEY SHARE;
+    IF NOT FOUND OR v_actor_token <> p_audit_actor_token THEN
       RETURN NULL;
     END IF;
-    v_publication_ref := p_publication_ref;
-    v_event_type := 'debate.publication.published';
-    v_warning_version := 'PUBLIC_INDEXED_V1';
-    INSERT INTO serve.publication_snapshot (
-      publication_ref,run_id,format_version,content_ciphertext,created_at
+
+    PERFORM 1 FROM identity.session AS session
+    WHERE session.session_id=p_session_id
+      AND session.user_id=p_user_id
+      AND session.revoked_at IS NULL
+      AND session.idle_expires_at>v_now
+      AND session.absolute_expires_at>v_now
+    FOR KEY SHARE;
+    IF NOT FOUND THEN
+      RETURN NULL;
+    END IF;
+    IF NOT v_run_eligible THEN
+      EXIT authenticated_transition;
+    END IF;
+
+    SELECT ownership.owner_ref
+    INTO v_latest_owner
+    FROM core.run_ownership_event AS ownership
+    WHERE ownership.run_id=p_run_id
+    ORDER BY ownership.at_seq DESC
+    LIMIT 1;
+    IF v_latest_owner IS DISTINCT FROM p_owner_ref THEN
+      EXIT authenticated_transition;
+    END IF;
+
+    SELECT event.state,event.publication_ref
+    INTO v_latest_state,v_latest_publication_ref
+    FROM core.run_visibility_event AS event
+    WHERE event.run_id=p_run_id
+    ORDER BY event.at_seq DESC
+    LIMIT 1;
+
+    SELECT step_grant.step_up_grant_id
+    INTO v_grant_id
+    FROM identity.step_up_grant AS step_grant
+    WHERE step_grant.token_hash=p_grant_token_hash
+      AND step_grant.session_id=p_session_id
+      AND step_grant.user_id=p_user_id
+      AND step_grant.action=p_action
+      AND step_grant.target_run_id=p_run_id
+      AND step_grant.consumed_at IS NULL
+      AND step_grant.issued_at<=v_now
+      AND step_grant.expires_at>v_now
+    FOR UPDATE;
+    IF NOT FOUND THEN
+      EXIT authenticated_transition;
+    END IF;
+
+    IF p_action='PUBLISH' THEN
+      IF v_latest_state='PUBLISHED'
+        OR p_publication_ref IS NULL
+        OR p_expected_pseudonym IS DISTINCT FROM v_pseudonym
+        OR p_content_ciphertext IS NULL THEN
+        EXIT authenticated_transition;
+      END IF;
+      v_publication_ref := p_publication_ref;
+      v_event_type := 'debate.publication.published';
+      v_warning_version := 'PUBLIC_INDEXED_V1';
+    ELSE
+      IF v_latest_state IS DISTINCT FROM 'PUBLISHED'
+        OR v_latest_publication_ref IS NULL
+        OR p_publication_ref IS NOT NULL
+        OR p_expected_pseudonym IS NOT NULL
+        OR p_content_ciphertext IS NOT NULL THEN
+        EXIT authenticated_transition;
+      END IF;
+      v_publication_ref := v_latest_publication_ref;
+      v_event_type := 'debate.publication.unpublished';
+      v_warning_version := 'COPIES_MAY_PERSIST_V1';
+    END IF;
+
+    UPDATE identity.step_up_grant
+    SET consumed_at=v_now
+    WHERE step_up_grant_id=v_grant_id AND consumed_at IS NULL;
+    IF NOT FOUND THEN
+      EXIT authenticated_transition;
+    END IF;
+
+    IF p_action='PUBLISH' THEN
+      INSERT INTO serve.publication_snapshot (
+        publication_ref,run_id,format_version,content_ciphertext,created_at
+      ) VALUES (
+        v_publication_ref,p_run_id,1,p_content_ciphertext,p_presented_at
+      );
+    ELSE
+      INSERT INTO serve.publication_key_cleanup_intent (
+        publication_ref,requested_at,completed_at
+      ) VALUES (v_publication_ref,v_now,NULL)
+      ON CONFLICT (publication_ref) DO UPDATE
+        SET requested_at=LEAST(serve.publication_key_cleanup_intent.requested_at,EXCLUDED.requested_at),
+            completed_at=NULL;
+    END IF;
+
+    SELECT ledger.allocate_sequence() INTO v_at_seq;
+    INSERT INTO core.run_visibility_event (
+      run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
+      warning_version,occurred_at,at_seq
     ) VALUES (
-      v_publication_ref,p_run_id,1,p_content_ciphertext,p_presented_at
+      p_event_id,p_run_id,v_publication_ref,
+      CASE p_action WHEN 'PUBLISH' THEN 'PUBLISHED' ELSE 'PRIVATE' END,
+      v_actor_token,v_warning_version,v_now,v_at_seq
     );
-  ELSE
-    IF v_latest_state IS DISTINCT FROM 'PUBLISHED'
-      OR v_latest_publication_ref IS NULL
-      OR p_publication_ref IS NOT NULL
-      OR p_expected_pseudonym IS NOT NULL
-      OR p_content_ciphertext IS NOT NULL THEN
-      RETURN NULL;
+
+    -- Audit is last in the deterministic order. A concurrent audit writer makes
+    -- the caller retry from a new head; the entire transition is rolled back.
+    PERFORM pg_advisory_xact_lock(hashtextextended('identity:audit-chain',0));
+    SELECT parent.this_hash
+    INTO v_audit_head
+    FROM identity.audit_event AS parent
+    LEFT JOIN identity.audit_event AS child ON child.prev_hash=parent.this_hash
+    WHERE child.audit_id IS NULL
+    ORDER BY parent.occurred_at DESC,parent.audit_id DESC
+    LIMIT 1;
+    IF v_audit_head IS DISTINCT FROM p_audit_prev_hash THEN
+      RAISE EXCEPTION USING ERRCODE='40001', MESSAGE='PUBLICATION_AUDIT_HEAD_CHANGED';
     END IF;
-    v_publication_ref := v_latest_publication_ref;
-    v_event_type := 'debate.publication.unpublished';
-    v_warning_version := 'COPIES_MAY_PERSIST_V1';
-    INSERT INTO serve.publication_key_cleanup_intent (
-      publication_ref,requested_at,completed_at
-    ) VALUES (v_publication_ref,v_now,NULL)
-    ON CONFLICT (publication_ref) DO UPDATE
-      SET requested_at=LEAST(serve.publication_key_cleanup_intent.requested_at,EXCLUDED.requested_at),
-          completed_at=NULL;
-  END IF;
+    INSERT INTO identity.audit_event (
+      audit_id,prev_hash,this_hash,actor_ciphertext,actor_key_ref,event_type,
+      target_type,target_id,occurred_at,source_context,decision,success,justification
+    ) VALUES (
+      p_audit_id,p_audit_prev_hash,p_audit_this_hash,NULL,v_actor_token::text,
+      v_event_type,'core.run_visibility_event',p_event_id::text,p_presented_at,
+      p_audit_source_context,'ALLOW',true,NULL
+    );
+    RETURN v_publication_ref;
+  END authenticated_transition;
 
-  UPDATE identity.step_up_grant
-  SET consumed_at=v_now
-  WHERE step_up_grant_id=v_grant_id AND consumed_at IS NULL;
-  IF NOT FOUND THEN
-    RETURN NULL;
-  END IF;
-
-  SELECT ledger.allocate_sequence() INTO v_at_seq;
-  INSERT INTO core.run_visibility_event (
-    run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
-    warning_version,occurred_at,at_seq
-  ) VALUES (
-    p_event_id,p_run_id,v_publication_ref,
-    CASE p_action WHEN 'PUBLISH' THEN 'PUBLISHED' ELSE 'PRIVATE' END,
-    v_actor_token,v_warning_version,v_now,v_at_seq
-  );
-
-  -- Audit is last in the deterministic order. A concurrent audit writer makes
-  -- the caller retry from a new head; the entire transition is rolled back.
+  -- Only an actor and session authenticated above can reach this branch. The
+  -- target is a fresh attempt identifier, never a run/publication/content key.
   PERFORM pg_advisory_xact_lock(hashtextextended('identity:audit-chain',0));
   SELECT parent.this_hash
   INTO v_audit_head
@@ -475,11 +594,11 @@ BEGIN
     audit_id,prev_hash,this_hash,actor_ciphertext,actor_key_ref,event_type,
     target_type,target_id,occurred_at,source_context,decision,success,justification
   ) VALUES (
-    p_audit_id,p_audit_prev_hash,p_audit_this_hash,NULL,v_actor_token::text,
-    v_event_type,'core.run_visibility_event',p_event_id::text,p_presented_at,
-    p_audit_source_context,'ALLOW',true,NULL
+    p_denied_audit_id,p_audit_prev_hash,p_denied_audit_this_hash,NULL,v_actor_token::text,
+    'debate.publication.denied','debate.publication_attempt',p_denied_audit_id::text,
+    p_presented_at,p_audit_source_context,'DENY',false,'PUBLICATION_TRANSITION_DENIED'
   );
-  RETURN v_publication_ref;
+  RETURN NULL;
 END;
 $$;
 
@@ -516,8 +635,9 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION identity.publication_grant_is_live(text,uuid,uuid,text,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION identity.audit_publication_preflight_denial(uuid,uuid,uuid,timestamptz,bytea,bytea,uuid,text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz) FROM PUBLIC, debateai_runtime;
-REVOKE ALL ON FUNCTION core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,bytea,uuid,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION serve.pending_publication_key_cleanup(integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION serve.complete_publication_key_cleanup(uuid,timestamptz) FROM PUBLIC;
 
@@ -532,7 +652,8 @@ REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON identity.step_up_grant FROM d
 REVOKE ALL ON FUNCTION core.run_is_published(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION core.run_is_published(uuid, uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.publication_grant_is_live(text,uuid,uuid,text,uuid) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.audit_publication_preflight_denial(uuid,uuid,uuid,timestamptz,bytea,bytea,uuid,text) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz) TO debateai_authorization_runtime;
-GRANT EXECUTE ON FUNCTION core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,bytea,uuid,jsonb) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION serve.pending_publication_key_cleanup(integer) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION serve.complete_publication_key_cleanup(uuid,timestamptz) TO debateai_runtime;

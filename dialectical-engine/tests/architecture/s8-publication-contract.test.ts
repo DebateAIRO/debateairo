@@ -19,6 +19,16 @@ describe("Accounts S8 publication architecture", () => {
     expect(migration).toMatch(/BEFORE TRUNCATE ON serve\.publication_snapshot/i);
     expect(migration).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON core\.run_visibility_event FROM debateai_runtime/i);
     expect(migration).toContain("core.transition_run_publication");
+    expect(migration).toContain("identity.audit_publication_preflight_denial");
+    const preflightDenial = migration.slice(
+      migration.indexOf("CREATE OR REPLACE FUNCTION identity.audit_publication_preflight_denial"),
+      migration.indexOf("-- Session rotation and optional grant minting")
+    );
+    expect(preflightDenial).not.toContain("p_run_id");
+    expect(preflightDenial).not.toContain("p_publication_ref");
+    expect(preflightDenial).not.toContain("p_grant");
+    expect(preflightDenial).toContain("'debate.publication_attempt'");
+    expect(preflightDenial).toContain("'OMITTED_FOR_PREFLIGHT_DENIAL'");
     expect(migration).not.toContain("serve.append_publication_snapshot");
     expect(migration).not.toContain("core.append_run_visibility_event");
     expect(migration).not.toContain("core.lock_run_for_publication");
@@ -51,6 +61,19 @@ describe("Accounts S8 publication architecture", () => {
     expect(main).toContain("authorizationPool");
     expect(main).toContain("loadKek(environment.CORPUS_KEK_PATH");
     expect(main).toContain("FilePublicationKeyStore");
+    const domainAttestation = main.slice(
+      main.indexOf("assertPublicationSecretDomains({"),
+      main.indexOf("});", main.indexOf("assertPublicationSecretDomains({"))
+    );
+    for (const secretPath of [
+      "BLIND_INDEX_KEY_PATH",
+      "CONTENT_BLIND_INDEX_KEY_PATH",
+      "AUDIT_SOURCE_IP_SALT_PATH",
+      "AUDIT_KEY_STORE_PATH"
+    ]) expect(domainAttestation).toContain(secretPath);
+    expect(publication).toContain("session_user");
+    expect(publication).toContain("rolsuper");
+    expect(publication).toContain("debate.publication.denied");
     expect(publication).not.toContain("FileRunContentKeyStore");
     expect(publication).not.toContain("FileUserDekStore");
     expect(publication).not.toMatch(/INSERT INTO serve\.publication_snapshot/i);
@@ -83,6 +106,7 @@ describe("Accounts S8 publication architecture", () => {
     expect(databaseSessions).toContain("grantTokenHash");
     expect(api).toContain("PublishDebateRequestSchema");
     expect(api).toContain("step_up_grant");
+    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(2);
     expect(contract).toContain("warning_acknowledged");
     expect(contract).toContain("z.literal(true)");
   });
@@ -128,6 +152,12 @@ describe("Accounts S8 publication architecture", () => {
       expect(home).toContain("readPublicDebates(50, 0)");
       expect(home).toContain("Published debates");
       expect(home).toContain("/public/debate/");
+      const publicCard = home.slice(
+        home.indexOf("published.items.map"),
+        home.indexOf("</article>", home.indexOf("published.items.map"))
+      );
+      expect(publicCard).toContain("may be indexed by search engines");
+      expect(publicCard).toContain("Copies may persist after unpublishing");
     }
     for (const page of [applicationPublic, webPublic]) {
       expect(page).toContain("readPublicDebate(id)");

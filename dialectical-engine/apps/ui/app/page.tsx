@@ -89,6 +89,7 @@ export default async function HomePage() {
                 By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
                 {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
               </p>
+              <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
             </article>
           ))}
         </div>

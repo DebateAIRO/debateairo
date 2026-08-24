@@ -312,6 +312,45 @@ describe("S8 publication on real PostgreSQL", () => {
       await expect(assertPublicationDatabaseRoleSeparation(
         authorizationPool, publicationPool
       )).rejects.toThrow("PUBLICATION_DATABASE_ROLES_MUST_BE_SEPARATE");
+      const ownerAuthorizationRejected = await assertPublicationDatabaseRoleSeparation(
+        publicationPool, database.pool
+      ).then(() => false, () => true);
+
+      const authorizationDmlRejections: boolean[] = [];
+      for (const privilege of ["SELECT", "INSERT", "UPDATE", "DELETE"] as const) {
+        await database.pool.query(
+          `GRANT ${privilege} ON identity.step_up_grant TO s8_authorization_login`
+        );
+        authorizationDmlRejections.push(await assertPublicationDatabaseRoleSeparation(
+          publicationPool, authorizationPool
+        ).then(() => false, () => true));
+        await database.pool.query(
+          `REVOKE ${privilege} ON identity.step_up_grant FROM s8_authorization_login`
+        );
+      }
+
+      await authorizationPool.query("SET ROLE debateai_authorization_runtime");
+      const setRoleRejected = await assertPublicationDatabaseRoleSeparation(
+        publicationPool, authorizationPool
+      ).then(() => false, () => true);
+      await authorizationPool.query("RESET ROLE");
+      await publicationPool.query("SET ROLE debateai_runtime");
+      const publicationSetRoleRejected = await assertPublicationDatabaseRoleSeparation(
+        publicationPool, authorizationPool
+      ).then(() => false, () => true);
+      await publicationPool.query("RESET ROLE");
+      expect({
+        ownerAuthorizationRejected,
+        authorizationDmlRejections,
+        setRoleRejected,
+        publicationSetRoleRejected
+      })
+        .toEqual({
+          ownerAuthorizationRejected: true,
+          authorizationDmlRejections: [true, true, true, true],
+          setRoleRejected: true,
+          publicationSetRoleRejected: true
+        });
     } finally {
       await Promise.all([publicationPool.end(), authorizationPool.end(), dualPool.end()]);
     }
@@ -611,6 +650,108 @@ describe("S8 publication on real PostgreSQL", () => {
     )).rowCount).toBe(0);
   });
 
+  it("audits authenticated publish and unpublish denials without run or content identifiers", async () => {
+    const identity = await createIdentity("denied-audit");
+    const runId = await createRun(identity, "denied-audit");
+    const publicationRef = randomUUID();
+    const publishGrant = await grant(identity, runId, "PUBLISH", "d", new Date());
+    expect(await repository.publish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef,
+      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      occurredAt: new Date(), source, publicationRef,
+      expectedPseudonym: "wrong-pseudonym",
+      contentCiphertext: await encryptedSnapshot(publicationRef, runId, "denied-audit")
+    })).toBe(false);
+
+    const unpublishGrant = await grant(identity, runId, "UNPUBLISH", "f", new Date());
+    expect(await repository.unpublish({
+      runId, userId: identity.userId, ownerRef: identity.ownerRef,
+      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(unpublishGrant),
+      occurredAt: new Date(), source
+    })).toBeNull();
+
+    const denied = await database.pool.query<{
+      actor_key_ref: string; event_type: string; target_type: string; target_id: string;
+      decision: string; success: boolean; justification: string | null;
+    }>(`
+      SELECT actor_key_ref,event_type,target_type,target_id,decision,success,justification
+      FROM identity.audit_event
+      WHERE event_type='debate.publication.denied' AND actor_key_ref=$1
+      ORDER BY occurred_at,audit_id
+    `, [identity.auditToken]);
+    expect(denied.rows).toHaveLength(2);
+    for (const row of denied.rows) {
+      expect(row).toMatchObject({
+        actor_key_ref: identity.auditToken,
+        event_type: "debate.publication.denied",
+        target_type: "debate.publication_attempt",
+        decision: "DENY",
+        success: false,
+        justification: "PUBLICATION_TRANSITION_DENIED"
+      });
+      expect(row.target_id).toMatch(/^[0-9a-f-]{36}$/i);
+      expect([runId, publicationRef]).not.toContain(row.target_id);
+    }
+    const serialized = JSON.stringify(denied.rows);
+    for (const forbidden of [
+      identity.userId, identity.ownerRef, identity.pseudonym, runId,
+      publicationRef, "S8 private question denied-audit", "public answer denied-audit"
+    ]) expect(serialized).not.toContain(forbidden);
+    expect(verifyChain(await readAuditChain())).toBe(true);
+  });
+
+  it("audits authenticated grant-preflight denials opaquely without source KDF work", async () => {
+    const identity = await createIdentity("preflight-denied-audit");
+    const runId = await createRun(identity, "preflight-denied-audit");
+    const publicationRef = randomUUID();
+    const requestId = `request:${randomUUID()}`;
+    expect(await repository.auditAuthenticatedPreflightDenial({
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      occurredAt: new Date(),
+      requestId
+    })).toBe(true);
+
+    expect(await repository.auditAuthenticatedPreflightDenial({
+      userId: identity.userId,
+      sessionId: randomUUID(),
+      occurredAt: new Date(),
+      requestId: `request:${randomUUID()}`
+    })).toBe(false);
+
+    const denied = await database.pool.query<{
+      actor_key_ref: string; event_type: string; target_type: string; target_id: string;
+      source_context: Record<string, unknown>; decision: string; success: boolean;
+      justification: string | null;
+    }>(`
+      SELECT actor_key_ref,event_type,target_type,target_id,source_context,
+        decision,success,justification
+      FROM identity.audit_event
+      WHERE event_type='debate.publication.preflight_denied' AND actor_key_ref=$1
+    `, [identity.auditToken]);
+    expect(denied.rows).toHaveLength(1);
+    expect(denied.rows[0]).toMatchObject({
+      actor_key_ref: identity.auditToken,
+      event_type: "debate.publication.preflight_denied",
+      target_type: "debate.publication_attempt",
+      source_context: {
+        requestId,
+        sourceCorrelation: "OMITTED_FOR_PREFLIGHT_DENIAL"
+      },
+      decision: "DENY",
+      success: false,
+      justification: "PUBLICATION_GRANT_PREFLIGHT_DENIED"
+    });
+    expect(denied.rows[0]?.target_id).toMatch(/^[0-9a-f-]{36}$/i);
+    const serialized = JSON.stringify(denied.rows);
+    for (const forbidden of [
+      identity.userId, identity.ownerRef, identity.pseudonym, identity.sessionId,
+      runId, publicationRef, source.ip, source.userAgent,
+      "S8 private question preflight-denied-audit"
+    ]) expect(serialized).not.toContain(forbidden);
+    expect(verifyChain(await readAuditChain())).toBe(true);
+  });
+
   it("refuses corpus publication of an owned legacy plaintext run", async () => {
     const identity = await createIdentity("legacy-plaintext");
     const runId = await createRun(identity, "legacy-plaintext", unconfiguredPool(database.pool));
@@ -651,7 +792,7 @@ describe("S8 publication on real PostgreSQL", () => {
         has_table_privilege('debateai_runtime','identity.step_up_grant','INSERT') AS grant_insert,
         has_table_privilege('debateai_runtime','identity.step_up_grant','UPDATE') AS grant_update,
         has_function_privilege('debateai_runtime',
-          'core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,jsonb)',
+          'core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,bytea,uuid,jsonb)',
           'EXECUTE') AS atomic_transition,
         has_function_privilege('debateai_runtime',
           'identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz)',
@@ -705,12 +846,13 @@ describe("S8 publication on real PostgreSQL", () => {
       const attempted = await runtime.query<{ publication_ref: string | null }>(`
         SELECT core.transition_run_publication(
           $1,$2,$3,$4,$5,$6,'PUBLISH',$7,$8,$9::jsonb,$10,
-          $11,NULL,$12,$13,$14::jsonb
+          $11,NULL,$12,$13,$14,$15,$16::jsonb
         ) AS publication_ref
       `, [
         randomUUID(), runId, identity.userId, identity.ownerRef, identity.sessionId,
         hash("b"), publicationRef, identity.pseudonym, JSON.stringify(contentCiphertext),
-        new Date(), randomUUID(), Buffer.alloc(32, 0x11), identity.auditToken,
+        new Date(), randomUUID(), Buffer.alloc(32, 0x11), randomUUID(),
+        Buffer.alloc(32, 0x22), randomUUID(),
         JSON.stringify({ ipArgon2id: "opaque", userAgentArgon2id: "opaque" })
       ]);
       expect(attempted.rows[0]?.publication_ref).toBeNull();

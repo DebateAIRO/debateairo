@@ -22,6 +22,10 @@ export interface PublicationApplication {
     grantToken: string;
     action: "PUBLISH" | "UNPUBLISH";
   }>): Promise<boolean>;
+  auditPreflightDenial(input: Readonly<{
+    authenticated: AuthenticatedSession;
+    requestId: string | undefined;
+  }>): Promise<boolean>;
   readOwnedVisibility(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -77,6 +81,18 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }, input.action);
   }
 
+  async auditPreflightDenial(input: Readonly<{
+    authenticated: AuthenticatedSession;
+    requestId: string | undefined;
+  }>): Promise<boolean> {
+    return this.repository.auditAuthenticatedPreflightDenial({
+      userId: input.authenticated.userId,
+      sessionId: input.authenticated.session.session_id,
+      occurredAt: this.clock(),
+      requestId: input.requestId
+    });
+  }
+
   async readOwnedVisibility(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -109,7 +125,13 @@ export class PostgresPublicationApplication implements PublicationApplication {
       authenticated: input.authenticated,
       grantToken: input.grantToken,
       action: "PUBLISH"
-    })) return null;
+    })) {
+      await this.auditPreflightDenial({
+        authenticated: input.authenticated,
+        requestId: input.source.requestId
+      });
+      return null;
+    }
     const pseudonym = await this.repository.readAuthorPseudonym(
       input.runId,
       input.authenticated.userId,
@@ -179,7 +201,13 @@ export class PostgresPublicationApplication implements PublicationApplication {
       authenticated: input.authenticated,
       grantToken: input.grantToken,
       action: "UNPUBLISH"
-    })) return null;
+    })) {
+      await this.auditPreflightDenial({
+        authenticated: input.authenticated,
+        requestId: input.source.requestId
+      });
+      return null;
+    }
     // Retry durable cleanup from a prior committed PRIVATE transition before
     // handling the next request. Key I/O runs outside every DB transaction.
     await this.reconcileKeyCleanup();

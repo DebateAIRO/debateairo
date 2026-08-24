@@ -29,6 +29,8 @@ describe("S8 duplicated public readers", () => {
       expect(html).toContain("Verdict unavailable in this published serving mode.");
       expect(html).toContain("Evidence as of");
       expect(html).toContain("2026");
+      expect(html).toContain("may be indexed by search engines");
+      expect(html).toContain("Copies may persist after unpublishing");
     }
   });
 });

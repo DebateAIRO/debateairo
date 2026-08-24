@@ -9,7 +9,7 @@ import type { Answer, PublicDebate } from "@debateai/contract";
 import type { PublicationApplication } from "../../apps/api/src/publications.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { PublicationCipher } from "../../packages/crypto/src/index.js";
-import type { PostgresPublicationRepository } from "../../packages/db/src/publication.js";
+import { PostgresPublicationRepository } from "../../packages/db/src/publication.js";
 import type {
   AuthenticatedSession,
   SessionApplication
@@ -147,6 +147,7 @@ function publications(overrides: Partial<PublicationApplication> = {}): Publicat
   return {
     reconcileKeyCleanup: async () => 0,
     preflightGrant: async () => true,
+    auditPreflightDenial: async () => true,
     readOwnedVisibility: async () => ({ state: "PRIVATE", public_ref: null }),
     publish: async () => ({ state: "PUBLISHED", public_ref: PUBLIC_REF }),
     unpublish: async () => ({ state: "PRIVATE", public_ref: null }),
@@ -211,19 +212,41 @@ describe("S8 publication HTTP boundary", () => {
     await api.close();
   });
 
-  it("rejects an invalid grant before private S6 reads, corpus key I/O, or audit KDF work", async () => {
+  it("audits authenticated invalid grants before private S6 reads, corpus key I/O, or audit KDF work", async () => {
     const privateS6Read = vi.fn<AskApplication["readRunAnswer"]>(async () => answer());
+    const privateRunRead = vi.fn<AskApplication["readRun"]>(async (runId) => ({
+      run_ref: runId, question_line: "Owned run", state: "SETTLED",
+      terminal_reason: null, hold_until: null
+    }));
     const app = application();
     app.readRunAnswer = privateS6Read;
+    app.readRun = privateRunRead;
     const corpusKeyCreate = vi.fn();
-    const auditKdfAndTransition = vi.fn();
+    const corpusKeyDestroy = vi.fn();
+    const auditIpKdf = vi.fn();
+    const auditUserAgentKdf = vi.fn();
+    const query = vi.fn(async (statement: string, values?: readonly unknown[]) => {
+      if (statement.includes("identity.publication_grant_is_live")) {
+        return { rows: [{ live: false }] };
+      }
+      if (statement.includes("FROM identity.\"user\" AS identity_user")) {
+        return { rows: [{
+          audit_token: "77777777-7777-4777-8777-777777777777",
+          this_hash: null
+        }] };
+      }
+      if (statement.includes("identity.audit_publication_preflight_denial")) {
+        return { rows: [{ appended: true }], values };
+      }
+      throw new Error(`UNEXPECTED_QUERY:${statement}`);
+    });
+    const repository = new PostgresPublicationRepository(
+      { query } as never,
+      { hashSourceIp: auditIpKdf, hashUserAgent: auditUserAgentKdf } as never
+    );
     const publication = new PostgresPublicationApplication(
-      {
-        preflightGrant: vi.fn(async () => false),
-        readAuthorPseudonym: vi.fn(),
-        publish: auditKdfAndTransition
-      } as unknown as PostgresPublicationRepository,
-      { create: corpusKeyCreate } as unknown as PublicationCipher
+      repository,
+      { create: corpusKeyCreate, destroy: corpusKeyDestroy } as unknown as PublicationCipher
     );
     const api = buildApi({
       application: app,
@@ -231,15 +254,45 @@ describe("S8 publication HTTP boundary", () => {
       publications: publication,
       allowedOrigin: ORIGIN
     });
-    const response = await api.inject({
-      method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
-      payload: { step_up_grant: GRANT_TOKEN, warning_acknowledged: true }
-    });
-    expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });
+    for (const attempt of [
+      { label: "random", method: "publish", token: "r".repeat(43) },
+      { label: "expired", method: "publish", token: "e".repeat(43) },
+      { label: "wrong-action", method: "unpublish", token: "w".repeat(43) }
+    ] as const) {
+      const response = await api.inject({
+        method: "POST", url: `/v1/runs/${RUN_ID}/${attempt.method}`, headers: mutationHeaders,
+        payload: attempt.method === "publish"
+          ? { step_up_grant: attempt.token, warning_acknowledged: true }
+          : { step_up_grant: attempt.token, copies_may_persist_acknowledged: true }
+      });
+      expect(response.statusCode, attempt.label).toBe(404);
+      expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });
+    }
     expect(privateS6Read).not.toHaveBeenCalled();
+    expect(privateRunRead).not.toHaveBeenCalled();
     expect(corpusKeyCreate).not.toHaveBeenCalled();
-    expect(auditKdfAndTransition).not.toHaveBeenCalled();
+    expect(corpusKeyDestroy).not.toHaveBeenCalled();
+    expect(auditIpKdf).not.toHaveBeenCalled();
+    expect(auditUserAgentKdf).not.toHaveBeenCalled();
+    const denialCalls = query.mock.calls.filter(([statement]) =>
+      statement.includes("identity.audit_publication_preflight_denial")
+    );
+    expect(denialCalls).toHaveLength(3);
+    for (const [, values] of denialCalls) {
+      expect(values).toHaveLength(8);
+      expect(values?.[7]).toEqual(expect.any(String));
+      expect(JSON.stringify(values)).not.toContain(RUN_ID);
+      expect(JSON.stringify(values)).not.toContain("s8-test-browser");
+    }
+    const unauthenticated = await api.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/publish`,
+      headers: { origin: ORIGIN, "user-agent": "s8-test-browser" },
+      payload: { step_up_grant: "u".repeat(43), warning_acknowledged: true }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(query.mock.calls.filter(([statement]) =>
+      statement.includes("identity.audit_publication_preflight_denial")
+    )).toHaveLength(3);
     await api.close();
   });
 

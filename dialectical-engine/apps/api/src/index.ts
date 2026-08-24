@@ -860,7 +860,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         authenticated,
         grantToken: input.step_up_grant,
         action: "PUBLISH"
-      })) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      })) {
+        await options.publications.auditPreflightDenial({
+          authenticated,
+          requestId: request.id
+        });
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
       const answer = await options.application.readRunAnswer(
         runId.data,
         request.session,
@@ -897,7 +903,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         authenticated,
         grantToken: input.step_up_grant,
         action: "UNPUBLISH"
-      })) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      })) {
+        await options.publications.auditPreflightDenial({
+          authenticated,
+          requestId: request.id
+        });
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
       const owned = await options.application.readRun(
         runId.data,
         request.session,

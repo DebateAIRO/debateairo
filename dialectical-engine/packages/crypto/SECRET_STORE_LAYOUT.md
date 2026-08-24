@@ -38,9 +38,11 @@ PUBLICATION_KEY_STORE_PATH/          durable mode-0700 volume
       publication-key.v1.json        mode 0600
 ```
 
-The corpus KEK, publication store, user/private KEK, and user store must not
-share key bytes, inodes, symlink-resolved paths, or nested roots. API startup
-fails closed if the domains overlap. Publication also requires S6 content
+The corpus KEK, publication store, user/private KEK, user store, email and
+content blind-index keys, audit source salt, and audit-key store must not share
+key bytes, inodes, symlink-resolved paths, or nested roots. API startup performs
+this check across every loaded key material and configured secret/store path and
+fails closed if any pair overlaps. Publication also requires S6 content
 encryption to be enabled, so the durable public snapshot is never sourced from
 a legacy plaintext run. Unpublish commits PRIVATE plus a database cleanup
 intent first; startup and subsequent unpublish requests reconcile that outbox

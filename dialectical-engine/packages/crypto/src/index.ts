@@ -154,22 +154,35 @@ export function assertPublicationSecretDomains(input: Readonly<{
   corpusKekPath: string;
   privateStorePath: string;
   publicationStorePath: string;
+  additionalSecrets?: readonly Readonly<{
+    path: string;
+    material: Uint8Array;
+  }>[];
+  additionalStorePaths?: readonly string[];
 }>): void {
-  const privateMaterial = readKek(input.privateKek);
-  const corpusMaterial = readKek(input.corpusKek);
+  const materials: Buffer[] = [];
   try {
-    if (timingSafeEqual(privateMaterial, corpusMaterial)) {
-      throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+    materials.push(readKek(input.privateKek), readKek(input.corpusKek));
+    for (const secret of input.additionalSecrets ?? []) {
+      materials.push(copyKey(secret.material));
+    }
+    for (let leftIndex = 0; leftIndex < materials.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < materials.length; rightIndex += 1) {
+        if (timingSafeEqual(materials[leftIndex]!, materials[rightIndex]!)) {
+          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+        }
+      }
     }
   } finally {
-    privateMaterial.fill(0);
-    corpusMaterial.fill(0);
+    for (const material of materials) material.fill(0);
   }
   const paths = [
     canonicalCandidatePath(input.privateKekPath),
     canonicalCandidatePath(input.privateStorePath),
     canonicalCandidatePath(input.corpusKekPath),
-    canonicalCandidatePath(input.publicationStorePath)
+    canonicalCandidatePath(input.publicationStorePath),
+    ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
+    ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
   for (let leftIndex = 0; leftIndex < paths.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < paths.length; rightIndex += 1) {

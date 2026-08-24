@@ -44,7 +44,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {publishedError ? <div className="error">{publishedError}</div> : null}
           {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
           {published.total > published.items.length ? <p>{published.items.length} shown of {published.total} total</p> : <p>{published.total} total</p>}
-          {published.items.map((debate) => <article className="debateCard" key={debate.public_ref}><Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link><p>By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}{debate.confidence_band ? ` · ${debate.confidence_band}` : ""}</p></article>)}
+          {published.items.map((debate) => <article className="debateCard" key={debate.public_ref}><Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link><p>By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}{debate.confidence_band ? ` · ${debate.confidence_band}` : ""}</p><p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p></article>)}
         </section>
       </div>
     </main>

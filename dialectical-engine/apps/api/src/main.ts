@@ -49,6 +49,10 @@ const environment = loadApiEnvironment();
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
+const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
+const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
+const contentBlindIndexKey = environment.CONTENT_ENCRYPTION_ENABLED === "true"
+  ? loadSecretKey(environment.CONTENT_BLIND_INDEX_KEY_PATH!) : undefined;
 if (corpusKek !== undefined) {
   assertPublicationSecretDomains({
     privateKek: kek,
@@ -56,11 +60,15 @@ if (corpusKek !== undefined) {
     privateKekPath: environment.KEK_PATH,
     corpusKekPath: environment.CORPUS_KEK_PATH!,
     privateStorePath: environment.USER_DEK_STORE_PATH,
-    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!
+    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!,
+    additionalSecrets: [
+      { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
+      { path: environment.CONTENT_BLIND_INDEX_KEY_PATH!, material: contentBlindIndexKey! },
+      { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+    ],
+    additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
   });
 }
-const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
-const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 const pool = createPool(environment.DATABASE_URL);
 const authorizationPool = environment.PUBLICATION_ENABLED === "true"
   ? createPool(environment.AUTHORIZATION_DATABASE_URL!) : pool;
@@ -99,7 +107,6 @@ const probes = new ProviderProbeRepository(pool);
 const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
 const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
-  const contentBlindIndexKey = loadSecretKey(environment.CONTENT_BLIND_INDEX_KEY_PATH!);
   try {
     configureContentEncryption(pool, new ContentCipher(
       new FileRunContentKeyStore(
@@ -116,10 +123,10 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
           return userId;
         }
       ),
-      contentBlindIndexKey
+      contentBlindIndexKey!
     ));
   } finally {
-    contentBlindIndexKey.fill(0);
+    contentBlindIndexKey!.fill(0);
   }
 }
 const registration = new RegistrationService({
