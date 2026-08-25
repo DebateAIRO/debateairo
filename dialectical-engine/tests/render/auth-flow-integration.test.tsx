@@ -2,6 +2,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
@@ -64,6 +65,48 @@ describe("rendered auth flow integration", () => {
     root = null;
     document.body.replaceChildren();
     vi.unstubAllGlobals();
+  });
+
+  it("raw-renders credential forms with query-free same-origin POST fallbacks", () => {
+    const loginHtml = renderToStaticMarkup(
+      <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+    );
+    const signUpHtml = renderToStaticMarkup(
+      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+    );
+    const cases = [
+      { route: "/login", html: loginHtml },
+      { route: "/sign-up", html: signUpHtml }
+    ];
+
+    for (const { route, html } of cases) {
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      const forms = parsed.querySelectorAll("form");
+      expect(forms, `${route} must raw-render exactly one initial credential form`).toHaveLength(1);
+      expect(forms[0]!.getAttribute("method")).toBe("post");
+      expect(forms[0]!.getAttribute("action")).toBe(route);
+      expect(forms[0]!.getAttribute("action")).not.toContain("?");
+    }
+  });
+
+  it("renders the second-step login form with the same safe POST fallback", async () => {
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    await act(async () => root!.render(
+      <LoginFlow client={{ beginLogin, completeLogin: vi.fn() }} onAuthenticated={vi.fn()} />
+    ));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+
+    const form = document.querySelector<HTMLFormElement>("form");
+    expect(form).not.toBeNull();
+    expect(form!.getAttribute("method")).toBe("post");
+    expect(form!.getAttribute("action")).toBe("/login");
+    expect(form!.getAttribute("action")).not.toContain("?");
   });
 
   it("keeps recovery-login navigation behind one explicit replacement-code acknowledgement", async () => {

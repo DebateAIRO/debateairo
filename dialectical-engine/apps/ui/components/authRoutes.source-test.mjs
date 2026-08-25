@@ -18,6 +18,7 @@ const topBar = read("./TopBar.tsx");
 const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
+const enrollMfa = read("../app/enroll-mfa/page.tsx");
 const packageJson = read("../package.json");
 
 test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
@@ -127,4 +128,25 @@ test("ordinary top bar exposes a neutral account entry without inventing session
   assert.match(topBar, /href="\/login"[\s\S]*?>\s*Account\s*</);
   assert.doesNotMatch(topBar, />\s*Log in\s*</);
   assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
+});
+
+test("every credential-bearing auth form has an explicit query-free POST fallback", () => {
+  const forms = [
+    ...(login.match(/<form\b[^>]*>/g) ?? []).map((tag) => ({ route: "/login", tag })),
+    ...(signUp.match(/<form\b[^>]*>/g) ?? []).map((tag) => ({ route: "/sign-up", tag }))
+  ];
+
+  assert.equal(forms.length, 3, "expected login credentials, login MFA, and sign-up forms");
+  for (const { route, tag } of forms) {
+    assert.match(tag, /\bmethod="post"/, `${route} form must never default to GET`);
+    assert.match(tag, new RegExp(`\\baction="${route}"`), `${route} form must use a safe same-origin action`);
+    assert.doesNotMatch(tag, /\baction="[^"]*\?/, `${route} action must not preserve a sensitive query`);
+  }
+});
+
+test("mailed-token enrollment has no native form that could submit secrets before hydration", () => {
+  assert.match(enrollMfa, /id="totp-code"/);
+  assert.match(enrollMfa, /id="recovery-typeback"/);
+  assert.doesNotMatch(enrollMfa, /<form\b/);
+  assert.doesNotMatch(verifyEmail, /<form\b/);
 });

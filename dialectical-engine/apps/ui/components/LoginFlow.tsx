@@ -94,7 +94,7 @@ export function LoginFlow({
           </button>
         </section>
       ) : challengeToken === null ? (
-        <form className="authForm" aria-busy={busy} onSubmit={submitCredentials}>
+        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
           <div className="authField"><label htmlFor="login-email">Email</label>
             <input id="login-email" name="email" type="email" autoComplete="username" placeholder="you@institution.edu" required autoFocus disabled={busy} />
           </div>
@@ -106,7 +106,7 @@ export function LoginFlow({
           </button>
         </form>
       ) : (
-        <form className="authForm" aria-busy={busy} onSubmit={submitMfa}>
+        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
           <div className="authPhase" role="status">Password accepted. Complete the required second step to open your session.</div>
           <div className="authField">
             <label htmlFor="login-code">Authenticator or recovery code</label>

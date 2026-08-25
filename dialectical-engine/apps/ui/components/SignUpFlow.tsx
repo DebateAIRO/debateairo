@@ -76,7 +76,7 @@ export function SignUpFlow({
           </button>
         </section>
       ) : (
-        <form className="authForm" aria-busy={busy} onSubmit={submitRegistration}>
+        <form className="authForm" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
           <div className="authField">
             <label htmlFor="signup-email">Email</label>
             <input id="signup-email" name="email" type="email" autoComplete="section-primary-email email" placeholder="you@institution.edu" required autoFocus disabled={busy} />
