@@ -87,7 +87,18 @@ describe("XREV-01 cross-maker node review", () => {
         }
         if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "8" }] };
         throw new Error(`UNEXPECTED_QUERY:${sql}`);
-      })
+      }),
+      connect: vi.fn(async () => ({
+        query: vi.fn(async (sql: string, values?: readonly unknown[]) => {
+          if (sql.includes("pg_advisory_lock")) return { rows: [] };
+          if (sql.includes("run_private_content_is_live")) return {
+            rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }]
+          };
+          if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
+          throw new Error(`UNEXPECTED_CLIENT_QUERY:${sql}`);
+        }),
+        release: vi.fn()
+      }))
     } as unknown as Pool;
     const gateway = createPostgresProviderGateway(pool, {
       endpoint: "http://127.0.0.1:1",

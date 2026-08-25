@@ -180,19 +180,33 @@ export type SessionList = z.infer<typeof SessionListSchema>;
 
 export const RevokeAllSessionsSchema = z.object({ revoked: z.number().int().nonnegative() }).strict();
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
-export const StepUpAuthorizationRequestSchema = z.object({
-  action: VisibilityGrantActionSchema,
-  target_run_id: z.uuid()
-}).strict();
+export const RunTargetedGrantActionSchema = z.enum([
+  "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
+]);
+export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: RunTargetedGrantActionSchema,
+    target_run_id: z.uuid()
+  }).strict(),
+  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict()
+]);
+const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: RunTargetedGrantActionSchema,
+    target_run_id: z.uuid(),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("DELETE_ACCOUNT"),
+    expires_at: z.iso.datetime()
+  }).strict()
+]);
 export const StepUpResponseSchema = z.object({
   status: z.literal("step_up_complete"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  step_up_grant: z.object({
-    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: VisibilityGrantActionSchema,
-    target_run_id: z.uuid(),
-    expires_at: z.iso.datetime()
-  }).strict().optional()
+  step_up_grant: StepUpGrantResponseSchema.optional()
 }).strict();
 
 export const PublishDebateRequestSchema = z.object({
@@ -203,6 +217,32 @@ export const PublishDebateRequestSchema = z.object({
 export const UnpublishDebateRequestSchema = z.object({
   step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   copies_may_persist_acknowledged: z.literal(true)
+}).strict();
+
+const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+export const AccountErasureScheduleRequestSchema = z.object({
+  confirmation: z.literal("DELETE MY ACCOUNT"),
+  step_up_grant: StepUpGrantTokenSchema
+}).strict();
+export const AccountErasureStatusSchema = z.discriminatedUnion("status", [
+  z.object({ status:z.literal("NONE") }).strict(),
+  z.object({
+    status:z.enum(["SCHEDULED","DUE","PROCESSING"]),
+    execute_at:z.iso.datetime(),
+    cancellation_ref:z.uuid()
+  }).strict()
+]);
+export const AccountErasureCancelRequestSchema = z.object({
+  cancellation_ref:z.uuid()
+}).strict();
+export const AccountErasureCancelledSchema = z.object({
+  status:z.literal("CANCELLED")
+}).strict();
+export const PrivateDebateErasureRequestSchema = z.object({
+  step_up_grant:StepUpGrantTokenSchema
+}).strict();
+export const PrivateDebateErasureStatusSchema = z.object({
+  status:z.enum(["CLEANED","PENDING"])
 }).strict();
 
 export const PublicationTransitionSchema = z.object({
@@ -606,6 +646,10 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/auth/sessions/{id}",
     "DELETE /v1/auth/sessions",
     "POST /v1/auth/step-up",
+    "DELETE /v1/account",
+    "GET /v1/account/erasure",
+    "POST /v1/account/erasure/cancel",
+    "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
     "POST /v1/asks",
@@ -630,8 +674,12 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
+    RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
+    AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
+    AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
+    PrivateDebateErasureStatusSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

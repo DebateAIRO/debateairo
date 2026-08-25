@@ -18,13 +18,13 @@ Direct worker writes are limited to evaluator-owned `domain`,
 `shadow_decision`, `vllm_probe`, `vllm_catalog_model`, and `consumer_output`.
 Consumer refreshes additionally write only their evaluator-owned
 `consumer_refresh_receipt` audit rows.
-The evaluator API role may insert only `consumer_selection`. Normal provider
-gateway calls separately retain their existing narrow ledger write authority.
-Tagger calls use evaluator-scoped attempt ids and a null ledger `run_id`; the
-product run is correlated only by evaluator-owned admission, assignment, and
-pipeline rows. Consequently tag attempts cannot consume a product cost
-envelope, enter its execution digest, or participate in product liveness
-partitions.
+The evaluator API role may insert only `consumer_selection`. Provider ledger
+writes remain subject to the S10 authenticated evaluator-scope trigger.
+Tagger and add-on calls carry the exact product `run_id`; every prompt, raw
+artifact, diagnostic, and locator is authenticated under that run's content
+domain. S10 refuses null-run or cross-run evaluator provider evidence. Product
+accounting/liveness segregation is a separate, closed evaluator-purpose
+authorization boundary rather than a null-run convention.
 No evaluator role can write product `core`, `serve`, `memory`, settlement
 `scorecard`, or routing/session-assignment rows.
 
@@ -59,9 +59,10 @@ locks, then re-reads the registry before deciding and inserting. The registry
 lock also prevents two differently spelled near duplicates from racing. A grown
 row requires
 provider/model/version, source run, raw tagger artifact, guardrail version, and
-provenance. The source run is evaluator-owned correlation metadata; the tagger
-artifact itself remains null-run evaluator evidence. Registry and admission
-history remain append-only.
+provenance. The tagger artifact, its ledger entry, attempt, provider, and STARTED
+pipeline receipt must all bind to that exact run; null-run, cross-run, and
+prefix-only evidence is refused. Registry and admission history remain
+append-only.
 
 Question domains land only in `evaluator.question_domain`. The `run_id` and
 `domain_admission_id` uniqueness constraints make assignment singular; a
@@ -116,10 +117,13 @@ explicit evaluator-owned values; harvest never inserts into or mutates
 `scorecard.answer_outcome`.
 
 Artifact identity comes from each source table's explicit artifact reference.
-Call-site classification correlates `ledger.ledger_entry` to
-`ledger.raw_artifact` by `attempt_id`, including evaluator artifacts whose
-`run_id` is null. Any `evaluator.` call-site attempt is excluded from model
-performance observations. Model versions that are absent are skipped rather
+An evaluator artifact is excluded from product performance, budget, liveness,
+and execution-digest projections only when the database authenticates its exact
+closed call-site, subject/attempt, run, provider, raw-artifact linkage, and
+STARTED pipeline receipt. Caller-authored `evaluator.` prefixes, lane labels,
+NULL call sites, or cross-run references do not create an exemption. An
+artifact durable before its matching ledger receipt is conservatively treated
+as product-visible evidence. Model versions that are absent are skipped rather
 than collapsed into maker-level identity, with a typed
 `MODEL_IDENTITY_INCOMPLETE` pipeline receipt.
 
@@ -180,13 +184,14 @@ invalid-policy, and register-version preflights write typed `SKIPPED` receipts
 before `STARTED`, so configuration faults never consume that lifetime budget.
 A family/register mismatch is recoverable by retrying with the matching family.
 An absent policy records an explicit `ADDON_POLICY_UNAVAILABLE` skip. Each
-invocation can make exactly one gateway call, with `runId: null`, an
+invocation can make exactly one gateway call, with the exact `runId`, an
 `evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. A
-non-blocking session advisory lock guards the per-run candidate/provider pass;
-same-run losers record `ADDON_PASS_IN_FLIGHT`, while the winner performs every
-repository operation on the lock-owning client. This preserves the one-call
-ceiling without nested pool checkout or pool starvation. The product run's
-attempt accounting is never used as a retry bound.
+session advisory content lease guards the per-run candidate/provider pass on
+one connection. Same-run followers serialize, then observe
+`ADDON_ALREADY_GRADED`; every repository operation uses the lease-owning
+client. This preserves the one-call ceiling without nested pool checkout or
+pool starvation. The product run's attempt accounting is never used as a retry
+bound.
 
 The repository requires a successful HARVEST receipt, selects at most one
 reduced judgement deterministically, and creates a fresh allowlist-only blind
@@ -200,10 +205,9 @@ Successful grades append `judging.blind-grade.v1` observations with step
 profile identity is the graded judge's exact provider/model/version; graded and
 grader artifacts remain separate evidence references. Code refuses equal
 makers before calling and again before inserting. Migration 0026 makes the
-database guard compatible with the required null-run grader artifact while
-still requiring the graded artifact to belong to the product run and refusing
-equal makers. The add-on stays collect-only and has no dispatch or routing read
-path.
+database guard requires both graded and grader artifacts to belong to the exact
+product run while refusing equal makers. The add-on stays collect-only and has
+no dispatch or routing read path.
 
 ## Consumer reader
 
@@ -219,21 +223,26 @@ The model may return only a plain-language bias-pattern name, a per-domain
 capability summary, and flags for allowlisted opaque adjacent-domain refs;
 numeric, routing, unknown, duplicated, or malformed fields are refused.
 
-Both on-demand and post-aggregate worker entry points use null-run evaluator
-calls with their own hard two-attempt provider bound. A short transaction uses
+Both on-demand and post-aggregate worker entry points use a separate
+`PublicAggregateProvider`, not the private-run `ProviderGateway`. Each current
+publication sample is decrypted under its publication-domain session lease and
+classified independently with its exact selected public model and hard
+two-attempt bound. The provider adapter has no raw-artifact, ledger, private
+run-key, or persistence dependency; validated provider bytes remain ephemeral.
+A short transaction uses
 `pg_try_advisory_xact_lock` only to append a STARTED claim; no database client or
 lock spans the provider call. Concurrent losers receive durable in-flight
 receipts, and failed refreshes stop after two consumer-owned invocations for the
 same selection/target/domain/prompt/snapshot key. Provider isolation is asserted
 again immediately before every call.
 
-Successful language output is append-only in `evaluator.consumer_output`, keyed
-by prompt version and aggregate snapshot hash. Migration 0028 adds append-only
-global refresh receipts because consumer aggregation has no honest product
-`run_id`; preflight, STARTED, success, failure, retry-limit, current-output, and
-in-flight outcomes therefore never borrow product counters or fabricate a run.
-The repository validates that the generated artifact is null-run, from the
-selected local consumer model and pinned evaluator maker. It has no write path
+Successful output is a content-free count aggregate append-only in
+`evaluator.consumer_output`, keyed by prompt version and aggregate snapshot
+hash. Migration 0028 adds append-only global refresh receipts because the
+cross-run aggregate has no honest single product `run_id`; preflight, STARTED,
+success, failure, retry-limit, current-output, and in-flight outcomes therefore
+never borrow product counters or fabricate a run. No provider raw artifact or
+ledger row is generated. The repository has no write path
 to profile cells, ranks, relative cost, shadow decisions, selection, binding, or
 live dispatch, including when the selected consumer interprets its own
 code-computed row.

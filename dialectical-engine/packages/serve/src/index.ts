@@ -4,11 +4,13 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
+  MAX_OWNER_PRIVATE_HISTORY_SCAN,
   allocateSequence,
   decryptContentForRun,
-  encryptContentForRun,
+  encryptAttestedContentForRun,
   normalizeRunOwnership,
   RunRepository,
+  withRunContentLease,
   type CryptoEnvelope,
   withWriteTransaction,
   type RunOwnershipInput
@@ -941,6 +943,7 @@ export class ServeRepository {
     if (owner === undefined) {
       throw new TypedDomainError("SERVED_NUMBER_NOT_FOUND", `No served number ${servedNumberId} exists`);
     }
+    await withRunContentLease(this.pool,[owner.run_id],async () => {
     const composedContent = owner.composed_text_id === null ? { segments: owner.segments ?? [] }
       : await decryptContentForRun<{ segments: Array<{ segment_id: string; served_number_refs: string[] }> }>(
         this.pool, owner.run_id, "serve.composed_text", owner.composed_text_id,
@@ -962,6 +965,7 @@ export class ServeRepository {
           [owner.answer_id, owner.answer_version, segment.segment_id, owner.number_ref, await allocateSequence(client)]
         );
       }
+    });
     });
   }
 
@@ -1000,13 +1004,14 @@ export class ServeRepository {
     )) {
       throw new TypedDomainError("CONDITION_MARK_AFFECTED_NODES_REQUIRED", "Every S09 mark must inspect affected nodes");
     }
+    return withRunContentLease(this.pool,[input.runId],async () => {
     const verdict = deriveHonestVerdict({
       usableBasis: input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
       reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
     });
     const factBundleId = randomUUID();
-    const factContent = await encryptContentForRun(
+    const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
       { facts: input.factBundle.facts, residualObjections: input.factBundle.residualObjections }
     );
@@ -1019,7 +1024,7 @@ export class ServeRepository {
     }));
     const composedContent = input.supersedes !== undefined || input.compositionRawArtifactRef === null
       ? null
-      : await encryptContentForRun(
+      : await encryptAttestedContentForRun(
         this.pool, input.runId, "serve.composed_text", nextComposedTextId,
         { segments: storedSegments }
       );
@@ -1058,26 +1063,28 @@ export class ServeRepository {
         : priorAnswer.answer_version + 1;
       const facts = await client.query<{ fact_bundle_id: string }>(
         `INSERT INTO serve.fact_bundle (
-          fact_bundle_id,run_id,facts,residual_objections,content_hash,version,content_ciphertext
-        ) VALUES ($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7::jsonb) RETURNING fact_bundle_id`,
+          fact_bundle_id,run_id,facts,residual_objections,content_hash,
+          content_hash_version,version,content_ciphertext,content_attestation
+        ) VALUES ($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8::jsonb,$9) RETURNING fact_bundle_id`,
         [
           factBundleId, input.runId,
           JSON.stringify(factContent === null ? input.factBundle.facts : []),
           JSON.stringify(factContent === null ? input.factBundle.residualObjections : []),
-          input.factBundleContentHash,
+          factContent === null ? input.factBundleContentHash : null,
+          factContent === null ? 1 : 2,
           answerVersion,
-          factContent === null ? null : JSON.stringify(factContent)
+          factContent === null ? null : JSON.stringify(factContent.envelope),factContent?.attestation ?? null
         ]
       );
       const storedFactBundleId = facts.rows[0]!.fact_bundle_id;
       const composed = priorAnswer !== undefined || input.compositionRawArtifactRef === null ? null : await client.query<{ composed_text_id: string }>(
         `INSERT INTO serve.composed_text (
-          composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext
-        ) VALUES ($1,$2,$3::jsonb,$4,$5,$6::jsonb) RETURNING composed_text_id`,
+          composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation
+        ) VALUES ($1,$2,$3::jsonb,$4,$5,$6::jsonb,$7) RETURNING composed_text_id`,
         [nextComposedTextId, storedFactBundleId,
         JSON.stringify(composedContent === null ? storedSegments : []),
         input.compositionRawArtifactRef, input.compositionAttempt,
-        composedContent === null ? null : JSON.stringify(composedContent)]
+        composedContent === null ? null : JSON.stringify(composedContent.envelope),composedContent?.attestation ?? null]
       );
       const composedTextId = priorAnswer?.composed_text_id ?? composed?.rows[0]!.composed_text_id ?? null;
       const conformance = priorAnswer !== undefined || composedTextId === null ? null : await client.query<{ conformance_record_id: string }>(
@@ -1223,6 +1230,7 @@ export class ServeRepository {
         servedNumberId: servedNumber?.rows[0]!.served_number_id ?? null
       };
     });
+    });
   }
 
   async readReviewCatchUpDisclosedNodeIds(
@@ -1242,6 +1250,7 @@ export class ServeRepository {
   }
 
   async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {
+    return this.#memory.withDisclosureContentLease([runId],async () => {
     const head = await this.pool.query<{
       effective_asker_id: string;
       owner_ref: string | null;
@@ -1344,6 +1353,7 @@ export class ServeRepository {
         propagationRunId: row.propagation_run_id!
       })
     });
+    });
   }
 
   async readAnswerProjection(answerId: string, ownership: RunOwnershipInput, version?: number): Promise<Answer | null> {
@@ -1421,6 +1431,7 @@ export class ServeRepository {
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
+    return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
         this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
@@ -1652,12 +1663,17 @@ export class ServeRepository {
       staleness_state: staleness.state,
       relevant_as_of: staleness.relevantAsOf
     };
+    });
   }
 
   async readAnswerIndex(ownership: RunOwnershipInput, limit: number, offset: number): Promise<AnswerIndex> {
     const access = normalizeRunOwnership(ownership);
-    if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
-      throw new TypedDomainError("ANSWER_INDEX_PAGE_INVALID", "An explicit positive limit and nonnegative offset are required");
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
+      || !Number.isInteger(offset) || offset < 0) {
+      throw new TypedDomainError(
+        "ANSWER_INDEX_PAGE_INVALID",
+        "An explicit bounded positive limit and nonnegative offset are required"
+      );
     }
     const [page, count] = await Promise.all([
       this.pool.query<{
@@ -1677,6 +1693,8 @@ export class ServeRepository {
            FROM core.run AS run
            JOIN serve.answer AS answer ON answer.run_id = run.run_id
            WHERE core.run_is_owned_by(run.run_id,$1,$2)
+             AND (run.content_encryption_version IS DISTINCT FROM 1
+               OR core.run_private_content_is_live(run.run_id))
            ORDER BY run.run_id, answer.sealed_at_seq DESC
          ), open_run AS (
            SELECT
@@ -1687,6 +1705,8 @@ export class ServeRepository {
              run.created_at_seq AS created_at_sequence
            FROM core.run AS run
            WHERE core.run_is_owned_by(run.run_id,$1,$2)
+             AND (run.content_encryption_version IS DISTINCT FROM 1
+               OR core.run_private_content_is_live(run.run_id))
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
@@ -1695,45 +1715,56 @@ export class ServeRepository {
          LIMIT $3 OFFSET $4`, [access.ownerRef, access.legacyAskerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM core.run
-         WHERE core.run_is_owned_by(run_id,$1,$2)`, [access.ownerRef, access.legacyAskerId]
+        `SELECT count(*)::text AS count FROM core.run AS run
+         WHERE core.run_is_owned_by(run.run_id,$1,$2)
+           AND (run.content_encryption_version IS DISTINCT FROM 1
+             OR core.run_private_content_is_live(run.run_id))`,
+        [access.ownerRef, access.legacyAskerId]
       )
     ]);
-    const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
-    const answers = await Promise.all(answerRows.map(async (row) => ({
-      row,
-      answer: await this.readAnswerProjection(row.answer_id, access)
-    })));
-    const runRepository = new RunRepository(this.pool);
-    const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
-    const openRuns = await Promise.all(openRows.map(async (row) => ({
-      row,
-      projection: await runRepository.readLoadingProjection(row.run_ref, access)
-    })));
-    return AnswerIndexSchema.parse({
-      items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
-        answer_id: answer.answer_id,
-        run_ref: answer.run_ref,
-        answer_version: answer.answer_version,
-        question_line: answer.question_line,
-        verdict_state: answer.verdict_state,
-        abstention: answer.abstention,
-        serve_state: answer.serve_state,
-        staleness_state: answer.staleness_state,
-        builds_on_previous: answer.builds_on_previous.value,
-        created_at_sequence: Number(row.created_at_sequence)
-      }]),
-      open_runs: openRuns.flatMap(({ row, projection }) => projection === null ? [] : [{
-        run_ref: projection.runRef,
-        question_line: projection.questionLine,
-        state: projection.state,
-        terminal_reason: projection.terminalReason,
-        created_at_sequence: Number(row.created_at_sequence)
-      }]),
-      limit,
-      offset,
-      total: Number(count.rows[0]?.count ?? 0)
-    });
+    if (page.rows.length === 0) {
+      return AnswerIndexSchema.parse({ items: [], open_runs: [], limit, offset, total: Number(count.rows[0]?.count ?? 0) });
+    }
+    return this.#memory.withDisclosureContentLease(
+      page.rows.map((row) => row.run_ref),
+      async () => {
+      const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
+      const answers = await Promise.all(answerRows.map(async (row) => ({
+        row,
+        answer: await this.readAnswerProjection(row.answer_id, access)
+      })));
+      const runRepository = new RunRepository(this.pool);
+      const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
+      const openRuns = await Promise.all(openRows.map(async (row) => ({
+        row,
+        projection: await runRepository.readLoadingProjection(row.run_ref, access)
+      })));
+      return AnswerIndexSchema.parse({
+        items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
+          answer_id: answer.answer_id,
+          run_ref: answer.run_ref,
+          answer_version: answer.answer_version,
+          question_line: answer.question_line,
+          verdict_state: answer.verdict_state,
+          abstention: answer.abstention,
+          serve_state: answer.serve_state,
+          staleness_state: answer.staleness_state,
+          builds_on_previous: answer.builds_on_previous.value,
+          created_at_sequence: Number(row.created_at_sequence)
+        }]),
+        open_runs: openRuns.flatMap(({ row, projection }) => projection === null ? [] : [{
+          run_ref: projection.runRef,
+          question_line: projection.questionLine,
+          state: projection.state,
+          terminal_reason: projection.terminalReason,
+          created_at_sequence: Number(row.created_at_sequence)
+        }]),
+        limit,
+        offset,
+        total: Number(count.rows[0]?.count ?? 0)
+      });
+      }
+    );
   }
 
   async readRunAnswerProjection(runId: string, ownership: RunOwnershipInput): Promise<Answer | null> {
@@ -1763,9 +1794,10 @@ export class ServeRepository {
       [input.answerId]
     )).rows[0];
     if (candidate === undefined) return null;
+    return withRunContentLease(this.pool,[candidate.run_id],async () => {
     const requestRef = randomUUID();
     const replayHandle = `investigation-request:${requestRef}`;
-    const content = input.userInput === null ? null : await encryptContentForRun(
+    const content = input.userInput === null ? null : await encryptAttestedContentForRun(
       this.pool, candidate.run_id, "core.investigation_request", requestRef,
       { userInput: input.userInput }
     );
@@ -1798,14 +1830,15 @@ export class ServeRepository {
       await client.query(
         `INSERT INTO core.investigation_request (
            investigation_request_id, run_id, answer_id, answer_version, gap_ref,
-           user_input, input_kind, status, replay_handle, at_seq, content_ciphertext
-         ) VALUES ($1,$2,$3,$4,$5,$6,'HUMAN_STEER','RECORDED',$7,$8,$9::jsonb)`,
+           user_input, input_kind, status, replay_handle, at_seq, content_ciphertext,content_attestation
+         ) VALUES ($1,$2,$3,$4,$5,$6,'HUMAN_STEER','RECORDED',$7,$8,$9::jsonb,$10)`,
         [requestRef, answer.run_id, input.answerId, answer.answer_version, input.gapRef,
           content === null ? input.userInput : CONTENT_CIPHERTEXT_SENTINEL,
           replayHandle, await allocateSequence(client),
-          content === null ? null : JSON.stringify(content)]
+          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
       );
       return Object.freeze({ request_ref: requestRef, status: "RECORDED" as const, replay_handle: replayHandle });
+    });
     });
   }
 
@@ -1825,7 +1858,10 @@ export class ServeRepository {
     }>(
       `SELECT ledger_entry_id::text AS entry_ref, action_kind, subject_item_id AS subject_ref,
               outcome, actor_ref, started_at, finished_at
-       FROM ledger.ledger_entry WHERE run_id=$1 ORDER BY sequence`, [runId]
+       FROM ledger.ledger_entry
+       WHERE run_id=$1
+         AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)
+       ORDER BY sequence`, [runId]
     ), this.pool.query<{ node_id: string }>(
       `SELECT node_id::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq`, [runId]
     ), this.pool.query<{ node_set: unknown; state: string; claim_deadline: Date | null }>(
@@ -1985,6 +2021,7 @@ export class ServeRepository {
   }
 
   private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number): Promise<Node[]> {
+    return withRunContentLease(this.pool,[runId],async () => {
     const result = await this.pool.query<{
       node_id: string;
       claim_text: string;
@@ -2168,5 +2205,6 @@ export class ServeRepository {
       relevant_as_of: staleness.relevantAsOf
       };
     }));
+    });
   }
 }

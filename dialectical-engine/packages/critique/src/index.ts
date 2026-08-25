@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import { allocateSequence, withRunContentLease, withWriteTransaction } from "@debateai/db";
 import {
   LEDGER_ACTION_SCOPE,
   TypedDomainError,
@@ -482,16 +482,22 @@ export class CritiqueRepository {
   }
 
   async recordCritiquePacket(input: BlindedCritiquePacket): Promise<string> {
-    return withWriteTransaction(this.pool, async (client) => {
-      const atSequence = await allocateSequence(client);
-      const result = await client.query<{ critique_packet_id: string }>(`
-        INSERT INTO core.critique_packet (
-          run_id, source_artifact_ref, packet_fingerprint, critic_maker, blinding_applied,
-          research_context_hash, critique_context_hash, at_seq
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING critique_packet_id
-      `, [input.runId, input.sourceArtifactRef, input.packetFingerprint, input.criticMaker, input.blindingApplied,
-        input.researchContextHash, input.critiqueContextHash, atSequence]);
-      return result.rows[0]!.critique_packet_id;
+    return withRunContentLease(this.pool, [input.runId], async () => {
+      const critiquePacketId = randomUUID();
+      return withWriteTransaction(this.pool, async (client) => {
+        const atSequence = await allocateSequence(client);
+        const result = await client.query<{ critique_packet_id: string }>(`
+          INSERT INTO core.critique_packet (
+            critique_packet_id,run_id,source_artifact_ref,packet_fingerprint,
+            packet_fingerprint_version,critic_maker,blinding_applied,
+            research_context_hash,research_context_hash_version,
+            critique_context_hash,critique_context_hash_version,at_seq
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING critique_packet_id
+        `, [critiquePacketId,input.runId,input.sourceArtifactRef,input.packetFingerprint,
+          1,input.criticMaker,input.blindingApplied,
+          input.researchContextHash,1,input.critiqueContextHash,1,atSequence]);
+        return result.rows[0]!.critique_packet_id;
+      });
     });
   }
 

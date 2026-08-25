@@ -3,8 +3,7 @@ import {
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek,
-  loadSecretKey
+  loadKek
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool } from "@debateai/db";
 import { WorkItemRepository } from "@debateai/battery";
@@ -20,28 +19,22 @@ const kek = loadKek(environment.KEK_PATH);
 const pool = createPool(environment.DATABASE_URL);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
-  const contentBlindIndexKey = loadSecretKey(environment.CONTENT_BLIND_INDEX_KEY_PATH!);
-  try {
-    configureContentEncryption(pool, new ContentCipher(
-      new FileRunContentKeyStore(
-        environment.USER_DEK_STORE_PATH!,
-        users,
-        async (ownerRef) => {
-          const resolved = await pool.query<{ user_id: string }>(
-            `SELECT user_id FROM identity."user"
-             WHERE owner_ref=$1 AND state='active'`,
-            [ownerRef]
-          );
-          const userId = resolved.rows[0]?.user_id;
-          if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
-          return userId;
-        }
-      ),
-      contentBlindIndexKey
-    ));
-  } finally {
-    contentBlindIndexKey.fill(0);
-  }
+  configureContentEncryption(pool, new ContentCipher(
+    new FileRunContentKeyStore(
+      environment.USER_DEK_STORE_PATH!,
+      users,
+      async (ownerRef) => {
+        const resolved = await pool.query<{ user_id: string }>(
+          `SELECT user_id FROM identity."user"
+           WHERE owner_ref=$1 AND state='active'`,
+          [ownerRef]
+        );
+        const userId = resolved.rows[0]?.user_id;
+        if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
+        return userId;
+      }
+    )
+  ));
 }
 const bootstrap = await loadBootstrapRegister();
 // DR-128: the canonical row is attached to the judgement path; absence blocks loudly before claim.

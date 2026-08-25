@@ -21,7 +21,9 @@ import {
   persistBootstrapRegister,
   readClaimTypeCompositionMap
 } from "@debateai/register";
-import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import {
+  createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
+} from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   createPostgresProviderGateway,
@@ -563,7 +565,10 @@ describe("LOAD-01 run projection ownership boundary", () => {
       state: "HOLDING", holdUntil: new Date(future)
     });
 
-    const application = new PostgresAskApplication(database.pool, {} as never, {} as never);
+    const application = new PostgresAskApplication(
+      database.pool,{} as never,{} as never,undefined,database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
+    );
     const api = buildApi({
       application,
       legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: ownerToken })
@@ -1375,16 +1380,17 @@ describe("FX-LG-02 / FX-LED-04 — append-only ordered ledger", () => {
 
 describe("S01 ledger hardening", () => {
   it("FX-LED-05 persists the input/contract/content hash triple on a raw artifact", async () => {
+    const runId = await createRun(`fx-led-05-${randomUUID()}`);
     const artifactId = randomUUID();
     const supersedingArtifactId = randomUUID();
     await new LedgerRepository(database.pool).appendRawArtifact({
-      artifactId, attemptId: randomUUID(), runId: null, providerRef: "provider:test",
+      artifactId, attemptId: randomUUID(), runId, providerRef: "provider:test",
       provider: "test-layer-http", model: "fixture/model", maker: "fixture", modelVersion: null,
       rawText: "labeled test-layer artifact", metadata: {}, parseStatus: "UNPARSED",
       inputHash: "a".repeat(64), contractHash: "b".repeat(64), contentHash: "c".repeat(64)
     });
     await new LedgerRepository(database.pool).appendRawArtifact({
-      artifactId: supersedingArtifactId, attemptId: randomUUID(), runId: null, providerRef: "provider:test",
+      artifactId: supersedingArtifactId, attemptId: randomUUID(), runId, providerRef: "provider:test",
       provider: "test-layer-http", model: "fixture/model", maker: "fixture", modelVersion: null,
       rawText: "labeled test-layer artifact", metadata: {}, parseStatus: "UNPARSED",
       inputHash: "a".repeat(64), contractHash: "d".repeat(64), contentHash: "c".repeat(64)

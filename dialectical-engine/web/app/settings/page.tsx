@@ -5,6 +5,7 @@ import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import type { Session } from "@/lib/types";
 import { ContractHttpError } from "@debateai/contract";
 import { SessionControls } from "@/components/SessionControls";
+import { AccountErasureControls } from "@/components/AccountErasureControls";
 
 export default function SettingsPage() {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -75,5 +76,6 @@ export default function SettingsPage() {
       setSession(null);
       setError(null);
     }} /> : null}
+    {session ? <AccountErasureControls /> : null}
   </div></main>;
 }

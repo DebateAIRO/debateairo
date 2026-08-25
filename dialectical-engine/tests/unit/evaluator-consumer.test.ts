@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
-import type { ProviderGateway } from "@debateai/providers";
 import {
   CONSUMER_MAX_PROVIDER_ATTEMPTS,
   buildEvaluatorConsumerPrompt,
   runEvaluatorConsumerRefresh,
   type EvaluatorConsumerJob,
   type EvaluatorConsumerRepository,
-  type EvaluatorProviderFamilyRow
+  type EvaluatorProviderFamilyRow,
+  type PublicAggregateProvider
 } from "../../packages/evaluator/src/index.js";
 
 const family: EvaluatorProviderFamilyRow = {
@@ -58,15 +58,21 @@ const job: EvaluatorConsumerJob = {
     intervalUpper: 0.8,
     derivationVersion: 4
   }],
-  blindedSamples: [{
-    sampleId: "opaque:sample-1",
+  blindedSamples: [1,2,3].map((ordinal) => ({
+    runId: `00000000-0000-4000-8000-00000000000${ordinal}`,
+    publicationRef: `10000000-0000-4000-8000-00000000000${ordinal}`,
+    sampleId: `opaque:sample-${ordinal}`
+  })),
+  adjacentDomains: [{ domainRef: "opaque:domain-medicine", name: "Medicine" }]
+};
+
+const resolvedSamples = job.blindedSamples.map((sample) => ({
+    ...sample,
     questionExcerpt: "Is the anonymous claim supported?",
     taskExcerpt: "Assess the supplied anonymous judgement.",
     grade: "0.75 (PROBABILITY)",
     reasons: ["The evidence supports the anonymous claim."]
-  }],
-  adjacentDomains: [{ domainRef: "opaque:domain-medicine", name: "Medicine" }]
-};
+  }));
 
 function repository(overrides: Partial<EvaluatorConsumerRepository> = {}): EvaluatorConsumerRepository & {
   readonly receipts: unknown[];
@@ -92,6 +98,11 @@ function repository(overrides: Partial<EvaluatorConsumerRepository> = {}): Evalu
       receipts.push(receipt);
       return `receipt:${receipts.length}`;
     }),
+    withPublicSampleLease: vi.fn(async (sample, use) => {
+      const resolved = resolvedSamples.find((candidate) => candidate.sampleId===sample.sampleId);
+      if (resolved === undefined) throw new Error("PUBLIC_SAMPLE_FIXTURE_MISSING");
+      return use(resolved);
+    }),
     persistOutput: vi.fn(async (output) => {
       outputs.push(output);
       return { consumerOutputId: "output:1", inserted: true };
@@ -100,17 +111,20 @@ function repository(overrides: Partial<EvaluatorConsumerRepository> = {}): Evalu
   };
 }
 
-function provider(content: unknown): ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } {
+function provider(content: unknown): PublicAggregateProvider & {
+  readonly classify: ReturnType<typeof vi.fn>;
+} {
   return {
-    call: vi.fn(async () => ({
-      rawArtifactRef: "artifact:consumer",
-      ledgerEntryRef: "ledger:consumer",
-      content: typeof content === "string" ? content : JSON.stringify(content),
-      provider: "openai-compatible-http" as const,
-      model: "consumer:local",
-      maker: "maker:evaluator-local-vllm",
-      modelVersion: "consumer-v1"
-    }))
+    classify: vi.fn(async () => {
+      if (typeof content === "string") {
+        throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED");
+      }
+      if (typeof content === "object" && content !== null
+        && Object.keys(content).some((key) => /numeric|rank|route|routing|score|weight/i.test(key))) {
+        throw new TypedDomainError("SELF_ROUTING_FORBIDDEN", "SELF_ROUTING_FORBIDDEN");
+      }
+      return Object.freeze({ classification: "ACCEPTED" as const });
+    })
   };
 }
 
@@ -124,7 +138,7 @@ const baseInput = {
 
 describe("evaluator consumer reader", () => {
   it("builds an aggregate prompt whose sample material and target are blinded", () => {
-    const prompt = buildEvaluatorConsumerPrompt(job);
+    const prompt = buildEvaluatorConsumerPrompt(job,resolvedSamples);
     const bytes = JSON.stringify(prompt);
 
     expect(bytes).toContain("opaque:sample-1");
@@ -135,7 +149,7 @@ describe("evaluator consumer reader", () => {
     expect(bytes).not.toMatch(/maker|raw_artifact|lineage|provenance/i);
   });
 
-  it("makes a null-run bounded evaluator call and persists interpretation only", async () => {
+  it("makes one leased call per public run and persists only content-free aggregate counts", async () => {
     const records = repository();
     const gateway = provider({
       bias_pattern_name: "Cautiously lenient",
@@ -157,14 +171,12 @@ describe("evaluator consumer reader", () => {
       failures: 0
     });
 
-    expect(gateway.call).toHaveBeenCalledTimes(1);
-    expect(gateway.call.mock.calls[0]![0]).toMatchObject({
-      runId: null,
-      subjectItemId: expect.stringMatching(/^evaluator:consumer-attempt:/),
-      callSiteKey: "evaluator.refresh-consumer-output.v1",
-      lane: "evaluator",
+    expect(gateway.classify).toHaveBeenCalledTimes(3);
+    expect(records.withPublicSampleLease).toHaveBeenCalledTimes(3);
+    expect(gateway.classify.mock.calls[0]![0]).toMatchObject({
       bound: { maxAttempts: 2, tokenCeiling: 512, deadlineMs: 250 }
     });
+    expect(gateway.classify.mock.calls[0]![0]).not.toHaveProperty("runId");
     expect(records.outputs).toEqual([expect.objectContaining({
       job: expect.objectContaining({
         target: {
@@ -173,16 +185,15 @@ describe("evaluator consumer reader", () => {
           modelVersion: "secret-v1"
         }
       }),
-      generatedRawArtifactRef: "artifact:consumer",
-      adjacentDomainFlags: [{
-        domain_ref: "opaque:domain-medicine",
-        reason: "The same evidence-evaluation skill may transfer.",
-        confidence: "MEDIUM"
-      }]
+      generatedRawArtifactRef: null,
+      blindedSampleRefs: [],
+      adjacentDomainFlags: []
     })]);
     expect(JSON.parse((records.outputs[0] as { summary: string }).summary)).toEqual({
-      bias_pattern_name: "Cautiously lenient",
-      capability_summary: "Strong calibrated judging in this domain."
+      kind: "PUBLIC_SAMPLE_AGGREGATE_V1",
+      public_sample_count: 3,
+      profile_cell_count: 1,
+      rank_count: 1
     });
   });
 
@@ -236,7 +247,7 @@ describe("evaluator consumer reader", () => {
       provider: gateway,
       repository: records
     })).resolves.toMatchObject({ state: "FAILED", failures: 1 });
-    expect(gateway.call).not.toHaveBeenCalled();
+    expect(gateway.classify).not.toHaveBeenCalled();
     expect(records.receipts).toEqual([
       expect.objectContaining({ state: "SKIPPED", reason: "CONSUMER_PROVIDER_ISOLATION_FAILED" })
     ]);
@@ -249,19 +260,10 @@ describe("evaluator consumer reader", () => {
       capability_summary: "This response came from the wrong selected identity.",
       adjacent_domain_flags: []
     });
-    gateway.call.mockResolvedValueOnce({
-      rawArtifactRef: "artifact:other",
-      ledgerEntryRef: "ledger:other",
-      content: JSON.stringify({
-        bias_pattern_name: "Unauthorized",
-        capability_summary: "This response came from the wrong selected identity.",
-        adjacent_domain_flags: []
-      }),
-      provider: "openai-compatible-http",
-      model: "consumer:not-selected",
-      maker: "maker:evaluator-local-vllm",
-      modelVersion: "other-v1"
-    });
+    gateway.classify.mockRejectedValueOnce(new TypedDomainError(
+      "CONSUMER_AUTHORIZATION_FAILED",
+      "CONSUMER_AUTHORIZATION_FAILED"
+    ));
 
     await expect(runEvaluatorConsumerRefresh({
       ...baseInput,
@@ -290,7 +292,7 @@ describe("evaluator consumer reader", () => {
     });
     expect(records.listJobs).not.toHaveBeenCalled();
     expect(records.claimJob).not.toHaveBeenCalled();
-    expect(gateway.call).not.toHaveBeenCalled();
+    expect(gateway.classify).not.toHaveBeenCalled();
     expect(records.receipts).toEqual([
       expect.objectContaining({ state: "FAILED", reason: "CONSUMER_PREFLIGHT_FAILED" })
     ]);
@@ -305,7 +307,7 @@ describe("evaluator consumer reader", () => {
       provider: gateway,
       repository: excessive
     })).resolves.toMatchObject({ reason: "CONSUMER_PREFLIGHT_FAILED" });
-    expect(gateway.call).not.toHaveBeenCalled();
+    expect(gateway.classify).not.toHaveBeenCalled();
 
     const inFlight = repository({
       claimJob: vi.fn(async () => ({ state: "IN_FLIGHT" as const, receiptId: "receipt:existing" }))
@@ -315,7 +317,7 @@ describe("evaluator consumer reader", () => {
       provider: gateway,
       repository: inFlight
     })).resolves.toMatchObject({ state: "SKIPPED", inFlight: 1 });
-    expect(gateway.call).not.toHaveBeenCalled();
+    expect(gateway.classify).not.toHaveBeenCalled();
 
     const retryLimited = repository({
       claimJob: vi.fn(async () => ({
@@ -328,7 +330,7 @@ describe("evaluator consumer reader", () => {
       provider: gateway,
       repository: retryLimited
     })).resolves.toMatchObject({ state: "SKIPPED", retryLimited: 1 });
-    expect(gateway.call).not.toHaveBeenCalled();
+    expect(gateway.classify).not.toHaveBeenCalled();
   });
 
   it("reports a failed batch when a current sibling accompanies a failed job", async () => {

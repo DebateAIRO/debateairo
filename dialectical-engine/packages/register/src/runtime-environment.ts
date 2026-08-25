@@ -41,6 +41,7 @@ export function loadSettlementEnvironment() {
 const positiveInteger = z.coerce.number().int().positive();
 const nonNegativeInteger = z.coerce.number().int().nonnegative();
 const boundedRate = z.coerce.number().min(0).max(1);
+export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
   HATCHET_API_URL: z.string().url(), HATCHET_TENANT_ID: z.string().min(1),
@@ -56,10 +57,15 @@ export function loadApiEnvironment() {
     USER_DEK_STORE_PATH: z.string().min(1),
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
+    CONTENT_PROVISION_DATABASE_URL: z.string().url(),
     PUBLICATION_ENABLED: z.enum(["true", "false"]).default("false"),
     CORPUS_KEK_PATH: z.string().min(1).optional(),
     PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
     AUTHORIZATION_DATABASE_URL: z.string().url().optional(),
+    PUBLICATION_CLEANUP_DATABASE_URL: z.string().url().optional(),
+    ERASURE_DATABASE_URL: z.string().url(),
+    ACCOUNT_ERASURE_GRACE_MS: z.literal(String(ACCOUNT_ERASURE_GRACE_MS))
+      .transform(() => ACCOUNT_ERASURE_GRACE_MS),
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
@@ -82,9 +88,20 @@ export function loadApiEnvironment() {
   if (environment.EVALUATOR_DEV_MENU_ENABLED === "true" && environment.NODE_ENV === "production") {
     throw new TypeError("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
   }
-  if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
-    && environment.CONTENT_BLIND_INDEX_KEY_PATH === undefined) {
-    throw new TypeError("CONTENT_BLIND_INDEX_KEY_PATH_REQUIRED");
+  if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {
+    throw new TypeError("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
+  }
+  if (environment.ERASURE_DATABASE_URL === environment.DATABASE_URL
+    || environment.ERASURE_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL
+    || environment.ERASURE_DATABASE_URL === environment.PUBLICATION_CLEANUP_DATABASE_URL
+    || environment.ERASURE_DATABASE_URL === environment.CONTENT_PROVISION_DATABASE_URL
+    || environment.ERASURE_DATABASE_URL === environment.EVALUATOR_DEV_MENU_DATABASE_URL) {
+    throw new TypeError("ERASURE_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.CONTENT_PROVISION_DATABASE_URL === environment.DATABASE_URL
+      || environment.CONTENT_PROVISION_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL
+      || environment.CONTENT_PROVISION_DATABASE_URL === environment.PUBLICATION_CLEANUP_DATABASE_URL) {
+    throw new TypeError("CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE");
   }
   if (environment.PUBLICATION_ENABLED === "true"
     && (environment.CORPUS_KEK_PATH === undefined
@@ -98,6 +115,15 @@ export function loadApiEnvironment() {
   if (environment.PUBLICATION_ENABLED === "true"
     && environment.AUTHORIZATION_DATABASE_URL === undefined) {
     throw new TypeError("AUTHORIZATION_DATABASE_URL_REQUIRED");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && environment.PUBLICATION_CLEANUP_DATABASE_URL === undefined) {
+    throw new TypeError("PUBLICATION_CLEANUP_DATABASE_URL_REQUIRED");
+  }
+  if (environment.PUBLICATION_ENABLED === "true"
+    && (environment.PUBLICATION_CLEANUP_DATABASE_URL === environment.DATABASE_URL
+      || environment.PUBLICATION_CLEANUP_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL)) {
+    throw new TypeError("PUBLICATION_CLEANUP_DATABASE_URL_MUST_BE_SEPARATE");
   }
   if (environment.PUBLICATION_ENABLED === "true"
     && environment.AUTHORIZATION_DATABASE_URL === environment.DATABASE_URL) {
@@ -131,9 +157,11 @@ export function loadRunnerEnvironment() {
     VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
     VLLM_AUTHORIZATION: z.string().min(1).optional(), ...hatchetShape
   });
+  if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {
+    throw new TypeError("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
+  }
   if (environment.CONTENT_ENCRYPTION_ENABLED === "true"
-    && (environment.CONTENT_BLIND_INDEX_KEY_PATH === undefined
-      || environment.USER_DEK_STORE_PATH === undefined)) {
+    && environment.USER_DEK_STORE_PATH === undefined) {
     throw new TypeError("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
   }
   return environment;

@@ -22,6 +22,7 @@ const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
 
 function application(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,

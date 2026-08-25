@@ -1,4 +1,7 @@
 import {
+  AccountErasureCancelRequestSchema,
+  AccountErasureCancelledSchema,
+  AccountErasureStatusSchema,
   AnswerSchema,
   AnswerIndexSchema,
   AskAcceptedSchema,
@@ -7,6 +10,7 @@ import {
   InspectionSchema,
   InvestigationAcceptedSchema,
   NodeSchema,
+  PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -190,18 +194,24 @@ export interface ContractClient {
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
   revokeAllSessions(): Promise<{ revoked: number }>;
-  stepUp(password: string, code: string, authorization?: Readonly<{
-    action: "PUBLISH" | "UNPUBLISH";
-    target_run_id: string;
-  }>): Promise<{
+  stepUp(password: string, code: string, authorization?:
+    | Readonly<{
+      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+      target_run_id: string;
+    }>
+    | Readonly<{ action: "DELETE_ACCOUNT" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
-    step_up_grant?: {
+    step_up_grant?: ({
       token: string;
-      action: "PUBLISH" | "UNPUBLISH";
+      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
       expires_at: string;
-    } | undefined;
+    } | {
+      token: string;
+      action: "DELETE_ACCOUNT";
+      expires_at: string;
+    }) | undefined;
   }>;
   readPublicDebates(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
@@ -218,6 +228,17 @@ export interface ContractClient {
   readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  scheduleAccountErasure(stepUpGrant:string):Promise<{
+    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;
+  }>;
+  readAccountErasure():Promise<
+    | { status:"NONE" }
+    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string }
+  >;
+  cancelAccountErasure(cancellationRef:string):Promise<{ status:"CANCELLED" }>;
+  deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
+    status:"CLEANED"|"PENDING";
+  }>;
   submitAsk(input: AskRequest, token: string): Promise<AskAccepted>;
   readSession(token: string): Promise<Session>;
   readDeployment(token: string): Promise<Deployment>;
@@ -338,10 +359,12 @@ export function createContractClient(
     revokeAllSessions: () => request(
       "/v1/auth/sessions", "", RevokeAllSessionsSchema, { method: "DELETE" }
     ),
-    stepUp: (password: string, code: string, authorization?: Readonly<{
-      action: "PUBLISH" | "UNPUBLISH";
-      target_run_id: string;
-    }>) => request(
+    stepUp: (password: string, code: string, authorization?:
+      | Readonly<{
+        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        target_run_id: string;
+      }>
+      | Readonly<{ action: "DELETE_ACCOUNT" }>) => request(
       "/v1/auth/step-up", "", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
@@ -381,6 +404,30 @@ export function createContractClient(
           step_up_grant: stepUpGrant,
           copies_may_persist_acknowledged: true
         }) }
+    ),
+    scheduleAccountErasure:(stepUpGrant:string)=>request(
+      "/v1/account","",AccountErasureStatusSchema,
+      { method:"DELETE",body:JSON.stringify({
+          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
+        }) }
+    ).then((status)=>{
+      if (status.status==="NONE") throw new ContractHttpError(
+        "INVALID_RESPONSE",200,"Scheduled deletion returned NONE"
+      );
+      return status;
+    }),
+    readAccountErasure:()=>request(
+      "/v1/account/erasure","",AccountErasureStatusSchema
+    ),
+    cancelAccountErasure:(cancellationRef:string)=>request(
+      "/v1/account/erasure/cancel","",AccountErasureCancelledSchema,
+      { method:"POST",body:JSON.stringify(AccountErasureCancelRequestSchema.parse({
+          cancellation_ref:cancellationRef
+        })) }
+    ),
+    deletePrivateDebate:(runId:string,stepUpGrant:string)=>request(
+      `/v1/debates/${encodeURIComponent(runId)}`,"",PrivateDebateErasureStatusSchema,
+      { method:"DELETE",body:JSON.stringify({ step_up_grant:stepUpGrant }) }
     ),
     submitAsk: (input: AskRequest, token: string) => request("/v1/asks", token, AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     readSession: (token: string) => request("/v1/session", token, SessionSchema),

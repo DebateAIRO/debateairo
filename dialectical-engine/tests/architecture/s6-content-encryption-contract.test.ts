@@ -49,7 +49,7 @@ describe("S6 content-encryption architecture contract", () => {
       evaluator.indexOf("private async readSnapshot"),
       evaluator.indexOf("export const PROFILE_DERIVATION_VERSION", evaluator.indexOf("private async readSnapshot"))
     );
-    const harvestPrepare = harvest.indexOf("prepareContentEncryptionForRun");
+    const harvestPrepare = harvest.indexOf("prepareLeasedContentEncryptionForRun");
     const harvestTransaction = harvest.indexOf("withWriteTransaction");
     const harvestCallback = harvest.indexOf("async (client) =>", harvestTransaction);
     expect(harvestPrepare).toBeGreaterThan(-1);
@@ -57,19 +57,20 @@ describe("S6 content-encryption architecture contract", () => {
     expect(harvestCallback).toBeGreaterThan(harvestTransaction);
     expect(harvest.slice(harvestCallback, harvest.indexOf("});", harvestCallback) + 3))
       .not.toContain("this.pool");
-    expect(harvest).toContain("preparedContent?.close()");
-    expect(readSnapshot).toContain("decryptPreparedContentForRun");
+    expect(harvest).toContain("leasedContent?.close()");
+    expect(readSnapshot).toContain("decryptLeasedContentForRun");
     expect(readSnapshot).not.toContain("decryptContentForRun");
-    expect(readSnapshot).not.toContain("prepareContentEncryptionForRun");
+    expect(readSnapshot).not.toContain("prepareLeasedContentEncryptionForRun");
     expect(readSnapshot).not.toContain("this.pool");
 
-    const addonRunner = evaluator.slice(
-      evaluator.indexOf("export async function runEvaluatorJudgeAddon"),
-      evaluator.indexOf("function extractBlindJudgementReasons")
+    const addonCallback = evaluator.slice(
+      evaluator.indexOf("async withRunLock<T>"),
+      evaluator.indexOf("async loadCandidate(", evaluator.indexOf("async withRunLock<T>"))
     );
-    const addonCallback = addonRunner.slice(addonRunner.indexOf("withRunLock"));
-    expect(addonCallback).toContain("loadCandidate(input.runId, client, preparedContent)");
-    expect(addonCallback).toContain("preparedContent?.close()");
+    expect(addonCallback).toContain("withRunContentLease(this.pool, [runId]");
+    expect(addonCallback).toContain("prepareLeasedContentEncryptionForRun");
+    expect(addonCallback).toContain("work(client, leasedContent)");
+    expect(addonCallback).toContain("leasedContent.close()");
     expect(addonCallback).not.toContain("prepareContentEncryptionForRun");
     expect(addonCallback).not.toContain("decryptContentForRun");
 
@@ -77,20 +78,102 @@ describe("S6 content-encryption architecture contract", () => {
       evaluator.indexOf("async withRunLock<T>(", evaluator.indexOf("export class PostgresEvaluatorAddonRepository")),
       evaluator.indexOf("async loadCandidate", evaluator.indexOf("export class PostgresEvaluatorAddonRepository"))
     );
-    const addonPrepare = withRunLock.indexOf("prepareContentEncryptionForRun");
-    const addonConnect = withRunLock.indexOf("this.pool.connect");
+    const addonLease = withRunLock.indexOf("withRunContentLease(this.pool, [runId]");
+    const addonPrepare = withRunLock.indexOf("prepareLeasedContentEncryptionForRun");
+    const addonSharedClient = withRunLock.indexOf("const client=contentLease.client");
+    const addonLock = withRunLock.indexOf("pg_try_advisory_lock");
+    const addonWork = withRunLock.indexOf("work(client, leasedContent)");
+    const addonClose = withRunLock.indexOf("leasedContent.close()");
+    expect(addonLease).toBeGreaterThan(-1);
     expect(addonPrepare).toBeGreaterThan(-1);
-    expect(addonPrepare).toBeLessThan(addonConnect);
-    expect(withRunLock).toContain("work(client, preparedContent)");
-    expect(withRunLock).toContain("preparedContent?.close()");
+    expect(addonSharedClient).toBeGreaterThan(-1);
+    expect(addonLock).toBeGreaterThan(-1);
+    expect(addonWork).toBeGreaterThan(-1);
+    expect(addonClose).toBeGreaterThan(-1);
+    expect(addonLease).toBeLessThan(addonPrepare);
+    expect(addonPrepare).toBeLessThan(addonSharedClient);
+    expect(addonSharedClient).toBeLessThan(addonLock);
+    expect(addonLock).toBeLessThan(addonWork);
+    expect(addonWork).toBeLessThan(addonClose);
+    expect(withRunLock).not.toContain("this.pool.connect");
 
     const loadCandidate = evaluator.slice(
       evaluator.indexOf("async #loadCandidate", evaluator.indexOf("export class PostgresEvaluatorAddonRepository")),
       evaluator.indexOf("async recordPipelineEvent", evaluator.indexOf("export class PostgresEvaluatorAddonRepository"))
     );
-    expect(loadCandidate).toContain("decryptPreparedContentForRun");
+    expect(loadCandidate).toContain("decryptLeasedContentForRun");
     expect(loadCandidate).not.toContain("decryptContentForRun");
     expect(loadCandidate).not.toContain("prepareContentEncryptionForRun");
     expect(loadCandidate).not.toContain("this.pool");
+  });
+
+  it("bounds every owner-history decrypt scan before leases or key loads", async () => {
+    const [database,liveness,memory,serve,api,main,acceptance] = await Promise.all([
+      read("packages/db/src/index.ts"),
+      read("packages/liveness/src/index.ts"),
+      read("packages/memory/src/index.ts"),
+      read("packages/serve/src/index.ts"),
+      read("apps/api/src/index.ts"),
+      read("apps/api/src/main.ts"),
+      read("acceptance/main.ts")
+    ]);
+    expect(database).toContain("export const MAX_OWNER_PRIVATE_HISTORY_SCAN = 128");
+    expect(liveness).toContain("LIMIT $3");
+    expect(liveness).toContain("MAX_OWNER_PRIVATE_HISTORY_SCAN+1");
+    expect(memory).toContain("LIMIT $4");
+    expect(memory).toContain("MAX_OWNER_PRIVATE_HISTORY_SCAN+1");
+    for (const source of [liveness,memory]) {
+      expect(source).toContain("OWNER_PRIVATE_HISTORY_SCAN_SATURATED");
+    }
+    expect(serve).toContain("limit > MAX_OWNER_PRIVATE_HISTORY_SCAN");
+    expect(api).toContain("limit > MAX_OWNER_PRIVATE_HISTORY_SCAN");
+    expect(api).toContain('error.code === "OWNER_PRIVATE_HISTORY_SCAN_SATURATED"');
+    expect(api).toContain('throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE")');
+    expect(api).not.toContain("askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>=");
+    expect(database).toContain('const OWNER_ASK_ADMISSION_NAMESPACE = "debateai:owner-ask-admission:v1:"');
+    expect(database).toContain("export async function acquireOwnerAskAdmissionLease(");
+    expect(database).toContain("SELECT pg_advisory_lock(hashtextextended($1,0))");
+    expect(database).toContain("SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked");
+    const admissionLease=database.slice(
+      database.indexOf("export async function withOwnerAskAdmissionLease<T>("),
+      database.indexOf("export interface DiscoveredPanelMember")
+    );
+    expect(admissionLease).toContain("await acquireOwnerAskAdmissionLease(pool,input)");
+    expect(admissionLease).toContain("await lease.release()");
+    const startRun=database.slice(
+      database.indexOf("async startRun("),database.indexOf("async readLoadingProjection(")
+    );
+    expect(startRun).toContain("admissionClient?: PoolClient");
+    expect(startRun).toContain("const provisionExecutor=admissionClient ?? this.provisionPool");
+    expect(startRun).toContain("client = admissionClient ?? await this.pool.connect()");
+    expect(startRun).toContain("if (ownsClient) client?.release()");
+    const submit=api.slice(
+      api.indexOf("async submit("),api.indexOf("async unlinkMemoryLink(")
+    );
+    const lease=submit.indexOf("withOwnerAskAdmissionLease(admissionPool,ownership");
+    const livenessCall=submit.indexOf("this.#liveness.recordQuery",lease);
+    const start=submit.indexOf("this.#runs.startRun",livenessCall);
+    const memoryWrite=submit.indexOf("this.#serve.recordMemoryQuestion",start);
+    const enqueue=submit.indexOf("this.#work.enqueue",memoryWrite);
+    const dispatch=submit.indexOf("this.dispatcher.dispatch",enqueue);
+    expect(lease).toBeGreaterThan(-1);
+    expect(livenessCall).toBeGreaterThan(lease);
+    expect(start).toBeGreaterThan(livenessCall);
+    expect(memoryWrite).toBeGreaterThan(start);
+    expect(enqueue).toBeGreaterThan(memoryWrite);
+    expect(dispatch).toBeGreaterThan(enqueue);
+    expect(submit.slice(lease,memoryWrite)).toContain("},lease.client);");
+    expect(submit.slice(start,memoryWrite)).toContain("});\n    } catch");
+    expect(main).toContain("const serverAskAdmissionPool=createPool(environment.CONTENT_PROVISION_DATABASE_URL)");
+    expect(main).toContain("const legacyAskAdmissionPool=createPool(environment.DATABASE_URL)");
+    expect(main).toContain("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+    expect(main).toContain("assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)");
+    expect(main).toContain("assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool)");
+    expect(main).toContain("server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool");
+    expect(main).toContain("serverAskAdmissionPool,\n    legacyAskAdmissionPool");
+    expect(acceptance.match(/createPool\(input\.environment\.DATABASE_URL\)/g)).toHaveLength(2);
+    expect(acceptance).toContain("ACCEPTANCE_ASK_ADMISSION_DATABASE_ROLE_MISMATCH");
+    expect(acceptance).toContain("server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool");
+    expect(acceptance).toContain("serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()");
   });
 });

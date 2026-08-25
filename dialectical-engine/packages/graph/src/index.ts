@@ -3,11 +3,11 @@ import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
-  decryptPreparedContentForRun,
-  encryptPreparedContentForRun,
-  prepareContentEncryptionForRun,
+  decryptLeasedContentForRun,
+  encryptAttestedLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
   type CryptoEnvelope,
-  type PreparedRunContentCipher,
+  type LeasedPreparedRunContentCipher,
   withWriteTransaction
 } from "@debateai/db";
 import {
@@ -215,7 +215,7 @@ export class GraphWriter {
   constructor(
     private readonly client: PoolClient,
     private readonly runId: string,
-    private readonly preparedContent: PreparedRunContentCipher | null
+    private readonly leasedContent: LeasedPreparedRunContentCipher
   ) {}
 
   async addNode(input: AddNodeInput): Promise<string> {
@@ -240,16 +240,16 @@ export class GraphWriter {
       materializedPath = `${parentRow.materialized_path}/${input.siblingOrdinal}`;
     }
     const nodeId = randomUUID();
-    const content = encryptPreparedContentForRun(
-      this.preparedContent, "core.node", nodeId, { claimText: input.statementText }
+    const content = encryptAttestedLeasedContentForRun(
+      this.leasedContent, "core.node", nodeId, { claimText: input.statementText }
     );
     const inserted = await this.client.query<{ node_id: string }>(
       `INSERT INTO core.node (
         node_id, run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
         materialized_path, generation_status, path_status, exploration_decision,
         provenance_ref, way_of_knowing, locator, value_laden, position_label, is_folder, created_at_seq,
-        content_ciphertext
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb)
+        content_ciphertext,content_attestation
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21)
       RETURNING node_id`,
       [
         nodeId,
@@ -271,7 +271,8 @@ export class GraphWriter {
         input.positionLabel ?? null,
         input.isFolder ?? false,
         await allocateSequence(this.client),
-        content === null ? null : JSON.stringify(content)
+        content === null ? null : JSON.stringify(content.envelope),
+        content?.attestation ?? null
       ]
     );
     return inserted.rows[0]!.node_id;
@@ -377,8 +378,8 @@ export class GraphWriter {
     );
     const replay = existing.rows[0];
     if (replay !== undefined) {
-      const replayContent = decryptPreparedContentForRun<{ claimText: string }>(
-        this.preparedContent, "core.node", replay.node_id, replay.content_ciphertext,
+      const replayContent = decryptLeasedContentForRun<{ claimText: string }>(
+        this.leasedContent, "core.node", replay.node_id, replay.content_ciphertext,
         { claimText: replay.claim_text }
       );
       if (
@@ -431,20 +432,20 @@ export class GraphWriter {
     readonly checkStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
   }): Promise<void> {
     const restatementId = randomUUID();
-    const content = encryptPreparedContentForRun(
-      this.preparedContent, "core.stranger_restatement", restatementId,
+    const content = encryptAttestedLeasedContentForRun(
+      this.leasedContent, "core.stranger_restatement", restatementId,
       { restatementText: input.text }
     );
     await this.client.query(
       `INSERT INTO core.stranger_restatement (
         restatement_id, run_id, subject_kind, subject_id, restatement_text,
-        check_status, at_seq, content_ciphertext
-      ) VALUES ($1,$2,'node',$3,$4,$5,$6,$7::jsonb)`,
+        check_status, at_seq, content_ciphertext,content_attestation
+      ) VALUES ($1,$2,'node',$3,$4,$5,$6,$7::jsonb,$8)`,
       [
         restatementId, this.runId, input.nodeId,
         content === null ? input.text : CONTENT_CIPHERTEXT_SENTINEL,
         input.checkStatus, await allocateSequence(this.client),
-        content === null ? null : JSON.stringify(content)
+        content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null
       ]
     );
   }
@@ -454,14 +455,18 @@ export class GraphRepository {
   constructor(private readonly pool: Pool) {}
 
   async withGraphWrite<T>(runId: string, operation: (writer: GraphWriter) => Promise<T>): Promise<T> {
-    const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
+    const leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
-      return await withWriteTransaction(this.pool, async (client) => {
+      const value = await withWriteTransaction(this.pool, async (client) => {
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [runId]);
-        return operation(new GraphWriter(client, runId, preparedContent));
+        const result = await operation(new GraphWriter(client, runId, leasedContent));
+        await leasedContent.assertLive();
+        return result;
       });
+      await leasedContent.assertLive();
+      return value;
     } finally {
-      preparedContent?.close();
+      await leasedContent.close();
     }
   }
 

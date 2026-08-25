@@ -8,6 +8,7 @@ import type { SettingsView } from "@/lib/v3/adapter";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 import { EvaluatorDevMenu } from "@/components/EvaluatorDevMenu";
 import { SessionControls } from "@/components/SessionControls";
+import { AccountErasureControls } from "@/components/AccountErasureControls";
 
 const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
   && process.env.NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED === "true";
@@ -45,6 +46,7 @@ function AccountSettingsScreen() {
           Review and revoke your signed-in browser sessions. Deployment and model administration are operator-only.
         </p>
         <SessionControls />
+        <AccountErasureControls />
         <div className="pill pillGen" style={{ marginTop: 24 }}>
           <span className="dot" />
           Deployment controls unavailable for user sessions
@@ -55,7 +57,7 @@ function AccountSettingsScreen() {
 }
 
 /** Kept as the read-only operator projection used by an operator-capable host. */
-export function OperatorSettingsScreen({ token }: { token: string }) {
+function OperatorSettingsScreen({ token }: { token: string }) {
   const [view, setView] = useState<SettingsView | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

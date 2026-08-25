@@ -16,6 +16,7 @@ import type { AuthenticatedSession } from "./sessions.js";
 
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
+  reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
   preflightGrant(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -64,7 +65,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
   constructor(
     private readonly repository: PostgresPublicationRepository,
     private readonly cipher: PublicationCipher,
-    private readonly clock: () => Date = () => new Date()
+    private readonly clock: () => Date = () => new Date(),
+    private readonly cleanupRepository: PostgresPublicationRepository = repository
   ) {}
 
   async preflightGrant(input: Readonly<{
@@ -140,6 +142,14 @@ export class PostgresPublicationApplication implements PublicationApplication {
     if (pseudonym === null) return null;
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
+    if (!await this.repository.prepareKeyProvision({
+      publicationRef,
+      runId: input.runId,
+      userId: input.authenticated.userId,
+      ownerRef: input.authenticated.ownerRef,
+      sessionId: input.authenticated.session.session_id,
+      grantTokenHash
+    })) return null;
     const publicDebate = PublicDebateSchema.parse({
       public_ref: publicationRef,
       author_pseudonym: pseudonym,
@@ -157,7 +167,15 @@ export class PostgresPublicationApplication implements PublicationApplication {
         as_of: input.answer.as_of
       }
     });
-    const prepared = await this.cipher.create(publicationRef, input.runId);
+    let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
+    try {
+      prepared = await this.cipher.create(publicationRef, input.runId);
+    } catch (error) {
+      await this.repository.abandonKeyProvision(
+        publicationRef,input.authenticated.userId
+      ).catch(() => false);
+      throw error;
+    }
     let transitionAttempted = false;
     try {
       const contentCiphertext = prepared.encrypt(publicDebate);
@@ -176,15 +194,25 @@ export class PostgresPublicationApplication implements PublicationApplication {
         contentCiphertext
       });
       if (!published) {
-        await this.cipher.destroy(publicationRef);
+        await this.repository.abandonKeyProvision(
+          publicationRef,input.authenticated.userId
+        );
+        await this.reconcileKeyProvisionCleanup();
         return null;
       }
       return Object.freeze({ state: "PUBLISHED" as const, public_ref: publicationRef });
     } catch (error) {
       prepared.close();
-      // After COMMIT has been attempted, retaining an orphan key is safer than
-      // destroying a key that may already protect a committed public record.
-      if (!transitionAttempted) await this.cipher.destroy(publicationRef);
+      // Resolve an ambiguous COMMIT from fresh DB state. A committed snapshot
+      // consumes the intent and keeps its corpus key; otherwise the durable
+      // intent is expired and the claimed reconciler performs deletion.
+      if (!transitionAttempted
+        || await this.repository.readPublic(publicationRef).catch(() => null) === null) {
+        await this.repository.abandonKeyProvision(
+          publicationRef,input.authenticated.userId
+        ).catch(() => false);
+        await this.reconcileKeyProvisionCleanup().catch(() => 0);
+      }
       throw error;
     }
   }
@@ -226,38 +254,75 @@ export class PostgresPublicationApplication implements PublicationApplication {
   }
 
   async reconcileKeyCleanup(limit = 100): Promise<number> {
-    const pending = await this.repository.listPendingKeyCleanup(limit);
+    const claimed = await this.cleanupRepository.claimKeyCleanup(limit);
     let completed = 0;
-    for (const publicationRef of pending) {
-      await this.cipher.destroy(publicationRef);
-      if (await this.repository.completeKeyCleanup(publicationRef, this.clock())) completed += 1;
+    for (const claim of claimed) {
+      try {
+        await this.cleanupRepository.withContentLease(claim.publicationRef,async () => {
+          const destroyResult = await this.cipher.destroy(claim.publicationRef);
+          // The DB cleanup receipt is written only after an independent store
+          // readback observes the entire publication directory absent. Any
+          // unlink/fsync/lstat ambiguity remains pending without starving the
+          // later refs in this deterministic batch.
+          if (await this.cipher.exists(claim.publicationRef)) return;
+          if (await this.cleanupRepository.completeKeyCleanup(
+            claim.publicationRef,claim.claimToken,destroyResult
+          )) completed += 1;
+        });
+      } catch {
+        continue;
+      }
     }
     return completed;
   }
 
-  async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
-    const snapshot = await this.repository.readPublic(publicationRef);
-    if (snapshot === null) return null;
-    let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
-    try {
-      // Visibility is authorized before external key resolution/decryption.
-      prepared = await this.cipher.open(publicationRef, snapshot.runId);
-      const publicDebate = PublicDebateSchema.parse(
-        prepared.decrypt(snapshot.contentCiphertext)
-      );
-      prepared.close();
-      prepared = undefined;
-      // A concurrent unpublish can commit while decryption runs. Latest-wins
-      // visibility is revalidated before any plaintext leaves the service.
-      if (publicDebate.public_ref !== snapshot.publicationRef
-        || publicDebate.published_at !== snapshot.createdAt.toISOString()) return null;
-      return await this.repository.revalidatePublic(snapshot.runId, publicationRef)
-        ? publicDebate : null;
-    } catch {
-      return null;
-    } finally {
-      prepared?.close();
+  async reconcileKeyProvisionCleanup(limit = 100): Promise<number> {
+    const claimed = await this.cleanupRepository.claimKeyProvisionCleanup(limit);
+    let completed = 0;
+    let failed = false;
+    for (const intent of claimed) {
+      try {
+        await this.cleanupRepository.withContentLease(intent.publicationRef,async () => {
+          await this.cipher.destroy(intent.publicationRef);
+          if (await this.cipher.exists(intent.publicationRef)) return;
+          if (await this.cleanupRepository.completeKeyProvisionCleanup(
+            intent.publicationRef,intent.claimToken
+          )) completed += 1;
+        });
+      } catch {
+        failed = true;
+        continue;
+      }
     }
+    if (failed) throw new TypeError("PUBLICATION_KEY_PROVISION_CLEANUP_PENDING");
+    return completed;
+  }
+
+  async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
+    return this.repository.withContentLease(publicationRef,async () => {
+      const snapshot = await this.repository.readPublic(publicationRef);
+      if (snapshot === null) return null;
+      let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
+      try {
+        // Visibility is authorized before external key resolution/decryption.
+        prepared = await this.cipher.open(publicationRef, snapshot.runId);
+        const publicDebate = PublicDebateSchema.parse(
+          prepared.decrypt(snapshot.contentCiphertext)
+        );
+        prepared.close();
+        prepared = undefined;
+        // A concurrent unpublish can commit while decryption runs. Latest-wins
+        // visibility is revalidated before any plaintext leaves the service.
+        if (publicDebate.public_ref !== snapshot.publicationRef
+          || publicDebate.published_at !== snapshot.createdAt.toISOString()) return null;
+        return await this.repository.revalidatePublic(snapshot.runId, publicationRef)
+          ? publicDebate : null;
+      } catch {
+        return null;
+      } finally {
+        prepared?.close();
+      }
+    });
   }
 
   async list(limit: number, offset: number): Promise<Readonly<{

@@ -1,15 +1,20 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { assertNoOpenWriteTransaction, migrate } from "@debateai/db";
-import { LedgerRepository } from "@debateai/ledger";
-import { OpenAICompatibleProviderGateway, type ProviderGateway } from "@debateai/providers";
+import { configureContentEncryption, migrate, RunRepository } from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
+import {
+  ContentCipher,
+  generateDek,
+  MemoryRunContentKeyStore,
+  type ReadableUserDekStore
+} from "../../packages/crypto/src/index.js";
 import {
   BLIND_SAMPLE_EXCERPT_MAX_BYTES,
-  DomainRegistryRepository,
-  EvaluatorHarvestRepository,
+  createOpenAiPublicAggregateProvider,
   PostgresEvaluatorConsumerRepository,
-  type EvaluatorProviderFamilyRow
+  type EvaluatorProviderFamilyRow,
+  type PublicAggregateProvider
 } from "../../packages/evaluator/src/index.js";
 import {
   runOnDemandEvaluatorConsumerRefresh,
@@ -21,7 +26,24 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 let database: TestDatabase;
 let selectionId: string;
 let lawDomainId: string;
-let consumerArtifactId: string;
+let fixtureUserId: string;
+let fixtureOwnerRef: string;
+let fixtureSessionId: string;
+const fixtureUserDeks = new Map<string, Buffer>();
+const fixtureUsers: ReadableUserDekStore = Object.freeze({
+  async store(userId: string, dek: Uint8Array): Promise<void> {
+    fixtureUserDeks.set(userId,Buffer.from(dek));
+  },
+  async load(userId: string): Promise<Buffer> {
+    const dek=fixtureUserDeks.get(userId);
+    if (dek===undefined) throw new Error("USER_DEK_UNRESOLVED");
+    return Buffer.from(dek);
+  },
+  async exists(userId: string): Promise<boolean> { return fixtureUserDeks.has(userId); },
+  async destroy(userId: string): Promise<"DESTROYED"|"ALREADY_ABSENT"> {
+    return fixtureUserDeks.delete(userId) ? "DESTROYED" : "ALREADY_ABSENT";
+  }
+});
 const sourceIdentitySentinels = Object.freeze({
   providerRef: "provider:sample-source-must-not-leak",
   maker: "maker:sample-source-must-not-leak"
@@ -51,12 +73,46 @@ const family: EvaluatorProviderFamilyRow = {
 const workerBase = {
   family,
   deployment: { configuredProviders: [{ providerRef: "provider:product", maker: "maker:product" }] },
-  bound: { maxAttempts: 2, tokenCeiling: 512, deadlineMs: 250 }
+  bound: { maxAttempts: 2, tokenCeiling: 512, deadlineMs: 250 },
+  publicationCipher: {
+    open: async () => ({
+      decrypt: <T>() => ({
+        question:"fixture public question",
+        answer:{ verdict:"SUPPORTED",summary_segments:[{ text:"fixture public answer" }],
+          residual_objections:[] }
+      }) as T,
+      close: () => undefined
+    })
+  }
 };
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  fixtureUserId=randomUUID();
+  fixtureOwnerRef=randomUUID();
+  fixtureSessionId=randomUUID();
+  await database.pool.query(`
+    INSERT INTO identity."user"(
+      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+      password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+    ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,'fixture-password',$3,$4,$5,
+      'active',now(),now())
+  `,[fixtureUserId,randomBytes(32),`consumer-${randomUUID()}`,randomUUID(),fixtureOwnerRef]);
+  await database.pool.query(`
+    INSERT INTO identity.session(
+      session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,
+      last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+    ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
+      now()+interval '2 hours',now())
+  `,[fixtureSessionId,fixtureUserId,`sha256:${randomBytes(32).toString("hex")}`,
+    `sha256:${randomBytes(32).toString("hex")}`]);
+  await fixtureUsers.store(fixtureUserId,generateDek());
+  const runKeys=new MemoryRunContentKeyStore(fixtureUsers,async (ownerRef)=>{
+    if (ownerRef!==fixtureOwnerRef) throw new Error("OWNER_REF_UNRESOLVED");
+    return fixtureUserId;
+  });
+  configureContentEncryption(database.pool,new ContentCipher(runKeys));
   const domains = await database.pool.query<{ domain_id: string; canonical_name: string }>(`
     INSERT INTO evaluator.domain (
       canonical_name,normalized_name,origin,guardrail_version,provenance_ref,admitted_at,at_seq
@@ -85,18 +141,6 @@ beforeAll(async () => {
   `, [probe.rows[0]!.vllm_probe_id,FIRST_AS_OF]);
   selectionId = selection.rows[0]!.consumer_selection_id;
 
-  consumerArtifactId = randomUUID();
-  await database.pool.query(`
-    INSERT INTO ledger.raw_artifact (
-      raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
-      model_version,raw_text,metadata_json,parse_status,content_hash,input_hash,
-      contract_hash,at_seq
-    ) VALUES (
-      $1,gen_random_uuid(),NULL,'provider:evaluator-vllm','openai-compatible-http',
-      'consumer:local','maker:evaluator-local-vllm','consumer-v1','{}','{}'::jsonb,
-      'PARSED',$2,'fixture:input','fixture:contract',ledger.allocate_sequence()
-    )
-  `, [consumerArtifactId,"a".repeat(64)]);
   await insertAggregate(FIRST_AS_OF, 1, 0.65);
   for (const [index, claim] of [
     "A short anonymous legal claim.",
@@ -154,80 +198,73 @@ async function insertHarvestedSample(input: {
   readonly claimText: string;
   readonly observedAt: Date;
   readonly withDomain: boolean;
-}): Promise<void> {
-  const run = await database.pool.query<{ run_id: string }>(`
-    INSERT INTO core.run (
-      question_line,asker_id,session_id,caller_scope,as_of,asker_risk_tier,
-      risk_tier,tier_source,tier_provenance_ref,composition_budget_tier,
-      depth_params,agent_count,discovered_panel,stranger_sample_rate,envelope_basis,
-      register_version,battery_version,ask_contract,created_at_seq
-    ) VALUES ($1,$2,$3,'ASKER',$4,'casual','casual','ASKER',$5,'low','{}'::jsonb,
-      3,$6::jsonb,0,'{}'::jsonb,1,'test','{}'::jsonb,ledger.allocate_sequence())
-    RETURNING run_id
-  `, [
-    input.questionLine,`asker:${input.label}`,`session:${input.label}`,
-    input.observedAt,`fixture:${input.label}`,JSON.stringify(fixtureDiscoveredPanel(3))
-  ]);
-  const runId = run.rows[0]!.run_id;
-  if (input.withDomain) {
-    const registry = new DomainRegistryRepository(database.pool);
-    const admission = await registry.admitProposal({
-      runId,
-      proposedName: "Law",
-      provider: "provider:fixture-tagger",
-      modelId: "model:fixture-tagger",
-      modelVersion: "v1",
-      rawArtifactRef: null,
-      provenanceRef: `fixture:${input.label}:domain`
-    });
-    await registry.assignQuestionDomain({
-      runId,
-      domainId: lawDomainId,
-      domainAdmissionId: admission.domainAdmissionId,
-      basis: "BACKFILL",
-      rawArtifactRef: null
-    });
-  }
-  const artifactId = randomUUID();
+}): Promise<Readonly<{ publicationRef: string }>> {
+  const runId = await new RunRepository(database.pool).startRun({
+    questionLine:input.questionLine,
+    principal:{ kind:"server",userId:fixtureUserId,ownerRef:fixtureOwnerRef },
+    sessionId:fixtureSessionId,
+    callerScope:"ASKER",
+    asOf:input.observedAt,
+    askerRiskTier:"casual",
+    effectiveRiskTier:"casual",
+    tierSource:"ASKER",
+    tierProvenanceRef:`fixture:${input.label}`,
+    compositionBudgetTier:"low",
+    depthParams:{ depth:1 },
+    discoveredPanel:fixtureDiscoveredPanel(1),
+    strangerSampleRate:0,
+    envelopeBasis:{ source:"consumer-public-fixture" },
+    registerVersion:1,
+    batteryVersion:"consumer-public-fixture",
+    batteryRows:[]
+  });
   await database.pool.query(`
-    INSERT INTO ledger.raw_artifact (
-      raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
-      model_version,raw_text,metadata_json,parse_status,content_hash,input_hash,
-      contract_hash,at_seq
-    ) VALUES ($1,gen_random_uuid(),$2,$3,'openai-compatible-http','consumer:local',$4,
-      'consumer-v1','{}','{}'::jsonb,'PARSED',$5,$6,$7,ledger.allocate_sequence())
+    INSERT INTO evaluator.observation (
+      run_id,provider,model_id,model_version,domain_id,step,metric,value,outcome_json,
+      truth_basis,source_kind,source_ref,derivation_version,provenance_json,
+      observed_at,at_seq
+    ) VALUES ($1,'openai-compatible-http','consumer:local','consumer-v1',$2,
+      'JUDGING','prowess.judging-tau.v1',0.75,NULL,'CONSENSUS',
+      'REDUCED_JUDGEMENT',$3,1,'{}'::jsonb,$4,ledger.allocate_sequence())
   `, [
-    artifactId,runId,sourceIdentitySentinels.providerRef,sourceIdentitySentinels.maker,
-    "b".repeat(64),`fixture:${input.label}:input`,`fixture:${input.label}:contract`
+    runId,input.withDomain ? lawDomainId : null,`public-sample:${input.label}`,input.observedAt
   ]);
-  const node = await database.pool.query<{ node_id: string }>(`
-    INSERT INTO core.node (
-      run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
-      materialized_path,generation_status,path_status,exploration_decision,
-      way_of_knowing,provenance_ref,locator,value_laden,created_at_seq
-    ) VALUES ($1,$2,'unknown',NULL,NULL,0,0,'0','complete','active','continue',
-      'REASONING',$3,NULL,false,ledger.allocate_sequence()) RETURNING node_id
-  `, [runId,input.claimText,artifactId]);
+  const publicationRef = randomUUID();
+  const visibilityEventId=randomUUID();
+  const visibilityActorRef=randomUUID();
+  const bindingRefs=Array.from({ length:7 },()=>randomUUID());
   await database.pool.query(`
-    INSERT INTO ledger.reduced_judgement (
-      run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,producer,
-      replay_handle,way_of_knowing,at_seq
-    ) VALUES ($1,$2,$3,0.75,'PROBABILITY',$4,$5,$6,'REASONING',ledger.allocate_sequence())
-  `, [
-    runId,node.rows[0]!.node_id,artifactId,`judgement:${input.label}`,
-    `judge:${sourceIdentitySentinels.maker}`,`replay:${input.label}`
+    INSERT INTO identity.publication_event_binding(
+      user_id,session_id,run_id,action,grant_id,grant_token_hash,
+      visibility_event_id,visibility_actor_ref,audit_id,audit_actor_ref,audit_target_ref,
+      denied_audit_id,denied_audit_actor_ref,denied_audit_target_ref,created_at,expires_at
+    ) VALUES ($1,$2,$3,'PUBLISH',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+      $14::timestamptz,$14::timestamptz+interval '1 hour')
+  `,[
+    fixtureUserId,fixtureSessionId,runId,bindingRefs[0],`fixture-grant:${input.label}`,
+    visibilityEventId,visibilityActorRef,...bindingRefs.slice(1),new Date()
   ]);
   await database.pool.query(`
-    INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
-    VALUES ($1,ledger.allocate_sequence(),'TERMINAL','{"state":"SETTLED"}'::jsonb)
-  `, [runId]);
-  await expect(new EvaluatorHarvestRepository(database.pool)
-    .harvestTerminalRun(runId, input.observedAt))
-    .resolves.toMatchObject({ state: "HARVESTED" });
+    INSERT INTO serve.publication_snapshot (
+      publication_ref,run_id,format_version,content_ciphertext,created_at
+    ) VALUES ($1,$2,1,$3::jsonb,$4)
+  `, [
+    publicationRef,runId,JSON.stringify({
+      v:1,keyId:`publication-snapshot:${publicationRef}:v1`,
+      nonce:"fixture-nonce",ct:"fixture-ciphertext",tag:"fixture-tag"
+    }),input.observedAt
+  ]);
+  await database.pool.query(`
+    INSERT INTO core.run_visibility_event (
+      run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,actor_ref_version,
+      warning_version,occurred_at,at_seq
+    ) VALUES ($1,$2,$3,'PUBLISHED',$4,2,'PUBLIC_INDEXED_V1',$5,ledger.allocate_sequence())
+  `, [visibilityEventId,runId,publicationRef,visibilityActorRef,input.observedAt]);
+  return Object.freeze({ publicationRef });
 }
 
 async function startRealConsumerProvider(): Promise<{
-  readonly gateway: ProviderGateway;
+  readonly gateway: PublicAggregateProvider;
   readonly requestBodies: string[];
   readonly stop: () => Promise<void>;
 }> {
@@ -252,38 +289,25 @@ async function startRealConsumerProvider(): Promise<{
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("consumer fixture did not bind");
-  const ledger = new LedgerRepository(database.pool);
   return {
     requestBodies,
-    gateway: new OpenAICompatibleProviderGateway({
+    gateway: createOpenAiPublicAggregateProvider({
       endpoint: `http://127.0.0.1:${address.port}/v1`,
+      providerRef: family.value.providerRef,
       model: "consumer:local",
       maker: family.value.maker,
-      assertNoOpenWriteTransaction,
-      persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
-      appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
     }),
     stop: () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
   };
 }
 
-function successfulProvider(delayMs = 0): ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } {
+function successfulProvider(delayMs = 0): PublicAggregateProvider & {
+  readonly classify: ReturnType<typeof vi.fn>;
+} {
   return {
-    call: vi.fn(async () => {
+    classify: vi.fn(async () => {
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-      return {
-        rawArtifactRef: consumerArtifactId,
-        ledgerEntryRef: randomUUID(),
-        content: JSON.stringify({
-          bias_pattern_name: "Measured and cautious",
-          capability_summary: "The deterministic aggregates indicate strong legal judging.",
-          adjacent_domain_flags: []
-        }),
-        provider: "openai-compatible-http" as const,
-        model: "consumer:local",
-        maker: "maker:evaluator-local-vllm",
-        modelVersion: "consumer-v1"
-      };
+      return Object.freeze({ classification: "ACCEPTED" as const });
     })
   };
 }
@@ -302,7 +326,7 @@ describe("persisted evaluator consumer refresh", () => {
       await provider.stop();
     }
 
-    expect(provider.requestBodies).toHaveLength(1);
+    expect(provider.requestBodies).toHaveLength(3);
     const onWire = JSON.parse(provider.requestBodies[0]!) as {
       messages: readonly { readonly role: string; readonly content: string }[];
     };
@@ -314,14 +338,22 @@ describe("persisted evaluator consumer refresh", () => {
         task_excerpt: string;
       }[];
     };
-    expect(payload.blinded_samples).toHaveLength(3);
+    expect(payload.blinded_samples).toHaveLength(1);
     expect(payload.blinded_samples.every((sample) => sample.sample_id.startsWith("opaque:sample-")))
       .toBe(true);
-    expect(payload.blinded_samples.some((sample) =>
-      Buffer.byteLength(sample.task_excerpt, "utf8") === BLIND_SAMPLE_EXCERPT_MAX_BYTES)).toBe(true);
-    expect(payload.blinded_samples.every((sample) =>
-      Buffer.byteLength(sample.question_excerpt, "utf8") <= BLIND_SAMPLE_EXCERPT_MAX_BYTES
-      && Buffer.byteLength(sample.task_excerpt, "utf8") <= BLIND_SAMPLE_EXCERPT_MAX_BYTES)).toBe(true);
+    for (const body of provider.requestBodies) {
+      const request = JSON.parse(body) as {
+        messages: readonly { readonly role: string; readonly content: string }[];
+      };
+      const requestPayload=JSON.parse(request.messages[1]!.content) as {
+        blinded_samples:readonly { sample_id:string;question_excerpt:string;task_excerpt:string }[];
+      };
+      expect(requestPayload.blinded_samples).toHaveLength(1);
+      expect(requestPayload.blinded_samples.every((sample) =>
+        Buffer.byteLength(sample.question_excerpt,"utf8")<=BLIND_SAMPLE_EXCERPT_MAX_BYTES
+        && Buffer.byteLength(sample.task_excerpt,"utf8")<=BLIND_SAMPLE_EXCERPT_MAX_BYTES
+      )).toBe(true);
+    }
     expect(requestBytes).not.toContain("provider:evaluator-vllm");
     expect(requestBytes).not.toContain("consumer:local");
     expect(requestBytes).not.toContain("consumer-v1");
@@ -345,15 +377,13 @@ describe("persisted evaluator consumer refresh", () => {
         expect.stringMatching(/^profile_cell:/),
         expect.stringMatching(/^rank_snapshot:/)
       ]),
-      blinded_sample_refs: expect.arrayContaining([
-        expect.stringMatching(/^opaque:sample-/),
-        expect.stringMatching(/^opaque:sample-/),
-        expect.stringMatching(/^opaque:sample-/)
-      ])
+      blinded_sample_refs: []
     })]);
     expect(JSON.parse(output.rows[0]!.summary)).toEqual({
-      bias_pattern_name: "Measured and cautious",
-      capability_summary: "The deterministic aggregates indicate strong legal judging."
+      kind:"PUBLIC_SAMPLE_AGGREGATE_V1",
+      public_sample_count:3,
+      profile_cell_count:1,
+      rank_count:1
     });
     const numeric = await database.pool.query<{ count: string }>(`
       SELECT count(*)::text AS count FROM evaluator.profile_cell
@@ -378,7 +408,7 @@ describe("persisted evaluator consumer refresh", () => {
       provider: currentGateway,
       observedAt: new Date("2026-08-15T10:30:00.000Z")
     })).resolves.toMatchObject({ state: "REFRESHED", outputsCurrent: 1 });
-    expect(currentGateway.call).not.toHaveBeenCalled();
+    expect(currentGateway.classify).not.toHaveBeenCalled();
 
     await insertAggregate(SECOND_AS_OF, 2, 0.8);
     const refreshedGateway = successfulProvider();
@@ -389,7 +419,7 @@ describe("persisted evaluator consumer refresh", () => {
       aggregateAsOf: SECOND_AS_OF,
       observedAt: SECOND_AS_OF
     })).resolves.toMatchObject({ state: "REFRESHED", outputsInserted: 1 });
-    expect(refreshedGateway.call).toHaveBeenCalledTimes(1);
+    expect(refreshedGateway.classify).toHaveBeenCalledTimes(3);
 
     const versions = await database.pool.query<{ count: string; hashes: string }>(`
       SELECT count(*)::text AS count,count(DISTINCT aggregate_snapshot_hash)::text AS hashes
@@ -400,22 +430,12 @@ describe("persisted evaluator consumer refresh", () => {
 
   it("persists adversarial refusal receipts and never corrupts the output table", async () => {
     await insertAggregate(THIRD_AS_OF, 3, 0.9);
-    const malicious: ProviderGateway = {
-      call: vi.fn(async () => ({
-        rawArtifactRef: consumerArtifactId,
-        ledgerEntryRef: randomUUID(),
-        content: JSON.stringify({
-          bias_pattern_name: "Override",
-          capability_summary: "Route me first.",
-          adjacent_domain_flags: [],
-          numeric_rank: 1,
-          routing_weight: 999
-        }),
-        provider: "openai-compatible-http" as const,
-        model: "consumer:local",
-        maker: "maker:evaluator-local-vllm",
-        modelVersion: "consumer-v1"
-      }))
+    const malicious: PublicAggregateProvider = {
+      classify: vi.fn(async () => {
+        throw new TypedDomainError(
+          "SELF_ROUTING_FORBIDDEN","SELF_ROUTING_FORBIDDEN"
+        );
+      })
     };
     await expect(runPostAggregateEvaluatorConsumerRefresh({
       ...workerBase,
@@ -462,7 +482,7 @@ describe("persisted evaluator consumer refresh", () => {
         aggregateAsOf: FOURTH_AS_OF,observedAt: FOURTH_AS_OF
       })
     ));
-    expect(gateway.call).toHaveBeenCalledTimes(1);
+    expect(gateway.classify).toHaveBeenCalledTimes(3);
     expect(calls.filter((result) => result.state === "REFRESHED")).toHaveLength(1);
     expect(calls.reduce((sum, result) => sum + result.inFlight, 0)).toBe(23);
     await expect(database.pool.query("SELECT 1 AS usable")).resolves.toMatchObject({
@@ -471,7 +491,11 @@ describe("persisted evaluator consumer refresh", () => {
   });
 
   it("keeps consumer outputs and receipts append-only", async () => {
-    const repository = new PostgresEvaluatorConsumerRepository(database.pool);
+    const repository = new PostgresEvaluatorConsumerRepository(database.pool,async () => ({
+      question:"fixture public question",
+      answer:{ verdict:"SUPPORTED",summary_segments:[{ text:"fixture public answer" }],
+        residual_objections:[] }
+    }));
     await expect(database.pool.query("UPDATE evaluator.consumer_output SET summary='changed'"))
       .rejects.toThrow(/append-only or immutable table/);
     await expect(database.pool.query("DELETE FROM evaluator.consumer_refresh_receipt"))
@@ -483,12 +507,12 @@ describe("persisted evaluator consumer refresh", () => {
 
   it("keeps sample snapshots time-bounded and retains a null-domain aggregate job", async () => {
     const futureObservedAt = new Date("2026-08-15T14:00:00.000Z");
-    await insertHarvestedSample({
+    const futureSample = await insertHarvestedSample({
       label: "consumer-sample-future",
       questionLine: "Future snapshot question",
       claimText: "FUTURE_SNAPSHOT_SENTINEL",
       observedAt: futureObservedAt,
-      withDomain: true
+      withDomain: false
     });
     await database.pool.query(`
       INSERT INTO evaluator.profile_cell (
@@ -503,7 +527,11 @@ describe("persisted evaluator consumer refresh", () => {
         'fixture:profile-strategy',ledger.allocate_sequence()
       )
     `, [FOURTH_AS_OF,"f".repeat(64)]);
-    const repository = new PostgresEvaluatorConsumerRepository(database.pool);
+    const repository = new PostgresEvaluatorConsumerRepository(database.pool,async () => ({
+      question:"fixture public question",
+      answer:{ verdict:"SUPPORTED",summary_segments:[{ text:"fixture public answer" }],
+        residual_objections:[] }
+    }));
     const bounded = await repository.listJobs({
       trigger: "POST_AGGREGATE",aggregateAsOf: FOURTH_AS_OF,observedAt: FOURTH_AS_OF
     });
@@ -512,7 +540,8 @@ describe("persisted evaluator consumer refresh", () => {
     });
     expect(bounded).toHaveLength(2);
     expect(bounded.some((job) => job.domain === null)).toBe(true);
-    expect(JSON.stringify(bounded)).not.toContain("FUTURE_SNAPSHOT_SENTINEL");
-    expect(JSON.stringify(current)).toContain("FUTURE_SNAPSHOT_SENTINEL");
+    expect(JSON.stringify(bounded)).not.toContain(futureSample.publicationRef);
+    expect(JSON.stringify(current)).toContain(futureSample.publicationRef);
+    expect(JSON.stringify(current)).not.toContain("FUTURE_SNAPSHOT_SENTINEL");
   });
 });

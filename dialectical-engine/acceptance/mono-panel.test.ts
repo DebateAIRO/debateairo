@@ -97,6 +97,7 @@ describe("DR-182 live mono-panel composition", () => {
   it("boots and serves high-stakes depth 4 with the ruled cap and disclosures", async () => {
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
+      legacyUserToken:"mono-panel-owner",
       environment: {
         DATABASE_URL: database.connectionString,
         API_HOST: "127.0.0.1",

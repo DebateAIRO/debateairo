@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { chmod, link, mkdir, mkdtemp, open, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,link,lstat,mkdir,mkdtemp,open,readFile,rename,rm,stat,symlink,writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -241,6 +243,131 @@ describe("S8 publication crypto and projection", () => {
       .rejects.toBeInstanceOf(PublicationKeyUnresolvedError);
   });
 
+  it("publishes corpus keys only after file, child-directory, and parent-directory fsync", async () => {
+    const root = await mkdtemp(join(tmpdir(),"debateai-s10-publication-durability-"));
+    roots.push(root);
+    const publicationRef = randomUUID();
+    const events: string[] = [];
+    const io = {
+      mkdir,chmod,lstat,readFile,rename,rm,stat,
+      async open(path: string,flags: string,mode?: number) {
+        const handle = await open(path,flags,mode);
+        const kind = path.endsWith(".tmp") ? "temp"
+          : path===join(root,"publications") ? "parent" : "directory";
+        events.push(`open-${kind}`);
+        return {
+          writeFile: handle.writeFile.bind(handle),
+          async sync() { events.push(`sync-${kind}`); await handle.sync(); },
+          async close() { events.push(`close-${kind}`); await handle.close(); }
+        };
+      }
+    } as unknown as PublicationKeyFileSystem;
+    const kekBytes = Buffer.alloc(32,0xa9);
+    const store = new FilePublicationKeyStore(root,loadKek(kekBytes),io);
+    await store.store(publicationRef,Buffer.alloc(32,0xaa));
+    expect(events).toEqual([
+      "open-temp","sync-temp","close-temp",
+      "open-directory","sync-directory","close-directory",
+      "open-parent","sync-parent","close-parent"
+    ]);
+    const loaded = await new FilePublicationKeyStore(root,loadKek(kekBytes)).load(publicationRef);
+    expect(loaded.key).toEqual(Buffer.alloc(32,0xaa));
+    loaded.key.fill(0);
+  });
+
+  it("fails closed at every corpus-key publication fsync stage", async () => {
+    for (const failure of ["temp","directory","parent"] as const) {
+      const root = await mkdtemp(join(tmpdir(),`debateai-s10-publication-${failure}-`));
+      roots.push(root);
+      const publicationRef = randomUUID();
+      const io = {
+        mkdir,chmod,lstat,readFile,rename,rm,stat,
+        async open(path: string,flags: string,mode?: number) {
+          const handle = await open(path,flags,mode);
+          const kind = path.endsWith(".tmp") ? "temp"
+            : path===join(root,"publications") ? "parent" : "directory";
+          return {
+            writeFile: handle.writeFile.bind(handle),
+            async sync() {
+              if (kind===failure) throw new Error(`PUBLICATION_${failure.toUpperCase()}_FSYNC_FAILED`);
+              await handle.sync();
+            },
+            close: handle.close.bind(handle)
+          };
+        }
+      } as unknown as PublicationKeyFileSystem;
+      const store = new FilePublicationKeyStore(root,loadKek(Buffer.alloc(32,0xab)),io);
+      if (failure==="temp") {
+        await expect(store.store(publicationRef,Buffer.alloc(32,0xac)))
+          .rejects.toThrow("PUBLICATION_TEMP_FSYNC_FAILED");
+        await expect(lstat(join(root,"publications",publicationRef)))
+          .rejects.toMatchObject({ code: "ENOENT" });
+      } else {
+        await expect(store.store(publicationRef,Buffer.alloc(32,0xac)))
+          .rejects.toMatchObject({ code: "PUBLICATION_KEY_STORE_DURABILITY_UNCERTAIN" });
+        expect((await stat(join(
+          root,"publications",publicationRef,"publication-key.v1.json"
+        ))).isFile()).toBe(true);
+      }
+    }
+  });
+
+  it("publishes corpus-key absence only after unlink, parent fsync, and lstat readback", async () => {
+    for (const failure of ["unlink","parent","readback"] as const) {
+      const root = await mkdtemp(join(tmpdir(),`debateai-s10-publication-destroy-${failure}-`));
+      roots.push(root);
+      const publicationRef = randomUUID();
+      const kekBytes = Buffer.alloc(32,0xad);
+      await new FilePublicationKeyStore(root,loadKek(kekBytes))
+        .store(publicationRef,Buffer.alloc(32,0xae));
+      const io = {
+        mkdir,chmod,lstat,readFile,rename,stat,
+        async rm(path: string,options: { recursive: boolean; force: boolean }) {
+          if (failure==="unlink") throw new Error("PUBLICATION_UNLINK_FAILED");
+          if (failure!=="readback") await rm(path,options);
+        },
+        async open(path: string,flags: string,mode?: number) {
+          const handle = await open(path,flags,mode);
+          if (failure!=="parent") return handle;
+          return new Proxy(handle,{
+            get(target,property,receiver) {
+              if (property==="sync") return async () => { throw new Error("PUBLICATION_PARENT_FSYNC_FAILED"); };
+              const value = Reflect.get(target,property,receiver);
+              return typeof value==="function" ? value.bind(target) : value;
+            }
+          });
+        }
+      } as unknown as PublicationKeyFileSystem;
+      const faulted = new FilePublicationKeyStore(root,loadKek(kekBytes),io);
+      await expect(faulted.destroy(publicationRef)).rejects.toThrow(
+        failure==="unlink" ? "PUBLICATION_UNLINK_FAILED"
+          : failure==="parent" ? "PUBLICATION_PARENT_FSYNC_FAILED"
+            : "Secret-store directory still exists after durable removal"
+      );
+      const fresh = new FilePublicationKeyStore(root,loadKek(kekBytes));
+      if (failure==="parent") {
+        await expect(fresh.exists(publicationRef)).resolves.toBe(false);
+        await expect(fresh.load(publicationRef)).rejects
+          .toBeInstanceOf(PublicationKeyUnresolvedError);
+      } else {
+        await expect(fresh.exists(publicationRef)).resolves.toBe(true);
+      }
+    }
+
+    const root = await mkdtemp(join(tmpdir(),"debateai-s10-publication-destroy-green-"));
+    roots.push(root);
+    const publicationRef = randomUUID();
+    const kekBytes = Buffer.alloc(32,0xaf);
+    const store = new FilePublicationKeyStore(root,loadKek(kekBytes));
+    await store.store(publicationRef,Buffer.alloc(32,0xb0));
+    await expect(store.destroy(publicationRef)).resolves.toBe("DESTROYED");
+    const fresh = new FilePublicationKeyStore(root,loadKek(kekBytes));
+    await expect(fresh.exists(publicationRef)).resolves.toBe(false);
+    await expect(fresh.load(publicationRef)).rejects
+      .toBeInstanceOf(PublicationKeyUnresolvedError);
+    await expect(fresh.destroy(publicationRef)).resolves.toBe("ALREADY_ABSENT");
+  });
+
   it("binds snapshot ciphertext to run identity and rejects decrypted row-identity mismatch", async () => {
     const publicationRef = randomUUID();
     const runId = randomUUID();
@@ -268,6 +395,7 @@ describe("S8 publication crypto and projection", () => {
       mismatchPrepared.close();
       const revalidatePublic = vi.fn(async () => true);
       const repository = {
+        withContentLease: async <T>(_publicationRef: string,use: () => Promise<T>) => use(),
         readPublic: async () => ({
           publicationRef, runId, contentCiphertext: mismatchedEnvelope,
           createdAt: new Date("2026-08-24T00:00:00.000Z")
@@ -291,7 +419,13 @@ describe("S8 publication crypto and projection", () => {
         this.loaded = Buffer.from(this.stored!);
         return Object.freeze({ publicationRef, key: this.loaded });
       }
-      async destroy(): Promise<void> { this.stored?.fill(0); this.stored = undefined; }
+      async exists(): Promise<boolean> { return this.stored !== undefined; }
+      async destroy(): Promise<"DESTROYED" | "ALREADY_ABSENT"> {
+        if (this.stored === undefined) return "ALREADY_ABSENT";
+        this.stored.fill(0);
+        this.stored = undefined;
+        return "DESTROYED";
+      }
     }
     const store = new TrackingStore();
     const cipher = new PublicationCipher(store);
@@ -327,7 +461,7 @@ describe("S8 publication crypto and projection", () => {
       fileSystem
     );
     await expect(store.store(randomUUID(), Buffer.alloc(32, 0xc2))).rejects.toMatchObject({
-      code: "PUBLICATION_KEY_STORE_CLEANUP_FAILED"
+      code: "PUBLICATION_KEY_STORE_DURABILITY_UNCERTAIN"
     });
   });
 
@@ -344,7 +478,10 @@ describe("S8 publication crypto and projection", () => {
         this.loaded = Buffer.from(this.stored!);
         return Object.freeze({ publicationRef, key: this.loaded });
       }
-      async destroy(): Promise<void> {}
+      async exists(): Promise<boolean> { return this.stored !== undefined; }
+      async destroy(): Promise<"DESTROYED" | "ALREADY_ABSENT"> {
+        return this.stored === undefined ? "ALREADY_ABSENT" : "DESTROYED";
+      }
     }
     const store = new TrackingStore();
     const cipher = new PublicationCipher(store);
@@ -355,6 +492,7 @@ describe("S8 publication crypto and projection", () => {
     const contentCiphertext = prepared.encrypt(publicDebate(publicationRef));
     prepared.close();
     const repository = {
+      withContentLease: async <T>(_publicationRef: string,use: () => Promise<T>) => use(),
       readPublic: async () => {
         store.calls.push("readPublic");
         return { publicationRef, runId, contentCiphertext, createdAt };
@@ -390,7 +528,8 @@ describe("S8 publication crypto and projection", () => {
     const store: PublicationKeyStore = {
       store: async () => { stores += 1; },
       load: async () => { throw new PublicationKeyUnresolvedError(); },
-      destroy: async () => undefined
+      exists: async () => stores > 0,
+      destroy: async () => "DESTROYED"
     };
     const auditPreflightDenial = vi.fn(async () => true);
     const application = new PostgresPublicationApplication({
@@ -416,18 +555,31 @@ describe("S8 publication crypto and projection", () => {
   it("keeps failed unpublish key cleanup pending and makes reconciliation idempotently retryable", async () => {
     const publicationRef = randomUUID();
     let failDestroy = true;
+    let noOpDestroy = true;
     let completed = false;
+    let present = true;
     const store: PublicationKeyStore = {
       store: async () => undefined,
       load: async () => { throw new PublicationKeyUnresolvedError(); },
+      exists: async () => present,
       destroy: async () => {
         if (failDestroy) throw new Error("SECRET_STORE_DELETE_FAILED");
+        if (noOpDestroy) return "DESTROYED";
+        present = false;
+        return "DESTROYED";
       }
     };
     const repository = {
-      listPendingKeyCleanup: async () => completed ? [] : [publicationRef],
-      completeKeyCleanup: async (candidate: string) => {
+      withContentLease: async <T>(_publicationRef: string,use: () => Promise<T>) => use(),
+      claimKeyCleanup: async () => completed ? [] : [{
+        publicationRef,claimToken: "claim-token"
+      }],
+      completeKeyCleanup: async (
+        candidate: string,claimToken: string,destroyResult: string
+      ) => {
         expect(candidate).toBe(publicationRef);
+        expect(claimToken).toBe("claim-token");
+        expect(destroyResult).toBe("DESTROYED");
         completed = true;
         return true;
       }
@@ -437,9 +589,12 @@ describe("S8 publication crypto and projection", () => {
       new PublicationCipher(store),
       () => new Date("2026-08-24T00:00:00.000Z")
     );
-    await expect(application.reconcileKeyCleanup()).rejects.toThrow("SECRET_STORE_DELETE_FAILED");
+    await expect(application.reconcileKeyCleanup()).resolves.toBe(0);
     expect(completed).toBe(false);
     failDestroy = false;
+    await expect(application.reconcileKeyCleanup()).resolves.toBe(0);
+    expect(completed).toBe(false);
+    noOpDestroy = false;
     await expect(application.reconcileKeyCleanup()).resolves.toBe(1);
     await expect(application.reconcileKeyCleanup()).resolves.toBe(0);
   });

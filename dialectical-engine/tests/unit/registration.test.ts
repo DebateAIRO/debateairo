@@ -1,6 +1,8 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,lstat,mkdir,mkdtemp,open,readFile,rename,rm,stat,writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -20,7 +22,8 @@ import {
   hashPassword,
   hashVerificationToken,
   loadKek,
-  verifyPassword
+  verifyPassword,
+  type UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
@@ -117,6 +120,7 @@ function retainedStateContains(root: unknown, needle: string): boolean {
 
 function fixtureAskApplication(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: "run:test", status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
@@ -374,10 +378,10 @@ describe("S3 ruled authentication policy", () => {
       pre_transport_work_budget_ms: 600,
       no_send_equal_transport_work_ms: 5_000,
       handoff_scheduler_tolerance_ms: 100,
-      registration_minimum_reservation_ms: 5_100,
+      registration_minimum_reservation_ms: 5_700,
       minimum_reservation_ms: 5_700,
       queue_wait_timeout_ms: 18_000,
-      release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_AFTER_PROVISIONING_AND_RESPONSE_CLAMP_OR_60MS_RESEND;_SATURATION_HANDOFF_ROUTE_DERIVED_5100MS_REGISTRATION_OR_5700MS_RESEND;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
+      release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_BEFORE_PROVISIONING_OR_60MS_RESEND;_HTTP_RESPONSE_FLOOR_600MS_FROM_REGISTRATION_ACTIVATION;_SATURATION_HANDOFF_ROUTE_DERIVED_5700MS_EVERY_ROUTE;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
       // Rework7 gave registration its own 28-second wait deadline, so the
       // retention disclosure names both routes and both bounds.
       retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
@@ -632,6 +636,138 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
       expect(JSON.parse(stored)).toMatchObject({ version: 1, user_id: userId });
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes user DEKs only after file, child-directory, and parent-directory fsync", async () => {
+    const root = await mkdtemp(join(tmpdir(),"debateai-s10-user-dek-durability-"));
+    const events: string[] = [];
+    const io = {
+      mkdir,chmod,lstat,readFile,rename,rm,stat,
+      async open(path: string,flags: string,mode?: number) {
+        const handle = await open(path,flags,mode);
+        const kind = path.endsWith(".tmp") ? "temp"
+          : path===join(root,"users") ? "parent" : "directory";
+        events.push(`open-${kind}`);
+        return {
+          writeFile: handle.writeFile.bind(handle),
+          async sync() { events.push(`sync-${kind}`); await handle.sync(); },
+          async close() { events.push(`close-${kind}`); await handle.close(); }
+        };
+      }
+    } as unknown as UserDekStoreFileSystem;
+    try {
+      const userId = randomUUID();
+      const kekBytes = Buffer.alloc(32,0x5b);
+      const store = new FileUserDekStore(root,loadKek(kekBytes),io);
+      await store.store(userId,Buffer.alloc(32,0x6c));
+      expect(events).toEqual([
+        "open-temp","sync-temp","close-temp",
+        "open-directory","sync-directory","close-directory",
+        "open-parent","sync-parent","close-parent"
+      ]);
+      const fresh = new FileUserDekStore(root,loadKek(kekBytes));
+      const loaded = await fresh.load(userId);
+      expect(loaded).toEqual(Buffer.alloc(32,0x6c));
+      loaded.fill(0);
+    } finally {
+      await rm(root,{ recursive: true,force: true });
+    }
+  });
+
+  it("fails closed at every user-DEK publication fsync stage", async () => {
+    for (const failure of ["temp","directory","parent"] as const) {
+      const root = await mkdtemp(join(tmpdir(),`debateai-s10-user-dek-${failure}-`));
+      const userId = randomUUID();
+      const io = {
+        mkdir,chmod,lstat,readFile,rename,rm,stat,
+        async open(path: string,flags: string,mode?: number) {
+          const handle = await open(path,flags,mode);
+          const kind = path.endsWith(".tmp") ? "temp"
+            : path===join(root,"users") ? "parent" : "directory";
+          return {
+            writeFile: handle.writeFile.bind(handle),
+            async sync() {
+              if (kind===failure) throw new Error(`USER_DEK_${failure.toUpperCase()}_FSYNC_FAILED`);
+              await handle.sync();
+            },
+            close: handle.close.bind(handle)
+          };
+        }
+      } as unknown as UserDekStoreFileSystem;
+      try {
+        const store = new FileUserDekStore(root,loadKek(Buffer.alloc(32,0x5c)),io);
+        if (failure==="temp") {
+          await expect(store.store(userId,Buffer.alloc(32,0x6d)))
+            .rejects.toThrow("USER_DEK_TEMP_FSYNC_FAILED");
+          await expect(lstat(join(root,"users",userId))).rejects.toMatchObject({ code: "ENOENT" });
+        } else {
+          await expect(store.store(userId,Buffer.alloc(32,0x6d)))
+            .rejects.toMatchObject({ code: "USER_DEK_STORE_DURABILITY_UNCERTAIN" });
+          expect((await stat(join(root,"users",userId,"dek.v1.json"))).isFile()).toBe(true);
+        }
+      } finally {
+        await rm(root,{ recursive: true,force: true });
+      }
+    }
+  });
+
+  it("publishes user-DEK absence only after unlink, parent fsync, and lstat readback", async () => {
+    for (const failure of ["unlink","parent","readback"] as const) {
+      const root = await mkdtemp(join(tmpdir(),`debateai-s10-user-destroy-${failure}-`));
+      const userId = randomUUID();
+      const kekBytes = Buffer.alloc(32,0x5d);
+      await new FileUserDekStore(root,loadKek(kekBytes)).store(userId,Buffer.alloc(32,0x6e));
+      const io = {
+        mkdir,chmod,lstat,readFile,rename,stat,
+        async rm(path: string,options: { recursive: boolean; force: boolean }) {
+          if (failure==="unlink") throw new Error("USER_DEK_UNLINK_FAILED");
+          if (failure!=="readback") await rm(path,options);
+        },
+        async open(path: string,flags: string,mode?: number) {
+          const handle = await open(path,flags,mode);
+          if (failure!=="parent") return handle;
+          return new Proxy(handle,{
+            get(target,property,receiver) {
+              if (property==="sync") return async () => { throw new Error("USER_DEK_PARENT_FSYNC_FAILED"); };
+              const value = Reflect.get(target,property,receiver);
+              return typeof value==="function" ? value.bind(target) : value;
+            }
+          });
+        }
+      } as unknown as UserDekStoreFileSystem;
+      try {
+        const faulted = new FileUserDekStore(root,loadKek(kekBytes),io);
+        await expect(faulted.destroy(userId)).rejects.toThrow(
+          failure==="unlink" ? "USER_DEK_UNLINK_FAILED"
+            : failure==="parent" ? "USER_DEK_PARENT_FSYNC_FAILED"
+              : "Secret-store directory still exists after durable removal"
+        );
+        const fresh = new FileUserDekStore(root,loadKek(kekBytes));
+        if (failure==="parent") {
+          await expect(fresh.exists(userId)).resolves.toBe(false);
+          await expect(fresh.load(userId)).rejects.toThrow();
+        } else {
+          await expect(fresh.exists(userId)).resolves.toBe(true);
+        }
+      } finally {
+        await rm(root,{ recursive: true,force: true });
+      }
+    }
+
+    const root = await mkdtemp(join(tmpdir(),"debateai-s10-user-destroy-green-"));
+    const userId = randomUUID();
+    const kekBytes = Buffer.alloc(32,0x5e);
+    try {
+      const store = new FileUserDekStore(root,loadKek(kekBytes));
+      await store.store(userId,Buffer.alloc(32,0x6f));
+      await expect(store.destroy(userId)).resolves.toBe("DESTROYED");
+      const fresh = new FileUserDekStore(root,loadKek(kekBytes));
+      await expect(fresh.exists(userId)).resolves.toBe(false);
+      await expect(fresh.load(userId)).rejects.toThrow();
+      await expect(fresh.destroy(userId)).resolves.toBe("ALREADY_ABSENT");
+    } finally {
+      await rm(root,{ recursive: true,force: true });
     }
   });
 });
@@ -1168,7 +1304,10 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
           ...occurrence.repository
         } as never,
         mail: new MemoryMailSender(),
-        dekStore: { store: async () => undefined },
+        dekStore: {
+          store: async () => undefined,
+          destroy: async () => "ALREADY_ABSENT"
+        },
         blindIndexKey: Buffer.alloc(32, 0x3c),
         policy,
         limiter: new InProcessAuthRateLimiter(
@@ -1247,6 +1386,7 @@ interface Rework7Counters {
   passwordHash: number;
   auditHash: number;
   mailReservation: number;
+  mailRelease: number;
   tokenMint: number;
   send: number;
   mutation: number;
@@ -1262,7 +1402,10 @@ interface Rework7Occupancy {
   readonly releases: number;
 }
 
-type Rework7Activation = () => Promise<() => Promise<void>>;
+type Rework7Activation = () => Promise<Readonly<{
+  activatedAt: number;
+  release: () => Promise<void>;
+}>>;
 
 interface Rework7Harness {
   readonly service: RegistrationService;
@@ -1300,7 +1443,7 @@ const REWORK7_PASSWORD = "correct horse battery staple";
  * Reservation minimums and activation spacing are the only production values a
  * unit harness overrides, and only to zero: they are wall-clock waits on the
  * RAW timer, not on the injected sleep, so leaving them shipped would make
- * every barrier test wait out a 5,100 ms lease per permit wave. The two ruled
+ * every barrier test wait out a 5,700 ms lease per permit wave. The two ruled
  * wait DEADLINES are deliberately NOT in this set — the tests that assert 28 s
  * and 18 s read them straight off the production policy.
  */
@@ -1333,7 +1476,7 @@ function rework7Harness(options: {
 
   const counters: Rework7Counters = {
     repository: 0, limiterConsume: 0, limiterRefusal: 0, passwordHash: 0, auditHash: 0,
-    mailReservation: 0, tokenMint: 0, send: 0, mutation: 0, deliveryAudit: 0,
+    mailReservation: 0, mailRelease: 0, tokenMint: 0, send: 0, mutation: 0, deliveryAudit: 0,
     registrationFailureAudit: 0
   };
   const sleeps: number[] = [];
@@ -1456,7 +1599,10 @@ function rework7Harness(options: {
   const service = new RegistrationService({
     repository: repository as never,
     mail: { async sendVerification(): Promise<void> { counters.send += 1; } },
-    dekStore: { store: async () => undefined },
+    dekStore: {
+      store: async () => undefined,
+      destroy: async () => "ALREADY_ABSENT"
+    },
     blindIndexKey: Buffer.alloc(32, 0x3c),
     policy,
     limiter,
@@ -1473,6 +1619,10 @@ function rework7Harness(options: {
   });
 
   interface Rework7Inspected {
+    activateMailDispatch(
+      enforceMinimum?: boolean,
+      minimumReservationMs?: number
+    ): Readonly<{ activatedAt: number; release: () => Promise<void> }>;
     reserveMailDispatchPermit(request: {
       readonly correlationId: string;
       readonly minimumReservationMs?: number;
@@ -1484,6 +1634,17 @@ function rework7Harness(options: {
     registrationAdmissionOccupancy?(): Rework7Occupancy;
   }
   const inspected = service as unknown as Rework7Inspected;
+  const realActivate = inspected.activateMailDispatch.bind(service);
+  inspected.activateMailDispatch = (enforceMinimum = false, minimumReservationMs?: number) => {
+    const receipt = realActivate(enforceMinimum, minimumReservationMs);
+    return Object.freeze({
+      activatedAt: receipt.activatedAt,
+      release: () => {
+        counters.mailRelease += 1;
+        return receipt.release();
+      }
+    });
+  };
   const realReserve = inspected.reserveMailDispatchPermit.bind(service);
   inspected.reserveMailDispatchPermit = (request) => {
     counters.mailReservation += 1;
@@ -1530,7 +1691,7 @@ function rework7Harness(options: {
     freeOneMailPermit: async () => {
       const activate = heldPermits.shift();
       if (activate === undefined) throw new Error("REWORK7_NO_HELD_PERMIT");
-      await (await activate())();
+      await (await activate()).release();
     },
     register: (index: number) => service.register({
       email: `rework7-${index}@example.test`,
@@ -1925,63 +2086,87 @@ describe("T1 rework7 A1 — the admission token is released exactly once, and ne
     }
   });
 
-  it("hands the admission to the reservation continuation, which releases it after registering the hold", async () => {
+  it("does not reserve mail capacity while a started password hash is unsettled", async () => {
     const harness = rework7Harness({
-      hashFails: true,
-      channel: {
-        maxConcurrentVerificationDispatches: 1,
-        maxQueuedVerificationDispatches: 1,
-        registrationMailDispatchMinimumReservationMs: 200
-      }
+      deferHash: true
     });
     try {
-      await harness.holdMailPermits(1);
       const attempt = harness.register(0)
         .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
-      expect(await attempt).toBe("AUTH_TEMPORARILY_UNAVAILABLE");
-      // The request is gone but its reservation is still QUEUED, so the local
-      // finally must NOT have released: exactly one owner exists, and it is the
-      // continuation.
-      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
-      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
-
-      await harness.freeOneMailPermit();
       await rework7Settle();
+      expect(harness.pendingHashes()).toBe(1);
+      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.service.mailDispatchOccupancy()).toMatchObject({ inFlight: 0, queued: 0 });
 
-      // The hold was registered in pendingMailDispatches BEFORE the token was
-      // released, and the release did not wait out the 200 ms lease.
-      expect(harness.reservationHoldOccupancy).toHaveLength(1);
-      expect(harness.reservationHoldOccupancy[0]).toMatchObject({ admitted: 1, releases: 0 });
-      expect(harness.service.mailDispatchOccupancy().activeSends).toBe(1);
-      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
-
-      await harness.service.drainMailDispatches();
+      harness.failHashes(1);
+      expect(await attempt).toBe("AUTH_TEMPORARILY_UNAVAILABLE");
       expect(harness.occupancy()).toMatchObject({ admitted: 0, releases: 1 });
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.reservationHoldOccupancy).toEqual([]);
     } finally {
       harness.restore();
     }
   });
 
-  it("lets the reservation continuation release the admission when the reservation is rejected", async () => {
+  it("uses the exact 5700ms registration lease and releases admission once on reservation refusal", async () => {
     const harness = rework7Harness({
-      hashFails: true,
-      channel: {
-        maxConcurrentVerificationDispatches: 1,
-        maxQueuedVerificationDispatches: 1,
-        registrationMailDispatchQueueWaitTimeoutMs: 40
-      }
+      channel: { registrationMailDispatchMinimumReservationMs: 5_700 }
     });
     try {
-      await harness.holdMailPermits(1);
-      expect(await harness.register(0)
-        .then(() => "SUCCESS", (error: unknown) => rework7Code(error)))
-        .toBe("AUTH_TEMPORARILY_UNAVAILABLE");
+      const inspected = harness.service as unknown as {
+        reserveMailDispatchPermit(request: {
+          readonly correlationId: string;
+          readonly minimumReservationMs?: number;
+          readonly waitDeadlineMs?: number;
+        }): Promise<Rework7Activation>;
+      };
+      const requests: Array<Readonly<{
+        minimumReservationMs: number | undefined;
+        waitDeadlineMs: number | undefined;
+      }>> = [];
+      let rejectReservation!: (error: unknown) => void;
+      inspected.reserveMailDispatchPermit = (request) => {
+        requests.push(Object.freeze({
+          minimumReservationMs: request.minimumReservationMs,
+          waitDeadlineMs: request.waitDeadlineMs
+        }));
+        return new Promise<Rework7Activation>((_resolve, reject) => {
+          rejectReservation = reject;
+        });
+      };
+      const attempt = harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
+      await rework7Settle();
+      expect(requests).toEqual([{
+        minimumReservationMs: 5_700,
+        waitDeadlineMs: 28_000
+      }]);
       expect(harness.occupancy()).toMatchObject({ admitted: 1, releases: 0 });
 
-      await new Promise<void>((resolve) => { setTimeout(resolve, 120); });
+      rejectReservation(new AuthFlowError("AUTH_MAIL_BUSY"));
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
       expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
       expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
       expect(harness.reservationHoldOccupancy).toEqual([]);
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it("hands a provisioning failure to one visible reservation hold and invokes its release once", async () => {
+    const harness = rework7Harness({ provisionFails: true });
+    try {
+      expect(await harness.register(0)
+        .then(() => "SUCCESS", (error: unknown) => rework7Code(error)))
+        .toBe("AUTH_REGISTRATION_FAILED");
+      await harness.service.drainMailDispatches();
+      expect(harness.counters.mailReservation).toBe(1);
+      expect(harness.counters.mailRelease).toBe(1);
+      expect(harness.reservationHoldOccupancy).toHaveLength(1);
+      expect(harness.reservationHoldOccupancy[0]).toMatchObject({ admitted: 1, releases: 0 });
+      expect(harness.service.mailDispatchOccupancy()).toMatchObject({ inFlight: 0, activeSends: 0 });
+      expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 });
     } finally {
       harness.restore();
     }
@@ -2122,7 +2307,7 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
  * and `retainedStateContains` cannot look inside a closure at all.
  */
 describe("T1 rework8 F1/F2 — password work may not outlive its admission token", () => {
-  it("holds the admission and the drain until already-started password work settles after a reservation rejection", async () => {
+  it("holds the admission and drain through started password work before attempting a reservation", async () => {
     const secret = "rework8-started-kdf-secret-passphrase";
     const harness = rework7Harness({ deferHash: true, password: secret });
     const unhandled: unknown[] = [];
@@ -2136,39 +2321,20 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
         }): Promise<Rework7Activation>;
       }
       const inspected = harness.service as unknown as Rework8Reservation;
-      // The reservation is driven by the TEST, not by a timer: the race this
-      // pins is "reservation rejected while the KDF is still running", and
-      // wall-clock timing has no business deciding when that happens.
       const deadlines: Array<number | undefined> = [];
-      let rejectReservation!: (error: unknown) => void;
-      const reservation = new Promise<Rework7Activation>((_resolve, reject) => {
-        rejectReservation = reject;
-      });
       inspected.reserveMailDispatchPermit = (request) => {
         deadlines.push(request.waitDeadlineMs);
-        return reservation;
+        return Promise.reject(new AuthFlowError("AUTH_MAIL_BUSY"));
       };
 
       const attempt = harness.register(0)
         .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
       await rework7Settle();
 
-      // NON-VACUITY. The request is really admitted, its reservation is really
-      // outstanding on the ruled 28-second deadline, and its KDF has really
-      // been dispatched and really has not settled.
-      expect(deadlines).toEqual([28_000]);
+      // NON-VACUITY. The request is admitted and its KDF is dispatched, but no
+      // mail reservation exists until that secret-bearing work is settled.
+      expect(deadlines).toEqual([]);
       expect(harness.counters.passwordHash).toBe(1);
-      expect(harness.pendingHashes()).toBe(1);
-      expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
-
-      rejectReservation(new AuthFlowError("AUTH_MAIL_BUSY"));
-
-      // The CALLER is allowed to leave immediately with the opaque failure.
-      expect(await attempt).toBe("AUTH_MAIL_BUSY");
-      await rework7Settle();
-
-      // The TOKEN is not. Password work is still in the pool with the secret in
-      // its closure, so the slot it was admitted under stays occupied.
       expect(harness.pendingHashes()).toBe(1);
       expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
 
@@ -2183,14 +2349,16 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
 
       harness.settleHashes(1);
       await rework7Settle();
+      expect(await attempt).toBe("AUTH_MAIL_BUSY");
+      expect(deadlines).toEqual([28_000]);
       expect(drained).toBe(true);
       await drain;
 
       const after = harness.occupancy();
       expect(after.admitted).toBe(0);
       expect(after.admissions).toBe(1);
-      // Exactly one release: the local owner did not release, the continuation
-      // did, and it did so once.
+      // Exactly one release after the KDF settled and the later reservation
+      // failed; no continuation owned a mail lease during the hash.
       expect(after.releases).toBe(1);
       expect(harness.pendingHashes()).toBe(0);
       // The losing attempt did no account, token or mail work.
@@ -2205,7 +2373,7 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
     }
   });
 
-  it("cancels a genuinely queued registration hash on mail timeout, removing its start closure and clearing its password", async () => {
+  it("keeps a genuinely queued hash outside the mail queue until a hash slot becomes available", async () => {
     const secret = "rework8-queued-kdf-secret-passphrase";
     const harness = rework7Harness({
       deferHash: true,
@@ -2250,7 +2418,8 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       // and none of them still retains a reference.
       expect(inspected.registrationPasswordReferencesHeld).toBe(0);
 
-      // Fill the shared dispatcher so the target's permit must really queue.
+      // Fill the shared dispatcher. The target must still NOT join that mail
+      // queue until its password hash has first completed.
       await harness.holdMailPermits(
         harness.policy.channel.maxConcurrentVerificationDispatches
       );
@@ -2260,7 +2429,7 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       await rework7Settle();
 
       // NON-VACUITY, every clause checked BEFORE the deadline fires.
-      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
       expect(inspected.waitingRegistrationHashes).toHaveLength(1);
       const queuedStart = inspected.waitingRegistrationHashes[0]!;
       // The target hash was NOT dispatched: the pool call count is unmoved.
@@ -2269,23 +2438,29 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       expect(inspected.registrationPasswordReferencesHeld).toBe(1);
       expect(harness.occupancy()).toMatchObject({ admitted: 1, admissions: 1, releases: 0 });
 
+      // Let the saturators finish, which dispatches the target hash, then let
+      // that hash finish. Only now may the target enqueue its mail deadline.
+      harness.settleHashes(slots);
+      await rework7Settle();
+      expect(inspected.waitingRegistrationHashes).toHaveLength(0);
+      expect(inspected.waitingRegistrationHashes).not.toContain(queuedStart);
+      expect(harness.counters.passwordHash).toBe(slots + 1);
+      expect(harness.pendingHashes()).toBe(1);
+      expect(inspected.registrationPasswordReferencesHeld).toBe(0);
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+
+      harness.settleHashes(1);
+      await rework7Settle();
+      expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
       expect(await attempt).toBe("AUTH_MAIL_BUSY");
       await rework7Settle();
 
-      // The start closure was REMOVED and never executed.
-      expect(inspected.waitingRegistrationHashes).toHaveLength(0);
-      expect(inspected.waitingRegistrationHashes).not.toContain(queuedStart);
-      expect(harness.counters.passwordHash).toBe(slots);
-      expect(harness.pendingHashes()).toBe(slots);
-      // The password reference was cleared, proven by the counter and not by a
-      // shallow scan that a closure would defeat.
-      expect(inspected.registrationPasswordReferencesHeld).toBe(0);
-      // The mail waiter is gone with it and nothing was left queued.
+      // The mail waiter is gone and nothing secret-bearing remains queued.
       expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
       expect(harness.service.mailDispatchOccupancy().inFlight)
         .toBe(harness.policy.channel.maxConcurrentVerificationDispatches);
-      // Beyond the already-ruled validation / pre-race lookup and limiter call,
-      // the timed-out target did no work at all.
+      // Beyond validation, lookup, limiter and the completed KDF, the timed-out
+      // target performed no account/token/mail mutation.
       expect(harness.counters.repository).toBe(1);
       expect(harness.counters.limiterConsume).toBe(1);
       expect(harness.counters).toMatchObject({

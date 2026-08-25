@@ -68,7 +68,9 @@ import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { Toast } from "@/components/Toast";
-import { PublicationControl } from "@/components/PublicationControl";
+import {
+  PublicationControl,type PrivateDeletionStatus
+} from "@/components/PublicationControl";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import { computeLean, countClaims, renderStateOf, treeDepth } from "@/lib/debatePresentation";
 import type { PopoverState } from "@/lib/scrutiny";
@@ -360,6 +362,8 @@ export default function DebatePageClient({
   const [honestyActionState, setHonestyActionState] = useState<string | null>(null);
   const lowStrengthThreshold: number | undefined = undefined;
   const [investigationInput, setInvestigationInput] = useState<Record<string, string>>({});
+  const [privateDeletionStatus,setPrivateDeletionStatus]=useState<PrivateDeletionStatus|null>(null);
+  const privateDeletionRef=useRef<PrivateDeletionStatus|null>(null);
   const liveRef = useRef<LiveRunState>(createLiveRunState());
   const answerRef = useRef<Answer | null>(initialAnswer);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
@@ -408,11 +412,13 @@ export default function DebatePageClient({
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
 
   const refresh = useCallback(async (answerExpected = false) => {
+    if (privateDeletionRef.current!==null) return;
     try {
       const bundle = await getDebateBundle(id, COOKIE_SESSION_MARKER, contractClient, {
         answerExpected,
         currentAnswer: answerRef.current
       });
+      if (privateDeletionRef.current!==null) return;
       if (bundle.kind === "served") {
         answerRef.current = bundle.answer;
         setAnswer(bundle.answer);
@@ -433,6 +439,7 @@ export default function DebatePageClient({
         ? `Debate generation failed: ${bundle.run.terminal_reason}`
         : null);
     } catch (exc) {
+      if (privateDeletionRef.current!==null) return;
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
       // visible answer exists, and must remain an honest fatal result.
@@ -440,13 +447,32 @@ export default function DebatePageClient({
     }
   }, [id]);
 
+  const purgePrivateDebate=useCallback((status:PrivateDeletionStatus)=>{
+    privateDeletionRef.current=status;
+    setPrivateDeletionStatus(status);
+    answerRef.current=null;
+    liveRef.current=createLiveRunState();
+    setDebate(null);setAnswer(null);setLive(createLiveRunState());
+    setLedgerDigest(null);setLedgerError(null);setInspection(null);setInspectionError(null);
+    setHonestyOpen(false);setHonestyActionState(null);setInvestigationInput({});
+    setSynthesisDraft(null);setError(null);setStreamState({ status:"connecting" });
+    setScoringState({ status:"idle",data:null,error:null });
+    setScoringRefreshState({ status:"idle",jobId:null,error:null });
+    setAdaptiveDepthDryRunState({ status:"idle",data:null,error:null });
+    setExpanded(new Set());setCollapsed(new Set());setFocusNodeId(null);
+    setSelectedNodeId(null);setDetailNodeId(null);setPopover(null);setInvestigation(null);
+    setScrutiny({});setWorkspaceOpen(false);setScoringDiagnosticsOpen(false);
+    setGuideOpen(false);setToast(null);
+  },[]);
+
   const debateTerminal = debate
     ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
     : false;
 
   useEffect(() => {
+    if (privateDeletionStatus!==null) return;
     refresh();
-  }, [refresh]);
+  }, [privateDeletionStatus,refresh]);
 
   useEffect(() => {
     setScoringState({ status: "idle", data: null, error: null });
@@ -455,6 +481,7 @@ export default function DebatePageClient({
   }, [id]);
 
   useEffect(() => {
+    if (privateDeletionStatus!==null) return;
     let active = true;
     setScoringState((current) => ({ status: "loading", data: current.data, error: null }));
     getDebateScoring(id)
@@ -477,9 +504,10 @@ export default function DebatePageClient({
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id,privateDeletionStatus]);
 
   useEffect(() => {
+    if (privateDeletionStatus!==null) return;
     let active = true;
     setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
     getDebateAdaptiveDepthDryRun(id)
@@ -498,7 +526,7 @@ export default function DebatePageClient({
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id,privateDeletionStatus]);
 
   useEffect(() => {
     let active = true;
@@ -525,6 +553,7 @@ export default function DebatePageClient({
   // translator; while no settled answer exists, the tree the stream described
   // is materialized into the SAME debate state the V2 views already render.
   useEffect(() => {
+    if (privateDeletionStatus!==null) return;
     const runRef = answerRef.current?.run_ref ?? id;
 
     const consume = createDebatePageRunEventConsumer({
@@ -632,7 +661,7 @@ export default function DebatePageClient({
       controller.abort();
       if (timer) window.clearTimeout(timer);
     };
-  }, [debateTerminal, id, refresh, answer?.run_ref]);
+  }, [debateTerminal,id,privateDeletionStatus,refresh,answer?.run_ref]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -976,6 +1005,20 @@ export default function DebatePageClient({
   // Fatal dead-end ONLY for a definitive error with no data. A transient SSR
   // failure never reaches here: it leaves error null (pending), so it falls
   // through to the loading/connecting state below and the client retries.
+  if (privateDeletionStatus!==null) {
+    return (
+      <div className="screen scroll"><div className="screenInner narrow">
+        <p className="eyebrow">Private debate</p>
+        <h1>{privateDeletionStatus==="CLEANED"
+          ? "Private debate deleted"
+          : "Private debate deletion is processing"}</h1>
+        <p role="status">{privateDeletionStatus==="CLEANED"
+          ? "This debate is a tombstone. Its encrypted private content is permanently unreadable."
+          : "Private content is no longer available while durable key cleanup finishes."}</p>
+        <Link className="btn" href="/">← Back to library</Link>
+      </div></div>
+    );
+  }
   if (error && !debate) {
     return (
       <div className="screen scroll">
@@ -1410,7 +1453,10 @@ export default function DebatePageClient({
         />
       ) : null}
 
-      {answer ? <PublicationControl runId={answer.run_ref} /> : null}
+      {debate ? <PublicationControl
+        runId={answer?.run_ref ?? id}
+        onPrivateDeletion={purgePrivateDebate}
+      /> : null}
       {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
 
       {toast ? <Toast message={toast} /> : null}

@@ -3,10 +3,11 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
   allocateSequence,
-  decryptPreparedContentForRun,
-  prepareContentEncryptionForRun,
+  decryptLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
+  type LeasedPreparedRunContentCipher,
   type CryptoEnvelope,
-  type PreparedRunContentCipher,
+  withRunContentLease,
   withWriteTransaction
 } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
@@ -22,6 +23,7 @@ import { HARVEST_PIPELINE_VERSION } from "./harvest-constants.js";
 export * from "./blind-sample.js";
 export * from "./consumer.js";
 export * from "./consumer-postgres.js";
+export * from "./public-aggregate-provider.js";
 export * from "./dev-menu.js";
 export * from "./dispatch-binding.js";
 export * from "./harvest-constants.js";
@@ -347,13 +349,13 @@ export interface EvaluatorAddonRepository {
     runId: string,
     work: (
       client?: PoolClient,
-      preparedContent?: PreparedRunContentCipher | null
+      preparedContent?: LeasedPreparedRunContentCipher
     ) => Promise<T>
   ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }>;
   loadCandidate(
     runId: string,
     client?: PoolClient,
-    preparedContent?: PreparedRunContentCipher | null
+    preparedContent?: LeasedPreparedRunContentCipher
   ): Promise<EvaluatorAddonCandidateResult>;
   recordPipelineEvent(input: AddonPipelineEventInput, client?: PoolClient): Promise<string>;
   insertObservation(input: EvaluatorAddonObservationInput, client?: PoolClient): Promise<string>;
@@ -473,8 +475,6 @@ export async function runEvaluatorJudgeAddon(input: {
   } catch {
     await recordTerminalEvent("FAILED", "ADDON_PREFLIGHT_FAILED", client);
     return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
-  } finally {
-    preparedContent?.close();
   }
   const candidate = typeof candidateResult === "string" ? null : candidateResult;
   inputHash = addonInputHash(input.runId, candidate, policy);
@@ -532,7 +532,7 @@ export async function runEvaluatorJudgeAddon(input: {
       ]
     };
     const response = await input.provider.call({
-      runId: null,
+      runId: input.runId,
       subjectItemId: `evaluator:addon-attempt:${attemptId}`,
       callSiteKey: "evaluator.grade-judge-output.v1",
       role: "JUDGE",
@@ -643,74 +643,86 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
     runId: string,
     work: (
       client?: PoolClient,
-      preparedContent?: PreparedRunContentCipher | null
+      preparedContent?: LeasedPreparedRunContentCipher
     ) => Promise<T>
   ): Promise<{ readonly acquired: true; readonly value: T } | { readonly acquired: false }> {
-    const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
-    let client: PoolClient | undefined;
+    return withRunContentLease(this.pool, [runId], async (contentLease) => {
+    const leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+    const client=contentLease.client;
     const lockKey = `evaluator-addon:${runId}`;
     let acquired = false;
     try {
-      client = await this.pool.connect();
       const lock = await client.query<{ acquired: boolean }>(
         "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
         [lockKey]
       );
       acquired = lock.rows[0]?.acquired === true;
       if (!acquired) return Object.freeze({ acquired: false as const });
+      const value = await work(client, leasedContent);
+      await leasedContent.assertLive();
       return Object.freeze({
         acquired: true as const,
-        value: await work(client, preparedContent)
+        value
       });
     } finally {
       try {
-        if (client !== undefined) {
-          if (!acquired) {
-            client.release();
-          } else {
-            try {
-              const unlock = await client.query<{ unlocked: boolean }>(
-                "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
-                [lockKey]
-              );
-              if (unlock.rows[0]?.unlocked !== true) {
-                throw new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED");
-              }
-              client.release();
-            } catch (error) {
-              client.release(error instanceof Error
-                ? error
-                : new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED"));
-              throw error;
+        if (acquired) {
+          try {
+            const unlock = await client.query<{ unlocked: boolean }>(
+              "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+              [lockKey]
+            );
+            if (unlock.rows[0]?.unlocked !== true) {
+              throw new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED");
             }
+          } catch (error) {
+            contentLease.invalidate(error instanceof Error
+              ? error : new Error("EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED"));
+            throw error;
           }
         }
       } finally {
-        preparedContent?.close();
+        await leasedContent.close();
       }
     }
+    });
   }
 
   async loadCandidate(
     runId: string,
     client?: PoolClient,
-    preparedContent?: PreparedRunContentCipher | null
+    preparedContent?: LeasedPreparedRunContentCipher
   ): Promise<EvaluatorAddonCandidateResult> {
-    const ownsPreparedContent = client === undefined && preparedContent === undefined;
-    const activePreparedContent = ownsPreparedContent
-      ? await prepareContentEncryptionForRun(this.pool, runId)
-      : preparedContent ?? null;
+    if (preparedContent === undefined) {
+      return withRunContentLease(this.pool, [runId], async () => {
+        const leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+        try {
+          const result = await this.#loadCandidate(runId, client ?? this.pool, leasedContent);
+          await leasedContent.assertLive();
+          return result;
+        } finally {
+          await leasedContent.close();
+        }
+      });
+    }
+    const ownsPreparedContent = preparedContent === undefined;
+    const leasedContent = ownsPreparedContent
+      ? await prepareLeasedContentEncryptionForRun(this.pool, runId)
+      : undefined;
+    const activePreparedContent = leasedContent ?? preparedContent;
     try {
-      return await this.#loadCandidate(runId, client ?? this.pool, activePreparedContent);
+      const result = await this.#loadCandidate(runId, client ?? this.pool, activePreparedContent!);
+      await leasedContent?.assertLive();
+      return result;
     } finally {
-      if (ownsPreparedContent) activePreparedContent?.close();
+      await leasedContent?.close();
     }
   }
 
   async #loadCandidate(
     runId: string,
     database: Pool | PoolClient,
-    preparedContent: PreparedRunContentCipher | null
+    preparedContent: LeasedPreparedRunContentCipher
   ): Promise<EvaluatorAddonCandidateResult> {
     const existing = await database.query(`
       SELECT 1 FROM evaluator.observation
@@ -763,15 +775,15 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
     const row = result.rows[0];
     if (row === undefined) return "NO_JUDGEMENT";
     const [runContent, nodeContent, artifactContent] = [
-      decryptPreparedContentForRun<{ questionLine: string }>(
+      decryptLeasedContentForRun<{ questionLine: string }>(
         preparedContent, "core.run", row.run_id, row.run_content_ciphertext,
         { questionLine: row.question_line }
       ),
-      decryptPreparedContentForRun<{ claimText: string }>(
+      decryptLeasedContentForRun<{ claimText: string }>(
         preparedContent, "core.node", row.node_id,
         row.node_content_ciphertext, { claimText: row.claim_text }
       ),
-      decryptPreparedContentForRun<{ rawText: string }>(
+      decryptLeasedContentForRun<{ rawText: string }>(
         preparedContent, "ledger.raw_artifact", row.raw_artifact_ref,
         row.artifact_content_ciphertext, { rawText: row.raw_text }
       )
@@ -794,16 +806,20 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
   }
 
   async recordPipelineEvent(input: AddonPipelineEventInput, client?: PoolClient): Promise<string> {
+    return withRunContentLease(this.pool, [input.runId], async () => {
+    const pipelineEventId = randomUUID();
     const insert = async (writeClient: PoolClient): Promise<string> => {
       const result = await writeClient.query<{ pipeline_event_id: string }>(`
         INSERT INTO evaluator.pipeline_event (
-          run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
-        ) VALUES ($1,'ADDON',$2,$3,$4,$5,$6,$7) RETURNING pipeline_event_id
-      `, [input.runId, ADDON_PIPELINE_VERSION, input.attemptId, input.state, input.reason,
-        input.inputHash, await allocateSequence(writeClient)]);
+          pipeline_event_id,run_id,pipeline,pipeline_version,attempt_id,state,reason,
+          input_hash,input_hash_version,at_seq
+        ) VALUES ($1,$2,'ADDON',$3,$4,$5,$6,$7,$8,$9) RETURNING pipeline_event_id
+      `, [pipelineEventId,input.runId,ADDON_PIPELINE_VERSION,input.attemptId,input.state,input.reason,
+        input.inputHash,1,await allocateSequence(writeClient)]);
       return result.rows[0]!.pipeline_event_id;
     };
     return client === undefined ? withWriteTransaction(this.pool, insert) : insert(client);
+    });
   }
 
   async insertObservation(input: EvaluatorAddonObservationInput, client?: PoolClient): Promise<string> {
@@ -1021,15 +1037,26 @@ async function assertAdmissionArtifact(
     provider: string;
     model_id: string;
     model_version: string | null;
+    authenticated_tagger_scope:boolean;
   }>(`
-    SELECT run_id, provider_ref, provider, model_id, model_version
-    FROM ledger.raw_artifact WHERE raw_artifact_id=$1
+    SELECT artifact.run_id,artifact.provider_ref,artifact.provider,
+      artifact.model_id,artifact.model_version,
+      EXISTS (
+        SELECT 1 FROM ledger.ledger_entry AS entry
+        WHERE entry.raw_artifact_ref=artifact.raw_artifact_id
+          AND entry.run_id=artifact.run_id
+          AND entry.attempt_id=artifact.attempt_id
+          AND entry.call_site_key='evaluator.tag-question.v1'
+          AND evaluator.ledger_entry_is_authenticated_scope(entry.ledger_entry_id)
+      ) AS authenticated_tagger_scope
+    FROM ledger.raw_artifact AS artifact WHERE artifact.raw_artifact_id=$1
   `, [input.rawArtifactRef]);
   const artifactRow = artifact.rows[0];
-  const expectedRunId = artifactRow?.provider_ref === EVALUATOR_PROVIDER_REF ? null : input.runId;
-  if (artifactRow === undefined || artifactRow.run_id !== expectedRunId
+  if (artifactRow === undefined || artifactRow.run_id !== input.runId
+    || artifactRow.provider_ref!==EVALUATOR_PROVIDER_REF
     || artifactRow.provider !== input.provider || artifactRow.model_id !== input.modelId
-    || artifactRow.model_version !== input.modelVersion) {
+    || artifactRow.model_version !== input.modelVersion
+    || !artifactRow.authenticated_tagger_scope) {
     throw new TypedDomainError(
       "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH",
       "Domain proposal identity must match its evaluator scope and raw artifact"
@@ -1334,21 +1361,24 @@ export class DomainRegistryRepository {
   }
 
   async recordTagPipelineEvent(input: TagPipelineEventInput): Promise<string> {
+    return withRunContentLease(this.pool, [input.runId], async () => {
     requireNonblank(input.runId, "EVALUATOR_TAG_RUN_ID_INVALID");
     requireNonblank(input.reason, "EVALUATOR_TAG_EVENT_REASON_INVALID");
     requireNonblank(input.inputHash, "EVALUATOR_TAG_INPUT_HASH_INVALID");
+    const pipelineEventId = randomUUID();
     return withWriteTransaction(this.pool, async (client) => {
       const inserted = await client.query<{ pipeline_event_id: string }>(`
         INSERT INTO evaluator.pipeline_event (
-          run_id, pipeline, pipeline_version, attempt_id, state,
-          reason, input_hash, at_seq
-        ) VALUES ($1,'TAG',$2,$3,$4,$5,$6,$7)
+          pipeline_event_id,run_id,pipeline,pipeline_version,attempt_id,state,
+          reason,input_hash,input_hash_version,at_seq
+        ) VALUES ($1,$2,'TAG',$3,$4,$5,$6,$7,$8,$9)
         RETURNING pipeline_event_id
       `, [
-        input.runId, TAGGER_PIPELINE_VERSION, input.attemptId, input.state,
-        input.reason, input.inputHash, await allocateSequence(client)
+        pipelineEventId,input.runId,TAGGER_PIPELINE_VERSION,input.attemptId,input.state,
+        input.reason,input.inputHash,1,await allocateSequence(client)
       ]);
       return inserted.rows[0]!.pipeline_event_id;
+    });
     });
   }
 }
@@ -1504,7 +1534,7 @@ export async function runEvaluatorQuestionTagger(input: {
   let stage: "PROVIDER_CALL" | "EXECUTION" = "PROVIDER_CALL";
   try {
     const response = await input.provider.call({
-      runId: null,
+      runId: input.runId,
       subjectItemId: `evaluator:tag-attempt:${attemptId}`,
       callSiteKey: "evaluator.tag-question.v1",
       role: "CLASSIFIER",
@@ -1607,7 +1637,12 @@ export interface EvaluatorHarvestSnapshot {
   readonly domainId: string | null;
   readonly observedAt: Date;
   readonly rawArtifacts: readonly EvaluatorHarvestArtifact[];
-  readonly modelCalls: readonly { readonly attemptId: string; readonly callSiteKey: string }[];
+  readonly modelCalls: readonly {
+    readonly rawArtifactRef:string;
+    readonly attemptId:string;
+    readonly callSiteKey:string;
+    readonly authenticatedEvaluatorScope:boolean;
+  }[];
   readonly authoredNodes: readonly {
     readonly nodeId: string;
     readonly rawArtifactRef: string;
@@ -1687,11 +1722,11 @@ function compareObservation(left: EvaluatorObservationCandidate, right: Evaluato
 export function projectEvaluatorObservations(
   snapshot: EvaluatorHarvestSnapshot
 ): readonly EvaluatorObservationCandidate[] {
-  const excludedAttempts = new Set(snapshot.modelCalls
-    .filter((call) => call.callSiteKey.startsWith("evaluator."))
-    .map((call) => call.attemptId));
+  const excludedArtifacts = new Set(snapshot.modelCalls
+    .filter((call) => call.authenticatedEvaluatorScope)
+    .map((call) => call.rawArtifactRef));
   const artifacts = new Map(snapshot.rawArtifacts
-    .filter((artifact) => !excludedAttempts.has(artifact.attemptId))
+    .filter((artifact) => !excludedArtifacts.has(artifact.rawArtifactId))
     .filter((artifact): artifact is EvaluatorHarvestArtifact & { readonly modelVersion: string } =>
       artifact.modelVersion !== null && artifact.modelVersion.trim() !== "")
     .map((artifact) => [artifact.rawArtifactId, artifact]));
@@ -1843,15 +1878,15 @@ export class EvaluatorHarvestRepository {
   constructor(private readonly pool: Pool) {}
 
   async harvestTerminalRun(runId: string, observedAt: Date = new Date()): Promise<EvaluatorHarvestResult> {
+    return withRunContentLease(this.pool, [runId], async () => {
     const attemptId = randomUUID();
     let inputHash: string | undefined;
+    let leasedContent: LeasedPreparedRunContentCipher | undefined;
     try {
       requireNonblank(runId, "EVALUATOR_HARVEST_RUN_ID_INVALID");
       if (!Number.isFinite(observedAt.getTime())) throw new TypeError("EVALUATOR_HARVEST_TIME_INVALID");
-      const preparedContent = await prepareContentEncryptionForRun(this.pool, runId);
-      const prepared = await (async () => {
-        try {
-          return await withWriteTransaction(this.pool, async (client) => {
+      leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+      const prepared = await withWriteTransaction(this.pool, async (client) => {
             await client.query(
               "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
               [`evaluator-harvest:${runId}`]
@@ -1864,7 +1899,7 @@ export class EvaluatorHarvestRepository {
               return Object.freeze({ state: "NOT_TERMINAL" as const, runId });
             }
             const snapshot = await this.readSnapshot(
-              client, runId, observedAt, preparedContent
+              client, runId, observedAt, leasedContent!
             );
             inputHash = harvestInputHash(snapshot);
             await this.recordPipelineEvent(
@@ -1872,13 +1907,9 @@ export class EvaluatorHarvestRepository {
             );
             return Object.freeze({ state: "PREPARED" as const, inputHash, snapshot });
           });
-        } finally {
-          preparedContent?.close();
-        }
-      })();
       if (prepared.state === "NOT_TERMINAL") return prepared;
 
-      return await withWriteTransaction(this.pool, async (client) => {
+      const result = await withWriteTransaction(this.pool, async (client) => {
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`evaluator-harvest:${runId}`]);
         const prior = await client.query(
           `SELECT 1 FROM evaluator.pipeline_event
@@ -1892,11 +1923,11 @@ export class EvaluatorHarvestRepository {
           .filter((row) => !alreadyHarvested || row.truthBasis === "SETTLEMENT");
 
         if (!alreadyHarvested) {
-          const excludedAttempts = new Set(snapshot.modelCalls
-            .filter((call) => call.callSiteKey.startsWith("evaluator."))
-            .map((call) => call.attemptId));
+          const excludedArtifacts = new Set(snapshot.modelCalls
+            .filter((call) => call.authenticatedEvaluatorScope)
+            .map((call) => call.rawArtifactRef));
           for (const artifact of snapshot.rawArtifacts) {
-            if (!excludedAttempts.has(artifact.attemptId)
+            if (!excludedArtifacts.has(artifact.rawArtifactId)
               && (artifact.modelVersion === null || artifact.modelVersion.trim() === "")) {
               await this.recordPipelineEvent(
                 client, runId, attemptId, "SKIPPED",
@@ -2031,6 +2062,8 @@ export class EvaluatorHarvestRepository {
         );
         return Object.freeze({ state: "HARVESTED" as const, runId, observationsInserted: inserted });
       });
+      await leasedContent.assertLive();
+      return result;
     } catch (error) {
       const failureInputHash = inputHash ?? createHash("sha256").update(JSON.stringify({
         run_id: runId,
@@ -2049,7 +2082,10 @@ export class EvaluatorHarvestRepository {
         // Preserve the harvesting failure; receipt persistence is best-effort if the database itself is unavailable.
       }
       throw error;
+    } finally {
+      await leasedContent?.close();
     }
+    });
   }
 
   private async recordPipelineEvent(
@@ -2060,18 +2096,21 @@ export class EvaluatorHarvestRepository {
     reason: string,
     inputHash: string
   ): Promise<void> {
+    const pipelineEventId = randomUUID();
     await client.query(`
       INSERT INTO evaluator.pipeline_event (
-        run_id, pipeline, pipeline_version, attempt_id, state, reason, input_hash, at_seq
-      ) VALUES ($1,'HARVEST',$2,$3,$4,$5,$6,$7)
-    `, [runId, HARVEST_PIPELINE_VERSION, attemptId, state, reason, inputHash, await allocateSequence(client)]);
+        pipeline_event_id,run_id,pipeline,pipeline_version,attempt_id,state,reason,
+        input_hash,input_hash_version,at_seq
+      ) VALUES ($1,$2,'HARVEST',$3,$4,$5,$6,$7,$8,$9)
+    `, [pipelineEventId,runId,HARVEST_PIPELINE_VERSION,attemptId,state,reason,
+      inputHash,1,await allocateSequence(client)]);
   }
 
   private async readSnapshot(
     client: PoolClient,
     runId: string,
     observedAt: Date,
-    preparedContent: PreparedRunContentCipher | null
+    preparedContent: LeasedPreparedRunContentCipher
   ): Promise<EvaluatorHarvestSnapshot> {
     const domain = await client.query<{ domain_id: string }>(
       "SELECT domain_id FROM evaluator.question_domain WHERE run_id=$1",
@@ -2092,13 +2131,29 @@ export class EvaluatorHarvestRepository {
       FROM refs JOIN ledger.raw_artifact AS artifact USING (raw_artifact_id)
       ORDER BY artifact.raw_artifact_id
     `, [runId]);
-    const attemptIds = artifacts.rows.map((row) => row.attempt_id);
-    const modelCalls = attemptIds.length === 0 ? { rows: [] as { attempt_id: string; call_site_key: string }[] }
-      : await client.query<{ attempt_id: string; call_site_key: string }>(`
-          SELECT DISTINCT attempt_id, call_site_key FROM ledger.ledger_entry
-          WHERE attempt_id = ANY($1::uuid[]) AND call_site_key IS NOT NULL
-          ORDER BY attempt_id, call_site_key
-        `, [attemptIds]);
+    const artifactRefs = artifacts.rows.map((row) => row.raw_artifact_id);
+    const modelCalls = artifactRefs.length === 0 ? { rows: [] as {
+      raw_artifact_ref:string;attempt_id:string;call_site_key:string;
+      authenticated_evaluator_scope:boolean;
+    }[] }
+      : await client.query<{
+          raw_artifact_ref:string;attempt_id:string;call_site_key:string;
+          authenticated_evaluator_scope:boolean;
+        }>(`
+          SELECT DISTINCT entry.raw_artifact_ref,entry.attempt_id,entry.call_site_key,
+            evaluator.ledger_entry_is_authenticated_scope(entry.ledger_entry_id)
+              AS authenticated_evaluator_scope
+          FROM ledger.ledger_entry AS entry
+          JOIN ledger.raw_artifact AS artifact
+            ON artifact.raw_artifact_id=entry.raw_artifact_ref
+           AND artifact.run_id=entry.run_id
+           AND artifact.attempt_id=entry.attempt_id
+          WHERE entry.run_id=$1
+            AND entry.raw_artifact_ref=ANY($2::uuid[])
+            AND entry.call_site_key IS NOT NULL
+          ORDER BY entry.raw_artifact_ref,entry.attempt_id,entry.call_site_key,
+            authenticated_evaluator_scope
+        `, [runId,artifactRefs]);
     const nodes = await client.query<{
       node_id: string; raw_artifact_ref: string; generation_status: string;
       path_status: string; claim_type: string;
@@ -2116,7 +2171,7 @@ export class EvaluatorHarvestRepository {
       FROM ledger.node_review WHERE run_id=$1 ORDER BY node_review_id
     `, [runId]);
     const decryptedReviews = reviews.rows.map((row) => {
-      const content = decryptPreparedContentForRun<{ reasons: unknown }>(
+      const content = decryptLeasedContentForRun<{ reasons: unknown }>(
         preparedContent, "ledger.node_review", row.node_review_id,
         row.content_ciphertext, { reasons: row.reasons }
       );
@@ -2169,7 +2224,9 @@ export class EvaluatorHarvestRepository {
         modelId: row.model_id, modelVersion: row.model_version
       }))),
       modelCalls: Object.freeze(modelCalls.rows.map((row) => Object.freeze({
-        attemptId: row.attempt_id, callSiteKey: row.call_site_key
+        rawArtifactRef:row.raw_artifact_ref,
+        attemptId:row.attempt_id,callSiteKey:row.call_site_key,
+        authenticatedEvaluatorScope:row.authenticated_evaluator_scope
       }))),
       authoredNodes: Object.freeze(nodes.rows.map((row) => Object.freeze({
         nodeId: row.node_id, rawArtifactRef: row.raw_artifact_ref,

@@ -402,7 +402,11 @@ interface DuplicateRegistrationPostwork {
 
 type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
 type MailDispatchRelease = () => Promise<void>;
-type MailDispatchActivation = () => Promise<MailDispatchRelease>;
+interface MailDispatchActivationReceipt {
+  readonly activatedAt: number;
+  readonly release: MailDispatchRelease;
+}
+type MailDispatchActivation = () => Promise<MailDispatchActivationReceipt>;
 
 interface WaitingMailDispatch {
   readonly resolve: (activate: MailDispatchActivation) => void;
@@ -651,6 +655,18 @@ export class RegistrationService implements RegistrationApplication {
     const clampMs = this.dependencies.policy.verification.enumerationResponseFloorMs
       + this.dependencies.policy.verification.enumerationToleranceMs;
     const remaining = clampMs - (performance.now() - startedAt);
+    if (remaining > 0) await this.sleep(remaining);
+  }
+
+  /**
+   * A queued registration can receive its mail permit long after the ordinary
+   * request-arrival clamp has expired. Anchor a second, branch-independent
+   * boundary to the actual reservation activation so neither account creation
+   * nor duplicate-account locking is reflected in the HTTP completion time.
+   */
+  private async holdRegistrationPostActivationFloor(activatedAt: number): Promise<void> {
+    const remaining = this.dependencies.policy.channel.mailDispatchPreTransportWorkBudgetMs
+      - (performance.now() - activatedAt);
     if (remaining > 0) await this.sleep(remaining);
   }
 
@@ -926,10 +942,10 @@ export class RegistrationService implements RegistrationApplication {
   private activateMailDispatch(
     enforceMinimum = false,
     minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs
-  ): MailDispatchRelease {
+  ): MailDispatchActivationReceipt {
     const activatedAt = performance.now();
     let release: Promise<void> | undefined;
-    return () => {
+    const releaseReservation = () => {
       if (release !== undefined) return release;
       release = (async () => {
         const minimum = enforceMinimum || this.waitingMailDispatches.length > 0
@@ -952,13 +968,14 @@ export class RegistrationService implements RegistrationApplication {
       });
       return release;
     };
+    return Object.freeze({ activatedAt, release: releaseReservation });
   }
 
   private async scheduleMailDispatchActivation(
     enforceMinimum = false,
     minimumReservationMs: number = this.dependencies.policy.channel.mailDispatchMinimumReservationMs,
     activationSpacingMs: number = this.dependencies.policy.channel.mailDispatchActivationSpacingMs
-  ): Promise<MailDispatchRelease> {
+  ): Promise<MailDispatchActivationReceipt> {
     const now = performance.now();
     const scheduledAt = Math.max(now, this.nextMailDispatchActivationAt);
     this.nextMailDispatchActivationAt = scheduledAt
@@ -1065,7 +1082,7 @@ export class RegistrationService implements RegistrationApplication {
 
   private async reserveMailDispatch(correlationId: string): Promise<MailDispatchRelease> {
     const activate = await this.reserveMailDispatchPermit({ correlationId });
-    return activate();
+    return (await activate()).release;
   }
 
   mailDispatchOccupancy(): Readonly<{
@@ -1186,7 +1203,6 @@ export class RegistrationService implements RegistrationApplication {
   private async provisionPendingAccount(input: PendingRegistration): Promise<RegistrationPostwork> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const userId = randomUUID();
-      const auditToken = randomUUID();
       const pseudonym = generatePseudonym();
       const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
       const tokenHash = hashVerificationToken(token);
@@ -1209,7 +1225,6 @@ export class RegistrationService implements RegistrationApplication {
           recoveryEmailCiphertext,
           passwordHash: input.passwordHash,
           pseudonym,
-          auditToken,
           adultAffirmedAt: input.requestedAt,
           verificationTokenHash: tokenHash,
           verificationExpiresAt: expiresAt,
@@ -1297,15 +1312,8 @@ export class RegistrationService implements RegistrationApplication {
     const correlationId = randomUUID();
     let pendingPostwork: RegistrationPostwork | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
-    let activateMailDispatch: MailDispatchActivation | undefined;
+    let mailDispatchActivatedAt: number | undefined;
     let releaseAdmission: (() => void) | undefined;
-    /**
-     * Who owes the release. `local` is the ordinary case and settles in the
-     * outermost `finally` below. It flips to `continuation` exactly once, on the
-     * one path where a reservation outlives this request, and the two owners are
-     * mutually exclusive from that moment on.
-     */
-    let admissionOwner: "local" | "continuation" = "local";
     try {
       try {
         if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
@@ -1342,7 +1350,27 @@ export class RegistrationService implements RegistrationApplication {
           });
         }
 
-        const reservation = this.reserveMailDispatchPermit({
+        const passwordHashWork = this.scheduleRegistrationHash(input.password);
+        let passwordHash: string;
+        try {
+          passwordHash = await passwordHashWork.promise;
+        } catch (error) {
+          // Cancellation only wins while the work is still QUEUED. If the KDF
+          // was already dispatched this returns having revoked nothing, and the
+          // password plus its closure are still live inside the pool — whose own
+          // execution timeout starts at dispatch, not at submission.
+          passwordHashWork.cancel();
+          // Once dispatched, the work owns the secret until settlement. Keep
+          // the admission slot until that ownership is gone, but do not reserve
+          // any mail capacity for a registration that has no completed hash.
+          await passwordHashWork.settlement;
+          throw error;
+        }
+        // Hash first: there is no live positive Argon2+provisioning bound that
+        // fits the 600 ms pre-transport budget. Once hashing is complete, bind
+        // activation directly to permit fulfillment so no granted-but-unleased
+        // interval can be published to a successor.
+        const activationReceipt = await this.reserveMailDispatchPermit({
           correlationId,
           minimumReservationMs:
             this.dependencies.policy.channel.registrationMailDispatchMinimumReservationMs,
@@ -1351,57 +1379,22 @@ export class RegistrationService implements RegistrationApplication {
           // Registration alone waits the ruled 28,000 ms. Resend keeps 18,000.
           waitDeadlineMs:
             this.dependencies.policy.channel.registrationMailDispatchQueueWaitTimeoutMs
-        });
-        const passwordHashWork = this.scheduleRegistrationHash(input.password);
-        let passwordHash: string;
-        try {
-          [activateMailDispatch, passwordHash] = await Promise.all([
-            reservation, passwordHashWork.promise
-          ]);
-        } catch (error) {
-          // Cancellation only wins while the work is still QUEUED. If the KDF
-          // was already dispatched this returns having revoked nothing, and the
-          // password plus its closure are still live inside the pool — whose own
-          // execution timeout starts at dispatch, not at submission.
-          passwordHashWork.cancel();
-          // So the token is owed to the WORK, not to the caller. Whichever way
-          // the reservation ends, the slot goes back only once this settles:
-          // cancelled-and-never-run settles it at once, already-started settles
-          // it when the pool is finished with the secret. The admission budget
-          // therefore never has a secret-bearing unit outside it, and a
-          // shutdown drain cannot pass one.
-          const secretWorkSettled = passwordHashWork.settlement;
-          // The reservation OUTLIVES this request: it may still be granted long
-          // after the caller has its 503. So the admission release moves with it,
-          // atomically and exactly once, and the local `finally` below stops
-          // owning it from this synchronous assignment onward.
-          const admission = releaseAdmission;
-          admissionOwner = "continuation";
-          void reservation.then(
-            async (activate) => {
-              try {
-                // Register the hold in `pendingMailDispatches` FIRST, so a
-                // shutdown drain can see the work, and only then hand the budget
-                // back — without waiting out the reservation lease, which would
-                // hold an admission slot for seconds against a request that no
-                // longer exists.
-                this.dispatchMailReservationHold(await activate());
-              } finally {
-                await secretWorkSettled;
-                admission?.();
-              }
-            },
-            async () => {
-              await secretWorkSettled;
-              admission?.();
-            }
-          ).catch(() => undefined);
-          throw error;
-        }
+        }).then((activate) => activate());
+        releaseMailDispatch = activationReceipt.release;
+        mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
             email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
           }));
+          const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
+          if (preTransportWorkMs
+            > this.dependencies.policy.channel.mailDispatchPreTransportWorkBudgetMs) {
+            console.error(
+              `[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED] correlation=${correlationId} `
+              + `code=REGISTRATION_PRETRANSPORT_SLOW elapsed_ms=${Math.ceil(preTransportWorkMs)} `
+              + `budget_ms=${this.dependencies.policy.channel.mailDispatchPreTransportWorkBudgetMs}`
+            );
+          }
         } catch (provisionError) {
           console.error(
             `[AUTH_REGISTRATION_PROVISION_FAILED] correlation=${correlationId} code=PROVISION_FAILED`
@@ -1415,10 +1408,6 @@ export class RegistrationService implements RegistrationApplication {
               `[AUTH_REGISTRATION_FAILURE_AUDIT_FAILED] correlation=${correlationId} code=AUDIT_RECORD_FAILED`
             );
           });
-          if (activateMailDispatch !== undefined) {
-            releaseMailDispatch = await activateMailDispatch();
-            activateMailDispatch = undefined;
-          }
           // A provisioning failure caused by the Argon2 pool takes the one shared
           // retryable envelope; anything else keeps the existing registration
           // failure code, whose response shape is unchanged.
@@ -1432,13 +1421,28 @@ export class RegistrationService implements RegistrationApplication {
         // pool failure among them leaves as the one constant 503 envelope.
         throw asAuthFlowFailure(error);
       } finally {
+        const holdPostActivationFloor = mailDispatchActivatedAt !== undefined;
         try {
-          await this.holdRegistrationEnumerationClamp(startedAt);
-        } finally {
-          if (pendingPostwork !== undefined && activateMailDispatch !== undefined) {
-            releaseMailDispatch = await activateMailDispatch();
-            activateMailDispatch = undefined;
+          // Begin the equal send/no-send work as soon as provisioning settles,
+          // while the pre-activated reservation is still held. The public
+          // response remains behind both arrival- and activation-anchored
+          // floors, but the transport work runs inside rather than after them.
+          if (pendingPostwork !== undefined && releaseMailDispatch !== undefined) {
+            const release = releaseMailDispatch;
+            releaseMailDispatch = undefined;
+            this.dispatchVerification(pendingPostwork, release);
+          } else if (releaseMailDispatch !== undefined) {
+            const release = releaseMailDispatch;
+            releaseMailDispatch = undefined;
+            this.dispatchMailReservationHold(release);
           }
+          await Promise.all([
+            this.holdRegistrationEnumerationClamp(startedAt),
+            holdPostActivationFloor
+              ? this.holdRegistrationPostActivationFloor(mailDispatchActivatedAt!)
+              : Promise.resolve()
+          ]);
+        } finally {
           if (pendingPostwork !== undefined && releaseMailDispatch !== undefined) {
             const release = releaseMailDispatch;
             releaseMailDispatch = undefined;
@@ -1452,9 +1456,9 @@ export class RegistrationService implements RegistrationApplication {
     } finally {
       // The OUTERMOST release, after the clamp and after the handoff block has
       // either given successful postwork to `dispatchVerification` or given the
-      // reservation to a continuation. Never at commit, never at clamp entry,
-      // never before handoff — and never here at all once ownership moved.
-      if (admissionOwner === "local") releaseAdmission?.();
+      // reservation to a visible hold. Never at commit, clamp entry, or before
+      // the secret/hash and mail-capacity owners have settled.
+      releaseAdmission?.();
     }
   }
 

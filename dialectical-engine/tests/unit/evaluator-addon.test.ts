@@ -115,7 +115,7 @@ describe("judge-grading evaluator add-on", () => {
     expect(() => shouldSampleEvaluatorAddon(12, 0)).toThrow("EVALUATOR_ADDON_SAMPLE_INTERVAL_INVALID");
   });
 
-  it("makes one null-run evaluator-scoped blinded call and writes a JUDGING observation", async () => {
+  it("makes one run-bound evaluator-scoped blinded call and writes a JUDGING observation", async () => {
     const records = repository();
     const gateway = provider();
 
@@ -128,7 +128,7 @@ describe("judge-grading evaluator add-on", () => {
     expect(gateway.call).toHaveBeenCalledTimes(1);
     const request = gateway.call.mock.calls[0]![0];
     expect(request).toMatchObject({
-      runId: null,
+      runId: "run:addon",
       subjectItemId: expect.stringMatching(/^evaluator:addon-attempt:/),
       callSiteKey: "evaluator.grade-judge-output.v1",
       role: "JUDGE",
@@ -274,19 +274,31 @@ describe("judge-grading evaluator add-on", () => {
 
   it("destroys the checked-out client when advisory unlock throws", async () => {
     const unlockError = new Error("unlock failed");
-    const release = vi.fn();
-    const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [{ acquired: true }] })
-        .mockRejectedValueOnce(unlockError),
-      release
+    const leaseRelease = vi.fn();
+    const leaseClient = {
+      query: vi.fn(async (sql: string, params?: readonly unknown[]) => {
+        if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
+        if (sql.includes("pg_advisory_lock")) return { rows: [] };
+        if (sql.includes("run_private_content_is_live")) {
+          return { rows: [{ run_id: "run:addon", live: true }] };
+        }
+        if (sql.includes("content_encryption_version=1")) return { rows: [{ enabled: false }] };
+        if (sql.includes("pg_advisory_unlock")
+          && String(params?.[0]).startsWith("evaluator-addon:")) throw unlockError;
+        if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
+        throw new Error(`UNEXPECTED_QUERY:${sql}`);
+      }),
+      release: leaseRelease
     };
-    const pool = { connect: vi.fn(async () => client) } as unknown as Pool;
+    const pool = {
+      connect: vi.fn().mockResolvedValueOnce(leaseClient)
+    } as unknown as Pool;
 
     await expect(new PostgresEvaluatorAddonRepository(pool)
       .withRunLock("run:addon", async () => "completed"))
       .rejects.toBe(unlockError);
-    expect(release).toHaveBeenCalledTimes(1);
-    expect(release).toHaveBeenCalledWith(unlockError);
+    expect(leaseRelease).toHaveBeenCalledTimes(1);
+    expect(leaseRelease).toHaveBeenCalledWith(unlockError);
+    expect((pool.connect as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
   });
 });

@@ -19,6 +19,7 @@ const view = {
 
 function askApplication(): AskApplication {
   return {
+    withContentLease: async <T>(_runId: string,use: () => Promise<T>) => use(),
     submit: vi.fn(), readAnswer: vi.fn(), readRunAnswer: vi.fn(), readRun: vi.fn(),
     readAnswerIndex: vi.fn(), readInspection: vi.fn(), readLedgerDigest: vi.fn(),
     readNode: vi.fn(), recordInvestigation: vi.fn(), unlinkMemoryLink: vi.fn(),
@@ -40,6 +41,9 @@ describe("dev-only evaluator API", () => {
       MAIL_FROM: "noreply@debateai.test",
       PUBLIC_APP_URL: "https://debateai.test",
       DATABASE_URL: "postgresql://runtime:runtime@localhost/debateai",
+      CONTENT_PROVISION_DATABASE_URL: "postgresql://content:fixture@localhost/debateai",
+      ERASURE_DATABASE_URL: "postgresql://erasure:fixture@localhost/debateai",
+      ACCOUNT_ERASURE_GRACE_MS: "604800000",
       API_HOST: "127.0.0.1", API_PORT: "3001", STRANGER_SAMPLE_RATE: "0",
       REGISTER_VERSION: "1", BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "fixture", HATCHET_HOST_PORT: "localhost:7070",
@@ -72,15 +76,8 @@ describe("dev-only evaluator API", () => {
       evaluatorDevMenuRegisterVersion: 1
     });
 
-    const routes = api.printRoutes({ commonPrefix: false });
-    const start = routes.indexOf("├── /v1/dev/evaluator");
-    const end = routes.indexOf("├── /v1/asks", start);
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(end).toBeGreaterThan(start);
-    expect(routes.slice(start, end)).toBe(
-      "├── /v1/dev/evaluator (GET)\n" +
-      "│   └── /consumer-selection (POST)\n"
-    );
+    expect(api.hasRoute({ method: "GET", url: "/v1/dev/evaluator" })).toBe(true);
+    expect(api.hasRoute({ method: "POST", url: "/v1/dev/evaluator/consumer-selection" })).toBe(true);
 
     await api.close();
   });

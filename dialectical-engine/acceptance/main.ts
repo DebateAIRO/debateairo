@@ -2,13 +2,16 @@ import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
-import { buildApi, PostgresAskApplication, type Dispatcher } from "@debateai/api";
+import {
+  buildApi,createLegacyDevSessionResolver,PostgresAskApplication,type Dispatcher
+} from "@debateai/api";
 import {
   createTerminalActivationEvaluator,
   WorkItemRepository,
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
 import {
+  createPool,
   ProviderProbeRepository,
   RunRepository,
   type CompletionActivationResolution
@@ -173,6 +176,7 @@ export async function createAcceptanceRuntime(input: {
   readonly pool: Pool;
   readonly environment: AcceptanceEnvironment;
   readonly makerRelays: readonly AcceptanceMakerRelay[];
+  readonly legacyUserToken?:string;
   readonly testOnlyTerminalEvaluator?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];
@@ -330,6 +334,25 @@ export async function createAcceptanceRuntime(input: {
       probedAt: new Date()
     });
   }
+  const serverAskAdmissionPool=createPool(input.environment.DATABASE_URL);
+  const legacyAskAdmissionPool=createPool(input.environment.DATABASE_URL);
+  try {
+    const principals=await Promise.all([
+      input.pool,serverAskAdmissionPool,legacyAskAdmissionPool
+    ].map(async (candidate) => (await candidate.query<{ principal:string }>(
+      "SELECT current_user AS principal"
+    )).rows[0]?.principal));
+    if (principals.some((principal)=>principal===undefined)
+      || new Set(principals).size!==1) {
+      throw new TypeError("ACCEPTANCE_ASK_ADMISSION_DATABASE_ROLE_MISMATCH");
+    }
+  } catch (error) {
+    await Promise.allSettled([
+      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
+    ]);
+    throw error;
+  }
+  try {
   const application = new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
@@ -400,13 +423,33 @@ export async function createAcceptanceRuntime(input: {
       askerProvenanceRef,
       policy.riskTier
     )
+  },undefined,input.pool,Object.freeze({
+    server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
+  }));
+  const api=buildApi({
+    application,
+    ...(input.legacyUserToken===undefined ? {} : {
+      legacyDevSessionResolver:createLegacyDevSessionResolver({
+        userToken:input.legacyUserToken
+      })
+    })
   });
-  return Object.freeze({ api: buildApi({ application }), runner });
+  api.addHook("onClose",async () => {
+    await Promise.allSettled([
+      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
+    ]);
+  });
+  return Object.freeze({ api,runner });
+  } catch (error) {
+    await Promise.allSettled([
+      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
+    ]);
+    throw error;
+  }
 }
 
 async function main(): Promise<void> {
   const environment = loadAcceptanceEnvironment();
-  const { createPool } = await import("@debateai/db");
   const pool = createPool(environment.DATABASE_URL);
   // FAIR-01: the standalone boot starts the REAL Anthropic relay itself — the
   // startup handshake proves the claude CLI is alive and captures its honest
@@ -422,11 +465,15 @@ async function main(): Promise<void> {
   const runtime = await createAcceptanceRuntime({
     pool,
     environment,
+    ...(process.env.LEGACY_USER_DEV_TOKEN===undefined ? {} : {
+      legacyUserToken:process.env.LEGACY_USER_DEV_TOKEN
+    }),
     makerRelays: [
       ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
       ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])
     ]
   });
+  runtime.api.addHook("onClose",async () => pool.end());
   await runtime.api.listen({ host: environment.API_HOST, port: environment.API_PORT });
 }
 

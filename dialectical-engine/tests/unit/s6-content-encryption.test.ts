@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import {
   chmod,
+  lstat,
   mkdir,
   mkdtemp,
   open,
   readFile,
+  readdir,
   rename,
   rm,
   stat
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ContentCipher,
@@ -20,6 +22,7 @@ import {
   loadKek,
   type LoadedRunContentKey,
   type ReadableUserDekStore,
+  type RunContentKeyFileSystem,
   type RunContentKeyIdentity,
   type RunContentKeyStore
 } from "../../packages/crypto/src/index.js";
@@ -41,9 +44,17 @@ class MemoryUserDekStore implements ReadableUserDekStore {
     if (key === undefined) throw new Error("USER_DEK_NOT_FOUND");
     return Buffer.from(key);
   }
+
+  async exists(userId: string): Promise<boolean> {
+    return this.#keys.has(userId);
+  }
+
+  async destroy(userId: string): Promise<"DESTROYED" | "ALREADY_ABSENT"> {
+    return this.#keys.delete(userId) ? "DESTROYED" : "ALREADY_ABSENT";
+  }
 }
 
-type RunKeyFileSystemFailure = "temp-sync" | "directory-sync" | "cleanup";
+type RunKeyFileSystemFailure = "temp-sync" | "directory-sync" | "parent-sync" | "cleanup";
 
 function observingRunKeyFileSystem(
   events: string[],
@@ -52,8 +63,10 @@ function observingRunKeyFileSystem(
   return {
     mkdir,
     chmod,
+    lstat,
     stat,
     readFile,
+    readdir,
     async rename(source: string, destination: string) {
       events.push("rename");
       await rename(source, destination);
@@ -66,21 +79,25 @@ function observingRunKeyFileSystem(
     async open(path: string, flags: string, mode?: number) {
       const handle = await open(path, flags, mode);
       const directory = !path.includes("content-key.v1.json");
-      events.push(directory ? "open-directory" : "open-temp");
+      const kind = !directory ? "temp" : basename(path)==="runs" ? "parent" : "directory";
+      events.push(`open-${kind}`);
       return {
         writeFile: handle.writeFile.bind(handle),
         async sync() {
-          events.push(directory ? "sync-directory" : "sync-temp");
+          events.push(`sync-${kind}`);
           if (!directory && failures.has("temp-sync")) {
             throw new Error("S6_INJECTED_TEMP_FSYNC_FAILURE");
           }
-          if (directory && failures.has("directory-sync")) {
+          if (kind==="directory" && failures.has("directory-sync")) {
             throw new Error("S6_INJECTED_DIRECTORY_FSYNC_FAILURE");
+          }
+          if (kind==="parent" && failures.has("parent-sync")) {
+            throw new Error("S6_INJECTED_PARENT_FSYNC_FAILURE");
           }
           await handle.sync();
         },
         async close() {
-          events.push(directory ? "close-directory" : "close-temp");
+          events.push(`close-${kind}`);
           await handle.close();
         }
       };
@@ -112,7 +129,7 @@ async function fixture() {
     if (candidate !== ownerRef) throw new Error("OWNER_REF_UNRESOLVED");
     return userId;
   });
-  const cipher = new ContentCipher(keys, Buffer.alloc(32, 0x6d));
+  const cipher = new ContentCipher(keys);
   const runId = randomUUID();
   await cipher.provisionRun(runId, { userId, ownerRef });
   return { cipher, keys, runId, userId, ownerRef };
@@ -133,6 +150,10 @@ function stubApiEnvironment(): void {
     MAIL_FROM: "noreply@debateai.test",
     PUBLIC_APP_URL: "https://debateai.test",
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
+    ERASURE_DATABASE_URL: "postgresql://erasure:pass@127.0.0.1:5432/debateai",
+    ACCOUNT_ERASURE_GRACE_MS: "604800000",
+    CONTENT_PROVISION_DATABASE_URL:
+      "postgresql://content:pass@127.0.0.1:5432/debateai",
     API_HOST: "127.0.0.1",
     API_PORT: "3000",
     STRANGER_SAMPLE_RATE: "0.1",
@@ -233,7 +254,7 @@ describe("S6 per-run private content encryption", () => {
       if (candidate !== ownerRef) throw new Error("OWNER_REF_UNRESOLVED");
       return userId;
     });
-    const cipher = new ContentCipher(keys, Buffer.alloc(32, 0x2a));
+    const cipher = new ContentCipher(keys);
     const firstRun = randomUUID();
     const secondRun = randomUUID();
     await cipher.provisionRun(firstRun, { userId, ownerRef });
@@ -271,7 +292,7 @@ describe("S6 per-run private content encryption", () => {
     const resolverStore = new MemoryRunContentKeyStore(users, async () => {
       throw new Error(`resolver leaked ${ownerRef}`);
     });
-    const resolverCipher = new ContentCipher(resolverStore, Buffer.alloc(32, 0x22));
+    const resolverCipher = new ContentCipher(resolverStore);
     await resolverCipher.provisionRun(runId, { userId, ownerRef });
     const resolverFailure = await resolverCipher.encrypt(runId, "core.run", runId, {})
       .catch((error: unknown) => error);
@@ -282,14 +303,21 @@ describe("S6 per-run private content encryption", () => {
     expect(String(resolverFailure)).not.toContain(ownerRef);
   });
 
-  it("uses an owner-scoped deterministic blind index without storing the question", async () => {
-    const { cipher } = await fixture();
-    const owner = randomUUID();
-    const same = cipher.questionBlindIndex(owner, "  Should Memory Still Match?  ");
-    expect(cipher.questionBlindIndex(owner, "should memory still match?")).toEqual(same);
-    expect(cipher.questionBlindIndex(randomUUID(), "should memory still match?")).not.toEqual(same);
-    expect(cipher.questionBlindIndex(owner, "a different question")).not.toEqual(same);
-    expect(same.toString("utf8")).not.toContain("memory");
+  it("derives a row-bound non-decrypting envelope attestation that is destroyed with the run key", async () => {
+    const { cipher, runId, userId, ownerRef } = await fixture();
+    const sameOwnerOtherRun = randomUUID();
+    await cipher.provisionRun(sameOwnerOtherRun, { userId, ownerRef });
+    const prepared = await cipher.prepareRun(runId);
+    const envelope = prepared.encrypt("core.run",runId,{ questionLine: "private" });
+    const same = prepared.attestEnvelope("core.run",runId,"content_ciphertext",envelope);
+    expect(prepared.attestEnvelope("core.run",runId,"content_ciphertext",envelope)).toEqual(same);
+    expect(prepared.attestEnvelope("memory.question_key",runId,"content_ciphertext",envelope)).not.toEqual(same);
+    expect(prepared.attestEnvelope("core.run",randomUUID(),"content_ciphertext",envelope)).not.toEqual(same);
+    expect(prepared.attestEnvelope("core.run",runId,"other_purpose",envelope)).not.toEqual(same);
+    expect(same.toString("utf8")).not.toContain("private");
+    prepared.close();
+    await cipher.destroyRunKey(runId);
+    await expect(cipher.prepareRun(runId)).rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
   });
 
   it("persists only a wrapped per-run key in the external mode-0600 secret store", async () => {
@@ -303,7 +331,7 @@ describe("S6 per-run private content encryption", () => {
       if (candidate !== ownerRef) throw new Error("OWNER_REF_UNRESOLVED");
       return userId;
     });
-    const cipher = new ContentCipher(store, Buffer.alloc(32, 0x3c));
+    const cipher = new ContentCipher(store);
     await cipher.provisionRun(runId, { userId, ownerRef });
     const location = join(root, "runs", runId, "content-key.v1.json");
     const serialized = await readFile(location, "utf8");
@@ -330,7 +358,7 @@ describe("S6 per-run private content encryption", () => {
         if (candidate !== ownerRef) throw new Error("OWNER_REF_UNRESOLVED");
         return userId;
       }
-    ), Buffer.alloc(32, 0x3c));
+    ));
     await expect(restarted.decrypt(runId, "core.run", runId, envelope))
       .resolves.toEqual({ questionLine: "private question survives a process restart" });
     await restarted.destroyRunKey(runId);
@@ -361,7 +389,10 @@ describe("S6 per-run private content encryption", () => {
         "rename",
         "open-directory",
         "sync-directory",
-        "close-directory"
+        "close-directory",
+        "open-parent",
+        "sync-parent",
+        "close-parent"
       ]);
       const location = join(root, "runs", runId, "content-key.v1.json");
       expect((await stat(location)).mode & 0o777).toBe(0o600);
@@ -443,13 +474,107 @@ describe("S6 per-run private content encryption", () => {
     }
   });
 
-  it("defaults content encryption off and fails closed when enablement lacks key paths", () => {
+  it("reports uncertain durability when the run-directory parent entry cannot be synced", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-s6-key-parent-crash-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    await users.store(userId,generateDek());
+    const store = fileRunContentKeyStoreWithIo(
+      root,users,async () => userId,
+      observingRunKeyFileSystem([],new Set(["parent-sync"]))
+    );
+    try {
+      await expect(store.store(runId,{ userId,ownerRef },generateDek()))
+        .rejects.toMatchObject({ code: "RUN_CONTENT_KEY_STORE_DURABILITY_UNCERTAIN" });
+      expect((await stat(join(root,"runs",runId,"content-key.v1.json"))).isFile()).toBe(true);
+    } finally {
+      await rm(root,{ recursive: true,force: true });
+    }
+  });
+
+  it("publishes run-key absence only after unlink, parent fsync, and lstat readback", async () => {
+    for (const failure of ["unlink","parent","readback"] as const) {
+      const root = await mkdtemp(join(tmpdir(),`debateai-s10-run-destroy-${failure}-`));
+      const users = new MemoryUserDekStore();
+      const userId = randomUUID();
+      const ownerRef = randomUUID();
+      const runId = randomUUID();
+      await users.store(userId,generateDek());
+      await new FileRunContentKeyStore(root,users,async () => userId)
+        .store(runId,{ userId,ownerRef },generateDek());
+      const io = {
+        mkdir,chmod,lstat,readFile,readdir,rename,stat,
+        async rm(path: string,options: { recursive: boolean; force: boolean }) {
+          if (failure==="unlink") throw new Error("RUN_KEY_UNLINK_FAILED");
+          if (failure!=="readback") await rm(path,options);
+        },
+        async open(path: string,flags: string,mode?: number) {
+          const handle = await open(path,flags,mode);
+          if (failure!=="parent") return handle;
+          return new Proxy(handle,{
+            get(target,property,receiver) {
+              if (property==="sync") return async () => { throw new Error("RUN_KEY_PARENT_FSYNC_FAILED"); };
+              const value = Reflect.get(target,property,receiver);
+              return typeof value==="function" ? value.bind(target) : value;
+            }
+          });
+        }
+      } as unknown as RunContentKeyFileSystem;
+      try {
+        const faulted = new FileRunContentKeyStore(root,users,async () => userId,io);
+        await expect(faulted.destroy(runId)).rejects.toThrow(
+          failure==="unlink" ? "RUN_KEY_UNLINK_FAILED"
+            : failure==="parent" ? "RUN_KEY_PARENT_FSYNC_FAILED"
+              : "Secret-store directory still exists after durable removal"
+        );
+        const fresh = new FileRunContentKeyStore(root,users,async () => userId);
+        if (failure==="parent") {
+          await expect(fresh.exists(runId)).resolves.toBe(false);
+          await expect(fresh.load(runId)).rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
+        } else {
+          await expect(fresh.exists(runId)).resolves.toBe(true);
+        }
+      } finally {
+        await rm(root,{ recursive: true,force: true });
+      }
+    }
+
+    const root = await mkdtemp(join(tmpdir(),"debateai-s10-run-destroy-green-"));
+    const users = new MemoryUserDekStore();
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    const runId = randomUUID();
+    try {
+      await users.store(userId,generateDek());
+      const store = new FileRunContentKeyStore(root,users,async () => userId);
+      await store.store(runId,{ userId,ownerRef },generateDek());
+      await expect(store.destroy(runId)).resolves.toBe("DESTROYED");
+      const fresh = new FileRunContentKeyStore(root,users,async () => userId);
+      await expect(fresh.exists(runId)).resolves.toBe(false);
+      await expect(fresh.load(runId)).rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
+      await expect(fresh.destroy(runId)).resolves.toBe("ALREADY_ABSENT");
+    } finally {
+      await rm(root,{ recursive: true,force: true });
+    }
+  });
+
+  it("defaults content encryption off, retires the v1 blind-index path, and requires wrapping-key paths", () => {
     vi.stubEnv("CONTENT_ENCRYPTION_ENABLED", undefined);
     vi.stubEnv("CONTENT_BLIND_INDEX_KEY_PATH", undefined);
     stubApiEnvironment();
     expect(loadApiEnvironment().CONTENT_ENCRYPTION_ENABLED).toBe("false");
+    vi.stubEnv("CONTENT_PROVISION_DATABASE_URL", undefined);
+    expect(() => loadApiEnvironment()).toThrow();
+    vi.stubEnv(
+      "CONTENT_PROVISION_DATABASE_URL",
+      "postgresql://content:pass@127.0.0.1:5432/debateai"
+    );
     vi.stubEnv("CONTENT_ENCRYPTION_ENABLED", "true");
-    expect(() => loadApiEnvironment()).toThrow("CONTENT_BLIND_INDEX_KEY_PATH_REQUIRED");
+    expect(() => loadApiEnvironment()).not.toThrow();
+    vi.stubEnv("CONTENT_BLIND_INDEX_KEY_PATH", "/retired/v1.key");
+    expect(() => loadApiEnvironment()).toThrow("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
 
     vi.unstubAllEnvs();
     vi.stubEnv("CONTENT_ENCRYPTION_ENABLED", undefined);
@@ -459,13 +584,15 @@ describe("S6 per-run private content encryption", () => {
     expect(loadRunnerEnvironment().CONTENT_ENCRYPTION_ENABLED).toBe("false");
     vi.stubEnv("CONTENT_ENCRYPTION_ENABLED", "true");
     expect(() => loadRunnerEnvironment()).toThrow("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
+    vi.stubEnv("CONTENT_BLIND_INDEX_KEY_PATH", "/retired/v1.key");
+    expect(() => loadRunnerEnvironment()).toThrow("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
   });
 
   it("never accepts a KEK handle as the content blind-index key", async () => {
     const users = new MemoryUserDekStore();
     const store = new MemoryRunContentKeyStore(users, async () => randomUUID());
     const kek = loadKek(generateDek());
-    expect(() => new ContentCipher(store, kek as unknown as Uint8Array)).toThrow("CONTENT_BLIND_INDEX_KEY_INVALID");
+    expect(() => new ContentCipher(store)).not.toThrow();
   });
 
   it("zeroes transient run keys after provisioning, use, and provisioning failure", async () => {
@@ -482,9 +609,12 @@ describe("S6 per-run private content encryption", () => {
         loaded = generateDek();
         return { runId, ownerRef, key: loaded };
       },
-      async destroy() {}
+      async exists() { return true; },
+      async ownerRef() { return ownerRef; },
+      async listByOwner() { return []; },
+      async destroy() { return "DESTROYED" as const; }
     };
-    const cipher = new ContentCipher(store, Buffer.alloc(32, 0x1a));
+    const cipher = new ContentCipher(store);
     await cipher.provisionRun(runId, { userId, ownerRef });
     expect([...provisioned!].every((byte) => byte === 0)).toBe(true);
     await cipher.encrypt(runId, "core.run", runId, { questionLine: "zero me" });
@@ -497,8 +627,11 @@ describe("S6 per-run private content encryption", () => {
         throw new Error("SECRET_STORE_WRITE_FAILED");
       },
       async load() { throw new Error("unused"); },
-      async destroy() {}
-    }, Buffer.alloc(32, 0x1b));
+      async exists() { return false; },
+      async ownerRef() { throw new Error("unused"); },
+      async listByOwner() { return []; },
+      async destroy() { return "ALREADY_ABSENT" as const; }
+    });
     await expect(failing.provisionRun(randomUUID(), { userId, ownerRef }))
       .rejects.toThrow("SECRET_STORE_WRITE_FAILED");
     expect([...failedKey!].every((byte) => byte === 0)).toBe(true);
@@ -514,8 +647,11 @@ describe("S6 per-run private content encryption", () => {
         loaded = generateDek();
         return { runId, ownerRef, key: loaded };
       },
-      async destroy() {}
-    }, Buffer.alloc(32, 0x1c));
+      async exists() { return true; },
+      async ownerRef() { return ownerRef; },
+      async listByOwner() { return []; },
+      async destroy() { return "DESTROYED" as const; }
+    });
     const prepared = await cipher.prepareRun(runId);
     expect([...loaded!].some((byte) => byte !== 0)).toBe(true);
     prepared.encrypt("core.run", runId, { questionLine: "prepared lifetime" });

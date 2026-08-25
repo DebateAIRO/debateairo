@@ -98,6 +98,7 @@ function answer(): Answer {
 
 function application(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => answer(),
@@ -146,6 +147,7 @@ function sessions(stepUp = vi.fn<SessionApplication["stepUp"]>(async () => ({
 function publications(overrides: Partial<PublicationApplication> = {}): PublicationApplication {
   return {
     reconcileKeyCleanup: async () => 0,
+    reconcileKeyProvisionCleanup: async () => 0,
     preflightGrant: async () => true,
     auditPreflightDenial: async () => true,
     readOwnedVisibility: async () => ({ state: "PRIVATE", public_ref: null }),
@@ -229,6 +231,19 @@ describe("S8 publication HTTP boundary", () => {
       if (statement.includes("identity.publication_grant_is_live")) {
         return { rows: [{ live: false }] };
       }
+      if (statement.includes("identity.reserve_publication_event_refs")) {
+        return { rows: [{
+          reservation_id: "88888888-8888-4888-8888-888888888888",
+          visibility_event_id: null,
+          visibility_actor_ref: null,
+          audit_id: "99999999-9999-4999-8999-999999999999",
+          audit_actor_ref: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          audit_target_ref: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          denied_audit_id: null,
+          denied_audit_actor_ref: null,
+          denied_audit_target_ref: null
+        }] };
+      }
       if (statement.includes("FROM identity.\"user\" AS identity_user")) {
         return { rows: [{
           audit_token: "77777777-7777-4777-8777-777777777777",
@@ -279,8 +294,7 @@ describe("S8 publication HTTP boundary", () => {
     );
     expect(denialCalls).toHaveLength(3);
     for (const [, values] of denialCalls) {
-      expect(values).toHaveLength(8);
-      expect(values?.[7]).toEqual(expect.any(String));
+      expect(values).toHaveLength(5);
       expect(JSON.stringify(values)).not.toContain(RUN_ID);
       expect(JSON.stringify(values)).not.toContain("s8-test-browser");
     }

@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { createHash, randomUUID } from "node:crypto";
-import { decryptContentForRun, type CryptoEnvelope } from "@debateai/db";
+import { decryptContentForRun, type CryptoEnvelope, withRunContentLease } from "@debateai/db";
 import type { CallBound, ProviderGateway } from "@debateai/providers";
 import {
   assertEvaluatorProviderIsolation,
@@ -9,6 +9,11 @@ import {
   EvaluatorHarvestRepository,
   PostgresEvaluatorAddonRepository,
   PostgresEvaluatorConsumerRepository,
+  createOpenAiPublicAggregateProvider,
+  EVALUATOR_ADAPTER_KIND,
+  EVALUATOR_MAKER,
+  EVALUATOR_PROVIDER_FAMILY_ROW_KEY,
+  EVALUATOR_PROVIDER_REF,
   HARVEST_MAX_CONSECUTIVE_FAILURES,
   HARVEST_PIPELINE_VERSION,
   probeEvaluatorVllmCatalog,
@@ -23,6 +28,7 @@ import {
   type EvaluatorMeteringReconciliationResult,
   type EvaluatorQuestionTagResult,
   type EvaluatorProviderFamilyRow,
+  type PublicAggregateProvider,
   type RelativeCostDerivationWindow
 } from "@debateai/evaluator";
 
@@ -59,9 +65,94 @@ interface EvaluatorConsumerWorkerInput {
   readonly deployment: {
     readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
   };
-  readonly provider: ProviderGateway;
+  readonly provider: PublicAggregateProvider;
   readonly bound: CallBound;
+  readonly publicationCipher: Readonly<{
+    open(publicationRef: string, runId: string): Promise<Readonly<{
+      decrypt<T>(envelope: CryptoEnvelope): T;
+      close(): void;
+    }>>;
+  }>;
   readonly observedAt?: Date;
+}
+
+export type PublicEvaluatorConsumerRunInput = Omit<
+  EvaluatorConsumerWorkerInput,"provider"|"publicationCipher"|"family"|"deployment"
+>;
+
+export interface PublicEvaluatorConsumerWorker {
+  runOnDemand(input: PublicEvaluatorConsumerRunInput):
+    Promise<EvaluatorConsumerRefreshResult>;
+  runPostAggregate(input: PublicEvaluatorConsumerRunInput
+    & { readonly aggregateAsOf:Date }): Promise<EvaluatorConsumerRefreshResult>;
+}
+
+/**
+ * The production cross-run composition can be built only from the narrow
+ * public transport plus the publication-key cipher. It has no constructor
+ * parameter for the private ProviderGateway, LedgerRepository, or run cipher.
+ */
+export function createPublicEvaluatorConsumerWorker(options: Readonly<{
+  family:EvaluatorProviderFamilyRow;
+  deployment:EvaluatorConsumerWorkerInput["deployment"];
+  model:string;
+  publicationCipher:EvaluatorConsumerWorkerInput["publicationCipher"];
+  fetchImplementation?:typeof fetch;
+}>): PublicEvaluatorConsumerWorker {
+  const endpoint=new URL(options.family.value.chatBaseUrl);
+  if (options.family.rowKey!==EVALUATOR_PROVIDER_FAMILY_ROW_KEY
+    || !Number.isInteger(options.family.registerVersion)
+    || options.family.registerVersion<1
+    || options.family.sourceRef.trim()===""
+    || options.family.value.providerRef!==EVALUATOR_PROVIDER_REF
+    || options.family.value.maker!==EVALUATOR_MAKER
+    || options.family.value.adapterKind!==EVALUATOR_ADAPTER_KIND
+    || options.family.value.source!=="LOCAL_CONTAINER_NO_AUTH"
+    || endpoint.protocol!=="http:"
+    || !new Set(["vllm","localhost","127.0.0.1","[::1]"]).has(endpoint.hostname)
+    || options.model.trim()==="") {
+    throw new TypeError("PUBLIC_EVALUATOR_WORKER_CONFIGURATION_INVALID");
+  }
+  assertEvaluatorProviderIsolation(options.family,options.deployment);
+  const provider = createOpenAiPublicAggregateProvider({
+    endpoint:options.family.value.chatBaseUrl,
+    providerRef:options.family.value.providerRef,
+    model:options.model,
+    maker:options.family.value.maker,
+    ...(options.fetchImplementation === undefined
+      ? {} : { fetchImplementation:options.fetchImplementation })
+  });
+  const runInput=(input:PublicEvaluatorConsumerRunInput):EvaluatorConsumerWorkerInput=>({
+    pool:input.pool,
+    family:options.family,
+    deployment:options.deployment,
+    provider,
+    publicationCipher:options.publicationCipher,
+    bound:input.bound,
+    ...(input.observedAt===undefined?{}:{ observedAt:input.observedAt })
+  });
+  return Object.freeze({
+    runOnDemand: async (input:PublicEvaluatorConsumerRunInput) =>
+      runOnDemandEvaluatorConsumerRefresh(runInput(input)),
+    runPostAggregate: async (input:PublicEvaluatorConsumerRunInput
+      & { readonly aggregateAsOf:Date }) => runPostAggregateEvaluatorConsumerRefresh({
+      ...runInput(input),aggregateAsOf:input.aggregateAsOf
+    })
+  });
+}
+
+function consumerRepository(input: EvaluatorConsumerWorkerInput): PostgresEvaluatorConsumerRepository {
+  return new PostgresEvaluatorConsumerRepository(
+    input.pool,
+    async (publicationRef,runId,envelope) => {
+      const prepared = await input.publicationCipher.open(publicationRef,runId);
+      try {
+        return prepared.decrypt(envelope);
+      } finally {
+        prepared.close();
+      }
+    }
+  );
 }
 
 export async function runOnDemandEvaluatorConsumerRefresh(
@@ -70,7 +161,7 @@ export async function runOnDemandEvaluatorConsumerRefresh(
   return runEvaluatorConsumerRefresh({
     ...input,
     trigger: "ON_DEMAND",
-    repository: new PostgresEvaluatorConsumerRepository(input.pool)
+    repository: consumerRepository(input)
   });
 }
 
@@ -80,7 +171,7 @@ export async function runPostAggregateEvaluatorConsumerRefresh(
   return runEvaluatorConsumerRefresh({
     ...input,
     trigger: "POST_AGGREGATE",
-    repository: new PostgresEvaluatorConsumerRepository(input.pool)
+    repository: consumerRepository(input)
   });
 }
 
@@ -283,6 +374,14 @@ async function runPersistedQuestionTag(input: {
   readonly provenanceRef: string;
   readonly basis: "TAGGER" | "BACKFILL";
 }): Promise<EvaluatorQuestionTagResult> {
+  const exists = await input.pool.query(
+    "SELECT 1 FROM core.run WHERE run_id=$1",
+    [input.runId]
+  );
+  if (exists.rowCount === 0) {
+    return Object.freeze({ state: "UNTAGGED", reason: "TAGGER_RUN_UNRESOLVED" });
+  }
+  return withRunContentLease(input.pool,[input.runId],async () => {
   const run = await input.pool.query<{
     question_line: string;
     content_ciphertext: CryptoEnvelope | null;
@@ -308,5 +407,6 @@ async function runPersistedQuestionTag(input: {
     bound: input.bound,
     basis: input.basis,
     provenanceRef: input.provenanceRef
+  });
   });
 }

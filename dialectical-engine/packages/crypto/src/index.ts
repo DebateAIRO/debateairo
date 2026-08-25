@@ -9,7 +9,8 @@ import {
   timingSafeEqual
 } from "node:crypto";
 import { readFileSync, realpathSync, statSync } from "node:fs";
-import { chmod, mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
@@ -62,6 +63,40 @@ export interface CryptoEnvelope {
   readonly nonce: string;
   readonly ct: string;
   readonly tag: string;
+}
+
+const CONTENT_ATTESTATION_SECRET_DOMAIN = "debateai:run-content:db-envelope-attestation-secret:v1\0";
+const CONTENT_ATTESTATION_BINDING_DOMAIN = "debateai:content-envelope-attestation:v2";
+
+function encodeAttestationField(value: string): Buffer {
+  const bytes = Buffer.from(value, "utf8");
+  return Buffer.concat([
+    Buffer.from(bytes.byteLength.toString().padStart(10, "0") + ":", "ascii"),
+    bytes
+  ]);
+}
+
+export function canonicalContentEnvelopeAttestationBytes(input: {
+  readonly runId: string;
+  readonly carrier: string;
+  readonly primaryKey: string;
+  readonly purpose: string;
+  readonly envelope: CryptoEnvelope;
+}): Buffer {
+  const fields = [
+    CONTENT_ATTESTATION_BINDING_DOMAIN,
+    "2",
+    input.runId.toLowerCase(),
+    input.carrier,
+    input.primaryKey,
+    input.purpose,
+    String(input.envelope.v),
+    input.envelope.keyId,
+    input.envelope.nonce,
+    input.envelope.ct,
+    input.envelope.tag
+  ];
+  return Buffer.concat(fields.map(encodeAttestationField));
 }
 
 export class CryptoError extends Error {
@@ -1031,24 +1066,91 @@ export function generatePseudonym(): string {
 
 export interface UserDekStore {
   store(userId: string, dek: Uint8Array): Promise<void>;
+  /** Idempotently removes the wrapped user DEK and durably publishes the removal. */
+  destroy(userId: string): Promise<KeyDestroyResult>;
 }
 
 export interface ReadableUserDekStore extends UserDekStore {
   load(userId: string): Promise<Buffer>;
+  exists(userId: string): Promise<boolean>;
+}
+
+export type KeyDestroyResult = "DESTROYED" | "ALREADY_ABSENT";
+
+export interface UserDekStoreFileSystem {
+  readonly mkdir: typeof mkdir;
+  readonly chmod: typeof chmod;
+  readonly open: typeof open;
+  readonly readFile: typeof readFile;
+  readonly lstat: typeof lstat;
+  readonly rename: typeof rename;
+  readonly rm: typeof rm;
+  readonly stat: typeof stat;
+}
+
+const defaultUserDekStoreFileSystem: UserDekStoreFileSystem = Object.freeze({
+  mkdir,
+  chmod,
+  open,
+  readFile,
+  lstat,
+  rename,
+  rm,
+  stat
+});
+
+function assertUserDekStoreUserId(userId: string): void {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+    throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
+  }
+}
+
+async function durableRemoveDirectory(
+  directory: string,
+  parent: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "lstat" | "rm" | "open"> = defaultUserDekStoreFileSystem
+): Promise<KeyDestroyResult> {
+  let existed = true;
+  try {
+    await fileSystem.lstat(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    existed = false;
+  }
+  await fileSystem.rm(directory, { recursive: true, force: true });
+  try {
+    const parentHandle = await fileSystem.open(parent, "r");
+    try {
+      await parentHandle.sync();
+    } finally {
+      await parentHandle.close();
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  try {
+    await fileSystem.lstat(directory);
+    throw new CryptoError(
+      "KEY_DESTROY_READBACK_FAILED",
+      "Secret-store directory still exists after durable removal"
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  return existed ? "DESTROYED" : "ALREADY_ABSENT";
 }
 
 export class FileUserDekStore implements ReadableUserDekStore {
   constructor(
     private readonly root: string,
-    private readonly kek: KekHandle
+    private readonly kek: KekHandle,
+    private readonly fileSystem: UserDekStoreFileSystem = defaultUserDekStoreFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("USER_DEK_STORE_PATH_REQUIRED");
   }
 
   async store(userId: string, dek: Uint8Array): Promise<void> {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-      throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
-    }
+    assertUserDekStoreUserId(userId);
     const aad = [
       "secret-store", "user-dek", userId, "run:none", userId,
       `user-dek:${userId}`, "1"
@@ -1056,34 +1158,85 @@ export class FileUserDekStore implements ReadableUserDekStore {
     const envelope = wrapDek(this.kek, dek, aad);
     const users = join(this.root, "users");
     const directory = join(users, userId);
-    await mkdir(this.root, { recursive: true, mode: 0o700 });
-    await chmod(this.root, 0o700);
-    await mkdir(users, { recursive: true, mode: 0o700 });
-    await chmod(users, 0o700);
-    await mkdir(directory, { recursive: false, mode: 0o700 });
     const location = join(directory, "dek.v1.json");
-    const file = await open(location, "wx", 0o600);
+    const temporary = join(directory, "dek.v1.json.tmp");
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryCreated = false;
+    let published = false;
     try {
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(this.root, 0o700);
+      await this.fileSystem.mkdir(users, { recursive: true, mode: 0o700 });
+      await this.fileSystem.chmod(users, 0o700);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      directoryCreated = true;
+      file = await this.fileSystem.open(temporary, "wx", 0o600);
       await file.writeFile(JSON.stringify({
         version: 1,
         user_id: userId,
         key_id: envelope.keyId,
         wrapped_dek: envelope
       }), "utf8");
-    } finally {
+      await file.sync();
       await file.close();
+      file = undefined;
+      await this.fileSystem.rename(temporary, location);
+      published = true;
+      directoryHandle = await this.fileSystem.open(directory, "r");
+      await directoryHandle.sync();
+      await directoryHandle.close();
+      directoryHandle = undefined;
+      parentHandle = await this.fileSystem.open(users, "r");
+      await parentHandle.sync();
+      await parentHandle.close();
+      parentHandle = undefined;
+    } catch (error) {
+      const cleanupFailures: unknown[] = [];
+      for (const handle of [file,directoryHandle,parentHandle]) {
+        if (handle !== undefined) {
+          try { await handle.close(); } catch (closeError) { cleanupFailures.push(closeError); }
+        }
+      }
+      if (!published) {
+        try {
+          await this.fileSystem.lstat(location);
+          published = true;
+        } catch (readbackError) {
+          if ((readbackError as NodeJS.ErrnoException).code !== "ENOENT") published = true;
+        }
+      }
+      if (published) {
+        throw new CryptoError(
+          "USER_DEK_STORE_DURABILITY_UNCERTAIN",
+          "User DEK durability could not be confirmed"
+        );
+      }
+      if (directoryCreated) {
+        try {
+          await durableRemoveDirectory(directory,users,this.fileSystem);
+        } catch (cleanupError) {
+          cleanupFailures.push(cleanupError);
+        }
+      }
+      if (cleanupFailures.length>0) {
+        throw new CryptoError(
+          "USER_DEK_STORE_CLEANUP_FAILED",
+          "User DEK publication cleanup did not complete"
+        );
+      }
+      throw error;
     }
   }
 
   async load(userId: string): Promise<Buffer> {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-      throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
-    }
+    assertUserDekStoreUserId(userId);
     const location = join(this.root, "users", userId, "dek.v1.json");
     try {
-      const metadata = await stat(location);
+      const metadata = await this.fileSystem.stat(location);
       if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) throw new KekUnresolvedError();
-      const parsed = JSON.parse(await readFile(location, "utf8")) as unknown;
+      const parsed = JSON.parse(await this.fileSystem.readFile(location, "utf8")) as unknown;
       if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
       const record = parsed as Record<string, unknown>;
       const envelope = record.wrapped_dek;
@@ -1105,6 +1258,23 @@ export class FileUserDekStore implements ReadableUserDekStore {
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
     }
+  }
+
+  async exists(userId: string): Promise<boolean> {
+    assertUserDekStoreUserId(userId);
+    try {
+      await this.fileSystem.lstat(join(this.root, "users", userId));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  }
+
+  async destroy(userId: string): Promise<KeyDestroyResult> {
+    assertUserDekStoreUserId(userId);
+    const users = join(this.root, "users");
+    return durableRemoveDirectory(join(users, userId), users, this.fileSystem);
   }
 }
 
@@ -1144,7 +1314,10 @@ export interface LoadedRunContentKey {
 export interface RunContentKeyStore {
   store(runId: string, identity: RunContentKeyIdentity, contentKey: Uint8Array): Promise<void>;
   load(runId: string): Promise<LoadedRunContentKey>;
-  destroy(runId: string): Promise<void>;
+  exists(runId: string): Promise<boolean>;
+  ownerRef(runId: string): Promise<string>;
+  listByOwner(ownerRef: string): Promise<readonly string[]>;
+  destroy(runId: string): Promise<KeyDestroyResult>;
 }
 
 export interface RunContentKeyFileSystem {
@@ -1152,6 +1325,8 @@ export interface RunContentKeyFileSystem {
   readonly chmod: typeof chmod;
   readonly open: typeof open;
   readonly readFile: typeof readFile;
+  readonly lstat: typeof lstat;
+  readonly readdir: typeof readdir;
   readonly rename: typeof rename;
   readonly rm: typeof rm;
   readonly stat: typeof stat;
@@ -1162,6 +1337,8 @@ const defaultRunContentKeyFileSystem: RunContentKeyFileSystem = Object.freeze({
   chmod,
   open,
   readFile,
+  lstat,
+  readdir,
   rename,
   rm,
   stat
@@ -1286,8 +1463,27 @@ export class MemoryRunContentKeyStore implements RunContentKeyStore {
     return unwrapRunContentKey(this.users, this.resolveUserId, record);
   }
 
-  async destroy(runId: string): Promise<void> {
-    this.#records.delete(runId);
+  async exists(runId: string): Promise<boolean> {
+    if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
+    return this.#records.has(runId);
+  }
+
+  async ownerRef(runId: string): Promise<string> {
+    const record = this.#records.get(runId);
+    if (record === undefined) throw new RunContentKeyUnresolvedError();
+    return record.owner_ref;
+  }
+
+  async listByOwner(ownerRef: string): Promise<readonly string[]> {
+    if (!UUID_V4.test(ownerRef)) throw new RunContentKeyUnresolvedError();
+    return Object.freeze([...this.#records.entries()]
+      .filter(([, record]) => record.owner_ref === ownerRef)
+      .map(([runId]) => runId)
+      .sort());
+  }
+
+  async destroy(runId: string): Promise<KeyDestroyResult> {
+    return this.#records.delete(runId) ? "DESTROYED" : "ALREADY_ABSENT";
   }
 }
 
@@ -1309,6 +1505,7 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     const temporary = join(directory, "content-key.v1.json.tmp");
     let file: Awaited<ReturnType<typeof open>> | undefined;
     let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
     try {
@@ -1329,6 +1526,10 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       await directoryHandle.sync();
       await directoryHandle.close();
       directoryHandle = undefined;
+      parentHandle = await this.fileSystem.open(runs, "r");
+      await parentHandle.sync();
+      await parentHandle.close();
+      parentHandle = undefined;
     } catch (error) {
       const cleanupFailures: unknown[] = [];
       if (file !== undefined) {
@@ -1347,6 +1548,22 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
         }
         directoryHandle = undefined;
       }
+      if (parentHandle !== undefined) {
+        try {
+          await parentHandle.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        parentHandle = undefined;
+      }
+      if (!published) {
+        try {
+          await this.fileSystem.lstat(location);
+          published = true;
+        } catch (readbackError) {
+          if ((readbackError as NodeJS.ErrnoException).code !== "ENOENT") published = true;
+        }
+      }
       if (published) {
         throw new CryptoError(
           "RUN_CONTENT_KEY_STORE_DURABILITY_UNCERTAIN",
@@ -1355,7 +1572,7 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       }
       if (directoryCreated) {
         try {
-          await this.fileSystem.rm(directory, { recursive: true, force: true });
+          await durableRemoveDirectory(directory,runs,this.fileSystem);
         } catch (cleanupError) {
           cleanupFailures.push(cleanupError);
         }
@@ -1386,9 +1603,59 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     }
   }
 
-  async destroy(runId: string): Promise<void> {
+  async exists(runId: string): Promise<boolean> {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
-    await this.fileSystem.rm(join(this.root, "runs", runId), { recursive: true, force: true });
+    try {
+      await this.fileSystem.lstat(join(this.root, "runs", runId));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  }
+
+  async ownerRef(runId: string): Promise<string> {
+    if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
+    try {
+      const location = join(this.root, "runs", runId, "content-key.v1.json");
+      const metadata = await this.fileSystem.stat(location);
+      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+        throw new RunContentKeyUnresolvedError();
+      }
+      return parseStoredRunContentKey(
+        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        runId
+      ).owner_ref;
+    } catch (error) {
+      if (error instanceof RunContentKeyUnresolvedError) throw error;
+      throw new RunContentKeyUnresolvedError();
+    }
+  }
+
+  async listByOwner(ownerRef: string): Promise<readonly string[]> {
+    if (!UUID_V4.test(ownerRef)) throw new RunContentKeyUnresolvedError();
+    const runs = join(this.root, "runs");
+    let entries: Dirent<string>[];
+    try {
+      entries = await this.fileSystem.readdir(runs, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
+      throw new RunContentKeyUnresolvedError();
+    }
+    const owned: string[] = [];
+    for (const entry of entries) {
+      if (typeof entry === "string" || !entry.isDirectory() || !UUID_V4.test(entry.name)) {
+        throw new RunContentKeyUnresolvedError();
+      }
+      if (await this.ownerRef(entry.name) === ownerRef) owned.push(entry.name);
+    }
+    return Object.freeze(owned.sort());
+  }
+
+  async destroy(runId: string): Promise<KeyDestroyResult> {
+    if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
+    const runs = join(this.root, "runs");
+    return durableRemoveDirectory(join(runs,runId),runs,this.fileSystem);
   }
 }
 
@@ -1396,6 +1663,13 @@ export interface PreparedRunContentCipher {
   readonly runId: string;
   encrypt(carrier: ContentCarrier, primaryKey: string, value: unknown): CryptoEnvelope;
   decrypt<T = unknown>(carrier: ContentCarrier, primaryKey: string, envelope: CryptoEnvelope): T;
+  databaseAttestationSecret(): Buffer;
+  attestEnvelope(
+    carrier: ContentCarrier,
+    primaryKey: string,
+    purpose: string,
+    envelope: CryptoEnvelope
+  ): Buffer;
   close(): void;
 }
 
@@ -1444,6 +1718,33 @@ class PreparedRunContentCipherImpl implements PreparedRunContentCipher {
     }
   }
 
+  databaseAttestationSecret(): Buffer {
+    const key = this.#key;
+    if (key === undefined) throw new RunContentKeyUnresolvedError();
+    return createHmac("sha256", key)
+      .update(CONTENT_ATTESTATION_SECRET_DOMAIN, "utf8")
+      .update(this.runId.toLowerCase(), "utf8")
+      .digest();
+  }
+
+  attestEnvelope(
+    carrier: ContentCarrier,
+    primaryKey: string,
+    purpose: string,
+    envelope: CryptoEnvelope
+  ): Buffer {
+    const secret = this.databaseAttestationSecret();
+    const bytes = canonicalContentEnvelopeAttestationBytes({
+      runId: this.runId,carrier,primaryKey,purpose,envelope
+    });
+    try {
+      return createHmac("sha256",secret).update(bytes).digest();
+    } finally {
+      bytes.fill(0);
+      secret.fill(0);
+    }
+  }
+
   close(): void {
     this.#key?.fill(0);
     this.#key = undefined;
@@ -1451,17 +1752,7 @@ class PreparedRunContentCipherImpl implements PreparedRunContentCipher {
 }
 
 export class ContentCipher {
-  readonly #blindIndexKey: Buffer;
-
-  constructor(
-    private readonly keys: RunContentKeyStore,
-    blindIndexKey: Uint8Array
-  ) {
-    if (!(blindIndexKey instanceof Uint8Array) || blindIndexKey.byteLength !== KEY_BYTES) {
-      throw new TypeError("CONTENT_BLIND_INDEX_KEY_INVALID");
-    }
-    this.#blindIndexKey = Buffer.from(blindIndexKey);
-  }
+  constructor(private readonly keys: RunContentKeyStore) {}
 
   async provisionRun(runId: string, identity: RunContentKeyIdentity): Promise<void> {
     const contentKey = generateDek();
@@ -1505,20 +1796,7 @@ export class ContentCipher {
     }
   }
 
-  questionBlindIndex(ownerRef: string, question: string): Buffer {
-    if (!UUID_V4.test(ownerRef) || typeof question !== "string" || question.trim() === "") {
-      throw new TypeError("CONTENT_BLIND_INDEX_INPUT_INVALID");
-    }
-    const normalized = question.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
-    return createHmac("sha256", this.#blindIndexKey)
-      .update("debateai:content-question:v1\0", "utf8")
-      .update(ownerRef.toLowerCase(), "utf8")
-      .update("\0", "utf8")
-      .update(normalized, "utf8")
-      .digest();
-  }
-
-  destroyRunKey(runId: string): Promise<void> {
+  destroyRunKey(runId: string): Promise<KeyDestroyResult> {
     return this.keys.destroy(runId);
   }
 }
@@ -1531,7 +1809,8 @@ export interface LoadedPublicationKey {
 export interface PublicationKeyStore {
   store(publicationRef: string, key: Uint8Array): Promise<void>;
   load(publicationRef: string): Promise<LoadedPublicationKey>;
-  destroy(publicationRef: string): Promise<void>;
+  exists(publicationRef: string): Promise<boolean>;
+  destroy(publicationRef: string): Promise<KeyDestroyResult>;
 }
 
 export type PublicationKeyFileSystem = RunContentKeyFileSystem;
@@ -1643,9 +1922,14 @@ export class MemoryPublicationKeyStore implements PublicationKeyStore {
     return unwrapPublicationKey(this.corpusKek, record);
   }
 
-  async destroy(publicationRef: string): Promise<void> {
+  async exists(publicationRef: string): Promise<boolean> {
     assertPublicationRef(publicationRef);
-    this.#records.delete(publicationRef);
+    return this.#records.has(publicationRef);
+  }
+
+  async destroy(publicationRef: string): Promise<KeyDestroyResult> {
+    assertPublicationRef(publicationRef);
+    return this.#records.delete(publicationRef) ? "DESTROYED" : "ALREADY_ABSENT";
   }
 }
 
@@ -1666,6 +1950,7 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     const temporary = join(directory, "publication-key.v1.json.tmp");
     let file: Awaited<ReturnType<typeof open>> | undefined;
     let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
     try {
@@ -1686,6 +1971,10 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       await directoryHandle.sync();
       await directoryHandle.close();
       directoryHandle = undefined;
+      parentHandle = await this.fileSystem.open(publications, "r");
+      await parentHandle.sync();
+      await parentHandle.close();
+      parentHandle = undefined;
     } catch (error) {
       const cleanupFailures: unknown[] = [];
       if (file !== undefined) {
@@ -1696,6 +1985,18 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
         try { await directoryHandle.close(); } catch (closeError) { cleanupFailures.push(closeError); }
         directoryHandle = undefined;
       }
+      if (parentHandle !== undefined) {
+        try { await parentHandle.close(); } catch (closeError) { cleanupFailures.push(closeError); }
+        parentHandle = undefined;
+      }
+      if (!published) {
+        try {
+          await this.fileSystem.lstat(location);
+          published = true;
+        } catch (readbackError) {
+          if ((readbackError as NodeJS.ErrnoException).code !== "ENOENT") published = true;
+        }
+      }
       if (published) {
         throw new CryptoError(
           "PUBLICATION_KEY_STORE_DURABILITY_UNCERTAIN",
@@ -1704,7 +2005,7 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
       }
       if (directoryCreated) {
         try {
-          await this.fileSystem.rm(directory, { recursive: true, force: true });
+          await durableRemoveDirectory(directory,publications,this.fileSystem);
         } catch (cleanupError) {
           cleanupFailures.push(cleanupError);
         }
@@ -1738,11 +2039,22 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     }
   }
 
-  async destroy(publicationRef: string): Promise<void> {
+  async exists(publicationRef: string): Promise<boolean> {
     assertPublicationRef(publicationRef);
-    await this.fileSystem.rm(
-      join(this.root, "publications", publicationRef),
-      { recursive: true, force: true }
+    try {
+      await this.fileSystem.lstat(join(this.root, "publications", publicationRef));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  }
+
+  async destroy(publicationRef: string): Promise<KeyDestroyResult> {
+    assertPublicationRef(publicationRef);
+    const publications = join(this.root, "publications");
+    return durableRemoveDirectory(
+      join(publications, publicationRef),publications,this.fileSystem
     );
   }
 }
@@ -1816,7 +2128,21 @@ export class PublicationCipher {
     return new PreparedPublicationCipherImpl(publicationRef, runId, loaded.key);
   }
 
-  destroy(publicationRef: string): Promise<void> {
+  exists(publicationRef: string): Promise<boolean> {
+    return this.keys.exists(publicationRef);
+  }
+
+  async keyReadable(publicationRef: string): Promise<boolean> {
+    try {
+      const loaded = await this.keys.load(publicationRef);
+      loaded.key.fill(0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  destroy(publicationRef: string): Promise<KeyDestroyResult> {
     return this.keys.destroy(publicationRef);
   }
 }

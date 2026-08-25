@@ -238,7 +238,8 @@ export class BudgetRepository {
     const result = await this.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count
        FROM ledger.ledger_entry
-       WHERE run_id = $1 AND action_kind = 'MODEL_CALL'`,
+       WHERE run_id = $1 AND action_kind = 'MODEL_CALL'
+         AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)`,
       [runId]
     );
     return Number(result.rows[0]?.count ?? 0);

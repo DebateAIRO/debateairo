@@ -13,6 +13,7 @@ const node = Object.freeze({
 
 function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): ReviewCatchUpDependencies {
   return {
+    withContentLease: async (_runId,use) => use(),
     probePinnedPanel: vi.fn(async () => [{
       maker: "maker:b", providerRef: "provider:b",
       review: vi.fn(async (input) => ({

@@ -49,7 +49,11 @@ function normalizeSameOriginApiPath(apiBase: string): string {
   if (!normalized.startsWith("/") || normalized.startsWith("//")) {
     throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
   }
-  if (normalized.split("/").some((segment) => segment === "..")) {
+  if (normalized.includes("?") || normalized.includes("#") || normalized.split("/").some((segment) => {
+    let decoded: string;
+    try { decoded = decodeURIComponent(segment); } catch { return true; }
+    return decoded === "." || decoded === ".." || decoded.includes("/") || decoded.includes("\\");
+  })) {
     throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
   }
   let resolved: URL;
@@ -58,7 +62,8 @@ function normalizeSameOriginApiPath(apiBase: string): string {
   } catch {
     throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
   }
-  if (resolved.origin !== "http://sentinel.invalid") {
+  if (resolved.origin !== "http://sentinel.invalid"
+    || resolved.pathname !== `${normalized}/origin-probe`) {
     throw new Error("NEXT_PUBLIC_API_BASE_MUST_BE_SAME_ORIGIN_PATH");
   }
   return normalized;

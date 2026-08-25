@@ -42,11 +42,12 @@ describe("Accounts S8 publication architecture", () => {
   });
 
   it("uses a publication-only key domain and performs key I/O outside database locks", async () => {
-    const [crypto, publication, environment, main] = await Promise.all([
+    const [crypto, publication, environment, main, erasureMigration] = await Promise.all([
       read("packages/crypto/src/index.ts"),
       read("packages/db/src/publication.ts"),
       read("packages/register/src/runtime-environment.ts"),
-      read("apps/api/src/main.ts")
+      read("apps/api/src/main.ts"),
+      read("migrations/0040_account_erasure.sql")
     ]);
     expect(crypto).toContain("export interface PublicationKeyStore");
     expect(crypto).toContain("export class FilePublicationKeyStore");
@@ -67,13 +68,12 @@ describe("Accounts S8 publication architecture", () => {
     );
     for (const secretPath of [
       "BLIND_INDEX_KEY_PATH",
-      "CONTENT_BLIND_INDEX_KEY_PATH",
       "AUDIT_SOURCE_IP_SALT_PATH",
       "AUDIT_KEY_STORE_PATH"
     ]) expect(domainAttestation).toContain(secretPath);
     expect(publication).toContain("session_user");
     expect(publication).toContain("rolsuper");
-    expect(publication).toContain("debate.publication.denied");
+    expect(erasureMigration).toContain("debate.publication.denied");
     expect(publication).not.toContain("FileRunContentKeyStore");
     expect(publication).not.toContain("FileUserDekStore");
     expect(publication).not.toMatch(/INSERT INTO serve\.publication_snapshot/i);

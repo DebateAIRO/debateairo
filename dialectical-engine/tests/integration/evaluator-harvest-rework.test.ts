@@ -50,7 +50,7 @@ async function createTerminalRun(label: string): Promise<string> {
 }
 
 async function addArtifactCall(input: {
-  readonly runId: string | null;
+  readonly runId: string;
   readonly callSiteKey: string;
   readonly providerRef: string;
   readonly modelId: string;
@@ -303,18 +303,19 @@ describe("PROG-05 rework regressions", () => {
   });
 
   it("records malformed observed usage as UNMETERED and still harvests an unrelated run", async () => {
+    const poisonRunId = await createTerminalRun("malformed-metering-poison");
     const poisonMismatch = await addArtifactCall({
-      runId: null, callSiteKey: "runner.poison.v1", providerRef: "provider:poison",
+      runId: poisonRunId, callSiteKey: "runner.poison.v1", providerRef: "provider:poison",
       modelId: "model:poison", modelVersion: "v1", maker: "maker:poison",
       usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 99 }
     });
     const poisonEmpty = await addArtifactCall({
-      runId: null, callSiteKey: "runner.poison-empty.v1", providerRef: "provider:poison",
+      runId: poisonRunId, callSiteKey: "runner.poison-empty.v1", providerRef: "provider:poison",
       modelId: "model:poison-empty", modelVersion: "v1", maker: "maker:poison",
       usage: {}
     });
     const poisonUnknown = await addArtifactCall({
-      runId: null, callSiteKey: "runner.poison-unknown.v1", providerRef: "provider:poison",
+      runId: poisonRunId, callSiteKey: "runner.poison-unknown.v1", providerRef: "provider:poison",
       modelId: "model:poison-unknown", modelVersion: "v1", maker: "maker:poison",
       usage: { input_tokens: 3, output_tokens: 2 }
     });
@@ -358,9 +359,10 @@ describe("PROG-05 rework regressions", () => {
   });
 
   it("proves the zero-provider-call assertion detects injected evidence and passes for harvest", async () => {
+    const injectedRunId = await createTerminalRun("injected-provider-call");
     await expect(expectNoProviderEvidenceDuring(async () => {
       await addArtifactCall({
-        runId: null, callSiteKey: "test.injected-provider-call", providerRef: "provider:injected",
+        runId: injectedRunId, callSiteKey: "test.injected-provider-call", providerRef: "provider:injected",
         modelId: "model:injected", modelVersion: "v1", maker: "maker:injected", usage: null
       });
     })).rejects.toThrow();

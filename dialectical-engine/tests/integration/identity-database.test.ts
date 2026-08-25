@@ -43,37 +43,78 @@ beforeAll(async () => {
 afterAll(async () => database?.stop());
 
 describe("S2 identity schema on real PostgreSQL", () => {
-  it("creates the identity tables with the required contact and audit column types", async () => {
+  it("creates the exact identity table inventory with the required contact, audit, and erasure column types", async () => {
     const tables = await database.pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema='identity' AND table_type='BASE TABLE'
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
-      "audit_event", "channel_binding", "login_challenge", "mfa_factor", "recovery_code", "session",
-      "step_up_grant", "user",
+      "account_erasure_notification_outbox", "account_erasure_request", "audit_event",
+      "channel_binding", "login_challenge", "mfa_factor", "private_erasure_audit_binding",
+      "publication_event_binding", "recovery_code", "run_execution_binding", "runtime_audit_attempt",
+      "session", "step_up_grant", "user",
       "verification_token_credential"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`
-      SELECT table_name,column_name,data_type FROM information_schema.columns
-      WHERE table_schema='identity'
-        AND (table_name,column_name) IN (
+      SELECT relation.relname AS table_name,attribute.attname AS column_name,
+        pg_catalog.format_type(attribute.atttypid,attribute.atttypmod) AS data_type
+      FROM pg_catalog.pg_attribute AS attribute
+      JOIN pg_catalog.pg_class AS relation ON relation.oid=attribute.attrelid
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
+      WHERE namespace.nspname='identity'
+        AND attribute.attnum>0 AND NOT attribute.attisdropped
+        AND (relation.relname,attribute.attname) IN (
           ('user','user_id'),('user','email_blind_index'),('user','email_ciphertext'),
           ('user','recovery_email_ciphertext'),('user','phone_ciphertext'),
           ('audit_event','prev_hash'),('audit_event','this_hash'),
           ('audit_event','actor_ciphertext'),('audit_event','occurred_at'),
-          ('audit_event','source_context'),('audit_event','success')
+          ('audit_event','source_context'),('audit_event','success'),
+          ('account_erasure_notification_outbox','message_id'),
+          ('account_erasure_notification_outbox','channel_binding_id'),
+          ('account_erasure_notification_outbox','event_kind'),
+          ('account_erasure_notification_outbox','claim_token'),
+          ('account_erasure_request','erasure_id'),
+          ('account_erasure_request','cancellation_ref'),
+          ('account_erasure_request','execute_at'),
+          ('account_erasure_request','prepared_run_ids'),
+          ('private_erasure_audit_binding','request_ref'),
+          ('private_erasure_audit_binding','forensic_source_context'),
+          ('publication_event_binding','reservation_id'),
+          ('publication_event_binding','action'),
+          ('run_execution_binding','execution_ref'),
+          ('run_execution_binding','run_id'),
+          ('runtime_audit_attempt','attempt_id'),
+          ('runtime_audit_attempt','backend_pid'),
+          ('runtime_audit_attempt','transaction_id')
         )
-      ORDER BY table_name,column_name
+      ORDER BY relation.relname,attribute.attname
     `);
     expect(columns.rows).toEqual([
+      { table_name: "account_erasure_notification_outbox", column_name: "channel_binding_id", data_type: "uuid" },
+      { table_name: "account_erasure_notification_outbox", column_name: "claim_token", data_type: "uuid" },
+      { table_name: "account_erasure_notification_outbox", column_name: "event_kind", data_type: "text" },
+      { table_name: "account_erasure_notification_outbox", column_name: "message_id", data_type: "uuid" },
+      { table_name: "account_erasure_request", column_name: "cancellation_ref", data_type: "uuid" },
+      { table_name: "account_erasure_request", column_name: "erasure_id", data_type: "uuid" },
+      { table_name: "account_erasure_request", column_name: "execute_at", data_type: "timestamp with time zone" },
+      { table_name: "account_erasure_request", column_name: "prepared_run_ids", data_type: "uuid[]" },
       { table_name: "audit_event", column_name: "actor_ciphertext", data_type: "jsonb" },
       { table_name: "audit_event", column_name: "occurred_at", data_type: "timestamp with time zone" },
       { table_name: "audit_event", column_name: "prev_hash", data_type: "bytea" },
       { table_name: "audit_event", column_name: "source_context", data_type: "jsonb" },
       { table_name: "audit_event", column_name: "success", data_type: "boolean" },
       { table_name: "audit_event", column_name: "this_hash", data_type: "bytea" },
+      { table_name: "private_erasure_audit_binding", column_name: "forensic_source_context", data_type: "jsonb" },
+      { table_name: "private_erasure_audit_binding", column_name: "request_ref", data_type: "uuid" },
+      { table_name: "publication_event_binding", column_name: "action", data_type: "text" },
+      { table_name: "publication_event_binding", column_name: "reservation_id", data_type: "uuid" },
+      { table_name: "run_execution_binding", column_name: "execution_ref", data_type: "uuid" },
+      { table_name: "run_execution_binding", column_name: "run_id", data_type: "uuid" },
+      { table_name: "runtime_audit_attempt", column_name: "attempt_id", data_type: "uuid" },
+      { table_name: "runtime_audit_attempt", column_name: "backend_pid", data_type: "integer" },
+      { table_name: "runtime_audit_attempt", column_name: "transaction_id", data_type: "xid8" },
       { table_name: "user", column_name: "email_blind_index", data_type: "bytea" },
       { table_name: "user", column_name: "email_ciphertext", data_type: "jsonb" },
       { table_name: "user", column_name: "phone_ciphertext", data_type: "jsonb" },

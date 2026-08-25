@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContractHttpError, type ExecutionLedgerDigest, type Inspection, type RunEvent } from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
 import type { Answer, Node } from "@/lib/types";
@@ -10,7 +10,9 @@ import { VerdictBanner } from "@/components/VerdictBanner";
 import { DebateCanvas } from "@/components/DebateCanvas";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
-import { PublicationControl } from "@/components/PublicationControl";
+import {
+  PublicationControl,type PrivateDeletionStatus
+} from "@/components/PublicationControl";
 
 const EMPTY_LIVE_STATE: LiveAnswerState = createEmptyLiveAnswerState();
 
@@ -23,9 +25,12 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   const [ledgerDigest, setLedgerDigest] = useState<ExecutionLedgerDigest | null>(null);
   const [actionState, setActionState] = useState<string | null>(null);
   const [investigationInput, setInvestigationInput] = useState<Readonly<Record<string, string>>>({});
+  const [privateDeletionStatus,setPrivateDeletionStatus]=useState<PrivateDeletionStatus|null>(null);
+  const privateDeletionRef=useRef<PrivateDeletionStatus|null>(null);
   const surface = useMemo(() => answer === null ? null : projectAnswerSurface(answer), [answer]);
 
   const refresh = useCallback(async () => {
+    if (privateDeletionRef.current!==null) return;
     try {
       let next;
       try { next = await contractClient.readAnswer(id, COOKIE_SESSION_MARKER); }
@@ -33,20 +38,42 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
         if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") throw failure;
         next = await contractClient.readRunAnswer(id, COOKIE_SESSION_MARKER);
       }
+      if (privateDeletionRef.current!==null) return;
       setAnswer(next); setError(null);
     } catch (failure) {
+      if (privateDeletionRef.current!==null) return;
       setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
     }
   }, [id]);
 
-  useEffect(() => { if (answer === null) void refresh(); }, [answer, refresh]);
+  const purgePrivateDebate=useCallback((status:PrivateDeletionStatus)=>{
+    privateDeletionRef.current=status;
+    setPrivateDeletionStatus(status);
+    setAnswer(null);
+    setSelectedNode(null);
+    setLive(createEmptyLiveAnswerState());
+    setInspection(null);
+    setLedgerDigest(null);
+    setActionState(null);
+    setInvestigationInput({});
+    setError(null);
+  },[]);
+
+  useEffect(() => {
+    if (answer === null && privateDeletionStatus===null) void refresh();
+  }, [answer,privateDeletionStatus,refresh]);
   useEffect(() => {
     if (answer === null) return;
+    let active=true;
     void contractClient.readLedgerDigest(answer.answer_id, COOKIE_SESSION_MARKER)
-      .then(setLedgerDigest)
-      .catch((failure) => setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE"));
+      .then((digest)=>{ if (active) setLedgerDigest(digest); })
+      .catch((failure) => { if (active) setActionState(
+        failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE"
+      ); });
+    return ()=>{ active=false; };
   }, [answer]);
   useEffect(() => {
+    if (privateDeletionStatus!==null) return;
     const controller = new AbortController();
     const consume = (event: RunEvent) => {
       setLive((current) => applyRunEvent(current, event));
@@ -62,7 +89,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
       if (!controller.signal.aborted) setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
     });
     return () => controller.abort();
-  }, [answer?.run_ref, id, refresh]);
+  }, [answer?.run_ref,id,privateDeletionStatus,refresh]);
   useEffect(() => {
     const wake = () => { if (document.visibilityState === "visible") void refresh(); };
     document.addEventListener("visibilitychange", wake);
@@ -110,6 +137,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
 
   const exportHref = useMemo(() => answer === null || ledgerDigest === null ? null : `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify({ answer, execution_ledger_digest: ledgerDigest }, null, 2))}`, [answer, ledgerDigest]);
 
+  if (privateDeletionStatus!==null) return <main className="screen"><div className="screenInner"><div className="eyebrow">Private debate</div><h1 className="display">{privateDeletionStatus==="CLEANED" ? "Private debate deleted" : "Private debate deletion is processing"}</h1><p role="status">{privateDeletionStatus==="CLEANED" ? "This debate is a tombstone. Its encrypted private content is permanently unreadable." : "Private content is no longer available while durable key cleanup finishes."}</p><Link className="button" href="/">Return to your library</Link></div></main>;
   if (surface === null) return <main className="screen"><div className="screenInner"><div className="eyebrow">Answer</div><h1 className="display">No served answer yet</h1>{error ? <div className="error">{error}</div> : <p>Loading the asker-scoped projection…</p>}<button className="button" onClick={() => void refresh()}>Read current state</button></div></main>;
   return <main className="screen scroll"><div className="screenInner wide">
     <nav style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><Link href="/">DebateAI</Link><div><button className="button" onClick={() => void refresh()}>Refresh current state</button>{exportHref ? <a className="button" href={exportHref} download={`${surface.identity.answerId}-v${surface.identity.answerVersion}.json`}>Export answer + honesty + ledger</a> : <span className="pill">Ledger digest loading</span>}</div></nav>
@@ -123,7 +151,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
     {live.cycleRefusals.map((code, index) => <div className="error" key={`${code}:${index}`}>{code}: redirected to a shared crux.</div>)}
     {live.investigationGaps.length > 0 ? <section className="card"><h2>Investigate deeper</h2>{live.investigationGaps.map((gap) => <article key={gap.gap_ref}><span className="pill">Model-authored remediation · {gap.verdict}</span><h3>{gap.gap}</h3><p>{gap.why} · effort {gap.effort_grade}</p><pre>{gap.constructed_prompt}</pre>{gap.accepts_user_input ? <label>Optional verbatim input<textarea value={investigationInput[gap.gap_ref] ?? ""} onChange={(event) => setInvestigationInput((current) => ({ ...current, [gap.gap_ref]: event.target.value }))} /></label> : null}<button className="button" onClick={() => void recordInvestigation(gap.gap_ref, gap.accepts_user_input)}>Record investigate-deeper request</button></article>)}</section> : null}
     <DebateWorkspaceDrawer answer={surface} />
-    <PublicationControl runId={answer!.run_ref} />
+    <PublicationControl runId={answer!.run_ref} onPrivateDeletion={purgePrivateDebate} />
     {surface.memoryDisclosure ? <section className="card"><h2>Builds on a previous answer</h2><p>{surface.memoryDisclosure.tier} · {surface.memoryDisclosure.relation}</p><p>Prior freshness: {surface.memoryDisclosure.prior?.staleness_state ?? "No linked prior answer"}</p>{surface.memoryDisclosure.unlink.available ? <button className="button" onClick={() => void unlinkMemory()}>Unlink prior answer</button> : null}</section> : <section className="card"><h2>Builds on a previous answer</h2><p>No matched prior answer.</p></section>}
     <section className="card"><h2>Authorized inspection</h2><p>Handle: {surface.inspectionHandle}</p><button className="button" onClick={() => void showInspection()}>Show me why</button>{inspection ? <pre>{JSON.stringify(inspection, null, 2)}</pre> : null}</section>
     {ledgerDigest ? <section className="card"><h2>Execution ledger digest</h2><p>{ledgerDigest.entries.length} executed ledger entries.</p>{ledgerDigest.work_items.map((item) => <p key={item.node_ref}>{item.node_ref} · {item.status}{item.reason ? ` · ${item.reason}` : ""}</p>)}</section> : null}

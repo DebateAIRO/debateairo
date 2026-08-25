@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CSRF_COOKIE_NAME,
@@ -8,17 +8,25 @@ import {
   buildApi
 } from "@debateai/api";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
-import { RunRepository, migrate } from "@debateai/db";
+import { RunRepository, configureContentEncryption, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import { ServeRepository } from "@debateai/serve";
 import type { Session } from "@debateai/contract";
-import { appendAuditEvent } from "../../packages/crypto/src/index.js";
+import {
+  ContentCipher,
+  MemoryRunContentKeyStore,
+  appendAuditEvent,
+  generateDek,
+  type ReadableUserDekStore
+} from "../../packages/crypto/src/index.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
-import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import {
+  createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
+} from "../support/testDatabase.js";
 
 const ORIGIN = "https://ui.s7.test";
 const OWNER_TOKEN = "o".repeat(43);
@@ -53,6 +61,25 @@ let foreignRun: RunFixture;
 let priorOwned: RunFixture;
 let memoryLinkId: string;
 let foreignMemoryLinkId: string;
+let contentCipher: ContentCipher;
+const userDeks = new Map<string, Buffer>();
+const userIdsByOwnerRef = new Map<string, string>();
+const users: ReadableUserDekStore = Object.freeze({
+  async store(userId: string, dek: Uint8Array): Promise<void> {
+    userDeks.set(userId, Buffer.from(dek));
+  },
+  async load(userId: string): Promise<Buffer> {
+    const dek = userDeks.get(userId);
+    if (dek === undefined) throw new Error("USER_DEK_UNRESOLVED");
+    return Buffer.from(dek);
+  },
+  async exists(userId: string): Promise<boolean> {
+    return userDeks.has(userId);
+  },
+  async destroy(userId: string): Promise<"DESTROYED" | "ALREADY_ABSENT"> {
+    return userDeks.delete(userId) ? "DESTROYED" : "ALREADY_ABSENT";
+  }
+});
 
 function serverSession(ownerRef: string): Session {
   return Object.freeze({
@@ -80,6 +107,17 @@ async function createIdentity(label: string, token: string, csrf: string): Promi
     [userId, blind, pseudonym, auditToken, ownerRef]
   );
   const session = serverSession(ownerRef);
+  userIdsByOwnerRef.set(ownerRef, userId);
+  await users.store(userId, generateDek());
+  await database.pool.query(
+    `INSERT INTO identity.session(
+       session_id,user_id,token_hash,csrf_token_hash,binding_context,
+       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
+       now()+interval '2 hours',now())`,
+    [session.session_id,userId,`sha256:${randomBytes(32).toString("hex")}`,
+      `sha256:${randomBytes(32).toString("hex")}`]
+  );
   return Object.freeze({
     userId, ownerRef, auditToken, pseudonym, email, blindHex: blind.toString("hex"), csrf,
     auth: Object.freeze({
@@ -213,22 +251,33 @@ async function seedMemoryLink(source: RunFixture, priorAnswer: RunFixture, linkO
      VALUES ($1,'LINKED','s7:database-match','S7_REAL_PG_FIXTURE',ledger.allocate_sequence())`,
     [id]
   );
+  const pullRecordId = randomUUID();
+  const payloadSnapshot = {
+    runId: priorAnswer.runId,
+    questionLine: "S7 prior authorization fixture",
+    verdict: null,
+    confidenceBand: null
+  };
+  const preparedContent=await contentCipher.prepareRun(source.runId);
+  const pullEnvelope=preparedContent.encrypt(
+    "memory.pull_record",pullRecordId,{ payloadSnapshot }
+  );
+  const pullAttestation=preparedContent.attestEnvelope(
+    "memory.pull_record",pullRecordId,"content_ciphertext",pullEnvelope
+  );
+  preparedContent.close();
   await database.pool.query(
     `INSERT INTO memory.pull_record (
-       memory_link_id,artifact_kind,artifact_id,artifact_version,content_hash,artifact_as_of,
+       pull_record_id,memory_link_id,artifact_kind,artifact_id,artifact_version,content_hash,artifact_as_of,
        staleness_state_at_pull,asker_scope,payload_snapshot,register_row_key,
-       register_version,register_source_ref,at_seq
+       register_version,register_source_ref,at_seq,content_ciphertext,content_attestation,
+       content_hash_version
      ) VALUES (
-       $1,'PRIOR_ANSWER',$2,1,$3,$4,'FRESH',$5,$6::jsonb,
-       's7:memory-pull',1,'s7:real-pg',ledger.allocate_sequence()
+       $1,$2,'PRIOR_ANSWER',$3,1,$4,$5,'FRESH',$6,'{"ciphertext":true,"v":1}'::jsonb,
+       's7:memory-pull',1,'s7:real-pg',ledger.allocate_sequence(),$7::jsonb,$8,2
      )`,
-    [id, priorAnswer.answerId, prior.rows[0]!.content_hash, prior.rows[0]!.as_of,
-      `owner:${linkOwnerRef}`, JSON.stringify({
-        runId: priorAnswer.runId,
-        questionLine: "S7 prior authorization fixture",
-        verdict: null,
-        confidenceBand: null
-      })]
+    [pullRecordId,id, priorAnswer.answerId, prior.rows[0]!.content_hash,
+      prior.rows[0]!.as_of,`owner:${linkOwnerRef}`,JSON.stringify(pullEnvelope),pullAttestation]
   );
   return id;
 }
@@ -236,6 +285,15 @@ async function seedMemoryLink(source: RunFixture, priorAnswer: RunFixture, linkO
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  contentCipher = new ContentCipher(new MemoryRunContentKeyStore(
+    users,
+    async (candidateOwnerRef) => {
+      const candidateUserId = userIdsByOwnerRef.get(candidateOwnerRef);
+      if (candidateUserId === undefined) throw new Error("OWNER_REF_UNRESOLVED");
+      return candidateUserId;
+    }
+  ));
+  configureContentEncryption(database.pool, contentCipher);
   owner = await createIdentity("owner", OWNER_TOKEN, OWNER_CSRF);
   foreign = await createIdentity("foreign", FOREIGN_TOKEN, FOREIGN_CSRF);
   owned = await createOwnedTerminalRun(owner, "owned");
@@ -281,7 +339,10 @@ beforeAll(async () => {
       supplied === (authenticated.userId === owner.userId ? OWNER_CSRF : FOREIGN_CSRF)
   } as unknown as SessionApplication;
   api = buildApi({
-    application: new PostgresAskApplication(database.pool, {} as never, {} as never),
+    application:new PostgresAskApplication(
+      database.pool,{} as never,{} as never,undefined,database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
+    ),
     sessions,
     allowedOrigin: ORIGIN
   });
@@ -340,11 +401,11 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     await expect(database.pool.query(
       `SELECT core.append_run_ownership_event($1,'11111111-1111-1111-8111-111111111111')`,
       [owned.runId]
-    )).rejects.toThrow(/RUN_OWNERSHIP_OWNER_REF_NOT_UUID_V4/);
+    )).rejects.toThrow(/RUN_OWNERSHIP_OWNER_REF_NOT_ACTIVE/);
     await expect(database.pool.query(
       `SELECT core.append_run_ownership_event($1,$2)`,
-      [owned.runId, randomUUID()]
-    )).rejects.toThrow(/RUN_OWNERSHIP_OWNER_REF_NOT_ACTIVE/);
+      [owned.runId, foreign.ownerRef]
+    )).rejects.toThrow(/ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP/);
     await expect(database.pool.query(
       `UPDATE identity."user" SET owner_ref=$2 WHERE user_id=$1`, [owner.userId, randomUUID()]
     )).rejects.toThrow(/IDENTITY_OWNER_REF_IMMUTABLE/);
@@ -411,7 +472,6 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     });
 
     const runtimeClient = await database.pool.connect();
-    let runtimeRunId: string | null = null;
     try {
       await runtimeClient.query("SET ROLE debateai_runtime");
       await expect(runtimeClient.query(
@@ -420,7 +480,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
         [owned.runId, owner.ownerRef]
       )).rejects.toThrow(/permission denied/);
       await runtimeClient.query("BEGIN");
-      const inserted = await runtimeClient.query<{ run_id: string }>(
+      await expect(runtimeClient.query<{ run_id: string }>(
         `INSERT INTO core.run (
            question_line,asker_id,session_id,caller_scope,as_of,
            asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
@@ -441,24 +501,13 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
           `session:s7-runtime-${randomUUID()}`,
           owned.runId
         ]
-      );
-      runtimeRunId = inserted.rows[0]!.run_id;
-      await runtimeClient.query(
-        `SELECT core.append_run_ownership_event($1,$2) AS at_seq`,
-        [runtimeRunId, owner.ownerRef]
-      );
-      const runtimeOwned = await runtimeClient.query<{ owned: boolean }>(
-        `SELECT core.run_is_owned_by($1,$2,NULL) AS owned`,
-        [runtimeRunId, owner.ownerRef]
-      );
-      expect(runtimeOwned.rows[0]?.owned).toBe(true);
+      )).rejects.toThrow(/permission denied/);
       await runtimeClient.query("ROLLBACK");
     } finally {
       await runtimeClient.query("ROLLBACK").catch(() => undefined);
       await runtimeClient.query("RESET ROLE").catch(() => undefined);
       runtimeClient.release();
     }
-    expect(runtimeRunId).not.toBeNull();
 
     const replayClient = await database.pool.connect();
     try {
@@ -674,56 +723,24 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
   }, 60_000);
 
-  it("serializes a claim on the run lock and makes every later old-owner mutation revalidate closed", async () => {
-    const claimed = await createOwnedTerminalRun(owner, "claim-race");
-    await database.pool.query(
-      `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
-       VALUES ($1,ledger.allocate_sequence(),'honesty.investigation_gap_opened',$2::jsonb)`,
-      [claimed.runId, JSON.stringify({
-        gap_ref: "gap:s7-claim-race",
-        gap: "Claim-race gap",
-        verdict: "UNDER-EXPLORED",
-        why: "Race fixture",
-        effort_grade: "bounded",
-        constructed_prompt: "Investigate claim race.",
-        accepts_user_input: true,
-        model_authored: true
-      })]
-    );
-    const link = await database.pool.query<{ memory_link_id: string }>(
-      `INSERT INTO memory.memory_link (
-         source_run_id,prior_run_id,relation,match_tier,agreed_fields,disagreed_fields,
-         not_compared_fields,decided_by,decided_at,source_as_of,prior_as_of,
-         source_policy_version,prior_policy_version,source_key_version,prior_key_version,
-         alias_row_ids,prior_answer_id,at_seq
-       ) VALUES (
-         $1,$2,'REPEATS','EXACT_QUESTION','[]'::jsonb,'[]'::jsonb,'[]'::jsonb,
-         's7:claim-race',now(),now(),now(),1,1,1,1,'[]'::jsonb,$3,ledger.allocate_sequence()
-       ) RETURNING memory_link_id`,
-      [claimed.runId, priorOwned.runId, priorOwned.answerId]
-    );
-    await database.pool.query(
-      `INSERT INTO memory.memory_link_event (memory_link_id,state,actor_ref,reason,at_seq)
-       VALUES ($1,'LINKED','s7:claim-race','S7_CLAIM_RACE_FIXTURE',ledger.allocate_sequence())`,
-      [link.rows[0]!.memory_link_id]
-    );
-
+  it("serializes a rejected encrypted ownership transfer on the run lock without changing the owner", async () => {
+    const claimedRunId = await createOwnedRunHead(owner, "claim-race");
     const mutator = await database.pool.connect();
     const claimant = await database.pool.connect();
-    let claimSequence = 0;
     let mutationSequence = 0;
+    let claim: Promise<unknown> | undefined;
     try {
       await mutator.query("BEGIN");
-      await mutator.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [claimed.runId]);
+      await mutator.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [claimedRunId]);
       const ownedAfterLock = await mutator.query<{ owned: boolean }>(
-        `SELECT core.run_is_owned_by($1,$2,NULL) AS owned`, [claimed.runId, owner.ownerRef]
+        `SELECT core.run_is_owned_by($1,$2,NULL) AS owned`, [claimedRunId, owner.ownerRef]
       );
       expect(ownedAfterLock.rows[0]!.owned).toBe(true);
       await claimant.query("BEGIN");
       await claimant.query("SET LOCAL statement_timeout='5s'");
       const claimantPid = (await claimant.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
-      const claim = claimant.query<{ at_seq: string }>(
-        `SELECT core.append_run_ownership_event($1,$2)::text AS at_seq`, [claimed.runId, foreign.ownerRef]
+      claim = claimant.query(
+        `SELECT core.append_run_ownership_event($1,$2)::text AS at_seq`, [claimedRunId, foreign.ownerRef]
       );
       let waitType: string | null = null;
       for (let attempt = 0; attempt < 20 && waitType !== "Lock"; attempt += 1) {
@@ -738,60 +755,32 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       // the append path allocated before acquiring the run lock.
       const recorded = await mutator.query<{ at_seq: string }>(
         `INSERT INTO core.question_liveness_event (run_id,kind,occurred_at,at_seq)
-         VALUES ($1,'QUERY',now(),ledger.allocate_sequence()) RETURNING at_seq`, [claimed.runId]
+         VALUES ($1,'QUERY',now(),ledger.allocate_sequence()) RETURNING at_seq`, [claimedRunId]
       );
       mutationSequence = Number(recorded.rows[0]!.at_seq);
       await mutator.query("COMMIT");
-      claimSequence = Number((await claim).rows[0]!.at_seq);
-      await claimant.query("COMMIT");
+      await expect(claim).rejects.toThrow(/ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP/);
+      await claimant.query("ROLLBACK");
     } finally {
       await mutator.query("ROLLBACK").catch(() => undefined);
       await claimant.query("ROLLBACK").catch(() => undefined);
+      await Promise.allSettled(claim === undefined ? [] : [claim]);
       mutator.release();
       claimant.release();
     }
-    expect(claimSequence).toBeGreaterThan(mutationSequence);
-
-    const access = { ownerRef: owner.ownerRef, legacyAskerId: null } as const;
-    const investigationBefore = Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM core.investigation_request WHERE run_id=$1`, [claimed.runId]
-    )).rows[0]!.count);
-    await expect(new ServeRepository(database.pool).recordInvestigationRequest({
-      answerId: claimed.answerId,
-      gapRef: "gap:s7-claim-race",
-      ownership: access,
-      userInput: "must not persist after claim"
-    })).resolves.toBeNull();
-    expect(Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM core.investigation_request WHERE run_id=$1`, [claimed.runId]
-    )).rows[0]!.count)).toBe(investigationBefore);
-
-    const linkEventsBefore = Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [link.rows[0]!.memory_link_id]
-    )).rows[0]!.count);
-    await expect(new ServeRepository(database.pool).unlinkMemoryForAnswer(
-      claimed.answerId, access, "s7:old-owner"
-    )).resolves.toBeNull();
-    expect(Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [link.rows[0]!.memory_link_id]
-    )).rows[0]!.count)).toBe(linkEventsBefore);
-
-    const livenessBefore = Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM core.question_liveness_event WHERE run_id=$1`, [claimed.runId]
-    )).rows[0]!.count);
-    await expect(new LivenessRepository(database.pool).recordQuery(
-      "S7 claim-race authorization fixture", access
-    )).resolves.toBe(0);
-    expect(Number((await database.pool.query<{ count: string }>(
-      `SELECT count(*) FROM core.question_liveness_event WHERE run_id=$1`, [claimed.runId]
-    )).rows[0]!.count)).toBe(livenessBefore);
-
-    const catchUp = await new ServeRepository(database.pool).readReviewCatchUpSource(claimed.runId);
-    expect(catchUp.askerId).toBe(`owner:${foreign.ownerRef}`);
-    expect(catchUp.answerId).toBe(claimed.answerId);
+    expect(mutationSequence).toBeGreaterThan(0);
+    const ownership = await database.pool.query<{ owner_ref: string; count: string }>(
+      `SELECT min(owner_ref::text) AS owner_ref,count(*)::text AS count
+       FROM core.run_ownership_event WHERE run_id=$1`,
+      [claimedRunId]
+    );
+    expect(ownership.rows[0]).toEqual({ owner_ref: owner.ownerRef, count: "1" });
+    expect((await database.pool.query<{ owned: boolean }>(
+      `SELECT core.run_is_owned_by($1,$2,NULL) AS owned`, [claimedRunId, owner.ownerRef]
+    )).rows[0]!.owned).toBe(true);
   }, 60_000);
 
-  it("keeps the claim lock compatible with allocator-first child foreign keys", async () => {
+  it("keeps a same-owner append lock compatible with allocator-first child foreign keys", async () => {
     const runId = await createOwnedRunHead(owner, `implicit-fk-cycle-${randomUUID()}`);
     const mutator = await database.pool.connect();
     const claimant = await database.pool.connect();
@@ -812,7 +801,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       )).rows[0]!.pid;
       claim = claimant.query<{ at_seq: string }>(
         `SELECT core.append_run_ownership_event($1,$2)::text AS at_seq`,
-        [runId, foreign.ownerRef]
+        [runId, owner.ownerRef]
       ).then((result) => {
         claimSequence = Number(result.rows[0]!.at_seq);
       });
@@ -923,7 +912,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     )).rows[0]!.count).toBe("1");
   }, 60_000);
 
-  it("locks every matching run before allocation and rechecks after a queued claim", async () => {
+  it("locks every matching run before allocation while a rejected transfer is queued", async () => {
     const label = `queued-claim-liveness-${randomUUID()}`;
     const question = `S7 ${label} authorization fixture`;
     const survivingRunId = await createOwnedRunHead(owner, label);
@@ -960,8 +949,8 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       }
       expect(lockWaiters).toBeGreaterThanOrEqual(2);
       await blocker.query("COMMIT");
-      await claim;
-      await claimant.query("COMMIT");
+      await expect(claim).rejects.toThrow(/ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP/);
+      await claimant.query("ROLLBACK");
       livenessResult = await liveness;
     } finally {
       await blocker.query("ROLLBACK").catch(() => undefined);
@@ -969,16 +958,16 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       blocker.release();
       claimant.release();
     }
-    expect(livenessResult).toBe(1);
+    expect(livenessResult).toBe(2);
     expect((await database.pool.query<{ count: string }>(
       `SELECT count(*) FROM core.question_liveness_event WHERE run_id=$1`, [survivingRunId]
     )).rows[0]!.count).toBe("2");
     expect((await database.pool.query<{ count: string }>(
       `SELECT count(*) FROM core.question_liveness_event WHERE run_id=$1`, [claimedRunId]
-    )).rows[0]!.count).toBe("1");
+    )).rows[0]!.count).toBe("2");
   }, 60_000);
 
-  it("revalidates ownership after the SSE lifecycle snapshot and before yielding any event", async () => {
+  it("rejects an encrypted ownership transfer while an SSE lifecycle snapshot is open", async () => {
     const runId = await createOwnedRunHead(owner, `sse-claim-${randomUUID()}`);
     let markProjectionEntered!: () => void;
     let releaseProjection!: () => void;
@@ -995,7 +984,9 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
           await projectionRelease;
           return [];
         }
-      }
+      },
+      database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
     );
     const stream = application.events(
       runId,
@@ -1004,12 +995,17 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     )[Symbol.asyncIterator]();
     const first = stream.next();
     await projectionEntered;
-    await database.pool.query(
+    await expect(database.pool.query(
       `SELECT core.append_run_ownership_event($1,$2) AS at_seq`,
       [runId, foreign.ownerRef]
-    );
+    )).rejects.toThrow(/ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP/);
     releaseProjection();
-    await expect(first).resolves.toEqual({ value: undefined, done: true });
+    const firstEvent = await first;
+    expect(firstEvent.done).toBe(false);
+    expect(firstEvent.value).toMatchObject({ run_ref: runId });
+    expect((await database.pool.query<{ owned: boolean }>(
+      `SELECT core.run_is_owned_by($1,$2,NULL) AS owned`, [runId, owner.ownerRef]
+    )).rows[0]!.owned).toBe(true);
   }, 60_000);
 
   it("holds the active identity row through server-run creation", async () => {
@@ -1040,7 +1036,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       for (let attempt = 0; attempt < 30 && !insertPaused; attempt += 1) {
         insertPaused = Number((await database.pool.query<{ count: string }>(
           `SELECT count(*) FROM pg_stat_activity
-           WHERE wait_event_type='Lock' AND query LIKE '%INSERT INTO core.run (%'`
+           WHERE wait_event_type='Lock' AND query LIKE '%core.create_encrypted_run%'`
         )).rows[0]!.count) > 0;
         if (!insertPaused) await new Promise((resolve) => setTimeout(resolve, 5));
       }
@@ -1197,19 +1193,19 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       `INSERT INTO memory.question_key (
          run_id,canonical_question_text,caller_scope,asker_scope,normalized_binding,
          frozen_terms,as_of,policy_version,key_version,at_seq
-       ) VALUES ($1,'s7 raw memory scope','ASKER',$2,'{}'::jsonb,'[]'::jsonb,
+      ) VALUES ($1,'s7 raw memory scope','ASKER',$2,'{}'::jsonb,'[]'::jsonb,
          now(),1,1,ledger.allocate_sequence())`,
       [foreignRun.runId, rawScope]
-    )).rejects.toThrow(/memory_question_key_asker_scope_no_raw_user_uuid/);
+    )).rejects.toThrow(/CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory\.question_key/);
     await expect(database.pool.query(
       `INSERT INTO memory.pull_record (
          memory_link_id,artifact_kind,artifact_id,artifact_version,content_hash,
          artifact_as_of,staleness_state_at_pull,asker_scope,payload_snapshot,
          register_row_key,register_version,register_source_ref,at_seq
-       ) VALUES ($1,'PRIOR_ANSWER',$2,1,$3,now(),'FRESH',$4,'{}'::jsonb,
+      ) VALUES ($1,'PRIOR_ANSWER',$2,1,$3,now(),'FRESH',$4,'{}'::jsonb,
          's7:raw-memory',1,'s7:raw-memory',ledger.allocate_sequence())`,
       [foreignMemoryLinkId, randomUUID(), "a".repeat(64), rawScope]
-    )).rejects.toThrow(/memory_pull_record_asker_scope_no_raw_user_uuid/);
+    )).rejects.toThrow(/CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory\.pull_record/);
 
     const migration = await readFile(new URL("../../migrations/0037_run_ownership.sql", import.meta.url), "utf8");
     const applyPreS7Migrations = async (target: TestDatabase) => {

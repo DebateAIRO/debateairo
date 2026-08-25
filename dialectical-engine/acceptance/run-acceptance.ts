@@ -201,6 +201,7 @@ export async function runAcceptanceCeremony(
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
       environment: runtimeEnvironment,
+      legacyUserToken:parsed.token,
       makerRelays: [
         ...(shim === null ? [] : [{ providerRef: "acceptance:codex-cli", baseUrl: shim.baseUrl, model: shim.model }]),
         ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),

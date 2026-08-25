@@ -59,6 +59,8 @@ export type LoginResult = Readonly<{
 
 export interface SessionApplication {
   authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null>;
+  authenticateErasureStatus?(sessionToken:string,source:AuthSourceContext):
+    Promise<AuthenticatedSession|null>;
   verifyCsrf(session: AuthenticatedSession, suppliedToken: string): boolean;
   beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext): Promise<Readonly<{
     status: "mfa_required";
@@ -73,10 +75,12 @@ export interface SessionApplication {
     session: AuthenticatedSession;
     password: string;
     code: string;
-    authorization?: Readonly<{
-      action: "PUBLISH" | "UNPUBLISH";
-      targetRunId: string;
-    }>;
+    authorization?:
+      | Readonly<{
+        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        targetRunId: string;
+      }>
+      | Readonly<{ action: "DELETE_ACCOUNT" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -87,6 +91,7 @@ export interface SessionApplication {
 
 type SessionRepository = Pick<PostgresSessionRepository,
   | "authenticateSession"
+  | "authenticateAccountErasureStatusSession"
   | "completeRecoveryLogin"
   | "completeTotpLogin"
   | "createLoginChallenge"
@@ -232,6 +237,21 @@ export class SessionService implements SessionApplication {
       tokenHash,
       csrfTokenHash: record.csrfTokenHash,
       authKind: "cookie" as const
+    });
+  }
+
+  async authenticateErasureStatus(
+    sessionToken:string,source:AuthSourceContext
+  ):Promise<AuthenticatedSession|null> {
+    const tokenHash=safeTokenHash(sessionToken);
+    if (tokenHash===null) return null;
+    const record=await this.dependencies.repository.authenticateAccountErasureStatusSession({
+      tokenHash,bindingHash:this.bindingHash(source),occurredAt:this.now()
+    });
+    return record===null ? null : Object.freeze({
+      session:sessionFor(record.ownerRef,record.sessionId),userId:record.userId,
+      ownerRef:record.ownerRef,tokenHash,csrfTokenHash:record.csrfTokenHash,
+      authKind:"cookie" as const
     });
   }
 
@@ -459,10 +479,12 @@ export class SessionService implements SessionApplication {
     session: AuthenticatedSession;
     password: string;
     code: string;
-    authorization?: Readonly<{
-      action: "PUBLISH" | "UNPUBLISH";
-      targetRunId: string;
-    }>;
+    authorization?:
+      | Readonly<{
+        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        targetRunId: string;
+      }>
+      | Readonly<{ action: "DELETE_ACCOUNT" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -522,13 +544,20 @@ export class SessionService implements SessionApplication {
         source,
         ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
           ? {}
-          : { grant: {
-              grantId: randomUUID(),
-              grantTokenHash: hashVerificationToken(grantToken),
-              action: input.authorization.action,
-              targetRunId: input.authorization.targetRunId,
-              expiresAt: grantExpiresAt
-            } })
+          : { grant: input.authorization.action === "DELETE_ACCOUNT"
+              ? {
+                  grantId: randomUUID(),
+                  grantTokenHash: hashVerificationToken(grantToken),
+                  action: input.authorization.action,
+                  expiresAt: grantExpiresAt
+                }
+              : {
+                  grantId: randomUUID(),
+                  grantTokenHash: hashVerificationToken(grantToken),
+                  action: input.authorization.action,
+                  targetRunId: input.authorization.targetRunId,
+                  expiresAt: grantExpiresAt
+                } })
       });
       if (!rotated) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       this.limiter.clearEnrollment(rateKey);

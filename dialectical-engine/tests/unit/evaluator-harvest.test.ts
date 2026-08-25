@@ -32,9 +32,9 @@ const snapshot: EvaluatorHarvestSnapshot = {
     }
   ],
   modelCalls: [
-    { attemptId: "attempt:author", callSiteKey: "runner.author.v1" },
-    { attemptId: "attempt:reviewer", callSiteKey: "runner.review.v1" },
-    { attemptId: "attempt:evaluator", callSiteKey: "evaluator.tag-question.v1" }
+    { rawArtifactRef:"artifact:author",attemptId:"attempt:author",callSiteKey:"runner.author.v1",authenticatedEvaluatorScope:false },
+    { rawArtifactRef:"artifact:reviewer",attemptId:"attempt:reviewer",callSiteKey:"runner.review.v1",authenticatedEvaluatorScope:false },
+    { rawArtifactRef:"artifact:evaluator",attemptId:"attempt:evaluator",callSiteKey:"evaluator.tag-question.v1",authenticatedEvaluatorScope:true }
   ],
   authoredNodes: [
     {
@@ -88,10 +88,20 @@ describe("deterministic evaluator harvest projector", () => {
     expect(rows.every((row) => row.truthBasis === "CONSENSUS")).toBe(true);
   });
 
-  it("excludes evaluator call sites by attempt id even when the artifact is null-run-scoped", () => {
+  it("excludes only the exact DB-authenticated evaluator artifact reference", () => {
     const rows = projectEvaluatorObservations(snapshot);
 
     expect(rows.some((row) => row.modelId === "evaluator-model")).toBe(false);
+    expect(rows.some((row) => row.sourceRawArtifactRef === "artifact:evaluator")).toBe(false);
+  });
+
+  it("preserves a product artifact that collides with an evaluator attempt id", () => {
+    const rows = projectEvaluatorObservations({
+      ...snapshot,
+      rawArtifacts: snapshot.rawArtifacts.map((artifact) => artifact.rawArtifactId === "artifact:author"
+        ? { ...artifact, attemptId: "attempt:evaluator" } : artifact)
+    });
+    expect(rows.some((row) => row.sourceRawArtifactRef === "artifact:author")).toBe(true);
     expect(rows.some((row) => row.sourceRawArtifactRef === "artifact:evaluator")).toBe(false);
   });
 

@@ -5,6 +5,7 @@ import {
   buildApi as buildApiBase,
   createLegacyDevSessionResolver,
   evaluateAskAdmission,
+  PostgresAskApplication,
   preserveSubmittedTierSource,
   type AskApplication,
   type RunCreationSettings
@@ -45,6 +46,7 @@ function buildOperatorApi(options: Parameters<typeof buildApiBase>[0]) {
 
 function fixtureApplication(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
@@ -284,6 +286,129 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       message: "No runCostEnvelope member matches the declared depth and effective risk tier"
     });
     await api.close();
+  });
+
+  it("refuses a saturated owner history before any run provision or partial output", async () => {
+    const queries: string[] = [];
+    const leaseQueries: Array<readonly unknown[]> = [];
+    let connectCalls = 0;
+    const saturatedRows = Array.from({ length: 129 }, (_, index) => ({
+      run_id: `${String(index + 1).padStart(8, "0")}-0000-4000-8000-000000000000`,
+      question_line: "⟦DEBATEAI:CIPHERTEXT:V1⟧",
+      content_ciphertext: { v: 1, alg: "A256GCM", nonce: "AA==", ct: "AA==", tag: "AA==" },
+      created_at_seq: String(index + 1)
+    }));
+    const pool = {
+      async query(statement: string) {
+        queries.push(statement);
+        return { rows: saturatedRows };
+      },
+      async connect() {
+        connectCalls += 1;
+        return {
+          async query(...args:unknown[]) {
+            leaseQueries.push(args);
+            return { rows:/pg_advisory_unlock/i.test(String(args[0]))
+              ? [{ unlocked:true }] : [{}] };
+          },
+          on() { return this; },
+          removeListener() { return this; },
+          release() {}
+        };
+      }
+    };
+    const dispatcher = { dispatch: async () => undefined };
+    const serverAdmissionPool=new Proxy(pool,{});
+    const legacyAdmissionPool=new Proxy(pool,{});
+    expect(() => new PostgresAskApplication(
+      pool as never,dispatcher as never,admissionSettings(),undefined,pool as never,
+      { server:pool as never,legacy:legacyAdmissionPool as never }
+    )).toThrow("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+    const application = new PostgresAskApplication(
+      pool as never,
+      dispatcher as never,
+      admissionSettings(),
+      undefined,
+      pool as never,
+      { server:serverAdmissionPool as never,legacy:legacyAdmissionPool as never }
+    );
+    const ask: AskRequest = {
+      question_line: "Bound this owner history",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:bounded-history",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "bounded-history",
+      as_of: "2026-08-25T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+    const session: Session = {
+      asker_id: "owner:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      session_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      caller_scope: "ASKER",
+      ownership_provenance: "server_session",
+      provisional_identity_model: false
+    };
+
+    await expect(application.submit(ask, session, {
+      kind: "server",
+      userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      ownerRef: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    })).rejects.toMatchObject({
+      name: "AskRefusal",
+      code: "OWNER_PRIVATE_HISTORY_SCAN_SATURATED"
+    });
+    expect(connectCalls).toBe(1);
+    expect(leaseQueries).toHaveLength(2);
+    expect(leaseQueries.map((query) => String(query[0]))).toEqual([
+      expect.stringMatching(/pg_advisory_lock/),
+      expect.stringMatching(/pg_advisory_unlock/)
+    ]);
+    expect(JSON.stringify(leaseQueries)).toContain("owner-ask-admission");
+    expect(JSON.stringify(leaseQueries)).not.toContain("run-content-lease");
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("LIMIT");
+    expect(queries.join("\n")).not.toMatch(/prepare_run_key_provision|create_encrypted_run|INSERT INTO core\.run/i);
+
+    const apiApplication = fixtureApplication();
+    apiApplication.submit = async () => {
+      throw new AskRefusal(new TypedDomainError(
+        "OWNER_PRIVATE_HISTORY_SCAN_SATURATED",
+        "Private history exceeds the bounded comparison window"
+      ));
+    };
+    const api = buildApi({ application: apiApplication });
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: { "x-user-dev-token": "test-token" },
+      payload: ask
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "OWNER_PRIVATE_HISTORY_SCAN_SATURATED",
+      message: "Private history exceeds the bounded comparison window"
+    });
+    await api.close();
+
+    let answerIndexCalls = 0;
+    const indexApplication = fixtureApplication();
+    indexApplication.readAnswerIndex = async (_session,limit,offset) => {
+      answerIndexCalls += 1;
+      return { items:[],open_runs:[],limit,offset,total:0 };
+    };
+    const indexApi = buildApi({ application:indexApplication });
+    const oversized = await indexApi.inject({
+      method:"GET",
+      url:"/v1/answers?limit=129&offset=0",
+      headers:{ "x-user-dev-token":"test-token" }
+    });
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json()).toEqual({ error:"MALFORMED_REQUEST" });
+    expect(answerIndexCalls).toBe(0);
+    await indexApi.close();
   });
 
   it("keeps typed internal faults and untyped crashes on the 500 face", async () => {

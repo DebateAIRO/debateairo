@@ -1,16 +1,15 @@
-import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import {
-  appendAuditEvent,
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
+import { withPublicationContentLease } from "./publication-lease.js";
 
 const PUBLICATION_TRANSITION_SIGNATURE =
-  "core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,bytea,bytea,uuid,bytea,uuid,jsonb)";
+  "core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,uuid,uuid)";
 const STEP_UP_ROTATION_SIGNATURE =
-  "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz)";
+  "identity.rotate_session_after_step_up_with_audit(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamptz,uuid,text,text,uuid,timestamptz,jsonb)";
 
 type PublicationDatabaseRoleWitness = Readonly<{
   sessionPrincipal: string;
@@ -113,10 +112,66 @@ export async function assertPublicationDatabaseRoleSeparation(
   }
 }
 
+export async function assertPublicationCleanupDatabaseRole(pool: Pool): Promise<void> {
+  const result = await pool.query<{
+    session_principal: string;
+    principal: string;
+    rolsuper: boolean;
+    rolcreaterole: boolean;
+    rolcreatedb: boolean;
+    rolreplication: boolean;
+    rolbypassrls: boolean;
+    cleanup_member: boolean;
+    runtime_member: boolean;
+    authorization_member: boolean;
+    claim_cleanup: boolean;
+    complete_cleanup: boolean;
+    claim_provision: boolean;
+    complete_provision: boolean;
+    can_transition: boolean;
+    cleanup_table_dml: boolean;
+  }>(`
+    SELECT session_user AS session_principal,current_user AS principal,
+      role.rolsuper,role.rolcreaterole,role.rolcreatedb,role.rolreplication,
+      role.rolbypassrls,
+      pg_has_role(current_user,'debateai_publication_cleanup','USAGE') AS cleanup_member,
+      pg_has_role(current_user,'debateai_runtime','MEMBER') AS runtime_member,
+      pg_has_role(current_user,'debateai_authorization_runtime','MEMBER') AS authorization_member,
+      has_function_privilege(current_user,
+        'serve.claim_publication_key_cleanup(integer)','EXECUTE') AS claim_cleanup,
+      has_function_privilege(current_user,
+        'serve.complete_publication_key_cleanup(uuid,uuid,text)','EXECUTE') AS complete_cleanup,
+      has_function_privilege(current_user,
+        'serve.claim_publication_key_provision_cleanup(integer)','EXECUTE') AS claim_provision,
+      has_function_privilege(current_user,
+        'serve.complete_publication_key_provision_cleanup(uuid,uuid)','EXECUTE') AS complete_provision,
+      COALESCE((
+        SELECT has_function_privilege(current_user,procedure.oid,'EXECUTE')
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+        WHERE namespace.nspname='core' AND procedure.proname='transition_run_publication'
+          AND pg_catalog.pg_get_function_identity_arguments(procedure.oid)=
+            'uuid, uuid, uuid, uuid, uuid, text, text, uuid, text, jsonb, timestamp with time zone, uuid, uuid, uuid'
+      ),false) AS can_transition,
+      has_table_privilege(current_user,'serve.publication_key_cleanup_intent','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+        AS cleanup_table_dml
+    FROM pg_catalog.pg_roles AS role WHERE role.rolname=current_user
+  `);
+  const row = result.rows[0];
+  if (row === undefined
+    || row.session_principal !== row.principal
+    || row.rolsuper || row.rolcreaterole || row.rolcreatedb
+    || row.rolreplication || row.rolbypassrls
+    || !row.cleanup_member || row.runtime_member || row.authorization_member
+    || !row.claim_cleanup || !row.complete_cleanup
+    || !row.claim_provision || !row.complete_provision
+    || row.can_transition || row.cleanup_table_dml) {
+    throw new TypeError("PUBLICATION_CLEANUP_DATABASE_ROLE_INVALID");
+  }
+}
+
 type PreparedAuditContext = Readonly<{
-  ipArgon2id: string;
-  userAgentArgon2id: string;
-  requestId: string;
+  schema: "s10-publication-event-v2";
 }>;
 
 export type PublicationTransitionInput = Readonly<{
@@ -149,18 +204,32 @@ export type PublicSnapshotRecord = Readonly<{
   createdAt: Date;
 }>;
 
+export type PublicationKeyProvisionCleanup = Readonly<{
+  publicationRef: string;
+  runId: string;
+  userId: string;
+  ownerRef: string;
+  claimToken: string;
+}>;
+
+export type PublicationKeyCleanupClaim = Readonly<{
+  publicationRef: string;
+  claimToken: string;
+}>;
+
 type PublicationAction = "PUBLISH" | "UNPUBLISH";
 
-function normalized(value: unknown, maximumLength: number): string {
-  const text = typeof value === "string" ? value.trim() : "";
-  return (text === "" ? "unknown" : text).slice(0, maximumLength);
-}
-
-function assertOpaqueAuditToken(value: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
-    throw new TypeError("AUDIT_TOKEN_MUST_BE_RANDOM_UUID_V4");
-  }
-}
+type PublicationEventRefs = Readonly<{
+  reservationId: string;
+  visibilityEventId: string | null;
+  visibilityActorRef: string | null;
+  auditId: string;
+  auditActorRef: string;
+  auditTargetRef: string;
+  deniedAuditId: string | null;
+  deniedAuditActorRef: string | null;
+  deniedAuditTargetRef: string | null;
+}>;
 
 export class PostgresPublicationRepository {
   constructor(
@@ -168,17 +237,50 @@ export class PostgresPublicationRepository {
     private readonly auditContext: AuditContextHasher
   ) {}
 
+  withContentLease<T>(publicationRef: string,use: () => Promise<T>): Promise<T> {
+    return withPublicationContentLease(this.pool,[publicationRef],async () => use());
+  }
+
   private async prepareAuditContext(source: AuthSourceContext): Promise<PreparedAuditContext> {
-    // External memory-hard reductions complete before pool.connect(), BEGIN,
-    // the run lock, or the audit advisory lock.
-    const [ipArgon2id, userAgentArgon2id] = await Promise.all([
-      this.auditContext.hashSourceIp(normalized(source?.ip, 64)),
-      this.auditContext.hashUserAgent(normalized(source?.userAgent, 256))
-    ]);
-    return Object.freeze({
-      ipArgon2id,
-      userAgentArgon2id,
-      requestId: normalized(source?.requestId, 128)
+    // Network/request correlation belongs only to the mutable attribution
+    // binding. Immutable publication audit is deliberately event-local so a
+    // public snapshot cannot expand into the actor's other audit history.
+    void source;
+    void this.auditContext;
+    return Object.freeze({ schema: "s10-publication-event-v2" as const });
+  }
+
+  private async reserveEventRefs(input: Readonly<{
+    userId: string;
+    sessionId: string;
+    runId: string | null;
+    action: PublicationAction | "PREFLIGHT_DENIAL";
+    grantTokenHash: string | null;
+  }>): Promise<PublicationEventRefs | null> {
+    const result = await this.pool.query<{
+      reservation_id: string;
+      visibility_event_id: string | null;
+      visibility_actor_ref: string | null;
+      audit_id: string;
+      audit_actor_ref: string;
+      audit_target_ref: string;
+      denied_audit_id: string | null;
+      denied_audit_actor_ref: string | null;
+      denied_audit_target_ref: string | null;
+    }>(`
+      SELECT * FROM identity.reserve_publication_event_refs($1,$2,$3,$4,$5)
+    `, [input.userId, input.sessionId, input.runId, input.action, input.grantTokenHash]);
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      reservationId: row.reservation_id,
+      visibilityEventId: row.visibility_event_id,
+      visibilityActorRef: row.visibility_actor_ref,
+      auditId: row.audit_id,
+      auditActorRef: row.audit_actor_ref,
+      auditTargetRef: row.audit_target_ref,
+      deniedAuditId: row.denied_audit_id,
+      deniedAuditActorRef: row.denied_audit_actor_ref,
+      deniedAuditTargetRef: row.denied_audit_target_ref
     });
   }
 
@@ -194,76 +296,72 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.live === true;
   }
 
+  async prepareKeyProvision(input: Readonly<{
+    publicationRef: string;
+    runId: string;
+    userId: string;
+    ownerRef: string;
+    sessionId: string;
+    grantTokenHash: string;
+  }>): Promise<boolean> {
+    const result = await this.pool.query<{ prepared: boolean }>(`
+      SELECT serve.prepare_publication_key_provision($1,$2,$3,$4,$5,$6) AS prepared
+    `, [
+      input.publicationRef,input.runId,input.userId,input.ownerRef,
+      input.sessionId,input.grantTokenHash
+    ]);
+    return result.rows[0]?.prepared === true;
+  }
+
+  async abandonKeyProvision(publicationRef: string,userId: string): Promise<boolean> {
+    const result = await this.pool.query<{ abandoned: boolean }>(`
+      SELECT serve.abandon_publication_key_provision($1,$2) AS abandoned
+    `, [publicationRef,userId]);
+    return result.rows[0]?.abandoned === true;
+  }
+
+  async claimKeyProvisionCleanup(limit = 100): Promise<readonly PublicationKeyProvisionCleanup[]> {
+    const result = await this.pool.query<{
+      publication_ref: string;
+      run_id: string;
+      user_id: string;
+      owner_ref: string;
+      claim_token: string;
+    }>("SELECT * FROM serve.claim_publication_key_provision_cleanup($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      publicationRef: row.publication_ref,
+      runId: row.run_id,
+      userId: row.user_id,
+      ownerRef: row.owner_ref,
+      claimToken: row.claim_token
+    })));
+  }
+
+  async completeKeyProvisionCleanup(
+    publicationRef: string,claimToken: string
+  ): Promise<boolean> {
+    const result = await this.pool.query<{ completed: boolean }>(`
+      SELECT serve.complete_publication_key_provision_cleanup($1,$2) AS completed
+    `, [publicationRef,claimToken]);
+    return result.rows[0]?.completed === true;
+  }
+
   async auditAuthenticatedPreflightDenial(
     input: PublicationPreflightDenialInput
   ): Promise<boolean> {
-    const auditId = randomUUID();
-    const sourceContext = Object.freeze({
-      requestId: normalized(input.requestId, 128),
-      sourceCorrelation: "OMITTED_FOR_PREFLIGHT_DENIAL"
+    const refs = await this.reserveEventRefs({
+      userId: input.userId,
+      sessionId: input.sessionId,
+      runId: null,
+      action: "PREFLIGHT_DENIAL",
+      grantTokenHash: null
     });
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const seed = await this.pool.query<{
-        audit_token: string;
-        this_hash: Buffer | null;
-      }>(`
-        SELECT identity_user.audit_token,head.this_hash
-        FROM identity."user" AS identity_user
-        JOIN identity.session AS session
-          ON session.session_id=$2 AND session.user_id=identity_user.user_id
-            AND session.revoked_at IS NULL
-            AND session.idle_expires_at>clock_timestamp()
-            AND session.absolute_expires_at>clock_timestamp()
-        LEFT JOIN LATERAL (
-          SELECT parent.this_hash
-          FROM identity.audit_event AS parent
-          LEFT JOIN identity.audit_event AS child ON child.prev_hash=parent.this_hash
-          WHERE child.audit_id IS NULL
-          ORDER BY parent.occurred_at DESC,parent.audit_id DESC
-          LIMIT 1
-        ) AS head ON true
-        WHERE identity_user.user_id=$1 AND identity_user.state='active'
-      `, [input.userId, input.sessionId]);
-      const actorToken = seed.rows[0]?.audit_token;
-      if (actorToken === undefined) return false;
-      assertOpaqueAuditToken(actorToken);
-      const denied = appendAuditEvent(
-        seed.rows[0]?.this_hash?.toString("hex") ?? null,
-        Object.freeze({
-          auditId,
-          actorCiphertext: null,
-          actorKeyRef: actorToken,
-          eventType: "debate.publication.preflight_denied",
-          targetType: "debate.publication_attempt",
-          targetId: auditId,
-          occurredAt: input.occurredAt,
-          sourceContext,
-          decision: "DENY",
-          success: false,
-          justification: "PUBLICATION_GRANT_PREFLIGHT_DENIED"
-        })
-      );
-      try {
-        const result = await this.pool.query<{ appended: boolean }>(`
-          SELECT identity.audit_publication_preflight_denial(
-            $1,$2,$3,$4,$5,$6,$7,$8
-          ) AS appended
-        `, [
-          auditId,
-          input.userId,
-          input.sessionId,
-          input.occurredAt,
-          denied.prevHash === null ? null : Buffer.from(denied.prevHash, "hex"),
-          Buffer.from(denied.thisHash, "hex"),
-          actorToken,
-          sourceContext.requestId
-        ]);
-        return result.rows[0]?.appended === true;
-      } catch (error) {
-        if ((error as { code?: string }).code !== "40001" || attempt === 2) throw error;
-      }
-    }
-    return false;
+    if (refs === null) return false;
+    void input.requestId;
+    const result = await this.pool.query<{ appended: boolean }>(`
+      SELECT identity.audit_publication_preflight_denial($1,$2,$3,$4,$5) AS appended
+    `, [refs.auditId,input.userId,input.sessionId,input.occurredAt,refs.reservationId]);
+    return result.rows[0]?.appended === true;
   }
 
   private async transition(
@@ -281,98 +379,28 @@ export class PostgresPublicationRepository {
       occurredAt: Date;
     }>
   ): Promise<string | null> {
-    const eventId = randomUUID();
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const seed = await this.pool.query<{
-        audit_token: string;
-        this_hash: Buffer | null;
-      }>(`
-        SELECT identity_user.audit_token,head.this_hash
-        FROM identity."user" AS identity_user
-        LEFT JOIN LATERAL (
-          SELECT parent.this_hash
-          FROM identity.audit_event AS parent
-          LEFT JOIN identity.audit_event AS child ON child.prev_hash=parent.this_hash
-          WHERE child.audit_id IS NULL
-          ORDER BY parent.occurred_at DESC,parent.audit_id DESC
-          LIMIT 1
-        ) AS head ON true
-        WHERE identity_user.user_id=$1 AND identity_user.owner_ref=$2
-          AND identity_user.state='active'
-      `, [input.userId, input.ownerRef]);
-      const actorToken = seed.rows[0]?.audit_token;
-      if (actorToken === undefined) return null;
-      assertOpaqueAuditToken(actorToken);
-      const sourceContext = Object.freeze({
-        ipArgon2id: prepared.ipArgon2id,
-        userAgentArgon2id: prepared.userAgentArgon2id,
-        requestId: prepared.requestId
-      });
-      const chained = appendAuditEvent(
-        seed.rows[0]?.this_hash?.toString("hex") ?? null,
-        Object.freeze({
-          auditId: randomUUID(),
-          actorCiphertext: null,
-          actorKeyRef: actorToken,
-          eventType: input.action === "PUBLISH"
-            ? "debate.publication.published" : "debate.publication.unpublished",
-          targetType: "core.run_visibility_event",
-          targetId: eventId,
-          occurredAt: input.occurredAt,
-          sourceContext,
-          decision: "ALLOW",
-          success: true,
-          justification: null
-        })
-      );
-      const deniedAuditId = randomUUID();
-      const denied = appendAuditEvent(
-        seed.rows[0]?.this_hash?.toString("hex") ?? null,
-        Object.freeze({
-          auditId: deniedAuditId,
-          actorCiphertext: null,
-          actorKeyRef: actorToken,
-          eventType: "debate.publication.denied",
-          targetType: "debate.publication_attempt",
-          targetId: deniedAuditId,
-          occurredAt: input.occurredAt,
-          sourceContext,
-          decision: "DENY",
-          success: false,
-          justification: "PUBLICATION_TRANSITION_DENIED"
-        })
-      );
-      try {
-        const result = await this.pool.query<{ publication_ref: string | null }>(`
-          SELECT core.transition_run_publication(
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18::jsonb
-          ) AS publication_ref
-        `, [
-          eventId,
-          input.runId,
-          input.userId,
-          input.ownerRef,
-          input.sessionId,
-          input.grantTokenHash,
-          input.action,
-          input.publicationRef,
-          input.expectedPseudonym,
-          input.contentCiphertext === null ? null : JSON.stringify(input.contentCiphertext),
-          input.occurredAt,
-          chained.auditId,
-          chained.prevHash === null ? null : Buffer.from(chained.prevHash, "hex"),
-          Buffer.from(chained.thisHash, "hex"),
-          denied.auditId,
-          Buffer.from(denied.thisHash, "hex"),
-          actorToken,
-          JSON.stringify(sourceContext)
-        ]);
-        return result.rows[0]?.publication_ref ?? null;
-      } catch (error) {
-        if ((error as { code?: string }).code !== "40001" || attempt === 2) throw error;
-      }
-    }
-    return null;
+    void prepared;
+    const refs = await this.reserveEventRefs({
+      userId: input.userId,
+      sessionId: input.sessionId,
+      runId: input.runId,
+      action: input.action,
+      grantTokenHash: input.grantTokenHash
+    });
+    if (refs === null || refs.visibilityEventId === null || refs.visibilityActorRef === null
+      || refs.deniedAuditId === null || refs.deniedAuditActorRef === null
+      || refs.deniedAuditTargetRef === null) return null;
+    const result = await this.pool.query<{ publication_ref: string | null }>(`
+      SELECT core.transition_run_publication(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14
+      ) AS publication_ref
+    `, [
+      refs.visibilityEventId,input.runId,input.userId,input.ownerRef,input.sessionId,
+      input.grantTokenHash,input.action,input.publicationRef,input.expectedPseudonym,
+      input.contentCiphertext === null ? null : JSON.stringify(input.contentCiphertext),
+      input.occurredAt,refs.auditId,refs.deniedAuditId,refs.reservationId
+    ]);
+    return result.rows[0]?.publication_ref ?? null;
   }
 
   async readAuthorPseudonym(runId: string, userId: string, ownerRef: string): Promise<string | null> {
@@ -444,18 +472,25 @@ export class PostgresPublicationRepository {
     });
   }
 
-  async listPendingKeyCleanup(limit = 100): Promise<readonly string[]> {
-    const result = await this.pool.query<{ publication_ref: string }>(
-      "SELECT publication_ref FROM serve.pending_publication_key_cleanup($1)",
-      [limit]
-    );
-    return Object.freeze(result.rows.map((row) => row.publication_ref));
+  async claimKeyCleanup(limit = 100): Promise<readonly PublicationKeyCleanupClaim[]> {
+    const result = await this.pool.query<{
+      publication_ref: string;
+      claim_token: string;
+    }>("SELECT * FROM serve.claim_publication_key_cleanup($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      publicationRef: row.publication_ref,
+      claimToken: row.claim_token
+    })));
   }
 
-  async completeKeyCleanup(publicationRef: string, completedAt: Date): Promise<boolean> {
+  async completeKeyCleanup(
+    publicationRef: string,
+    claimToken: string,
+    destroyResult: "DESTROYED" | "ALREADY_ABSENT"
+  ): Promise<boolean> {
     const result = await this.pool.query<{ completed: boolean }>(
-      "SELECT serve.complete_publication_key_cleanup($1,$2) AS completed",
-      [publicationRef, completedAt]
+      "SELECT serve.complete_publication_key_cleanup($1,$2,$3) AS completed",
+      [publicationRef, claimToken, destroyResult]
     );
     return result.rows[0]?.completed === true;
   }

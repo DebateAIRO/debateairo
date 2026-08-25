@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest, Session } from "@debateai/contract";
@@ -13,7 +14,9 @@ import {
   deriveRelativeCostCellsV1,
   runEvaluatorQuestionTagger
 } from "../../packages/evaluator/src/index.js";
-import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import {
+  createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
+} from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { ServeRepository } from "@debateai/serve";
@@ -100,13 +103,18 @@ describe("terminal evaluator harvest", () => {
           'maker:author','v1','author','{"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5,"x_cost_usd":0.01}}','PARSED',$8,'input','contract',ledger.allocate_sequence()),
         ($2,$5,$7,'provider:reviewer','openai-compatible-http','model:reviewer',
           'maker:reviewer','v2','review','{"usage":{"total_tokens":4,"x_cost_usd":0.02}}','PARSED',$8,'input','contract',ledger.allocate_sequence()),
-        ($3,$6,NULL,$9,'openai-compatible-http','model:evaluator',
+        ($3,$6,$7,$9,'openai-compatible-http','model:evaluator',
           $10,'v3','tag','{"usage":{"total_tokens":8}}','PARSED',$8,'input','contract',ledger.allocate_sequence())
     `, [
       authorArtifact, reviewerArtifact, evaluatorArtifact,
       authorAttempt, reviewerAttempt, evaluatorAttempt, runId, "b".repeat(64),
       EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER
     ]);
+    await database.pool.query(`
+      INSERT INTO evaluator.pipeline_event (
+        run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
+      ) VALUES ($1,'TAG',1,$2,'STARTED','ASK_TIME_TAG_STARTED',$3,ledger.allocate_sequence())
+    `, [runId, evaluatorAttempt, "d".repeat(64)]);
     const entries = await database.pool.query<{ ledger_entry_id: string }>(`
       INSERT INTO ledger.ledger_entry (
         sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
@@ -117,14 +125,14 @@ describe("terminal evaluator harvest", () => {
           'UNASSIGNED','OK','provider:author','input','contract',$5,$8,$9),
         (ledger.allocate_sequence(),$1,$3,'MODEL_CALL','runner.review.v1','node:review',
           'UNASSIGNED','OK','provider:reviewer','input','contract',$6,$8,$9),
-        (ledger.allocate_sequence(),NULL,$4,'MODEL_CALL','evaluator.tag-question.v1','tag:attempt',
+        (ledger.allocate_sequence(),$1,$4,'MODEL_CALL','evaluator.tag-question.v1',$11,
           'UNASSIGNED','OK',$10,'input','contract',$7,$8,$9)
       RETURNING ledger_entry_id
     `, [
       runId, authorAttempt, reviewerAttempt, evaluatorAttempt,
       authorArtifact, reviewerArtifact, evaluatorArtifact,
       new Date("2026-08-15T08:00:00.000Z"), new Date("2026-08-15T08:00:01.000Z"),
-      EVALUATOR_PROVIDER_REF
+      EVALUATOR_PROVIDER_REF, `evaluator:tag-attempt:${evaluatorAttempt}`
     ]);
     expect(entries.rows).toHaveLength(3);
     const authorNodeRow = await database.pool.query<{ node_id: string }>(`
@@ -214,6 +222,7 @@ describe("terminal evaluator harvest", () => {
 
 describe("0023 evaluator foundation migration", () => {
   it("projects usage and versioned relative cost into both evaluator metering tables", async () => {
+    const runId = await insertEvaluatorRun("evaluator metering projection");
     const artifactId = "00000000-0000-4000-8000-000000000801";
     const attemptId = "00000000-0000-4000-8000-000000000802";
     await database.pool.query(`
@@ -221,21 +230,21 @@ describe("0023 evaluator foundation migration", () => {
         raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
         maker, model_version, raw_text, metadata_json, parse_status, content_hash,
         input_hash, contract_hash, at_seq
-      ) VALUES ($1,$2,NULL,'provider:test','openai-compatible-http','model:test',
+      ) VALUES ($1,$2,$4,'provider:test','openai-compatible-http','model:test',
         'maker:test','v1','{}','{}','PARSED',$3,'input','contract',ledger.allocate_sequence())
-    `, [artifactId, attemptId, "a".repeat(64)]);
+    `, [artifactId, attemptId, "a".repeat(64), runId]);
     const entries = await database.pool.query<{ ledger_entry_id: string }>(`
       INSERT INTO ledger.ledger_entry (
         sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
         stance_at_action, outcome, actor_ref, input_hash, contract_hash,
         raw_artifact_ref, started_at, finished_at
       ) VALUES
-        (ledger.allocate_sequence(),NULL,$1,'MODEL_CALL','test:metered','node:metered',
+        (ledger.allocate_sequence(),$3,$1,'MODEL_CALL','test:metered','node:metered',
           'UNASSIGNED','OK','provider:test','input','contract',$2,now(),now()),
-        (ledger.allocate_sequence(),NULL,NULL,'MODEL_CALL','test:unmetered','node:unmetered',
+        (ledger.allocate_sequence(),$3,NULL,'MODEL_CALL','test:unmetered','node:unmetered',
           'UNASSIGNED','OK','provider:test','input','contract',NULL,now(),now())
       RETURNING ledger_entry_id
-    `, [attemptId, artifactId]);
+    `, [attemptId, artifactId, runId]);
     const repository = new EvaluatorMeteringRepository(database.pool);
     await repository.recordCall({
       ledgerEntryId: entries.rows[0]!.ledger_entry_id, rawArtifactId: artifactId,
@@ -462,8 +471,6 @@ describe("domain registry repository", () => {
     const domain = (await new DomainRegistryRepository(database.pool).listDomains())
       .find((row) => row.canonicalName === "Mathematics");
     if (domain === undefined) throw new Error("Expected migrated Mathematics starter domain");
-    const artifactRef = await insertTaggerRawArtifact(runId);
-
     await expect(runEvaluatorQuestionTagger({
       runId,
       rawQuestion: "memory no-op tagger",
@@ -483,15 +490,9 @@ describe("domain registry repository", () => {
         }
       },
       deployment: { configuredProviders: [] },
-      provider: { call: async () => ({
-        rawArtifactRef: artifactRef,
-        ledgerEntryRef: "ledger:test:tagger",
-        content: JSON.stringify({ decision: "SELECT_EXISTING", domain_id: domain.domainId }),
-        provider: "openai-compatible-http",
-        model: "local/evaluator",
-        maker: EVALUATOR_MAKER,
-        modelVersion: "local/evaluator"
-      }) },
+      provider: evaluatorGateway(JSON.stringify({
+        decision: "SELECT_EXISTING", domain_id: domain.domainId
+      }), "local/evaluator"),
       repository: new DomainRegistryRepository(database.pool),
       bound: { maxAttempts: 1, tokenCeiling: 128, deadlineMs: 250 },
       basis: "TAGGER",
@@ -526,18 +527,11 @@ describe("domain registry repository", () => {
     })).resolves.toEqual({ state: "UNTAGGED", reason: "TAGGER_PROVIDER_FAILED" });
     await expect(new DomainRegistryRepository(database.pool).readQuestionDomain(runId)).resolves.toBeNull();
 
-    const artifactRef = await insertTaggerRawArtifact(runId);
     await expect(runEvaluatorTagReconciliation({
       ...common,
-      provider: { call: async () => ({
-        rawArtifactRef: artifactRef,
-        ledgerEntryRef: "ledger:test:reconciled-tagger",
-        content: JSON.stringify({ decision: "SELECT_EXISTING", domain_id: domain.domainId }),
-        provider: "openai-compatible-http",
-        model: "local/evaluator",
-        maker: EVALUATOR_MAKER,
-        modelVersion: "local/evaluator"
-      }) }
+      provider: evaluatorGateway(JSON.stringify({
+        decision: "SELECT_EXISTING", domain_id: domain.domainId
+      }), "local/evaluator")
     })).resolves.toMatchObject({ state: "TAGGED", domainId: domain.domainId });
     await expect(new DomainRegistryRepository(database.pool).readQuestionDomain(runId))
       .resolves.toMatchObject({ assignmentBasis: "BACKFILL", domainId: domain.domainId });
@@ -571,10 +565,10 @@ describe("domain registry repository", () => {
     const grown = await repository.admitProposal({
       runId,
       proposedName: "Climate Science",
-      provider: "provider:test",
-      modelId: "model:test",
-      modelVersion: "v1",
-      rawArtifactRef: await insertRawArtifact(runId, "artifact:domain:climate"),
+      provider: "openai-compatible-http",
+      modelId: "local/evaluator",
+      modelVersion: "local/evaluator",
+      rawArtifactRef: await insertTaggerRawArtifact(runId),
       provenanceRef: "test:proposal:new"
     });
     expect(grown).toMatchObject({ decision: "ADMITTED_NEW" });
@@ -636,14 +630,14 @@ describe("domain registry repository", () => {
 
   it("serializes concurrent near-duplicate proposals into one grown domain", async () => {
     const runId = await insertEvaluatorRun("concurrent domain proposal");
-    const rawArtifactRef = await insertRawArtifact(runId, "artifact:domain:robotics");
+    const rawArtifactRef = await insertTaggerRawArtifact(runId);
     const repository = new DomainRegistryRepository(database.pool);
     const input = {
       runId,
       proposedName: "Robotics",
-      provider: "provider:test",
-      modelId: "model:test",
-      modelVersion: "v1",
+      provider: "openai-compatible-http",
+      modelId: "local/evaluator",
+      modelVersion: "local/evaluator",
       rawArtifactRef,
       provenanceRef: "test:proposal:robotics"
     } as const;
@@ -805,6 +799,188 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
     })).resolves.toMatchObject({ state: "TAGGED", domainId: domain.domainId });
   });
 
+  it("authenticates evaluator scope before HTTP and rejects actual-role prefix, run, provider, and raw-ref forgeries", async () => {
+    const runA = await insertEvaluatorRun("authenticated evaluator scope A");
+    const runB = await insertEvaluatorRun("authenticated evaluator scope B");
+    const attemptId = randomUUID();
+    await database.pool.query(`
+      INSERT INTO evaluator.pipeline_event (
+        run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
+      ) VALUES ($1,'TAG',1,$2,'STARTED','ASK_TIME_TAG_STARTED',$3,ledger.allocate_sequence())
+    `, [runA, attemptId, "d".repeat(64)]);
+
+    let fetchCalls = 0;
+    const gateway = createPostgresProviderGateway(database.pool, {
+      endpoint: "http://evaluator.test/v1",
+      model: "local/evaluator",
+      maker: EVALUATOR_MAKER,
+      fetchImplementation: (async () => {
+        fetchCalls += 1;
+        return new Response("unreachable", { status: 500 });
+      }) as typeof fetch
+    });
+    const request = {
+      runId: runA,
+      subjectItemId: `evaluator:tag-attempt:${attemptId}`,
+      callSiteKey: "evaluator.tag-question.v1",
+      role: "CLASSIFIER" as const,
+      lane: "evaluator" as const,
+      bound: { maxAttempts: 1, tokenCeiling: 128, deadlineMs: 250 },
+      contractHash: "b".repeat(64),
+      providerRef: EVALUATOR_PROVIDER_REF,
+      packet: { messages: [{ role: "user" as const, content: "scope probe" }] }
+    };
+    for (const forged of [
+      { ...request, lane: "served" as const },
+      { ...request, callSiteKey: "product:forged-prefix" },
+      { ...request, runId: runB },
+      { ...request, providerRef: "provider:forged" }
+    ]) {
+      await expect(gateway.call(forged)).rejects.toMatchObject({
+        code: "EVALUATOR_PROVIDER_SCOPE_UNAUTHORIZED"
+      });
+    }
+    expect(fetchCalls).toBe(0);
+
+    const crossRunArtifact = await database.pool.query<{ raw_artifact_id: string }>(`
+      INSERT INTO ledger.raw_artifact (
+        raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
+        model_version,raw_text,metadata_json,parse_status,input_hash,contract_hash,
+        content_hash,at_seq
+      ) VALUES (
+        gen_random_uuid(),$2,$1,$3,'openai-compatible-http','local/evaluator',$4,
+        'local/evaluator','{}','{}'::jsonb,'PARSED',repeat('a',64),repeat('b',64),
+        repeat('c',64),ledger.allocate_sequence()
+      ) RETURNING raw_artifact_id
+    `, [runB, attemptId, EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER]);
+    const wrongProviderArtifact = await insertRawArtifact(runA, "forged admission artifact");
+    await expect(new DomainRegistryRepository(database.pool).admitProposal({
+      runId: runA,
+      proposedName: "Forged Evaluator Scope",
+      provider: "provider:test",
+      modelId: "model:test",
+      modelVersion: "v1",
+      rawArtifactRef: wrongProviderArtifact,
+      provenanceRef: "test:evaluator-scope:forged-admission"
+    })).rejects.toMatchObject({ code: "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH" });
+    await expect(new DomainRegistryRepository(database.pool).admitProposal({
+      runId: runA,
+      proposedName: "Cross Run Evaluator Scope",
+      provider: "openai-compatible-http",
+      modelId: "local/evaluator",
+      modelVersion: "local/evaluator",
+      rawArtifactRef: crossRunArtifact.rows[0]!.raw_artifact_id,
+      provenanceRef: "test:evaluator-scope:cross-run-admission"
+    })).rejects.toMatchObject({ code: "EVALUATOR_DOMAIN_PROPOSAL_ARTIFACT_MISMATCH" });
+    const direct = await database.pool.connect();
+    try {
+      const nextSequence = async () => Number((await database.pool.query<{ sequence: string }>(
+        "SELECT ledger.allocate_sequence()::text AS sequence"
+      )).rows[0]!.sequence);
+
+      await direct.query("SET ROLE debateai_runtime");
+      const runtimeSequence = await nextSequence();
+      await expect(direct.query(`
+        INSERT INTO ledger.ledger_entry (
+          sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+          stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+          raw_artifact_ref,started_at,finished_at
+        ) VALUES ($1,$2,$3,'MODEL_CALL','evaluator.tag-question.v1',$4,
+          'UNASSIGNED','OK',$5,repeat('a',64),repeat('b',64),NULL,now(),now())
+      `, [runtimeSequence, runA, randomUUID(),
+        `evaluator:tag-attempt:${randomUUID()}`, EVALUATOR_PROVIDER_REF]))
+        .rejects.toThrow(/EVALUATOR_LEDGER_SCOPE_UNAUTHORIZED/);
+      await expect(direct.query(`
+        INSERT INTO evaluator.pipeline_event (
+          pipeline_event_id,run_id,pipeline,pipeline_version,attempt_id,state,
+          reason,input_hash,input_hash_version,at_seq
+        ) VALUES (gen_random_uuid(),$1,'TAG',1,gen_random_uuid(),'STARTED',
+          'ASK_TIME_TAG_STARTED',repeat('a',64),1,$2)
+      `, [runA, await nextSequence()])).rejects.toThrow(/permission denied/);
+      await direct.query("RESET ROLE");
+
+      await direct.query("SET ROLE debateai_evaluator_worker");
+      for (const forgery of [
+        {
+          runId: runA, attemptId: randomUUID(), callSiteKey: "evaluator.unruled.v1",
+          subjectItemId: "evaluator:unruled", actorRef: EVALUATOR_PROVIDER_REF
+        },
+        {
+          runId: runB, attemptId, callSiteKey: "evaluator.tag-question.v1",
+          subjectItemId: `evaluator:tag-attempt:${attemptId}`, actorRef: EVALUATOR_PROVIDER_REF
+        },
+        {
+          runId: runA, attemptId, callSiteKey: "evaluator.tag-question.v1",
+          subjectItemId: `evaluator:tag-attempt:${attemptId}`, actorRef: "provider:forged"
+        },
+        {
+          runId: runA, attemptId, callSiteKey: "evaluator.tag-question.v1",
+          subjectItemId: `evaluator:tag-attempt:${attemptId}`, actorRef: EVALUATOR_PROVIDER_REF,
+          rawArtifactRef: crossRunArtifact.rows[0]!.raw_artifact_id
+        }
+      ]) {
+        const sequence = await nextSequence();
+        await expect(direct.query(`
+          INSERT INTO ledger.ledger_entry (
+            sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+            stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+            raw_artifact_ref,started_at,finished_at
+          ) VALUES ($1,$2,$3,'MODEL_CALL',$4,$5,'UNASSIGNED','OK',$6,
+            repeat('a',64),repeat('b',64),$7,now(),now())
+        `, [sequence, forgery.runId, forgery.attemptId, forgery.callSiteKey,
+          forgery.subjectItemId, forgery.actorRef, forgery.rawArtifactRef ?? null]))
+          .rejects.toThrow(/EVALUATOR_LEDGER_SCOPE_UNAUTHORIZED/);
+      }
+      const lawfulCrossRunCollisionSequence = await nextSequence();
+      await expect(direct.query(`
+        INSERT INTO ledger.ledger_entry (
+          sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+          stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+          raw_artifact_ref,started_at,finished_at
+        ) VALUES ($1,$2,$3,'MODEL_CALL','evaluator.tag-question.v1',$4,
+          'UNASSIGNED','OK',$5,repeat('a',64),repeat('b',64),NULL,now(),now())
+      `, [lawfulCrossRunCollisionSequence, runA, attemptId,
+        `evaluator:tag-attempt:${attemptId}`, EVALUATOR_PROVIDER_REF])).resolves.toBeDefined();
+      await direct.query("RESET ROLE");
+    } finally {
+      await direct.query("RESET ROLE").catch(() => undefined);
+      direct.release();
+    }
+    const durableForgeries = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM ledger.ledger_entry
+      WHERE run_id IN ($1,$2) AND call_site_key LIKE 'evaluator.%'
+        AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)
+    `, [runA, runB]);
+    expect(durableForgeries.rows[0]!.count).toBe("0");
+    await database.pool.query(`
+      INSERT INTO core.node (
+        run_id,claim_text,claim_type,parent_node_id,child_kind,depth,sibling_ordinal,
+        materialized_path,generation_status,path_status,exploration_decision,
+        way_of_knowing,provenance_ref,locator,value_laden,created_at_seq
+      ) VALUES ($1,'cross-run collision victim','unknown',NULL,NULL,0,0,'0',
+        'complete','active','continue','REASONING',$2,NULL,false,ledger.allocate_sequence())
+    `, [runB, crossRunArtifact.rows[0]!.raw_artifact_id]);
+    await database.pool.query(`
+      INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+      VALUES ($1,ledger.allocate_sequence(),'TERMINAL','{"state":"SETTLED"}'::jsonb)
+    `, [runB]);
+    await expect(runEvaluatorTerminalHarvest({
+      pool: database.pool,
+      runId: runB,
+      meteringWindow: {
+        windowStart: new Date("2026-08-25T00:00:00.000Z"),
+        windowEnd: new Date("2026-08-26T00:00:00.000Z"),
+        asOf: new Date("2026-08-26T00:00:01.000Z")
+      },
+      observedAt: new Date("2026-08-25T12:00:00.000Z")
+    })).resolves.toMatchObject({ harvest: { state: "HARVESTED", observationsInserted: 1 } });
+    const preservedVictim = await database.pool.query<{ model_id: string }>(`
+      SELECT model_id FROM evaluator.observation
+      WHERE run_id=$1 AND source_raw_artifact_ref=$2
+    `, [runB, crossRunArtifact.rows[0]!.raw_artifact_id]);
+    expect(preservedVictim.rows).toEqual([{ model_id: "local/evaluator" }]);
+  });
+
   it("does not fire product liveness when evaluator tags span model versions", async () => {
     const runId = await insertEvaluatorRun("liveness-safe evaluator tags");
     await insertServedEvaluatorAnswer(runId);
@@ -845,8 +1021,8 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
       ORDER BY artifact.at_seq
     `, [EVALUATOR_PROVIDER_REF]);
     expect(artifacts.rows).toEqual([
-      { artifact_run_id: null, ledger_run_id: null, model_version: "local/evaluator:v1" },
-      { artifact_run_id: null, ledger_run_id: null, model_version: "local/evaluator:v2" }
+      { artifact_run_id: runId, ledger_run_id: runId, model_version: "local/evaluator:v1" },
+      { artifact_run_id: runId, ledger_run_id: runId, model_version: "local/evaluator:v2" }
     ]);
     await new LivenessRepository(database.pool).detectProviderModelVersionTriggers();
 
@@ -855,13 +1031,44 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
       WHERE run_id=$1 AND trigger_kind='PROVIDER_MODEL_VERSION'
     `, [runId]);
     expect(triggers.rows[0]!.count).toBe("0");
+
+    await insertProductVersionArtifact(runId, "product:v1");
+    await insertProductVersionArtifact(runId, "product:v2");
+    await insertUnboundEvaluatorArtifact(runId, "crash:v1");
+    await insertUnboundEvaluatorArtifact(runId, "crash:v2");
+    await new LivenessRepository(database.pool).detectProviderModelVersionTriggers();
+    const productTriggers = await database.pool.query<{ trigger_key: string }>(`
+      SELECT trigger_key FROM core.revision_trigger
+      WHERE run_id=$1 AND trigger_kind='PROVIDER_MODEL_VERSION'
+      ORDER BY trigger_key
+    `, [runId]);
+    expect(productTriggers.rows.map((row) => row.trigger_key)).toEqual([
+      `provider-model-version:${EVALUATOR_PROVIDER_REF}:crash:v2`,
+      "provider-model-version:provider:product-version:product:v2"
+    ]);
   });
 
   it("keeps the asker-visible execution digest byte-identical with tagging off versus on", async () => {
     const runId = await insertEvaluatorRun("digest-safe evaluator tag");
     const answerId = await insertServedEvaluatorAnswer(runId);
+    await insertProductModelAttempt(runId);
+    await database.pool.query(`
+      INSERT INTO ledger.ledger_entry (
+        sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+        stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+        raw_artifact_ref,started_at,finished_at
+      ) VALUES (
+        ledger.allocate_sequence(),$1,gen_random_uuid(),'BUDGET_SKIP',NULL,
+        'product:null-callsite','UNASSIGNED','SKIPPED_BY_BUDGET','system:budget',
+        repeat('a',64),repeat('b',64),NULL,now(),now()
+      )
+    `, [runId]);
     const serve = new ServeRepository(database.pool);
     const before = await serve.readExecutionLedgerDigest(answerId, "asker:evaluator-domain");
+    expect(before?.entries.map((entry) => [entry.action_kind, entry.subject_ref])).toEqual([
+      ["MODEL_CALL", "product:work"],
+      ["BUDGET_SKIP", "product:null-callsite"]
+    ]);
 
     await runAskTimeEvaluatorTag({
       pool: database.pool,
@@ -878,6 +1085,11 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
     const after = await serve.readExecutionLedgerDigest(answerId, "asker:evaluator-domain");
 
     expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+    const authenticated = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM ledger.ledger_entry
+      WHERE run_id=$1 AND evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)
+    `, [runId]);
+    expect(authenticated.rows[0]!.count).toBe("1");
   });
 });
 
@@ -963,6 +1175,48 @@ async function insertProductModelAttempt(runId: string): Promise<void> {
   `, [runId]);
 }
 
+async function insertProductVersionArtifact(runId: string, modelVersion: string): Promise<string> {
+  const attemptId = randomUUID();
+  const artifact = await database.pool.query<{ raw_artifact_id: string }>(`
+    INSERT INTO ledger.raw_artifact (
+      raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
+      model_version,raw_text,metadata_json,parse_status,input_hash,contract_hash,
+      content_hash,at_seq
+    ) VALUES (
+      gen_random_uuid(),$2,$1,'provider:product-version','openai-compatible-http',
+      'model:product-version','maker:product-version',$3,'{}','{}'::jsonb,'PARSED',
+      repeat('a',64),repeat('b',64),repeat('c',64),ledger.allocate_sequence()
+    ) RETURNING raw_artifact_id
+  `, [runId, attemptId, modelVersion]);
+  await database.pool.query(`
+    INSERT INTO ledger.ledger_entry (
+      sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+      stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+      raw_artifact_ref,started_at,finished_at
+    ) VALUES (
+      ledger.allocate_sequence(),$1,$2,'MODEL_CALL','product:version-probe',$3,
+      'UNASSIGNED','OK','provider:product-version',repeat('a',64),repeat('b',64),
+      $4,now(),now()
+    )
+  `, [runId, attemptId, `product:version:${modelVersion}`, artifact.rows[0]!.raw_artifact_id]);
+  return artifact.rows[0]!.raw_artifact_id;
+}
+
+async function insertUnboundEvaluatorArtifact(runId: string, modelVersion: string): Promise<string> {
+  const artifact = await database.pool.query<{ raw_artifact_id: string }>(`
+    INSERT INTO ledger.raw_artifact (
+      raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,
+      model_version,raw_text,metadata_json,parse_status,input_hash,contract_hash,
+      content_hash,at_seq
+    ) VALUES (
+      gen_random_uuid(),gen_random_uuid(),$1,$2,'openai-compatible-http',
+      'model:evaluator-crash',$3,$4,'{}','{}'::jsonb,'PARSED',repeat('a',64),
+      repeat('b',64),repeat('c',64),ledger.allocate_sequence()
+    ) RETURNING raw_artifact_id
+  `, [runId, EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER, modelVersion]);
+  return artifact.rows[0]!.raw_artifact_id;
+}
+
 async function insertRawArtifact(runId: string, callSite: string): Promise<string> {
   const result = await database.pool.query<{ raw_artifact_id: string }>(`
     INSERT INTO ledger.raw_artifact (
@@ -978,19 +1232,47 @@ async function insertRawArtifact(runId: string, callSite: string): Promise<strin
   return result.rows[0]!.raw_artifact_id;
 }
 
-async function insertTaggerRawArtifact(_runId: string): Promise<string> {
-  const result = await database.pool.query<{ raw_artifact_id: string }>(`
-    INSERT INTO ledger.raw_artifact (
-      raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
-      maker, model_version, raw_text, metadata_json, parse_status, input_hash,
-      contract_hash, content_hash, at_seq
-    ) VALUES (
-      gen_random_uuid(), gen_random_uuid(), NULL, $1, 'openai-compatible-http',
-      'local/evaluator', $2, 'local/evaluator', '{}', '{}'::jsonb, 'PARSED',
-      repeat('b', 64), repeat('c', 64), repeat('a', 64), ledger.allocate_sequence()
-    ) RETURNING raw_artifact_id
-  `, [EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER]);
-  return result.rows[0]!.raw_artifact_id;
+async function insertTaggerRawArtifact(runId: string): Promise<string> {
+  const client = await database.pool.connect();
+  const attemptId = randomUUID();
+  try {
+    await client.query("BEGIN");
+    await client.query(`
+      INSERT INTO evaluator.pipeline_event (
+        run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
+      ) VALUES ($1,'TAG',1,$2,'STARTED','ASK_TIME_TAG_STARTED',$3,ledger.allocate_sequence())
+    `, [runId, attemptId, "d".repeat(64)]);
+    const result = await client.query<{ raw_artifact_id: string }>(`
+      INSERT INTO ledger.raw_artifact (
+        raw_artifact_id, attempt_id, run_id, provider_ref, provider, model_id,
+        maker, model_version, raw_text, metadata_json, parse_status, input_hash,
+        contract_hash, content_hash, at_seq
+      ) VALUES (
+        gen_random_uuid(), $2, $1, $3, 'openai-compatible-http',
+        'local/evaluator', $4, 'local/evaluator', '{}', '{}'::jsonb, 'PARSED',
+        repeat('b', 64), repeat('c', 64), repeat('a', 64), ledger.allocate_sequence()
+      ) RETURNING raw_artifact_id
+    `, [runId, attemptId, EVALUATOR_PROVIDER_REF, EVALUATOR_MAKER]);
+    const rawArtifactRef = result.rows[0]!.raw_artifact_id;
+    await client.query(`
+      INSERT INTO ledger.ledger_entry (
+        sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+        stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+        raw_artifact_ref,started_at,finished_at
+      ) VALUES (
+        ledger.allocate_sequence(),$1,$2,'MODEL_CALL','evaluator.tag-question.v1',$3,
+        'UNASSIGNED','OK',$4,repeat('b',64),repeat('c',64),$5,now(),now()
+      )
+    `, [runId, attemptId, `evaluator:tag-attempt:${attemptId}`,
+      EVALUATOR_PROVIDER_REF, rawArtifactRef]);
+    await client.query("COMMIT");
+    return rawArtifactRef;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function evaluatorFamilyFixture() {
@@ -1103,7 +1385,10 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     const application = new PostgresAskApplication(
       database.pool,
       { dispatch: async () => undefined },
-      settings
+      settings,
+      undefined,
+      database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
     );
     const accepted = await application.submit(ask, session, {
       kind: "legacy", legacyAskerId: session.asker_id

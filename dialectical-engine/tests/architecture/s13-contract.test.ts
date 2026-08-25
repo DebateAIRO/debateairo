@@ -56,16 +56,16 @@ describe("S13 / cross-run memory architecture", () => {
     expect(candidateRefs).not.toContain("frozen_terms");
     expect(record).toMatch(/for \(const candidateRef of candidateRefs\) \{\s*const evaluated = await this\.#evaluateCandidate/);
 
-    const candidatePrepare = evaluate.indexOf("prepareContentEncryptionForRun");
+    const candidatePrepare = evaluate.indexOf("prepareLeasedContentEncryptionForRun");
     const candidateTransaction = evaluate.indexOf("withWriteTransaction");
     const candidateLock = evaluate.indexOf("FOR UPDATE", candidateTransaction);
     const candidateOwner = evaluate.indexOf("core.run_is_owned_by", candidateLock);
     const candidateFetch = evaluate.indexOf("const candidateRows = await client.query", candidateOwner);
-    const candidateDecrypt = evaluate.indexOf("decryptPreparedContentForRun", candidateFetch);
+    const candidateDecrypt = evaluate.indexOf("decryptLeasedContentForRun", candidateFetch);
     const candidateMatch = evaluate.indexOf("matchQuestionKeys", candidateDecrypt);
     expect(candidatePrepare).toBeGreaterThan(-1);
     expect(candidatePrepare).toBeLessThan(candidateTransaction);
-    expect(evaluate.match(/prepareContentEncryptionForRun/g)).toHaveLength(1);
+    expect(evaluate.match(/prepareLeasedContentEncryptionForRun/g)).toHaveLength(1);
     expect(candidateTransaction).toBeLessThan(candidateLock);
     expect(candidateLock).toBeLessThan(candidateOwner);
     expect(candidateOwner).toBeLessThan(candidateFetch);
@@ -91,8 +91,8 @@ describe("S13 / cross-run memory architecture", () => {
     expect(record).toContain("const storedBinding = questionContent === null ? input.key.normalizedBinding : {};");
     expect(record).toContain("const storedTerms = questionContent === null ? input.key.frozenTerms : [];");
     expect(answerPull).not.toContain("this.pool");
-    expect(answerPull).toContain("decryptPreparedContentForRun");
-    expect(answerPull).toContain("encryptPreparedContentForRun");
+    expect(answerPull).toContain("decryptLeasedContentForRun");
+    expect(answerPull).toContain("encryptAttestedLeasedContentForRun");
 
     for (const [name, method, transaction] of [
       ["recordQuestionAndMatch", record, finalTransaction],

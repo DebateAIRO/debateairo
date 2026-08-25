@@ -1,15 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
-import type { CallBound, PromptPacket, ProviderGateway } from "@debateai/providers";
-import {
-  ProviderCallFailedError,
-  ProviderContentUnacceptedError
-} from "@debateai/providers";
+import type { CallBound, PromptPacket } from "@debateai/providers";
 
 export const CONSUMER_PROMPT_VERSION = 1 as const;
 export const CONSUMER_MAX_PROVIDER_ATTEMPTS = 2 as const;
 export const CONSUMER_MAX_REFRESH_ATTEMPTS = 2 as const;
+export const CONSUMER_PUBLIC_SAMPLE_MINIMUM = 3 as const;
 
 export type EvaluatorConsumerRefreshTrigger = "ON_DEMAND" | "POST_AGGREGATE";
 
@@ -55,16 +51,38 @@ export interface EvaluatorConsumerJob {
     readonly derivationVersion: number;
   }[];
   readonly blindedSamples: readonly {
+    readonly runId: string;
+    readonly publicationRef: string;
     readonly sampleId: string;
-    readonly questionExcerpt: string;
-    readonly taskExcerpt: string;
-    readonly grade: string;
-    readonly reasons: readonly string[];
   }[];
   readonly adjacentDomains: readonly {
     readonly domainRef: string;
     readonly name: string;
   }[];
+}
+
+export interface EvaluatorConsumerPublicSample {
+    readonly runId: string;
+    readonly publicationRef: string;
+    readonly sampleId: string;
+    readonly questionExcerpt: string;
+    readonly taskExcerpt: string;
+    readonly grade: string;
+    readonly reasons: readonly string[];
+}
+
+/**
+ * The cross-run consumer deliberately cannot accept the product ProviderGateway.
+ * Its provider boundary returns only a closed classification and has no run id,
+ * raw-artifact, ledger, or private-content-key surface.
+ */
+export interface PublicAggregateProvider {
+  classify(input: Readonly<{
+    consumerModelId: string;
+    packet: PromptPacket;
+    bound: CallBound;
+    allowedAdjacentDomainRefs: readonly string[];
+  }>): Promise<Readonly<{ classification: "ACCEPTED" }>>;
 }
 
 export interface EvaluatorConsumerReceiptInput {
@@ -117,6 +135,10 @@ export interface EvaluatorConsumerRepository {
     readonly observedAt: Date;
   }): Promise<string>;
   recordTerminalReceipt(input: EvaluatorConsumerReceiptInput): Promise<string>;
+  withPublicSampleLease<T>(
+    sample: EvaluatorConsumerJob["blindedSamples"][number],
+    use: (resolved: EvaluatorConsumerPublicSample) => Promise<T>
+  ): Promise<T>;
   persistOutput(input: {
     readonly job: EvaluatorConsumerJob;
     readonly family: EvaluatorConsumerFamily;
@@ -130,30 +152,9 @@ export interface EvaluatorConsumerRepository {
       readonly reason: string;
       readonly confidence: "LOW" | "MEDIUM" | "HIGH";
     }[];
-    readonly generatedRawArtifactRef: string;
+    readonly generatedRawArtifactRef: null;
     readonly observedAt: Date;
   }): Promise<{ readonly consumerOutputId: string; readonly inserted: boolean }>;
-}
-
-const consumerOutputSchema = z.object({
-  bias_pattern_name: z.string().trim().min(1).max(200),
-  capability_summary: z.string().trim().min(1).max(4_000),
-  adjacent_domain_flags: z.array(z.object({
-    domain_ref: z.string().trim().min(1),
-    reason: z.string().trim().min(1).max(1_000),
-    confidence: z.enum(["LOW", "MEDIUM", "HIGH"])
-  }).strict()).max(32)
-}).strict();
-
-type ConsumerOutput = z.infer<typeof consumerOutputSchema>;
-
-const selfRoutingKey = /(?:^|_)(?:numeric|ordinal|rank|route|routing|score|weight)(?:_|$)/i;
-
-function containsSelfRoutingField(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(containsSelfRoutingField);
-  if (value === null || typeof value !== "object") return false;
-  return Object.entries(value).some(([key, nested]) => selfRoutingKey.test(key)
-    || containsSelfRoutingField(nested));
 }
 
 function sha256(value: unknown): string {
@@ -166,7 +167,10 @@ function targetRef(job: EvaluatorConsumerJob): string {
   ]).slice(0, 24)}`;
 }
 
-export function buildEvaluatorConsumerPrompt(job: EvaluatorConsumerJob): PromptPacket {
+export function buildEvaluatorConsumerPrompt(
+  job: EvaluatorConsumerJob,
+  resolvedSamples: readonly EvaluatorConsumerPublicSample[] = []
+): PromptPacket {
   const payload = Object.freeze({
     prompt_version: CONSUMER_PROMPT_VERSION,
     numeric_source: "DETERMINISTIC_CODE",
@@ -196,7 +200,7 @@ export function buildEvaluatorConsumerPrompt(job: EvaluatorConsumerJob): PromptP
       interval_upper: rank.intervalUpper,
       derivation_version: rank.derivationVersion
     }))),
-    blinded_samples: Object.freeze(job.blindedSamples.map((sample) => Object.freeze({
+    blinded_samples: Object.freeze(resolvedSamples.map((sample) => Object.freeze({
       sample_id: sample.sampleId,
       question_excerpt: sample.questionExcerpt,
       task_excerpt: sample.taskExcerpt,
@@ -215,34 +219,6 @@ export function buildEvaluatorConsumerPrompt(job: EvaluatorConsumerJob): PromptP
     }),
     Object.freeze({ role: "user" as const, content: JSON.stringify(payload) })
   ]) });
-}
-
-function parseConsumerOutput(content: string, job: EvaluatorConsumerJob): ConsumerOutput {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(content);
-  } catch {
-    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: malformed JSON");
-  }
-  if (containsSelfRoutingField(decoded)) {
-    throw new TypedDomainError(
-      "SELF_ROUTING_FORBIDDEN",
-      "SELF_ROUTING_FORBIDDEN: evaluator interpretation may not supply numeric or routing fields"
-    );
-  }
-  const parsed = consumerOutputSchema.safeParse(decoded);
-  if (!parsed.success) {
-    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: schema mismatch");
-  }
-  const allowed = new Set(job.adjacentDomains.map((domain) => domain.domainRef));
-  if (parsed.data.adjacent_domain_flags.some((flag) => !allowed.has(flag.domain_ref))) {
-    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: unknown domain");
-  }
-  const refs = parsed.data.adjacent_domain_flags.map((flag) => flag.domain_ref);
-  if (new Set(refs).size !== refs.length) {
-    throw new TypedDomainError("CONSUMER_CONTENT_REFUSED", "CONSUMER_CONTENT_REFUSED: duplicate domain");
-  }
-  return parsed.data;
 }
 
 function assertConsumerIsolation(
@@ -265,12 +241,13 @@ function aggregateRefs(job: EvaluatorConsumerJob): readonly string[] {
 }
 
 function aggregateSnapshotHash(job: EvaluatorConsumerJob, packet: PromptPacket): string {
+  void packet;
   return sha256({
     prompt_version: CONSUMER_PROMPT_VERSION,
     target: job.target,
     domain_id: job.domain?.domainId ?? null,
     aggregate_refs: aggregateRefs(job),
-    prompt: packet
+    public_sample_count: job.blindedSamples.length
   });
 }
 
@@ -297,7 +274,7 @@ export type EvaluatorConsumerRefreshResult = {
   readonly inFlight: number;
   readonly retryLimited: number;
   readonly failures: number;
-  readonly reason?: "CONSUMER_PREFLIGHT_FAILED" | "CONSUMER_NO_AGGREGATES";
+  readonly reason?: "CONSUMER_PREFLIGHT_FAILED" | "CONSUMER_INSUFFICIENT_PUBLIC_SAMPLE";
 };
 
 export async function runEvaluatorConsumerRefresh(input: {
@@ -308,7 +285,7 @@ export async function runEvaluatorConsumerRefresh(input: {
     readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
   };
   readonly bound: CallBound;
-  readonly provider: ProviderGateway;
+  readonly provider: PublicAggregateProvider;
   readonly repository: EvaluatorConsumerRepository;
   readonly observedAt?: Date;
 }): Promise<EvaluatorConsumerRefreshResult> {
@@ -370,13 +347,31 @@ export async function runEvaluatorConsumerRefresh(input: {
       trigger: input.trigger,
       attemptId,
       state: "SKIPPED",
-      reason: "CONSUMER_NO_AGGREGATES",
+      reason: "CONSUMER_INSUFFICIENT_PUBLIC_SAMPLE",
       inputHash: preflightInputHash,
       observedAt
     });
     return Object.freeze({
       state: "SKIPPED", outputsInserted: 0, outputsCurrent: 0, inFlight: 0,
-      retryLimited: 0, failures: 0, reason: "CONSUMER_NO_AGGREGATES"
+      retryLimited: 0, failures: 0, reason: "CONSUMER_INSUFFICIENT_PUBLIC_SAMPLE"
+    });
+  }
+
+  const eligibleJobs = jobs.filter((job) =>
+    job.blindedSamples.length >= CONSUMER_PUBLIC_SAMPLE_MINIMUM
+  );
+  if (eligibleJobs.length === 0) {
+    await input.repository.recordPreflightReceipt({
+      trigger: input.trigger,
+      attemptId,
+      state: "SKIPPED",
+      reason: "CONSUMER_INSUFFICIENT_PUBLIC_SAMPLE",
+      inputHash: preflightInputHash,
+      observedAt
+    });
+    return Object.freeze({
+      state: "SKIPPED", outputsInserted: 0, outputsCurrent: 0, inFlight: 0,
+      retryLimited: 0, failures: 0, reason: "CONSUMER_INSUFFICIENT_PUBLIC_SAMPLE"
     });
   }
 
@@ -385,10 +380,14 @@ export async function runEvaluatorConsumerRefresh(input: {
   let inFlight = 0;
   let retryLimited = 0;
   let failures = 0;
-  for (const job of jobs) {
-    const packet = buildEvaluatorConsumerPrompt(job);
-    const snapshotHash = aggregateSnapshotHash(job, packet);
-    const jobInputHash = sha256({ trigger: input.trigger, snapshot_hash: snapshotHash, packet });
+  for (const job of eligibleJobs) {
+    const aggregatePacket = buildEvaluatorConsumerPrompt(job);
+    const snapshotHash = aggregateSnapshotHash(job, aggregatePacket);
+    const jobInputHash = sha256({
+      trigger: input.trigger,
+      snapshot_hash: snapshotHash,
+      public_sample_count: job.blindedSamples.length
+    });
     const jobAttemptId = randomUUID();
     let claim: EvaluatorConsumerClaim;
     try {
@@ -403,125 +402,92 @@ export async function runEvaluatorConsumerRefresh(input: {
     } catch {
       failures += 1;
       await input.repository.recordPreflightReceipt({
-        trigger: input.trigger,
-        attemptId: jobAttemptId,
-        state: "FAILED",
-        reason: "CONSUMER_CLAIM_FAILED",
-        inputHash: jobInputHash,
-        observedAt
+        trigger: input.trigger, attemptId: jobAttemptId, state: "FAILED",
+        reason: "CONSUMER_CLAIM_FAILED", inputHash: jobInputHash, observedAt
       });
       continue;
     }
-    if (claim.state === "ALREADY_CURRENT") {
-      outputsCurrent += 1;
-      continue;
-    }
-    if (claim.state === "IN_FLIGHT") {
-      inFlight += 1;
-      continue;
-    }
-    if (claim.state === "RETRY_LIMIT_REACHED") {
-      retryLimited += 1;
-      continue;
-    }
+    if (claim.state === "ALREADY_CURRENT") { outputsCurrent += 1; continue; }
+    if (claim.state === "IN_FLIGHT") { inFlight += 1; continue; }
+    if (claim.state === "RETRY_LIMIT_REACHED") { retryLimited += 1; continue; }
 
     const receiptBase = {
-      job,
-      trigger: input.trigger,
-      attemptId: claim.attemptId,
-      attemptOrdinal: claim.attemptOrdinal,
-      inputHash: jobInputHash,
-      aggregateSnapshotHash: snapshotHash,
-      observedAt
+      job, trigger: input.trigger, attemptId: claim.attemptId,
+      attemptOrdinal: claim.attemptOrdinal, inputHash: jobInputHash,
+      aggregateSnapshotHash: snapshotHash, observedAt
     } as const;
     try {
-      // This assertion intentionally occurs after the short claim transaction and
-      // immediately before the call. No repository client or lock spans the call.
       assertConsumerIsolation(input.family, input.deployment);
     } catch {
       await input.repository.recordTerminalReceipt({
-        ...receiptBase, state: "SKIPPED", reason: "CONSUMER_PROVIDER_ISOLATION_FAILED"
+        ...receiptBase,
+        state: "SKIPPED",
+        reason: "CONSUMER_PROVIDER_ISOLATION_FAILED"
       });
       failures += 1;
       continue;
     }
-
     try {
-      const response = await input.provider.call({
-        runId: null,
-        subjectItemId: `evaluator:consumer-attempt:${claim.attemptId}`,
-        callSiteKey: "evaluator.refresh-consumer-output.v1",
-        role: "CLASSIFIER",
-        lane: "evaluator",
-        bound: input.bound,
-        contractHash: sha256("evaluator-consumer-interpretation/v1"),
-        providerRef: input.family.value.providerRef,
-        packet,
-        classifyContent: (content) => {
-          try {
-            parseConsumerOutput(content, job);
-            return { parseStatus: "PARSED", parseError: null };
-          } catch (error) {
-            return {
-              parseStatus: "SCHEMA_FAILED",
-              parseError: error instanceof TypedDomainError ? error.code : "CONSUMER_CONTENT_REFUSED"
-            };
+      for (const sample of job.blindedSamples) {
+        await input.repository.withPublicSampleLease(sample,async (resolvedSample) => {
+          const singlePublicRunJob = Object.freeze({
+            ...job,
+            blindedSamples: Object.freeze([sample])
+          });
+          const packet = buildEvaluatorConsumerPrompt(singlePublicRunJob,[resolvedSample]);
+          const response = await input.provider.classify({
+            consumerModelId: job.consumerModelId,
+            bound: input.bound,
+            packet,
+            allowedAdjacentDomainRefs: Object.freeze(
+              singlePublicRunJob.adjacentDomains.map((domain) => domain.domainRef)
+            )
+          });
+          if (response.classification !== "ACCEPTED") {
+            throw new TypedDomainError(
+              "CONSUMER_AUTHORIZATION_FAILED",
+              "CONSUMER_AUTHORIZATION_FAILED"
+            );
           }
-        },
-        buildRepairPacket: ({ parseError }) => Object.freeze({ messages: Object.freeze([
-          ...packet.messages,
-          Object.freeze({
-            role: "user" as const,
-            content: `The response violated the interpretation contract (${parseError}). Return corrected strict JSON only; do not add numeric or routing fields.`
-          })
-        ]) })
-      });
-      if (response.maker !== input.family.value.maker || response.model !== job.consumerModelId) {
-        await input.repository.recordTerminalReceipt({
-          ...receiptBase, state: "FAILED", reason: "CONSUMER_AUTHORIZATION_FAILED"
         });
-        failures += 1;
-        continue;
       }
-      const interpretation = parseConsumerOutput(response.content, job);
       const persisted = await input.repository.persistOutput({
         job,
         family: input.family,
         promptVersion: CONSUMER_PROMPT_VERSION,
         aggregateSnapshotHash: snapshotHash,
         aggregateRefs: aggregateRefs(job),
-        blindedSampleRefs: Object.freeze(job.blindedSamples.map((sample) => sample.sampleId).sort()),
+        blindedSampleRefs: Object.freeze([]),
         summary: JSON.stringify({
-          bias_pattern_name: interpretation.bias_pattern_name,
-          capability_summary: interpretation.capability_summary
+          kind: "PUBLIC_SAMPLE_AGGREGATE_V1",
+          public_sample_count: job.blindedSamples.length,
+          profile_cell_count: job.profileCells.length,
+          rank_count: job.ranks.length
         }),
-        adjacentDomainFlags: Object.freeze(interpretation.adjacent_domain_flags.map((flag) => Object.freeze(flag))),
-        generatedRawArtifactRef: response.rawArtifactRef,
+        adjacentDomainFlags: Object.freeze([]),
+        generatedRawArtifactRef: null,
         observedAt
       });
       await input.repository.recordTerminalReceipt({
         ...receiptBase,
         state: "SUCCEEDED",
-        reason: persisted.inserted ? "CONSUMER_OUTPUT_PERSISTED" : "CONSUMER_OUTPUT_ALREADY_CURRENT",
+        reason: persisted.inserted
+          ? "CONSUMER_OUTPUT_PERSISTED" : "CONSUMER_OUTPUT_ALREADY_CURRENT",
         consumerOutputId: persisted.consumerOutputId
       });
       if (persisted.inserted) outputsInserted += 1;
       else outputsCurrent += 1;
     } catch (error) {
-      const reason = (error instanceof ProviderContentUnacceptedError
-          && error.lastParseError === "SELF_ROUTING_FORBIDDEN")
-        || (error instanceof TypedDomainError && error.code === "SELF_ROUTING_FORBIDDEN")
+      const reason = error instanceof TypedDomainError && error.code === "SELF_ROUTING_FORBIDDEN"
         ? "SELF_ROUTING_FORBIDDEN"
-        : error instanceof ProviderContentUnacceptedError
-          || (error instanceof TypedDomainError && error.code === "CONSUMER_CONTENT_REFUSED")
+        : error instanceof TypedDomainError && error.code === "CONSUMER_CONTENT_REFUSED"
           ? "CONSUMER_CONTENT_REFUSED"
           : error instanceof TypedDomainError && error.code === "CONSUMER_AUTHORIZATION_FAILED"
             ? "CONSUMER_AUTHORIZATION_FAILED"
-        : error instanceof ProviderCallFailedError && error.lastOutcome === "TIMED_OUT"
-          ? "CONSUMER_PROVIDER_TIMED_OUT"
-          : error instanceof ProviderCallFailedError
-            ? "CONSUMER_PROVIDER_FAILED"
-            : "CONSUMER_EXECUTION_FAILED";
+            : error instanceof TypedDomainError && error.code === "CONSUMER_PROVIDER_TIMED_OUT"
+              ? "CONSUMER_PROVIDER_TIMED_OUT"
+              : error instanceof TypedDomainError && error.code === "CONSUMER_PROVIDER_FAILED"
+                ? "CONSUMER_PROVIDER_FAILED" : "CONSUMER_EXECUTION_FAILED";
       await input.repository.recordTerminalReceipt({
         ...receiptBase, state: "FAILED", reason
       });
@@ -532,8 +498,7 @@ export async function runEvaluatorConsumerRefresh(input: {
   const state = failures > 0
     ? "FAILED" as const
     : outputsInserted + outputsCurrent === 0
-      ? "SKIPPED" as const
-      : "REFRESHED" as const;
+      ? "SKIPPED" as const : "REFRESHED" as const;
   return Object.freeze({
     state, outputsInserted, outputsCurrent, inFlight, retryLimited, failures
   });

@@ -1,11 +1,12 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
   decryptContentForRun,
-  encryptContentForRun,
+  encryptAttestedContentForRun,
   type CryptoEnvelope,
+  withRunContentLease,
   withWriteTransaction
 } from "@debateai/db";
 import {
@@ -177,6 +178,8 @@ export class LedgerRepository {
   }
 
   async append(input: AppendLedgerInput): Promise<LedgerEntryRecord> {
+    const perform = async (): Promise<LedgerEntryRecord> => {
+    const ledgerEntryId = randomUUID();
     return withWriteTransaction(this.pool, async (client) => {
       const sequence = await allocateSequence(client);
       const actionKind = classifyLedgerActionKind(input.actionKind);
@@ -190,15 +193,16 @@ export class LedgerRepository {
         outcome: LedgerOutcome;
       }>(
         `INSERT INTO ledger.ledger_entry (
-          sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
+          ledger_entry_id, sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
           stance_at_action, outcome, actor_ref, input_hash, contract_hash,
-          raw_artifact_ref, started_at, finished_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          input_hash_version, raw_artifact_ref, started_at, finished_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
         RETURNING ledger_entry_id, subject_item_id, stance_at_action, outcome`,
         [
-          sequence, input.runId, input.attemptId ?? null, actionKind, callSiteKey,
-          input.subjectItemId, input.stanceAtAction, input.outcome, input.actorRef, input.inputHash,
-          input.contractHash, input.rawArtifactRef ?? null, input.startedAt, input.finishedAt
+          ledgerEntryId, sequence, input.runId, input.attemptId ?? null, actionKind, callSiteKey,
+          input.subjectItemId, input.stanceAtAction, input.outcome, input.actorRef,input.inputHash,
+          input.contractHash,1,input.rawArtifactRef ?? null,
+          input.startedAt, input.finishedAt
         ]
       );
       const row = result.rows[0]!;
@@ -210,13 +214,28 @@ export class LedgerRepository {
         outcome: row.outcome
       };
     });
+    };
+    return input.runId === null
+      ? perform()
+      : withRunContentLease(this.pool,[input.runId],async () => perform());
   }
 
   async appendRawArtifact(input: AppendRawArtifactInput): Promise<string> {
-    const content = input.runId === null ? null : await encryptContentForRun(
-      this.pool, input.runId, "ledger.raw_artifact", input.artifactId,
-      { rawText: input.rawText }
+    if (input.runId === null) {
+      throw new TypedDomainError(
+        "RAW_ARTIFACT_RUN_REQUIRED",
+        "Provider artifacts must be bound to exactly one run"
+      );
+    }
+    const runId = input.runId;
+    return withRunContentLease(this.pool,[runId],async () => {
+    const content = await encryptAttestedContentForRun(
+      this.pool, runId, "ledger.raw_artifact", input.artifactId,
+      { rawText: input.rawText, parseErrorDetail: input.parseError ?? null }
     );
+    const parseErrorCode = input.parseStatus === "PARSE_FAILED"
+      ? "CONTENT_PARSE_FAILED"
+      : input.parseStatus === "SCHEMA_FAILED" ? "CONTENT_SCHEMA_FAILED" : null;
     return withWriteTransaction(this.pool, async (client) => {
       const sequence = await allocateSequence(client);
       const result = await client.query<{ raw_artifact_id: string }>(
@@ -224,19 +243,23 @@ export class LedgerRepository {
           raw_artifact_id, attempt_id, run_id, provider_ref, provider,
           model_id, maker, model_version, raw_text, metadata_json,
           parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq,
-          content_ciphertext
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb)
+          input_hash_version,content_hash_version,
+          content_ciphertext,content_attestation
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20)
         RETURNING raw_artifact_id`,
         [
           input.artifactId, input.attemptId, input.runId, input.providerRef, input.provider,
           input.model, input.maker, input.modelVersion,
           content === null ? input.rawText : CONTENT_CIPHERTEXT_SENTINEL,
-          JSON.stringify(input.metadata), input.parseStatus, input.parseError ?? null,
-          input.inputHash, input.contractHash, input.contentHash, sequence,
-          content === null ? null : JSON.stringify(content)
+          JSON.stringify(input.metadata), input.parseStatus, parseErrorCode,
+          content === null ? input.inputHash : null,input.contractHash,
+          content === null ? input.contentHash : null,sequence,
+          content === null ? 1 : 2,content === null ? 1 : 2,
+          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null
         ]
       );
       return result.rows[0]!.raw_artifact_id;
+    });
     });
   }
 
@@ -280,6 +303,8 @@ export class LedgerRepository {
       readonly reducedJudgementRef?: string | null;
     }[];
   }): Promise<string> {
+    return withRunContentLease(this.pool,[input.runId],async () => {
+    const propagationRunId = randomUUID();
     return withWriteTransaction(this.pool, async (client) => {
       const propagationSequence = await allocateSequence(client);
       const missing = await client.query<{ subject_item_id: string }>(
@@ -306,18 +331,22 @@ export class LedgerRepository {
       }
       const propagation = await client.query<{ propagation_run_id: string }>(
         `INSERT INTO ledger.propagation_run (
-          run_id, input_hash, contract_hash, graph_fingerprint,
+          propagation_run_id,run_id,input_hash,contract_hash,graph_fingerprint,
+          input_hash_version,graph_fingerprint_version,
           arrow_order, cluster_records, operator_by_parent, transmission_reductions,
           lift_records, judgement_selection_rule,
           judgement_selection_rule_key, judgement_selection_rule_register_version,
           judgement_selection_rule_source_ref, at_seq
-        ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17)
         RETURNING propagation_run_id`,
         [
+          propagationRunId,
           input.runId,
           input.inputHash,
           input.contractHash,
           input.graphFingerprint,
+          1,
+          1,
           JSON.stringify(input.arrowOrder),
           JSON.stringify(input.clusterRecords),
           JSON.stringify(input.operatorResolutions),
@@ -330,7 +359,7 @@ export class LedgerRepository {
           propagationSequence
         ]
       );
-      const propagationRunId = propagation.rows[0]!.propagation_run_id;
+      const storedPropagationRunId = propagation.rows[0]!.propagation_run_id;
       for (const strength of input.strengths) {
         await client.query(
           `INSERT INTO ledger.node_strength_record (
@@ -341,7 +370,7 @@ export class LedgerRepository {
             lift_marker, rival_operator, rival_strength, reduced_judgement_ref
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18::jsonb,$19,$20,$21)`,
           [
-            propagationRunId,
+            storedPropagationRunId,
             strength.nodeId,
             strength.strength,
             strength.numberKind,
@@ -372,7 +401,7 @@ export class LedgerRepository {
             propagation_run_id, removed_node_id, leverage, fragility, at_seq
           ) VALUES ($1,$2,$3,$4::jsonb,$5)`,
           [
-            propagationRunId,
+            storedPropagationRunId,
             sensitivity.removedNodeId,
             sensitivity.leverage,
             JSON.stringify(sensitivity.fragility),
@@ -380,7 +409,8 @@ export class LedgerRepository {
           ]
         );
       }
-      return propagationRunId;
+      return storedPropagationRunId;
+    });
     });
   }
 
@@ -413,11 +443,13 @@ export class LedgerRepository {
   }
 
   async assertComplete(runId: string): Promise<void> {
+    await withRunContentLease(this.pool,[runId],async () => {
     const rows = await this.scheduledArtifacts(runId);
     const missing = rows.filter((row) => row.raw_artifact_id === null).map((row) => row.subject_item_id);
     if (missing.length > 0) {
       throw new TypedDomainError("COMPLETENESS_GATE_FAILED", `Required items have no persisted artifact: ${missing.join(",")}`);
     }
+    });
   }
 
   async rebuildFromArtifacts(runId: string): Promise<readonly {
@@ -426,6 +458,7 @@ export class LedgerRepository {
     readonly rawText: string;
     readonly parseStatus: "PARSED" | "UNPARSED" | "PARSE_FAILED" | "SCHEMA_FAILED";
   }[]> {
+    return withRunContentLease(this.pool,[runId],async () => {
     const rows = await this.scheduledArtifacts(runId);
     if (rows.some((row) => row.raw_artifact_id === null)) {
       throw new TypedDomainError("RECONSTRUCTION_INPUT_MISSING", `Run ${runId} has a required item without an artifact`);
@@ -436,6 +469,7 @@ export class LedgerRepository {
       rawText: row.raw_text!,
       parseStatus: row.parse_status!
     }));
+    });
   }
 
   async readStoredResultVerbatim(runId: string): Promise<readonly {

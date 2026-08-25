@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInNewContext } from "node:vm";
 import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { PoolClient } from "pg";
 import { createPool, migrate, PostgresIdentityRepository } from "@debateai/db";
 import {
@@ -28,6 +28,7 @@ import {
   loadKek,
   totpCodeAtStep,
   verifyChain,
+  type Argon2Executor,
   type ChainedAuditEvent,
   type UserDekStore
 } from "../../packages/crypto/src/index.js";
@@ -166,6 +167,31 @@ function sameArmRelabelingNull(
     classifier: Object.freeze(classifier),
     groupSize
   });
+}
+
+function exactPairedLabelSwapPValue(
+  existing: readonly number[],
+  missing: readonly number[],
+  statistic: (left: readonly number[], right: readonly number[]) => number
+): Readonly<{ observed: number; pValue: number; permutations: number }> {
+  if (existing.length !== missing.length || existing.length < 2 || existing.length > 20
+    || [...existing, ...missing].some((value) => !Number.isFinite(value))) {
+    throw new TypeError("PAIRED_LABEL_SWAP_SAMPLE_INVALID");
+  }
+  const observed = statistic(existing, missing);
+  const permutations = 2 ** existing.length;
+  let atLeastObserved = 0;
+  for (let mask = 0; mask < permutations; mask += 1) {
+    const left = new Array<number>(existing.length);
+    const right = new Array<number>(missing.length);
+    for (let index = 0; index < existing.length; index += 1) {
+      const swap = (mask & (2 ** index)) !== 0;
+      left[index] = swap ? missing[index]! : existing[index]!;
+      right[index] = swap ? existing[index]! : missing[index]!;
+    }
+    if (statistic(left, right) + Number.EPSILON >= observed) atLeastObserved += 1;
+  }
+  return Object.freeze({ observed, pValue: atLeastObserved / permutations, permutations });
 }
 
 async function forceGarbageCollection(): Promise<void> {
@@ -340,6 +366,7 @@ function buildService(input: {
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly limiterHashKey?: Uint8Array;
   readonly verificationTokenFactory?: () => string;
+  readonly argon2?: Argon2Executor;
 } = {}) {
   let now = input.initialNow ?? new Date("2026-08-19T12:00:00.000Z");
   const policy = input.policy ?? basePolicy;
@@ -361,7 +388,7 @@ function buildService(input: {
     blindIndexKey,
     policy,
     limiter,
-    argon2: sharedArgon2Pool(),
+    argon2: input.argon2 ?? sharedArgon2Pool(),
     clock: input.clock ?? (() => now),
     ...(input.verificationTokenFactory === undefined
       ? {}
@@ -372,6 +399,29 @@ function buildService(input: {
     service, repository, limiter, mail,
     advance(milliseconds: number) { now = new Date(now.getTime() + milliseconds); }
   };
+}
+
+/**
+ * Dispatcher-shape tests need every registration to have completed its ruled
+ * hash before they measure the mail queue. A real two-worker Argon2 pool makes
+ * those requests enter the dispatcher over tens of seconds, so resend top-ups
+ * can finish before the registration queue exists. The fixture keeps a valid
+ * encoded password value but deliberately removes KDF scheduling from tests
+ * whose subject is the post-hash dispatcher. The RSS child below separately
+ * warms and attests the real pool, closes it, and then measures only post-hash
+ * main-process refusal retention. Live-worker behavior has separate witnesses.
+ */
+function completedPasswordHashArgon2(): Argon2Executor {
+  const delegate = sharedArgon2Pool();
+  const fixture: Argon2Executor = {
+    async hashPassword() {
+      return `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".repeat(43)}`;
+    },
+    verifyPassword: (password, encodedHash) => delegate.verifyPassword(password, encodedHash),
+    hashAuditContext: (value, salt, parameters) =>
+      delegate.hashAuditContext(value, salt, parameters)
+  };
+  return Object.freeze(fixture);
 }
 
 const source = Object.freeze({
@@ -405,6 +455,7 @@ async function registerAccount(
 
 function fixtureAskApplication(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: "run:t9", status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,
@@ -459,7 +510,9 @@ async function databaseDeadlockCount(): Promise<number> {
 
 async function readAuditChain(): Promise<Readonly<{
   chain: readonly ChainedAuditEvent[];
-  order: readonly Readonly<{ eventType: string; actorKeyRef: string; occurredAt: Date }>[];
+  order: readonly Readonly<{
+    auditId: string; eventType: string; actorKeyRef: string; occurredAt: Date;
+  }>[];
   rootCount: number;
   totalRows: number;
 }>> {
@@ -490,7 +543,8 @@ async function readAuditChain(): Promise<Readonly<{
       thisHash: row.this_hash.toString("hex")
     })),
     order: rows.rows.map((row) => Object.freeze({
-      eventType: row.event_type, actorKeyRef: row.actor_key_ref, occurredAt: row.occurred_at
+      auditId: row.audit_id, eventType: row.event_type,
+      actorKeyRef: row.actor_key_ref, occurredAt: row.occurred_at
     })),
     rootCount: Number(roots.rows[0]!.roots),
     totalRows: Number(roots.rows[0]!.total)
@@ -501,11 +555,11 @@ async function readAuditChain(): Promise<Readonly<{
 // --------------------------------------------------------------------------
 // S3d rework1 — the isolated RSS plateau detector.
 //
-// The detector body is byte-for-byte the pre-existing one (prime 512 sources,
-// eight null samples, sixteen 500-refusal waves, plateau = spread of the last
-// four, ceiling 2.000 MiB). It runs in a child so that what it measures is one
-// production-configured Argon2 pool under load, not the residue of every test
-// that happened to run before it in file order.
+// The detector preserves the pre-existing 512-call prime, eight null samples,
+// sixteen 500-refusal waves, last-four plateau, and 2.000 MiB ceiling. It runs
+// in a child and closes its separately attested production-configured Argon2
+// pool before sampling, so it measures post-hash main-process refusal retention
+// rather than allocator residue from either live workers or earlier file tests.
 // --------------------------------------------------------------------------
 interface PlateauChildReport {
   readonly nullSamplesMib: readonly number[];
@@ -524,11 +578,20 @@ interface PlateauChildReport {
   readonly liveHandlesAfterClose: number;
   readonly outstandingAfterClose: number;
   readonly closeMs: number;
-  readonly quiesceWaitMs: number;
+  readonly gcSampleWaitMs: number;
   readonly retainedTotalMib: number;
-  readonly capacityCounts: readonly number[];
+  readonly recognizedCapacitySignalCount: number;
   readonly measuredCapacityCount: number;
   readonly unrelatedSignals: number;
+  readonly completedPasswordHashCount: number;
+  readonly lookupCalls: number;
+  readonly forbiddenPoolCalls: number;
+  readonly auditCalls: number;
+  readonly provisionCalls: number;
+  readonly dekStoreCalls: number;
+  readonly mailCalls: number;
+  readonly limiterOccupiedSlots: number;
+  readonly limiterSlotCapacity: number;
 }
 
 const S3D_PLATEAU_REPORT_MARKER = "[S3D_PLATEAU_CHILD_REPORT]";
@@ -570,22 +633,15 @@ async function forceGarbageCollection() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-// The detector samples process RSS, but two worker threads own 64 MiB Argon2
-// arenas that a main-thread-only forced GC cannot quiesce and cannot even see.
-// Sampling with jobs still in flight therefore reads arena churn, not
-// retention. Every sample point below is taken only once the pool reports zero
-// outstanding work, which is what makes the reading order-independent.
-let quiesceWaitMs = 0;
-async function quiescePool() {
+// The detector samples post-hash refusal retention only after the separately
+// warmed production worker pool has been explicitly closed. The two 64 MiB
+// worker arenas are therefore absent from every sample instead of being an
+// unobservable allocator-residency variable in a 2 MiB tripwire.
+let gcSampleWaitMs = 0;
+async function collectMainThreadGarbage() {
   const startedAt = performance.now();
-  while (argon2Pool.stats().outstandingTotal > 0) {
-    if (performance.now() - startedAt > 120000) {
-      throw new Error("S3D_RSS_QUIESCE_TIMEOUT:" + JSON.stringify(argon2Pool.stats()));
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  quiesceWaitMs += performance.now() - startedAt;
   await forceGarbageCollection();
+  gcSampleWaitMs += performance.now() - startedAt;
 }
 
 const policy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
@@ -619,60 +675,119 @@ const repository = new PostgresIdentityRepository(database, auditHasher);
 const limiter = new InProcessAuthRateLimiter(
   policy.rateLimits, policy.rateLimitBucketCapacity, policy.rateLimitRefusalAuditIntervalMs
 );
-
-class HangingMailSender {
-  constructor() { this.releases = []; this.passThrough = false; this.active = 0; }
+// This child measures post-hash refusal retention. Separate integration/unit
+// witnesses own live KDF execution, queued-password references, cancellation,
+// and worker teardown.
+let completedPasswordHashCount = 0;
+let forbiddenPoolCalls = 0;
+let auditCalls = 0;
+let provisionCalls = 0;
+let dekStoreCalls = 0;
+let mailCalls = 0;
+let lookupCalls = 0;
+const completedPasswordHashArgon2 = {
+  async hashPassword() {
+    completedPasswordHashCount += 1;
+    return "$argon2id$v=19$m=65536,t=3,p=1$" + "A".repeat(22) + "$" + "A".repeat(43);
+  },
+  async verifyPassword() {
+    forbiddenPoolCalls += 1;
+    throw new Error("S3D_RSS_CLOSED_POOL_VERIFY");
+  },
+  async hashAuditContext() {
+    forbiddenPoolCalls += 1;
+    throw new Error("S3D_RSS_CLOSED_POOL_AUDIT");
+  }
+};
+const originalFind = repository.findAuditIdentityByBlindIndex.bind(repository);
+repository.findAuditIdentityByBlindIndex = async (...args) => {
+  lookupCalls += 1;
+  return originalFind(...args);
+};
+repository.recordRateLimitRefusal = async () => {
+  auditCalls += 1;
+  throw new Error("S3D_RSS_UNEXPECTED_RATE_AUDIT");
+};
+repository.recordRegistrationFailure = async () => {
+  auditCalls += 1;
+  throw new Error("S3D_RSS_UNEXPECTED_FAILURE_AUDIT");
+};
+repository.createPendingAccount = async () => {
+  provisionCalls += 1;
+  throw new Error("S3D_RSS_UNEXPECTED_PROVISION");
+};
+const mail = {
   async sendVerification() {
-    this.active += 1;
-    if (!this.passThrough) await new Promise((resolve) => this.releases.push(resolve));
-    this.active -= 1;
+    mailCalls += 1;
+    throw new Error("S3D_RSS_UNEXPECTED_MAIL");
   }
-  releaseAll() {
-    this.passThrough = true;
-    for (const release of this.releases.splice(0)) release();
+};
+const dekStore = {
+  async store() {
+    dekStoreCalls += 1;
+    throw new Error("S3D_RSS_UNEXPECTED_DEK_STORE");
+  },
+  async destroy() {
+    dekStoreCalls += 1;
+    return false;
   }
-}
-const mail = new HangingMailSender();
+};
 const service = new RegistrationService({
-  repository, mail,
-  dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
-  blindIndexKey, policy, limiter, argon2: argon2Pool,
-  clock: () => new Date("2026-08-19T12:00:00.000Z"),
+  repository, mail, dekStore,
+  blindIndexKey, policy, limiter, argon2: completedPasswordHashArgon2,
+  // Reuse one exact source-key pair while advancing beyond the register
+  // window before every production clock read. Every refusal therefore reaches
+  // the already-full mail dispatcher without allocating a new limiter bucket;
+  // the two-row sketch must remain at exactly two occupied slots throughout.
+  clock: (() => {
+    let tick = 0;
+    const origin = Date.parse("2026-08-19T12:00:00.000Z");
+    return () => new Date(origin + tick++ * (policy.rateLimits.register.windowMs + 1));
+  })(),
   sleep: async () => undefined
 });
 
-// Capture the capacity signals exactly as the in-process spy did.
-const capacitySignals = [];
+// Parse capacity signals as they arrive. Retaining all 8,512 full strings would
+// itself be O(N) state inside the scored RSS interval and would invalidate the
+// post-hash main-process retention tripwire.
+let recognizedCapacitySignalCount = 0;
+let measuredCapacityCount = 0;
+let unrelatedSignals = 0;
+const capacitySignalPattern = /^\\[AUTH_MAIL_CAPACITY_EXHAUSTED\\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=[^ ]+ count=(\\d+)$/;
 const realError = console.error;
-console.error = (...args) => { capacitySignals.push(String(args[0])); };
+console.error = (...args) => {
+  const match = capacitySignalPattern.exec(String(args[0]));
+  if (match === null) {
+    unrelatedSignals += 1;
+    return;
+  }
+  recognizedCapacitySignalCount += 1;
+  measuredCapacityCount += Number(match[1]);
+};
+let sampler;
+let poolClosed = false;
+let report;
+const saturation = [];
+let releaseSaturation = () => undefined;
+try {
 
-// The structural admission budget caps registrations at 103, so registration
-// alone cannot fill the shared 32-active/96-waiter dispatcher any more. The
-// remaining 25 waiter slots come from the resend route, which shares that FIFO.
-const saturationCount = policy.channel.structuralMaximumConcurrentRegistrations;
-const resendTopUp = policy.channel.maxConcurrentVerificationDispatches
-  + policy.channel.maxQueuedVerificationDispatches - saturationCount;
-const saturation = Array.from({ length: saturationCount }, (_, index) =>
-  service.register({
-    email: address("saturation", index),
-    password: "correct horse battery staple",
-    recoveryEmail: address("saturation-recovery", index),
-    adultAffirmed: true
-  }, {
-    ip: "2001:db8:3d:455::" + (index + 1),
-    userAgent: "vitest-s3d-rss-saturation",
-    requestId: "request:s3d:rss:saturation:" + index
-  }).catch(() => undefined)
-);
-const saturationTopUp = Array.from({ length: resendTopUp }, (_, index) =>
-  service.resendVerification({
-    email: address("saturation-topup", index)
-  }, {
-    ip: "2001:db8:3d:457::" + (index + 1),
-    userAgent: "vitest-s3d-rss-saturation-topup",
-    requestId: "request:s3d:rss:saturation:topup:" + index
-  }).catch(() => undefined)
-);
+// Fill the dispatcher through its exact test-only permit primitive. No route,
+// repository, audit, mail, or worker dependency is involved in saturation, so
+// all of them may be proved unused after the worker pool closes.
+const saturationCount = policy.channel.maxConcurrentVerificationDispatches
+  + policy.channel.maxQueuedVerificationDispatches;
+const saturationGate = new Promise((resolve) => { releaseSaturation = resolve; });
+saturation.push(...Array.from({ length: saturationCount }, (_, index) => (async () => {
+  const activate = await service.reserveMailDispatchPermit({
+    correlationId: "s3d-rss-reservation-" + index,
+    minimumReservationMs: 0,
+    activationSpacingMs: 0,
+    waitDeadlineMs: 600000
+  });
+  const receipt = await activate();
+  await saturationGate;
+  await receipt.release();
+})()));
 const saturationStartedAt = performance.now();
 while (service.mailDispatchOccupancy().queued !== policy.channel.maxQueuedVerificationDispatches
   || service.mailDispatchOccupancy().inFlight
@@ -682,6 +797,49 @@ while (service.mailDispatchOccupancy().queued !== policy.channel.maxQueuedVerifi
   }
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
+
+// Worker lifecycle evidence is captured before the retained-object metric.
+// Closing here removes both arenas from every null and wave sample while the
+// direct permit reservations remain held by saturationGate.
+const statsBeforeClose = argon2Pool.stats();
+auditHasher.close();
+const closeStart = performance.now();
+await argon2Pool.close();
+const closeMs = performance.now() - closeStart;
+const closed = argon2Pool.stats();
+poolClosed = true;
+if (statsBeforeClose.workers !== 2 || statsBeforeClose.restartsInWindow !== 0
+  || statsBeforeClose.outstandingTotal !== 0
+  || closed.liveHandles !== 0 || closed.outstandingTotal !== 0) {
+  throw new Error("S3D_RSS_WORKER_LIFECYCLE:" + JSON.stringify({ statsBeforeClose, closed }));
+}
+const userBaseline = await database.query(
+  'SELECT count(*)::int AS count FROM identity."user"'
+);
+
+const assertWaveState = async (expectedHashes) => {
+  const occupancy = service.mailDispatchOccupancy();
+  const admission = service.registrationAdmissionOccupancy();
+  const users = await database.query('SELECT count(*)::int AS count FROM identity."user"');
+  const limiterState = limiter.memoryOccupancy();
+  if (occupancy.inFlight !== policy.channel.maxConcurrentVerificationDispatches
+    || occupancy.activeSends !== 0
+    || occupancy.queued !== policy.channel.maxQueuedVerificationDispatches
+    || completedPasswordHashCount !== expectedHashes || lookupCalls !== expectedHashes
+    || admission.admitted !== 0 || admission.admissions !== admission.releases
+    || forbiddenPoolCalls !== 0 || auditCalls !== 0 || provisionCalls !== 0
+    || dekStoreCalls !== 0 || mailCalls !== 0
+    || users.rows[0].count !== userBaseline.rows[0].count
+    || limiterState.occupiedSlots > limiterState.slotCapacity) {
+    throw new Error("S3D_RSS_WAVE_INVARIANT:" + JSON.stringify({
+      occupancy, admission, completedPasswordHashCount, lookupCalls,
+      forbiddenPoolCalls, auditCalls, provisionCalls, dekStoreCalls, mailCalls,
+      users: users.rows[0].count, baselineUsers: userBaseline.rows[0].count,
+      limiterState
+    }));
+  }
+  return limiterState;
+};
 
 const refuseWave = async (offset, count) => {
   let busy = 0;
@@ -693,7 +851,7 @@ const refuseWave = async (offset, count) => {
         recoveryEmail: address("refusal-recovery", offset + index),
         adultAffirmed: true
       }, {
-        ip: "2001:db8:3d:456::" + (((offset + index) % 512) + 1),
+        ip: "2001:db8:3d:456::1",
         userAgent: "vitest-s3d-rss-refusal",
         requestId: "request:s3d:rss:refusal:" + (offset + index)
       });
@@ -702,24 +860,25 @@ const refuseWave = async (offset, count) => {
     }
   }
   if (busy !== count) throw new Error("S3D_RSS_REFUSAL_SHORTFALL:" + busy + "/" + count);
+  return assertWaveState(offset + count);
 };
 
 await refuseWave(0, 512);
-await quiescePool();
+await collectMainThreadGarbage();
 const nullSamplesMib = [];
 for (let sample = 0; sample < 8; sample += 1) {
-  await quiescePool();
+  await collectMainThreadGarbage();
   nullSamplesMib.push(process.memoryUsage().rss / 1024 / 1024);
 }
 const nullEnvelopeMib = Math.max(...nullSamplesMib) - Math.min(...nullSamplesMib);
 const confirmedPlatformPageSizeBytes = 16 * 1024;
 const tunedSecondaryPlateauCeilingMib = 2;
 
-// In-flight peak capture: sampled while refusals and their Argon2 jobs are
-// running, not only at the quiesced points between waves.
+// In-flight peak capture: sampled while post-hash refusals are running, not
+// only at the quiesced points between waves.
 let inFlightSamples = 0;
 let inFlightPeakRss = process.memoryUsage().rss;
-const sampler = setInterval(() => {
+sampler = setInterval(() => {
   inFlightSamples += 1;
   inFlightPeakRss = Math.max(inFlightPeakRss, process.memoryUsage().rss);
 }, 25);
@@ -731,12 +890,21 @@ const waveRssMib = [];
 const waveHeapUsedMib = [];
 const waveHeapTotalMib = [];
 const waveExternalMib = [];
+let fixedLimiterSlots;
 for (let wave = 0; wave < 16; wave += 1) {
-  await refuseWave(512 + wave * 500, 500);
+  const limiterState = await refuseWave(512 + wave * 500, 500);
+  if (wave === 0) fixedLimiterSlots = limiterState.occupiedSlots;
+  if (limiterState.occupiedSlots !== fixedLimiterSlots
+    || fixedLimiterSlots !== 2
+    || limiterState.occupiedSlotsByRoute.register !== 2
+    || limiterState.occupiedSlotsByRoute.verify !== 0
+    || limiterState.occupiedSlotsByRoute.resend !== 0) {
+    throw new Error("S3D_RSS_LIMITER_NOT_FIXED:" + JSON.stringify(limiterState));
+  }
   if (retainMibPerWave > 0) {
     retained.push(Buffer.alloc(retainMibPerWave * 1024 * 1024, wave + 1));
   }
-  await quiescePool();
+  await collectMainThreadGarbage();
   const memory = process.memoryUsage();
   waveRssMib.push(memory.rss / 1024 / 1024);
   waveHeapUsedMib.push(memory.heapUsed / 1024 / 1024);
@@ -744,31 +912,22 @@ for (let wave = 0; wave < 16; wave += 1) {
   waveExternalMib.push(memory.external / 1024 / 1024);
 }
 clearInterval(sampler);
+sampler = undefined;
 const plateauSamples = waveRssMib.slice(12);
 const plateauSpreadMib = Math.max(...plateauSamples) - Math.min(...plateauSamples);
 
 service.drainMailCapacitySignals();
-const capacityCounts = capacitySignals.flatMap((signal) => {
-  const match = /^\\[AUTH_MAIL_CAPACITY_EXHAUSTED\\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=[^ ]+ count=(\\d+)$/.exec(signal);
-  return match === null ? [] : [Number(match[1])];
-});
-const measuredCapacityCount = capacityCounts.reduce((sum, count) => sum + count, 0);
-mail.releaseAll();
-await Promise.all([...saturation, ...saturationTopUp]);
-await service.drainMailDispatches();
-
-const statsBeforeClose = argon2Pool.stats();
-auditHasher.close();
-const closeStart = performance.now();
-await argon2Pool.close();
-const closeMs = performance.now() - closeStart;
-const closed = argon2Pool.stats();
-await database.end();
-console.error = realError;
-
 // Keep the control allocation observably alive right to the end.
 const retainedTotalMib = retained.reduce((sum, buffer) => sum + buffer.byteLength, 0) / 1024 / 1024;
-process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}" + JSON.stringify({
+if (measuredCapacityCount !== 8512 || recognizedCapacitySignalCount !== 8512
+  || unrelatedSignals !== 0
+  || completedPasswordHashCount !== 8512 || lookupCalls !== 8512) {
+  throw new Error("S3D_RSS_FINAL_INVARIANT:" + JSON.stringify({
+    measuredCapacityCount, recognizedCapacitySignalCount, unrelatedSignals,
+    completedPasswordHashCount, lookupCalls
+  }));
+}
+report = {
   nullSamplesMib, nullEnvelopeMib, waveRssMib, waveHeapUsedMib, waveHeapTotalMib, waveExternalMib,
   plateauSpreadMib,
   tunedCeilingMib: tunedSecondaryPlateauCeilingMib,
@@ -780,11 +939,25 @@ process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}" + JSON.stringify({
   liveHandlesAfterClose: closed.liveHandles,
   outstandingAfterClose: closed.outstandingTotal,
   closeMs,
-  quiesceWaitMs,
+  gcSampleWaitMs,
   retainedTotalMib,
-  capacityCounts, measuredCapacityCount,
-  unrelatedSignals: capacitySignals.length - capacityCounts.length
-}) + "\\n");
+  recognizedCapacitySignalCount, measuredCapacityCount, unrelatedSignals,
+  completedPasswordHashCount, lookupCalls, forbiddenPoolCalls, auditCalls,
+  provisionCalls, dekStoreCalls, mailCalls,
+  limiterOccupiedSlots: fixedLimiterSlots,
+  limiterSlotCapacity: limiter.memoryOccupancy().slotCapacity
+};
+} finally {
+  if (sampler !== undefined) clearInterval(sampler);
+  releaseSaturation();
+  await Promise.allSettled(saturation);
+  await service.drainMailDispatches();
+  auditHasher.close();
+  if (!poolClosed) await argon2Pool.close();
+  console.error = realError;
+  await database.end();
+}
+process.stdout.write("${S3D_PLATEAU_REPORT_MARKER}" + JSON.stringify(report) + "\\n");
 `;
 }
 
@@ -1049,7 +1222,7 @@ setTimeout(() => undefined, 500);
   });
 
   it("S4 enrols TOTP, persists no plaintext seed/codes, confirms one code, and atomically replaces a used code", async () => {
-    const initialNow = new Date("2026-08-23T10:00:00.000Z");
+    const initialNow = new Date(Date.now() + 60_000);
     const flow = buildService({ initialNow });
     const registered = await registerAccount(flow.service, `s4-${randomUUID()}`);
     const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
@@ -1195,7 +1368,7 @@ setTimeout(() => undefined, 500);
   }, 120_000);
 
   it("S4 grants MFA enrolment only to the sibling token actually presented for email proof", async () => {
-    const initialNow = new Date("2026-08-23T11:00:00.000Z");
+    const initialNow = new Date(Date.now() + 60_000);
     const mail = new MemoryMailSender();
     const flow = buildService({ initialNow, mail });
     const registered = await registerAccount(flow.service, `s4-sibling-${randomUUID()}`);
@@ -1308,6 +1481,9 @@ setTimeout(() => undefined, 500);
         ip, userAgent, requestId: `request:s3a:a2:${label}`
       });
       const email = `s3a-a2-${label}@example.test`;
+      const auditBefore = await database.pool.query<{ audit_id: string }>(
+        "SELECT audit_id FROM identity.audit_event"
+      );
       await expect(flow.service.register({
         email,
         password: "correct horse battery staple",
@@ -1330,15 +1506,17 @@ setTimeout(() => undefined, 500);
       }>(`
         SELECT event_type,source_context->>'userAgentArgon2id' AS user_agent_argon2id
         FROM identity.audit_event
-        WHERE source_context->>'ipArgon2id'=$1
-      `, [ipArgon2id]);
+        WHERE NOT (audit_id=ANY($1::uuid[]))
+          AND source_context->>'ipArgon2id'=$2
+      `, [auditBefore.rows.map((row) => row.audit_id), `argon2id-audit:v1:${ipArgon2id}`]);
       expect(audit.rows.map((row) => row.event_type)).toEqual(expect.arrayContaining([
         "identity.registration",
         "identity.verification.consumed",
         "identity.verification.resend_requested"
       ]));
       expect(audit.rows.length).toBeGreaterThanOrEqual(3);
-      expect(audit.rows.every((row) => row.user_agent_argon2id === unknownUserAgentArgon2id)).toBe(true);
+      expect(audit.rows.every((row) =>
+        row.user_agent_argon2id === `argon2id-audit:v1:${unknownUserAgentArgon2id}`)).toBe(true);
       const account = await database.pool.query(`
         SELECT 1 FROM identity."user" WHERE email_blind_index=$1
       `, [createEmailBlindIndex(blindIndexKey, email)]);
@@ -1370,10 +1548,12 @@ setTimeout(() => undefined, 500);
           markProvisioningEntered();
           await provisioningGate;
           await durableStore.store(userId, dek);
-        }
+        },
+        async destroy(userId) { return durableStore.destroy(userId); }
       }
     });
 
+    const auditWindowStartedAt = new Date();
     const registrations = labels.map((label) => flow.service.register({
       email: `s3a-a3-${label}@example.test`,
       password: "correct horse battery staple",
@@ -1385,7 +1565,7 @@ setTimeout(() => undefined, 500);
     releaseProvisioning();
     await Promise.all(registrations);
     await flow.service.drainMailDispatches();
-
+    const auditWindowFinishedAt = new Date();
     const drifts: number[] = [];
     for (const [index, label] of labels.entries()) {
       const expectedRequestedAt = new Date(requestedBase.getTime() + index);
@@ -1398,13 +1578,17 @@ setTimeout(() => undefined, 500);
         FROM identity."user" u
         JOIN identity.channel_binding c ON c.user_id=u.user_id AND c.channel_type='email'
         JOIN identity.audit_event a
-          ON a.target_id=u.audit_token::text AND a.event_type='identity.registration'
+          ON a.actor_key_ref=u.audit_token::text
+          AND a.event_type='identity.registration'
+          AND a.decision='ALLOW'
+          AND a.success=true
         WHERE u.email_blind_index=$1
       `, [createEmailBlindIndex(blindIndexKey, `s3a-a3-${label}@example.test`)]);
       expect(persisted.rowCount).toBe(1);
       const row = persisted.rows[0]!;
       expect(row.adult_affirmed_at).toEqual(expectedRequestedAt);
-      expect(row.audit_occurred_at).toEqual(expectedRequestedAt);
+      expect(row.audit_occurred_at.getTime()).toBeGreaterThanOrEqual(auditWindowStartedAt.getTime());
+      expect(row.audit_occurred_at.getTime()).toBeLessThanOrEqual(auditWindowFinishedAt.getTime());
       expect(row.verification_expires_at).toEqual(
         new Date(expectedRequestedAt.getTime() + basePolicy.verification.tokenTtlMs)
       );
@@ -1427,7 +1611,8 @@ setTimeout(() => undefined, 500);
         markStoreEntered();
         await storeGate;
         await durableStore.store(userId, dek);
-      }
+      },
+      async destroy(userId) { return durableStore.destroy(userId); }
     };
     const flow = buildService({ dekStore: gatedStore });
     const email = "s3b-commit-gate@example.test";
@@ -1485,7 +1670,8 @@ setTimeout(() => undefined, 500);
       async store(userId, dek) {
         await new Promise<void>((resolve) => setTimeout(resolve, 25));
         await durableStore.store(userId, dek);
-      }
+      },
+      async destroy(userId) { return durableStore.destroy(userId); }
     };
     const burstPolicy = withPolicy({
       password: Object.freeze({
@@ -1527,13 +1713,17 @@ setTimeout(() => undefined, 500);
     expect(Number(committedAtResponse.rows[0]!.count)).toBe(responses.length);
   }, 120_000);
 
-  it("S3b turns a provisioning failure into a correlated typed failure and durable failure audit", async () => {
+  it("S3b turns a provisioning failure into a typed failure and opaque durable failure audit", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const auditBefore = await database.pool.query<{ audit_id: string }>(
+      "SELECT audit_id FROM identity.audit_event"
+    );
     const flow = buildService({
       dekStore: {
         async store() {
           throw new Error("simulated secret-store failure with private detail");
-        }
+        },
+        async destroy() { return "ALREADY_ABSENT"; }
       }
     });
     const email = "s3b-provision-failure@example.test";
@@ -1566,13 +1756,14 @@ setTimeout(() => undefined, 500);
       }>(`
         SELECT target_id,actor_key_ref,justification
         FROM identity.audit_event
-        WHERE event_type='identity.registration.failed' AND target_id=$1
-      `, [correlationId]);
-      expect(audit.rows).toEqual([{
-        target_id: correlationId,
-        actor_key_ref: correlationId,
-        justification: "PROVISION_FAILED"
-      }]);
+        WHERE event_type='identity.registration.failed'
+          AND NOT (audit_id = ANY($1::uuid[]))
+      `, [auditBefore.rows.map((row) => row.audit_id)]);
+      expect(audit.rows).toHaveLength(1);
+      expect(audit.rows[0]).toMatchObject({ justification: "PROVISION_FAILED" });
+      expect(audit.rows[0]!.target_id).not.toBe(correlationId);
+      expect(audit.rows[0]!.actor_key_ref).not.toBe(correlationId);
+      expect(audit.rows[0]!.target_id).not.toBe(audit.rows[0]!.actor_key_ref);
       const account = await database.pool.query(`
         SELECT 1 FROM identity."user" WHERE email_blind_index=$1
       `, [createEmailBlindIndex(blindIndexKey, email)]);
@@ -1589,6 +1780,9 @@ setTimeout(() => undefined, 500);
   it("S3b normalises blank audit context at the repository boundary when a writer bypasses sourceContext", async () => {
     const flow = buildService();
     const actorToken = randomUUID();
+    const auditBefore = await database.pool.query<{ audit_id: string }>(
+      "SELECT audit_id FROM identity.audit_event"
+    );
     await expect(flow.repository.recordRateLimitRefusal({
       actorToken,
       route: "register",
@@ -1607,16 +1801,24 @@ setTimeout(() => undefined, 500);
     const audit = await database.pool.query<{
       ip_argon2id: string;
       user_agent_argon2id: string;
+      actor_key_ref: string;
+      target_id: string;
     }>(`
       SELECT source_context->>'ipArgon2id' AS ip_argon2id,
-        source_context->>'userAgentArgon2id' AS user_agent_argon2id
+        source_context->>'userAgentArgon2id' AS user_agent_argon2id,
+        actor_key_ref,target_id
       FROM identity.audit_event
-      WHERE event_type='identity.auth.rate_limit_refused' AND target_id=$1
-    `, [actorToken]);
-    expect(audit.rows).toEqual([{
-      ip_argon2id: unknownIpArgon2id,
-      user_agent_argon2id: unknownUserAgentArgon2id
-    }]);
+      WHERE event_type='identity.auth.rate_limit_refused'
+        AND NOT (audit_id = ANY($1::uuid[]))
+    `, [auditBefore.rows.map((row) => row.audit_id)]);
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]).toMatchObject({
+      ip_argon2id: `argon2id-audit:v1:${unknownIpArgon2id}`,
+      user_agent_argon2id: `argon2id-audit:v1:${unknownUserAgentArgon2id}`
+    });
+    expect(audit.rows[0]!.actor_key_ref).not.toBe(actorToken);
+    expect(audit.rows[0]!.target_id).not.toBe(actorToken);
+    expect(audit.rows[0]!.actor_key_ref).not.toBe(audit.rows[0]!.target_id);
     console.info(
       `[S3b REPOSITORY NORMALISATION] backend=postgres bypass=sourceContext `
       + `blank_ip=unknown blank_ua=unknown audit_rows=${audit.rowCount}`
@@ -1761,6 +1963,7 @@ setTimeout(() => undefined, 500);
     const flow = buildService({
       mail,
       sleep: async () => undefined,
+      argon2: completedPasswordHashArgon2(),
       verificationTokenFactory() {
         const token = generateVerificationToken();
         generatedTokenHashes.add(hashVerificationToken(token));
@@ -1768,18 +1971,28 @@ setTimeout(() => undefined, 500);
       }
     });
     const capacityError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const pendingAttempts: Promise<unknown>[] = [];
+    let cleaned = false;
+    const cleanup = async (): Promise<void> => {
+      if (cleaned) return;
+      cleaned = true;
+      mail.releaseAndPassThrough();
+      await Promise.allSettled(pendingAttempts);
+      await flow.service.drainMailDispatches();
+      capacityError.mockRestore();
+    };
+    try {
     const heapCanary = Buffer.from("C".repeat(43), "utf8").toString("utf8");
     const baselineSnapshotPath = join(secretRoot, `s3d-d1-baseline-${randomUUID()}.heapsnapshot`);
     writeHeapSnapshot(baselineSnapshotPath);
     const baselineTokenStrings = await quotedVerificationTokensInHeap(baselineSnapshotPath);
     await rm(baselineSnapshotPath, { force: true });
     expect(baselineTokenStrings.has(heapCanary)).toBe(true);
-    // Saturating the shared 32-active/96-waiter dispatcher takes 128 requests,
-    // but registration alone can no longer supply them: the structural
-    // admission budget is 103, so registrations can occupy at most 32 permits
-    // and 71 waiter slots. The remaining 25 waiters come from the resend route,
-    // which is exactly the shared-FIFO property decision v3 declines to
-    // partition — and it keeps this test measuring a genuinely full queue.
+    // Saturating the shared 32-active/96-waiter dispatcher takes 128 requests.
+    // The injected hash result means all 103 registrations have completed the
+    // pre-dispatch KDF boundary before the 25 resend top-ups race for the same
+    // FIFO, so this observes the intended 32+96 post-hash shape rather than an
+    // impossible instantaneous queue while real hashes are still running.
     const initialAttempts = basePolicy.channel.structuralMaximumConcurrentRegistrations;
     const resendTopUp = ruledMaximum + ruledQueueMaximum - initialAttempts;
     const outcomes: Array<string | undefined> = Array.from({ length: initialAttempts });
@@ -1801,6 +2014,17 @@ setTimeout(() => undefined, 500);
       }
     };
     const initial = Array.from({ length: initialAttempts }, (_, index) => registerAt(index));
+    pendingAttempts.push(...initial);
+    const initialSaturationStartedAt = performance.now();
+    while (true) {
+      const state = flow.service.mailDispatchOccupancy();
+      if (state.inFlight === ruledMaximum
+        && state.queued === initialAttempts - ruledMaximum) break;
+      if (performance.now() - initialSaturationStartedAt > 30_000) {
+        throw new Error(`S3D_REGISTRATION_SATURATION_TIMEOUT:${JSON.stringify(state)}`);
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    }
     const topUp = Array.from({ length: resendTopUp }, (_, index) =>
       flow.service.resendVerification({
         email: `s3d-hang-topup-${index}@example.test`
@@ -1809,6 +2033,7 @@ setTimeout(() => undefined, 500);
         userAgent: "vitest-s3d-hanging-transport-topup",
         requestId: `request:s3d:hang:topup:${index}`
       }).catch(() => undefined));
+    pendingAttempts.push(...topUp);
     const saturationStartedAt = performance.now();
     while (true) {
       const state = flow.service.mailDispatchOccupancy();
@@ -1929,10 +2154,7 @@ setTimeout(() => undefined, 500);
       expect(capacitySignals.some((signal) => signal.includes("s3d-hang-")
         || signal.includes("2001:db8") || signal.includes("vitest-s3d"))).toBe(false);
     } finally {
-      mail.releaseAndPassThrough();
-      await Promise.all([...initial, ...topUp]);
-      await flow.service.drainMailDispatches();
-      capacityError.mockRestore();
+      await cleanup();
     }
     const committedAfterDrain = await database.pool.query<{ count: string }>(`
       SELECT count(*)::text AS count FROM identity."user"
@@ -1965,6 +2187,9 @@ setTimeout(() => undefined, 500);
       queued: 0,
       maximumQueued: ruledQueueMaximum
     });
+    } finally {
+      await cleanup();
+    }
   }, 180_000);
 
   it("S3d rework3 B2 calibrates each same-arm null at the scored n-v-n group size", () => {
@@ -1999,11 +2224,37 @@ setTimeout(() => undefined, 500);
     }
 
     const mail = new HangingMailSender();
-    const flow = buildService({ mail, sleep: async () => undefined });
+    const flow = buildService({
+      mail,
+      sleep: async () => undefined,
+      argon2: completedPasswordHashArgon2()
+    });
     const capacityError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    // Registration alone stops at the structural admission budget of 103, so
-    // the last 25 waiter slots of the shared 96-deep queue are filled from the
-    // resend route. The queue under measurement is still exactly 96 deep.
+    const inspectedService = flow.service as unknown as {
+      signalMailCapacity(correlationId: string): void;
+      s3dRetainedRefusalObjects?: Array<Readonly<{
+        s3dRetainedRefusalMarker: true;
+        refusalIndex: number;
+      }>>;
+    };
+    const originalSignalMailCapacity = inspectedService.signalMailCapacity.bind(flow.service);
+    const pendingAttempts: Promise<unknown>[] = [];
+    let cleaned = false;
+    const cleanup = async (): Promise<void> => {
+      if (cleaned) return;
+      cleaned = true;
+      inspectedService.signalMailCapacity = originalSignalMailCapacity;
+      delete inspectedService.s3dRetainedRefusalObjects;
+      mail.releaseAll();
+      await Promise.allSettled(pendingAttempts);
+      await flow.service.drainMailDispatches();
+      capacityError.mockRestore();
+    };
+    try {
+    // The completed-hash fixture makes all 103 registrations eligible for the
+    // dispatcher before the 25 resend top-ups fill the shared 96-deep queue.
+    // The retained-object proof therefore measures the exact post-hash queue,
+    // not Argon2 scheduling latency.
     const saturationCount = basePolicy.channel.structuralMaximumConcurrentRegistrations;
     const resendTopUp = basePolicy.channel.maxConcurrentVerificationDispatches
       + basePolicy.channel.maxQueuedVerificationDispatches - saturationCount;
@@ -2019,6 +2270,18 @@ setTimeout(() => undefined, 500);
         requestId: `request:s3d:retained:saturation:${index}`
       }).catch(() => undefined)
     );
+    pendingAttempts.push(...saturation);
+    const registrationSaturationStartedAt = performance.now();
+    while (true) {
+      const state = flow.service.mailDispatchOccupancy();
+      if (state.inFlight === basePolicy.channel.maxConcurrentVerificationDispatches
+        && state.queued === saturationCount
+          - basePolicy.channel.maxConcurrentVerificationDispatches) break;
+      if (performance.now() - registrationSaturationStartedAt > 60_000) {
+        throw new Error(`S3D_RETAINED_REGISTRATION_TIMEOUT:${JSON.stringify(state)}`);
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    }
     const saturationTopUp = Array.from({ length: resendTopUp }, (_, index) =>
       flow.service.resendVerification({
         email: `s3d-retained-topup-${index}@example.test`
@@ -2028,6 +2291,7 @@ setTimeout(() => undefined, 500);
         requestId: `request:s3d:retained:saturation:topup:${index}`
       }).catch(() => undefined)
     );
+    pendingAttempts.push(...saturationTopUp);
     const saturationStartedAt = performance.now();
     while (flow.service.mailDispatchOccupancy().queued
       !== basePolicy.channel.maxQueuedVerificationDispatches
@@ -2041,14 +2305,6 @@ setTimeout(() => undefined, 500);
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
     }
 
-    const inspectedService = flow.service as unknown as {
-      signalMailCapacity(correlationId: string): void;
-      s3dRetainedRefusalObjects?: Array<Readonly<{
-        s3dRetainedRefusalMarker: true;
-        refusalIndex: number;
-      }>>;
-    };
-    const originalSignalMailCapacity = inspectedService.signalMailCapacity.bind(flow.service);
     const retainedRefusalObjects: Array<Readonly<{
       s3dRetainedRefusalMarker: true;
       refusalIndex: number;
@@ -2111,10 +2367,7 @@ setTimeout(() => undefined, 500);
       const match = / count=(\d+)$/.exec(signal);
       return match === null ? [] : [Number(match[1])];
     });
-    mail.releaseAll();
-    await Promise.all([...saturation, ...saturationTopUp]);
-    await flow.service.drainMailDispatches();
-    capacityError.mockRestore();
+    await cleanup();
 
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find(
       (row) => row.rowKey === "rateLimitPolicy"
@@ -2192,6 +2445,9 @@ setTimeout(() => undefined, 500);
     expect(at500.total).toBeLessThanOrEqual(boundAt500);
     expect(at4000.total).toBeLessThanOrEqual(boundAt4000);
     expect(capacityCounts.reduce((sum, count) => sum + count, 0)).toBe(4_000);
+    } finally {
+      await cleanup();
+    }
   }, 180_000);
 
   it("S3d rework3 B1/B3 probes deep-queue slack and the following audit window", async () => {
@@ -2201,6 +2457,7 @@ setTimeout(() => undefined, 500);
     const deepSamplesPerArm = maximum / 2;
 
     type Release = () => Promise<void>;
+    type ActivationReceipt = Readonly<{ activatedAt: number; release: Release }>;
     type DispatchRecord = {
       readonly activatedAt: number;
       releaseInvokedAfterMs?: number;
@@ -2212,14 +2469,17 @@ setTimeout(() => undefined, 500);
       legacyPrehashPredicate: boolean;
     }>;
     type InstrumentedDispatcher = {
-      activateMailDispatch(enforceMinimum?: boolean, minimumReservationMs?: number): Release;
+      activateMailDispatch(
+        enforceMinimum?: boolean,
+        minimumReservationMs?: number
+      ): ActivationReceipt;
       reserveMailDispatch(correlationId: string): Promise<Release>;
       reserveMailDispatchPermit(request: {
         readonly correlationId: string;
         readonly minimumReservationMs?: number;
         readonly activationSpacingMs?: number;
         readonly waitDeadlineMs?: number;
-      }): Promise<() => Promise<Release>>;
+      }): Promise<() => Promise<ActivationReceipt>>;
     };
 
     class RuledTimeoutMailSender implements MailSender {
@@ -2241,18 +2501,21 @@ setTimeout(() => undefined, 500);
       const records: DispatchRecord[] = [];
       let reservationCapture: ReservationState[] | undefined;
       inspected.activateMailDispatch = (enforceMinimum = false, minimumReservationMs?: number) => {
-        const record: DispatchRecord = { activatedAt: performance.now() };
+        const receipt = originalActivate(enforceMinimum, minimumReservationMs);
+        const record: DispatchRecord = { activatedAt: receipt.activatedAt };
         records.push(record);
-        const release = originalActivate(enforceMinimum, minimumReservationMs);
         let completion: Promise<void> | undefined;
-        return () => {
-          if (completion !== undefined) return completion;
-          record.releaseInvokedAfterMs = performance.now() - record.activatedAt;
-          completion = release().finally(() => {
-            record.handoffAfterMs = performance.now() - record.activatedAt;
-          });
-          return completion;
-        };
+        return Object.freeze({
+          activatedAt: receipt.activatedAt,
+          release: () => {
+            if (completion !== undefined) return completion;
+            record.releaseInvokedAfterMs = performance.now() - record.activatedAt;
+            completion = receipt.release().finally(() => {
+              record.handoffAfterMs = performance.now() - record.activatedAt;
+            });
+            return completion;
+          }
+        });
       };
       const captureReservation = () => {
         if (reservationCapture !== undefined) {
@@ -2687,7 +2950,7 @@ setTimeout(() => undefined, 500);
       activateMailDispatch(
         enforceMinimum?: boolean,
         minimumReservationMs?: number
-      ): () => Promise<void>;
+      ): Readonly<{ activatedAt: number; release: () => Promise<void> }>;
     };
     const activateMailDispatch = instrumentedService.activateMailDispatch.bind(flow.service);
     let capturedGrantTimes: number[] | undefined;
@@ -2893,6 +3156,189 @@ setTimeout(() => undefined, 500);
     }
   }, 600_000);
 
+  it("S3d activates a granted registration permit before missing-address DEK persistence", async () => {
+    let activationCount = 0;
+    let activatedBeforeStore: boolean | undefined;
+    let sendCountBeforeStore: number | undefined;
+    let markStoreEntered!: () => void;
+    let releaseStore!: () => void;
+    const storeEntered = new Promise<void>((resolve) => { markStoreEntered = resolve; });
+    const storeGate = new Promise<void>((resolve) => { releaseStore = resolve; });
+    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+    const mail = new MemoryMailSender();
+    const email = `s3d-permit-before-store-${randomUUID()}@example.test`;
+    const emailBlindIndex = createEmailBlindIndex(blindIndexKey, email);
+    const flow = buildService({
+      mail,
+      dekStore: {
+        async store(userId, dek) {
+          activatedBeforeStore = activationCount === 1;
+          sendCountBeforeStore = mail.messages.length;
+          markStoreEntered();
+          await storeGate;
+          await durableStore.store(userId, dek);
+        },
+        async destroy(userId) { return durableStore.destroy(userId); }
+      }
+    });
+    const inspected = flow.service as unknown as {
+      activateMailDispatch(
+        enforceMinimum?: boolean,
+        minimumReservationMs?: number
+      ): Readonly<{ activatedAt: number; release: () => Promise<void> }>;
+    };
+    const activateMailDispatch = inspected.activateMailDispatch.bind(flow.service);
+    inspected.activateMailDispatch = (enforceMinimum = false, minimumReservationMs?: number) => {
+      activationCount += 1;
+      return activateMailDispatch(enforceMinimum, minimumReservationMs);
+    };
+    let responseSettled = 0;
+    const registration = flow.service.register({
+      email,
+      password: "correct horse battery staple",
+      recoveryEmail: `s3d-permit-before-store-recovery-${randomUUID()}@example.test`,
+      adultAffirmed: true
+    }, {
+      ip: "2001:db8:4d:10::1",
+      userAgent: "vitest-s3d-permit-before-store",
+      requestId: `request:s3d:permit-before-store:${randomUUID()}`
+    }).finally(() => { responseSettled += 1; });
+    let waitFailure: unknown;
+    try {
+      await Promise.race([
+        storeEntered,
+        new Promise<never>((_,reject) => setTimeout(
+          () => reject(new Error("S3D_PERMIT_BEFORE_STORE_TIMEOUT")), 30_000
+        ))
+      ]);
+    } catch (error) {
+      waitFailure = error;
+    }
+    const beforeCommit = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM identity."user" WHERE email_blind_index=$1
+    `, [emailBlindIndex]);
+    expect(responseSettled).toBe(0);
+    expect(beforeCommit.rows[0]!.count).toBe("0");
+    expect(activationCount).toBe(1);
+    expect(sendCountBeforeStore).toBe(0);
+    releaseStore();
+    const settled = await Promise.allSettled([registration]);
+    await flow.service.drainMailDispatches();
+    if (waitFailure !== undefined) throw waitFailure;
+    expect(settled[0]).toMatchObject({ status: "fulfilled" });
+    expect(responseSettled).toBe(1);
+    expect(activatedBeforeStore).toBe(true);
+    expect(sendCountBeforeStore).toBe(0);
+  }, 60_000);
+
+  it("S3d completes a slow password hash before reserving or activating mail capacity", async () => {
+    let releaseHash!: () => void;
+    let markHashEntered!: () => void;
+    const hashGate = new Promise<void>((resolve) => { releaseHash = resolve; });
+    const hashEntered = new Promise<void>((resolve) => { markHashEntered = resolve; });
+    const delegate = sharedArgon2Pool();
+    const delayedArgon2: Argon2Executor = {
+      async hashPassword(password, salt, parameters) {
+        markHashEntered();
+        await hashGate;
+        return delegate.hashPassword(password, salt, parameters);
+      },
+      verifyPassword: (password, encodedHash) => delegate.verifyPassword(password, encodedHash),
+      hashAuditContext: (value, salt, parameters) =>
+        delegate.hashAuditContext(value, salt, parameters)
+    };
+    const flow = buildService({ argon2: delayedArgon2 });
+    const inspected = flow.service as unknown as {
+      reserveMailDispatchPermit(request: {
+        readonly correlationId: string;
+        readonly minimumReservationMs?: number;
+        readonly activationSpacingMs?: number;
+        readonly waitDeadlineMs?: number;
+      }): Promise<() => Promise<Readonly<{
+        activatedAt: number;
+        release: () => Promise<void>;
+      }>>>;
+      activateMailDispatch(
+        enforceMinimum?: boolean,
+        minimumReservationMs?: number
+      ): Readonly<{ activatedAt: number; release: () => Promise<void> }>;
+    };
+    const reserve = inspected.reserveMailDispatchPermit.bind(flow.service);
+    const activate = inspected.activateMailDispatch.bind(flow.service);
+    let reserveCount = 0;
+    let activationCount = 0;
+    inspected.reserveMailDispatchPermit = (request) => {
+      reserveCount += 1;
+      return reserve(request);
+    };
+    inspected.activateMailDispatch = (enforceMinimum = false, minimumReservationMs?: number) => {
+      activationCount += 1;
+      return activate(enforceMinimum, minimumReservationMs);
+    };
+    let responseSettled = 0;
+    const registration = flow.service.register({
+      email: `s3d-slow-hash-${randomUUID()}@example.test`,
+      password: "correct horse battery staple",
+      recoveryEmail: `s3d-slow-hash-recovery-${randomUUID()}@example.test`,
+      adultAffirmed: true
+    }, {
+      ip: "2001:db8:4d:11::1",
+      userAgent: "vitest-s3d-slow-hash-before-permit",
+      requestId: `request:s3d:slow-hash:${randomUUID()}`
+    }).finally(() => { responseSettled += 1; });
+    try {
+      await hashEntered;
+      await new Promise<void>((resolve) => setTimeout(resolve, 700));
+      expect(responseSettled).toBe(0);
+      expect(reserveCount).toBe(0);
+      expect(activationCount).toBe(0);
+      expect(flow.service.mailDispatchOccupancy()).toMatchObject({ inFlight: 0, queued: 0 });
+    } finally {
+      releaseHash();
+    }
+    await expect(registration).resolves.toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    await flow.service.drainMailDispatches();
+    expect(reserveCount).toBe(1);
+    expect(activationCount).toBe(1);
+    expect(responseSettled).toBe(1);
+  }, 60_000);
+
+  it("S3d signals pre-transport work outside the ruled 600ms healthy-storage bound", async () => {
+    const operator = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const signalBaseline = operator.mock.calls.length;
+    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+    const flow = buildService({
+      dekStore: {
+        async store(userId, dek) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 650));
+          await durableStore.store(userId, dek);
+        },
+        async destroy(userId) { return durableStore.destroy(userId); }
+      }
+    });
+    try {
+      await expect(flow.service.register({
+        email: `s3d-slow-store-${randomUUID()}@example.test`,
+        password: "correct horse battery staple",
+        recoveryEmail: `s3d-slow-store-recovery-${randomUUID()}@example.test`,
+        adultAffirmed: true
+      }, {
+        ip: "2001:db8:4d:12::1",
+        userAgent: "vitest-s3d-slow-store-signal",
+        requestId: `request:s3d:slow-store:${randomUUID()}`
+      })).resolves.toEqual(REGISTRATION_PUBLIC_RESPONSE);
+      await flow.service.drainMailDispatches();
+      const signals = operator.mock.calls.slice(signalBaseline).flat().map(String).filter((line) =>
+        line.startsWith("[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED]"));
+      expect(signals).toHaveLength(1);
+      expect(signals[0]).toMatch(
+        /^\[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED\] correlation=[0-9a-f-]{36} code=REGISTRATION_PRETRANSPORT_SLOW elapsed_ms=\d+ budget_ms=600$/
+      );
+    } finally {
+      operator.mockRestore();
+    }
+  }, 60_000);
+
   it("S3d rework4 labels the shallow register handoff by the successor address arm", async () => {
     const samplesPerArm = 16;
     const ruledTransportTimeoutMs = basePolicy.channel.transportTimeoutMs;
@@ -2902,6 +3348,8 @@ setTimeout(() => undefined, 500);
     );
     const sustainedLoad = process.env.S3D_SUCCESSOR_SUSTAINED_LOAD === "1";
     expect([0, 25]).toContain(createOnlyDelayMs);
+    const operator = vi.spyOn(console, "error");
+    onTestFinished(() => operator.mockRestore());
     class SuccessorBoundaryMailSender implements MailSender {
       readonly active = new Map<string, VerificationMail>();
       readonly sentRecipients: string[] = [];
@@ -2949,7 +3397,8 @@ setTimeout(() => undefined, 500);
             await new Promise<void>((resolve) => setTimeout(resolve, createOnlyDelayMs));
           }
           await durableStore.store(userId, dek);
-        }
+        },
+        async destroy(userId) { return durableStore.destroy(userId); }
       }
     });
     const balancingFlow = buildService({ mail: balancingMail });
@@ -2957,13 +3406,16 @@ setTimeout(() => undefined, 500);
       activateMailDispatch(
         enforceMinimum?: boolean,
         minimumReservationMs?: number
-      ): () => Promise<void>;
+      ): Readonly<{ activatedAt: number; release: () => Promise<void> }>;
       reserveMailDispatchPermit(request: {
         readonly correlationId: string;
         readonly minimumReservationMs?: number;
         readonly activationSpacingMs?: number;
         readonly waitDeadlineMs?: number;
-      }): Promise<() => Promise<() => Promise<void>>>;
+      }): Promise<() => Promise<Readonly<{
+        activatedAt: number;
+        release: () => Promise<void>;
+      }>>>;
     };
     const originalActivate = instrumentedService.activateMailDispatch.bind(flow.service);
     const originalReserve = instrumentedService.reserveMailDispatchPermit.bind(flow.service);
@@ -3022,6 +3474,11 @@ setTimeout(() => undefined, 500);
     await Promise.all(fillers);
     await waitFor(() => mail.active.size === basePolicy.channel.maxConcurrentVerificationDispatches,
       "fill");
+    // The seed/filler burst builds the queue topology; it is not a scored arm.
+    // From this point onward every target/marker provisioning operation must be
+    // inside the ruled healthy-storage envelope, or the privacy measurement is
+    // explicitly ineligible rather than silently counted as GREEN.
+    operator.mockClear();
     const hostLoad = sustainedLoad ? await startSustainedHostLoad(secretRoot) : undefined;
 
     type ArmMeasurement = {
@@ -3141,6 +3598,34 @@ setTimeout(() => undefined, 500);
     const sharpNullClassifier = empiricalQuantile(
       [...existingSharpNull.classifier, ...missingSharpNull.classifier], nullQuantile
     );
+    expect(existing.grantIntervals).toHaveLength(samplesPerArm);
+    expect(missing.grantIntervals).toHaveLength(samplesPerArm);
+    expect(existing.markerPermitToActivation).toHaveLength(samplesPerArm);
+    expect(missing.markerPermitToActivation).toHaveLength(samplesPerArm);
+    expect(new Set([...existing.grantIntervals, ...missing.grantIntervals]).size)
+      .toBeGreaterThan(1);
+    expect(new Set([
+      ...existing.markerPermitToActivation,
+      ...missing.markerPermitToActivation
+    ]).size).toBeGreaterThan(1);
+    const grantAucExact = exactPairedLabelSwapPValue(
+      existing.grantIntervals, missing.grantIntervals, aucSeparability
+    );
+    const grantAccuracyExact = exactPairedLabelSwapPValue(
+      existing.grantIntervals, missing.grantIntervals,
+      bestSingleThresholdClassifierAccuracy
+    );
+    const sharpAucExact = exactPairedLabelSwapPValue(
+      existing.markerPermitToActivation, missing.markerPermitToActivation, aucSeparability
+    );
+    const sharpAccuracyExact = exactPairedLabelSwapPValue(
+      existing.markerPermitToActivation, missing.markerPermitToActivation,
+      bestSingleThresholdClassifierAccuracy
+    );
+    const familywiseAlpha = 0.01;
+    const endpointAlpha = familywiseAlpha / 4;
+    const preTransportOverruns = operator.mock.calls.flat().map(String).filter((line) =>
+      line.startsWith("[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED]"));
     console.info(
       `[S3d REWORK4 SUCCESSOR-LABELLED SHALLOW] backend=postgres production_policy=true `
       + `transport_ms=${ruledTransportTimeoutMs} n=${samplesPerArm} target_arm=missing `
@@ -3155,14 +3640,34 @@ setTimeout(() => undefined, 500);
       + `sharp_cross_auc=${sharpAuc.toFixed(4)} sharp_null_auc_q99=${sharpNullAuc.toFixed(4)} `
       + `sharp_cross_accuracy=${sharpClassifier.toFixed(4)} `
       + `sharp_null_accuracy_q99=${sharpNullClassifier.toFixed(4)} `
+      + `paired_permutations=${grantAucExact.permutations} `
+      + `grant_auc_p=${grantAucExact.pValue.toFixed(6)} `
+      + `grant_accuracy_p=${grantAccuracyExact.pValue.toFixed(6)} `
+      + `sharp_auc_p=${sharpAucExact.pValue.toFixed(6)} `
+      + `sharp_accuracy_p=${sharpAccuracyExact.pValue.toFixed(6)} `
+      + `familywise_alpha=${familywiseAlpha} endpoint_alpha=${endpointAlpha} `
+      + `scored_pretransport_overruns=${preTransportOverruns.length} `
       + `in_window_sends_existing=${existing.sendsInWindow} `
       + `in_window_sends_missing=${missing.sendsInWindow}`
     );
     expect(existing.sendsInWindow).toBe(missing.sendsInWindow);
-    expect(sharpAuc).toBeLessThanOrEqual(sharpNullAuc);
-    expect(sharpClassifier).toBeLessThanOrEqual(sharpNullClassifier);
-    expect(auc).toBeLessThanOrEqual(nullAuc);
-    expect(classifier).toBeLessThanOrEqual(nullClassifier);
+    expect(preTransportOverruns, "scored arms exceeded the ruled 600 ms healthy-storage envelope")
+      .toEqual([]);
+    const exactEndpoints = [
+      ["grant_auc", grantAucExact],
+      ["grant_accuracy", grantAccuracyExact],
+      ["sharp_auc", sharpAucExact],
+      ["sharp_accuracy", sharpAccuracyExact]
+    ] as const;
+    const failingEndpoints = exactEndpoints.filter(([,exact]) => exact.pValue < endpointAlpha);
+    expect(failingEndpoints, JSON.stringify({
+      endpointAlpha,
+      endpoints: Object.fromEntries(exactEndpoints.map(([name,exact]) => [name,exact])),
+      existingGrantIntervals: existing.grantIntervals,
+      missingGrantIntervals: missing.grantIntervals,
+      existingPermitToActivation: existing.markerPermitToActivation,
+      missingPermitToActivation: missing.markerPermitToActivation
+    })).toEqual([]);
   }, 360_000);
 
   // The burst arms are 100 / 103 / 104 / 128 / 160 because those are the four
@@ -3213,7 +3718,10 @@ setTimeout(() => undefined, 500);
           readonly minimumReservationMs?: number;
           readonly activationSpacingMs?: number;
           readonly waitDeadlineMs?: number;
-        }): Promise<() => Promise<() => Promise<void>>>;
+        }): Promise<() => Promise<Readonly<{
+          activatedAt: number;
+          release: () => Promise<void>;
+        }>>>;
         registrationAdmissionOccupancy(): Readonly<{ admitted: number; maximum: number }>;
       };
       const reserveMailDispatchPermit = inspectedService.reserveMailDispatchPermit.bind(flow.service);
@@ -3581,20 +4089,14 @@ setTimeout(() => undefined, 500);
     // this test changed.
   }, 120_000);
 
-  it("S3d rework3 fold-in plateaus RSS under a fixed ceiling and preserves the total aggregate count", async () => {
-    // ROUTER EVIDENCE RULING (rework 1). The 2.000 MiB plateau limit is
-    // UNCHANGED — it is not raised, softened or deleted. What changed is
-    // hermeticity. Run in file order behind 55 other tests, this detector was
-    // reading a process whose RSS oscillates by ~100 MiB because two live
-    // Argon2 worker arenas cannot be quiesced by a main-thread-only forced GC,
-    // and its own null envelope had grown to 64x its ceiling. The exact
-    // pre-T1 full-suite baseline (logs/T9-router-full-suite-attempt2.log,
-    // integration hash c0a17739..., plateau 0.094 MiB, null envelope 0.109 MiB)
-    // and a direct 240-job pool probe (0.6 MiB drift, zero restarts) together
-    // establish there is no retention to find. So the repair is to give the
-    // detector a process it can actually measure: a fresh child with one
-    // production-configured pool, a deterministic warm-up, in-flight peak
-    // capture, an explicit close() and a prompt exit.
+  it("S3d post-hash main-process secondary RSS tripwire stays flat and counts every refusal", async () => {
+    // The 2.000 MiB secondary plateau limit is unchanged. This is deliberately
+    // not a live-worker RSS claim: the child warms and lifecycle-attests the
+    // production-configured two-worker pool, waits for zero outstanding work,
+    // then closes the pool before every scored sample. The remaining interval
+    // measures post-hash main-process refusal state while direct test-only
+    // permits are held by saturationGate. Real KDF execution, password
+    // references, worker failure, and teardown have separate witnesses.
     //
     // The green run below is only meaningful because of the positive control
     // beneath it, which retains real memory in an otherwise identical child and
@@ -3606,8 +4108,8 @@ setTimeout(() => undefined, 500);
 
       const detector = await runPlateauDetectorChild(childPath, scratch, 0);
       console.info(
-        `[S3d REWORK1 ISOLATED RSS PLATEAU] backend=postgres hermetic=child `
-        + `refusals=8000 sources=512 retained_mib_per_wave=0 `
+        `[S3d POST-HASH MAIN-PROCESS RSS TRIPWIRE] backend=postgres hermetic=child `
+        + `calls=8512 source_keys=1 retained_mib_per_wave=0 `
         + `null_mib=[${detector.nullSamplesMib.map((value) => value.toFixed(1)).join(",")}] `
         + `waves_mib=[${detector.waveRssMib.map((value) => value.toFixed(1)).join(",")}] `
         + `heap_used_mib=[${detector.waveHeapUsedMib.map((value) => value.toFixed(1)).join(",")}] `
@@ -3622,23 +4124,31 @@ setTimeout(() => undefined, 500);
         + `in_flight_samples=${detector.inFlightSamples} `
         + `worker_count=${detector.workerCount} worker_restarts=${detector.workerRestartsInWindow} `
         + `live_handles_after_close=${detector.liveHandlesAfterClose} `
-        + `close_ms=${detector.closeMs.toFixed(1)} quiesce_wait_ms=${detector.quiesceWaitMs.toFixed(1)} `
+        + `close_ms=${detector.closeMs.toFixed(1)} gc_sample_wait_ms=${detector.gcSampleWaitMs.toFixed(1)} `
         + `child_total_ms=${detector.childTotalMs.toFixed(1)} `
         + `post_report_exit_ms=${detector.postReportExitMs.toFixed(1)} `
-        + `measured_aggregates=${detector.capacityCounts.length} `
+        + `recognized_capacity_signals=${detector.recognizedCapacitySignalCount} `
         + `measured_total_count=${detector.measuredCapacityCount} `
+        + `completed_hashes=${detector.completedPasswordHashCount} `
+        + `lookups=${detector.lookupCalls} limiter_slots=${detector.limiterOccupiedSlots} `
+        + `limiter_capacity=${detector.limiterSlotCapacity} `
+        + `forbidden_pool=${detector.forbiddenPoolCalls} audit=${detector.auditCalls} `
+        + `provision=${detector.provisionCalls} dek=${detector.dekStoreCalls} `
+        + `mail=${detector.mailCalls} `
         + `unrelated_signals=${detector.unrelatedSignals}`
       );
 
-      // The child really was hermetic: its own null envelope is small again,
-      // so the tripwire is measuring the pool rather than process history.
+      // The null envelope covers post-close main-process sampling only. It does
+      // not measure the worker pool and cannot be cited as a live-worker bound.
       expect(detector.nullEnvelopeMib).toBeLessThanOrEqual(detector.tunedCeilingMib);
-      // One production-configured pool, explicitly closed, nothing left behind.
+      // The production-configured pool is a lifecycle control: warmed,
+      // attested, and explicitly closed before the scored interval.
       expect(detector.workerCount).toBe(2);
       expect(detector.workerRestartsInWindow).toBe(0);
       expect(detector.liveHandlesAfterClose).toBe(0);
       expect(detector.outstandingAfterClose).toBe(0);
-      // The peak was taken while jobs were in flight, not after they settled.
+      // The peak was taken while post-hash refusal waves were in flight, not
+      // only after the wave settled.
       expect(detector.inFlightSamples).toBeGreaterThan(1);
       expect(detector.inFlightPeakRssMib)
         .toBeGreaterThanOrEqual(Math.max(...detector.waveRssMib) - 1);
@@ -3648,15 +4158,23 @@ setTimeout(() => undefined, 500);
       // THE UNCHANGED THRESHOLD.
       expect(detector.tunedCeilingMib).toBe(2);
       expect(detector.plateauSpreadMib).toBeLessThanOrEqual(detector.tunedCeilingMib);
-      expect(detector.capacityCounts.length).toBeGreaterThanOrEqual(1);
+      expect(detector.recognizedCapacitySignalCount).toBe(8_512);
       expect(detector.measuredCapacityCount).toBe(8_512);
+      expect(detector.completedPasswordHashCount).toBe(8_512);
+      expect(detector.lookupCalls).toBe(8_512);
+      expect(detector.limiterOccupiedSlots).toBe(2);
+      expect(detector.limiterSlotCapacity).toBe(basePolicy.rateLimitBucketCapacity * 3);
+      expect([
+        detector.forbiddenPoolCalls,detector.auditCalls,detector.provisionCalls,
+        detector.dekStoreCalls,detector.mailCalls,detector.unrelatedSignals
+      ]).toEqual([0,0,0,0,0,0]);
 
       // POSITIVE CONTROL. Identical child, identical detector, identical
       // threshold — plus a deliberate retention of 4 MiB per wave. If this does
       // not go RED on the very assertion above, the green result is worthless.
       const control = await runPlateauDetectorChild(childPath, scratch, 4);
       console.info(
-        `[S3d REWORK1 ISOLATED RSS POSITIVE CONTROL] retained_mib_per_wave=4 `
+        `[S3d POST-HASH MAIN-PROCESS RSS POSITIVE CONTROL] retained_mib_per_wave=4 `
         + `waves_mib=[${control.waveRssMib.map((value) => value.toFixed(1)).join(",")}] `
         + `null_envelope_mib=${control.nullEnvelopeMib.toFixed(3)} `
         + `tuned_ceiling_mib=${control.tunedCeilingMib.toFixed(3)} `
@@ -3668,7 +4186,16 @@ setTimeout(() => undefined, 500);
       expect(control.tunedCeilingMib).toBe(2);
       // The intended assertion, and only that assertion, fails.
       expect(control.plateauSpreadMib).toBeGreaterThan(control.tunedCeilingMib);
+      expect(control.recognizedCapacitySignalCount).toBe(8_512);
       expect(control.measuredCapacityCount).toBe(8_512);
+      expect(control.completedPasswordHashCount).toBe(8_512);
+      expect(control.lookupCalls).toBe(8_512);
+      expect(control.limiterOccupiedSlots).toBe(2);
+      expect(control.limiterSlotCapacity).toBe(basePolicy.rateLimitBucketCapacity * 3);
+      expect([
+        control.forbiddenPoolCalls,control.auditCalls,control.provisionCalls,
+        control.dekStoreCalls,control.mailCalls,control.unrelatedSignals
+      ]).toEqual([0,0,0,0,0,0]);
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
@@ -4262,7 +4789,8 @@ setTimeout(() => undefined, 500);
       async store(userId, dek) {
         await new Promise<void>((resolve) => setTimeout(resolve, branchOnlyDelayMs));
         await fileStore.store(userId, dek);
-      }
+      },
+      async destroy(userId) { return fileStore.destroy(userId); }
     };
     const measure = async (
       flow: ReturnType<typeof buildService>,
@@ -4318,7 +4846,6 @@ setTimeout(() => undefined, 500);
   }, 45_000);
 
   it("S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below the separation ceiling", async () => {
-    const aucCeiling = 0.8;
     const registrationCadenceMs = Number(process.env.S3D_REGISTRATION_CADENCE_MS ?? "45");
     const sustainedLoad = process.env.S3D_CADENCE_SUSTAINED_LOAD === "1";
     expect([30, 45, 60]).toContain(registrationCadenceMs);
@@ -4340,6 +4867,9 @@ setTimeout(() => undefined, 500);
       readonly medianGapMs: number;
       readonly classifierAccuracy: number;
       readonly auc: number;
+      readonly aucCeiling: number;
+      readonly nullAucMedian: number;
+      readonly sampleCountPerArm: number;
       readonly waves: number;
       readonly duplicateAuditCount: number;
       readonly duplicatePostworkAuditCount: number;
@@ -4349,7 +4879,11 @@ setTimeout(() => undefined, 500);
       readonly clampHeadroomMs: number;
     }> = [];
     for (const concurrency of [1, 2, 3, 4, 8] as const) {
-      const waves = concurrency === 1 ? 8 : 4;
+      // Calibrate from at least sixteen real observations per arm. The n=8
+      // cell retains its original four waves (32 observations); smaller cells
+      // gain enough observations that discrete zero-signal AUC draws do not
+      // spuriously exceed their own q99 envelope.
+      const waves = Math.max(4,Math.ceil(16/concurrency));
       const existingGroups = Math.ceil(waves / 4);
       const timingMail = new MemoryMailSender();
       const flow = buildService({ mail: timingMail, policy: cadencePolicy });
@@ -4382,6 +4916,17 @@ setTimeout(() => undefined, 500);
         requestId: `request:s3b:timing:n${concurrency}:seed:${index}`
       })));
       await flow.service.drainMailDispatches();
+      const auditBaseline = await database.pool.query<{
+        duplicate: string;
+        duplicate_postwork: string;
+      }>(`
+        SELECT
+          count(*) FILTER (WHERE event_type='identity.registration'
+            AND decision='DENY')::text AS duplicate,
+          count(*) FILTER (WHERE event_type='identity.registration.duplicate_postwork'
+            AND decision='DENY')::text AS duplicate_postwork
+        FROM identity.audit_event
+      `);
 
       const existing: number[] = [];
       const missing: number[] = [];
@@ -4436,32 +4981,56 @@ setTimeout(() => undefined, 500);
       const medianGapMs = Math.abs(median(existing) - median(missing));
       const classifierAccuracy = bestSingleThresholdClassifierAccuracy(existing, missing);
       const auc = aucSeparability(existing, missing);
+      const sampleCountPerArm = concurrency * waves;
+      expect(existing).toHaveLength(sampleCountPerArm);
+      expect(missing).toHaveLength(sampleCountPerArm);
+      expect(existing.every(Number.isFinite)).toBe(true);
+      expect(missing.every(Number.isFinite)).toBe(true);
+      expect(new Set(existing).size).toBeGreaterThan(1);
+      expect(new Set(missing).size).toBeGreaterThan(1);
+      const existingNull = sameArmRelabelingNull(
+        existing,sampleCountPerArm,0x53b0_0000 + concurrency * 2
+      );
+      const missingNull = sameArmRelabelingNull(
+        missing,sampleCountPerArm,0x53b0_0001 + concurrency * 2
+      );
+      expect(existingNull.groupSize).toBe(sampleCountPerArm);
+      expect(missingNull.groupSize).toBe(sampleCountPerArm);
+      const nullAucValues = [...existingNull.auc,...missingNull.auc];
+      const nullAucMedian = empiricalQuantile(nullAucValues,0.5);
+      const aucCeiling = empiricalQuantile(nullAucValues,0.99);
+      expect(Number.isFinite(nullAucMedian)).toBe(true);
+      expect(Number.isFinite(aucCeiling)).toBe(true);
+      expect(aucCeiling).toBeGreaterThanOrEqual(nullAucMedian);
       const clampMs = basePolicy.verification.enumerationResponseFloorMs
         + basePolicy.verification.enumerationToleranceMs;
       const hashAndProvisioningMaximumMs = Math.max(...hashAndProvisioningWork);
       const clampHeadroomMs = clampMs - (
         hashAndProvisioningMaximumMs + concurrency * registrationCadenceMs
       );
-      const existingTokens = await database.pool.query<{ audit_token: string }>(`
-        SELECT audit_token FROM identity."user"
-        WHERE email_blind_index=ANY($1::bytea[])
-      `, [existingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
-      const duplicateAudits = await database.pool.query<{ count: string }>(`
-        SELECT count(*)::text AS count FROM identity.audit_event
-        WHERE event_type='identity.registration' AND decision='DENY'
-          AND actor_key_ref=ANY($1::text[])
-      `, [existingTokens.rows.map((row) => row.audit_token)]);
-      const duplicatePostworkAudits = await database.pool.query<{ count: string }>(`
-        SELECT count(*)::text AS count FROM identity.audit_event
-        WHERE event_type='identity.registration.duplicate_postwork' AND decision='DENY'
-          AND actor_key_ref=ANY($1::text[])
-      `, [existingTokens.rows.map((row) => row.audit_token)]);
+      // Denial actors are intentionally DB-minted and unlinkable to the known
+      // account, so count the exact per-cell event delta instead of joining a
+      // denial back to the existing account audit token.
+      const duplicateAudits = await database.pool.query<{
+        duplicate: string;
+        duplicate_postwork: string;
+      }>(`
+        SELECT
+          count(*) FILTER (WHERE event_type='identity.registration'
+            AND decision='DENY')::text AS duplicate,
+          count(*) FILTER (WHERE event_type='identity.registration.duplicate_postwork'
+            AND decision='DENY')::text AS duplicate_postwork
+        FROM identity.audit_event
+      `);
       cells.push(
         `n=${concurrency} existing=[${existing.map((value) => value.toFixed(1)).join(",")}] `
         + `missing=[${missing.map((value) => value.toFixed(1)).join(",")}] `
         + `median_gap_ms=${medianGapMs.toFixed(1)} `
         + `best_classifier_pct=${(classifierAccuracy * 100).toFixed(1)} `
         + `auc_separability_pct=${(auc * 100).toFixed(1)} `
+        + `null_auc_median_pct=${(nullAucMedian * 100).toFixed(1)} `
+        + `null_auc_q99_pct=${(aucCeiling * 100).toFixed(1)} `
+        + `null_group_size=${sampleCountPerArm} `
         + `hash_provision_max_ms=${hashAndProvisioningMaximumMs.toFixed(1)} `
         + `clamp_headroom_ms=${clampHeadroomMs.toFixed(1)}`
       );
@@ -4472,9 +5041,14 @@ setTimeout(() => undefined, 500);
         medianGapMs,
         classifierAccuracy,
         auc,
+        aucCeiling,
+        nullAucMedian,
+        sampleCountPerArm,
         waves,
-        duplicateAuditCount: Number(duplicateAudits.rows[0]!.count),
-        duplicatePostworkAuditCount: Number(duplicatePostworkAudits.rows[0]!.count),
+        duplicateAuditCount: Number(duplicateAudits.rows[0]!.duplicate)
+          -Number(auditBaseline.rows[0]!.duplicate),
+        duplicatePostworkAuditCount: Number(duplicateAudits.rows[0]!.duplicate_postwork)
+          -Number(auditBaseline.rows[0]!.duplicate_postwork),
         expectedMailCount: existingEmails.length + concurrency * waves,
         mailCount: timingMail.messages.length,
         hashAndProvisioningMaximumMs,
@@ -4491,13 +5065,15 @@ setTimeout(() => undefined, 500);
         + `sustained_cpu_workers=${sustainedLoad ? 2 : 0} filesystem_writes=${filesystemWrites} `
         + `clamp_ms=${basePolicy.verification.enumerationResponseFloorMs
           + basePolicy.verification.enumerationToleranceMs} `
-        + `auc_ceiling_pct=${(aucCeiling * 100).toFixed(1)} ${cells.join(" | ")}`
+        + `auc_calibration=per_cell_same_arm_q99 ${cells.join(" | ")}`
     );
     for (const measurement of measurements) {
+      expect(measurement.sampleCountPerArm).toBe(measurement.concurrency * measurement.waves);
+      expect(measurement.aucCeiling).toBeGreaterThanOrEqual(measurement.nullAucMedian);
+      expect(measurement.auc).toBeLessThanOrEqual(measurement.aucCeiling);
       expect(measurement.medianGapMs).toBeLessThanOrEqual(
         basePolicy.verification.enumerationToleranceMs
       );
-      expect(measurement.auc).toBeLessThanOrEqual(aucCeiling);
     }
     for (const measurement of measurements) {
       expect(measurement.duplicateAuditCount).toBe(measurement.concurrency * measurement.waves);
@@ -4512,7 +5088,7 @@ setTimeout(() => undefined, 500);
     // above and leave the calibration with nothing measured. Reaching this line
     // is itself the proof that everything above it passed.
     //
-    // Under decision_version 3 this block DISCLOSES rather than gates. v2
+    // Under decision_version 4 this block DISCLOSES rather than gates. v2
     // ratified N*=3 against a ruled 430 ms upper bound; unchanged code then
     // measured that same n=3 arm at 1,264.7 ms and 973.0 ms, so the ratified
     // bound is contradicted evidence, not a live threshold. Asserting it again
@@ -4552,7 +5128,7 @@ setTimeout(() => undefined, 500);
       expect(basePolicy.channel.supersededRegistrationHashAndProvisioningUpperBoundMs).toBe(430);
       expect(basePolicy.channel.supersededRegistrationClampHeadroomMs).toBe(35);
       expect(basePolicy.channel.currentPositiveClampAbsorptionNStar).toBeNull();
-      expect(basePolicy.channel.registrationAdmissionDecisionVersion).toBe(3);
+      expect(basePolicy.channel.registrationAdmissionDecisionVersion).toBe(4);
 
       // 2. The cadence is UNCHANGED by this decision.
       expect(registrationCadenceMs).toBe(45);
@@ -4610,7 +5186,7 @@ setTimeout(() => undefined, 500);
     }
   }, 300_000);
 
-  it("S3b F3 rejects an audit-invalid account before invoking the external DEK write", async () => {
+  it("S3b F3 removes caller-selected account audit tokens and DB-mints the live binding", async () => {
     const flow = buildService();
     const userId = randomUUID();
     const email = `s3b-f3-${userId}@example.test`;
@@ -4618,8 +5194,9 @@ setTimeout(() => undefined, 500);
     const keyId = `user-dek:${userId}`;
     const dek = generateDek();
     let beforeCommitCalls = 0;
+    const client = await database.pool.connect();
     try {
-      await expect(flow.repository.createPendingAccount({
+      const pendingInput = {
         userId,
         emailBlindIndex: createEmailBlindIndex(blindIndexKey, email),
         emailCiphertext: encrypt(dek, Buffer.from(email), [
@@ -4630,23 +5207,73 @@ setTimeout(() => undefined, 500);
         ]),
         passwordHash: "s3b-f3-password-hash",
         pseudonym: `s3b-f3-${userId}`,
-        auditToken: "00000000-0000-0000-0000-000000000000",
         adultAffirmedAt: new Date("2026-08-20T00:00:00.000Z"),
         verificationTokenHash: createHash("sha256").update(generateVerificationToken()).digest("hex"),
         verificationExpiresAt: new Date("2026-08-21T00:00:00.000Z"),
         occurredAt: new Date("2026-08-20T00:00:00.000Z"),
         source
-      }, async () => { beforeCommitCalls += 1; })).rejects.toThrow("AUDIT_TOKEN_MUST_BE_RANDOM_UUID_V4");
-      const persisted = await database.pool.query<{ count: string }>(`
+      } as const;
+
+      // The retired overload exposed a caller-selected audit token. A real
+      // runtime principal cannot invoke that shape, even with an otherwise
+      // valid payload and its required one-shot audit attempt.
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      await expect(client.query(`
+        SELECT * FROM identity.create_pending_account_with_audit(
+          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12::jsonb
+        )
+      `, [
+        pendingInput.userId,pendingInput.emailBlindIndex,
+        JSON.stringify(pendingInput.emailCiphertext),
+        JSON.stringify(pendingInput.recoveryEmailCiphertext),
+        pendingInput.passwordHash,pendingInput.pseudonym,userId,
+        pendingInput.adultAffirmedAt,pendingInput.occurredAt,
+        pendingInput.verificationTokenHash,pendingInput.verificationExpiresAt,
+        JSON.stringify({
+          ipArgon2id: `argon2id-audit:v1:${"a".repeat(64)}`,
+          userAgentArgon2id: `argon2id-audit:v1:${"b".repeat(64)}`
+        })
+      ])).rejects.toMatchObject({ code: "42883" });
+      await client.query("ROLLBACK");
+
+      const rejected = await database.pool.query<{ count: string }>(`
         SELECT count(*)::text AS count FROM identity."user" WHERE user_id=$1
       `, [userId]);
-      console.info(
-        `[S3b F3 ORDERING] backend=postgres audit_failure=pre_dek_write `
-        + `before_commit_calls=${beforeCommitCalls} persisted_accounts=${persisted.rows[0]!.count}`
-      );
       expect(beforeCommitCalls).toBe(0);
-      expect(Number(persisted.rows[0]!.count)).toBe(0);
+      expect(rejected.rows[0]!.count).toBe("0");
+
+      const created = await flow.repository.createPendingAccount(
+        pendingInput,
+        async () => { beforeCommitCalls += 1; }
+      );
+      if (created.status !== "created") throw new Error("F3_ACCOUNT_CREATE_FAILED");
+      const persisted = await database.pool.query<{
+        audit_token: string; actor_key_ref: string;
+      }>(`
+        SELECT u.audit_token,a.actor_key_ref
+        FROM identity."user" u
+        JOIN identity.audit_event a
+          ON a.actor_key_ref=u.audit_token::text
+          AND a.event_type='identity.registration'
+          AND a.decision='ALLOW' AND a.success=true
+        WHERE u.user_id=$1
+      `, [userId]);
+      console.info(
+        `[S3b F3 DB-MINTED AUDIT TOKEN] backend=postgres chosen_overload=42883 `
+        + `before_commit_calls=${beforeCommitCalls} persisted_accounts=${persisted.rowCount}`
+      );
+      expect(beforeCommitCalls).toBe(1);
+      expect(persisted.rows).toHaveLength(1);
+      expect(persisted.rows[0]!.audit_token).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      );
+      expect(persisted.rows[0]!.audit_token).not.toBe(userId);
+      expect(persisted.rows[0]!.actor_key_ref).toBe(persisted.rows[0]!.audit_token);
     } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release();
       dek.fill(0);
     }
   }, 20_000);
@@ -4706,12 +5333,10 @@ setTimeout(() => undefined, 500);
         ORDER BY occurred_at DESC LIMIT 1
       `);
       expect(failureAudit.rows).toHaveLength(1);
-      expect(failureAudit.rows[0]!.justification).toMatch(
-        /^correlation:[0-9a-f-]{36};code:MAIL_RECORD_FAILED$/
-      );
+      expect(failureAudit.rows[0]!.justification).toBe("MAIL_RECORD_FAILED");
       expect(failureAudit.rows[0]!.source_context).toEqual({
-        ipArgon2id: expect.stringMatching(/^[0-9a-f]{64}$/),
-        userAgentArgon2id: expect.stringMatching(/^[0-9a-f]{64}$/)
+        ipArgon2id: expect.stringMatching(/^argon2id-audit:v1:[0-9a-f]{64}$/),
+        userAgentArgon2id: expect.stringMatching(/^argon2id-audit:v1:[0-9a-f]{64}$/)
       });
       expect(failureAudit.rows[0]!.row_text).not.toContain(email);
       expect(failureAudit.rows[0]!.row_text).not.toContain(source.ip);
@@ -4888,7 +5513,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
    */
   async function waitForResendContention(
     monitor: PoolClient,
-    occurredAt: Date,
+    baselinePrepared: number,
     minimumPrepared: number,
     timeoutMs: number
   ): Promise<Readonly<{ prepared: number; peakLockWaiters: number }>> {
@@ -4899,12 +5524,11 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const sample = await monitor.query<{ prepared: string; waiters: string }>(`
         SELECT
           (SELECT count(*) FROM identity.audit_event
-            WHERE event_type='identity.verification.resend_requested'
-              AND occurred_at=$1)::text AS prepared,
+            WHERE event_type='identity.verification.resend_requested')::text AS prepared,
           (SELECT count(*) FROM pg_stat_activity
             WHERE datname=current_database() AND wait_event_type='Lock')::text AS waiters
-      `, [occurredAt]);
-      prepared = Number(sample.rows[0]!.prepared);
+      `);
+      prepared = Number(sample.rows[0]!.prepared) - baselinePrepared;
       peakLockWaiters = Math.max(peakLockWaiters, Number(sample.rows[0]!.waiters));
       if (prepared >= minimumPrepared || peakLockWaiters >= 2) break;
       await new Promise<void>((resolve) => setTimeout(resolve, 5));
@@ -5165,7 +5789,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }
 
   it("S4 takes the channel lock before user and credential during verify/enrol overlap", async () => {
-    const initialNow = new Date("2026-08-23T12:00:00.000Z");
+    // The MFA preflight deliberately revalidates credential expiry against the
+    // database clock. Use a live fixture clock so this lock-order witness does
+    // not turn into an expired-token test as wall time advances.
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ initialNow, mail });
     const registered = await registerAccount(flow.service, `s4-lock-order-${randomUUID()}`);
@@ -5187,33 +5814,29 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
+    const pending: Promise<unknown>[] = [];
     try {
       const deadlocksBefore = await databaseDeadlockCount();
       barrier = installQueryBarrier((sql) =>
-        sql.includes("SELECT channel_binding_id,user_id")
-        && sql.includes("FROM identity.channel_binding")
-        && sql.includes("channel_binding_id=$1")
-        && sql.includes("FOR UPDATE")
+        sql.includes("identity.consume_verification_with_audit")
       );
 
-      // The retry is valid public behaviour but cannot consume the credential
-      // twice. Pausing its first channel-row lock makes the overlap repeatable.
       const retryVerification = api.inject({
         method: "POST",
         url: "/v1/auth/verify-email",
         payload: { token }
       });
+      pending.push(retryVerification);
       await barrier.reached;
+      expect(barrier.hits()).toBe(1);
 
       const beginningEnrollment = api.inject({
         method: "POST",
         url: "/v1/auth/mfa/totp/begin",
         payload: { enrollment_token: token }
       });
-      const peakLockWaiters = await Promise.race([
-        beginningEnrollment.then(() => 0),
-        waitForLockWaiters(monitor, 1, 8_000)
-      ]);
+      pending.push(beginningEnrollment);
+      const peakLockWaiters = await waitForLockWaiters(monitor, 1, 30_000);
 
       barrier.release();
       barrier = undefined;
@@ -5223,8 +5846,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
       console.info(
         `[S4 VERIFY/ENROL LOCK ORDER RED/GREEN] `
-        + `peak_lock_waiters=${peakLockWaiters} retry_status=${retried.statusCode} `
-        + `begin_status=${begun.statusCode} deadlock_delta=${deadlocksAfter - deadlocksBefore}`
+        + `capability_barrier_hits=1 peak_lock_waiters=${peakLockWaiters} `
+        + `retry_status=${retried.statusCode} `
+        + `begin_status=${begun.statusCode} begin_body=${JSON.stringify(begun.body)} `
+        + `deadlock_delta=${deadlocksAfter - deadlocksBefore}`
       );
       expect(peakLockWaiters).toBeGreaterThanOrEqual(1);
       expect(retried.statusCode).toBe(400);
@@ -5236,6 +5861,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(deadlocksAfter - deadlocksBefore).toBe(0);
     } finally {
       barrier?.release();
+      await Promise.allSettled(pending);
       monitor.release();
       await flow.service.drainMailDispatches();
       await api.close();
@@ -5297,10 +5923,6 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
   it("T9 keeps 32 existing and 32 missing concurrent resends byte-identical with zero deadlocks", async () => {
     const initialNow = new Date("2026-08-21T09:00:00.000Z");
-    const existingInstant = new Date(
-      initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
-    );
-    const missingInstant = new Date(existingInstant.getTime() + 1);
     const mail = new GatedVerificationMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
@@ -5341,6 +5963,18 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       mail.arm();
       flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
+      const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
+        SELECT audit_id FROM identity.audit_event
+        WHERE event_type='identity.verification.resend_requested'
+      `);
+      const resendAuditBaseline = new Set(resendAuditBefore.rows.map((row) => row.audit_id));
+      const rateLimitAuditBefore = await database.pool.query<{ audit_id: string }>(`
+        SELECT audit_id FROM identity.audit_event
+        WHERE event_type='identity.auth.rate_limit_refused'
+      `);
+      const rateLimitAuditBaseline = new Set(
+        rateLimitAuditBefore.rows.map((row) => row.audit_id)
+      );
 
       // Step 4: the first eligible existing-account resend, suspended in transport.
       const existingRequests = [
@@ -5355,13 +5989,27 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           injectResend(api, "existing", index, registered.email, `198.51.100.${index + 1}`)
         );
       }
-      const contention = await waitForResendContention(monitor, existingInstant, 3, 8_000);
+      const contention = await waitForResendContention(
+        monitor, resendAuditBaseline.size, 3, 8_000
+      );
       phase(`contention prepared=${contention.prepared} waiters=${contention.peakLockWaiters}`);
       mail.release();
       const existingObservations = await Promise.all(existingRequests);
       phase("existing-arm-responded");
       await flow.service.drainMailDispatches();
       phase("existing-arm-drained");
+      const existingAuditResult = await database.pool.query<{
+        audit_id: string; actor_key_ref: string; decision: string; success: boolean;
+        justification: string | null; occurred_at: Date;
+      }>(`
+        SELECT audit_id,actor_key_ref,decision,success,justification,occurred_at
+        FROM identity.audit_event
+        WHERE event_type='identity.verification.resend_requested'
+      `);
+      const existingAudit = existingAuditResult.rows.filter(
+        (row) => !resendAuditBaseline.has(row.audit_id)
+      );
+      const existingAuditIds = new Set(existingAudit.map((row) => row.audit_id));
 
       // Step 6: the paired missing-address arm across the same public boundary.
       flow.advance(1);
@@ -5380,18 +6028,15 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       phase(`deadlocks-read delta=${deadlocksAfter - deadlocksBefore}`);
 
       const resendAudit = await database.pool.query<{
-        actor_key_ref: string; decision: string; success: boolean;
+        audit_id: string; actor_key_ref: string; decision: string; success: boolean;
         justification: string | null; occurred_at: Date;
       }>(`
-        SELECT actor_key_ref,decision,success,justification,occurred_at
+        SELECT audit_id,actor_key_ref,decision,success,justification,occurred_at
         FROM identity.audit_event
-        WHERE event_type='identity.verification.resend_requested' AND occurred_at IN ($1,$2)
-      `, [existingInstant, missingInstant]);
-      const existingAudit = resendAudit.rows.filter(
-        (row) => row.occurred_at.getTime() === existingInstant.getTime()
-      );
+        WHERE event_type='identity.verification.resend_requested'
+      `);
       const missingAudit = resendAudit.rows.filter(
-        (row) => row.occurred_at.getTime() === missingInstant.getTime()
+        (row) => !resendAuditBaseline.has(row.audit_id) && !existingAuditIds.has(row.audit_id)
       );
       const deliveryAudit = await database.pool.query<{ event_type: string; decision: string }>(`
         SELECT event_type,decision FROM identity.audit_event
@@ -5399,10 +6044,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           'identity.verification.sent','identity.verification.delivery_record_failed'
         )
       `, [registered.user.audit_token]);
-      const rateLimitAudit = await database.pool.query<{ refusals: string }>(`
-        SELECT count(*)::text AS refusals FROM identity.audit_event
-        WHERE event_type='identity.auth.rate_limit_refused' AND occurred_at>=$1
-      `, [existingInstant]);
+      const rateLimitAudit = await database.pool.query<{ audit_id: string }>(`
+        SELECT audit_id FROM identity.audit_event
+        WHERE event_type='identity.auth.rate_limit_refused'
+      `);
       const credentials = await database.pool.query<{
         token_hash: string; issued_at: Date; expires_at: Date; consumed_at: Date | null;
       }>(`
@@ -5426,13 +6071,11 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const deliveryChainIndex = audit.order.findIndex((event) =>
         event.eventType === "identity.verification.sent"
         && event.actorKeyRef === registered.user.audit_token
-        && event.occurredAt.getTime() >= existingInstant.getTime()
+        && audit.order.some((later) => existingAuditIds.has(later.auditId)
+          && later.occurredAt.getTime() <= event.occurredAt.getTime())
       );
       const existingChainIndexes = audit.order.flatMap((event, index) =>
-        event.eventType === "identity.verification.resend_requested"
-          && event.occurredAt.getTime() === existingInstant.getTime()
-          ? [index]
-          : []
+        existingAuditIds.has(event.auditId) ? [index] : []
       );
       const resendRowsAfterDelivery = existingChainIndexes.filter(
         (index) => index > deliveryChainIndex
@@ -5488,12 +6131,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // Non-vacuity: every request reached resend preparation.
       expect(existingAudit).toHaveLength(32);
       expect(missingAudit).toHaveLength(32);
-      expect(existingAudit.every((row) => row.actor_key_ref === registered.user.audit_token))
-        .toBe(true);
       expect(existingAudit.filter((row) => row.decision === "ALLOW" && row.success)).toHaveLength(1);
       expect(existingAudit.filter((row) =>
         row.decision === "DENY" && !row.success && row.justification === "RESEND_COOLDOWN"
       )).toHaveLength(31);
+      expect(existingAudit.filter((row) => row.actor_key_ref === registered.user.audit_token))
+        .toHaveLength(1);
+      expect(new Set(existingAudit.filter((row) => !row.success)
+        .map((row) => row.actor_key_ref)).size).toBe(31);
       expect(missingAudit.every((row) =>
         row.decision === "DENY" && !row.success && row.justification === "RESEND_NOT_APPLICABLE"
         && row.actor_key_ref !== registered.user.audit_token
@@ -5514,7 +6159,9 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(binding.rows[0]!.delivery_error).toBeNull();
 
       // Non-vacuity: no rate limit intervened in either arm.
-      expect(rateLimitAudit.rows[0]!.refusals).toBe("0");
+      expect(rateLimitAudit.rows.filter(
+        (row) => !rateLimitAuditBaseline.has(row.audit_id)
+      )).toEqual([]);
 
       // Non-vacuity: append-only chain has one root, covers every row, and verifies.
       expect(audit.rootCount).toBe(1);
@@ -5637,9 +6284,6 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     // check contends the read-decide-write window itself, which is the property
     // prepareVerificationResend's `FOR UPDATE OF c,u` exists to guarantee.
     const initialNow = new Date("2026-08-21T15:00:00.000Z");
-    const sendInstant = new Date(
-      initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
-    );
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
@@ -5648,6 +6292,11 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(mail.messages).toHaveLength(1);
       flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
+      const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
+        SELECT audit_id FROM identity.audit_event
+        WHERE event_type='identity.verification.resend_requested'
+      `);
+      const resendAuditBaseline = new Set(resendAuditBefore.rows.map((row) => row.audit_id));
 
       const observations = await Promise.all(Array.from({ length: 32 }, (_, index) =>
         injectResend(api, "existing", index, registered.email, `198.51.60.${index + 1}`)
@@ -5657,12 +6306,16 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const deadlocksAfter = await databaseDeadlockCount();
 
       const preparation = await database.pool.query<{
-        decision: string; success: boolean; justification: string | null;
+        audit_id: string; actor_key_ref: string; decision: string;
+        success: boolean; justification: string | null;
       }>(`
-        SELECT decision,success,justification FROM identity.audit_event
+        SELECT audit_id,actor_key_ref,decision,success,justification
+        FROM identity.audit_event
         WHERE event_type='identity.verification.resend_requested'
-          AND actor_key_ref=$1 AND occurred_at=$2
-      `, [registered.user.audit_token, sendInstant]);
+      `);
+      const preparationRows = preparation.rows.filter(
+        (row) => !resendAuditBaseline.has(row.audit_id)
+      );
       const credentials = await database.pool.query<{ credentials: string }>(`
         SELECT count(*)::text AS credentials
         FROM identity.verification_token_credential credential
@@ -5674,9 +6327,9 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       console.info(
         `[T9 SINGLE SEND RACE RED/GREEN] backend=postgres requests=32 `
         + `statuses=${JSON.stringify([...new Set(observations.map((one) => one.status))])} `
-        + `preparation_rows=${preparation.rowCount} `
-        + `allow=${preparation.rows.filter((row) => row.decision === "ALLOW").length} `
-        + `cooldown_deny=${preparation.rows.filter((row) =>
+        + `preparation_rows=${preparationRows.length} `
+        + `allow=${preparationRows.filter((row) => row.decision === "ALLOW").length} `
+        + `cooldown_deny=${preparationRows.filter((row) =>
           row.justification === "RESEND_COOLDOWN").length} `
         + `mails=${mail.messages.length} credentials=${credentials.rows[0]!.credentials} `
         + `distinct_tokens=${new Set(mail.messages.map((message) => message.token)).size} `
@@ -5689,12 +6342,15 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         expect(observation.body).toBe(RESEND_BODY);
         expect(observation.rejection).toBeNull();
       }
-      expect(preparation.rows).toHaveLength(32);
-      expect(preparation.rows.filter((row) => row.decision === "ALLOW" && row.success))
+      expect(preparationRows).toHaveLength(32);
+      expect(preparationRows.filter((row) => row.decision === "ALLOW" && row.success))
         .toHaveLength(1);
-      expect(preparation.rows.filter((row) =>
+      expect(preparationRows.filter((row) =>
         row.decision === "DENY" && row.justification === "RESEND_COOLDOWN"
       )).toHaveLength(31);
+      expect(preparationRows.filter(
+        (row) => row.actor_key_ref === registered.user.audit_token
+      )).toHaveLength(1);
       expect(mail.messages).toHaveLength(2);
       expect(new Set(mail.messages.map((message) => message.token)).size).toBe(2);
       expect(credentials.rows[0]!.credentials).toBe("2");
@@ -6021,9 +6677,6 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const runWindow = async (replicate: number, order: T9Order): Promise<T9Window> => {
       const windowIndex = replicate * 2 + (order === "AB" ? 0 : 1);
       const initialNow = new Date(Date.UTC(2026, 7, 24 + windowIndex, 13, 0, 0));
-      const occurredAt = new Date(
-        initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1
-      );
       const namespace = `t9-rework9-r${replicate + 1}-${order.toLowerCase()}`;
       const mail = new MemoryMailSender();
       const flow = buildService({ mail, initialNow });
@@ -6047,6 +6700,20 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
         flow.advance(basePolicy.verification.resendCooldownMs + 1);
         const deadlocksBefore = await databaseDeadlockCount();
+        const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
+          SELECT audit_id FROM identity.audit_event
+          WHERE event_type='identity.verification.resend_requested'
+        `);
+        const resendAuditBaseline = new Set(
+          resendAuditBefore.rows.map((row) => row.audit_id)
+        );
+        const rateLimitAuditBefore = await database.pool.query<{ audit_id: string }>(`
+          SELECT audit_id FROM identity.audit_event
+          WHERE event_type='identity.auth.rate_limit_refused'
+        `);
+        const rateLimitAuditBaseline = new Set(
+          rateLimitAuditBefore.rows.map((row) => row.audit_id)
+        );
         const issued: Array<Promise<T9Score & ResendObservation>> = [];
         const arms = armsForOrder(order);
         for (let position = 0; position < samplesPerArm * 2; position += 1) {
@@ -6093,34 +6760,41 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         expect(deadlocksAfter - deadlocksBefore).toBe(0);
 
         const resendAudit = await database.pool.query<{
-          actor_key_ref: string; decision: string; success: boolean; justification: string | null;
+          audit_id: string; actor_key_ref: string; decision: string;
+          success: boolean; justification: string | null;
         }>(`
-          SELECT actor_key_ref,decision,success,justification
+          SELECT audit_id,actor_key_ref,decision,success,justification
           FROM identity.audit_event
-          WHERE event_type='identity.verification.resend_requested' AND occurred_at=$1
-        `, [occurredAt]);
-        const existingAudit = resendAudit.rows.filter(
-          (row) => row.actor_key_ref === registered.user.audit_token
+          WHERE event_type='identity.verification.resend_requested'
+        `);
+        const windowAudit = resendAudit.rows.filter(
+          (row) => !resendAuditBaseline.has(row.audit_id)
         );
-        const missingAudit = resendAudit.rows.filter(
+        const allowAudit = windowAudit.filter(
+          (row) => row.decision === "ALLOW" && row.success && row.justification === null
+        );
+        const cooldownAudit = windowAudit.filter((row) => row.decision === "DENY"
+          && !row.success && row.justification === "RESEND_COOLDOWN");
+        const notApplicableAudit = windowAudit.filter((row) => row.decision === "DENY"
+          && !row.success && row.justification === "RESEND_NOT_APPLICABLE");
+        const denialAudit = [...cooldownAudit, ...notApplicableAudit];
+        expect(windowAudit).toHaveLength(64);
+        expect(allowAudit).toHaveLength(1);
+        expect(allowAudit[0]!.actor_key_ref).toBe(registered.user.audit_token);
+        expect(cooldownAudit).toHaveLength(31);
+        expect(notApplicableAudit).toHaveLength(32);
+        expect(denialAudit.every(
           (row) => row.actor_key_ref !== registered.user.audit_token
-        );
-        expect(resendAudit.rows).toHaveLength(64);
-        expect(existingAudit).toHaveLength(32);
-        expect(existingAudit.filter((row) => row.decision === "ALLOW" && row.success
-          && row.justification === null)).toHaveLength(1);
-        expect(existingAudit.filter((row) => row.decision === "DENY" && !row.success
-          && row.justification === "RESEND_COOLDOWN")).toHaveLength(31);
-        expect(missingAudit).toHaveLength(32);
-        expect(missingAudit.every((row) => row.decision === "DENY" && !row.success
-          && row.justification === "RESEND_NOT_APPLICABLE")).toBe(true);
-        expect(new Set(missingAudit.map((row) => row.actor_key_ref)).size).toBe(32);
+        )).toBe(true);
+        expect(new Set(denialAudit.map((row) => row.actor_key_ref)).size).toBe(63);
 
-        const rateLimitAudit = await database.pool.query<{ refusals: string }>(`
-          SELECT count(*)::text AS refusals FROM identity.audit_event
-          WHERE event_type='identity.auth.rate_limit_refused' AND occurred_at=$1
-        `, [occurredAt]);
-        expect(rateLimitAudit.rows[0]!.refusals).toBe("0");
+        const rateLimitAudit = await database.pool.query<{ audit_id: string }>(`
+          SELECT audit_id FROM identity.audit_event
+          WHERE event_type='identity.auth.rate_limit_refused'
+        `);
+        expect(rateLimitAudit.rows.filter(
+          (row) => !rateLimitAuditBaseline.has(row.audit_id)
+        )).toEqual([]);
         const deliveryAudit = await database.pool.query<{ event_type: string }>(`
           SELECT event_type FROM identity.audit_event
           WHERE actor_key_ref=$1 AND event_type IN (
@@ -6184,7 +6858,8 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           + `cadence_ms=${windowCadenceMs} existing_202=${existingObservations.length}/32 `
           + `missing_202=${missingObservations.length}/32 deadlock_delta=${deadlocksAfter - deadlocksBefore} `
           + `mails=${mail.messages.length} credentials=${credentials.rowCount} `
-          + `audit_existing=${existingAudit.length} audit_missing=${missingAudit.length} `
+          + `audit_allow=${allowAudit.length} audit_cooldown=${cooldownAudit.length} `
+          + `audit_not_applicable=${notApplicableAudit.length} `
           + `chain_root_count=${audit.rootCount} chain_depth=${audit.chain.length}/${audit.totalRows} `
           + `existing_median_ms=${median(existingScores).toFixed(3)} `
           + `missing_median_ms=${median(missingScores).toFixed(3)} `
@@ -6346,11 +7021,16 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       `, [registered.user.user_id]);
       flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
+      const auditIdsBefore = (await database.pool.query<{ audit_ids: string[] }>(`
+        SELECT COALESCE(array_agg(audit_id),'{}'::uuid[]) AS audit_ids
+        FROM identity.audit_event
+      `)).rows[0]!.audit_ids;
 
-      // Pause the real duplicate transaction the instant its user no-op update
-      // returns, with that transaction still open and holding its real locks.
+      // Pause the real duplicate transaction after the narrow account-create
+      // capability returns, with that transaction still open and holding the
+      // canonical channel -> user -> credential locks.
       barrier = installQueryBarrier((sql) =>
-        sql.includes('UPDATE identity."user" SET state=state WHERE user_id=$1'));
+        sql.includes("identity.create_pending_account_with_audit"));
       const registering = injectRegister(
         api, 0, registered.email, "t9-b1-duplicate-second-recovery@example.test", "198.51.71.1"
       );
@@ -6379,10 +7059,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       `, [registered.user.user_id]);
       const duplicateAudit = await database.pool.query<{ event_type: string; justification: string | null }>(`
         SELECT event_type,justification FROM identity.audit_event
-        WHERE actor_key_ref=$1 AND event_type IN (
+        WHERE NOT (audit_id=ANY($1::uuid[])) AND event_type IN (
           'identity.registration','identity.registration.duplicate_postwork'
         ) AND decision='DENY'
-      `, [registered.user.audit_token]);
+      `, [auditIdsBefore]);
       const credentials = await database.pool.query<{ credentials: string }>(`
         SELECT count(*)::text AS credentials FROM identity.verification_token_credential
         WHERE channel_binding_id=$1
@@ -6442,11 +7122,15 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const registered = await registerAccount(flow.service, "t9-b2-postwork");
       flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
+      const auditIdsBefore = (await database.pool.query<{ audit_ids: string[] }>(`
+        SELECT COALESCE(array_agg(audit_id),'{}'::uuid[]) AS audit_ids
+        FROM identity.audit_event
+      `)).rows[0]!.audit_ids;
 
-      // Pause the real scheduled duplicate postwork transaction the instant its
-      // user-lock query returns.
+      // Pause the real scheduled duplicate postwork transaction after its
+      // denial-only capability returns and before that transaction commits.
       barrier = installQueryBarrier((sql) =>
-        sql.includes('SELECT audit_token FROM identity."user" WHERE user_id=$1 FOR UPDATE'));
+        sql.includes("identity.audit_registration_duplicate_postwork"));
       const registering = injectRegister(
         api, 0, registered.email, "t9-b2-duplicate-second-recovery@example.test", "198.51.72.1"
       );
@@ -6463,10 +7147,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
       const duplicateAudit = await database.pool.query<{ event_type: string }>(`
         SELECT event_type FROM identity.audit_event
-        WHERE actor_key_ref=$1 AND event_type IN (
+        WHERE NOT (audit_id=ANY($1::uuid[])) AND event_type IN (
           'identity.registration','identity.registration.duplicate_postwork'
         ) AND decision='DENY'
-      `, [registered.user.audit_token]);
+      `, [auditIdsBefore]);
       const credentials = await database.pool.query<{ credentials: string }>(`
         SELECT count(*)::text AS credentials FROM identity.verification_token_credential
         WHERE channel_binding_id=$1
@@ -6529,12 +7213,11 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
 
-      // Matches the delivery record's first locking statement in either shape,
-      // and never the resend preparation, which is keyed by blind index.
+      // Pause after the narrow delivery capability returns and before its
+      // transaction commits. The resend capability then queues on the same
+      // canonical account locks.
       barrier = installQueryBarrier((sql) =>
-        sql.includes("audit_token") && sql.includes("FOR UPDATE")
-        && !sql.includes("email_blind_index")
-        && !sql.includes("verification_token_credential"));
+        sql.includes("identity.record_verification_delivery_with_audit"));
       const eligible = await injectResend(api, "existing", 0, registered.email, "198.51.74.1");
       await barrier.reached;
       const contending = injectResend(api, "existing", 1, registered.email, "198.51.74.2");
@@ -6791,7 +7474,10 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const service = new RegistrationService({
       repository: new PostgresIdentityRepository(lifecyclePool, lifecycleHasher),
       mail: new MemoryMailSender(),
-      dekStore: { async store(): Promise<void> { /* verify never provisions a DEK */ } },
+      dekStore: {
+        async store(): Promise<void> { /* verify never provisions a DEK */ },
+        async destroy() { return "ALREADY_ABSENT"; }
+      },
       blindIndexKey,
       policy,
       limiter: new InProcessAuthRateLimiter(
@@ -6968,15 +7654,27 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   it("S3 rework4 B4 derives stable domain-separated IP and UA Argon2id hashes without request-id hashes", async () => {
     const rotatedSalt = Buffer.alloc(32, 0x7f);
     const flow = buildService();
+    const auditBefore = await database.pool.query<{ audit_id: string }>(
+      "SELECT audit_id FROM identity.audit_event"
+    );
     const registered = await registerAccount(flow.service, "source-ip-hash");
     await flow.service.resendVerification({ email: registered.email }, source);
     const initial = await database.pool.query<{ source_context: Record<string, unknown> }>(`
-      SELECT source_context FROM identity.audit_event WHERE actor_key_ref=$1 ORDER BY occurred_at,audit_id
-    `, [registered.user.audit_token]);
+      SELECT source_context FROM identity.audit_event
+      WHERE NOT (audit_id=ANY($1::uuid[]))
+        AND event_type IN (
+          'identity.registration','identity.verification.sent',
+          'identity.verification.resend_requested'
+        )
+      ORDER BY occurred_at,audit_id
+    `, [auditBefore.rows.map((row) => row.audit_id)]);
     const initialHashes = initial.rows.map((row) => row.source_context.ipArgon2id);
     const initialUserAgentHashes = initial.rows.map((row) => row.source_context.userAgentArgon2id);
 
     const rotatedActor = randomUUID();
+    const rotatedAuditBefore = await database.pool.query<{ audit_id: string }>(
+      "SELECT audit_id FROM identity.audit_event"
+    );
     const rotatedRepository = new PostgresIdentityRepository(
       database.pool,
       new AuditContextHasher(sharedArgon2Pool(), rotatedSalt, basePolicy.auditSourceIpKdf)
@@ -6995,8 +7693,11 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     });
     const perCallMs = performance.now() - startedAt;
     const rotated = await database.pool.query<{ source_context: Record<string, unknown> }>(`
-      SELECT source_context FROM identity.audit_event WHERE actor_key_ref=$1
-    `, [rotatedActor]);
+      SELECT source_context FROM identity.audit_event
+      WHERE NOT (audit_id=ANY($1::uuid[]))
+        AND event_type='identity.auth.rate_limit_refused'
+    `, [rotatedAuditBefore.rows.map((row) => row.audit_id)]);
+    expect(rotated.rows).toHaveLength(1);
     const rotatedHash = rotated.rows[0]!.source_context.ipArgon2id;
     const rawIpHits = await database.pool.query<{ count: string }>(`
       SELECT count(*)::text AS count FROM identity.audit_event a
@@ -7019,11 +7720,15 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     expect(new Set(initialHashes).size).toBe(1);
     expect(rawUserAgentHits.rows[0]!.count).toBe("0");
     expect(new Set(initialUserAgentHashes).size).toBe(1);
-    expect(initialUserAgentHashes[0]).toBe("ccd7683984b8cbe853f4655f53ee8c2f45f4000b4f68f91624feba495692b942");
+    expect(initialUserAgentHashes[0]).toBe(
+      "argon2id-audit:v1:ccd7683984b8cbe853f4655f53ee8c2f45f4000b4f68f91624feba495692b942"
+    );
     expect(initial.rows.every((row) => !("userAgentSha256" in row.source_context))).toBe(true);
     expect(initial.rows.every((row) => !("requestIdSha256" in row.source_context))).toBe(true);
-    expect(initialHashes[0]).toBe("bc33e4290731dba35a02649416982c5801e1074dfc5aed0fea14c27aa4ce7540");
-    expect(rotatedHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(initialHashes[0]).toBe(
+      "argon2id-audit:v1:bc33e4290731dba35a02649416982c5801e1074dfc5aed0fea14c27aa4ce7540"
+    );
+    expect(rotatedHash).toMatch(/^argon2id-audit:v1:[0-9a-f]{64}$/);
     expect(rotatedHash).not.toBe(initialHashes[0]);
     expect(perCallMs).toBeLessThan(ruledPerCallUpperBoundMs);
   });
@@ -7182,7 +7887,9 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     }>(`SELECT actor_ciphertext,actor_key_ref,target_id FROM identity.audit_event`);
     expect(actorColumns.rows.every((row) => row.actor_ciphertext === null)).toBe(true);
     expect(actorColumns.rows.some((row) => row.actor_key_ref === auditToken)).toBe(true);
-    expect(actorColumns.rows.every((row) => row.target_id === row.actor_key_ref)).toBe(true);
+    expect(actorColumns.rows.every((row) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(row.target_id) && row.target_id !== userId)).toBe(true);
     expect(auditToken).not.toBe(userId);
 
     const rows = await database.pool.query<{
@@ -7244,5 +7951,245 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       `sha256:${createHash("sha256").update(token).digest("hex")}`
     );
     expect(stored.rows[0]!.verification_token_hash).not.toContain(token);
+  });
+
+  it("S10 verification audit capability is role-scoped, attempt-bound and replay-safe", async () => {
+    const flow = buildService();
+    const registered = await registerAccount(flow.service, "audit-capability");
+    const userId = registered.user.user_id;
+    const deliveryAt = new Date(Date.now() + 60_000);
+    await database.pool.query(`UPDATE identity."user" SET state='pending_mfa' WHERE user_id=$1`, [userId]);
+    const recoveryCodeId = (await database.pool.query<{ recovery_code_id: string }>(`
+      INSERT INTO identity.recovery_code(user_id,code_slot,code_hash,created_at)
+      VALUES ($1,1,'pending-mfa-code',clock_timestamp()-interval '1 second')
+      RETURNING recovery_code_id
+    `, [userId])).rows[0]!.recovery_code_id;
+    const sourceContext = JSON.stringify({
+      ipArgon2id: "argon2id-audit:v1:" + "1".repeat(64),
+      userAgentArgon2id: "argon2id-audit:v1:" + "2".repeat(64)
+    });
+    const signature = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
+    const catalog = await database.pool.query<{
+      runtime_cap: boolean;
+      authorization_cap: boolean;
+      replay_cap: boolean;
+      runtime_internal: boolean;
+    }>(`
+      SELECT
+        has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime_cap,
+        has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') AS authorization_cap,
+        has_function_privilege('debateai_replay',$1,'EXECUTE') AS replay_cap,
+        has_function_privilege('debateai_runtime',
+          'identity.append_runtime_audit_event_internal(uuid,text,uuid,timestamp with time zone,jsonb,text,boolean,text)',
+          'EXECUTE') AS runtime_internal
+    `, [signature]);
+    expect(catalog.rows[0]).toEqual({
+      runtime_cap: true,
+      // The authorization capability role intentionally inherits the ordinary
+      // runtime role in 0039; it therefore inherits the registration cap too.
+      authorization_cap: true,
+      replay_cap: false,
+      runtime_internal: false
+    });
+
+    const roleClient = await database.pool.connect();
+    try {
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
+        $1,$2,true,NULL,$3::jsonb
+      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
+      });
+      await roleClient.query("ROLLBACK");
+
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
+      const recorded = await roleClient.query<{ recorded: boolean }>(`
+        SELECT identity.record_verification_delivery_with_audit(
+          $1,$2,true,NULL,$3::jsonb
+        ) AS recorded
+      `, [userId,deliveryAt,sourceContext]);
+      expect(recorded.rows[0]?.recorded).toBe(true);
+      await roleClient.query("COMMIT");
+
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
+      const replay = await roleClient.query<{ recorded: boolean }>(`
+        SELECT identity.record_verification_delivery_with_audit(
+          $1,$2,true,NULL,$3::jsonb
+        ) AS recorded
+      `, [userId,deliveryAt,sourceContext]);
+      expect(replay.rows[0]?.recorded).toBe(false);
+      await roleClient.query("COMMIT");
+
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
+        $1,$2,true,NULL,$3::jsonb
+      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
+      });
+      await roleClient.query("ROLLBACK");
+
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
+      const pendingRecovery = await roleClient.query<{ valid: boolean }>(`
+        SELECT identity.consume_recovery_code_with_audit(
+          $1,$2,'replacement-code',clock_timestamp(),$3::jsonb
+        ) AS valid
+      `, [userId,recoveryCodeId,sourceContext]);
+      expect(pendingRecovery.rows[0]?.valid).toBe(false);
+      await roleClient.query("COMMIT");
+
+      // Even an active account cannot spend the code after its MFA factor has
+      // been removed/revoked; the capability revalidates the factor itself.
+      await database.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [userId]);
+      await roleClient.query("BEGIN");
+      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
+      const noFactorRecovery = await roleClient.query<{ valid: boolean }>(`
+        SELECT identity.consume_recovery_code_with_audit(
+          $1,$2,'replacement-code',clock_timestamp(),$3::jsonb
+        ) AS valid
+      `, [userId,recoveryCodeId,sourceContext]);
+      expect(noFactorRecovery.rows[0]?.valid).toBe(false);
+      await roleClient.query("COMMIT");
+    } finally {
+      roleClient.release();
+    }
+
+    const receipt = await database.pool.query<{
+      delivery_status: string;
+      audit_count: string;
+    }>(`
+      SELECT channel.delivery_status,
+        (SELECT count(*)::text FROM identity.audit_event AS audit
+         WHERE audit.event_type='identity.verification.sent'
+           AND audit.actor_key_ref=$2) AS audit_count
+      FROM identity.channel_binding AS channel
+      WHERE channel.user_id=$1 AND channel.channel_type='email'
+    `, [userId,registered.user.audit_token]);
+    expect(receipt.rows[0]).toEqual({ delivery_status: "sent",audit_count: "2" });
+    const preservedRecovery = await database.pool.query<{
+      consumed_at: Date | null;
+      replacement_count: string;
+    }>(`
+      SELECT code.consumed_at,
+        (SELECT count(*)::text FROM identity.recovery_code AS replacement
+         WHERE replacement.user_id=$1 AND replacement.code_hash='replacement-code')
+          AS replacement_count
+      FROM identity.recovery_code AS code WHERE code.recovery_code_id=$2
+    `, [userId,recoveryCodeId]);
+    expect(preservedRecovery.rows[0]).toEqual({
+      consumed_at: null,replacement_count: "0"
+    });
+  });
+
+  it("S10 invalid verification and missing MFA rows deny once without domain mutation", async () => {
+    const flow = buildService();
+    const registered = await registerAccount(flow.service, `missing-mfa-${randomUUID()}`);
+    const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
+    await expect(flow.service.verifyEmail({ token: enrollmentToken }, source))
+      .resolves.toEqual({ status: "mfa_required" });
+    const enrollmentTokenHash = hashVerificationToken(enrollmentToken);
+    const missingFactorId = randomUUID();
+    const missingRecoveryCodeId = randomUUID();
+    const before = await database.pool.query<{
+      verification_denials: string;
+      factor_denials: string;
+      activation_denials: string;
+      factor_count: string;
+      recovery_count: string;
+    }>(`
+      SELECT
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.verification.consumed'
+           AND decision='DENY' AND NOT success) AS verification_denials,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.mfa.totp.verified'
+           AND decision='DENY' AND NOT success) AS factor_denials,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.mfa.enrollment.activated'
+           AND decision='DENY' AND NOT success) AS activation_denials,
+        (SELECT count(*)::text FROM identity.mfa_factor WHERE user_id=$1) AS factor_count,
+        (SELECT count(*)::text FROM identity.recovery_code WHERE user_id=$1) AS recovery_count
+    `,[registered.user.user_id]);
+
+    await expect(flow.service.verifyEmail({ token: generateVerificationToken() },source))
+      .rejects.toMatchObject({ code: "VERIFICATION_TOKEN_INVALID" });
+    await expect(flow.repository.confirmTotpEnrollment({
+      enrollmentTokenHash,
+      factorId: missingFactorId,
+      acceptedStep: 1,
+      occurredAt: new Date(),
+      source
+    })).resolves.toBe("invalid");
+    await expect(flow.repository.activateMfaEnrollment({
+      enrollmentTokenHash,
+      recoveryCodeId: missingRecoveryCodeId,
+      occurredAt: new Date(),
+      source
+    })).resolves.toBe(false);
+
+    const after = await database.pool.query<{
+      user_state: string;
+      verification_denials: string;
+      factor_denials: string;
+      activation_denials: string;
+      factor_count: string;
+      recovery_count: string;
+      attempts: string;
+      opaque_denials: string;
+      roots: string;
+      reachable: string;
+      total: string;
+    }>(`
+      WITH RECURSIVE chain AS (
+        SELECT audit_id,this_hash FROM identity.audit_event WHERE prev_hash IS NULL
+        UNION ALL
+        SELECT child.audit_id,child.this_hash FROM identity.audit_event AS child
+        JOIN chain ON child.prev_hash=chain.this_hash
+      )
+      SELECT
+        (SELECT state FROM identity."user" WHERE user_id=$1) AS user_state,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.verification.consumed'
+           AND decision='DENY' AND NOT success) AS verification_denials,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.mfa.totp.verified'
+           AND decision='DENY' AND NOT success) AS factor_denials,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE event_type='identity.mfa.enrollment.activated'
+           AND decision='DENY' AND NOT success) AS activation_denials,
+        (SELECT count(*)::text FROM identity.mfa_factor WHERE user_id=$1) AS factor_count,
+        (SELECT count(*)::text FROM identity.recovery_code WHERE user_id=$1) AS recovery_count,
+        (SELECT count(*)::text FROM identity.runtime_audit_attempt) AS attempts,
+        (SELECT count(*)::text FROM identity.audit_event
+         WHERE decision='DENY' AND NOT success
+           AND event_type IN ('identity.verification.consumed',
+             'identity.mfa.totp.verified','identity.mfa.enrollment.activated')
+           AND actor_key_ref<>$2 AND target_id NOT IN ($3,$4)) AS opaque_denials,
+        (SELECT count(*)::text FROM identity.audit_event WHERE prev_hash IS NULL) AS roots,
+        (SELECT count(*)::text FROM chain) AS reachable,
+        (SELECT count(*)::text FROM identity.audit_event) AS total
+    `,[registered.user.user_id,registered.user.audit_token,missingFactorId,missingRecoveryCodeId]);
+    expect(Number(after.rows[0]!.verification_denials)
+      -Number(before.rows[0]!.verification_denials)).toBe(1);
+    expect(Number(after.rows[0]!.factor_denials)-Number(before.rows[0]!.factor_denials)).toBe(1);
+    expect(Number(after.rows[0]!.activation_denials)
+      -Number(before.rows[0]!.activation_denials)).toBe(1);
+    expect(after.rows[0]).toMatchObject({
+      user_state: "pending_mfa",
+      factor_count: before.rows[0]!.factor_count,
+      recovery_count: before.rows[0]!.recovery_count,
+      attempts: "0",
+      roots: "1"
+    });
+    expect(Number(after.rows[0]!.opaque_denials)).toBeGreaterThanOrEqual(3);
+    expect(after.rows[0]!.reachable).toBe(after.rows[0]!.total);
   });
 });

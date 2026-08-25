@@ -5,9 +5,13 @@ import { RunRepository } from "@debateai/db";
 describe("LOAD-01 persisted run projection", () => {
   it("reads the state only through the owning asker and prioritizes terminal failure", async () => {
     const calls: Array<{ text: string; values: readonly unknown[] }> = [];
-    const pool = {
-      query: async (text: string, values: readonly unknown[]) => {
+    const query = async (text: string, values: readonly unknown[] = []) => {
         calls.push({ text, values });
+        if (text.includes("pg_advisory_lock")) return { rows: [] };
+        if (text.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
+        if (text.includes("run_private_content_is_live")) {
+          return { rows: [{ run_id: "run:failed", live: true }] };
+        }
         if (text.includes("information_schema.columns")) {
           return { rows: [{ applied: false }] };
         }
@@ -20,7 +24,10 @@ describe("LOAD-01 persisted run projection", () => {
             terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
           }]
         };
-      }
+      };
+    const pool = {
+      query,
+      connect: async () => ({ query, release: () => undefined })
     } as unknown as Pool;
     const result = await new RunRepository(pool).readLoadingProjection("run:failed", "asker:owner");
     expect(result).toEqual({

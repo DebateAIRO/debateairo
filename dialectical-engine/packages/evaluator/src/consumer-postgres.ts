@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
   allocateSequence,
-  decryptContentForRun,
   type CryptoEnvelope,
+  withPublicationContentLease,
   withWriteTransaction
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -12,6 +12,7 @@ import {
   CONSUMER_PROMPT_VERSION,
   type EvaluatorConsumerClaim,
   type EvaluatorConsumerJob,
+  type EvaluatorConsumerPublicSample,
   type EvaluatorConsumerReceiptInput,
   type EvaluatorConsumerRefreshTrigger,
   type EvaluatorConsumerRepository
@@ -49,7 +50,21 @@ function modelDomainKey(input: {
 }
 
 export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly readPublicPresentation?: (
+      publicationRef: string,
+      runId: string,
+      envelope: CryptoEnvelope
+    ) => Promise<Readonly<{
+      question: string;
+      answer: Readonly<{
+        verdict: string | null;
+        summary_segments: readonly Readonly<{ text: string }>[];
+        residual_objections: readonly string[];
+      }>;
+    }>>
+  ) {}
 
   async listJobs(input: {
     readonly trigger: EvaluatorConsumerRefreshTrigger;
@@ -69,6 +84,60 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
     `);
     const selected = selection.rows[0];
     if (selected === undefined) return Object.freeze([]);
+
+    // Phase 1 inventories only current public snapshot references here. It
+    // does not decrypt any presentation until the provider operation holds
+    // the publication-domain session lease for that exact reference.
+    const currentPublicSnapshots = await this.pool.query<{
+      publication_ref: string;
+      run_id: string;
+      observation_id: string;
+      provider: string;
+      model_id: string;
+      model_version: string;
+      domain_id: string | null;
+    }>(`
+      SELECT DISTINCT ON (
+        observation.provider,observation.model_id,observation.model_version,
+        observation.domain_id,snapshot.publication_ref
+      ) snapshot.publication_ref,snapshot.run_id,
+        observation.observation_id,observation.provider,observation.model_id,
+        observation.model_version,observation.domain_id
+      FROM serve.publication_snapshot AS snapshot
+      JOIN LATERAL (
+        SELECT event.state,event.publication_ref
+        FROM core.run_visibility_event AS event
+        WHERE event.run_id=snapshot.run_id
+        ORDER BY event.at_seq DESC,event.run_visibility_event_id DESC
+        LIMIT 1
+      ) AS latest ON latest.state='PUBLISHED'
+        AND latest.publication_ref=snapshot.publication_ref
+      JOIN evaluator.observation AS observation ON observation.run_id=snapshot.run_id
+      WHERE ($1::timestamptz IS NULL OR snapshot.created_at <= $1)
+      ORDER BY observation.provider,observation.model_id,observation.model_version,
+        observation.domain_id,snapshot.publication_ref,observation.observed_at DESC,
+        observation.observation_id
+      LIMIT 96
+    `, [input.aggregateAsOf]);
+    if (currentPublicSnapshots.rows.length === 0) return Object.freeze([]);
+    const samplesByModelDomain = new Map<string, EvaluatorConsumerJob["blindedSamples"]>();
+    if (this.readPublicPresentation !== undefined) {
+      for (const row of currentPublicSnapshots.rows) {
+        const key = modelDomainKey({
+          provider: row.provider,
+          modelId: row.model_id,
+          modelVersion: row.model_version,
+          domainId: row.domain_id
+        });
+        const current = samplesByModelDomain.get(key) ?? [];
+        if (current.length >= 3) continue;
+        samplesByModelDomain.set(key, Object.freeze([...current, {
+          publicationRef:row.publication_ref,
+          runId:row.run_id,
+          sampleId:`opaque:sample-${sha256(row.publication_ref).slice(0,24)}`
+        }]));
+      }
+    }
 
     const cells = await this.pool.query<{
       profile_cell_id: string;
@@ -131,64 +200,6 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
       name: row.canonical_name
     }));
 
-    const samples = await this.pool.query<{
-      observation_id: string;
-      provider: string;
-      model_id: string;
-      model_version: string;
-      domain_id: string | null;
-      question_line: string;
-      claim_text: string;
-      run_id: string;
-      node_id: string;
-      run_content_ciphertext: CryptoEnvelope | null;
-      node_content_ciphertext: CryptoEnvelope | null;
-      tau: number;
-      number_kind: string;
-    }>(`
-      SELECT observation.observation_id,observation.provider,observation.model_id,
-        observation.model_version,observation.domain_id,run.run_id,node.node_id,
-        run.question_line,run.content_ciphertext AS run_content_ciphertext,
-        node.claim_text,node.content_ciphertext AS node_content_ciphertext,
-        judgement.tau,judgement.number_kind
-      FROM evaluator.observation AS observation
-      JOIN ledger.reduced_judgement AS judgement
-        ON judgement.reduced_judgement_id::text=observation.source_ref
-      JOIN core.node AS node ON node.node_id=judgement.node_id
-      JOIN core.run AS run ON run.run_id=observation.run_id
-      WHERE observation.source_kind='REDUCED_JUDGEMENT'
-        AND ($1::timestamptz IS NULL OR observation.observed_at <= $1)
-      ORDER BY observation.at_seq DESC,observation.observation_id
-    `, [input.aggregateAsOf]);
-    const samplesByModelDomain = new Map<string, EvaluatorConsumerJob["blindedSamples"]>();
-    for (const row of samples.rows) {
-      const key = modelDomainKey({
-        provider: row.provider,
-        modelId: row.model_id,
-        modelVersion: row.model_version,
-        domainId: row.domain_id
-      });
-      const current = samplesByModelDomain.get(key) ?? [];
-      if (current.length >= 3) continue;
-      const [runContent, nodeContent] = await Promise.all([
-        decryptContentForRun<{ questionLine: string }>(
-          this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
-          { questionLine: row.question_line }
-        ),
-        decryptContentForRun<{ claimText: string }>(
-          this.pool, row.run_id, "core.node", row.node_id, row.node_content_ciphertext,
-          { claimText: row.claim_text }
-        )
-      ]);
-      samplesByModelDomain.set(key, Object.freeze([...current, createBlindEvaluationSample({
-        sampleId: `opaque:sample-${sha256(row.observation_id).slice(0, 24)}`,
-        questionExcerpt: runContent.questionLine,
-        taskExcerpt: nodeContent.claimText,
-        grade: `${row.tau} (${row.number_kind})`,
-        reasons: Object.freeze([])
-      })]));
-    }
-
     const identities = new Map<string, {
       readonly provider: string;
       readonly modelId: string;
@@ -250,7 +261,8 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
             intervalUpper: row.interval_upper,
             derivationVersion: Number(row.derivation_version)
           }))),
-          blindedSamples: samplesByModelDomain.get(modelDomainKey({ ...identity, domainId })) ?? Object.freeze([]),
+          blindedSamples: samplesByModelDomain.get(modelDomainKey({ ...identity, domainId }))
+            ?? Object.freeze([]),
           adjacentDomains: Object.freeze(adjacentDomains
             .filter((domain) => domain.domainId !== domainId)
             .map(({ domainRef, name }) => Object.freeze({ domainRef, name })))
@@ -390,25 +402,69 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
     return withWriteTransaction(this.pool, async (client) => this.insertJobReceipt(client, input.job, input));
   }
 
+  async withPublicSampleLease<T>(
+    sample: EvaluatorConsumerJob["blindedSamples"][number],
+    use: (resolved: EvaluatorConsumerPublicSample) => Promise<T>
+  ): Promise<T> {
+    const readPublicPresentation = this.readPublicPresentation;
+    if (readPublicPresentation === undefined) {
+      throw new TypedDomainError(
+        "CONSUMER_PUBLIC_CIPHER_UNAVAILABLE",
+        "The public evaluator presentation reader is unavailable"
+      );
+    }
+    return withPublicationContentLease(this.pool,[sample.publicationRef],async (lease) => {
+      const snapshot = await lease.client.query<{
+        content_ciphertext: CryptoEnvelope;
+      }>(`
+        SELECT snapshot.content_ciphertext
+        FROM serve.publication_snapshot AS snapshot
+        WHERE snapshot.publication_ref=$1 AND snapshot.run_id=$2
+          AND core.run_is_published(snapshot.run_id,snapshot.publication_ref)
+      `,[sample.publicationRef,sample.runId]);
+      const stored = snapshot.rows[0];
+      if (stored === undefined) {
+        throw new TypedDomainError(
+          "CONSUMER_PUBLIC_SAMPLE_UNAVAILABLE",
+          "The current public evaluator sample is unavailable"
+        );
+      }
+      const presentation = await readPublicPresentation(
+        sample.publicationRef,sample.runId,stored.content_ciphertext
+      );
+      const taskExcerpt = presentation.answer.summary_segments[0]?.text
+        ?? presentation.answer.residual_objections[0]
+        ?? "Public presentation contains no textual summary.";
+      const resolved = Object.freeze({
+        ...sample,
+        ...createBlindEvaluationSample({
+          sampleId:sample.sampleId,
+          questionExcerpt:presentation.question,
+          taskExcerpt,
+          grade:presentation.answer.verdict ?? "VERDICT_UNAVAILABLE",
+          reasons:Object.freeze([])
+        })
+      });
+      const result = await use(resolved);
+      const live = await lease.client.query<{ live: boolean }>(
+        "SELECT core.run_is_published($1,$2) AS live",
+        [sample.runId,sample.publicationRef]
+      );
+      if (live.rows[0]?.live !== true) {
+        throw new TypedDomainError(
+          "CONSUMER_PUBLIC_SAMPLE_UNAVAILABLE",
+          "The current public evaluator sample is unavailable"
+        );
+      }
+      return result;
+    });
+  }
+
   async persistOutput(input: Parameters<EvaluatorConsumerRepository["persistOutput"]>[0]): Promise<{
     readonly consumerOutputId: string;
     readonly inserted: boolean;
   }> {
     return withWriteTransaction(this.pool, async (client) => {
-      const artifact = await client.query<{ raw_artifact_id: string }>(`
-        SELECT raw_artifact_id FROM ledger.raw_artifact
-        WHERE raw_artifact_id=$1 AND run_id IS NULL
-          AND provider_ref=$2 AND maker=$3 AND model_id=$4
-      `, [
-        input.generatedRawArtifactRef,input.family.value.providerRef,
-        input.family.value.maker,input.job.consumerModelId
-      ]);
-      if (artifact.rows[0] === undefined) {
-        throw new TypedDomainError(
-          "CONSUMER_AUTHORIZATION_FAILED",
-          "CONSUMER_AUTHORIZATION_FAILED: generated artifact does not match the selected family"
-        );
-      }
       const inserted = await client.query<{ consumer_output_id: string }>(`
         INSERT INTO evaluator.consumer_output (
           consumer_selection_id,target_provider,target_model_id,target_model_version,
@@ -421,7 +477,7 @@ export class PostgresEvaluatorConsumerRepository implements EvaluatorConsumerRep
         input.job.target.modelVersion,input.job.domain?.domainId ?? null,input.promptVersion,
         input.aggregateSnapshotHash,JSON.stringify(input.aggregateRefs),
         JSON.stringify(input.blindedSampleRefs),input.summary,
-        JSON.stringify(input.adjacentDomainFlags),input.generatedRawArtifactRef,
+        JSON.stringify(input.adjacentDomainFlags),null,
         await allocateSequence(client)
       ]);
       const insertedId = inserted.rows[0]?.consumer_output_id;

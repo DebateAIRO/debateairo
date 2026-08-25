@@ -16,6 +16,18 @@ export interface TestDatabase {
   stop(): Promise<void>;
 }
 
+export function createTestAskAdmissionPoolFacades(pool:Pool):Readonly<{
+  server:Pool;legacy:Pool;
+}> {
+  const facade=():Pool => new Proxy(pool,{
+    get(target,property) {
+      const value=Reflect.get(target,property,target);
+      return typeof value==="function" ? value.bind(target) : value;
+    }
+  });
+  return Object.freeze({ server:facade(),legacy:facade() });
+}
+
 export function selectPrototypeDatabaseMechanism(): {
   readonly mechanism: "embedded-postgres";
   readonly testcontainersStatus: "DEFERRED BY DR-121";

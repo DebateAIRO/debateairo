@@ -7,8 +7,9 @@ import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
   decryptContentForRun,
-  encryptContentForRun,
+  encryptAttestedContentForRun,
   type CryptoEnvelope,
+  withRunContentLease,
   withWriteTransaction
 } from "@debateai/db";
 import {
@@ -337,32 +338,35 @@ export class JudgementRepository {
   }
 
   async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
-    const nodeReviewId = randomUUID();
-    const content = await encryptContentForRun(
-      this.pool, input.runId, "ledger.node_review", nodeReviewId,
-      { reasons: input.reasons }
-    );
-    try {
-      return await withWriteTransaction(this.pool, async (client) => {
-        const result = await client.query<{ node_review_id: string }>(
-          `INSERT INTO ledger.node_review (
-            node_review_id, run_id, node_id, author_raw_artifact_ref,
-            review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb) RETURNING node_review_id`,
-          [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
-            input.reviewRawArtifactRef, input.outcome,
-            JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
-            await allocateSequence(client), content === null ? null : JSON.stringify(content)]
-        );
-        return result.rows[0]!.node_review_id;
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith("PRODUCER_GRADING_FORBIDDEN:")) {
-        throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message);
+    return withRunContentLease(this.pool, [input.runId], async () => {
+      const nodeReviewId = randomUUID();
+      const content = await encryptAttestedContentForRun(
+        this.pool, input.runId, "ledger.node_review", nodeReviewId,
+        { reasons: input.reasons }
+      );
+      try {
+        return await withWriteTransaction(this.pool, async (client) => {
+          const result = await client.query<{ node_review_id: string }>(
+            `INSERT INTO ledger.node_review (
+              node_review_id, run_id, node_id, author_raw_artifact_ref,
+              review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext,content_attestation
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING node_review_id`,
+            [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
+              input.reviewRawArtifactRef, input.outcome,
+              JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
+              await allocateSequence(client),
+              content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
+          );
+          return result.rows[0]!.node_review_id;
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.startsWith("PRODUCER_GRADING_FORBIDDEN:")) {
+          throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message);
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   async readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null> {
@@ -395,7 +399,8 @@ export class JudgementRepository {
 
   /** DR-184 catch-up work is recomputed from append-only ground truth. */
   async readUnreviewedNodes(runId: string): Promise<readonly UnreviewedNode[]> {
-    const result = await this.pool.query<{
+    return withRunContentLease(this.pool, [runId], async () => {
+      const result = await this.pool.query<{
       node_id: string;
       claim_text: string;
       content_ciphertext: CryptoEnvelope | null;
@@ -413,18 +418,19 @@ export class JudgementRepository {
        ORDER BY node.created_at_seq, node.node_id`,
       [runId]
     );
-    return Object.freeze(await Promise.all(result.rows.map(async (row) => {
-      const content = await decryptContentForRun<{ claimText: string }>(
-        this.pool, runId, "core.node", row.node_id, row.content_ciphertext,
-        { claimText: row.claim_text }
-      );
-      return Object.freeze({
-        nodeId: row.node_id,
-        statement: content.claimText,
-        authorMaker: row.maker,
-        authorRawArtifactRef: row.raw_artifact_id
-      });
-    })));
+      return Object.freeze(await Promise.all(result.rows.map(async (row) => {
+        const content = await decryptContentForRun<{ claimText: string }>(
+          this.pool, runId, "core.node", row.node_id, row.content_ciphertext,
+          { claimText: row.claim_text }
+        );
+        return Object.freeze({
+          nodeId: row.node_id,
+          statement: content.claimText,
+          authorMaker: row.maker,
+          authorRawArtifactRef: row.raw_artifact_id
+        });
+      })));
+    });
   }
 
   async readJudgementLineage(runId: string): Promise<Readonly<Record<string, {

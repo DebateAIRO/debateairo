@@ -140,7 +140,7 @@ describe("ask-time evaluator tagger", () => {
       expect.objectContaining({ state: "SUCCEEDED" })
     ]);
     expect(gateway.call).toHaveBeenCalledWith(expect.objectContaining({
-      runId: null,
+      runId: "run:tagger",
       role: "CLASSIFIER",
       lane: "evaluator"
     }));

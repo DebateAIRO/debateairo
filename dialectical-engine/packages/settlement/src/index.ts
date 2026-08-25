@@ -1,6 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  prepareLeasedContentEncryptionForRun,
+  type PreparedRunContentCipher,
+  withWriteTransaction
+} from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const SCORECARD_BASES = [
@@ -402,7 +407,7 @@ function settlementHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-async function appendSettlementLedger(client: PoolClient, input: {
+async function appendSettlementLedger(client: PoolClient, prepared: PreparedRunContentCipher | null, input: {
   readonly runId: string;
   readonly actionKind: string;
   readonly subjectItemId: string;
@@ -411,14 +416,16 @@ async function appendSettlementLedger(client: PoolClient, input: {
   readonly contractHash: string;
   readonly at: Date;
 }): Promise<{ readonly id: string; readonly sequence: number }> {
+  const ledgerEntryId = randomUUID();
   const sequence = await allocateSequence(client);
   const inserted = await client.query<{ ledger_entry_id: string }>(
     `INSERT INTO ledger.ledger_entry (
-       sequence, run_id, action_kind, call_site_key, subject_item_id, stance_at_action,
-       outcome, actor_ref, input_hash, contract_hash, started_at, finished_at
-     ) VALUES ($1,$2,$3,'settlement.watch',$4,'UNASSIGNED','OK',$5,$6,$7,$8,$8)
+       ledger_entry_id,sequence,run_id,action_kind,call_site_key,subject_item_id,stance_at_action,
+       outcome,actor_ref,input_hash,input_hash_version,contract_hash,started_at,finished_at
+     ) VALUES ($1,$2,$3,$4,'settlement.watch',$5,'UNASSIGNED','OK',$6,$7,$8,$9,$10,$10)
      RETURNING ledger_entry_id`,
-    [sequence, input.runId, input.actionKind, input.subjectItemId, input.actorRef, input.inputHash, input.contractHash, input.at]
+    [ledgerEntryId,sequence,input.runId,input.actionKind,input.subjectItemId,input.actorRef,
+      input.inputHash,1,input.contractHash,input.at]
   );
   return Object.freeze({ id: inserted.rows[0]!.ledger_entry_id, sequence });
 }
@@ -493,7 +500,10 @@ export class SettlementRepository {
 
   async settle(input: SettlementOutcomeInput, policy: SettlementPolicy): Promise<SettlementResult> {
     validateSettlement(input, policy);
-    return withWriteTransaction(this.pool, async (client) => {
+    const leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, input.runId);
+    const preparedContent = leasedContent.prepared;
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
       const terminal = await client.query(
         `SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL' LIMIT 1`,
         [input.runId]
@@ -650,7 +660,7 @@ export class SettlementRepository {
           sourceRef: policy.calibration.sourceRef
         }
       });
-      await appendSettlementLedger(client, {
+      await appendSettlementLedger(client, preparedContent, {
         runId: input.runId,
         actionKind: accepted ? "SETTLEMENT_OUTCOME_RECORDED" : "SETTLEMENT_ATTEMPT_SUPERSEDED",
         subjectItemId: answerOutcomeId,
@@ -659,7 +669,7 @@ export class SettlementRepository {
         contractHash,
         at: input.resolvedAt
       });
-      const readBackLedger = await appendSettlementLedger(client, {
+      const readBackLedger = await appendSettlementLedger(client, preparedContent, {
         runId: input.runId,
         actionKind: "SETTLEMENT_READ_BACK_VERIFIED",
         subjectItemId: answerOutcomeId,
@@ -744,7 +754,7 @@ export class SettlementRepository {
         ]
       );
       const scorecardCellId = materialised.rows[0]!.scorecard_cell_id;
-      await appendSettlementLedger(client, {
+      await appendSettlementLedger(client, preparedContent, {
         runId: input.runId,
         actionKind: "SCORECARD_DERIVED_FROM_LEDGER",
         subjectItemId: scorecardCellId,
@@ -754,16 +764,19 @@ export class SettlementRepository {
         at: input.resolvedAt
       });
       return Object.freeze({ kind: "SETTLED" as const, answerOutcomeId, readBackLedgerEntryId: readBackLedger.id, scorecardCellId });
-    });
+      });
+    } finally {
+      await leasedContent.close();
+    }
   }
 
   async recordRoutingDecision(input: {
-    readonly sessionId: string;
+    readonly executionRef: string;
     readonly selectedModelVersion: string | null;
     readonly selectedProvider: string;
     readonly decision: RoutingDecision;
   }): Promise<string> {
-    assertNonBlank(input.sessionId, "sessionId");
+    assertNonBlank(input.executionRef, "executionRef");
     assertNonBlank(input.selectedProvider, "selectedProvider");
     return withWriteTransaction(this.pool, async (client) => {
       const decisionSequence = await allocateSequence(client);
@@ -777,7 +790,7 @@ export class SettlementRepository {
          ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11)
          RETURNING routing_decision_id`,
         [
-          input.sessionId, input.decision.taskClass, lane, input.decision.selectedModelId,
+          input.executionRef, input.decision.taskClass, lane, input.decision.selectedModelId,
           input.selectedModelVersion, input.decision.propensity, JSON.stringify(input.decision.guardTrail),
           input.decision.policy.rowKey, input.decision.policy.registerVersion,
           input.decision.policy.sourceRef, decisionSequence
@@ -791,7 +804,7 @@ export class SettlementRepository {
              routing_decision_id, at_seq
            ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [
-            input.sessionId, input.decision.taskClass, input.decision.selectedModelId,
+            input.executionRef, input.decision.taskClass, input.decision.selectedModelId,
             input.selectedModelVersion, input.selectedProvider, routingDecisionId,
             await allocateSequence(client)
           ]

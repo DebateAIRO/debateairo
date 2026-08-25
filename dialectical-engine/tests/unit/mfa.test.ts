@@ -231,6 +231,8 @@ describe("S4 MFA enrolment service", () => {
       repository: repository as never,
       dekStore: {
         async store() { throw new Error("unused"); },
+        async destroy() { return "ALREADY_ABSENT"; },
+        async exists() { return true; },
         async load() { return Buffer.from(dek); }
       },
       argon2: fakeArgon2(),
@@ -323,6 +325,8 @@ describe("S4 MFA enrolment service", () => {
       } as never,
       dekStore: {
         async store() { throw new Error("unused"); },
+        async destroy() { return "ALREADY_ABSENT"; },
+        async exists() { return true; },
         async load() { throw new Error("unused"); }
       },
       argon2: controlled,

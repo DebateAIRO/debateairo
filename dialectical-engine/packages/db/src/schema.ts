@@ -121,8 +121,16 @@ export const run = core.table("run", {
   askContract: jsonb("ask_contract").notNull(),
   createdAtSeq: bigint("created_at_seq", { mode: "number" }).notNull(),
   contentEncryptionVersion: integer("content_encryption_version"),
+  questionBlindIndexVersion: integer("question_blind_index_version").notNull(),
   questionBlindIndex: bytea("question_blind_index"),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
+});
+
+export const runContentAttestationSecret = core.table("run_content_attestation_secret", {
+  runId: uuid("run_id").primaryKey().references(() => run.runId, { onDelete: "cascade" }),
+  secret: bytea("secret").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
 export const runOwnershipEvent = core.table("run_ownership_event", {
@@ -167,7 +175,8 @@ export const node = core.table("node", {
   isFolder: boolean("is_folder").notNull(),
   createdAtSeq: bigint("created_at_seq", { mode: "number" }).notNull(),
   relevantAsOf: timestamp("relevant_as_of", { withTimezone: true }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const revisionTrigger = core.table("revision_trigger", {
@@ -224,7 +233,8 @@ export const investigationRequest = core.table("investigation_request", {
   status: text("status").notNull(),
   replayHandle: text("replay_handle").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const edge = core.table("edge", {
@@ -256,6 +266,7 @@ export const ledgerEntry = ledger.table("ledger_entry", {
   outcome: text("outcome").notNull(),
   actorRef: text("actor_ref").notNull(),
   inputHash: text("input_hash").notNull(),
+  inputHashVersion: integer("input_hash_version").notNull(),
   contractHash: text("contract_hash").notNull(),
   rawArtifactRef: uuid("raw_artifact_ref"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
@@ -276,10 +287,13 @@ export const rawArtifact = ledger.table("raw_artifact", {
   parseStatus: text("parse_status").notNull(),
   parseError: text("parse_error"),
   inputHash: text("input_hash").notNull(),
+  inputHashVersion: integer("input_hash_version").notNull(),
   contractHash: text("contract_hash").notNull(),
   contentHash: text("content_hash").notNull(),
+  contentHashVersion: integer("content_hash_version").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const nodeReview = ledger.table("node_review", {
@@ -291,15 +305,18 @@ export const nodeReview = ledger.table("node_review", {
   outcome: text("outcome").notNull(),
   reasons: jsonb("reasons").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const propagationRun = ledger.table("propagation_run", {
   propagationRunId: uuid("propagation_run_id").primaryKey(),
   runId: uuid("run_id").notNull(),
   inputHash: text("input_hash").notNull(),
+  inputHashVersion: integer("input_hash_version").notNull(),
   contractHash: text("contract_hash").notNull(),
   graphFingerprint: text("graph_fingerprint").notNull(),
+  graphFingerprintVersion: integer("graph_fingerprint_version").notNull(),
   arrowOrder: jsonb("arrow_order").notNull(),
   clusterRecords: jsonb("cluster_records").notNull(),
   operatorByParent: jsonb("operator_by_parent").notNull(),
@@ -420,8 +437,10 @@ export const factBundle = serve.table("fact_bundle", {
   facts: jsonb("facts").notNull(),
   residualObjections: jsonb("residual_objections").notNull(),
   contentHash: text("content_hash").notNull(),
+  contentHashVersion: integer("content_hash_version").notNull(),
   version: integer("version").notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const composedText = serve.table("composed_text", {
@@ -430,7 +449,8 @@ export const composedText = serve.table("composed_text", {
   segments: jsonb("segments").notNull(),
   rawArtifactRef: uuid("raw_artifact_ref").notNull(),
   attempt: integer("attempt").notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const conformanceRecord = serve.table("conformance_record", {
@@ -553,8 +573,10 @@ export const querySet = evidence.table("query_set", {
   version: integer("version").notNull(),
   queries: jsonb("queries").notNull(),
   contentHash: text("content_hash").notNull(),
+  contentHashVersion: integer("content_hash_version").notNull(),
   frozenAtSeq: bigint("frozen_at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const queryAmendment = evidence.table("query_amendment", {
@@ -566,7 +588,8 @@ export const queryAmendment = evidence.table("query_amendment", {
   reason: text("reason").notNull(),
   confirmationPower: text("confirmation_power").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const sourceRecord = evidence.table("source_record", {
@@ -600,7 +623,8 @@ export const evidenceItem = evidence.table("evidence_item", {
   archivedSourceVersion: text("archived_source_version").notNull(),
   retrievedAt: timestamp("retrieved_at", { withTimezone: true }).notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const absenceRow = evidence.table("absence_row", {
@@ -612,7 +636,8 @@ export const absenceRow = evidence.table("absence_row", {
   observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
   reason: text("reason").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const probeCapture = evidence.table("probe_capture", {
@@ -767,12 +792,15 @@ export const memoryQuestionKey = memory.table("question_key", {
   normalizedBinding: jsonb("normalized_binding").notNull(),
   frozenTerms: jsonb("frozen_terms").notNull(),
   frozenQuerySetHash: text("frozen_query_set_hash"),
+  frozenQuerySetHashVersion: integer("frozen_query_set_hash_version").notNull(),
   asOf: timestamp("as_of", { withTimezone: true }).notNull(),
   policyVersion: bigint("policy_version", { mode: "number" }).notNull(),
   keyVersion: integer("key_version").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
+  questionBlindIndexVersion: integer("question_blind_index_version").notNull(),
   questionBlindIndex: bytea("question_blind_index"),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const memoryLink = memory.table("memory_link", {
@@ -833,6 +861,7 @@ export const memoryPullRecord = memory.table("pull_record", {
   artifactId: text("artifact_id").notNull(),
   artifactVersion: integer("artifact_version").notNull(),
   contentHash: text("content_hash").notNull(),
+  contentHashVersion: integer("content_hash_version").notNull(),
   artifactAsOf: timestamp("artifact_as_of", { withTimezone: true }).notNull(),
   stalenessStateAtPull: text("staleness_state_at_pull").notNull(),
   askerScope: text("asker_scope").notNull(),
@@ -841,7 +870,8 @@ export const memoryPullRecord = memory.table("pull_record", {
   registerVersion: bigint("register_version", { mode: "number" }).notNull(),
   registerSourceRef: text("register_source_ref").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
-  contentCiphertext: jsonb("content_ciphertext")
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const memoryCandidateRecord = memory.table("candidate_record", {
@@ -905,6 +935,7 @@ export const evaluatorPipelineEvent = evaluator.table("pipeline_event", {
   state: text("state").notNull(),
   reason: text("reason").notNull(),
   inputHash: text("input_hash").notNull(),
+  inputHashVersion: integer("input_hash_version").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull()
 });
 

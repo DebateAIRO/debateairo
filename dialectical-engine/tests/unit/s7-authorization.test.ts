@@ -25,6 +25,10 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
+  { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
+  { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
@@ -75,6 +79,7 @@ const evaluatorView = () => ({
 
 function fixtureApplication(): AskApplication {
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async () => ({ run_ref: "run:test", status: "QUEUED" }),
     readAnswer: async () => null,
     readRunAnswer: async () => null,

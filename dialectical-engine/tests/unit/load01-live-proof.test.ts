@@ -24,6 +24,7 @@ const RUN_REF = "11111111-1111-4111-8111-111111111111";
 function providerDoubleApplication(): AskApplication {
   const runs = new Map<string, RunProjection>();
   return {
+    withContentLease: async (_runId,use) => use(),
     submit: async (ask) => {
       runs.set(RUN_REF, {
         run_ref: RUN_REF,

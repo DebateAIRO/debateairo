@@ -6,8 +6,9 @@ const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 describe("Accounts S7 ownership architecture", () => {
   it("uses a distinct mutable identity owner ref and an append-only latest-wins run event", async () => {
-    const [migration, identityFoundation, database] = await Promise.all([
+    const [migration, erasureMigration, identityFoundation, database] = await Promise.all([
       read("migrations/0037_run_ownership.sql"),
+      read("migrations/0040_account_erasure.sql"),
       read("migrations/0030_identity_foundation.sql"),
       read("packages/db/src/index.ts")
     ]);
@@ -36,7 +37,7 @@ describe("Accounts S7 ownership architecture", () => {
     expect(appendFunction.indexOf("FROM core.run WHERE run_id = p_run_id FOR NO KEY UPDATE"))
       .toBeLessThan(appendFunction.indexOf("SELECT ledger.allocate_sequence()"));
     expect(migration).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON core\.run_ownership_event FROM debateai_runtime/i);
-    expect(database).toContain("core.append_run_ownership_event");
+    expect(erasureMigration).toContain("PERFORM core.append_run_ownership_event");
     expect(migration).toContain("FOR NO KEY UPDATE NOWAIT");
     expect(database).not.toMatch(/INSERT INTO core\.run_ownership_event/i);
     // MUT-S7-OWNER-AUDIT-REUSE: replace owner_ref with audit_token -> RED.
@@ -89,7 +90,7 @@ describe("Accounts S7 ownership architecture", () => {
     );
     expect(recordAndMatch).toContain("#ownerScopedCandidateRefs");
     expect(recordAndMatch).toContain("#evaluateCandidate");
-    expect(recordAndMatch.indexOf("prepareContentEncryptionForRun"))
+    expect(recordAndMatch.indexOf("prepareLeasedContentEncryptionForRuns"))
       .toBeLessThan(recordAndMatch.indexOf("await withWriteTransaction"));
     const finalRunLock = recordAndMatch.indexOf("ORDER BY run_id FOR UPDATE");
     const finalOwnershipCheck = recordAndMatch.indexOf("core.run_is_owned_by", finalRunLock);
@@ -111,12 +112,12 @@ describe("Accounts S7 ownership architecture", () => {
       memory.indexOf("async #evaluateCandidate"),
       memory.indexOf("async #recordAnswerPull")
     );
-    const candidatePreparation = evaluateCandidate.indexOf("prepareContentEncryptionForRun");
+    const candidatePreparation = evaluateCandidate.indexOf("prepareLeasedContentEncryptionForRun");
     const candidateTransaction = evaluateCandidate.indexOf("withWriteTransaction");
     const candidateLock = evaluateCandidate.indexOf("FOR UPDATE");
     const candidateOwnership = evaluateCandidate.indexOf("core.run_is_owned_by");
     const candidateFetch = evaluateCandidate.indexOf("const candidateRows = await client.query");
-    const candidateDecrypt = evaluateCandidate.indexOf("decryptPreparedContentForRun");
+    const candidateDecrypt = evaluateCandidate.indexOf("decryptLeasedContentForRun");
     expect(candidatePreparation).toBeLessThan(candidateTransaction);
     expect(candidateLock).toBeLessThan(candidateOwnership);
     expect(candidateOwnership).toBeLessThan(candidateFetch);
@@ -126,16 +127,16 @@ describe("Accounts S7 ownership architecture", () => {
       memory.indexOf("async #recordAnswerPull"),
       memory.indexOf("async readDisclosure")
     );
-    expect(answerPull).toContain("decryptPreparedContentForRun");
-    expect(answerPull).toContain("encryptPreparedContentForRun");
+    expect(answerPull).toContain("decryptLeasedContentForRun");
+    expect(answerPull).toContain("encryptAttestedLeasedContentForRun");
     expect(answerPull).not.toContain("this.pool");
 
     const contradiction = memory.slice(memory.indexOf("async observeAnswerContradiction"));
-    const contradictionPreparation = contradiction.indexOf("prepareContentEncryptionForRun");
+    const contradictionPreparation = contradiction.indexOf("prepareLeasedContentEncryptionForRuns");
     const contradictionTransaction = contradiction.indexOf("withWriteTransaction");
     const contradictionLock = contradiction.indexOf("ORDER BY run_id FOR UPDATE");
     const contradictionOwnership = contradiction.indexOf("core.run_is_owned_by");
-    const contradictionDecrypt = contradiction.indexOf("decryptPreparedContentForRun");
+    const contradictionDecrypt = contradiction.indexOf("decryptLeasedContentForRun");
     expect(contradictionPreparation).toBeLessThan(contradictionTransaction);
     expect(contradictionLock).toBeLessThan(contradictionOwnership);
     expect(contradictionOwnership).toBeLessThan(contradictionDecrypt);

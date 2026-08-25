@@ -2,6 +2,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  AccountErasureScheduleRequestSchema,
+  AccountErasureCancelRequestSchema,
+  AccountErasureStatusSchema,
   AnswerSchema,
   AnswerIndexSchema,
   AskAcceptedSchema,
@@ -13,6 +16,8 @@ import {
   InvestigationAcceptedSchema,
   InvestigationRequestSchema,
   NodeSchema,
+  PrivateDebateErasureRequestSchema,
+  PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -37,7 +42,10 @@ import {
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import {
+  MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
+  withOwnerAskAdmissionLease,
+  withRunContentLease,
   type DiscoveredPanelMember,
   type RunOwnershipAccess
 } from "@debateai/db";
@@ -59,6 +67,7 @@ import {
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
+import type { AccountErasureApplication } from "./account-erasure.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
@@ -78,6 +87,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
+  { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
+  { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
@@ -158,6 +171,7 @@ declare module "fastify" {
 }
 
 export interface AskApplication {
+  withContentLease<T>(runId: string, use: () => Promise<T>): Promise<T>;
   submit(ask: AskRequest, session: Session, principal: AskPrincipal): Promise<AskAccepted>;
   readAnswer(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null>;
   readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
@@ -182,6 +196,7 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
+  readonly accountErasure?: AccountErasureApplication;
   readonly allowedOrigin?: string;
   readonly legacyDevSessionResolver?: LegacyDevSessionResolver;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
@@ -397,8 +412,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     if (cookieWasPresented) {
       const sessionToken = exactCookie(rawCookie, SESSION_COOKIE_NAME);
-      const authenticated = sessionToken === null || options.sessions === undefined
+      let authenticated = sessionToken === null || options.sessions === undefined
         ? null : await options.sessions.authenticate(sessionToken, sourceFor(request));
+      if (authenticated===null
+        && sessionToken!==null
+        && request.method==="GET"
+        && request.routeOptions.url==="/v1/account/erasure"
+        && options.sessions?.authenticateErasureStatus!==undefined) {
+        authenticated=await options.sessions.authenticateErasureStatus(
+          sessionToken,sourceFor(request)
+        );
+      }
       if (authenticated === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
       request.authenticatedSession = authenticated;
       request.session = authenticated.session;
@@ -539,10 +563,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         session: authenticated,
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
-        ...(authorization === undefined ? {} : { authorization: {
-          action: authorization.action,
-          targetRunId: authorization.target_run_id
-        } })
+        ...(authorization === undefined ? {} : { authorization:
+          authorization.action === "DELETE_ACCOUNT"
+            ? { action: authorization.action }
+            : { action: authorization.action, targetRunId: authorization.target_run_id }
+        })
       }, sourceFor(request));
       reply.header("set-cookie", [
         sessionCookie(rotated.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
@@ -555,15 +580,108 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: {
-              token: rotated.grantToken,
-              action: authorization.action,
-              target_run_id: authorization.target_run_id,
-              expires_at: rotated.grantExpiresAt.toISOString()
-            } })
+          : { step_up_grant: authorization.action === "DELETE_ACCOUNT"
+              ? {
+                  token: rotated.grantToken,
+                  action: authorization.action,
+                  expires_at: rotated.grantExpiresAt.toISOString()
+                }
+              : {
+                  token: rotated.grantToken,
+                  action: authorization.action,
+                  target_run_id: authorization.target_run_id,
+                  expires_at: rotated.grantExpiresAt.toISOString()
+                } })
       });
     });
   }
+  api.delete("/v1/account",routePolicy("DELETE /v1/account"),async (request,reply)=>{
+    const authenticated=request.authenticatedSession;
+    if (authenticated===undefined) {
+      return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+    }
+    const input=parseRequest(AccountErasureScheduleRequestSchema,request.body);
+    if (options.accountErasure===undefined) {
+      return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+    }
+    const scheduled=await options.accountErasure.schedule({
+      authenticated,grantToken:input.step_up_grant
+    });
+    if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
+      return reply.status(409).send({ error:"ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED" });
+    }
+    if (scheduled===null || scheduled.status==="NONE" || scheduled.executeAt===undefined) {
+      return reply.status(404).send({ error:"NOT_FOUND" });
+    }
+    return reply.status(202).send(AccountErasureStatusSchema.parse({
+      status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
+      cancellation_ref:scheduled.cancellationRef
+    }));
+  });
+  api.get("/v1/account/erasure",routePolicy("GET /v1/account/erasure"),async (request,reply)=>{
+    const authenticated=request.authenticatedSession;
+    if (authenticated===undefined) {
+      return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+    }
+    if (options.accountErasure===undefined) {
+      return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+    }
+    const current=await options.accountErasure.current(authenticated);
+    return reply.send(AccountErasureStatusSchema.parse(current.status==="NONE"
+      ? { status:"NONE" }
+      : { status:current.status,execute_at:current.executeAt!.toISOString(),
+          cancellation_ref:current.cancellationRef! }
+    ));
+  });
+  api.post(
+    "/v1/account/erasure/cancel",
+    routePolicy("POST /v1/account/erasure/cancel"),
+    async (request,reply)=>{
+      const authenticated=request.authenticatedSession;
+      if (authenticated===undefined) {
+        return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
+      }
+      if (options.accountErasure===undefined) {
+        return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+      }
+      const input=parseRequest(AccountErasureCancelRequestSchema,request.body);
+      if (!await options.accountErasure.cancel({
+        authenticated,cancellationRef:input.cancellation_ref
+      })) {
+        return reply.status(404).send({ error:"NOT_FOUND" });
+      }
+      return reply.send({ status:"CANCELLED" });
+    }
+  );
+  api.delete<{ Params:{ id:string } }>(
+    "/v1/debates/:id",
+    routePolicy("DELETE /v1/debates/{id}"),
+    async (request,reply)=>{
+      const runId=ResourceIdSchema.safeParse(request.params.id);
+      const authenticated=request.authenticatedSession;
+      if (!runId.success || authenticated===undefined) {
+        return reply.status(404).send({ error:"NOT_FOUND" });
+      }
+      const input=parseRequest(PrivateDebateErasureRequestSchema,request.body);
+      if (options.accountErasure===undefined) {
+        return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
+      }
+      const outcome=await options.accountErasure.deletePrivateDebate({
+        runId:runId.data,authenticated,grantToken:input.step_up_grant,
+        source:sourceFor(request)
+      });
+      if (outcome==="NOT_FOUND") return reply.status(404).send({ error:"NOT_FOUND" });
+      if (outcome==="PUBLISHED") {
+        return reply.status(409).send({ error:"DEBATE_MUST_BE_PRIVATE" });
+      }
+      if (outcome==="LEGACY_RESIDUAL") {
+        return reply.status(409).send({ error:"LEGACY_CONTENT_RETAINED" });
+      }
+      return reply.status(outcome==="PENDING" ? 202 : 200).send(
+        PrivateDebateErasureStatusSchema.parse({ status:outcome })
+      );
+    }
+  );
 
   api.get<{ Querystring: { limit?: string; offset?: string } }>(
     "/v1/public/debates",
@@ -727,7 +845,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", routePolicy("GET /v1/answers"), async (request, reply) => {
     const limit = Number(request.query.limit);
     const offset = Number(request.query.offset);
-    if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
+      || !Number.isInteger(offset) || offset < 0) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST" });
     }
     return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
@@ -867,18 +986,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
-      const answer = await options.application.readRunAnswer(
-        runId.data,
-        request.session,
-        ownershipFor(request)
-      );
-      if (answer === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      const published = await options.publications.publish({
-        runId: runId.data,
-        answer,
-        authenticated,
-        grantToken: input.step_up_grant,
-        source: sourceFor(request)
+      const published = await options.application.withContentLease(runId.data, async () => {
+        const answer = await options.application.readRunAnswer(
+          runId.data,
+          request.session,
+          ownershipFor(request)
+        );
+        if (answer === null) return null;
+        return options.publications!.publish({
+          runId: runId.data,
+          answer,
+          authenticated,
+          grantToken: input.step_up_grant,
+          source: sourceFor(request)
+        });
       });
       return published === null
         ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
@@ -1041,18 +1162,34 @@ export class PostgresAskApplication implements AskApplication {
   readonly #serve: ServeRepository;
   readonly #splitLifecycle: Pick<SplitLifecycleProjection, "read">;
   readonly #liveness: LivenessRepository;
+  readonly #serverAskAdmissionPool: Pool;
+  readonly #legacyAskAdmissionPool: Pool;
 
   constructor(
     private readonly pool: Pool,
     private readonly dispatcher: Dispatcher,
     private readonly settings: RunCreationSettings,
-    splitLifecycle?: Pick<SplitLifecycleProjection, "read">
+    splitLifecycle:Pick<SplitLifecycleProjection, "read">|undefined,
+    runProvisionPool:Pool,
+    askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
-    this.#runs = new RunRepository(pool);
+    if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
+      || askAdmissionPools.server===runProvisionPool
+      || askAdmissionPools.legacy===runProvisionPool
+      || askAdmissionPools.server===askAdmissionPools.legacy) {
+      throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+    }
+    this.#runs = new RunRepository(pool,runProvisionPool);
     this.#work = new WorkItemRepository(pool);
     this.#serve = new ServeRepository(pool);
     this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
+    this.#serverAskAdmissionPool=askAdmissionPools.server;
+    this.#legacyAskAdmissionPool=askAdmissionPools.legacy;
+  }
+
+  withContentLease<T>(runId: string, use: () => Promise<T>): Promise<T> {
+    return withRunContentLease(this.pool,[runId],async () => use());
   }
 
   async submit(
@@ -1070,33 +1207,48 @@ export class PostgresAskApplication implements AskApplication {
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
-    await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
-    const runId = await this.#runs.startRun({
-      questionLine: ask.question_line,
-      principal,
-      sessionId: session.session_id,
-      callerScope: session.caller_scope,
-      asOf: new Date(ask.as_of),
-      askerRiskTier: ask.risk_tier,
-      effectiveRiskTier: risk.effectiveRiskTier,
-      tierSource: risk.tierSource,
-      tierProvenanceRef: risk.tierProvenanceRef,
-      compositionBudgetTier: ask.composition_budget_tier,
-      depthParams: ask.depth_params,
-      discoveredPanel,
-      strangerSampleRate: this.settings.strangerSampleRate,
-      envelopeBasis,
-      registerVersion: this.settings.registerVersion,
-      batteryVersion: this.settings.batteryVersion,
-      askContract: {
-        decision_scope: ask.decision_scope,
-        steering_presets: ask.steering_presets,
-        steering_annotations: ask.steering_annotations,
-        critic_unavailable_cap: criticUnavailableCap
-      },
-      batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
-    });
+    let runId:string;
+    try {
+      const admissionPool=principal.kind === "server"
+        ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+      runId=await withOwnerAskAdmissionLease(admissionPool,ownership,async (lease) => {
+        await this.#liveness.recordQuery(
+          ask.question_line,ownership,new Date(ask.as_of)
+        );
+        return this.#runs.startRun({
+          questionLine: ask.question_line,
+          principal,
+          sessionId: session.session_id,
+          callerScope: session.caller_scope,
+          asOf: new Date(ask.as_of),
+          askerRiskTier: ask.risk_tier,
+          effectiveRiskTier: risk.effectiveRiskTier,
+          tierSource: risk.tierSource,
+          tierProvenanceRef: risk.tierProvenanceRef,
+          compositionBudgetTier: ask.composition_budget_tier,
+          depthParams: ask.depth_params,
+          discoveredPanel,
+          strangerSampleRate: this.settings.strangerSampleRate,
+          envelopeBasis,
+          registerVersion: this.settings.registerVersion,
+          batteryVersion: this.settings.batteryVersion,
+          askContract: {
+            decision_scope: ask.decision_scope,
+            steering_presets: ask.steering_presets,
+            steering_annotations: ask.steering_annotations,
+            critic_unavailable_cap: criticUnavailableCap
+          },
+          batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+        },lease.client);
+      });
+    } catch (error) {
+      if (error instanceof TypedDomainError
+        && error.code === "OWNER_PRIVATE_HISTORY_SCAN_SATURATED") {
+        throw new AskRefusal(error);
+      }
+      throw error;
+    }
     await this.#serve.recordMemoryQuestion({
       runId,
       questionLine: ask.question_line,
@@ -1106,7 +1258,7 @@ export class PostgresAskApplication implements AskApplication {
       policyVersion: this.settings.registerVersion,
       ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
     }, ownership);
-    const workItemId = await this.#work.enqueue({
+    const workItemId=await this.#work.enqueue({
       runId,
       batteryRowId: "Q1",
       nodeSet: [],
@@ -1187,8 +1339,13 @@ export class PostgresAskApplication implements AskApplication {
       this.pool.query<{
         task_class: string; model_id: string; model_version: string; provider: string; routing_decision_id: string;
       }>(
-        `SELECT task_class, model_id, model_version, provider, routing_decision_id
-         FROM scorecard.session_assignment WHERE session_id=$1 ORDER BY at_seq`, [session.session_id]
+        `SELECT assignment.task_class,assignment.model_id,assignment.model_version,
+                assignment.provider,assignment.routing_decision_id
+         FROM identity.run_execution_binding AS execution
+         JOIN scorecard.session_assignment AS assignment
+           ON assignment.session_id=execution.execution_ref::text
+         WHERE execution.identity_session_id=$1
+         ORDER BY assignment.at_seq`, [session.session_id]
       )
     ]);
     return DeploymentSchema.parse({

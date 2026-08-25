@@ -2,15 +2,17 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
+  MAX_OWNER_PRIVATE_HISTORY_SCAN,
   allocateSequence,
   decryptContentForRun,
-  decryptPreparedContentForRun,
-  encryptPreparedContentForRun,
+  decryptLeasedContentForRun,
+  encryptAttestedLeasedContentForRun,
   normalizeRunOwnership,
-  prepareContentEncryptionForRun,
-  questionBlindIndexForOwner,
+  prepareLeasedContentEncryptionForRun,
+  prepareLeasedContentEncryptionForRuns,
   type CryptoEnvelope,
-  type PreparedRunContentCipher,
+  type LeasedPreparedRunContentCipher,
+  withRunContentLease,
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
@@ -330,6 +332,79 @@ function fromRow(row: QuestionKeyRow): MemoryQuestionKey {
 export class MemoryRepository {
   constructor(private readonly pool: Pool) {}
 
+  async withDisclosureContentLease<T>(
+    sourceRunIds: readonly string[],
+    use: () => Promise<T>
+  ): Promise<T> {
+    const sources = [...new Set(sourceRunIds)].sort();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const discovered = [...new Set((await Promise.all(
+        sources.map((runId) => this.leaseRunIdsForDisclosure(runId))
+      )).flat())].sort();
+      try {
+        return await withRunContentLease(this.pool,discovered,async () => {
+          const revalidated = [...new Set((await Promise.all(
+            sources.map((runId) => this.leaseRunIdsForDisclosure(runId))
+          )).flat())].sort();
+          if (revalidated.length !== discovered.length
+            || revalidated.some((runId,index) => runId !== discovered[index])) {
+            throw new TypedDomainError(
+              "CONTENT_LEASE_SCOPE_CHANGED",
+              "The private-content relation changed while its lease was acquired"
+            );
+          }
+          return use();
+        });
+      } catch (error) {
+        if (!(error instanceof TypedDomainError)
+          || error.code !== "CONTENT_LEASE_SCOPE_CHANGED"
+          || attempt === 2) throw error;
+      }
+    }
+    throw new TypedDomainError(
+      "CONTENT_LEASE_SCOPE_CHANGED",
+      "The private-content relation did not stabilize"
+    );
+  }
+
+  async leaseRunIdsForDisclosure(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ prior_run_id: string | null }>(
+      `SELECT link.prior_run_id
+       FROM memory.memory_link AS link
+       JOIN LATERAL (
+         SELECT state FROM memory.memory_link_event
+         WHERE memory_link_id=link.memory_link_id ORDER BY at_seq DESC LIMIT 1
+       ) AS event ON true
+       WHERE link.source_run_id=$1 AND event.state='LINKED'
+       ORDER BY link.at_seq DESC LIMIT 1`,
+      [runId]
+    );
+    return Object.freeze([...new Set([
+      runId,
+      ...(result.rows[0]?.prior_run_id === null || result.rows[0]?.prior_run_id === undefined
+        ? [] : [result.rows[0].prior_run_id])
+    ])].sort());
+  }
+
+  async leaseRunIdsForAnswerContradiction(answerId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ source_run_id: string; prior_run_id: string }>(
+      `SELECT link.source_run_id,link.prior_run_id
+       FROM serve.answer AS answer
+       JOIN memory.memory_link AS link ON link.source_run_id=answer.run_id
+       JOIN LATERAL (
+         SELECT state FROM memory.memory_link_event
+         WHERE memory_link_id=link.memory_link_id ORDER BY at_seq DESC LIMIT 1
+       ) AS event ON true
+       WHERE answer.answer_id=$1 AND event.state='LINKED'
+       ORDER BY link.at_seq DESC LIMIT 1`,
+      [answerId]
+    );
+    const row = result.rows[0];
+    return Object.freeze(row === undefined ? [] : [...new Set([
+      row.source_run_id,row.prior_run_id
+    ])].sort());
+  }
+
   async recordQuestionAndMatch(input: {
     readonly key: MemoryQuestionKey;
     readonly decidedBy: string;
@@ -359,23 +434,24 @@ export class MemoryRepository {
     }
 
     const questionKeyId = randomUUID();
-    const sourcePrepared = await prepareContentEncryptionForRun(this.pool, input.key.runId);
-    let selectedPrepared: PreparedRunContentCipher | null = null;
+    const leasedByRun = await prepareLeasedContentEncryptionForRuns(
+      this.pool,
+      selected === undefined ? [input.key.runId] : [input.key.runId,selected.priorRunId]
+    );
+    const sourceLease = leasedByRun.get(input.key.runId)!;
+    const sourcePrepared = sourceLease.prepared;
+    const selectedLease = selected === undefined
+      ? undefined
+      : leasedByRun.get(selected.priorRunId);
     try {
-      if (selected?.match.autoLink === true && input.pullPolicy !== undefined && input.pullPolicy.bound > 0) {
-        selectedPrepared = await prepareContentEncryptionForRun(this.pool, selected.priorRunId);
-      }
-      const questionContent = encryptPreparedContentForRun(
-        sourcePrepared, "memory.question_key", questionKeyId,
+      const questionContent = encryptAttestedLeasedContentForRun(
+        sourceLease, "memory.question_key", questionKeyId,
         {
           canonicalQuestionText: input.key.canonicalQuestionText,
           normalizedBinding: input.key.normalizedBinding,
           frozenTerms: input.key.frozenTerms
         }
       );
-      const questionBlindIndex = access.ownerRef === null
-        ? null
-        : questionBlindIndexForOwner(this.pool, access.ownerRef, input.key.canonicalQuestionText);
       const storedQuestion = questionContent === null
         ? input.key.canonicalQuestionText
         : CONTENT_CIPHERTEXT_SENTINEL;
@@ -403,6 +479,15 @@ export class MemoryRepository {
       if (owned.rows[0]?.owned !== true) {
         throw new TypedDomainError("MEMORY_RUN_NOT_OWNED", "The run owner changed before memory persistence");
       }
+      const sourceErasureGate = await client.query<{ live: boolean }>(
+        `SELECT CASE WHEN content_encryption_version=1
+           THEN core.run_private_content_is_live(run_id) ELSE true END AS live
+         FROM core.run WHERE run_id=$1`,
+        [input.key.runId]
+      );
+      if (sourceErasureGate.rows[0]?.live !== true) {
+        throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+      }
       if (selected !== undefined) {
         if (!locked.rows.some((row) => row.run_id === selected!.priorRunId)) {
           selected = undefined;
@@ -412,21 +497,35 @@ export class MemoryRepository {
             [selected.priorRunId, access.ownerRef, access.legacyAskerId]
           );
           if (stillOwned.rows[0]?.owned !== true) selected = undefined;
+          if (selected !== undefined) {
+            const selectedErasureGate = await client.query<{ live: boolean }>(
+              `SELECT CASE WHEN content_encryption_version=1
+                 THEN core.run_private_content_is_live(run_id) ELSE true END AS live
+               FROM core.run WHERE run_id=$1`,
+              [selected.priorRunId]
+            );
+            if (selectedErasureGate.rows[0]?.live !== true) selected = undefined;
+          }
         }
       }
       await client.query(
         `INSERT INTO memory.question_key (
            question_key_id,run_id,canonical_question_text,caller_scope,asker_scope,settlement_act,
            question_type, declared_field, normalized_binding, frozen_terms,
-           frozen_query_set_hash,as_of,policy_version,key_version,at_seq,
-           question_blind_index,content_ciphertext
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb)`,
+           frozen_query_set_hash,frozen_query_set_hash_version,
+           as_of,policy_version,key_version,at_seq,
+           question_blind_index_version,question_blind_index,content_ciphertext,content_attestation
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20)`,
         [questionKeyId, input.key.runId, storedQuestion, input.key.callerScope, askerScope,
           input.key.settlementAct, input.key.questionType, input.key.declaredField,
           JSON.stringify(storedBinding), JSON.stringify(storedTerms),
-          input.key.frozenQuerySetHash, new Date(input.key.asOf), input.key.policyVersion,
-          input.key.keyVersion, await allocateSequence(client), questionBlindIndex,
-          questionContent === null ? null : JSON.stringify(questionContent)]
+          questionContent === null ? input.key.frozenQuerySetHash : null,
+          questionContent === null ? 1 : 2,
+          new Date(input.key.asOf), input.key.policyVersion,
+          input.key.keyVersion, await allocateSequence(client), questionContent === null ? 1 : 2,
+          null,
+          questionContent === null ? null : JSON.stringify(questionContent.envelope),
+          questionContent?.attestation ?? null]
       );
       if (selected === undefined) return;
       if (!selected.match.autoLink) {
@@ -472,14 +571,14 @@ export class MemoryRepository {
       );
       if (input.pullPolicy !== undefined && input.pullPolicy.bound > 0) {
         await this.#recordAnswerPull(
-          client, sourcePrepared, selectedPrepared, input.key.runId, memoryLinkId,
+          client, sourceLease, selectedLease, input.key.runId, memoryLinkId,
           askerScope, selected.answerId, input.pullPolicy
         );
       }
       });
+      await sourceLease.assertLive();
     } finally {
-      selectedPrepared?.close();
-      sourcePrepared?.close();
+      await sourceLease.close();
     }
     return this.readDisclosure(input.key.runId);
   }
@@ -508,9 +607,24 @@ export class MemoryRepository {
            SELECT 1 FROM core.run_progress_event AS progress
            WHERE progress.run_id=key.run_id AND progress.kind='TERMINAL'
          )
-       ORDER BY key.at_seq DESC`,
-      [sourceRunId, access.ownerRef, access.legacyAskerId]
+         AND NOT EXISTS (
+           SELECT 1 FROM serve.private_run_key_cleanup_intent AS erased
+           WHERE erased.run_id=key.run_id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
+           WHERE tombstone.run_id=key.run_id
+         )
+       ORDER BY key.at_seq DESC,key.question_key_id
+       LIMIT $4`,
+      [sourceRunId, access.ownerRef, access.legacyAskerId,MAX_OWNER_PRIVATE_HISTORY_SCAN+1]
     );
+    if (candidates.rows.length > MAX_OWNER_PRIVATE_HISTORY_SCAN) {
+      throw new TypedDomainError(
+        "OWNER_PRIVATE_HISTORY_SCAN_SATURATED",
+        "Private history exceeds the bounded comparison window"
+      );
+    }
     return candidates.rows;
   }
 
@@ -520,9 +634,10 @@ export class MemoryRepository {
     askerScope: string,
     reference: MemoryCandidateRef
   ): Promise<MemoryCandidateSelection | null> {
-    const prepared = await prepareContentEncryptionForRun(this.pool, reference.run_id);
+    const leasedContent = await prepareLeasedContentEncryptionForRun(this.pool, reference.run_id);
+    const prepared = leasedContent.prepared;
     try {
-      return await withWriteTransaction(this.pool, async (client) => {
+      const selection = await withWriteTransaction(this.pool, async (client) => {
         const locked = await client.query<{ run_id: string }>(
           `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`,
           [reference.run_id]
@@ -533,6 +648,13 @@ export class MemoryRepository {
           [reference.run_id, access.ownerRef, access.legacyAskerId]
         );
         if (owned.rows[0]?.owned !== true) return null;
+        const erasureGate = await client.query<{ live: boolean }>(
+          `SELECT CASE WHEN content_encryption_version=1
+             THEN core.run_private_content_is_live(run_id) ELSE true END AS live
+           FROM core.run WHERE run_id=$1`,
+          [reference.run_id]
+        );
+        if (erasureGate.rows[0]?.live !== true) return null;
         const candidateRows = await client.query<QuestionKeyRow & { answer_id: string }>(
           `SELECT key.*, outcome.answer_id
            FROM memory.question_key AS key
@@ -551,12 +673,12 @@ export class MemoryRepository {
         );
         const candidate = candidateRows.rows[0];
         if (candidate === undefined) return null;
-        const content = decryptPreparedContentForRun<{
+        const content = decryptLeasedContentForRun<{
           canonicalQuestionText: string;
           normalizedBinding?: Readonly<Record<string, string | null>>;
           frozenTerms?: readonly string[];
         }>(
-          prepared, "memory.question_key", reference.question_key_id,
+          leasedContent, "memory.question_key", reference.question_key_id,
           candidate.content_ciphertext,
           {
             canonicalQuestionText: candidate.canonical_question_text,
@@ -583,21 +705,24 @@ export class MemoryRepository {
           match
         });
       });
+      await leasedContent.assertLive();
+      return selection;
     } finally {
-      prepared?.close();
+      await leasedContent.close();
     }
   }
 
   async #recordAnswerPull(
     client: PoolClient,
-    sourcePrepared: PreparedRunContentCipher | null,
-    selectedPrepared: PreparedRunContentCipher | null,
+    sourceLease: LeasedPreparedRunContentCipher,
+    selectedLease: LeasedPreparedRunContentCipher | undefined,
     sourceRunId: string,
     memoryLinkId: string,
     askerScope: string,
     answerId: string,
     policy: MemoryPullPolicy
   ): Promise<void> {
+    const sourcePrepared = sourceLease.prepared;
     const snapshot = await client.query<{
       answer_id: string; answer_version: number; run_id: string; question_line: string; as_of: Date;
       run_content_ciphertext: CryptoEnvelope | null;
@@ -615,10 +740,14 @@ export class MemoryRepository {
     );
     const row = snapshot.rows[0];
     if (row === undefined) throw new TypedDomainError("MEMORY_PRIOR_ANSWER_MISSING", "The linked settled answer is unavailable");
-    const runContent = decryptPreparedContentForRun<{ questionLine: string }>(
-      selectedPrepared, "core.run", row.run_id, row.run_content_ciphertext,
+    if (selectedLease === undefined) {
+      throw new TypedDomainError("MEMORY_PRIOR_ANSWER_MISSING", "The linked settled answer is unavailable");
+    }
+    const runContent = decryptLeasedContentForRun<{ questionLine: string }>(
+      selectedLease, "core.run", row.run_id, row.run_content_ciphertext,
       { questionLine: row.question_line }
     );
+    const pullRecordId = randomUUID();
     const pin: PinnedMemoryPull = {
       artifactId: row.answer_id, version: row.answer_version, contentHash: row.content_hash,
       asOf: row.as_of.toISOString(), stalenessStateAtPull: row.staleness_state ?? "FRESH",
@@ -626,7 +755,6 @@ export class MemoryRepository {
       registerSourceRef: policy.sourceRef
     };
     validatePinnedPulls([pin], policy);
-    const pullRecordId = randomUUID();
     const payloadSnapshot = {
       runId: row.run_id,
       questionLine: runContent.questionLine,
@@ -634,25 +762,33 @@ export class MemoryRepository {
       verdictAdmissibility: classifyPulledArtifact("PRIOR_VERDICT"),
       confidenceBand: row.confidence_band
     };
-    const content = encryptPreparedContentForRun(
-      sourcePrepared, "memory.pull_record", pullRecordId,
+    const content = encryptAttestedLeasedContentForRun(
+      sourceLease, "memory.pull_record", pullRecordId,
       { payloadSnapshot }
     );
     await client.query(
       `INSERT INTO memory.pull_record (
          pull_record_id,memory_link_id,artifact_kind,artifact_id,artifact_version,content_hash,
+         content_hash_version,
          artifact_as_of, staleness_state_at_pull, asker_scope, payload_snapshot,
-         register_row_key,register_version,register_source_ref,at_seq,content_ciphertext
-       ) VALUES ($1,$2,'PRIOR_ANSWER',$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14::jsonb)`,
-      [pullRecordId, memoryLinkId, pin.artifactId, pin.version, pin.contentHash,
+         register_row_key,register_version,register_source_ref,at_seq,content_ciphertext,content_attestation
+       ) VALUES ($1,$2,'PRIOR_ANSWER',$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15::jsonb,$16)`,
+      [pullRecordId, memoryLinkId, pin.artifactId, pin.version,
+        content === null ? pin.contentHash : null,content === null ? 1 : 2,
         new Date(pin.asOf), pin.stalenessStateAtPull, pin.askerScope,
         JSON.stringify(content === null ? payloadSnapshot : { ciphertext: true, v: 1 }),
         pin.registerRowKey, pin.registerVersion, pin.registerSourceRef,
-        await allocateSequence(client), content === null ? null : JSON.stringify(content)]
+        await allocateSequence(client),
+        content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
     );
   }
 
   async readDisclosure(runId: string): Promise<MemoryDisclosure | null> {
+    return this.withDisclosureContentLease([runId],async () =>
+      this.#readDisclosureUnderLease(runId));
+  }
+
+  async #readDisclosureUnderLease(runId: string): Promise<MemoryDisclosure | null> {
     const candidates = await this.pool.query<{ prior_run_id: string; match_tier: MemoryMatchTier }>(
       `SELECT prior_run_id, match_tier FROM memory.candidate_record WHERE source_run_id=$1 ORDER BY at_seq`, [runId]
     );
@@ -672,6 +808,15 @@ export class MemoryRepository {
           priorRunId: candidate.prior_run_id, tier: candidate.match_tier
         }))
       });
+    }
+    return withRunContentLease(this.pool, [row.source_run_id, row.prior_run_id], async () => {
+    const currentScope = await this.leaseRunIdsForDisclosure(runId);
+    if (!currentScope.every((candidate) =>
+      candidate === row.source_run_id || candidate === row.prior_run_id)) {
+      throw new TypedDomainError(
+        "CONTENT_LEASE_SCOPE_CHANGED",
+        "The private-content relation changed while its lease was acquired"
+      );
     }
     const pull = await this.pool.query<{
       pull_record_id: string;
@@ -711,6 +856,7 @@ export class MemoryRepository {
       },
       pulls: pins,
       candidates: candidates.rows.map((candidate) => ({ priorRunId: candidate.prior_run_id, tier: candidate.match_tier }))
+    });
     });
   }
 
@@ -780,9 +926,13 @@ export class MemoryRepository {
     const reference = located.rows[0];
     if (reference === undefined) return null;
     const access = ownershipFromMemoryScope(reference.asker_scope);
-    const sourcePrepared = await prepareContentEncryptionForRun(this.pool, reference.source_run_id);
+    const leasedByRun = await prepareLeasedContentEncryptionForRuns(
+      this.pool,[reference.source_run_id,reference.prior_run_id]
+    );
+    const sourceLease = leasedByRun.get(reference.source_run_id)!;
+    const sourcePrepared = sourceLease.prepared;
     try {
-      return await withWriteTransaction(this.pool, async (client) => {
+      const result = await withWriteTransaction(this.pool, async (client) => {
       const runIds = [reference.source_run_id, reference.prior_run_id].sort();
       const locked = await client.query<{ run_id: string }>(
         `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
@@ -795,6 +945,13 @@ export class MemoryRepository {
           [runId, access.ownerRef, access.legacyAskerId]
         );
         if (owned.rows[0]?.owned !== true) return null;
+        const erasureGate = await client.query<{ live: boolean }>(
+          `SELECT CASE WHEN content_encryption_version=1
+             THEN core.run_private_content_is_live(run_id) ELSE true END AS live
+           FROM core.run WHERE run_id=$1`,
+          [runId]
+        );
+        if (erasureGate.rows[0]?.live !== true) return null;
       }
       const observation = await client.query<{
         source_run_id: string; prior_run_id: string; memory_link_id: string; match_tier: MemoryMatchTier;
@@ -822,10 +979,10 @@ export class MemoryRepository {
       );
       const row = observation.rows[0];
       if (row === undefined || row.current_verdict === null) return null;
-      const observedPull = decryptPreparedContentForRun<{
+      const observedPull = decryptLeasedContentForRun<{
         payloadSnapshot: Readonly<Record<string, unknown>>;
       }>(
-        sourcePrepared, "memory.pull_record", row.pull_record_id,
+        sourceLease, "memory.pull_record", row.pull_record_id,
         row.pull_content_ciphertext, { payloadSnapshot: row.payload_snapshot }
       );
       const priorVerdict = typeof observedPull.payloadSnapshot.verdict === "string"
@@ -857,27 +1014,30 @@ export class MemoryRepository {
         content_ciphertext: CryptoEnvelope | null;
       }>("SELECT * FROM memory.pull_record WHERE memory_link_id=$1 ORDER BY at_seq", [row.memory_link_id]);
       for (const pull of priorPulls.rows) {
-        const oldContent = decryptPreparedContentForRun<{
+        const oldContent = decryptLeasedContentForRun<{
           payloadSnapshot: Readonly<Record<string, unknown>>;
         }>(
-          sourcePrepared, "memory.pull_record", pull.pull_record_id,
+          sourceLease, "memory.pull_record", pull.pull_record_id,
           pull.content_ciphertext, { payloadSnapshot: pull.payload_snapshot }
         );
         const pullRecordId = randomUUID();
-        const content = encryptPreparedContentForRun(
-          sourcePrepared, "memory.pull_record", pullRecordId, oldContent
+        const content = encryptAttestedLeasedContentForRun(
+          sourceLease, "memory.pull_record", pullRecordId, oldContent
         );
         await client.query(
           `INSERT INTO memory.pull_record (
              pull_record_id,memory_link_id,artifact_kind,artifact_id,artifact_version,content_hash,
+             content_hash_version,
              artifact_as_of,staleness_state_at_pull,asker_scope,payload_snapshot,
-             register_row_key,register_version,register_source_ref,at_seq,content_ciphertext
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15::jsonb)`,
-          [pullRecordId, memoryLinkId, pull.artifact_kind, pull.artifact_id, pull.artifact_version, pull.content_hash,
+             register_row_key,register_version,register_source_ref,at_seq,content_ciphertext,content_attestation
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16::jsonb,$17)`,
+          [pullRecordId, memoryLinkId, pull.artifact_kind, pull.artifact_id, pull.artifact_version,
+            content === null ? pull.content_hash : null,content === null ? 1 : 2,
             pull.artifact_as_of, pull.staleness_state_at_pull, pull.asker_scope,
             JSON.stringify(content === null ? oldContent.payloadSnapshot : { ciphertext: true, v: 1 }),
             pull.register_row_key, pull.register_version, pull.register_source_ref,
-            await allocateSequence(client), content === null ? null : JSON.stringify(content)]
+            await allocateSequence(client),
+            content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
         );
       }
       await client.query(
@@ -898,8 +1058,10 @@ export class MemoryRepository {
       );
       return memoryLinkId;
       });
+      await sourceLease.assertLive();
+      return result;
     } finally {
-      sourcePrepared?.close();
+      await sourceLease.close();
     }
   }
 }

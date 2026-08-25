@@ -32,19 +32,43 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
   readonly endpoint: string;
   stop(): Promise<void>;
 }> {
-  let cursor = 0;
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  const classifyContent = (content: string): ResponseClass => {
+    try {
+      const value = JSON.parse(content) as Record<string, unknown>;
+      if ("statement" in value) return "JUDGE";
+      if ("outcome" in value) return "REVIEW";
+      if ("segments" in value) return "COMPOSE";
+      if ("conforms" in value) return "CONFORMANCE";
+      if ("pass" in value) return "R9";
+    } catch { /* health-probe fixtures retain FIFO semantics */ }
+    return "GENERAL";
+  };
+  const pending = contents.map((content) => ({ content, kind: classifyContent(content) }));
+  let calls = 0;
   const server: Server = createServer((request, response) => {
-    request.resume();
-    const content = contents[cursor++];
-    if (content === undefined) {
-      response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "UNEXPECTED_TEST_CALL" }));
-      return;
-    }
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
-      id: `acceptance-test-${cursor}`,
-      model: "test-layer/model",
-      choices: [{ message: { content } }]
-    }));
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const body = Buffer.concat(chunks).toString("utf8");
+      const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
+        : body.includes("\"statement\": non-empty string") ? "JUDGE"
+          : body.includes("{conforms,findings}") ? "CONFORMANCE"
+            : body.includes("{pass}") ? "R9"
+              : body.includes("segments") && body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
+      const content = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+      calls += 1;
+      if (content === undefined) {
+        response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "UNEXPECTED_TEST_CALL" }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+        id: `acceptance-test-${calls}`,
+        model: "test-layer/model",
+        choices: [{ message: { content } }]
+      }));
+    });
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -213,6 +237,7 @@ describe("ACC-01 dry-run ceremony", () => {
     // DR-139 terminal activation evaluator wired by createAcceptanceRuntime.
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
+      legacyUserToken:"acc-01-owner-token",
       environment: {
         DATABASE_URL: database.connectionString,
         API_HOST: "127.0.0.1",
@@ -229,6 +254,7 @@ describe("ACC-01 dry-run ceremony", () => {
         { providerRef: "acceptance:claude-cli", baseUrl: criticProvider.endpoint, model: "test-layer/model" },
       ]
     });
+    try {
     const token = "acc-01-owner-token";
     const ask = await runtime.api.inject({
       method: "POST",
@@ -474,7 +500,10 @@ describe("ACC-01 dry-run ceremony", () => {
       url: `/v1/runs/${runId}/answer`,
       headers: { "x-user-dev-token": "different-owner-token" }
     });
-    expect(foreign.statusCode).toBe(404);
-    await runtime.api.close();
+    // An unrecognised dev token never materialises a synthetic foreign identity.
+    expect(foreign.statusCode).toBe(401);
+    } finally {
+      await runtime.api.close();
+    }
   });
 });

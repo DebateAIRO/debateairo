@@ -5,6 +5,7 @@ import {
   ProviderProbeRepository,
   RunRepository,
   assertNoOpenWriteTransaction,
+  withRunContentLease,
   type CompletionActivationResolution,
   type DiscoveredPanelMember
 } from "@debateai/db";
@@ -418,6 +419,7 @@ export interface ReviewCatchUpVersionCandidate {
 }
 
 export interface ReviewCatchUpDependencies {
+  withContentLease<T>(runId: string, use: () => Promise<T>): Promise<T>;
   /** The composition root probes these pinned members before any model spend. */
   probePinnedPanel(
     pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[]
@@ -482,6 +484,7 @@ export async function runReviewCatchUp(input: {
   readonly hold: HoldRecorder;
   readonly dependencies: ReviewCatchUpDependencies;
 }): Promise<ReviewCatchUpReport> {
+  return input.dependencies.withContentLease(input.runId,async () => {
   const beforeAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
   const reviewers = await input.dependencies.probePinnedPanel(input.pinnedPanel);
@@ -578,6 +581,7 @@ export async function runReviewCatchUp(input: {
     attemptsSpent: afterAttempts - beforeAttempts,
     envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal: null
   });
+  });
 }
 
 export function createPostgresReviewCatchUpDependencies(input: {
@@ -617,6 +621,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
     });
   };
   const dependencies: ReviewCatchUpDependencies = {
+    withContentLease: (runId,use) => withRunContentLease(input.pool,[runId],async () => use()),
     probePinnedPanel: async (pinnedPanel) => {
       const pinnedRefs = new Set(pinnedPanel.map((member) => member.providerRef));
       const candidates = input.reviewers.filter((reviewer) => pinnedRefs.has(reviewer.providerRef));
@@ -1125,7 +1130,7 @@ export class WalkingSkeletonRunner {
   }[];
 
   constructor(
-    pool: Pool,
+    private readonly pool: Pool,
     private readonly provider: ProviderGateway,
     private readonly settings: WalkingSkeletonSettings
   ) {
@@ -1164,6 +1169,7 @@ export class WalkingSkeletonRunner {
   }
 
   async executeValueOverlay(input: ValueOverlayExecutionInput): Promise<MixedValueAnswer> {
+    return withRunContentLease(this.pool,[input.runId],async () => {
     const frozen = await this.#valuation.readFrozenPropagation(input.propagationRunId);
     if (frozen.runId !== input.runId) {
       throw new TypedDomainError(
@@ -1198,6 +1204,7 @@ export class WalkingSkeletonRunner {
       empiricalSettlementRef: input.propagationRunId,
       findingFacts: input.findingFacts,
       overlay
+    });
     });
   }
 
@@ -1253,8 +1260,10 @@ export class WalkingSkeletonRunner {
       : await this.#work.claimById({ ...claimInput, workItemId });
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
+    const claimedRunId = claimed.runId;
+    return this.#memory.withDisclosureContentLease([claimedRunId],async () => {
     const runnerAttemptId = randomUUID();
-    const run = await this.#runs.readFrozenHead(claimed.runId);
+    const run = await this.#runs.readFrozenHead(claimedRunId);
     const preflightHaltedSites = new Map<string, {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
@@ -2469,6 +2478,7 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError("SETTLEMENT_RACE_WITHOUT_WINNER", claimed.workItemId);
     }
     return { kind: "COMPLETED", answerId: winningArtifact };
+    });
   }
 }
 
@@ -2539,7 +2549,40 @@ export function createPostgresProviderGateway(
   });
   return {
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
-      if (request.runId !== null) await budget.assertModelAttemptAllowed(request.runId);
+      if (request.runId === null) {
+        throw new TypedDomainError(
+          "PROVIDER_RUN_REQUIRED",
+          "Every provider content operation must be bound to one leased run"
+        );
+      }
+      const claimsEvaluatorScope=request.lane==="evaluator"
+        || request.callSiteKey.startsWith("evaluator.")
+        || request.subjectItemId.startsWith("evaluator:");
+      let authenticatedEvaluatorScope=false;
+      if (claimsEvaluatorScope) {
+        if (request.lane!=="evaluator") {
+          throw new TypedDomainError(
+            "EVALUATOR_PROVIDER_SCOPE_UNAUTHORIZED",
+            "Evaluator provider purpose, call site, and subject must agree"
+          );
+        }
+        const authorized=await pool.query<{ authorized:boolean }>(
+          `SELECT evaluator.provider_call_request_is_authorized($1,$2,$3,$4)
+             AS authorized`,
+          [request.runId,request.callSiteKey,request.subjectItemId,request.providerRef]
+        );
+        authenticatedEvaluatorScope=authorized.rows[0]?.authorized===true;
+        if (!authenticatedEvaluatorScope) {
+          throw new TypedDomainError(
+            "EVALUATOR_PROVIDER_SCOPE_UNAUTHORIZED",
+            "Evaluator provider purpose is not bound to a live evaluator attempt"
+          );
+        }
+      }
+      return withRunContentLease(pool,[request.runId],async () => {
+      if (!authenticatedEvaluatorScope) {
+        await budget.assertModelAttemptAllowed(request.runId!);
+      }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
         workItemId: request.subjectItemId,
@@ -2553,6 +2596,7 @@ export function createPostgresProviderGateway(
       return http.call({
         ...request,
         bound: { ...request.bound, maxAttempts: remaining }
+      });
       });
     }
   };

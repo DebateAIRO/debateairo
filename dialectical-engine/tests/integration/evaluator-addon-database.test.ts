@@ -54,9 +54,9 @@ async function seedRunAndArtifacts(registerVersion = 1): Promise<{
     ) VALUES
       ($1,gen_random_uuid(),$4,'provider:judge','openai-compatible-http','model:judge',
         'maker:judge','judge-v1','{}','{}','PARSED',$5,'input','contract',ledger.allocate_sequence()),
-      ($2,gen_random_uuid(),NULL,'provider:evaluator-vllm','openai-compatible-http','model:evaluator',
+      ($2,gen_random_uuid(),$4,'provider:evaluator-vllm','openai-compatible-http','model:evaluator',
         'maker:evaluator-local-vllm','evaluator-v1','{}','{}','PARSED',$5,'input','contract',ledger.allocate_sequence()),
-      ($3,gen_random_uuid(),NULL,'provider:other','openai-compatible-http','model:other',
+      ($3,gen_random_uuid(),$4,'provider:other','openai-compatible-http','model:other',
         'maker:judge','other-v1','{}','{}','PARSED',$5,'input','contract',ledger.allocate_sequence())
   `, [gradedArtifact, differentGraderArtifact, sameMakerGraderArtifact, runId, "a".repeat(64)]);
   return { runId, gradedArtifact, differentGraderArtifact, sameMakerGraderArtifact };
@@ -197,7 +197,7 @@ async function insertAddonObservation(input: {
 }
 
 describe("judge-grading add-on database maker guard", () => {
-  it("accepts a null-run evaluator grader artifact from a different maker", async () => {
+  it("accepts an exact-run evaluator grader artifact from a different maker", async () => {
     const fixture = await seedRunAndArtifacts();
     await expect(insertAddonObservation({
       runId: fixture.runId,
@@ -207,7 +207,7 @@ describe("judge-grading add-on database maker guard", () => {
     })).resolves.toBeUndefined();
   });
 
-  it("rejects a null-run grader artifact whose maker equals the graded judge maker", async () => {
+  it("rejects an exact-run grader artifact whose maker equals the graded judge maker", async () => {
     const fixture = await seedRunAndArtifacts();
     await expect(insertAddonObservation({
       runId: fixture.runId,
@@ -215,6 +215,17 @@ describe("judge-grading add-on database maker guard", () => {
       graderArtifact: fixture.sameMakerGraderArtifact,
       sourceRef: "judgement:same"
     })).rejects.toThrow(/PRODUCER_GRADING_FORBIDDEN/);
+  });
+
+  it("rejects a different-maker grader artifact bound to another run", async () => {
+    const graded = await seedRunAndArtifacts();
+    const foreign = await seedRunAndArtifacts();
+    await expect(insertAddonObservation({
+      runId:graded.runId,
+      gradedArtifact:graded.gradedArtifact,
+      graderArtifact:foreign.differentGraderArtifact,
+      sourceRef:"judgement:cross-run"
+    })).rejects.toThrow(/ADDON_GRADING_LINEAGE_UNRESOLVED/);
   });
 });
 
@@ -295,7 +306,7 @@ describe("persisted judge-grading add-on", () => {
     })).resolves.toMatchObject({ state: "GRADED", observationId: expect.any(String) });
     expect(gateway.call).toHaveBeenCalledTimes(1);
     expect(gateway.call.mock.calls[0]![0]).toMatchObject({
-      runId: null,
+      runId: fixture.runId,
       subjectItemId: expect.stringMatching(/^evaluator:addon-attempt:/),
       bound: { maxAttempts: 2 }
     });
@@ -446,7 +457,7 @@ describe("persisted judge-grading add-on", () => {
     expect(versionedGateway.call).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps twelve same-run invocations above pool max bounded to one provider call", async () => {
+  it("serializes twelve same-run invocations above pool max with one provider call", async () => {
     const registerVersion = 7005;
     const fixture = await seedGradableRun({ registerVersion });
     const gateway = successfulGateway(fixture.differentGraderArtifact, 40);
@@ -470,13 +481,13 @@ describe("persisted judge-grading add-on", () => {
     expect(gateway.call).toHaveBeenCalledTimes(1);
     expect(results.filter((result) => result.state === "GRADED")).toHaveLength(1);
     expect(results.filter((result) =>
-      result.state === "SKIPPED" && result.reason === "ADDON_PASS_IN_FLIGHT")).toHaveLength(11);
-    const inFlightReceipts = await database.pool.query<{ count: string }>(`
+      result.state === "SKIPPED" && result.reason === "ADDON_ALREADY_GRADED")).toHaveLength(11);
+    const serializedReceipts = await database.pool.query<{ count: string }>(`
       SELECT count(*)::text AS count FROM evaluator.pipeline_event
       WHERE run_id=$1 AND pipeline='ADDON' AND state='SKIPPED'
-        AND reason='ADDON_PASS_IN_FLIGHT'
+        AND reason='ADDON_ALREADY_GRADED'
     `, [fixture.runId]);
-    expect(inFlightReceipts.rows[0]!.count).toBe("11");
+    expect(serializedReceipts.rows[0]!.count).toBe("11");
   }, 15_000);
 
   it("completes twelve distinct-run passes above pool max and leaves the pool usable", async () => {

@@ -1,4 +1,5 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
+import { randomUUID } from "node:crypto";
 import {
   Argon2WorkerPool,
   AuditContextHasher,
@@ -11,7 +12,7 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresIdentityRepository, PostgresPublicationRepository, PostgresSessionRepository, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresIdentityRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -41,7 +42,12 @@ import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
-import { SendmailMailSender } from "./mail-channel.js";
+import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import {
+  AccountErasureNotificationReconciler,
+  createSingleFlightErasureReconciler,
+  PostgresAccountErasureApplication
+} from "./account-erasure.js";
 import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 
@@ -51,8 +57,6 @@ const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
-const contentBlindIndexKey = environment.CONTENT_ENCRYPTION_ENABLED === "true"
-  ? loadSecretKey(environment.CONTENT_BLIND_INDEX_KEY_PATH!) : undefined;
 if (corpusKek !== undefined) {
   assertPublicationSecretDomains({
     privateKek: kek,
@@ -63,7 +67,6 @@ if (corpusKek !== undefined) {
     publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!,
     additionalSecrets: [
       { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-      { path: environment.CONTENT_BLIND_INDEX_KEY_PATH!, material: contentBlindIndexKey! },
       { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
     ],
     additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
@@ -72,13 +75,42 @@ if (corpusKek !== undefined) {
 const pool = createPool(environment.DATABASE_URL);
 const authorizationPool = environment.PUBLICATION_ENABLED === "true"
   ? createPool(environment.AUTHORIZATION_DATABASE_URL!) : pool;
-if (environment.PUBLICATION_ENABLED === "true") {
-  try {
-    await assertPublicationDatabaseRoleSeparation(pool, authorizationPool);
-  } catch (error) {
-    await Promise.allSettled([pool.end(), authorizationPool.end()]);
-    throw error;
-  }
+const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
+  ? createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!) : pool;
+// Cleanup remains necessary when new encrypted writes are disabled: an intent
+// left by an earlier enabled process must not abort every erasure cycle under
+// the ordinary runtime principal.
+const contentProvisionPool = createPool(environment.CONTENT_PROVISION_DATABASE_URL);
+// Ask admission holds a session advisory lock while the count-changing run
+// commit uses that same backend. Keep both principal paths on explicit pool
+// instances so lock waiters cannot consume ordinary runtime/provision capacity.
+const serverAskAdmissionPool=createPool(environment.CONTENT_PROVISION_DATABASE_URL);
+const legacyAskAdmissionPool=createPool(environment.DATABASE_URL);
+if (serverAskAdmissionPool === contentProvisionPool
+  || serverAskAdmissionPool === pool
+  || legacyAskAdmissionPool === pool
+  || legacyAskAdmissionPool === contentProvisionPool
+  || legacyAskAdmissionPool === serverAskAdmissionPool) {
+  throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+}
+const erasurePool = createPool(environment.ERASURE_DATABASE_URL);
+try {
+  await Promise.all([
+    assertAccountErasureDatabaseRole(pool,erasurePool),
+    assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
+    ...(environment.PUBLICATION_ENABLED === "true" ? [
+      assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
+      assertPublicationCleanupDatabaseRole(publicationCleanupPool)
+    ] : []),
+    assertContentProvisionDatabaseRole(pool,contentProvisionPool),
+    assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
+  ]);
+} catch (error) {
+  await Promise.allSettled([...new Set([
+    pool,authorizationPool,publicationCleanupPool,contentProvisionPool,
+    serverAskAdmissionPool,legacyAskAdmissionPool,erasurePool
+  ])].map(async (databasePool) => databasePool.end()));
+  throw error;
 }
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
@@ -106,28 +138,22 @@ const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environme
 const probes = new ProviderProbeRepository(pool);
 const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
 const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
-if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
-  try {
-    configureContentEncryption(pool, new ContentCipher(
-      new FileRunContentKeyStore(
-        environment.USER_DEK_STORE_PATH,
-        dekStore,
-        async (ownerRef) => {
-          const resolved = await pool.query<{ user_id: string }>(
-            `SELECT user_id FROM identity."user"
-             WHERE owner_ref=$1 AND state='active'`,
-            [ownerRef]
-          );
-          const userId = resolved.rows[0]?.user_id;
-          if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
-          return userId;
-        }
-      ),
-      contentBlindIndexKey!
-    ));
-  } finally {
-    contentBlindIndexKey!.fill(0);
+const runKeyStore = new FileRunContentKeyStore(
+  environment.USER_DEK_STORE_PATH,
+  dekStore,
+  async (ownerRef) => {
+    const resolved = await pool.query<{ user_id: string }>(
+      `SELECT user_id FROM identity."user"
+       WHERE owner_ref=$1 AND state='active'`,
+      [ownerRef]
+    );
+    const userId = resolved.rows[0]?.user_id;
+    if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
+    return userId;
   }
+);
+if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
+  configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
 const registration = new RegistrationService({
   repository: identityRepository,
@@ -204,17 +230,76 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     });
     return preserveSubmittedTierSource(resolved, askerTierSource);
   }
-});
-const publications = environment.PUBLICATION_ENABLED === "true"
-  ? new PostgresPublicationApplication(
-      new PostgresPublicationRepository(pool, auditContextHasher),
-      new PublicationCipher(new FilePublicationKeyStore(
-        environment.PUBLICATION_KEY_STORE_PATH!,
-        corpusKek!
-      ))
-    )
+},undefined,contentProvisionPool,Object.freeze({
+  server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
+}));
+const publicationCipher = environment.PUBLICATION_ENABLED === "true"
+  ? new PublicationCipher(new FilePublicationKeyStore(
+      environment.PUBLICATION_KEY_STORE_PATH!,corpusKek!
+    ))
   : undefined;
-if (publications !== undefined) await publications.reconcileKeyCleanup();
+const publications = publicationCipher === undefined
+  ? undefined
+  : new PostgresPublicationApplication(
+      new PostgresPublicationRepository(pool, auditContextHasher),
+      publicationCipher,
+      undefined,
+      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher)
+    );
+let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+if (publications !== undefined) {
+  // Crash-orphan publication keys are claimed and removed before the process
+  // can accept traffic. Both bounded outboxes continue reconciling while the
+  // process is live; an item failure is reported only after later items in the
+  // same batch were given a chance to complete.
+  await publications.reconcileKeyProvisionCleanup();
+  await publications.reconcileKeyCleanup();
+  publicationCleanupTimer = setInterval(() => {
+    void Promise.all([
+      publications.reconcileKeyProvisionCleanup(),
+      publications.reconcileKeyCleanup()
+    ]).catch(() => console.error("[PUBLICATION_KEY_CLEANUP_PENDING]"));
+  },30_000);
+  publicationCleanupTimer.unref();
+}
+const accountErasureRepository = new PostgresAccountErasureRepository(
+  erasurePool,auditContextHasher,contentProvisionPool
+);
+const accountErasure = new AccountErasureCoordinator(
+  accountErasureRepository,dekStore,runKeyStore,publicationCipher
+);
+const privateErasure = new PrivateRunErasureCoordinator(
+  new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
+  runKeyStore,publicationCipher
+);
+const erasureApplication=new PostgresAccountErasureApplication(
+  accountErasureRepository,privateErasure
+);
+const erasureNotifications = new AccountErasureNotificationReconciler(
+  accountErasureRepository,dekStore,new SendmailSecurityNotificationSender({
+    executable:environment.MAIL_SENDMAIL_PATH,
+    from:environment.MAIL_FROM,
+    timeoutMs:authPolicy.channel.transportTimeoutMs
+  })
+);
+const reconciliationSource = () => Object.freeze({
+  ip:"background",userAgent:"debateai-account-erasure-reconciler",requestId:randomUUID()
+});
+const reconcileErasure = async ():Promise<void> => {
+  // Completion notifications must be acknowledged while the user DEK still
+  // exists. Account cleanup runs last, so a same-cycle ACK can open the
+  // authoritative SQL gate before any key destruction begins.
+  await erasureNotifications.reconcile(100);
+  await accountErasure.reconcileRunKeyProvisionIntents(100);
+  await privateErasure.reconcile(reconciliationSource(),100);
+  await accountErasure.reconcile(reconciliationSource(),100);
+};
+const triggerErasureReconciliation=createSingleFlightErasureReconciler(
+  reconcileErasure,
+  ()=>console.error("[ACCOUNT_ERASURE_RECONCILIATION_PENDING]")
+);
+const erasureReconcileTimer=setInterval(triggerErasureReconciliation,30_000);
+erasureReconcileTimer.unref();
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)
   : undefined;
@@ -223,6 +308,7 @@ const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   : undefined;
 const api = buildApi({
   application,
+  accountErasure:erasureApplication,
   registration,
   mfa,
   sessions,
@@ -244,6 +330,10 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
+if (publicationCleanupTimer !== undefined) {
+  api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
+}
+api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 const shutdown = installGracefulShutdown({
   api,
   registration,
@@ -252,11 +342,28 @@ const shutdown = installGracefulShutdown({
   databasePools: [
     pool,
     ...(authorizationPool === pool ? [] : [authorizationPool]),
+    ...(publicationCleanupPool === pool || publicationCleanupPool === authorizationPool
+      ? [] : [publicationCleanupPool]),
+    ...(contentProvisionPool === pool
+        || contentProvisionPool === authorizationPool
+        || contentProvisionPool === publicationCleanupPool
+      ? [] : [contentProvisionPool]),
+    serverAskAdmissionPool,
+    legacyAskAdmissionPool,
+    ...(erasurePool === pool
+        || erasurePool === authorizationPool
+        || erasurePool === publicationCleanupPool
+        || erasurePool === contentProvisionPool
+      ? [] : [erasurePool]),
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
   ]
 });
 try {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
+  // Queue draining is deliberately background-only. A bounded sendmail
+  // timeout can never hold readiness hostage, while the SQL ACK gate still
+  // prevents any user-key destruction before completion delivery succeeds.
+  triggerErasureReconciliation();
 } catch (error) {
   // A listen failure still owns every worker, secret cache, and DB handle built
   // above. Reuse the exact shutdown graph before surfacing the startup failure.

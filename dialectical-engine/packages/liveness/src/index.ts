@@ -1,9 +1,12 @@
 import type { Pool } from "pg";
 import {
+  MAX_OWNER_PRIVATE_HISTORY_SCAN,
   allocateSequence,
+  decryptContentForRun,
   normalizeRunOwnership,
-  questionBlindIndexForOwner,
+  withRunContentLease,
   withWriteTransaction,
+  type CryptoEnvelope,
   type RunOwnershipInput
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -127,20 +130,64 @@ export class LivenessRepository {
   async recordQuery(questionLine: string, ownership: RunOwnershipInput, queriedAt = new Date()): Promise<number> {
     if (questionLine.trim() === "") throw new TypedDomainError("LIVENESS_QUERY_INVALID", "Question and owner are required");
     const access = normalizeRunOwnership(ownership);
-    const questionBlindIndex = access.ownerRef === null
-      ? null
-      : questionBlindIndexForOwner(this.pool, access.ownerRef, questionLine);
-    return withWriteTransaction(this.pool, async (client) => {
-      const matches = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run
-         WHERE (
-           (question_blind_index IS NOT NULL AND question_blind_index=$1)
-           OR (question_blind_index IS NULL AND question_line=$2)
-         ) AND core.run_is_owned_by(run_id,$3,$4)
-         ORDER BY created_at_seq`,
-        [questionBlindIndex, questionLine, access.ownerRef, access.legacyAskerId]
+    const normalizedQuestion = questionLine.normalize("NFKC").trim()
+      .replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+    const candidates = await this.pool.query<{
+      run_id: string;
+      question_line: string;
+      content_ciphertext: CryptoEnvelope | null;
+      created_at_seq: string;
+    }>(`
+      SELECT run_id,question_line,content_ciphertext,created_at_seq
+      FROM core.run AS run
+      WHERE core.run_is_owned_by(run.run_id,$1,$2)
+        AND NOT EXISTS (
+          SELECT 1 FROM serve.private_run_key_cleanup_intent AS erased
+          WHERE erased.run_id=run.run_id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
+          WHERE tombstone.run_id=run.run_id
+        )
+      ORDER BY run.created_at_seq,run.run_id
+      LIMIT $3
+    `, [access.ownerRef, access.legacyAskerId,MAX_OWNER_PRIVATE_HISTORY_SCAN+1]);
+    if (candidates.rows.length > MAX_OWNER_PRIVATE_HISTORY_SCAN) {
+      throw new TypedDomainError(
+        "OWNER_PRIVATE_HISTORY_SCAN_SATURATED",
+        "Private history exceeds the bounded comparison window"
       );
-      const runIds = matches.rows.map((row) => row.run_id).sort();
+    }
+    if (candidates.rows.length === 0) return 0;
+    return withRunContentLease(
+      this.pool,
+      candidates.rows.map((candidate) => candidate.run_id),
+      async () => {
+    const matchedRunIds: string[] = [];
+    for (const candidate of candidates.rows) {
+      if (candidate.content_ciphertext === null) {
+        const normalizedCandidate = candidate.question_line.normalize("NFKC").trim()
+          .replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+        if (normalizedCandidate === normalizedQuestion) matchedRunIds.push(candidate.run_id);
+        continue;
+      }
+      // v1 shared and v2 per-run locators are deliberately never compared.
+      // Active owner lookup is an owner-scoped decrypt/normalize scan outside
+      // DB locks, so destroying one run key kills that run's guess oracle.
+      const content = await decryptContentForRun<Readonly<{ questionLine: string }>>(
+        this.pool,
+        candidate.run_id,
+        "core.run",
+        candidate.run_id,
+        candidate.content_ciphertext,
+        Object.freeze({ questionLine: "" })
+      );
+      const normalizedCandidate = content.questionLine.normalize("NFKC").trim()
+        .replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+      if (normalizedCandidate === normalizedQuestion) matchedRunIds.push(candidate.run_id);
+    }
+    return withWriteTransaction(this.pool, async (client) => {
+      const runIds = [...matchedRunIds].sort();
       const locked = runIds.length === 0
         ? { rows: [] as { run_id: string }[] }
         : await client.query<{ run_id: string }>(
@@ -150,50 +197,61 @@ export class LivenessRepository {
         );
       const lockedRunIds = new Set(locked.rows.map((row) => row.run_id));
       let recorded = 0;
-      for (const row of matches.rows) {
-        if (!lockedRunIds.has(row.run_id)) continue;
+      for (const runId of matchedRunIds) {
+        if (!lockedRunIds.has(runId)) continue;
         // Claims take the same run locks. Acquire the complete sorted set
         // before the first allocator write, then re-read each owner in a later
         // statement to close both the claim race and multi-run deadlock cycle.
         const owned = await client.query<{ owned: boolean }>(
           `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-          [row.run_id, access.ownerRef, access.legacyAskerId]
+          [runId, access.ownerRef, access.legacyAskerId]
         );
         if (owned.rows[0]?.owned !== true) continue;
+        const erasureGate = await client.query<{ live: boolean }>(
+          `SELECT CASE WHEN content_encryption_version=1
+             THEN core.run_private_content_is_live(run_id) ELSE true END AS live
+           FROM core.run WHERE run_id=$1`,
+          [runId]
+        );
+        if (erasureGate.rows[0]?.live !== true) {
+          throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+        }
         await client.query(
           `INSERT INTO core.question_liveness_event (run_id, kind, occurred_at, at_seq)
            VALUES ($1,'QUERY',$2,$3)`,
-          [row.run_id, queriedAt, await allocateSequence(client)]
+          [runId, queriedAt, await allocateSequence(client)]
         );
         const archived = await client.query<{ subject_kind: "ANSWER" | "NODE"; subject_ref: string }>(
           `SELECT DISTINCT ON (subject_kind, subject_ref) subject_kind, subject_ref
            FROM core.staleness_state WHERE run_id=$1
            ORDER BY subject_kind, subject_ref, at_seq DESC`,
-          [row.run_id]
+          [runId]
         );
         let revived = false;
         for (const subject of archived.rows.filter((candidate) => candidate.subject_kind && candidate.subject_ref)) {
           const latest = await client.query<{ state: StoredStalenessState }>(
             `SELECT state FROM core.staleness_state WHERE run_id=$1 AND subject_kind=$2 AND subject_ref=$3 ORDER BY at_seq DESC LIMIT 1`,
-            [row.run_id, subject.subject_kind, subject.subject_ref]
+            [runId, subject.subject_kind, subject.subject_ref]
           );
           if (latest.rows[0]?.state !== "ARCHIVED") continue;
           await client.query(
             `INSERT INTO core.staleness_state (run_id, subject_kind, subject_ref, state, reason, at_seq)
              VALUES ($1,$2,$3,'ARCHIVED_REVIVED','NEXT_QUERY',$4)`,
-            [row.run_id, subject.subject_kind, subject.subject_ref, await allocateSequence(client)]
+            [runId, subject.subject_kind, subject.subject_ref, await allocateSequence(client)]
           );
           revived = true;
         }
         if (revived) await client.query(
           `INSERT INTO core.question_liveness_event (run_id, kind, occurred_at, at_seq)
            VALUES ($1,'REVIVED',$2,$3)`,
-          [row.run_id, queriedAt, await allocateSequence(client)]
+          [runId, queriedAt, await allocateSequence(client)]
         );
         recorded += 1;
       }
       return recorded;
     });
+      }
+    );
   }
 
   async recordTriggerFired(input: {
@@ -346,6 +404,13 @@ export class LivenessRepository {
                 lag(model_version) OVER (PARTITION BY run_id, provider_ref ORDER BY at_seq) AS previous_version
          FROM ledger.raw_artifact
          WHERE run_id IS NOT NULL AND model_version IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM ledger.ledger_entry AS evaluator_entry
+             WHERE evaluator_entry.raw_artifact_ref=raw_artifact_id
+               AND evaluator.ledger_entry_is_authenticated_scope(
+                 evaluator_entry.ledger_entry_id
+               )
+           )
        )
        SELECT transition.run_id, transition.provider_ref, transition.previous_version, transition.model_version
        FROM ordered AS transition

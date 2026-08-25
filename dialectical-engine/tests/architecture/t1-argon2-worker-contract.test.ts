@@ -813,6 +813,9 @@ interface ChannelDispatchRow {
   readonly registration_admission: ClampAbsorptionRow & {
     readonly scope: Readonly<Record<string, unknown>>;
     readonly evidence: Readonly<Record<string, unknown>>;
+    readonly superseded_decision: ClampAbsorptionRow & {
+      readonly evidence: Readonly<Record<string, unknown>>;
+    };
     readonly retention_disclosure: Readonly<Record<string, unknown>>;
   };
 }
@@ -849,7 +852,7 @@ function rowsWithCurrentAbsorption(
   }) as readonly (typeof AUTH_POLICY_REGISTER_ROWS)[number][];
 }
 
-/** The register rows with ONE field of the decision_version 3 row perturbed. */
+/** The register rows with ONE field of the decision_version 4 row perturbed. */
 function rowsWithRegistrationAdmission(
   override: Readonly<Record<string, unknown>>
 ): readonly (typeof AUTH_POLICY_REGISTER_ROWS)[number][] {
@@ -1047,8 +1050,8 @@ describe("T1 rework2 — the versioned N*=3 clamp-absorption decision", () => {
 });
 
 // ==========================================================================
-// REWORK 7 — decision_version 3: a STRUCTURAL admission cap and a
-// route-specific registration wait deadline.
+// REWORK 7 — decision_version 4: hash-first/5,700 ms availability evidence,
+// the STRUCTURAL admission cap, and the retained route-specific deadline.
 //
 // v2 called 103 a measured accepted-request capacity. Unchanged-code evidence
 // then measured 98, and then 96, for the same burst — so that reading was
@@ -1061,12 +1064,12 @@ describe("T1 rework2 — the versioned N*=3 clamp-absorption decision", () => {
 // ceiling was widened, at a worst reservation wait of 21,902.2 ms — so the
 // shipped 18,000 ms bound was censoring admissions the system could serve.
 //
-// v3 also publishes what it does NOT know: the cadence stays 45 ms but is
-// provisional, and there is no positive current N* at all. An absent N* is a
-// disclosure; silently falling back to the historical N*=2 would not be.
+// v4 keeps v3 byte-exact as superseded history, and publishes what it does NOT
+// know: the cadence stays 45 ms but is provisional, the concurrent availability
+// burst is not timing-opacity evidence, and there is no positive current N*.
 // ==========================================================================
 
-describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and the 28 s deadline", () => {
+describe("T1 rework7 A4 — decision_version 4 publishes hash-first availability and retains 28 s", () => {
   const parse = (): ReturnType<typeof authPolicyFromRegisterRows> =>
     authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const admissionRow = (): ChannelDispatchRow["registration_admission"] =>
@@ -1074,9 +1077,9 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
 
   it("publishes the structural maximum of 103 and both wait deadlines", () => {
     const row = admissionRow();
-    expect(row.decision_version).toBe(3);
+    expect(row.decision_version).toBe(4);
     expect(row.status).toBe("CURRENT");
-    expect(row.supersedes_decision_version).toBe(2);
+    expect(row.supersedes_decision_version).toBe(3);
     expect(row.structural_maximum_concurrent_registrations).toBe(103);
     expect(row.registration_mail_permit_wait_deadline_ms).toBe(28_000);
     expect(row.shared_mail_permit_wait_deadline_ms).toBe(18_000);
@@ -1086,7 +1089,7 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
     expect(parse().channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(parse().channel.registrationMailDispatchQueueWaitTimeoutMs).toBe(28_000);
     expect(parse().channel.mailDispatchQueueWaitTimeoutMs).toBe(18_000);
-    expect(parse().channel.registrationAdmissionDecisionVersion).toBe(3);
+    expect(parse().channel.registrationAdmissionDecisionVersion).toBe(4);
   });
 
   it("keeps the 45 ms cadence but marks it provisional, and publishes NO positive N*", () => {
@@ -1113,32 +1116,50 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
       burst: "REGISTER_ONLY_SIMULTANEOUS",
       hard_availability_requests: 100,
       mixed_register_and_resend_availability_guaranteed: false,
-      route_partitioning: "NOT_AUTHORIZED_IN_REWORK7"
+      route_partitioning: "NOT_AUTHORIZED_IN_REWORK7",
+      privacy_pretransport_scope:
+        "SEPARATE_HEALTHY_STORAGE_BOUND_NOT_MET_BY_CONCURRENT_AVAILABILITY_BURST"
     });
     // The shared FIFO is explicitly unchanged and explicitly unpartitioned.
     expect(parse().channel.maxConcurrentVerificationDispatches).toBe(32);
     expect(parse().channel.maxQueuedVerificationDispatches).toBe(96);
   });
 
-  it("discloses the three diagnostic repeats and the exact deadline derivation", () => {
+  it("records one fresh availability run and preserves decision 3 byte-exact", () => {
     const evidence = admissionRow().evidence;
-    expect(evidence.repeats).toBe(3);
-    expect(evidence.successes_per_repeat).toEqual([103, 103, 103]);
-    expect(evidence.commits_per_repeat).toEqual([103, 103, 103]);
-    expect(evidence.sends_per_repeat).toEqual([103, 103, 103]);
-    expect(evidence.busy_per_repeat).toEqual([0, 0, 0]);
-    expect(evidence.unexpected_per_repeat).toEqual([0, 0, 0]);
-    // Tenths of a millisecond, so 20,922.9 / 21,902.2 / 20,942.1 stay exact.
+    expect(evidence.repeats).toBe(1);
+    expect(evidence.successes_per_repeat).toEqual([103]);
+    expect(evidence.commits_per_repeat).toEqual([103]);
+    expect(evidence.sends_per_repeat).toEqual([103]);
+    expect(evidence.busy_per_repeat).toEqual([0]);
+    expect(evidence.unexpected_per_repeat).toEqual([0]);
+    // Tenths of a millisecond, so the fresh 5,942.1 ms maximum stays exact.
     expect(evidence.reservation_wait_maximum_tenths_ms)
-      .toEqual([209_229, 219_022, 209_421]);
+      .toEqual([59_421]);
     expect(evidence.deadline_derivation)
-      .toBe("ceil_to_whole_second(1.25 * 21902.2 ms) = 28000 ms");
-    expect(Math.ceil(1.25 * 21_902.2 / 1_000) * 1_000).toBe(28_000);
-    // Hundredths of a percent: 25.28%, 21.78%, 25.21%.
-    expect(evidence.margin_hundredths_percent_per_repeat).toEqual([2_528, 2_178, 2_521]);
-    expect((evidence.margin_hundredths_percent_per_repeat as readonly number[])
-      .every((margin) => margin >= 2_000)).toBe(true);
-    expect(String(evidence.measurement)).toMatch(/DIAGNOSTIC_60000MS/);
+      .toBe("retained 28000 ms exceeds fresh 5942.1 ms maximum by 22057.9 ms");
+    expect(evidence.margin_hundredths_percent_per_repeat).toEqual([7_878]);
+    expect(String(evidence.measurement)).toMatch(/5700MS_HASH_FIRST/);
+    expect(String(evidence.measurement)).toMatch(/NOT_PRIVACY_ENVELOPE_EVIDENCE/);
+
+    const historical = admissionRow().superseded_decision;
+    expect(historical).toMatchObject({
+      decision_version: 3,
+      status: "SUPERSEDED_BY_DECISION_VERSION_4",
+      supersedes_decision_version: 2,
+      registration_minimum_reservation_ms: 5_100
+    });
+    expect(historical.evidence).toMatchObject({
+      repeats: 3,
+      successes_per_repeat: [103, 103, 103],
+      commits_per_repeat: [103, 103, 103],
+      sends_per_repeat: [103, 103, 103],
+      busy_per_repeat: [0, 0, 0],
+      unexpected_per_repeat: [0, 0, 0],
+      reservation_wait_maximum_tenths_ms: [209_229, 219_022, 209_421],
+      deadline_derivation: "ceil_to_whole_second(1.25 * 21902.2 ms) = 28000 ms",
+      margin_hundredths_percent_per_repeat: [2_528, 2_178, 2_521]
+    });
   });
 
   it("discloses what a queued registration frame retains, and for how long", () => {
@@ -1159,11 +1180,12 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
   it("discloses the derivation in prose, not just the conclusion", () => {
     const derivation = channelDispatchRow().sizing_derivation;
     for (const disclosure of [
-      "decision_version 3", "structural admission budget", "103",
+      "decision_version 3", "decision_version 4", "structural admission budget", "103",
       "104th", "28,000 ms", "18,000 ms", "21,902.2 ms",
       "1.25", "21.78 percent", "no positive current N*",
       "45 ms cadence is provisional", "not a measured accepted-request capacity",
-      "98", "96", "973.0 ms"
+      "98", "96", "973.0 ms", "5,942.1 ms", "5700 ms",
+      "not timing-opacity evidence", "beyond 600 ms"
     ]) {
       expect(derivation).toContain(disclosure);
     }
@@ -1178,7 +1200,7 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
   }[] = [
     { label: "a structural cap that is not the 103 the request path enforces",
       override: { structural_maximum_concurrent_registrations: 104 } },
-    { label: "a registration deadline below its own 1.25x derivation",
+    { label: "a registration deadline below the retained decision-3 deadline",
       override: { registration_mail_permit_wait_deadline_ms: 18_000 } },
     { label: "a shared deadline that drifted off the ruled 18 seconds",
       override: { shared_mail_permit_wait_deadline_ms: 28_000 } },
@@ -1196,10 +1218,12 @@ describe("T1 rework7 A4 — decision_version 3 publishes the structural cap and 
         shared_dispatcher_at_entry: "INITIALLY_EMPTY",
         burst: "REGISTER_ONLY_SIMULTANEOUS", hard_availability_requests: 100,
         mixed_register_and_resend_availability_guaranteed: true,
-        route_partitioning: "NOT_AUTHORIZED_IN_REWORK7"
+        route_partitioning: "NOT_AUTHORIZED_IN_REWORK7",
+        privacy_pretransport_scope:
+          "SEPARATE_HEALTHY_STORAGE_BOUND_NOT_MET_BY_CONCURRENT_AVAILABILITY_BURST"
       }) } },
-    { label: "a status that still calls decision_version 2 current",
-      override: { supersedes_decision_version: 1 } }
+    { label: "a status that skips sealed decision_version 3",
+      override: { supersedes_decision_version: 2 } }
   ];
 
   for (const perturbation of admissionPerturbations) {
