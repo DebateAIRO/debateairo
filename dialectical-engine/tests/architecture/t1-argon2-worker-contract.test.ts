@@ -730,7 +730,6 @@ describe("T1 rework2 R4 — the refusal-audit drain is bounded, not a 60 s wait"
     const aggregate = limiter.aggregateRefusal({
       route: "register",
       scope: "ip",
-      actorToken: "00000000-0000-4000-8000-000000000001",
       now,
       source: { ip: "203.0.113.9", userAgent: "t1-rework2-drain", requestId: "r-1" }
     });
@@ -778,6 +777,38 @@ describe("T1 rework2 R4 — the refusal-audit drain is bounded, not a 60 s wait"
     await service.drainRateLimitAuditFlushes();
     expect(recorded).toHaveLength(1);
   }, 60_000);
+});
+
+describe("T4 refusal-audit forensics contract", () => {
+  it("makes victim attribution unrepresentable and keeps distinct-source evidence bounded", () => {
+    const registration = readFileSync(join(repoRoot, "apps/api/src/registration.ts"), "utf8");
+    const repository = readFileSync(join(repoRoot, "packages/db/src/identity.ts"), "utf8");
+    const migration = readFileSync(
+      join(repoRoot, "migrations/0042_refusal_audit_forensics.sql"), "utf8"
+    );
+    const refusalInput = registration.slice(
+      registration.indexOf("private async refuseRateLimit"),
+      registration.indexOf("private async holdEnumerationFloor")
+    );
+    const repositoryInput = repository.slice(
+      repository.indexOf("async recordRateLimitRefusal"),
+      repository.indexOf("async recordRegistrationFailure")
+    );
+    expect(refusalInput).not.toContain("actorToken");
+    expect(repositoryInput).not.toContain("actorToken");
+    expect(repositoryInput).toContain("distinctSourceCount");
+    expect(registration).toContain("AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096");
+    expect(registration).toContain('update("auth-refusal-source:v1\\0", "utf8")');
+    expect(migration).toContain(
+      "DROP FUNCTION IF EXISTS identity.audit_rate_limit_refused(uuid,jsonb,text)"
+    );
+    expect(migration).toContain(
+      "CREATE OR REPLACE FUNCTION identity.audit_rate_limit_refused(jsonb,text)"
+    );
+    expect(migration).toContain(
+      "gen_random_uuid(),gen_random_uuid()::text,"
+    );
+  });
 });
 
 // ==========================================================================
@@ -1273,7 +1304,6 @@ describe("T1 rework3 RED 2 — a failed shutdown refusal-audit write is never re
   const SOURCE = Object.freeze({
     ip: "203.0.113.31", userAgent: "t1-rework3-drain", requestId: "r3-1"
   });
-  const ACTOR = "00000000-0000-4000-8000-000000000031";
 
   /**
    * A REAL `RegistrationService` over a REAL `InProcessAuthRateLimiter`, with
@@ -1320,11 +1350,11 @@ describe("T1 rework3 RED 2 — a failed shutdown refusal-audit write is never re
       // flush, and throws the public rate-limit outcome.
       refuse: (now: Date) => (service as unknown as {
         refuseRateLimit(input: {
-          route: string; scope: string; actorToken: string; now: Date;
+          route: string; scope: string; now: Date;
           source: { ip: string; userAgent: string; requestId: string };
         }): Promise<never>;
       }).refuseRateLimit({
-        route: "register", scope: "ip", actorToken: ACTOR, now, source: SOURCE
+        route: "register", scope: "ip", now, source: SOURCE
       })
     };
   }
@@ -1456,7 +1486,8 @@ describe("T1 rework3 RED 2 — a failed shutdown refusal-audit write is never re
       count: 1,
       ipCount: 1,
       addressCount: 0,
-      actorToken: ACTOR,
+      distinctSourceCount: 1,
+      distinctSourceCountSaturated: false,
       aggregateWindowStartedAt: new Date(windowBase())
     });
 
@@ -1530,7 +1561,6 @@ describe("T1 rework4 — rollover has exactly one persistence owner per route", 
   const SOURCE = Object.freeze({
     ip: "203.0.113.44", userAgent: "t1-rework4-rollover", requestId: "r4-1"
   });
-  const ACTOR = "00000000-0000-4000-8000-000000000044";
   const PG_FAILURE = (): Error => new Error("PG_RATE_LIMIT_REFUSAL_WRITE_FAILED");
 
   /**
@@ -1626,11 +1656,11 @@ describe("T1 rework4 — rollover has exactly one persistence owner per route", 
       // scheduling and the public outcome are all shipped code.
       refuse: (now: Date) => (service as unknown as {
         refuseRateLimit(input: {
-          route: string; scope: string; actorToken: string; now: Date;
+          route: string; scope: string; now: Date;
           source: { ip: string; userAgent: string; requestId: string };
         }): Promise<never>;
       }).refuseRateLimit({
-        route: "register", scope: "ip", actorToken: ACTOR, now, source: SOURCE
+        route: "register", scope: "ip", now, source: SOURCE
       })
     };
   }
@@ -1696,7 +1726,8 @@ describe("T1 rework4 — rollover has exactly one persistence owner per route", 
     count: 1,
     ipCount: 1,
     addressCount: 0,
-    actorToken: ACTOR,
+    distinctSourceCount: 1,
+    distinctSourceCountSaturated: false,
     aggregateWindowStartedAt: new Date(window),
     source: SOURCE
   });
@@ -1952,7 +1983,6 @@ describe("T1 rework5 — a retrograde window never displaces the in-flight write
   const SOURCE = Object.freeze({
     ip: "203.0.113.55", userAgent: "t1-rework5-retrograde", requestId: "r5-1"
   });
-  const ACTOR = "00000000-0000-4000-8000-000000000055";
 
   /** One observed `recordRateLimitRefusal` call, with its exact input identity. */
   interface WriteAttempt {
@@ -2027,11 +2057,11 @@ describe("T1 rework5 — a retrograde window never displaces the in-flight write
       landsImmediately: () => { mode = "land"; },
       refuse: (now: Date) => (service as unknown as {
         refuseRateLimit(input: {
-          route: string; scope: string; actorToken: string; now: Date;
+          route: string; scope: string; now: Date;
           source: { ip: string; userAgent: string; requestId: string };
         }): Promise<never>;
       }).refuseRateLimit({
-        route: "register", scope: "ip", actorToken: ACTOR, now, source: SOURCE
+        route: "register", scope: "ip", now, source: SOURCE
       })
     };
   }
@@ -2086,7 +2116,8 @@ describe("T1 rework5 — a retrograde window never displaces the in-flight write
     count: 1,
     ipCount: 1,
     addressCount: 0,
-    actorToken: ACTOR,
+    distinctSourceCount: 1,
+    distinctSourceCountSaturated: false,
     aggregateWindowStartedAt: new Date(window),
     source: SOURCE
   });
