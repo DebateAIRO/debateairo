@@ -66,3 +66,65 @@ test("verification remains one canonical mailed-link path and production builds 
   assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
   assert.match(packageJson, /assert-production-auth-routes\.mjs/);
 });
+
+test("ordinary top bar compacts without horizontal overflow at phone widths", () => {
+  assert.match(
+    styles,
+    /@media \(max-width: 640px\)[\s\S]*?\.topBar\s*\{[\s\S]*?height:\s*56px;[\s\S]*?padding-inline:\s*12px;[\s\S]*?\}/
+  );
+  assert.match(
+    styles,
+    /@media \(max-width: 640px\)[\s\S]*?\.topBar \.brandText,[\s\S]*?\.topBarContext\s*\{[\s\S]*?display:\s*none;[\s\S]*?\}/
+  );
+  assert.match(
+    styles,
+    /@media \(max-width: 640px\)[\s\S]*?\.topBarActions\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?gap:\s*6px;[\s\S]*?\}/
+  );
+  assert.match(
+    styles,
+    /@media \(max-width: 640px\)[\s\S]*?\.topBarActions \.btn\s*\{[\s\S]*?padding-inline:\s*10px;[\s\S]*?white-space:\s*nowrap;[\s\S]*?\}/
+  );
+});
+
+test("auth headline sizing stays monotonic across the 640px breakpoint", () => {
+  assert.match(
+    styles,
+    /\.authHeadline\s*\{[\s\S]*?font-size:\s*clamp\(42px,\s*9vw,\s*76px\);[\s\S]*?\}/
+  );
+  const phoneRules = styles.slice(styles.indexOf("@media (max-width: 640px)"));
+  const phoneHeadline = phoneRules.match(/\.authHeadline\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.doesNotMatch(phoneHeadline, /font-size:/);
+});
+
+test("desktop auth content is 862px wide after its outer padding is accounted for", () => {
+  assert.match(
+    styles,
+    /\.authColumn\s*\{[\s\S]*?max-width:\s*calc\(862px \+ 56px\);[\s\S]*?padding:\s*64px 28px 88px;[\s\S]*?\}/
+  );
+});
+
+test("auth failures use stable public copy instead of exception text", () => {
+  assert.doesNotMatch(login, /failure\.message/);
+  assert.doesNotMatch(signUp, /failure\.message/);
+  assert.match(login, /setError\("Sign-in could not be completed\."\)/);
+  assert.match(login, /setError\("Authenticator verification could not be completed\."\)/);
+  assert.match(signUp, /setError\("Account creation could not be completed\."\)/);
+  assert.match(signUp, /setError\("Verification instructions could not be resent\."\)/);
+});
+
+test("primary and recovery emails occupy distinct autocomplete sections", () => {
+  assert.match(
+    signUp,
+    /name="email"[^>]*autoComplete="section-primary-email email"/
+  );
+  assert.match(
+    signUp,
+    /name="recovery-email"[^>]*autoComplete="section-recovery-email email"/
+  );
+});
+
+test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
+  assert.match(topBar, /href="\/login"[\s\S]*?>\s*Account\s*</);
+  assert.doesNotMatch(topBar, />\s*Log in\s*</);
+  assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
+});

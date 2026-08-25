@@ -8,12 +8,6 @@ import { contractClient } from "@/lib/api";
 
 const HOME_PATH = "/";
 
-function failureMessage(failure: unknown, fallback: string): string {
-  return failure instanceof Error && failure.message.trim().length > 0
-    ? failure.message
-    : fallback;
-}
-
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
 
 function navigateHome(): void {
@@ -43,8 +37,8 @@ export function LoginFlow({
         String(data.get("password") ?? "")
       );
       setChallengeToken(result.challenge_token);
-    } catch (failure) {
-      setError(failureMessage(failure, "Sign-in could not be completed."));
+    } catch {
+      setError("Sign-in could not be completed.");
     } finally {
       setBusy(false);
     }
@@ -64,8 +58,8 @@ export function LoginFlow({
         return;
       }
       onAuthenticated();
-    } catch (failure) {
-      setError(failureMessage(failure, "Authenticator verification could not be completed."));
+    } catch {
+      setError("Authenticator verification could not be completed.");
     } finally {
       setBusy(false);
     }

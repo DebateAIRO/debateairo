@@ -142,4 +142,83 @@ describe("rendered auth flow integration", () => {
     expect(document.body.textContent).toContain(RESEND_MESSAGE);
     expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
   });
+
+  it("keeps login failures friendly and does not render transport or server details", async () => {
+    const beginLogin = vi.fn().mockRejectedValue(
+      new Error("ContractHttpError: EMAIL_NOT_FOUND from http://api.internal:3001")
+    );
+    const completeLogin = vi.fn();
+    await act(async () => root!.render(<LoginFlow client={{ beginLogin, completeLogin }} />));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+
+    expect(document.querySelector('[role="alert"]')?.textContent)
+      .toBe("Sign-in could not be completed.");
+    expect(document.body.textContent).not.toMatch(/ContractHttpError|EMAIL_NOT_FOUND|api\.internal/);
+  });
+
+  it("keeps MFA failures friendly and does not render rejected-code details", async () => {
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    const completeLogin = vi.fn().mockRejectedValue(
+      new Error("ContractHttpError: invalid TOTP for user 81f6")
+    );
+    await act(async () => root!.render(
+      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+    ));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+    field("code").value = "123456";
+    await submit();
+
+    expect(document.querySelector('[role="alert"]')?.textContent)
+      .toBe("Authenticator verification could not be completed.");
+    expect(document.body.textContent).not.toMatch(/ContractHttpError|invalid TOTP|81f6/);
+  });
+
+  it("keeps registration failures generic and separates primary and recovery autofill", async () => {
+    const register = vi.fn().mockRejectedValue(
+      new Error("ContractHttpError: duplicate account person@example.test")
+    );
+    const resendVerification = vi.fn();
+    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+
+    expect(field("email").autocomplete).toBe("section-primary-email email");
+    expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
+    field("email").value = "person@example.test";
+    field("recovery-email").value = "recovery@example.test";
+    field("password").value = "password";
+    field("adult-affirmed").checked = true;
+    await submit();
+
+    expect(document.querySelector('[role="alert"]')?.textContent)
+      .toBe("Account creation could not be completed.");
+    expect(document.body.textContent).not.toMatch(/ContractHttpError|duplicate account/);
+  });
+
+  it("keeps resend failures generic without changing the non-enumerating success message", async () => {
+    const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+    const resendVerification = vi.fn().mockRejectedValue(
+      new Error("network ECONNREFUSED api.internal")
+    );
+    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+
+    field("email").value = "person@example.test";
+    field("recovery-email").value = "recovery@example.test";
+    field("password").value = "password";
+    field("adult-affirmed").checked = true;
+    await submit();
+    expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
+
+    await click("Resend instructions");
+    expect(document.querySelector('[role="alert"]')?.textContent)
+      .toBe("Verification instructions could not be resent.");
+    expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);
+  });
 });

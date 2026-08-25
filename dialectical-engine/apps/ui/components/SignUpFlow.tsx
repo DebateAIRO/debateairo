@@ -6,12 +6,6 @@ import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
 
-function failureMessage(failure: unknown, fallback: string): string {
-  return failure instanceof Error && failure.message.trim().length > 0
-    ? failure.message
-    : fallback;
-}
-
 type RegistrationClient = Pick<ContractClient, "register" | "resendVerification">;
 
 export function SignUpFlow({
@@ -39,8 +33,8 @@ export function SignUpFlow({
       form.reset();
       setSubmittedEmail(email);
       setMessage(result.message);
-    } catch (failure) {
-      setError(failureMessage(failure, "Account creation could not be completed."));
+    } catch {
+      setError("Account creation could not be completed.");
     } finally {
       setBusy(false);
     }
@@ -53,8 +47,8 @@ export function SignUpFlow({
     try {
       const result = await client.resendVerification(submittedEmail);
       setMessage(result.message);
-    } catch (failure) {
-      setError(failureMessage(failure, "Verification instructions could not be resent."));
+    } catch {
+      setError("Verification instructions could not be resent.");
     } finally {
       setBusy(false);
     }
@@ -85,11 +79,11 @@ export function SignUpFlow({
         <form className="authForm" aria-busy={busy} onSubmit={submitRegistration}>
           <div className="authField">
             <label htmlFor="signup-email">Email</label>
-            <input id="signup-email" name="email" type="email" autoComplete="email" placeholder="you@institution.edu" required autoFocus disabled={busy} />
+            <input id="signup-email" name="email" type="email" autoComplete="section-primary-email email" placeholder="you@institution.edu" required autoFocus disabled={busy} />
           </div>
           <div className="authField">
             <label htmlFor="signup-recovery-email">Recovery email</label>
-            <input id="signup-recovery-email" name="recovery-email" type="email" autoComplete="email" aria-describedby="recovery-email-hint" required disabled={busy} />
+            <input id="signup-recovery-email" name="recovery-email" type="email" autoComplete="section-recovery-email email" aria-describedby="recovery-email-hint" required disabled={busy} />
             <span className="authFieldHint" id="recovery-email-hint">Use a different address reserved for account recovery.</span>
           </div>
           <div className="authField">

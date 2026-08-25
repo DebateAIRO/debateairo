@@ -537,7 +537,7 @@ a:focus-visible {
 
 .authColumn {
   width: 100%;
-  max-width: 862px;
+  max-width: calc(862px + 56px);
   margin: 0 auto;
   padding: 64px 28px 88px;
 }
@@ -561,7 +561,7 @@ a:focus-visible {
   margin: 18px 0 0;
   color: var(--text-strong);
   font-family: var(--font-serif);
-  font-size: clamp(48px, 7vw, 76px);
+  font-size: clamp(42px, 9vw, 76px);
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 0.98;
@@ -3123,6 +3123,25 @@ a:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .topBar {
+    height: 56px;
+    flex-basis: 56px;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .topBar .brandText,
+  .topBarContext {
+    display: none;
+  }
+  .topBarActions {
+    min-width: 0;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .topBarActions .btn {
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
   .authScreen {
     overflow-x: hidden;
   }
@@ -3135,7 +3154,6 @@ a:focus-visible {
   }
   .authHeadline {
     margin-top: 14px;
-    font-size: clamp(42px, 13vw, 58px);
   }
   .authLede {
     margin-top: 22px;

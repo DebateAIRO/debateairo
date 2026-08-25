@@ -51,7 +51,7 @@ export function TopBar() {
       )}
       <div className="topBarActions">
         <Link className="btn" href="/login">
-          Log in
+          Account
         </Link>
         <Link className="btn btnDark" href="/new">
           + New debate
