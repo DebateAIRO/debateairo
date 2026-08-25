@@ -26,6 +26,7 @@ import {
   type UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
+  AUTH_REFUSAL_DISTINCT_SOURCE_CAP,
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
   InProcessAuthRateLimiter,
@@ -1012,7 +1013,6 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     limiter.aggregateRefusal({
       route: "register",
       scope: "ip",
-      actorToken: "00000000-0000-4000-8000-000000000001",
       now: new Date(0),
       source: { ip: rawIp, userAgent: "D3-UA", requestId: "D3-REQUEST" }
     });
@@ -1027,6 +1027,74 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       + `aggregate_routes=1/${(["register", "verify", "resend"] as const).length}`
     );
     expect(aggregateState).toContain(rawIp);
+  });
+
+  it("T4 counts distinct refusal sources exactly until the fixed cap and then says it saturated", () => {
+    const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const limiter = new InProcessAuthRateLimiter(
+      base.rateLimits,
+      base.rateLimitBucketCapacity,
+      base.rateLimitRefusalAuditIntervalMs,
+      Buffer.alloc(32, 0x44)
+    );
+    const add = (route: TestAuthRoute, ip: string): void => {
+      limiter.aggregateRefusal({
+        route,
+        scope: "ip",
+        now: new Date(0),
+        source: { ip, userAgent: "t4-cardinality", requestId: `t4:${route}:${ip}` }
+      });
+    };
+    add("register", "198.51.100.1");
+    add("register", "198.51.100.1");
+    add("register", "198.51.100.2");
+    add("verify", "198.51.100.1");
+
+    type T4Aggregate = Readonly<{
+      count: number;
+      distinctSourceDigests: ReadonlySet<string>;
+      distinctSourceCountSaturated: boolean;
+    }>;
+    const aggregates = (limiter as unknown as {
+      refusalAggregates: ReadonlyMap<TestAuthRoute,T4Aggregate>;
+    }).refusalAggregates;
+    expect(aggregates.get("register")).toMatchObject({
+      count: 3,
+      distinctSourceCountSaturated: false
+    });
+    expect(aggregates.get("register")!.distinctSourceDigests.size).toBe(2);
+    expect(aggregates.get("verify")!.distinctSourceDigests.size).toBe(1);
+    expect([...aggregates.get("register")!.distinctSourceDigests]).toEqual([
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+      expect.stringMatching(/^[0-9a-f]{64}$/)
+    ]);
+    expect([...aggregates.get("register")!.distinctSourceDigests].join("|"))
+      .not.toContain("198.51.100");
+
+    const saturated = new InProcessAuthRateLimiter(
+      base.rateLimits,
+      base.rateLimitBucketCapacity,
+      base.rateLimitRefusalAuditIntervalMs,
+      Buffer.alloc(32, 0x45)
+    );
+    for (let index = 0; index <= AUTH_REFUSAL_DISTINCT_SOURCE_CAP; index += 1) {
+      saturated.aggregateRefusal({
+        route: "resend",
+        scope: "address",
+        now: new Date(0),
+        source: {
+          ip: `2001:db8:4::${index}`,
+          userAgent: "t4-saturation",
+          requestId: `t4:saturation:${index}`
+        }
+      });
+    }
+    const capped = (saturated as unknown as {
+      refusalAggregates: ReadonlyMap<TestAuthRoute,T4Aggregate>;
+    }).refusalAggregates.get("resend")!;
+    expect(capped.count).toBe(AUTH_REFUSAL_DISTINCT_SOURCE_CAP + 1);
+    expect(capped.distinctSourceDigests.size).toBe(AUTH_REFUSAL_DISTINCT_SOURCE_CAP);
+    expect(capped.distinctSourceCountSaturated).toBe(true);
   });
 
   it("S3 rework4 B6 models verification and delivery columns only on channel_binding", () => {

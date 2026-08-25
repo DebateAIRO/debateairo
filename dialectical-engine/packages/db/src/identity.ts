@@ -157,12 +157,6 @@ export class PostgresIdentityRepository {
         [event.actorToken,source]);
       return;
     }
-    if (event.eventType === "identity.auth.rate_limit_refused"
-      && event.decision === "DENY" && !event.success && event.justification !== null) {
-      await client.query("SELECT identity.audit_rate_limit_refused($1,$2::jsonb,$3)",
-        [event.actorToken,source,event.justification]);
-      return;
-    }
     if (event.eventType === "identity.registration.failed"
       && event.decision === "DENY" && !event.success && event.justification === "PROVISION_FAILED") {
       await client.query("SELECT identity.audit_registration_failed($1,$2::jsonb)",
@@ -364,12 +358,13 @@ export class PostgresIdentityRepository {
   }
 
   async recordRateLimitRefusal(input: {
-    readonly actorToken: string;
     readonly route: "register" | "verify" | "resend";
     readonly scope: "ip" | "address";
     readonly count: number;
     readonly ipCount: number;
     readonly addressCount: number;
+    readonly distinctSourceCount: number;
+    readonly distinctSourceCountSaturated: boolean;
     readonly occurredAt: Date;
     readonly aggregateWindowStartedAt: Date;
     readonly source: AuthSourceContext;
@@ -377,21 +372,28 @@ export class PostgresIdentityRepository {
     if (!Number.isSafeInteger(input.count) || input.count < 1
       || !Number.isSafeInteger(input.ipCount) || input.ipCount < 0
       || !Number.isSafeInteger(input.addressCount) || input.addressCount < 0
-      || input.ipCount + input.addressCount !== input.count) {
+      || input.ipCount + input.addressCount !== input.count
+      || !Number.isSafeInteger(input.distinctSourceCount)
+      || input.distinctSourceCount < 1 || input.distinctSourceCount > 4_096
+      || input.distinctSourceCount > input.count
+      || (input.distinctSourceCountSaturated
+        && (input.distinctSourceCount !== 4_096 || input.count <= 4_096))) {
       throw new TypeError("RATE_LIMIT_REFUSAL_AGGREGATE_INVALID");
     }
     const prepared = await this.prepareAuditContext(input.source);
-    await this.transaction((client) => this.appendAudit(client, prepared, {
-      actorToken: input.actorToken,
-      eventType: "identity.auth.rate_limit_refused",
-      targetType: `auth.${input.route}`,
-      subjectId: null,
-      occurredAt: input.occurredAt,
-      decision: "DENY",
-      success: false,
-      justification: `aggregate:route-window;route:${input.route};window:${input.aggregateWindowStartedAt.toISOString()}`
+    const justification = `aggregate:route-window;route:${input.route};window:${input.aggregateWindowStartedAt.toISOString()}`
         + `;count:${input.count};ip_count:${input.ipCount};address_count:${input.addressCount}`
-    }));
+        + `;distinct_source_count:${input.distinctSourceCount}`
+        + `;distinct_source_count_saturated:${String(input.distinctSourceCountSaturated)}`;
+    const source = JSON.stringify({
+      ipArgon2id: prepared.ipArgon2id,
+      userAgentArgon2id: prepared.userAgentArgon2id
+    });
+    await this.transaction(async (client) => {
+      await client.query("SELECT identity.audit_rate_limit_refused($1::jsonb,$2)", [
+        source,justification
+      ]);
+    });
   }
 
   async recordRegistrationFailure(input: {

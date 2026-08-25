@@ -99,15 +99,17 @@ function asAuthFlowFailure(error: unknown): unknown {
 
 type AuthRoute = "register" | "verify" | "resend";
 const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
+export const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
 
 interface RefusalAggregate {
   readonly windowStartedAt: number;
-  readonly actorToken: string;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
+  readonly distinctSourceDigests: Set<string>;
   count: number;
   ipCount: number;
   addressCount: number;
+  distinctSourceCountSaturated: boolean;
 }
 
 export class InProcessAuthRateLimiter {
@@ -203,6 +205,15 @@ export class InProcessAuthRateLimiter {
     return count;
   }
 
+  private refusalSourceDigest(route: AuthRoute, ip: string): string {
+    return createHmac("sha256", this.slotHashKey)
+      .update("auth-refusal-source:v1\0", "utf8")
+      .update(route, "utf8")
+      .update("\0", "utf8")
+      .update(ip, "utf8")
+      .digest("hex");
+  }
+
   /**
    * Bounded memory, exact per-key counting, and zero false refusal at saturation
    * cannot coexist. This keyed, route-isolated two-row fixed-slot sketch gives up
@@ -278,7 +289,6 @@ export class InProcessAuthRateLimiter {
   aggregateRefusal(input: {
     readonly route: AuthRoute;
     readonly scope: "ip" | "address";
-    readonly actorToken: string;
     readonly now: Date;
     readonly source: AuthSourceContext;
   }): Readonly<{
@@ -296,13 +306,22 @@ export class InProcessAuthRateLimiter {
       ? { ...current }
       : {
           windowStartedAt,
-          actorToken: input.actorToken,
           occurredAt: input.now,
           source: input.source,
+          distinctSourceDigests: new Set<string>(),
           count: 0,
           ipCount: 0,
-          addressCount: 0
+          addressCount: 0,
+          distinctSourceCountSaturated: false
         };
+    const sourceDigest = this.refusalSourceDigest(input.route, input.source.ip);
+    if (!aggregate.distinctSourceDigests.has(sourceDigest)) {
+      if (aggregate.distinctSourceDigests.size < AUTH_REFUSAL_DISTINCT_SOURCE_CAP) {
+        aggregate.distinctSourceDigests.add(sourceDigest);
+      } else {
+        aggregate.distinctSourceCountSaturated = true;
+      }
+    }
     if (aggregate.count < Number.MAX_SAFE_INTEGER) {
       aggregate.count += 1;
       if (input.scope === "ip") aggregate.ipCount += 1;
@@ -744,12 +763,13 @@ export class RegistrationService implements RegistrationApplication {
 
   private async recordRefusalAggregate(route: AuthRoute, aggregate: Readonly<RefusalAggregate>): Promise<void> {
     await this.dependencies.repository.recordRateLimitRefusal({
-      actorToken: aggregate.actorToken,
       route,
       scope: aggregate.ipCount > 0 ? "ip" : "address",
       count: aggregate.count,
       ipCount: aggregate.ipCount,
       addressCount: aggregate.addressCount,
+      distinctSourceCount: aggregate.distinctSourceDigests.size,
+      distinctSourceCountSaturated: aggregate.distinctSourceCountSaturated,
       occurredAt: aggregate.occurredAt,
       aggregateWindowStartedAt: new Date(aggregate.windowStartedAt),
       source: aggregate.source
@@ -1104,7 +1124,6 @@ export class RegistrationService implements RegistrationApplication {
   private async refuseRateLimit(input: {
     readonly route: AuthRoute;
     readonly scope: "ip" | "address";
-    readonly actorToken: string;
     readonly now: Date;
     readonly source: AuthSourceContext;
   }): Promise<never> {
@@ -1333,18 +1352,20 @@ export class RegistrationService implements RegistrationApplication {
         const email = normalizeEmailForBlindIndex(input.email);
         const recoveryEmail = normalizeEmailForBlindIndex(input.recoveryEmail);
         const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
+        // This lookup exists only to preserve the stable address limiter key.
+        // Its account audit token never enters a refusal row: that event is a
+        // route-window incident with DB-minted event-local actor/target refs.
         const existing = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
         const limit = this.dependencies.limiter.consume({
           route: "register",
           ip: source.ip,
-          addressKey: emailBlindIndex.toString("hex"),
+          addressKey: existing?.addressKey ?? emailBlindIndex.toString("hex"),
           now: this.clock()
         });
         if (!limit.allowed) {
           await this.refuseRateLimit({
             route: "register",
             scope: limit.scope,
-            actorToken: existing?.auditToken ?? randomUUID(),
             now: this.clock(),
             source
           });
@@ -1495,7 +1516,6 @@ export class RegistrationService implements RegistrationApplication {
       await this.refuseRateLimit({
         route: "verify",
         scope: limit.scope,
-        actorToken: identity?.auditToken ?? randomUUID(),
         now,
         source
       });
@@ -1524,14 +1544,13 @@ export class RegistrationService implements RegistrationApplication {
       const limit = this.dependencies.limiter.consume({
         route: "resend",
         ip: source.ip,
-        addressKey: emailBlindIndex.toString("hex"),
+        addressKey: identity?.addressKey ?? emailBlindIndex.toString("hex"),
         now
       });
       if (!limit.allowed) {
         await this.refuseRateLimit({
           route: "resend",
           scope: limit.scope,
-          actorToken: identity?.auditToken ?? randomUUID(),
           now,
           source
         });

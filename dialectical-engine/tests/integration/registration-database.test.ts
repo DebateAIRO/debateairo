@@ -305,7 +305,7 @@ async function retainedDispatcherShapeCounts(
       "resolve", "reject", "timeout"
     ]),
     refusalAggregates: Object.freeze([
-      "actorToken", "occurredAt", "source"
+      "occurredAt", "source", "distinctSourceDigests", "distinctSourceCountSaturated"
     ]),
     mailCapacityAggregates: Object.freeze([
       "correlationId", "timer"
@@ -1779,17 +1779,17 @@ setTimeout(() => undefined, 500);
 
   it("S3b normalises blank audit context at the repository boundary when a writer bypasses sourceContext", async () => {
     const flow = buildService();
-    const actorToken = randomUUID();
     const auditBefore = await database.pool.query<{ audit_id: string }>(
       "SELECT audit_id FROM identity.audit_event"
     );
     await expect(flow.repository.recordRateLimitRefusal({
-      actorToken,
       route: "register",
       scope: "ip",
       count: 1,
       ipCount: 1,
       addressCount: 0,
+      distinctSourceCount: 1,
+      distinctSourceCountSaturated: false,
       occurredAt: new Date("2026-08-19T15:00:00.000Z"),
       aggregateWindowStartedAt: new Date("2026-08-19T15:00:00.000Z"),
       source: { ip: "", userAgent: "  \t", requestId: "" }
@@ -1816,8 +1816,6 @@ setTimeout(() => undefined, 500);
       ip_argon2id: `argon2id-audit:v1:${unknownIpArgon2id}`,
       user_agent_argon2id: `argon2id-audit:v1:${unknownUserAgentArgon2id}`
     });
-    expect(audit.rows[0]!.actor_key_ref).not.toBe(actorToken);
-    expect(audit.rows[0]!.target_id).not.toBe(actorToken);
     expect(audit.rows[0]!.actor_key_ref).not.toBe(audit.rows[0]!.target_id);
     console.info(
       `[S3b REPOSITORY NORMALISATION] backend=postgres bypass=sourceContext `
@@ -7554,7 +7552,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       );
 
       expect(durable.rows).toEqual([{
-        justification: `aggregate:route-window;route:verify;window:${windowStartedAt.toISOString()};count:1;ip_count:1;address_count:0`
+        justification: `aggregate:route-window;route:verify;window:${windowStartedAt.toISOString()};count:1;ip_count:1;address_count:0;distinct_source_count:1;distinct_source_count_saturated:false`
       }]);
       expect(audit.rootCount).toBe(1);
       expect(audit.chain).toHaveLength(audit.totalRows);
@@ -7646,7 +7644,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       + `summary=${summaries.rows[0]?.justification ?? "missing"} chain_valid=${String(chainValid)}`
     );
     expect(summaries.rows).toEqual([{
-      justification: `aggregate:route-window;route:verify;window:${windowStartedAt.toISOString()};count:${refusals};ip_count:${refusals};address_count:0`
+      justification: `aggregate:route-window;route:verify;window:${windowStartedAt.toISOString()};count:${refusals};ip_count:${refusals};address_count:0;distinct_source_count:1;distinct_source_count_saturated:false`
     }]);
     expect(chainValid).toBe(true);
   });
@@ -7671,7 +7669,6 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const initialHashes = initial.rows.map((row) => row.source_context.ipArgon2id);
     const initialUserAgentHashes = initial.rows.map((row) => row.source_context.userAgentArgon2id);
 
-    const rotatedActor = randomUUID();
     const rotatedAuditBefore = await database.pool.query<{ audit_id: string }>(
       "SELECT audit_id FROM identity.audit_event"
     );
@@ -7681,12 +7678,13 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     );
     const startedAt = performance.now();
     await rotatedRepository.recordRateLimitRefusal({
-      actorToken: rotatedActor,
       route: "register",
       scope: "ip",
       count: 1,
       ipCount: 1,
       addressCount: 0,
+      distinctSourceCount: 1,
+      distinctSourceCountSaturated: false,
       occurredAt: new Date("2026-08-19T12:30:00.000Z"),
       aggregateWindowStartedAt: new Date("2026-08-19T12:30:00.000Z"),
       source
@@ -7951,6 +7949,99 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       `sha256:${createHash("sha256").update(token).digest("hex")}`
     );
     expect(stored.rows[0]!.verification_token_hash).not.toContain(token);
+  });
+
+  it("T4 persists bounded distinct-source forensics without accepting a victim actor", async () => {
+    const flow = buildService();
+    const victim = await registerAccount(flow.service, "t4-refusal-victim");
+    const migration = await readFile(join(process.cwd(), "migrations/0042_refusal_audit_forensics.sql"), "utf8");
+    await expect(database.pool.query(migration)).resolves.toBeDefined();
+    const auditBefore = await database.pool.query<{ audit_id: string }>(
+      "SELECT audit_id FROM identity.audit_event"
+    );
+    const sourceContext = JSON.stringify({
+      ipArgon2id: `argon2id-audit:v1:${"4".repeat(64)}`,
+      userAgentArgon2id: `argon2id-audit:v1:${"5".repeat(64)}`
+    });
+    const justification = "aggregate:route-window;route:register;"
+      + "window:2026-08-25T12:00:00.000Z;count:3;ip_count:2;address_count:1;"
+      + "distinct_source_count:2;distinct_source_count_saturated:false";
+    const catalog = await database.pool.query<{
+      old_signature: string | null;
+      new_signature: string | null;
+      runtime_execute: boolean;
+      replay_execute: boolean;
+    }>(`
+      SELECT
+        to_regprocedure('identity.audit_rate_limit_refused(uuid,jsonb,text)')::text
+          AS old_signature,
+        to_regprocedure('identity.audit_rate_limit_refused(jsonb,text)')::text
+          AS new_signature,
+        has_function_privilege('debateai_runtime',
+          'identity.audit_rate_limit_refused(jsonb,text)','EXECUTE') AS runtime_execute,
+        has_function_privilege('debateai_replay',
+          'identity.audit_rate_limit_refused(jsonb,text)','EXECUTE') AS replay_execute
+    `);
+    expect(catalog.rows[0]).toEqual({
+      old_signature: null,
+      new_signature: "identity.audit_rate_limit_refused(jsonb,text)",
+      runtime_execute: true,
+      replay_execute: false
+    });
+
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      await expect(client.query(`
+        SELECT identity.audit_rate_limit_refused($1::uuid,$2::jsonb,$3::text)
+      `, [victim.user.audit_token,sourceContext,justification]))
+        .rejects.toMatchObject({ code: "42883" });
+      await client.query("ROLLBACK");
+
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      await expect(client.query(`
+        SELECT identity.audit_rate_limit_refused($1::jsonb,$2::text)
+      `, [sourceContext,justification.replace("distinct_source_count:2", "distinct_source_count:4")]))
+        .rejects.toMatchObject({ code: "22023",message: "AUDIT_EVENT_SEMANTICS_INVALID" });
+      await client.query("ROLLBACK");
+
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      await expect(client.query(`
+        SELECT identity.audit_rate_limit_refused($1::jsonb,$2::text)
+      `, [sourceContext,justification])).resolves.toMatchObject({ rowCount: 1 });
+      await client.query("COMMIT");
+    } finally {
+      client.release();
+    }
+
+    const rows = await database.pool.query<{
+      actor_key_ref: string;
+      target_id: string;
+      target_type: string;
+      justification: string;
+    }>(`
+      SELECT actor_key_ref,target_id,target_type,justification
+      FROM identity.audit_event
+      WHERE NOT (audit_id=ANY($1::uuid[]))
+        AND event_type='identity.auth.rate_limit_refused'
+    `, [auditBefore.rows.map((row) => row.audit_id)]);
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0]).toMatchObject({
+      target_type: "auth.register",
+      justification
+    });
+    expect(rows.rows[0]!.actor_key_ref).not.toBe(victim.user.audit_token);
+    expect(rows.rows[0]!.target_id).not.toBe(victim.user.audit_token);
+    expect(rows.rows[0]!.actor_key_ref).not.toBe(rows.rows[0]!.target_id);
+    const audit = await readAuditChain();
+    expect(audit.chain).toHaveLength(audit.totalRows);
+    expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
   });
 
   it("S10 verification audit capability is role-scoped, attempt-bound and replay-safe", async () => {
