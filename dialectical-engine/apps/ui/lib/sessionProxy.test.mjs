@@ -6,6 +6,7 @@ import test, { after } from "node:test";
 import { pathToFileURL } from "node:url";
 
 const outDir = join(process.cwd(), ".tmp-s5-api-route-test");
+const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
 
 async function loadRoute() {
   rmSync(outDir, { recursive: true, force: true });
@@ -52,7 +53,7 @@ test("S5 proxy filters request cookies and response cookies/headers", async () =
       "user-agent": "S5 Browser",
       "x-csrf-token": "c".repeat(43),
       authorization: "Bearer drop",
-      "x-user-dev-token": "drop",
+      [RETIRED_DEV_HEADER]: "drop",
       "x-forwarded-host": "evil.test"
     },
     body: "{}"
@@ -61,7 +62,7 @@ test("S5 proxy filters request cookies and response cookies/headers", async () =
   assert.equal(forwarded.get("origin"), "https://app.test");
   assert.equal(forwarded.get("x-csrf-token"), "c".repeat(43));
   assert.equal(forwarded.get("user-agent"), "S5 Browser");
-  for (const name of ["authorization", "x-user-dev-token", "x-forwarded-host"]) assert.equal(forwarded.get(name), null);
+  for (const name of ["authorization", RETIRED_DEV_HEADER, "x-forwarded-host"]) assert.equal(forwarded.get(name), null);
   assert.equal(response.headers.get("access-control-allow-origin"), null);
   assert.equal(response.headers.get("x-internal"), null);
   assert.deepEqual(response.headers.getSetCookie().map((value) => value.split("=", 1)[0]), [

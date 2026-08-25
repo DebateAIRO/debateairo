@@ -11,9 +11,9 @@ export default async function DebatePage({ params }: { params: Promise<{ id: str
   let initialError: string | null = null;
   if (token !== null) {
     const client = createServerContractClient(fetch, token, userAgent);
-    try { initialAnswer = await client.readAnswer(id, "cookie-session"); }
+    try { initialAnswer = await client.readAnswer(id); }
     catch {
-      try { initialAnswer = await client.readRunAnswer(id, "cookie-session"); }
+      try { initialAnswer = await client.readRunAnswer(id); }
       catch (failure) { initialError = failure instanceof Error ? failure.name : "INVALID_RESPONSE"; }
     }
   }

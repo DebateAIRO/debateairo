@@ -11,7 +11,11 @@ export default defineConfig({
   ] },
   oxc: { jsx: { runtime: "automatic", importSource: "react" } },
   test: {
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    include: [
+      "tests/**/*.test.ts",
+      "tests/**/*.test.tsx",
+      "acceptance/**/*.test.ts"
+    ],
     fileParallelism: false,
     hookTimeout: 120_000,
     testTimeout: 120_000,

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
+import { contractClient } from "@/lib/api";
 import type { Session } from "@/lib/types";
 import { ContractHttpError } from "@debateai/contract";
 import { SessionControls } from "@/components/SessionControls";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
+import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 
 export default function SettingsPage() {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let active = true;
-    void contractClient.readSession(COOKIE_SESSION_MARKER).then((currentSession) => {
+    void contractClient.readSession().then((currentSession) => {
       if (active) setSession(currentSession);
     }).catch(() => {
       // An absent/expired cookie leaves the sign-in form visible. The session
@@ -76,6 +77,7 @@ export default function SettingsPage() {
       setSession(null);
       setError(null);
     }} /> : null}
+    {session ? <LegacyRunClaimControls /> : null}
     {session ? <AccountErasureControls /> : null}
   </div></main>;
 }

@@ -9,7 +9,7 @@ let ceremony: Awaited<ReturnType<typeof runAcceptanceCeremony>> | undefined;
 try {
   ceremony = await runAcceptanceCeremony(
     parseAcceptanceArguments([
-      "--token", "xrev01-depth1-local",
+      "--service-credential", "x".repeat(43),
       "--depth-params", '{"depth":1}',
       "--question", "Should a software company adopt a four-day workweek?"
     ]),

@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { decrypt, encrypt, generateDek } from "../../packages/crypto/src/index.js";
@@ -177,10 +177,16 @@ describe("S2 identity schema on real PostgreSQL", () => {
     const sessionUser = await insertUser("mutable-session");
     const session = await database.pool.query<{ session_id: string }>(`
       INSERT INTO identity.session (
-        user_id,token_hash,binding_context,created_at,last_seen_at,idle_expires_at,absolute_expires_at
-      ) VALUES ($1,$2,'{}'::jsonb,now(),now(),now()+interval '14 days',now()+interval '90 days')
+        user_id,token_hash,csrf_token_hash,binding_context,created_at,last_seen_at,
+        idle_expires_at,absolute_expires_at,last_mfa_at
+      ) VALUES ($1,$2,$3,'{}'::jsonb,now(),now(),
+        now()+interval '14 days',now()+interval '90 days',now())
       RETURNING session_id
-    `, [sessionUser.userId, `sha256:${randomUUID()}`]);
+    `, [
+      sessionUser.userId,
+      `sha256:${randomBytes(32).toString("hex")}`,
+      `sha256:${randomBytes(32).toString("hex")}`
+    ]);
     await expect(database.pool.query(
       `UPDATE identity.session SET revoked_at=now() WHERE session_id=$1`, [session.rows[0]!.session_id]
     )).resolves.toMatchObject({ rowCount: 1 });

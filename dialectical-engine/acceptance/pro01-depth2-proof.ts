@@ -14,7 +14,7 @@ let ceremony: Awaited<ReturnType<typeof runAcceptanceCeremony>> | undefined;
 try {
   ceremony = await runAcceptanceCeremony(
     parseAcceptanceArguments([
-      "--token", "pro01-depth2-local",
+      "--service-credential", "p".repeat(43),
       "--depth-params", '{"depth":2}',
       "--question", "Should a software company adopt a four-day workweek?"
     ]),

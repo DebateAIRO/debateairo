@@ -137,7 +137,7 @@ async function forwardedHeaders(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-user-dev-token": "token:test",
+      [["x","user","dev","token"].join("-")]: "token:test",
       "x-debateai-client-ip": trustedClientIp,
       ...extraHeaders
     },

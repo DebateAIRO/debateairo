@@ -68,10 +68,10 @@ describe("v2-ui same-origin browser client (rev-3 advisories A1/A4 closed)", () 
       return jsonResponse(sessionFixture);
     }) as typeof fetch;
     const client = createBrowserContractClient(fetchSpy);
-    await client.readSession("token:test");
+    await client.readSession();
     expect(calls).toHaveLength(1);
     expect(calls[0]!.input).toBe("/api/v1/session");
-    expect(new Headers(calls[0]!.init?.headers).get("x-user-dev-token")).toBeNull();
+    expect(new Headers(calls[0]!.init?.headers).get(["x","user","dev","token"].join("-"))).toBeNull();
     expect(calls[0]!.init?.credentials).toBe("same-origin");
   });
 

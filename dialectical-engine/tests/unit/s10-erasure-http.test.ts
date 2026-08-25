@@ -1,11 +1,11 @@
 import { describe,expect,it,vi } from "vitest";
 import {
   buildApi,
-  createLegacyDevSessionResolver,
   CSRF_COOKIE_NAME,
   SESSION_COOKIE_NAME,
   type AskApplication
 } from "@debateai/api";
+import { RETIRED_DEV_HEADER } from "../support/httpSession.js";
 import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication,
@@ -130,14 +130,13 @@ describe("S10 erasure HTTP boundary",()=>{
     }));
     const api=buildApi({
       application:application(),sessions:sessions(),accountErasure:erasure({ schedule }),
-      allowedOrigin:ORIGIN,
-      legacyDevSessionResolver:createLegacyDevSessionResolver({ userToken:"legacy-user" })
+      allowedOrigin:ORIGIN
     });
     const legacy=await api.inject({
-      method:"DELETE",url:"/v1/account",headers:{ "x-user-dev-token":"legacy-user" },
+      method:"DELETE",url:"/v1/account",headers:{ [RETIRED_DEV_HEADER]:"legacy-user" },
       payload:{ confirmation:"DELETE MY ACCOUNT",step_up_grant:GRANT_TOKEN }
     });
-    expect(legacy.statusCode).toBe(409);
+    expect(legacy.statusCode).toBe(401);
     expect(schedule).not.toHaveBeenCalled();
     const noCsrf=await api.inject({
       method:"DELETE",url:"/v1/account",headers:{ cookie,origin:ORIGIN },

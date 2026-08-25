@@ -50,7 +50,7 @@ export async function listDebatesPageServer(
   userAgent?: string
 ): Promise<DebateListPage> {
   const index = await (client ?? createServerContractClient(fetch, token, userAgent))
-    .readAnswerIndex("cookie-session", HOME_PAGE_SIZE, 0);
+    .readAnswerIndex(HOME_PAGE_SIZE, 0);
   return {
     summaries: debateSummariesFromIndex(index),
     shown: index.items.length,
@@ -81,10 +81,10 @@ export async function getDebateServer(
   let answer: Answer;
   try {
     try {
-      answer = await resolvedClient.readAnswer(id, "cookie-session");
+      answer = await resolvedClient.readAnswer(id);
     } catch (failure) {
       if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") throw failure;
-      answer = await resolvedClient.readRunAnswer(id, "cookie-session");
+      answer = await resolvedClient.readRunAnswer(id);
     }
   } catch (failure) {
     if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") {
@@ -94,7 +94,7 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: failure instanceof Error ? failure.message : "Unable to load debate" };
     }
     try {
-      const run = await resolvedClient.readRun(id, "cookie-session");
+      const run = await resolvedClient.readRun(id);
       if (run.state === "FAILED") {
         return { ok: false, kind: "failed", run, reason: run.terminal_reason! };
       }

@@ -19,7 +19,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   try { published = await createServerContractClient(fetch, undefined, userAgent).readPublicDebates(50, 0); }
   catch { publishedError = "Published debates are temporarily unavailable."; }
   if (pageRequested && token !== null) {
-    try { index = await createServerContractClient(fetch, token, userAgent).readAnswerIndex("cookie-session", limit, offset); }
+    try { index = await createServerContractClient(fetch, token, userAgent).readAnswerIndex(limit, offset); }
     catch (failure) { indexError = failure instanceof Error ? failure.name : "INVALID_RESPONSE"; }
   }
   return (

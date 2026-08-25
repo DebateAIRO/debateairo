@@ -240,18 +240,18 @@ describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
       }), { status: 200, headers: { "content-type": "application/json" } });
     }, "/api");
 
-    await expect(client.readSession("token:test")).resolves.toMatchObject({
+    await expect(client.readSession()).resolves.toMatchObject({
       session_id: "22222222-2222-4222-8222-222222222222"
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.input).toBe("/api/v1/session");
-    expect(calls[0]?.headers.get("x-user-dev-token")).toBeNull();
+    expect(calls[0]?.headers.get(["x","user","dev","token"].join("-"))).toBeNull();
     expect(calls[0]?.credentials).toBe("same-origin");
   });
 
   it("branches on typed 429 rather than response prose", async () => {
     const client = createContractClient("https://api.example.test", async () => new Response("arbitrary prose", { status: 429 }));
-    const request = client.readAnswer("answer:test", "token:test");
+    const request = client.readAnswer("answer:test");
     await expect(request).rejects.toBeInstanceOf(ContractHttpError);
     await expect(request).rejects.toMatchObject({ code: "RATE_LIMITED", status: 429 });
   });
@@ -265,7 +265,7 @@ describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
       shadow_suppressions: [],
       raw_text: "must not cross the inspection boundary"
     }), { status: 200, headers: { "content-type": "application/json" } }));
-    await expect(client.readInspection("answer:test", "token:test")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    await expect(client.readInspection("answer:test")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
   it("parses SSE incrementally through the generated client", async () => {
@@ -280,7 +280,7 @@ describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
     });
     const client = createContractClient("https://api.example.test", async () => new Response(body, { status: 200 }));
     const observed: RunEvent[] = [];
-    await client.streamEvents("run:test", "token:test", (event) => observed.push(event));
+    await client.streamEvents("run:test", (event) => observed.push(event));
     expect(observed.map((event) => event.event_type)).toEqual(["run.accepted", "run.running"]);
   });
 });

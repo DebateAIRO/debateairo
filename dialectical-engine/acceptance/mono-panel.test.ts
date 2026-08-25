@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
-import { createAcceptanceRuntime } from "./main.js";
+import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
 
 let database: StandingDatabase;
@@ -97,7 +97,7 @@ describe("DR-182 live mono-panel composition", () => {
   it("boots and serves high-stakes depth 4 with the ruled cap and disclosures", async () => {
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
-      legacyUserToken:"mono-panel-owner",
+      serviceCredential:"m".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
         API_HOST: "127.0.0.1",
@@ -111,11 +111,11 @@ describe("DR-182 live mono-panel composition", () => {
         { providerRef: "acceptance:codex-cli", baseUrl: provider.endpoint, model: "test-layer/model" }
       ]
     });
-    const token = "mono-panel-owner";
+    const origin = "http://127.0.0.1:8000";
     const ask = await runtime.api.inject({
       method: "POST",
       url: "/v1/asks",
-      headers: { "x-user-dev-token": token },
+      headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, true),
       payload: {
         question_line: "Can a mono-lineage day still serve honestly?",
         risk_tier: "high-stakes",
@@ -142,7 +142,7 @@ describe("DR-182 live mono-panel composition", () => {
     const answer = await runtime.api.inject({
       method: "GET",
       url: `/v1/runs/${runId}/answer`,
-      headers: { "x-user-dev-token": token }
+      headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, false)
     });
     expect(answer.statusCode).toBe(200);
     const payload = answer.json() as {

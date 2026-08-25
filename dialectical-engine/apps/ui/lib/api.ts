@@ -120,7 +120,7 @@ export function isNotFound(failure: unknown): boolean {
 
 /** readSession proves the browser's HttpOnly cookie names a real asker identity. */
 export async function validateSession(client: ContractClient = contractClient): Promise<void> {
-  await client.readSession(COOKIE_SESSION_MARKER);
+  await client.readSession();
 }
 
 export type DebateBundle =
@@ -152,14 +152,14 @@ export async function getDebateBundle(
 ): Promise<DebateBundle> {
   let run: RunProjection | null = null;
   try {
-    run = await client.readRun(id, token);
+    run = await client.readRun(id);
   } catch (failure) {
     if (!isNotFound(failure)) throw failure;
   }
   if (run !== null) {
     if (run.state === "SETTLED" || options.answerExpected) {
       try {
-        return servedDebateBundle(await client.readRunAnswer(id, token));
+        return servedDebateBundle(await client.readRunAnswer(id));
       } catch (failure) {
         // The projection and answer are committed by separate bounded writes.
         // Treat a momentary answer miss as finalizing, never as a user error.
@@ -173,7 +173,7 @@ export async function getDebateBundle(
     }
     return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run), run };
   }
-  return servedDebateBundle(await client.readAnswer(id, token));
+  return servedDebateBundle(await client.readAnswer(id));
 }
 
 export async function getDebate(id: string, client: ContractClient = contractClient): Promise<DebateDetail> {
@@ -223,7 +223,8 @@ export async function backendStatus(
   token?: string | null,
   client: ContractClient = contractClient
 ): Promise<WorkerStatus[]> {
-  const deployment = await client.readDeployment(requireToken(token));
+  requireToken(token);
+  const deployment = await client.readDeployment();
   return workersFromDeployment(deployment);
 }
 
@@ -231,7 +232,8 @@ export async function getSettingsView(
   token: string,
   client: ContractClient = contractClient
 ): Promise<SettingsView> {
-  return settingsViewFromDeployment(await client.readDeployment(token));
+  requireToken(token);
+  return settingsViewFromDeployment(await client.readDeployment());
 }
 
 export interface EvaluatorDevMenuView {
@@ -389,6 +391,7 @@ export async function createDebate(
     steering_presets: optionalLines(config, "steering_presets"),
     steering_annotations: optionalLines(config, "steering_annotations")
   };
-  const accepted = await client.submitAsk(ask, token);
+  requireToken(token);
+  const accepted = await client.submitAsk(ask);
   return { id: accepted.run_ref };
 }

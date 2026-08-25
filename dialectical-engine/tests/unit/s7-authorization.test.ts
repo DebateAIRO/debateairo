@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   authorizationPolicyInventory,
   buildApi,
-  createLegacyDevSessionResolver,
   type AskApplication
 } from "@debateai/api";
 import { contractInventory } from "@debateai/contract";
+import {
+  RETIRED_DEV_HEADER,TEST_APP_ORIGIN,testHttpIdentity,
+  testSessionApplication,testSessionHeaders
+} from "../support/httpSession.js";
 
 const OWNED_RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
@@ -28,6 +31,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
@@ -108,10 +112,17 @@ function fixtureApplication(): AskApplication {
 function buildRoleApi(application: AskApplication = fixtureApplication()) {
   return buildApi({
     application,
-    legacyDevSessionResolver: createLegacyDevSessionResolver({
-      userToken: "exact-user-token",
-      operatorToken: "exact-operator-token"
-    })
+    sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
+  });
+}
+
+const USER_IDENTITY=testHttpIdentity("s7-user");
+const USER_HEADERS=testSessionHeaders(USER_IDENTITY);
+const USER_MUTATION_HEADERS=testSessionHeaders(USER_IDENTITY,true);
+
+function buildUserApi(application:AskApplication=fixtureApplication()) {
+  return buildApi({
+    application,sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
   });
 }
 
@@ -158,36 +169,26 @@ describe("S7 deny-by-default authorization", () => {
     await api.close();
   });
 
-  it("operator-gates deployment with the exact transitional credential and stays default-off", async () => {
+  it("retires the transitional operator credential and keeps cookie askers out", async () => {
     const api = buildRoleApi();
     const ordinary = await api.inject({
       method: "GET", url: "/v1/deployment",
-      headers: { "x-user-dev-token": "exact-user-token" }
+      headers: USER_HEADERS
     });
-    const operator = await api.inject({
+    const retired = await api.inject({
       method: "GET", url: "/v1/deployment",
-      headers: { "x-user-dev-token": "exact-operator-token" }
+      headers: { [RETIRED_DEV_HEADER]: "exact-operator-token" }
     });
     expect(ordinary.statusCode).toBe(403);
-    expect(operator.statusCode).toBe(200);
+    expect(retired.statusCode).toBe(401);
     await api.close();
-
-    const defaultOff = buildApi({ application: fixtureApplication() });
-    expect((await defaultOff.inject({
-      method: "GET", url: "/v1/deployment",
-      headers: { "x-user-dev-token": "exact-operator-token" }
-    })).statusCode).toBe(401);
-    await defaultOff.close();
   });
 
   it("operator-gates both evaluator routes", async () => {
     const selectedBy: string[] = [];
     const api = buildApi({
       application: fixtureApplication(),
-      legacyDevSessionResolver: createLegacyDevSessionResolver({
-        userToken: "exact-user-token",
-        operatorToken: "exact-operator-token"
-      }),
+      sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN,
       evaluatorDevMenuRegisterVersion: 1,
       evaluatorDevMenu: {
         readView: async () => evaluatorView(),
@@ -205,19 +206,19 @@ describe("S7 deny-by-default authorization", () => {
       }
     ]) {
       expect((await api.inject({
-        ...route, headers: { "x-user-dev-token": "exact-user-token" }
+        ...route, headers: route.method==="POST" ? USER_MUTATION_HEADERS : USER_HEADERS
       })).statusCode).toBe(403);
     }
     expect((await api.inject({
       method: "GET", url: "/v1/dev/evaluator",
-      headers: { "x-user-dev-token": "exact-operator-token" }
-    })).statusCode).toBe(200);
+      headers: { [RETIRED_DEV_HEADER]: "exact-operator-token" }
+    })).statusCode).toBe(401);
     expect((await api.inject({
       method: "POST", url: "/v1/dev/evaluator/consumer-selection",
-      headers: { "x-user-dev-token": "exact-operator-token" },
+      headers: USER_MUTATION_HEADERS,
       payload: { model_id: "model:test" }
-    })).statusCode).toBe(201);
-    expect(selectedBy).toHaveLength(1);
+    })).statusCode).toBe(403);
+    expect(selectedBy).toHaveLength(0);
     await api.close();
   });
 
@@ -228,10 +229,10 @@ describe("S7 deny-by-default authorization", () => {
       submittedScope = session.caller_scope;
       return { run_ref: "run:test", status: "QUEUED" };
     };
-    const api = buildRoleApi(application);
+    const api = buildUserApi(application);
     const response = await api.inject({
       method: "POST", url: "/v1/asks",
-      headers: { "x-user-dev-token": "exact-user-token" },
+      headers: USER_MUTATION_HEADERS,
       payload: validAskPayload()
     });
     expect(response.statusCode).toBe(202);
@@ -252,7 +253,7 @@ describe("S7 deny-by-default authorization", () => {
     const response = await api.inject({
       method: "POST",
       url: "/v1/asks",
-      headers: { "x-user-dev-token": "exact-user-token" },
+      headers: USER_MUTATION_HEADERS,
       payload: {
         ...validAskPayload(),
         [field]: field === "caller_scope" ? "OPERATOR" : "attacker"
@@ -282,7 +283,7 @@ describe("S7 deny-by-default authorization", () => {
     const api = buildRoleApi(application);
     const response = await api.inject({
       method: "GET", url: `/v1/runs/${OWNED_RUN_ID}/events`,
-      headers: { "x-user-dev-token": "exact-user-token" }
+      headers: USER_HEADERS
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });
@@ -308,7 +309,7 @@ describe("S7 deny-by-default authorization", () => {
     const api = buildRoleApi(application);
     const response = await api.inject({
       method: "GET", url: `/v1/runs/${OWNED_RUN_ID}/events`,
-      headers: { "x-user-dev-token": "exact-user-token" }
+      headers: USER_HEADERS
     });
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("event: run.accepted");
@@ -332,15 +333,12 @@ describe("S7 deny-by-default authorization", () => {
   ])("maps denied owned route $method $url to its closed 404 face", async (route) => {
     const application = fixtureApplication();
     application.unlinkMemoryLink = async () => null;
+    const foreignIdentity=testHttpIdentity("s7-foreign");
     const api = buildApi({
-      application,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({
-        userToken: "foreign-user-token",
-        operatorToken: "not-used"
-      })
+      application,sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN
     });
     const foreign = await api.inject({
-      ...route, headers: { "x-user-dev-token": "foreign-user-token" }
+      ...route, headers:testSessionHeaders(foreignIdentity,route.method==="POST")
     });
     expect(foreign.statusCode).toBe(404);
     expect(foreign.json()).toEqual({ error: route.error });
@@ -363,7 +361,7 @@ describe("S7 deny-by-default authorization", () => {
   ])("maps malformed resource IDs on $method $url to the closed 404 face", async (route) => {
     const api = buildRoleApi();
     const response = await api.inject({
-      ...route, headers: { "x-user-dev-token": "exact-user-token" }
+      ...route, headers: route.method==="POST" ? USER_MUTATION_HEADERS : USER_HEADERS
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: route.error });
@@ -373,7 +371,7 @@ describe("S7 deny-by-default authorization", () => {
   it("does not expose implicit HEAD carriers for any governed GET route", async () => {
     const api = buildApi({
       application: fixtureApplication(),
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ operatorToken: "exact-operator-token" }),
+      sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN,
       evaluatorDevMenuRegisterVersion: 1,
       evaluatorDevMenu: {
         readView: async () => evaluatorView(),
@@ -388,7 +386,7 @@ describe("S7 deny-by-default authorization", () => {
         .replace("{nodeId}", "22222222-2222-4222-8222-222222222222");
       expect((await api.inject({
         method: "HEAD", url,
-        headers: { "x-user-dev-token": "exact-operator-token" }
+        headers: USER_HEADERS
       })).statusCode, policy.route).toBe(404);
     }
     await api.close();

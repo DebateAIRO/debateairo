@@ -165,10 +165,12 @@ ACCEPTANCE_BATTERY_VERSION=acceptance-v1
 ACCEPTANCE_SETTLEMENT_WATCH_HANDLE=acceptance:standing-watch
 ```
 
-Run with the same token later pasted into UI Settings:
+Run with a dedicated 43-character service credential. The harness derives a
+real server-side session from it; the credential itself is never sent as an
+HTTP header, cookie, URL, or request body:
 
 ```text
-./node_modules/.bin/tsx acceptance/run-acceptance.ts --token <same-ui-token>
+./node_modules/.bin/tsx acceptance/run-acceptance.ts --service-credential <43-character-service-credential>
 ```
 
 By default the ceremony settles, verifies the FAIR-01 fair-debate gate,

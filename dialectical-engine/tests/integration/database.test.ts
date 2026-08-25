@@ -38,15 +38,34 @@ import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
-  createLegacyDevSessionResolver,
   PostgresAskApplication,
   type AskApplication
 } from "@debateai/api";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
+import {
+  TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders,
+  type TestHttpIdentity
+} from "../support/httpSession.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
+
+async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promise<void> {
+  await database.pool.query(`
+    INSERT INTO identity."user" (
+      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+      phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+      adult_affirmed_at,created_at
+    ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,$3,$4,$5,$6,'active',now(),now())
+  `,[
+    identity.authenticated.userId,
+    createHash("sha256").update(`database-http-identity:${label}:${identity.authenticated.userId}`).digest(),
+    "integration-password-not-login-capable",
+    `database-http-${label}-${identity.authenticated.userId}`,
+    randomUUID(),identity.authenticated.ownerRef
+  ]);
+}
 
 const runnerSettings = (): WalkingSkeletonSettings => ({
   workerId: "runner:test-layer", claimMs: 10_000, claimMarginMs: 1_000,
@@ -541,9 +560,13 @@ describe("LOAD-01 run projection ownership boundary", () => {
   });
 
   it("T17/T18 persists typed hold events in order and self-expires HOLDING on real PostgreSQL", async () => {
-    const ownerToken = `resil01-owner-${randomUUID()}`;
-    const askerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
+    const identity=testHttpIdentity(`resil01-${randomUUID()}`);
+    await persistHttpIdentity(identity,"resil01");
+    const askerId = `asker:historical:${randomUUID()}`;
     const runId = await createRun(`resil01-holding-${randomUUID()}`, 10, 1, 1, askerId);
+    await database.pool.query("SELECT core.append_run_ownership_event($1,$2)",[
+      runId,identity.authenticated.ownerRef
+    ]);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `resil01:${runId}:Q1`
     });
@@ -561,7 +584,9 @@ describe("LOAD-01 run projection ownership boundary", () => {
     await repository.recordRunLifecycleEvent({
       runId, kind: "node.retrying", value: { ...common, state: "COOLDOWN_HOLD", hold_until: future }
     });
-    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+    await expect(repository.readLoadingProjection(runId, {
+      ownerRef:identity.authenticated.ownerRef,legacyAskerId:null
+    })).resolves.toMatchObject({
       state: "HOLDING", holdUntil: new Date(future)
     });
 
@@ -571,12 +596,12 @@ describe("LOAD-01 run projection ownership boundary", () => {
     );
     const api = buildApi({
       application,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: ownerToken })
+      sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN
     });
     try {
       const response = await api.inject({
         method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}/events`,
-        headers: { "x-user-dev-token": ownerToken }
+        headers:testSessionHeaders(identity)
       });
       expect(response.statusCode).toBe(200);
       expect(response.body).toContain("event: node.retrying");
@@ -591,7 +616,9 @@ describe("LOAD-01 run projection ownership boundary", () => {
         ...common, state: "COOLDOWN_HOLD", hold_until: new Date(Date.now() - 1_000).toISOString()
       }
     });
-    await expect(repository.readLoadingProjection(runId, askerId)).resolves.toMatchObject({
+    await expect(repository.readLoadingProjection(runId, {
+      ownerRef:identity.authenticated.ownerRef,legacyAskerId:null
+    })).resolves.toMatchObject({
       state: "RUNNING", holdUntil: null
     });
     expect(await repository.countCooldownHolds(runId)).toBe(2);
@@ -629,9 +656,15 @@ describe("LOAD-01 run projection ownership boundary", () => {
   });
 
   it("returns 401 to anonymous callers and 404 to a foreign asker", async () => {
-    const ownerToken = "load01-owner-token";
-    const ownerAskerId = `asker:${createHash("sha256").update(ownerToken).digest("hex")}`;
+    const ownerIdentity=testHttpIdentity(`load01-owner-${randomUUID()}`);
+    const foreignIdentity=testHttpIdentity(`load01-foreign-${randomUUID()}`);
+    await persistHttpIdentity(ownerIdentity,"load01-owner");
+    await persistHttpIdentity(foreignIdentity,"load01-foreign");
+    const ownerAskerId = `asker:historical:${randomUUID()}`;
     const runId = await createRun("load01-owned-loading-run", 10, 1, 1, ownerAskerId);
+    await database.pool.query("SELECT core.append_run_ownership_event($1,$2)",[
+      runId,ownerIdentity.authenticated.ownerRef
+    ]);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId,
       batteryRowId: "Q1",
@@ -639,11 +672,8 @@ describe("LOAD-01 run projection ownership boundary", () => {
       commandKey: `load01:${runId}:Q1`
     });
     const repository = new RunRepository(database.pool);
-    const readRun: AskApplication["readRun"] = async (candidateRunId, session) => {
-      const run = await repository.readLoadingProjection(candidateRunId, {
-        ownerRef: null,
-        legacyAskerId: session.asker_id
-      });
+    const readRun: AskApplication["readRun"] = async (candidateRunId, _session, ownership) => {
+      const run = await repository.readLoadingProjection(candidateRunId, ownership);
       return run === null ? null : {
         run_ref: run.runRef,
         question_line: run.questionLine,
@@ -657,11 +687,11 @@ describe("LOAD-01 run projection ownership boundary", () => {
     } as unknown as AskApplication;
     const api = buildApi({
       application,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: ownerToken })
+      sessions:testSessionApplication([ownerIdentity]),allowedOrigin:TEST_APP_ORIGIN
     });
     const foreignApi = buildApi({
       application,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "load01-foreign-token" })
+      sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN
     });
     try {
       const anonymous = await api.inject({ method: "GET", url: `/v1/runs/${encodeURIComponent(runId)}` });
@@ -670,14 +700,14 @@ describe("LOAD-01 run projection ownership boundary", () => {
       const foreign = await foreignApi.inject({
         method: "GET",
         url: `/v1/runs/${encodeURIComponent(runId)}`,
-        headers: { "x-user-dev-token": "load01-foreign-token" }
+        headers:testSessionHeaders(foreignIdentity)
       });
       expect(foreign.statusCode).toBe(404);
 
       const owner = await api.inject({
         method: "GET",
         url: `/v1/runs/${encodeURIComponent(runId)}`,
-        headers: { "x-user-dev-token": ownerToken }
+        headers:testSessionHeaders(ownerIdentity)
       });
       expect(owner.statusCode).toBe(200);
       expect(owner.json()).toMatchObject({ run_ref: runId, state: "QUEUED" });

@@ -463,7 +463,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       runtime_delete: false,
       runtime_truncate: false,
       runtime_execute: true,
-      runtime_append: true,
+      runtime_append: false,
       replay_schema: true,
       replay_select: true,
       public_execute: false,

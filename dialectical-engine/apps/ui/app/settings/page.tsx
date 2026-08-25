@@ -9,6 +9,7 @@ import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 import { EvaluatorDevMenu } from "@/components/EvaluatorDevMenu";
 import { SessionControls } from "@/components/SessionControls";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
+import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 
 const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
   && process.env.NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED === "true";
@@ -46,6 +47,7 @@ function AccountSettingsScreen() {
           Review and revoke your signed-in browser sessions. Deployment and model administration are operator-only.
         </p>
         <SessionControls />
+        <LegacyRunClaimControls />
         <AccountErasureControls />
         <div className="pill pillGen" style={{ marginTop: 24 }}>
           <span className="dot" />

@@ -61,12 +61,12 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
   it("generates runtime-validatable accepted/session/answer/node resources", () => {
     expect(AskAcceptedSchema.parse({ run_ref: "run:test", status: "QUEUED" }).status).toBe("QUEUED");
     expect(SessionSchema.parse({
-      asker_id: "asker:test",
-      session_id: "session:test",
+      asker_id: "owner:11111111-1111-4111-8111-111111111111",
+      session_id: "22222222-2222-4222-8222-222222222222",
       caller_scope: "ASKER",
-      ownership_provenance: "user_dev_token",
-      provisional_identity_model: true
-    }).ownership_provenance).toBe("user_dev_token");
+      ownership_provenance: "server_session",
+      provisional_identity_model: false
+    }).ownership_provenance).toBe("server_session");
     expect(NodeSchema).toBeDefined();
     expect(AnswerSchema).toBeDefined();
     expect(InspectionSchema).toBeDefined();

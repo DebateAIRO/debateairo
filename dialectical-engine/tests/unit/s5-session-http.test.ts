@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildApi,
-  createLegacyDevSessionResolver,
   CSRF_COOKIE_NAME,
   SESSION_COOKIE_NAME,
   type AskApplication
@@ -13,6 +12,7 @@ import type {
 import { createContractClient } from "@debateai/contract";
 import { createServerContractClient as createUiServerClient } from "../../apps/ui/lib/serverApi.js";
 import { createServerContractClient as createWebServerClient } from "../../web/lib/serverApi.js";
+import { RETIRED_DEV_HEADER } from "../support/httpSession.js";
 
 const SESSION_TOKEN = "s".repeat(43);
 const CSRF_TOKEN = "c".repeat(43);
@@ -117,51 +117,34 @@ const rejectedCsrfCases = Object.freeze([
 ] as const);
 
 describe("S5 HTTP session boundary", () => {
-  it("keeps the legacy rollback credential default-off and exact when explicitly configured", async () => {
-    const disabled = buildApi({ application: application() });
-    const disabledResponse = await disabled.inject({
+  it("refuses the retired development header with no rollback seam", async () => {
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
+    const response = await api.inject({
       method: "GET",
       url: "/v1/session",
-      headers: { "x-user-dev-token": "configured-only-in-test" }
+      headers: { [RETIRED_DEV_HEADER]: "configured-only-in-test" }
     });
-    expect(disabledResponse.statusCode).toBe(401);
-    await disabled.close();
-
-    const enabled = buildApi({
-      application: application(),
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "configured-only-in-test" })
-    });
-    expect((await enabled.inject({
-      method: "GET", url: "/v1/session", headers: { "x-user-dev-token": "wrong" }
-    })).statusCode).toBe(401);
-    const exact = await enabled.inject({
-      method: "GET", url: "/v1/session", headers: { "x-user-dev-token": "configured-only-in-test" }
-    });
-    expect(exact.statusCode).toBe(200);
-    expect(exact.json()).toMatchObject({
-      ownership_provenance: "user_dev_token",
-      provisional_identity_model: true
-    });
-    await enabled.close();
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
+    await api.close();
   });
 
   it("never falls back from an invalid/present cookie or accepts both credential channels", async () => {
     const api = buildApi({
       application: application(),
       sessions: sessions(),
-      allowedOrigin: ORIGIN,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "configured-only-in-test" })
+      allowedOrigin: ORIGIN
     });
     const invalidCookie = `${SESSION_COOKIE_NAME}=${"x".repeat(43)}`;
     expect((await api.inject({
       method: "GET",
       url: "/v1/session",
-      headers: { cookie: invalidCookie, "x-user-dev-token": "configured-only-in-test" }
+      headers: { cookie: invalidCookie, [RETIRED_DEV_HEADER]: "configured-only-in-test" }
     })).statusCode).toBe(401);
     expect((await api.inject({
       method: "GET",
       url: "/v1/session",
-      headers: { cookie, "x-user-dev-token": "configured-only-in-test", "user-agent": "s5-test-browser" }
+      headers: { cookie, [RETIRED_DEV_HEADER]: "configured-only-in-test", "user-agent": "s5-test-browser" }
     })).statusCode).toBe(401);
     await api.close();
   });
@@ -390,9 +373,9 @@ describe("S5 HTTP session boundary", () => {
     try {
       for (const createServerClient of [createUiServerClient, createWebServerClient]) {
         await expect(createServerClient(boundFetch, SESSION_TOKEN, "Bound Browser A")
-          .readSession("cookie-session")).resolves.toMatchObject({ ownership_provenance: "server_session" });
+          .readSession()).resolves.toMatchObject({ ownership_provenance: "server_session" });
         await expect(createServerClient(boundFetch, SESSION_TOKEN, "Different Browser B")
-          .readSession("cookie-session")).rejects.toMatchObject({ code: "SESSION_REQUIRED" });
+          .readSession()).rejects.toMatchObject({ code: "SESSION_REQUIRED" });
       }
       expect(seen).toHaveLength(4);
       expect(seen[0]!.get("cookie")).toBe(`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}`);

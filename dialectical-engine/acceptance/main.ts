@@ -1,10 +1,11 @@
 import { pathToFileURL } from "node:url";
-import { randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
 import {
-  buildApi,createLegacyDevSessionResolver,PostgresAskApplication,type Dispatcher
+  buildApi,PostgresAskApplication,type Dispatcher
 } from "@debateai/api";
+import type { AuthenticatedSession, SessionApplication } from "../apps/api/src/sessions.js";
 import {
   createTerminalActivationEvaluator,
   WorkItemRepository,
@@ -12,10 +13,22 @@ import {
 } from "@debateai/battery";
 import {
   createPool,
+  configureContentEncryption,
+  PostgresSessionRepository,
   ProviderProbeRepository,
   RunRepository,
+  type AuthSourceContext,
   type CompletionActivationResolution
 } from "@debateai/db";
+import {
+  ContentCipher,
+  generateDek,
+  hashVerificationToken,
+  MemoryRunContentKeyStore,
+  type AuditContextHasher,
+  type KeyDestroyResult,
+  type ReadableUserDekStore
+} from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { resolveEffectiveRiskTier } from "@debateai/register";
 import {
@@ -122,6 +135,208 @@ export class AcceptanceDispatcher implements Dispatcher {
 export interface AcceptanceRuntime {
   readonly api: ReturnType<typeof buildApi>;
   readonly runner: WalkingSkeletonRunner;
+  readonly serviceSession: AcceptanceServiceSession;
+}
+
+export interface AcceptanceServiceSession {
+  readonly sessionToken: string;
+  readonly csrfToken: string;
+  readonly userAgent: string;
+}
+
+export function acceptanceServiceRequestHeaders(
+  serviceSession: AcceptanceServiceSession,
+  origin: string,
+  mutating: boolean
+): Readonly<Record<string, string>> {
+  return Object.freeze({
+    cookie: `__Host-debateai-session=${serviceSession.sessionToken}; __Host-debateai-csrf=${serviceSession.csrfToken}`,
+    "user-agent": serviceSession.userAgent,
+    ...(mutating ? { origin, "x-csrf-token": serviceSession.csrfToken } : {})
+  });
+}
+
+const SERVICE_CREDENTIAL_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const ACCEPTANCE_SERVICE_USER_AGENT = "DebateAI-Acceptance-Service/1";
+
+export class AcceptanceUserDekStore implements ReadableUserDekStore {
+  readonly #keys = new Map<string, Buffer>();
+
+  async store(userId: string, dek: Uint8Array): Promise<void> {
+    if (this.#keys.has(userId)) throw new TypeError("ACCEPTANCE_USER_DEK_EXISTS");
+    this.#keys.set(userId, Buffer.from(dek));
+  }
+
+  async load(userId: string): Promise<Buffer> {
+    const key = this.#keys.get(userId);
+    if (key === undefined) throw new TypeError("ACCEPTANCE_USER_DEK_UNRESOLVED");
+    return Buffer.from(key);
+  }
+
+  async exists(userId: string): Promise<boolean> {
+    return this.#keys.has(userId);
+  }
+
+  async destroy(userId: string): Promise<KeyDestroyResult> {
+    const key = this.#keys.get(userId);
+    if (key === undefined) return "ALREADY_ABSENT";
+    key.fill(0);
+    this.#keys.delete(userId);
+    return "DESTROYED";
+  }
+}
+
+const acceptanceContentStores = new WeakMap<Pool, AcceptanceUserDekStore>();
+
+export function acceptanceContentStore(pool: Pool): AcceptanceUserDekStore {
+  const existing = acceptanceContentStores.get(pool);
+  if (existing !== undefined) return existing;
+  const users = new AcceptanceUserDekStore();
+  const runs = new MemoryRunContentKeyStore(users, async (ownerRef) => {
+    const resolved = await pool.query<{ user_id: string }>(
+      `SELECT user_id FROM identity."user"
+       WHERE owner_ref=$1 AND state='active'`,
+      [ownerRef]
+    );
+    const userId = resolved.rows[0]?.user_id;
+    if (userId === undefined) throw new TypeError("ACCEPTANCE_OWNER_REF_UNRESOLVED");
+    return userId;
+  });
+  configureContentEncryption(pool, new ContentCipher(runs));
+  acceptanceContentStores.set(pool, users);
+  return users;
+}
+
+function acceptanceBindingHash(bindingKey: Uint8Array, source: AuthSourceContext): string {
+  const userAgent = typeof source?.userAgent === "string" && source.userAgent.trim() !== ""
+    ? source.userAgent.trim().slice(0, 256) : "unknown";
+  return `sha256:${createHmac("sha256", bindingKey)
+    .update("debateai:session-user-agent:v1\0", "utf8")
+    .update(userAgent, "utf8").digest("hex")}`;
+}
+
+function exactHashEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left, "utf8");
+  const rightBytes = Buffer.from(right, "utf8");
+  return leftBytes.byteLength === rightBytes.byteLength && timingSafeEqual(leftBytes, rightBytes);
+}
+
+function derivedServiceToken(serviceCredential: string, purpose: string): string {
+  return createHmac("sha256", serviceCredential)
+    .update(`debateai:acceptance-service:${purpose}:v1\0`, "utf8")
+    .update(randomUUID(), "utf8")
+    .digest("base64url");
+}
+
+export async function createAcceptanceServiceSession(
+  pool: Pool,
+  serviceCredential: string,
+  userDeks: AcceptanceUserDekStore
+): Promise<Readonly<{
+  application: SessionApplication;
+  credentials: AcceptanceServiceSession;
+  principal: Readonly<{ userId:string;ownerRef:string;sessionId:string }>;
+  close(): Promise<void>;
+}>> {
+  if (!SERVICE_CREDENTIAL_PATTERN.test(serviceCredential)) {
+    throw new TypeError("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
+  }
+  const bindingKey = createHmac("sha256", serviceCredential)
+    .update("debateai:acceptance-service:binding-key:v1", "utf8").digest();
+  const sessionToken = derivedServiceToken(serviceCredential, "session");
+  const csrfToken = derivedServiceToken(serviceCredential, "csrf");
+  const userId = randomUUID();
+  const ownerRef = randomUUID();
+  const auditToken = randomUUID();
+  const sessionId = randomUUID();
+  const now = new Date();
+  const bindingHash = acceptanceBindingHash(bindingKey, {
+    ip: "127.0.0.1",
+    userAgent: ACCEPTANCE_SERVICE_USER_AGENT,
+    requestId: "acceptance-service-bootstrap"
+  });
+  await pool.query(`
+    INSERT INTO identity."user" (
+      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+      phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+      adult_affirmed_at,created_at
+    ) VALUES ($1,$2,$3::jsonb,$3::jsonb,NULL,$4,$5,$6,$7,'active',$8,$8)
+  `, [
+    userId,
+    createHash("sha256").update(`acceptance-service:${userId}`, "utf8").digest(),
+    JSON.stringify({ kind: "acceptance-service-non-address" }),
+    "acceptance-service-credential-not-login-capable",
+    `acceptance-service-${userId}`,
+    auditToken,
+    ownerRef,
+    now
+  ]);
+  await pool.query(`
+    INSERT INTO identity.session (
+      session_id,user_id,token_hash,csrf_token_hash,binding_context,
+      created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at,revoked_at
+    ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$6,$7,$8,$6,NULL)
+  `, [
+    sessionId,userId,hashVerificationToken(sessionToken),hashVerificationToken(csrfToken),
+    JSON.stringify({ user_agent_hash: bindingHash }),now,
+    new Date(now.getTime() + 14 * 24 * 60 * 60 * 1_000),
+    new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000)
+  ]);
+  const userDek = generateDek();
+  try {
+    await userDeks.store(userId, userDek);
+  } finally {
+    userDek.fill(0);
+  }
+  const unavailableAuditContext = Object.freeze({
+    hashSourceIp: async () => { throw new Error("ACCEPTANCE_SERVICE_AUDIT_PATH_UNAVAILABLE"); },
+    hashUserAgent: async () => { throw new Error("ACCEPTANCE_SERVICE_AUDIT_PATH_UNAVAILABLE"); }
+  }) as unknown as AuditContextHasher;
+  const repository = new PostgresSessionRepository(pool, unavailableAuditContext);
+  const unsupported = (): never => { throw new Error("ACCEPTANCE_SERVICE_SESSION_OPERATION_UNSUPPORTED"); };
+  const application: SessionApplication = Object.freeze({
+    async authenticate(presented: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {
+      if (!SERVICE_CREDENTIAL_PATTERN.test(presented)) return null;
+      const tokenHash = hashVerificationToken(presented);
+      const record = await repository.authenticateSession({
+        tokenHash,
+        bindingHash: acceptanceBindingHash(bindingKey, source),
+        occurredAt: new Date(),
+        idleExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1_000)
+      });
+      return record === null ? null : Object.freeze({
+        session: Object.freeze({
+          asker_id: `owner:${record.ownerRef}`,
+          session_id: record.sessionId,
+          caller_scope: "ASKER" as const,
+          ownership_provenance: "server_session" as const,
+          provisional_identity_model: false as const
+        }),
+        userId: record.userId,
+        ownerRef: record.ownerRef,
+        tokenHash,
+        csrfTokenHash: record.csrfTokenHash,
+        authKind: "cookie" as const
+      });
+    },
+    verifyCsrf(authenticated: AuthenticatedSession, suppliedToken: string): boolean {
+      if (!SERVICE_CREDENTIAL_PATTERN.test(suppliedToken)) return false;
+      return exactHashEqual(hashVerificationToken(suppliedToken), authenticated.csrfTokenHash);
+    },
+    beginLogin: async () => unsupported(),
+    completeLogin: async () => unsupported(),
+    logout: async () => unsupported(),
+    listSessions: async () => unsupported(),
+    revokeSession: async () => unsupported(),
+    revokeAllSessions: async () => unsupported(),
+    stepUp: async () => unsupported()
+  });
+  return Object.freeze({
+    application,
+    credentials: Object.freeze({ sessionToken, csrfToken, userAgent: ACCEPTANCE_SERVICE_USER_AGENT }),
+    principal:Object.freeze({ userId,ownerRef,sessionId }),
+    close: async () => { await userDeks.destroy(userId); }
+  });
 }
 
 /**
@@ -176,7 +391,7 @@ export async function createAcceptanceRuntime(input: {
   readonly pool: Pool;
   readonly environment: AcceptanceEnvironment;
   readonly makerRelays: readonly AcceptanceMakerRelay[];
-  readonly legacyUserToken?:string;
+  readonly serviceCredential:string;
   readonly testOnlyTerminalEvaluator?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];
@@ -352,7 +567,12 @@ export async function createAcceptanceRuntime(input: {
     ]);
     throw error;
   }
+  let serviceSession: Awaited<ReturnType<typeof createAcceptanceServiceSession>> | null = null;
   try {
+  const initializedSession=await createAcceptanceServiceSession(
+    input.pool,input.serviceCredential,acceptanceContentStore(input.pool)
+  );
+  serviceSession=initializedSession;
   const application = new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
@@ -428,21 +648,19 @@ export async function createAcceptanceRuntime(input: {
   }));
   const api=buildApi({
     application,
-    ...(input.legacyUserToken===undefined ? {} : {
-      legacyDevSessionResolver:createLegacyDevSessionResolver({
-        userToken:input.legacyUserToken
-      })
-    })
+    sessions:initializedSession.application,
+    allowedOrigin:`http://${input.environment.API_HOST}:${input.environment.API_PORT}`
   });
   api.addHook("onClose",async () => {
     await Promise.allSettled([
-      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
+      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end(),initializedSession.close()
     ]);
   });
-  return Object.freeze({ api,runner });
+  return Object.freeze({ api,runner,serviceSession:initializedSession.credentials });
   } catch (error) {
     await Promise.allSettled([
-      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end()
+      serverAskAdmissionPool.end(),legacyAskAdmissionPool.end(),
+      ...(serviceSession === null ? [] : [serviceSession.close()])
     ]);
     throw error;
   }
@@ -465,9 +683,8 @@ async function main(): Promise<void> {
   const runtime = await createAcceptanceRuntime({
     pool,
     environment,
-    ...(process.env.LEGACY_USER_DEV_TOKEN===undefined ? {} : {
-      legacyUserToken:process.env.LEGACY_USER_DEV_TOKEN
-    }),
+    serviceCredential:z.string().regex(SERVICE_CREDENTIAL_PATTERN)
+      .parse(process.env.ACCEPTANCE_SERVICE_CREDENTIAL),
     makerRelays: [
       ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
       ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])

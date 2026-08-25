@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContractHttpError, type ExecutionLedgerDigest, type Inspection, type RunEvent } from "@debateai/contract";
-import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
+import { contractClient } from "@/lib/api";
 import type { Answer, Node } from "@/lib/types";
 import { applyRunEvent, createEmptyLiveAnswerState, projectAnswerSurface, type LiveAnswerState } from "@/lib/v3Presentation";
 import { VerdictBanner } from "@/components/VerdictBanner";
@@ -33,10 +33,10 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
     if (privateDeletionRef.current!==null) return;
     try {
       let next;
-      try { next = await contractClient.readAnswer(id, COOKIE_SESSION_MARKER); }
+      try { next = await contractClient.readAnswer(id); }
       catch (failure) {
         if (!(failure instanceof ContractHttpError) || failure.code !== "NOT_FOUND") throw failure;
-        next = await contractClient.readRunAnswer(id, COOKIE_SESSION_MARKER);
+        next = await contractClient.readRunAnswer(id);
       }
       if (privateDeletionRef.current!==null) return;
       setAnswer(next); setError(null);
@@ -65,7 +65,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   useEffect(() => {
     if (answer === null) return;
     let active=true;
-    void contractClient.readLedgerDigest(answer.answer_id, COOKIE_SESSION_MARKER)
+    void contractClient.readLedgerDigest(answer.answer_id)
       .then((digest)=>{ if (active) setLedgerDigest(digest); })
       .catch((failure) => { if (active) setActionState(
         failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE"
@@ -82,7 +82,6 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
     };
     void contractClient.streamEvents(
       answer?.run_ref ?? id,
-      COOKIE_SESSION_MARKER,
       consume,
       controller.signal
     ).catch((failure) => {
@@ -101,7 +100,6 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
     try {
       setInspection(await contractClient.readInspection(
         answer.answer_id,
-        COOKIE_SESSION_MARKER,
         answer.answer_version
       ));
       setActionState(null);
@@ -113,8 +111,8 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
   const unlinkMemory = useCallback(async () => {
     if (answer === null) { setActionState("SESSION_REQUIRED"); return; }
     try {
-      await contractClient.unlinkMemory(answer.answer_id, COOKIE_SESSION_MARKER);
-      setAnswer(await contractClient.readAnswer(answer.answer_id, COOKIE_SESSION_MARKER));
+      await contractClient.unlinkMemory(answer.answer_id);
+      setAnswer(await contractClient.readAnswer(answer.answer_id));
       setActionState("MEMORY_UNLINKED");
     } catch (failure) {
       setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");
@@ -128,7 +126,7 @@ export default function DebatePageClient({ id, initialAnswer, initialError }: { 
       const accepted = await contractClient.recordInvestigation(answer.answer_id, gapRef, {
         user_input: acceptsUserInput && verbatim.length > 0 ? verbatim : null,
         human_steer_input: true
-      }, COOKIE_SESSION_MARKER);
+      });
       setActionState(`${accepted.status} · ${accepted.replay_handle}`);
     } catch (failure) {
       setActionState(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");

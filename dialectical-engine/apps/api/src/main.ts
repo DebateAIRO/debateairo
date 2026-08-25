@@ -12,7 +12,7 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresIdentityRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -33,7 +33,6 @@ import {
 } from "@debateai/register";
 import {
   buildApi,
-  createLegacyDevSessionResolver,
   HatchetDispatcher,
   PostgresAskApplication,
   preserveSubmittedTierSource
@@ -42,6 +41,7 @@ import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
+import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
 import {
   AccountErasureNotificationReconciler,
@@ -188,6 +188,9 @@ const sessions = await SessionService.create({
   sessionPolicy,
   blindIndexKey
 });
+const legacyRunClaim=new PostgresLegacyRunClaimApplication(
+  new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
+);
 const application = new PostgresAskApplication(pool, dispatcher, {
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
@@ -312,19 +315,9 @@ const api = buildApi({
   registration,
   mfa,
   sessions,
+  legacyRunClaim,
   ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
-  ...(
-    environment.LEGACY_USER_DEV_TOKEN === undefined
-      && environment.LEGACY_OPERATOR_DEV_TOKEN === undefined
-      ? {}
-      : { legacyDevSessionResolver: createLegacyDevSessionResolver({
-        ...(environment.LEGACY_USER_DEV_TOKEN === undefined
-          ? {} : { userToken: environment.LEGACY_USER_DEV_TOKEN }),
-        ...(environment.LEGACY_OPERATOR_DEV_TOKEN === undefined
-          ? {} : { operatorToken: environment.LEGACY_OPERATOR_DEV_TOKEN })
-      }) }
-  ),
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION

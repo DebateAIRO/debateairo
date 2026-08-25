@@ -55,7 +55,7 @@ function NewDebateForm({ token }: { token: string }) {
 
   useEffect(() => {
     let active = true;
-    void contractClient.readSession(token).then((session) => {
+    void contractClient.readSession().then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session);
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);

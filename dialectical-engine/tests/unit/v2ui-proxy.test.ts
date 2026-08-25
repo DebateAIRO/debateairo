@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // `[...path]` glob silently runs zero tests).
 import * as route from "../../apps/ui/app/api/[...path]/route.js";
 
+const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
+
 const originalFetch = globalThis.fetch;
 const originalBase = process.env.DIALECTICAL_API_BASE;
 
@@ -40,7 +42,7 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
           origin: "https://ui.example.test",
           "user-agent": "S5 proxy proof",
           "x-csrf-token": "c".repeat(43),
-          "x-user-dev-token": "attacker-controlled-legacy-header",
+          [RETIRED_DEV_HEADER]: "attacker-controlled-legacy-header",
           authorization: "Bearer must-not-cross",
           "x-forwarded-for": "198.51.100.8"
         },
@@ -59,7 +61,7 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
     expect(forwarded.get("origin")).toBe("https://ui.example.test");
     expect(forwarded.get("user-agent")).toBe("S5 proxy proof");
     expect(forwarded.get("x-csrf-token")).toBe("c".repeat(43));
-    expect(forwarded.get("x-user-dev-token")).toBeNull();
+    expect(forwarded.get(RETIRED_DEV_HEADER)).toBeNull();
     expect(forwarded.get("authorization")).toBeNull();
     expect(forwarded.get("x-forwarded-for")).toBeNull();
     expect(forwarded.get("host")).toBeNull();

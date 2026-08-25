@@ -109,7 +109,7 @@ describe("S05 ownership through the restored V2 data layer", () => {
 
   it("refuses an anonymous read with SESSION_REQUIRED (401 path)", async () => {
     const client = createBrowserContractClient(throughProxyAs(null));
-    const failure = await client.readAnswer(answer.answer_id, SESSION_MARKER).then(
+    const failure = await client.readAnswer(answer.answer_id).then(
       () => null,
       (thrown: unknown) => thrown
     );

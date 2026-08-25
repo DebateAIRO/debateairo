@@ -73,10 +73,6 @@ export function loadApiEnvironment() {
     STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: positiveInteger,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
-    // S9 rollback lane: absent by default. If present, only this exact secret
-    // is accepted and it remains visibly provisional in the public Session.
-    LEGACY_USER_DEV_TOKEN: z.string().min(32).optional(),
-    LEGACY_OPERATOR_DEV_TOKEN: z.string().min(32).optional(),
     EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
     EVALUATOR_DEV_MENU_DATABASE_URL: z.string().url().optional(),
     ...hatchetShape

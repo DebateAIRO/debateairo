@@ -8,7 +8,7 @@ import { WalkingSkeletonRunner } from "@debateai/runner";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
-import { createAcceptanceRuntime } from "./main.js";
+import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
 
 let database: StandingDatabase;
@@ -237,7 +237,7 @@ describe("ACC-01 dry-run ceremony", () => {
     // DR-139 terminal activation evaluator wired by createAcceptanceRuntime.
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
-      legacyUserToken:"acc-01-owner-token",
+      serviceCredential:"a".repeat(43),
       environment: {
         DATABASE_URL: database.connectionString,
         API_HOST: "127.0.0.1",
@@ -255,11 +255,11 @@ describe("ACC-01 dry-run ceremony", () => {
       ]
     });
     try {
-    const token = "acc-01-owner-token";
+    const origin = "http://127.0.0.1:8000";
     const ask = await runtime.api.inject({
       method: "POST",
       url: "/v1/asks",
-      headers: { "x-user-dev-token": token },
+      headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, true),
       payload: {
         question_line: "What is the strongest case for adopting this proposal?",
         risk_tier: "standard",
@@ -319,7 +319,7 @@ describe("ACC-01 dry-run ceremony", () => {
     const owned = await runtime.api.inject({
       method: "GET",
       url: `/v1/runs/${runId}/answer`,
-      headers: { "x-user-dev-token": token }
+      headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, false)
     });
     expect(owned.statusCode).toBe(200);
     expect(owned.json()).toMatchObject({ run_ref: runId, question_line: "What is the strongest case for adopting this proposal?" });
@@ -498,9 +498,12 @@ describe("ACC-01 dry-run ceremony", () => {
     const foreign = await runtime.api.inject({
       method: "GET",
       url: `/v1/runs/${runId}/answer`,
-      headers: { "x-user-dev-token": "different-owner-token" }
+      headers: {
+        cookie: `__Host-debateai-session=${"f".repeat(43)}`,
+        "user-agent": runtime.serviceSession.userAgent
+      }
     });
-    // An unrecognised dev token never materialises a synthetic foreign identity.
+    // An unrecognised cookie never materialises a synthetic foreign identity.
     expect(foreign.statusCode).toBe(401);
     } finally {
       await runtime.api.close();

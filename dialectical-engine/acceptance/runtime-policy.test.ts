@@ -103,7 +103,7 @@ describe("ACC-01 acceptance runtime policy", () => {
       },
       runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 }
     }, 2, 1)).toMatchObject({
-      max_model_attempts: 74,
+      max_model_attempts: 88,
       per_site_attempts: { judge: 3, organ: 3 }
     });
     for (const proofSource of [panelProofSource, reviewProofSource]) {

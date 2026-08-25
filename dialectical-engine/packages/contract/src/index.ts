@@ -143,14 +143,6 @@ export const RunProjectionSchema = z.object({
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
 
-const LegacyDevelopmentSessionSchema = z.object({
-  asker_id: z.string().min(1),
-  session_id: z.string().min(1),
-  caller_scope: z.enum(["ASKER", "OPERATOR"]),
-  ownership_provenance: z.enum(["user_dev_token", "operator_dev_token"]),
-  provisional_identity_model: z.literal(true)
-}).strict();
-
 const ServerSessionSchema = z.object({
   asker_id: z.string().regex(/^owner:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
   session_id: z.uuid(),
@@ -159,7 +151,7 @@ const ServerSessionSchema = z.object({
   provisional_identity_model: z.literal(false)
 }).strict();
 
-export const SessionSchema = z.union([LegacyDevelopmentSessionSchema, ServerSessionSchema]);
+export const SessionSchema = ServerSessionSchema;
 export type Session = z.infer<typeof SessionSchema>;
 
 export const SessionSummarySchema = z.object({
@@ -243,6 +235,13 @@ export const PrivateDebateErasureRequestSchema = z.object({
 }).strict();
 export const PrivateDebateErasureStatusSchema = z.object({
   status:z.enum(["CLEANED","PENDING"])
+}).strict();
+export const LegacyRunClaimRequestSchema = z.object({
+  legacy_token:z.string().min(1).max(1024)
+}).strict();
+export const LegacyRunClaimResultSchema = z.object({
+  status:z.enum(["CLAIMED","NO_MATCH"]),
+  claimed_count:z.number().int().nonnegative()
 }).strict();
 
 export const PublicationTransitionSchema = z.object({
@@ -649,6 +648,7 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "POST /v1/account/legacy-runs/claim",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
@@ -679,7 +679,7 @@ export const contractInventory = Object.freeze({
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
-    PrivateDebateErasureStatusSchema,
+    PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

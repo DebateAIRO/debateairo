@@ -124,7 +124,7 @@ describe("BUG-02 rendered refresh behaviour", () => {
     });
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
     mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
-    mocks.streamEvents.mockReset().mockImplementation(async (_runRef, _token, emit: (event: RunEvent) => void) => {
+    mocks.streamEvents.mockReset().mockImplementation(async (_runRef, emit: (event: RunEvent) => void) => {
       mocks.emit = emit;
       await new Promise<void>(() => {});
     });

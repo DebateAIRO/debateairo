@@ -576,7 +576,7 @@ export default function DebatePageClient({
       // without holding a live connection open.
       let active = true;
       contractClient
-        .readEvents(runRef, COOKIE_SESSION_MARKER)
+        .readEvents(runRef)
         .then((events) => {
           if (!active) return;
           let state = createLiveRunState();
@@ -617,7 +617,6 @@ export default function DebatePageClient({
       contractClient
         .streamEvents(
           runRef,
-          COOKIE_SESSION_MARKER,
           (event) => {
             if (!opened) {
               opened = true;
@@ -668,7 +667,7 @@ export default function DebatePageClient({
     if (answer === null) return;
     let active = true;
     contractClient
-      .readLedgerDigest(answer.answer_id, COOKIE_SESSION_MARKER)
+      .readLedgerDigest(answer.answer_id)
       .then((digest) => {
         if (!active) return;
         setLedgerDigest(digest);
@@ -688,7 +687,6 @@ export default function DebatePageClient({
     try {
       setInspection(await contractClient.readInspection(
         answerRef.current.answer_id,
-        COOKIE_SESSION_MARKER,
         answerRef.current.answer_version
       ));
       setInspectionError(null);
@@ -700,7 +698,7 @@ export default function DebatePageClient({
   const unlinkMemory = useCallback(async () => {
     if (answerRef.current === null) return;
     try {
-      await contractClient.unlinkMemory(answerRef.current.answer_id, COOKIE_SESSION_MARKER);
+      await contractClient.unlinkMemory(answerRef.current.answer_id);
       setHonestyActionState("MEMORY_UNLINKED");
       await refresh();
     } catch (failure) {
@@ -716,8 +714,7 @@ export default function DebatePageClient({
         const accepted = await contractClient.recordInvestigation(
           answerRef.current.answer_id,
           gap.gap_ref,
-          { user_input: gap.accepts_user_input && verbatim.length > 0 ? verbatim : null, human_steer_input: true },
-          COOKIE_SESSION_MARKER
+          { user_input: gap.accepts_user_input && verbatim.length > 0 ? verbatim : null, human_steer_input: true }
         );
         setHonestyActionState(`${accepted.status} · replay ${accepted.replay_handle}`);
       } catch (failure) {

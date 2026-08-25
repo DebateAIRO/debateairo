@@ -1783,9 +1783,9 @@ describe("S8 publication on real PostgreSQL", () => {
     await database.pool.query(`
       INSERT INTO identity.session (
         session_id,user_id,token_hash,csrf_token_hash,binding_context,
-        created_at,last_seen_at,idle_expires_at,absolute_expires_at
+        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
       ) VALUES ($1,$2,$3,$4,'{}'::jsonb,clock_timestamp(),clock_timestamp(),
-        clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')
+        clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours',clock_timestamp())
     `, [alternateSessionId, identity.userId, hash("7"), hash("8")]);
     const wrongSessionRef = randomUUID();
     expect(await repository.publish({

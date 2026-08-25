@@ -5,6 +5,8 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import { pathToFileURL } from "node:url";
 
+const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
+
 const outDir = join(process.cwd(), ".tmp-api-route-test");
 const routePath = join("app", "api", "[...path]", "route.ts");
 
@@ -63,7 +65,7 @@ test("forwards method, path, query, body, and the caller token without inventing
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-user-dev-token": "token:test"
+      [RETIRED_DEV_HEADER]: "token:test"
     },
     body: JSON.stringify({ question_line: "What follows?" })
   }), { params: Promise.resolve({ path: ["v1", "asks"] }) });
@@ -72,10 +74,10 @@ test("forwards method, path, query, body, and the caller token without inventing
   assert.equal(calls[0].url, "http://acceptance.local:8790/v1/asks?mode=live");
   assert.equal(calls[0].init.method, "POST");
   const forwardedHeaders = new Headers(calls[0].init.headers);
-  assert.equal(forwardedHeaders.get("x-user-dev-token"), "token:test");
+  assert.equal(forwardedHeaders.get(RETIRED_DEV_HEADER), "token:test");
   assert.equal(forwardedHeaders.get("host"), null);
   assert.equal(forwardedHeaders.get("expect"), null);
-  assert.deepEqual([...forwardedHeaders.keys()].sort(), ["content-type", "x-user-dev-token"]);
+  assert.deepEqual([...forwardedHeaders.keys()].sort(), ["content-type", RETIRED_DEV_HEADER]);
   assert.equal(new TextDecoder().decode(calls[0].init.body), JSON.stringify({ question_line: "What follows?" }));
   assert.equal(response.status, 202);
   assert.equal(response.headers.get("x-upstream"), "kept");

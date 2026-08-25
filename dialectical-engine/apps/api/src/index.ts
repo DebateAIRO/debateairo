@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -15,6 +15,8 @@ import {
   InspectionSchema,
   InvestigationAcceptedSchema,
   InvestigationRequestSchema,
+  LegacyRunClaimRequestSchema,
+  LegacyRunClaimResultSchema,
   NodeSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
@@ -68,6 +70,7 @@ import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
+import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
@@ -90,6 +93,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
@@ -146,6 +150,7 @@ export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
 const ResourceIdSchema = z.uuid();
 const SessionIdSchema = ResourceIdSchema;
 const SECURITY_HEADERS = Object.freeze({
@@ -197,44 +202,11 @@ export interface ApiOptions {
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
   readonly accountErasure?: AccountErasureApplication;
+  readonly legacyRunClaim?: LegacyRunClaimApplication;
   readonly allowedOrigin?: string;
-  readonly legacyDevSessionResolver?: LegacyDevSessionResolver;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
-}
-
-export type LegacyDevSessionResolver = (token: unknown) => Session | null;
-
-/**
- * S9 rollback boundary: only an explicitly configured, exact credential can
- * resolve. Cookie presence always suppresses this fallback in the HTTP hook.
- */
-export function createLegacyDevSessionResolver(input: Readonly<{
-  userToken?: string;
-  operatorToken?: string;
-}>): LegacyDevSessionResolver {
-  const configured = Object.freeze([
-    ...(input.userToken === undefined ? [] : [{ token: input.userToken, scope: "ASKER" as const }]),
-    ...(input.operatorToken === undefined ? [] : [{ token: input.operatorToken, scope: "OPERATOR" as const }])
-  ].map((entry) => Object.freeze({
-    digest: createHash("sha256").update(entry.token, "utf8").digest(),
-    scope: entry.scope
-  })));
-  return (token: unknown): Session | null => {
-    if (typeof token !== "string" || token.length === 0) return null;
-    const digest = createHash("sha256").update(token, "utf8").digest();
-    const match = configured.find((entry) => timingSafeEqual(entry.digest, digest));
-    if (match === undefined) return null;
-    const tokenDigest = digest.toString("hex");
-    return SessionSchema.parse({
-      asker_id: `asker:${tokenDigest}`,
-      session_id: `legacy:${tokenDigest}`,
-      caller_scope: match.scope,
-      ownership_provenance: match.scope === "OPERATOR" ? "operator_dev_token" : "user_dev_token",
-      provisional_identity_model: true
-    });
-  };
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -406,8 +378,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawCookie = request.headers.cookie;
     const cookieWasPresented = typeof rawCookie === "string"
       && rawCookie.split(";").some((member) => member.trimStart().startsWith(`${SESSION_COOKIE_NAME}=`));
-    const legacyWasPresented = typeof request.headers["x-user-dev-token"] === "string";
-    if (cookieWasPresented && legacyWasPresented) {
+    if (typeof request.headers[RETIRED_DEV_HEADER] === "string") {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     if (cookieWasPresented) {
@@ -442,12 +413,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    const legacy = options.legacyDevSessionResolver?.(request.headers["x-user-dev-token"]) ?? null;
-    if (legacy === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
-    request.session = legacy;
-    if (authPolicy === "operator" && legacy.caller_scope !== "OPERATOR") {
-      return reply.status(403).send({ error: "OPERATOR_REQUIRED" });
-    }
+    return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
   api.setErrorHandler((error, _request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
@@ -651,6 +617,29 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(404).send({ error:"NOT_FOUND" });
       }
       return reply.send({ status:"CANCELLED" });
+    }
+  );
+  api.post(
+    "/v1/account/legacy-runs/claim",
+    routePolicy("POST /v1/account/legacy-runs/claim"),
+    async (request,reply)=>{
+      const authenticated=request.authenticatedSession;
+      if (authenticated===undefined) {
+        return reply.status(401).send({ error:"SESSION_REQUIRED" });
+      }
+      if (options.legacyRunClaim===undefined) {
+        return reply.status(503).send({ error:"LEGACY_RUN_CLAIM_UNAVAILABLE" });
+      }
+      const input=parseRequest(LegacyRunClaimRequestSchema,request.body);
+      const outcome=await options.legacyRunClaim.claim({
+        authenticated,legacyToken:input.legacy_token,source:sourceFor(request)
+      });
+      if (outcome.status==="SESSION_INVALID") {
+        return reply.status(401).send({ error:"SESSION_REQUIRED" });
+      }
+      return reply.send(LegacyRunClaimResultSchema.parse({
+        status:outcome.status,claimed_count:outcome.claimedCount
+      }));
     }
   );
   api.delete<{ Params:{ id:string } }>(

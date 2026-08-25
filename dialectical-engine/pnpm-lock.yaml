@@ -39,6 +39,9 @@ importers:
       '@debateai/critique':
         specifier: workspace:*
         version: link:packages/critique
+      '@debateai/crypto':
+        specifier: workspace:*
+        version: link:packages/crypto
       '@debateai/db':
         specifier: workspace:*
         version: link:packages/db

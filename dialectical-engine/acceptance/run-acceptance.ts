@@ -6,6 +6,7 @@ import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
 import {
+  acceptanceServiceRequestHeaders,
   createAcceptanceRuntime,
   loadAcceptanceCeremonyEnvironment,
   type AcceptanceEnvironment
@@ -16,7 +17,7 @@ import { seedAcceptanceRegister } from "./seed-register.js";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
 
 export interface AcceptanceArguments {
-  readonly token: string;
+  readonly serviceCredential: string;
   readonly ask: AskRequest;
   /** TERM-01 rider: keep DB + shim + API standing after settle so the UI at
    * :3000 browses the result (replaces the ad-hoc standing script). */
@@ -24,7 +25,7 @@ export interface AcceptanceArguments {
 }
 
 const supportedArguments = new Set([
-  "--token",
+  "--service-credential",
   "--question",
   "--risk-tier",
   "--tier-provenance-ref",
@@ -67,8 +68,13 @@ export function parseAcceptanceArguments(
   const serveCount = arguments_.filter((argument) => argument === "--serve").length;
   if (serveCount > 1) throw new Error("DUPLICATE_ACCEPTANCE_ARGUMENT:--serve");
   const values = argumentMap(arguments_.filter((argument) => argument !== "--serve"));
-  const token = values.get("--token");
-  if (token === undefined || token.trim().length === 0) throw new Error("ACCEPTANCE_TOKEN_REQUIRED");
+  const serviceCredential = values.get("--service-credential");
+  if (serviceCredential === undefined || serviceCredential.trim().length === 0) {
+    throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
+  }
+  if (!/^[A-Za-z0-9_-]{43}$/.test(serviceCredential)) {
+    throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
+  }
   const ask = AskRequestSchema.parse({
     // ACC-01 N1: the default question must carry its own proposal — a
     // question referring to an unsupplied proposal makes the judge honestly
@@ -84,7 +90,7 @@ export function parseAcceptanceArguments(
     steering_presets: parseJson(values.get("--steering-presets") ?? "[]", "--steering-presets"),
     steering_annotations: parseJson(values.get("--steering-annotations") ?? "[]", "--steering-annotations")
   });
-  return Object.freeze({ token, ask, serve: serveCount === 1 });
+  return Object.freeze({ serviceCredential, ask, serve: serveCount === 1 });
 }
 
 export interface LiveAcceptanceCeremony {
@@ -201,7 +207,7 @@ export async function runAcceptanceCeremony(
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
       environment: runtimeEnvironment,
-      legacyUserToken:parsed.token,
+      serviceCredential:parsed.serviceCredential,
       makerRelays: [
         ...(shim === null ? [] : [{ providerRef: "acceptance:codex-cli", baseUrl: shim.baseUrl, model: shim.model }]),
         ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
@@ -211,11 +217,12 @@ export async function runAcceptanceCeremony(
     api = runtime.api;
     await api.listen({ host: runtimeEnvironment.API_HOST, port: runtimeEnvironment.API_PORT });
     const apiBase = `http://${runtimeEnvironment.API_HOST}:${runtimeEnvironment.API_PORT}`;
+    const serviceHeaders = acceptanceServiceRequestHeaders(runtime.serviceSession, apiBase, true);
     const acceptedResponse = await fetch(`${apiBase}/v1/asks`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-user-dev-token": parsed.token
+        ...serviceHeaders
       },
       body: JSON.stringify(parsed.ask)
     });
@@ -238,7 +245,7 @@ export async function runAcceptanceCeremony(
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
     const answerResponse = await fetch(`${apiBase}/v1/runs/${accepted.run_ref}/answer`, {
-      headers: { "x-user-dev-token": parsed.token }
+      headers: acceptanceServiceRequestHeaders(runtime.serviceSession, apiBase, false)
     });
     if (!answerResponse.ok) throw new Error(`ACCEPTANCE_ANSWER_HTTP_${answerResponse.status}`);
     const answer = AnswerSchema.parse(await answerResponse.json());

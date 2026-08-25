@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { COOKIE_SESSION_MARKER, contractClient } from "@/lib/api";
+import { contractClient } from "@/lib/api";
 import type { AskRequest } from "@/lib/types";
 import { ContractHttpError } from "@debateai/contract";
 
@@ -33,7 +33,7 @@ export function NewQuestionForm({ machineAsOf }: { readonly machineAsOf: string 
     };
     setSubmitting(true); setError(null);
     try {
-      const accepted = await contractClient.submitAsk(ask, COOKIE_SESSION_MARKER);
+      const accepted = await contractClient.submitAsk(ask);
       router.push(`/debate/${encodeURIComponent(accepted.run_ref)}`);
     } catch (failure) {
       setError(failure instanceof ContractHttpError ? failure.code : "NETWORK_FAILURE");

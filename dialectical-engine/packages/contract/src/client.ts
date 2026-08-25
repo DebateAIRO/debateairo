@@ -9,6 +9,8 @@ import {
   ExecutionLedgerDigestSchema,
   InspectionSchema,
   InvestigationAcceptedSchema,
+  LegacyRunClaimRequestSchema,
+  LegacyRunClaimResultSchema,
   NodeSchema,
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
@@ -93,30 +95,25 @@ async function requestJson<T>(
   baseUrl: string,
   fetchImplementation: typeof fetch,
   path: string,
-  token: string,
   schema: { parse(value: unknown): T },
   init: RequestInit = {},
-  auth: ContractClientAuth = { mode: "legacy" }
+  auth: ContractClientAuth
 ): Promise<T> {
   let response: Response;
   try {
     const headers = new Headers(init.headers);
-    if (auth.mode === "legacy") {
-      headers.set("x-user-dev-token", token);
-    } else {
-      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
-      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
-      if (init.method !== undefined && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
-        const csrf = auth.csrfToken?.() ?? browserCsrfToken();
-        if (csrf !== null) headers.set("x-csrf-token", csrf);
-      }
+    if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+    if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+    if (init.method !== undefined && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
     }
     if (init.body !== undefined) headers.set("content-type", "application/json");
     response = await fetchImplementation(new URL(path, baseUrl), {
       ...init,
       headers,
       cache: "no-store",
-      ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+      credentials: "same-origin" as const
     });
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
@@ -139,17 +136,15 @@ async function requestNoContent(
   let response: Response;
   try {
     const headers = new Headers(init.headers);
-    if (auth.mode === "cookie") {
-      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
-      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
-      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
-      if (csrf !== null) headers.set("x-csrf-token", csrf);
-    }
+    if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+    if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+    const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+    if (csrf !== null) headers.set("x-csrf-token", csrf);
     response = await fetchImplementation(new URL(path, baseUrl), {
       ...init,
       headers,
       cache: "no-store",
-      ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+      credentials: "same-origin" as const
     });
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
@@ -160,9 +155,7 @@ async function requestNoContent(
   }
 }
 
-export type ContractClientAuth =
-  | Readonly<{ mode: "legacy" }>
-  | Readonly<{
+export type ContractClientAuth = Readonly<{
     mode: "cookie";
     /** Server-side rendering only; browser code relies on the cookie jar. */
     cookieHeader?: string;
@@ -239,20 +232,23 @@ export interface ContractClient {
   deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
     status:"CLEANED"|"PENDING";
   }>;
-  submitAsk(input: AskRequest, token: string): Promise<AskAccepted>;
-  readSession(token: string): Promise<Session>;
-  readDeployment(token: string): Promise<Deployment>;
-  readAnswerIndex(token: string, limit: number, offset: number): Promise<AnswerIndex>;
-  readAnswer(answerId: string, token: string, version?: number): Promise<Answer>;
-  readRunAnswer(runId: string, token: string): Promise<Answer>;
-  readRun(runId: string, token: string): Promise<RunProjection>;
-  readInspection(answerId: string, token: string, version?: number): Promise<Inspection>;
-  readLedgerDigest(answerId: string, token: string): Promise<ExecutionLedgerDigest>;
-  readNode(answerId: string, nodeId: string, token: string): Promise<Node>;
-  recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest, token: string): Promise<InvestigationAccepted>;
-  unlinkMemory(answerId: string, token: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
-  readEvents(runId: string, token: string): Promise<readonly RunEvent[]>;
-  streamEvents(runId: string, token: string, consume: (event: RunEvent) => void, signal?: AbortSignal): Promise<void>;
+  claimLegacyRuns(legacyToken:string):Promise<{
+    status:"CLAIMED"|"NO_MATCH";claimed_count:number;
+  }>;
+  submitAsk(input: AskRequest): Promise<AskAccepted>;
+  readSession(): Promise<Session>;
+  readDeployment(): Promise<Deployment>;
+  readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
+  readAnswer(answerId: string, version?: number): Promise<Answer>;
+  readRunAnswer(runId: string): Promise<Answer>;
+  readRun(runId: string): Promise<RunProjection>;
+  readInspection(answerId: string, version?: number): Promise<Inspection>;
+  readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
+  readNode(answerId: string, nodeId: string): Promise<Node>;
+  recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest): Promise<InvestigationAccepted>;
+  unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
+  readEvents(runId: string): Promise<readonly RunEvent[]>;
+  streamEvents(runId: string, consume: (event: RunEvent) => void, signal?: AbortSignal): Promise<void>;
 }
 
 const UnlinkSchema = { parse(value: unknown) {
@@ -265,25 +261,22 @@ const UnlinkSchema = { parse(value: unknown) {
 export function createContractClient(
   baseUrl: string,
   fetchImplementation: typeof fetch = fetch,
-  auth: ContractClientAuth = { mode: "legacy" }
+  auth: ContractClientAuth = { mode: "cookie" }
 ): ContractClient {
   const root = new URL(baseUrl);
   const versionQuery = (version?: number) => version === undefined ? "" : `?version=${encodeURIComponent(String(version))}`;
-  const request = <T>(path: string, token: string, schema: { parse(value: unknown): T }, init: RequestInit = {}) =>
-    requestJson(root.href, fetchImplementation, path, token, schema, init, auth);
-  const eventResponse = async (runId: string, token: string, signal?: AbortSignal): Promise<Response> => {
+  const request = <T>(path: string, schema: { parse(value: unknown): T }, init: RequestInit = {}) =>
+    requestJson(root.href, fetchImplementation, path, schema, init, auth);
+  const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
     try {
       const headers = new Headers();
-      if (auth.mode === "legacy") headers.set("x-user-dev-token", token);
-      else {
-        if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
-        if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
-      }
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
       response = await fetchImplementation(new URL(`/v1/runs/${encodeURIComponent(runId)}/events`, root), {
         headers,
         cache: "no-store",
-        ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {}),
+        credentials: "same-origin" as const,
         ...(signal === undefined ? {} : { signal })
       });
     } catch (error) {
@@ -306,7 +299,7 @@ export function createContractClient(
     }
   };
   return Object.freeze({
-    beginLogin: (email: string, password: string) => request("/v1/auth/login", "", {
+    beginLogin: (email: string, password: string) => request("/v1/auth/login", {
       parse(value: unknown) {
         if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
         const row = value as Record<string, unknown>;
@@ -314,7 +307,7 @@ export function createContractClient(
         return { status: "mfa_required" as const, challenge_token: row.challenge_token };
       }
     }, { method: "POST", body: JSON.stringify({ email, password }) }),
-    completeLogin: (challengeToken: string, code: string) => request("/v1/auth/login", "", {
+    completeLogin: (challengeToken: string, code: string) => request("/v1/auth/login", {
       parse(value: unknown) {
         if (typeof value !== "object" || value === null) throw new TypeError("Invalid login response");
         const row = value as Record<string, unknown>;
@@ -332,23 +325,21 @@ export function createContractClient(
     async logout() {
       let response: Response;
       const headers = new Headers();
-      if (auth.mode === "cookie") {
-        if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
-        if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
-        const csrf = auth.csrfToken?.() ?? browserCsrfToken();
-        if (csrf !== null) headers.set("x-csrf-token", csrf);
-      }
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
       try {
         response = await fetchImplementation(new URL("/v1/auth/logout", root), {
           method: "POST", headers, cache: "no-store",
-          ...(auth.mode === "cookie" ? { credentials: "same-origin" as const } : {})
+          credentials: "same-origin" as const
         });
       } catch (error) {
         throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
       }
       if (!response.ok) throw await contractErrorForResponse(response);
     },
-    listSessions: () => request("/v1/auth/sessions", "", SessionListSchema),
+    listSessions: () => request("/v1/auth/sessions", SessionListSchema),
     revokeSession: (sessionId: string) => requestNoContent(
       root.href,
       fetchImplementation,
@@ -357,7 +348,7 @@ export function createContractClient(
       auth
     ),
     revokeAllSessions: () => request(
-      "/v1/auth/sessions", "", RevokeAllSessionsSchema, { method: "DELETE" }
+      "/v1/auth/sessions", RevokeAllSessionsSchema, { method: "DELETE" }
     ),
     stepUp: (password: string, code: string, authorization?:
       | Readonly<{
@@ -365,7 +356,7 @@ export function createContractClient(
         target_run_id: string;
       }>
       | Readonly<{ action: "DELETE_ACCOUNT" }>) => request(
-      "/v1/auth/step-up", "", StepUpResponseSchema,
+      "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
           code,
@@ -374,22 +365,18 @@ export function createContractClient(
     ),
     readPublicDebates: (limit: number, offset: number) => request(
       `/v1/public/debates?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`,
-      "",
       PublicDebateListSchema
     ),
     readPublicDebate: (publicationRef: string) => request(
       `/v1/public/debates/${encodeURIComponent(publicationRef)}`,
-      "",
       PublicDebateSchema
     ),
     readRunVisibility: (runId: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/visibility`,
-      "",
       PublicationTransitionSchema
     ),
     publishRun: (runId: string, stepUpGrant: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/publish`,
-      "",
       PublicationTransitionSchema,
       { method: "POST", body: JSON.stringify({
           step_up_grant: stepUpGrant,
@@ -398,7 +385,6 @@ export function createContractClient(
     ),
     unpublishRun: (runId: string, stepUpGrant: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/unpublish`,
-      "",
       PublicationTransitionSchema,
       { method: "POST", body: JSON.stringify({
           step_up_grant: stepUpGrant,
@@ -406,7 +392,7 @@ export function createContractClient(
         }) }
     ),
     scheduleAccountErasure:(stepUpGrant:string)=>request(
-      "/v1/account","",AccountErasureStatusSchema,
+      "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
           confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
         }) }
@@ -417,40 +403,46 @@ export function createContractClient(
       return status;
     }),
     readAccountErasure:()=>request(
-      "/v1/account/erasure","",AccountErasureStatusSchema
+      "/v1/account/erasure",AccountErasureStatusSchema
     ),
     cancelAccountErasure:(cancellationRef:string)=>request(
-      "/v1/account/erasure/cancel","",AccountErasureCancelledSchema,
+      "/v1/account/erasure/cancel",AccountErasureCancelledSchema,
       { method:"POST",body:JSON.stringify(AccountErasureCancelRequestSchema.parse({
           cancellation_ref:cancellationRef
         })) }
     ),
     deletePrivateDebate:(runId:string,stepUpGrant:string)=>request(
-      `/v1/debates/${encodeURIComponent(runId)}`,"",PrivateDebateErasureStatusSchema,
+      `/v1/debates/${encodeURIComponent(runId)}`,PrivateDebateErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({ step_up_grant:stepUpGrant }) }
     ),
-    submitAsk: (input: AskRequest, token: string) => request("/v1/asks", token, AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
-    readSession: (token: string) => request("/v1/session", token, SessionSchema),
-    readDeployment: (token: string) => request("/v1/deployment", token, DeploymentSchema),
-    readAnswerIndex: (token: string, limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, token, AnswerIndexSchema),
-    readAnswer: (answerId: string, token: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, token, AnswerSchema),
-    readRunAnswer: (runId: string, token: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, token, AnswerSchema),
-    readRun: (runId: string, token: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, token, RunProjectionSchema),
-    readInspection: (answerId: string, token: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, token, InspectionSchema),
-    readLedgerDigest: (answerId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, token, ExecutionLedgerDigestSchema),
-    readNode: (answerId: string, nodeId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, token, NodeSchema),
-    recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, token, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
-    unlinkMemory: (answerId: string, token: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, token, UnlinkSchema, { method: "POST" }),
-    async readEvents(runId: string, token: string) {
-      const response = await eventResponse(runId, token);
+    claimLegacyRuns:(legacyToken:string)=>request(
+      "/v1/account/legacy-runs/claim",LegacyRunClaimResultSchema,
+      { method:"POST",body:JSON.stringify(LegacyRunClaimRequestSchema.parse({
+          legacy_token:legacyToken
+        })) }
+    ),
+    submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    readSession: () => request("/v1/session", SessionSchema),
+    readDeployment: () => request("/v1/deployment", DeploymentSchema),
+    readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
+    readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
+    readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
+    readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
+    readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
+    readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),
+    readNode: (answerId: string, nodeId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, NodeSchema),
+    recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    unlinkMemory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, UnlinkSchema, { method: "POST" }),
+    async readEvents(runId: string) {
+      const response = await eventResponse(runId);
       const text = await response.text();
       return Object.freeze(text.split(/\r?\n\r?\n+/).flatMap((frame) => {
         const event = parseFrame(frame);
         return event === null ? [] : [event];
       }));
     },
-    async streamEvents(runId: string, token: string, consume: (event: RunEvent) => void, signal?: AbortSignal) {
-      const response = await eventResponse(runId, token, signal);
+    async streamEvents(runId: string, consume: (event: RunEvent) => void, signal?: AbortSignal) {
+      const response = await eventResponse(runId, signal);
       if (response.body === null) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Event stream has no body");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { buildApi, createLegacyDevSessionResolver, type AskApplication } from "@debateai/api";
+import { buildApi, type AskApplication } from "@debateai/api";
 import {
   createContractClient,
   type AskRequest,
   type RunProjection
 } from "@debateai/contract";
 import { getDebateServer } from "../../apps/ui/lib/serverApi.js";
+import {
+  TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication
+} from "../support/httpSession.js";
 
 const ASK: AskRequest = {
   question_line: "Messi or Ronaldo?",
@@ -20,6 +23,7 @@ const ASK: AskRequest = {
   steering_annotations: []
 };
 const RUN_REF = "11111111-1111-4111-8111-111111111111";
+const identity=testHttpIdentity("load01");
 
 function providerDoubleApplication(): AskApplication {
   const runs = new Map<string, RunProjection>();
@@ -57,11 +61,13 @@ function providerDoubleApplication(): AskApplication {
 function injectedFetch(api: ReturnType<typeof buildApi>): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
+    const headers=new Headers(request.headers);
+    if (request.method!=="GET" && request.method!=="HEAD") headers.set("origin",TEST_APP_ORIGIN);
     const payload = request.body === null ? null : await request.text();
     const rawResponse = await api.inject({
       method: request.method as "GET" | "POST",
       url: new URL(request.url).pathname + new URL(request.url).search,
-      headers: Object.fromEntries(request.headers.entries()),
+      headers: Object.fromEntries(headers.entries()),
       ...(payload === null ? {} : { payload })
     });
     return new Response(rawResponse.body, {
@@ -75,13 +81,18 @@ describe("LOAD-01 provider-double composition proof", () => {
   it("POST /new equivalent -> queued run ref -> debate loading projection keeps the real question", async () => {
     const api = buildApi({
       application: providerDoubleApplication(),
-      legacyDevSessionResolver: createLegacyDevSessionResolver({ userToken: "cookie-session" })
+      sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN
     });
-    const client = createContractClient("http://load01.test", injectedFetch(api));
-    const accepted = await client.submitAsk(ASK, "cookie-session");
+    const client = createContractClient("http://load01.test", injectedFetch(api),{
+      mode:"cookie",
+      cookieHeader:`__Host-debateai-session=${identity.rawSessionToken}; __Host-debateai-csrf=${identity.rawCsrfToken}`,
+      userAgent:`test-http-session/${identity.authenticated.session.session_id}`,
+      csrfToken:()=>identity.rawCsrfToken
+    });
+    const accepted = await client.submitAsk(ASK);
     expect(accepted).toEqual({ run_ref: RUN_REF, status: "QUEUED" });
 
-    const page = await getDebateServer(accepted.run_ref, "cookie-session", client);
+    const page = await getDebateServer(accepted.run_ref, identity.rawSessionToken, client);
     expect(page).toMatchObject({
       ok: false,
       kind: "loading",

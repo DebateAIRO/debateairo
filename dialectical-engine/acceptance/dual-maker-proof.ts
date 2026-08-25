@@ -1,14 +1,23 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import type { Pool } from "pg";
+import { RunRepository } from "@debateai/db";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startModelShim, type ModelShimHandle } from "./model-shim.js";
 import type { CommandSpec } from "./relay-core.js";
-import { readAcceptanceRuntimePolicy, type AcceptanceRuntimePolicy } from "./runtime-policy.js";
+import {
+  computeAcceptanceStructuralCeiling,
+  readAcceptanceRuntimePolicy,
+  type AcceptanceRuntimePolicy
+} from "./runtime-policy.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
+import {
+  acceptanceContentStore,
+  createAcceptanceServiceSession
+} from "./main.js";
 
 /**
  * FAIR-02 DONE-gate driver: one LIVE call round-trips through BOTH configured
@@ -58,6 +67,7 @@ export interface DualMakerProofOptions {
 
 async function callThroughMaker(input: {
   readonly pool: Pool;
+  readonly runId: string;
   readonly endpoint: string;
   readonly model: string;
   readonly provider: { readonly providerRef: string; readonly maker: string };
@@ -69,7 +79,7 @@ async function callThroughMaker(input: {
     maker: input.provider.maker
   });
   const result = await gateway.call({
-    runId: null,
+    runId: input.runId,
     subjectItemId: `acceptance:dual-maker-proof:${randomUUID()}`,
     callSiteKey: `acceptance:dual-maker-proof:${input.provider.providerRef}`,
     role: "JUDGE",
@@ -98,6 +108,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
   let ownedDatabase: StandingDatabase | null = null;
   let shim: ModelShimHandle | null = null;
   let relay: ClaudeRelayHandle | null = null;
+  let serviceSession: Awaited<ReturnType<typeof createAcceptanceServiceSession>> | null = null;
   try {
     let pool: Pool;
     if (options.pool !== undefined) {
@@ -120,9 +131,48 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
       timeoutMs: policy.bounds.JUDGE.deadlineMs,
       ...(options.testOnlyClaudeCommand !== undefined ? { testOnlyCommand: options.testOnlyClaudeCommand } : {})
     });
+    serviceSession=await createAcceptanceServiceSession(
+      pool,randomBytes(32).toString("base64url"),acceptanceContentStore(pool)
+    );
+    const proofRunId=await new RunRepository(pool).startRun({
+      questionLine:"Acceptance dual-maker transport proof",
+      askContract:{ kind:"acceptance-dual-maker-proof" },
+      principal:{ kind:"server",...serviceSession.principal },
+      sessionId:serviceSession.principal.sessionId,
+      callerScope:"ASKER",
+      asOf:new Date(),
+      askerRiskTier:"standard",
+      effectiveRiskTier:"standard",
+      tierSource:"ASKER",
+      tierProvenanceRef:"acceptance:dual-maker-proof",
+      compositionBudgetTier:"low",
+      depthParams:{ depth:1 },
+      discoveredPanel:[
+        {
+          provider_ref:policy.providers[0]!.providerRef,
+          maker:policy.providers[0]!.maker,
+          model_id:shim.model,
+          probe_evidence_ref:randomUUID(),
+          probed_at:new Date().toISOString()
+        },
+        {
+          provider_ref:policy.providers[1]!.providerRef,
+          maker:policy.providers[1]!.maker,
+          model_id:relay.model,
+          probe_evidence_ref:randomUUID(),
+          probed_at:new Date().toISOString()
+        }
+      ],
+      strangerSampleRate:1,
+      envelopeBasis:computeAcceptanceStructuralCeiling(policy,2,1),
+      registerVersion:1,
+      batteryVersion:"acceptance:dual-maker-proof",
+      batteryRows:[]
+    });
     const artifacts = [
       await callThroughMaker({
         pool,
+        runId:proofRunId,
         endpoint: `${shim.baseUrl}/v1`,
         // DR-181/D1: lineage comes from the Codex startup handshake.
         model: shim.model,
@@ -131,6 +181,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
       }),
       await callThroughMaker({
         pool,
+        runId:proofRunId,
         endpoint: `${relay.baseUrl}/v1`,
         // DR-115: the Anthropic model id comes from the relay's real CLI
         // handshake, never from a literal in this file.
@@ -162,6 +213,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
     }
     return Object.freeze({ artifacts: Object.freeze(artifacts), persistedMakers: Object.freeze(persistedMakers) });
   } finally {
+    await serviceSession?.close().catch(() => undefined);
     await relay?.close().catch(() => undefined);
     await shim?.close().catch(() => undefined);
     await ownedDatabase?.stop().catch(() => undefined);

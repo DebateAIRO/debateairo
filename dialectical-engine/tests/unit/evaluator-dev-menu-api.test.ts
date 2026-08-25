@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildApi,
-  createLegacyDevSessionResolver,
   type AskApplication,
   type EvaluatorDevMenuApplication
 } from "@debateai/api";
 import { loadApiEnvironment } from "@debateai/register";
+import {
+  TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders
+} from "../support/httpSession.js";
 
 const view = {
   catalog: { state: "UNAVAILABLE" as const, probeId: "probe:test", failureCode: "ECONNREFUSED", models: [] },
@@ -59,7 +61,7 @@ describe("dev-only evaluator API", () => {
   it("does not register the surface in a normal API composition", async () => {
     const api = buildApi({ application: askApplication() });
     const response = await api.inject({
-      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "token" }
+      method: "GET", url: "/v1/dev/evaluator"
     });
     expect(response.statusCode).toBe(404);
     await api.close();
@@ -82,7 +84,7 @@ describe("dev-only evaluator API", () => {
     await api.close();
   });
 
-  it("authenticates the gated read and maps the sole write to the resolved developer identity", async () => {
+  it("keeps the retired operator surface inaccessible to ordinary server sessions", async () => {
     const selectConsumerModel = vi.fn(async () => ({
       consumerSelectionId: "selection:test", modelId: "consumer:alpha", selectedAt: new Date("2026-08-15T14:00:00.000Z")
     }));
@@ -90,36 +92,27 @@ describe("dev-only evaluator API", () => {
       readView: vi.fn(async () => view),
       selectConsumerModel
     };
+    const identity=testHttpIdentity("evaluator-dev-menu");
     const api = buildApi({
       application: askApplication(),
       evaluatorDevMenu,
       evaluatorDevMenuRegisterVersion: 1,
-      legacyDevSessionResolver: createLegacyDevSessionResolver({
-        userToken: "user-token",
-        operatorToken: "operator-token"
-      })
+      sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN
     });
 
     expect((await api.inject({ method: "GET", url: "/v1/dev/evaluator" })).statusCode).toBe(401);
-    expect((await api.inject({
-      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "user-token" }
-    })).statusCode).toBe(403);
     const read = await api.inject({
-      method: "GET", url: "/v1/dev/evaluator", headers: { "x-user-dev-token": "operator-token" }
+      method: "GET", url: "/v1/dev/evaluator", headers:testSessionHeaders(identity)
     });
-    expect(read.statusCode).toBe(200);
-    expect(read.json()).toMatchObject({ catalog: { state: "UNAVAILABLE" }, dispatchBinding: { state: "UNBOUND" } });
+    expect(read.statusCode).toBe(403);
+    expect(read.json()).toEqual({ error:"OPERATOR_REQUIRED" });
 
     const selected = await api.inject({
       method: "POST", url: "/v1/dev/evaluator/consumer-selection",
-      headers: { "x-user-dev-token": "operator-token" }, payload: { model_id: "consumer:alpha" }
+      headers:testSessionHeaders(identity,true), payload: { model_id: "consumer:alpha" }
     });
-    expect(selected.statusCode).toBe(201);
-    expect(selectConsumerModel).toHaveBeenCalledWith(expect.objectContaining({
-      modelId: "consumer:alpha",
-      selectedBy: expect.stringMatching(/^asker:/),
-      orderRef: expect.stringMatching(/^dev-menu:legacy:/)
-    }));
+    expect(selected.statusCode).toBe(403);
+    expect(selectConsumerModel).not.toHaveBeenCalled();
     await api.close();
   });
 });

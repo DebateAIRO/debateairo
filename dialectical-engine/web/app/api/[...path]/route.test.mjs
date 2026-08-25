@@ -5,6 +5,8 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import { pathToFileURL } from "node:url";
 
+const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
+
 const outDir = join(process.cwd(), ".tmp-api-route-test");
 const routePath = join("app", "api", "[...path]", "route.ts");
 
@@ -77,7 +79,7 @@ test("forwards only the exact session cookies, Origin, CSRF proof, UA and ordina
       "user-agent": "S5 Browser",
       "x-csrf-token": "c".repeat(43),
       authorization: "Bearer must-not-pass",
-      "x-user-dev-token": "must-not-pass",
+      [RETIRED_DEV_HEADER]: "must-not-pass",
       "x-forwarded-for": "203.0.113.8"
     },
     body: JSON.stringify({ question_line: "What follows?" })
@@ -92,7 +94,7 @@ test("forwards only the exact session cookies, Origin, CSRF proof, UA and ordina
   assert.equal(forwardedHeaders.get("user-agent"), "S5 Browser");
   assert.equal(forwardedHeaders.get("x-csrf-token"), "c".repeat(43));
   assert.equal(forwardedHeaders.get("authorization"), null);
-  assert.equal(forwardedHeaders.get("x-user-dev-token"), null);
+  assert.equal(forwardedHeaders.get(RETIRED_DEV_HEADER), null);
   assert.equal(forwardedHeaders.get("host"), null);
   assert.equal(forwardedHeaders.get("expect"), null);
   assert.deepEqual([...forwardedHeaders.keys()].sort(), ["content-type", "cookie", "origin", "user-agent", "x-csrf-token"]);

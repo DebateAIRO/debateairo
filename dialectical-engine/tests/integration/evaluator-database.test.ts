@@ -1321,13 +1321,13 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     steering_presets: [],
     steering_annotations: []
   };
-  const session: Session = {
+  const session = {
     asker_id: "asker:evaluator-panel-isolation",
     session_id: "session:evaluator-panel-isolation",
     caller_scope: "ASKER",
     ownership_provenance: "user_dev_token",
     provisional_identity_model: true
-  };
+  } as unknown as Session;
   const productProviders = [
     { providerRef: "provider:product-a", adapterKind: "openai-compatible-http", maker: "maker:product-a" },
     { providerRef: "provider:product-b", adapterKind: "openai-compatible-http", maker: "maker:product-b" }

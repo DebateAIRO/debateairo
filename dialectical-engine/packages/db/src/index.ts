@@ -20,6 +20,11 @@ export {
 } from "./sessions.js";
 
 export {
+  PostgresLegacyRunClaimRepository,
+  type LegacyRunClaimOutcome
+} from "./legacy-claim.js";
+
+export {
   assertPublicationCleanupDatabaseRole,
   assertPublicationDatabaseRoleSeparation,
   PostgresPublicationRepository,
@@ -1131,7 +1136,13 @@ export class RunRepository {
             contentAttestation: contentAttestation!.toString("base64"),
             contentAttestationSecret: contentAttestationSecret!.toString("base64")
           }),input.principal.userId,input.principal.ownerRef,
-          JSON.stringify(input.batteryRows)]
+          JSON.stringify(input.batteryRows.map((row)=>({
+            batteryRowId:row.batteryRowId,
+            predicateRef:row.predicateRef,
+            openingState:row.openingState,
+            predicateInputs:row.predicateInputs,
+            skipEvidence:row.skipEvidence
+          })))]
         );
         if (created.rows[0]?.created !== true) {
           commitAttempted = false;
