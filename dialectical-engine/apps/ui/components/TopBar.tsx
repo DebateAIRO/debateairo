@@ -10,6 +10,8 @@ const SCREEN_TITLES: Record<string, string> = {
   "/admin/workers": "Workers"
 };
 
+const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
+
 export function BrandMark({ href = "/" }: { href?: string }) {
   return (
     <Link className="brand" href={href} aria-label="Dialectical Engine — home">
@@ -29,6 +31,10 @@ export function TopBar() {
 
   // The debate view renders its own contextual chrome.
   if (pathname?.startsWith("/debate/")) return null;
+
+  if (pathname !== null && AUTH_PATHS.has(pathname)) {
+    return <header className="authTopBar"><BrandMark /></header>;
+  }
 
   const title = SCREEN_TITLES[pathname ?? "/"] ?? "";
 
