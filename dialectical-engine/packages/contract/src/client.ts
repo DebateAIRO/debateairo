@@ -97,7 +97,8 @@ async function requestJson<T>(
   path: string,
   schema: { parse(value: unknown): T },
   init: RequestInit = {},
-  auth: ContractClientAuth
+  auth: ContractClientAuth,
+  expectedStatus?: number
 ): Promise<T> {
   let response: Response;
   try {
@@ -119,6 +120,13 @@ async function requestJson<T>(
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
   }
   if (!response.ok) throw await contractErrorForResponse(response);
+  if (expectedStatus !== undefined && response.status !== expectedStatus) {
+    throw new ContractHttpError(
+      "INVALID_RESPONSE",
+      response.status,
+      `Expected contract response status ${expectedStatus}, received ${response.status}`
+    );
+  }
   try {
     return schema.parse(await response.json());
   } catch (error) {
@@ -175,7 +183,41 @@ function browserCsrfToken(): string | null {
   return values.length === 1 ? values[0]! : null;
 }
 
+const REGISTRATION_PUBLIC_MESSAGE =
+  "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
+const RESEND_VERIFICATION_PUBLIC_MESSAGE =
+  "If this address is awaiting verification, new instructions will arrive. Check your spam folder." as const;
+
+function exactPublicMessageSchema<const Message extends string>(message: Message): {
+  parse(value: unknown): Readonly<{ message: Message }>;
+} {
+  return Object.freeze({
+    parse(value: unknown) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw new TypeError("Invalid public auth response");
+      }
+      const row = value as Record<string, unknown>;
+      if (Object.keys(row).length !== 1 || row.message !== message) {
+        throw new TypeError("Invalid public auth response");
+      }
+      return Object.freeze({ message });
+    }
+  });
+}
+
+const RegistrationPublicResponseSchema = exactPublicMessageSchema(REGISTRATION_PUBLIC_MESSAGE);
+const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_VERIFICATION_PUBLIC_MESSAGE);
+
 export interface ContractClient {
+  register(
+    email: string,
+    password: string,
+    recoveryEmail: string,
+    adultAffirmed: boolean
+  ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
+  resendVerification(email: string): Promise<Readonly<{
+    message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
+  }>>;
   beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
   completeLogin(challengeToken: string, code: string): Promise<{
     status: "authenticated";
@@ -265,8 +307,12 @@ export function createContractClient(
 ): ContractClient {
   const root = new URL(baseUrl);
   const versionQuery = (version?: number) => version === undefined ? "" : `?version=${encodeURIComponent(String(version))}`;
-  const request = <T>(path: string, schema: { parse(value: unknown): T }, init: RequestInit = {}) =>
-    requestJson(root.href, fetchImplementation, path, schema, init, auth);
+  const request = <T>(
+    path: string,
+    schema: { parse(value: unknown): T },
+    init: RequestInit = {},
+    expectedStatus?: number
+  ) => requestJson(root.href, fetchImplementation, path, schema, init, auth, expectedStatus);
   const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
     try {
@@ -299,6 +345,28 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    register: (
+      email: string,
+      password: string,
+      recoveryEmail: string,
+      adultAffirmed: boolean
+    ) => request(
+      "/v1/auth/register",
+      RegistrationPublicResponseSchema,
+      { method: "POST", body: JSON.stringify({
+          email,
+          password,
+          recovery_email: recoveryEmail,
+          adult_affirmed: adultAffirmed
+        }) },
+      202
+    ),
+    resendVerification: (email: string) => request(
+      "/v1/auth/resend-verification",
+      ResendVerificationPublicResponseSchema,
+      { method: "POST", body: JSON.stringify({ email }) },
+      202
+    ),
     beginLogin: (email: string, password: string) => request("/v1/auth/login", {
       parse(value: unknown) {
         if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
