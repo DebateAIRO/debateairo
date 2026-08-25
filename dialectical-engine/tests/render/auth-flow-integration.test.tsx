@@ -4,8 +4,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setPathname } from "next/navigation";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { TopBar } from "../../apps/ui/components/TopBar.js";
 
 const REGISTRATION_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder.";
@@ -55,6 +57,7 @@ async function click(label: string): Promise<void> {
 describe("rendered auth flow integration", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    setPathname("/");
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -107,6 +110,69 @@ describe("rendered auth flow integration", () => {
     expect(form!.getAttribute("method")).toBe("post");
     expect(form!.getAttribute("action")).toBe("/login");
     expect(form!.getAttribute("action")).not.toContain("?");
+  });
+
+  it("makes recovery-code acknowledgement the only home completion path", async () => {
+    setPathname("/login");
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    const completeLogin = vi.fn().mockResolvedValue({
+      status: "authenticated" as const,
+      csrf_token: "c".repeat(43),
+      session: SESSION,
+      replacement_recovery_code: "AAAA-BBBB-CCCC-DDDD"
+    });
+    const onAuthenticated = vi.fn();
+    await act(async () => root!.render(
+      <>
+        <TopBar />
+        <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={onAuthenticated} />
+      </>
+    ));
+
+    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+    field("code").value = "AAAA-BBBB-CCCC-DDDD";
+    await submit();
+
+    expect(document.body.textContent).toContain("AAAA-BBBB-CCCC-DDDD");
+    expect(document.querySelectorAll('a[href="/"]')).toHaveLength(0);
+    const unavailableBrand = document.querySelector('.authTopBar [aria-disabled="true"]');
+    expect(unavailableBrand).not.toBeNull();
+    expect(unavailableBrand?.tagName).not.toBe("A");
+    expect(onAuthenticated).not.toHaveBeenCalled();
+    const completionButtons = document.querySelectorAll(".authSuccessWarning button");
+    expect(completionButtons).toHaveLength(1);
+    expect(completionButtons[0]!.textContent?.trim()).toBe("I saved it — continue");
+
+    await click("I saved it — continue");
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps ordinary login and sign-up auth chrome linked truthfully to home", async () => {
+    setPathname("/login");
+    await act(async () => root!.render(
+      <>
+        <TopBar />
+        <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+      </>
+    ));
+    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+    expect(document.querySelector('.authTopBar [aria-disabled="true"]')).toBeNull();
+
+    setPathname("/sign-up");
+    await act(async () => root!.render(
+      <>
+        <TopBar />
+        <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+      </>
+    ));
+    expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
+    expect(document.querySelector('.authTopBar [aria-disabled="true"]')).toBeNull();
   });
 
   it("keeps recovery-login navigation behind one explicit replacement-code acknowledgement", async () => {

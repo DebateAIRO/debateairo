@@ -150,3 +150,12 @@ test("mailed-token enrollment has no native form that could submit secrets befor
   assert.doesNotMatch(enrollMfa, /<form\b/);
   assert.doesNotMatch(verifyEmail, /<form\b/);
 });
+
+test("replacement recovery-code custody synchronously blocks only home navigation", () => {
+  assert.match(login, /setRecoveryAcknowledgementPending\(true\)/);
+  assert.match(login, /setRecoveryAcknowledgementPending\(false\)[\s\S]*?onAuthenticated\(\)/);
+  assert.match(topBar, /useRecoveryAcknowledgementPending\(\)/);
+  assert.match(topBar, /homeNavigationAvailable=\{!recoveryAcknowledgementPending\}/);
+  assert.match(topBar, /aria-disabled="true"/);
+  assert.doesNotMatch(topBar, /href=\{href\}[\s\S]*?aria-disabled="true"/);
+});

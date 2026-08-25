@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
+import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 
 const HOME_PATH = "/";
 
@@ -25,6 +26,8 @@ export function LoginFlow({
   const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => setRecoveryAcknowledgementPending(false), []);
 
   async function submitCredentials(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -54,6 +57,7 @@ export function LoginFlow({
       const result = await client.completeLogin(challengeToken, code);
       setChallengeToken(null);
       if (result.replacement_recovery_code !== undefined) {
+        setRecoveryAcknowledgementPending(true);
         setReplacementRecoveryCode(result.replacement_recovery_code);
         return;
       }
@@ -86,6 +90,7 @@ export function LoginFlow({
             className="authPrimary"
             type="button"
             onClick={() => {
+              setRecoveryAcknowledgementPending(false);
               setReplacementRecoveryCode(null);
               onAuthenticated();
             }}
