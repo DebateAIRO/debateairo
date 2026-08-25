@@ -164,8 +164,10 @@ evidence contradicts the stated boundary:
   is refused;
 - current public snapshots, downloaded/quoted/indexed copies, and provider-
   retained public copies may persist;
-- T6 historical audit rows and ordinary historical source digests retain their
-  separately documented historical classification;
+- T6 historical audit rows retain the explicit
+  [T6 legacy audit erasure residual disposition](T6-legacy-audit-residual-disposition.md),
+  and ordinary historical source digests retain their separately documented
+  historical classification;
 - event-local publication/private correlation, retained public owner grouping,
   and a retired pseudonym are not anonymity;
 - WAL, replicas, PITR, backups, filesystem snapshots, and a backed-up
