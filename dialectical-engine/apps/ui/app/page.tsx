@@ -52,7 +52,13 @@ export default async function HomePage() {
 
         {error ? (
           <div className="error" style={{ marginTop: 18 }}>
-            {error}
+            <p>{error}</p>
+            {token === null ? (
+              <div className="formActions">
+                <Link className="btn" href="/login">Log in</Link>
+                <Link className="btn btnDark" href="/sign-up">Create account</Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

@@ -10,16 +10,19 @@ const read = (path) => {
   }
 };
 
-const login = read("../app/login/page.tsx");
-const signUp = read("../app/sign-up/page.tsx");
+const login = read("./LoginFlow.tsx");
+const signUp = read("./SignUpFlow.tsx");
 const shell = read("./AuthShell.tsx");
 const gate = read("./AuthGate.tsx");
 const topBar = read("./TopBar.tsx");
 const styles = read("../app/globals.css");
+const home = read("../app/page.tsx");
+const verifyEmail = read("../app/verify-email/page.tsx");
+const packageJson = read("../package.json");
 
 test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
-  assert.match(login, /contractClient\.beginLogin/);
-  assert.match(login, /contractClient\.completeLogin/);
+  assert.match(login, /client\.beginLogin/);
+  assert.match(login, /client\.completeLogin/);
   assert.match(login, /Authenticator or recovery code/);
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
@@ -28,8 +31,8 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
 });
 
 test("sign-up exposes only fields backed by the registration contract", () => {
-  assert.match(signUp, /contractClient\.register/);
-  assert.match(signUp, /contractClient\.resendVerification/);
+  assert.match(signUp, /client\.register/);
+  assert.match(signUp, /client\.resendVerification/);
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
   assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
@@ -48,4 +51,18 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
   assert.match(gate, /window\.location\.replace\("\/login"\)/);
   assert.doesNotMatch(gate, /beginLogin|completeLogin/);
   assert.match(topBar, /AUTH_PATHS/);
+});
+
+test("every public and protected entry point reaches the dedicated auth routes", () => {
+  assert.match(topBar, /href="\/login"/);
+  assert.match(home, /href="\/login"/);
+  assert.match(home, /href="\/sign-up"/);
+  assert.match(login, /href="\/sign-up"/);
+  assert.match(signUp, /href="\/login"/);
+  assert.match(gate, /window\.location\.replace\("\/login"\)/);
+});
+
+test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
+  assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
+  assert.match(packageJson, /assert-production-auth-routes\.mjs/);
 });

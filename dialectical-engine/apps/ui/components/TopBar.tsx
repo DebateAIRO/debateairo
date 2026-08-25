@@ -50,6 +50,9 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
+        <Link className="btn" href="/login">
+          Log in
+        </Link>
         <Link className="btn btnDark" href="/new">
           + New debate
         </Link>
