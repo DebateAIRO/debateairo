@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "same sole coding author; Grok 4.6 remains sole reviewer",
+  "outcome": "READY_FOR_SAME_GROK_RE_REVIEW",
+  "manifest": {
+    "path": "T1-rework9-rework4-manifest.json",
+    "sha256": "3ac9ca82c20460ad3d0d49a23c3788d17c7af19f809a19e1b9f4e7841373217d"
+  },
+  "blocking_finding": "The probe compared a canonical /private/var/folders realpath to an unresolved /var/folders literal, so it always failed after creating its directory.",
+  "repair": "The probe now compares its realpath to basename(probeDirectory) joined to realpathSync(dirname(probeDirectory)); all leaf symlink, ownership, group, and 0700 guards remain unchanged.",
+  "changed_hashes": {
+    "runtime_probe": "2eb8789b2784f57efb0b39e321eaeb5af4ea40e4c46dbd398edad848af84a999",
+    "static_fixture": "1445fc95c6c16e18ff71641fbf5310f791e20d48afe9fc2e55d9cb6445bae567",
+    "contract": "64a4b67de0db8bc091828942c3f03e5acade21bb48472947da5501513f54e257"
+  },
+  "preserved_hashes": {
+    "authority": "fb6a83f660c76fe5763fc95dc1b2c9fdb5dd768b53c24c8de0a9723443c961d8",
+    "recovery_tool": "38928ca6b4d307efe8f84f1814c1c0c7bbcc0ff81cb51fef5111c8683ea465ba",
+    "recovery_core": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "probe_plist": "061b3f7e8109fea3c10ab080ec43c5f6b4beccb4f326149500e3b95afeeb225d",
+    "static_supervisor_check": "c7eccc1ae2e5bb1501deb947b03d302bdffbb8c72fd665de662576e605096a61"
+  },
+  "evidence": {
+    "red_raw_status": 1,
+    "red_log": "T1-rework9-rework4-red-probe-realpath.log",
+    "green_raw_status": 0,
+    "green_log": "T1-rework9-rework4-green-probe-realpath.log",
+    "static_raw_status": 0,
+    "static_log": "T1-rework9-rework4-static-supervisor.log",
+    "fake_old_literal_comparison": false,
+    "fake_canonical_parent_comparison": true,
+    "recovery_guard_regression": false
+  },
+  "custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "lock_device": 16777233,
+    "lock_inode": 46312766,
+    "claim_inode": 46312780,
+    "claim_sha256": "fba7e6e38c05e5e88548fa85faeae4eaf571f46221cdf249674d98cba7a32b88",
+    "real_probe_directory": "absent_not_executed",
+    "real_lock": "present_untouched"
+  },
+  "router_order_after_same_grok_approval": [
+    "1. Outside the sandbox, verify the Rework4 manifest, HEAD/index/all twelve governed tuples, exact live lock/claim identity, zero streams and NEVER_STARTED absences, exact controller/worker/probe label absence, and no unexplained heavy process.",
+    "2. Confirm the run-bound probe directory is absent; outside the sandbox bootstrap the unchanged probe plist, require exclusive sentinel bytes ok\\n, then boot out only the exact probe label and preserve Router evidence.",
+    "3. Outside the sandbox invoke the unchanged Hermes Node recovery tool with the unchanged one-time authority JSON exactly once.",
+    "4. Require raw status 0 and NEVER_STARTED_RECOVERED_LOCK_ARCHIVED, then verify immutable intent/receipt and preserved archived directory/claim inodes and claim hash.",
+    "5. A fresh normal supervisor run still requires separate Router new-run authority."
+  ],
+  "prohibited_execution": {
+    "launchctl": false,
+    "real_probe": false,
+    "recovery": false,
+    "worker_or_supervisor": false,
+    "vitest_or_postgresql": false,
+    "commit_push_or_kanban": false
+  }
+}

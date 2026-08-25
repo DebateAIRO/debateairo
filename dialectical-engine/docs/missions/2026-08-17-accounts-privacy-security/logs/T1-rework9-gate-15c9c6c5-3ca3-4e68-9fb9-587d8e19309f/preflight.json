@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+  "process_snapshot_sha256": "4c8712b49d7ce46ae7520b0b0390143675062ed4811723d085cbd3d03e02d9fa",
+  "launchd_snapshot_sha256": "af241f6595b9f5fb5a20ad7672c4fe0e2f8ee0934c958b003645e8e8f93c157d",
+  "process_snapshot_complete": true,
+  "launchd_snapshot_complete": true,
+  "allowed_postgresql_baseline": [],
+  "unexplained_heavy_processes": [],
+  "other_t1_worker_service": false,
+  "token_verified": true,
+  "cwd_verified": true,
+  "argv_verified": true,
+  "head_verified": true,
+  "empty_index_verified": true,
+  "artifact_hashes_verified": true,
+  "governed_tuples_verified": true,
+  "bootstrap_decision": "BOOTSTRAP_CONTROLLER",
+  "utc": "2026-08-22T18:49:20.895Z",
+  "monotonic_ms": 644.128458
+}

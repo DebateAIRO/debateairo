@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "classification": "TERMINAL_PRODUCT_PASS_CUSTODY_HELD_FALSE_POSITIVE",
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "one_time": true,
+  "external_unsandboxed_execution_required": true,
+  "grok_recovery_review_required_before_execution": true,
+  "no_test_worker_controller_viewer_or_new_run_authority": true,
+  "paths": {
+    "receipt": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+    "lock": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock",
+    "archive": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/full-gate-custody-archived-lock",
+    "intent": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/full-gate-custody-recovery-intent.json",
+    "supplement": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/vitest-counts-supplement.json",
+    "marker": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/full-gate-custody-recovery.json",
+    "private_runtime": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14"
+  },
+  "labels": {
+    "controller": "com.debateai.t1gate.controller.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+    "controller_required_state": "present_not_running_or_exited_last_exit_0_no_pid",
+    "worker": "com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+    "worker_required_state": "absent"
+  },
+  "lock": {
+    "device": 16777233,
+    "inode": 47087786,
+    "claim_inode": 47087814,
+    "claim_sha256": "d51149eb7036f6c4ccf7557982e13d7860e3efffcbf6439d8aa129b80b939c86",
+    "ownership_token_sha256": "d88e47451687c860ce804009fa0cf4be8caaa8f2a01d841573e236b57da511cd",
+    "owner_sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0"
+  },
+  "receipt": {
+    "device": 16777233,
+    "inode": 47087787,
+    "mode": 448,
+    "entry_count": 26
+  },
+  "receipt_tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9",
+  "present_receipt_entries": [
+    "controller-epoch-1.json",
+    "controller.plist",
+    "controller.stderr.log",
+    "controller.stdout.log",
+    "custody-hold.json",
+    "events.jsonl",
+    "heartbeat.json",
+    "launchd-post-epoch-1.txt",
+    "launchd-pre.txt",
+    "launchd-streams.json",
+    "launchd-worker-pre.txt",
+    "owner.json",
+    "postflight-epoch-1.json",
+    "preflight-worker.json",
+    "preflight.json",
+    "process-post-epoch-1.txt",
+    "process-pre.txt",
+    "process-worker-pre.txt",
+    "test.stderr.log",
+    "test.stdout.log",
+    "viewer.ready.json",
+    "worker-bootstrap-requested.json",
+    "worker-terminal.json",
+    "worker.plist",
+    "worker.stderr.log",
+    "worker.stdout.log"
+  ],
+  "private_runtime": {
+    "device": 16777233,
+    "inode": 47087788,
+    "mode": 448,
+    "tree_entry_count": 17
+  },
+  "private_tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f",
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14.json",
+    "sha256": "0e34e9d7cb01a3b02f987bd0476e3608504fc8aa7a1d2d0021be92692c07f14c",
+    "size": 12858,
+    "mtime_ms": 1787432045079.5393
+  },
+  "owner": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/owner.json",
+    "sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0",
+    "size": 11242,
+    "mtime_ms": 1787432127658.011
+  },
+  "claim": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock/claim.json",
+    "sha256": "d51149eb7036f6c4ccf7557982e13d7860e3efffcbf6439d8aa129b80b939c86",
+    "size": 313,
+    "mtime_ms": 1787432127672.6052
+  },
+  "recovery_tool": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-full-gate-recovery.mjs",
+    "sha256": "30decab681b96f3a2fa8e3b0acc0ff0ed37a5fb13bbe08535260621fb34deac5",
+    "size": 29723,
+    "mtime_ms": 1787436398092.6812
+  },
+  "recovery_core": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework3-recovery-core.mjs",
+    "sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "size": 6850,
+    "mtime_ms": 1787420876982.2737
+  },
+  "supervisor_parsers": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-supervisor-parsers.mjs",
+    "sha256": "ea00acb85d0723f87dc3f156814e143fc0167e1520984587026c58b7134c29f5",
+    "size": 3688,
+    "mtime_ms": 1787434672548.33
+  },
+  "failure_evidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-full-gate-failure-evidence.json",
+    "sha256": "f2600cd89776a356fa222b2a6b24c9420905ff0b959b9ae65194edd4939b6079",
+    "size": 4809,
+    "mtime_ms": 1787434840352.1743
+  },
+  "grok_full_gate_review": {
+    "visible_log": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-full-gate-review-visible.log",
+      "sha256": "048277aada9c3daa52590f89e3a677bdf1f33acc8981c2fb62753b948347fc24",
+      "size": 8165,
+      "mtime_ms": 1787434333288.1287
+    },
+    "visible_status": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-full-gate-review-visible.status",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "size": 2,
+      "mtime_ms": 1787434333288.3938
+    },
+    "raw_status": 0,
+    "terminal_marker": "GROK REWORK9 FULL GATE ACCEPTED WITH CUSTODY RECOVERY REQUIRED"
+  },
+  "ansi_supplement": {
+    "source_stdout_sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+    "ansi_stripped_sha256": "58568909455abb34607b3ae82051457412db78a88b3f64493c76024c4ca3f5b7",
+    "test_files": "1/1",
+    "tests": "56/56",
+    "tests_skipped": 0,
+    "worker_terminal_rewrite_forbidden": true
+  },
+  "authorized_operation": "After the same Grok finder approves this exact authority/tool, write immutable intent and count supplement, atomically rename the live ae9 lock into the ae9 receipt preserving lock and claim inodes, and write an immutable recovery marker.",
+  "forbidden_operations": [
+    "launchctl bootstrap or bootout",
+    "controller, viewer, worker, test, Vitest, PostgreSQL, or heavy execution",
+    "terminal.json or release.json creation",
+    "worker-terminal.json rewrite",
+    "unlink, rmdir, or recursive deletion of the lock",
+    "receipt or private-runtime deletion or rewrite",
+    "new-run authority"
+  ]
+}

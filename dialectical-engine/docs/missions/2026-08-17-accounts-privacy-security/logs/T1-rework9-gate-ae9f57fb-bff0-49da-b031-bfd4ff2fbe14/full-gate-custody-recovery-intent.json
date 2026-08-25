@@ -1,0 +1,1400 @@
+{
+  "schema_version": 1,
+  "classification": "TERMINAL_PRODUCT_PASS_CUSTODY_HELD_FALSE_POSITIVE",
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "operation": "write_count_supplement_then_atomic_rename_preserving_lock_and_claim_inodes",
+  "authority": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-full-gate-recovery-authority.json",
+    "sha256": "44a9a30121c2669ac5a1be1ac4e06ec5af764f88d881577edf9fa263e44c265b",
+    "device": 16777233,
+    "inode": 47276339,
+    "mode": 292,
+    "uid": 501,
+    "gid": 20,
+    "size": 7740,
+    "mtime_ms": 1787436410576.1833
+  },
+  "recovery_tool": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-full-gate-recovery.mjs",
+    "sha256": "30decab681b96f3a2fa8e3b0acc0ff0ed37a5fb13bbe08535260621fb34deac5",
+    "device": 16777233,
+    "inode": 47272032,
+    "mode": 365,
+    "uid": 501,
+    "gid": 20,
+    "size": 29723,
+    "mtime_ms": 1787436398092.6812
+  },
+  "recovery_core": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework3-recovery-core.mjs",
+    "sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "device": 16777233,
+    "inode": 46364398,
+    "mode": 365,
+    "uid": 501,
+    "gid": 20,
+    "size": 6850,
+    "mtime_ms": 1787420876982.2737
+  },
+  "supervisor_parsers": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-supervisor-parsers.mjs",
+    "sha256": "ea00acb85d0723f87dc3f156814e143fc0167e1520984587026c58b7134c29f5",
+    "device": 16777233,
+    "inode": 47249301,
+    "mode": 420,
+    "uid": 501,
+    "gid": 20,
+    "size": 3688,
+    "mtime_ms": 1787434672548.33
+  },
+  "failure_evidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-full-gate-failure-evidence.json",
+    "sha256": "f2600cd89776a356fa222b2a6b24c9420905ff0b959b9ae65194edd4939b6079",
+    "device": 16777233,
+    "inode": 47260317,
+    "mode": 292,
+    "uid": 501,
+    "gid": 20,
+    "size": 4809,
+    "mtime_ms": 1787434840352.1743
+  },
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14.json",
+    "sha256": "0e34e9d7cb01a3b02f987bd0476e3608504fc8aa7a1d2d0021be92692c07f14c",
+    "device": 16777233,
+    "inode": 47082695,
+    "mode": 420,
+    "uid": 501,
+    "gid": 20,
+    "size": 12858,
+    "mtime_ms": 1787432045079.5393
+  },
+  "pre_incident": {
+    "receipt_tree": {
+      "directory": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+        "device": 16777233,
+        "inode": 47087787,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 896,
+        "mtime_ms": 1787433966301.8708
+      },
+      "entries": [
+        {
+          "relative_path": "controller-epoch-1.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087865,
+          "mode": 256,
+          "uid": 501,
+          "gid": 20,
+          "size": 196,
+          "mtime_ms": 1787432128314.767,
+          "sha256": "4d53f86a3f469e904f4d45a27603bbde6d4c3c43fbf43d30efdc08cee160cf8a"
+        },
+        {
+          "relative_path": "controller.plist",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087811,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 2275,
+          "mtime_ms": 1787432127657.2383,
+          "sha256": "fc5b0578415ecf9a1bfba072f2fa1be844419587d18a7022ab9ac42c7f96376d"
+        },
+        {
+          "relative_path": "controller.stderr.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207626,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 0,
+          "mtime_ms": 1787433965907.1494,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relative_path": "controller.stdout.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207618,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 0,
+          "mtime_ms": 1787433965870.38,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relative_path": "custody-hold.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207663,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 247,
+          "mtime_ms": 1787433966288.0671,
+          "sha256": "682b053cfc28ce99666c077cd45703254414cd099be00ae7edbbc49c4bc6cfa9"
+        },
+        {
+          "relative_path": "events.jsonl",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087871,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 1031,
+          "mtime_ms": 1787433966283.1096,
+          "sha256": "51c03798aa8c55e380c1dbe352c72eba3cb6b2681c733981fd911c67376bb699"
+        },
+        {
+          "relative_path": "heartbeat.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207664,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 383,
+          "mtime_ms": 1787433966296.9229,
+          "sha256": "9c0d12d1eea09461b668b80d92c8472d99ef0039f6898731efd25809859ad4d5"
+        },
+        {
+          "relative_path": "launchd-post-epoch-1.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207657,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 116893,
+          "mtime_ms": 1787433966244.6716,
+          "sha256": "13e5635f3652b04adca58c96eaf6cc8454b68f62f628d292ea579233144a1d9e"
+        },
+        {
+          "relative_path": "launchd-pre.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087840,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 116806,
+          "mtime_ms": 1787432128089.8054,
+          "sha256": "1e41ee14aebfc176a0f13b90596d49f50f839756422f20d7b4d89e89a748ed06"
+        },
+        {
+          "relative_path": "launchd-streams.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207637,
+          "mode": 256,
+          "uid": 501,
+          "gid": 20,
+          "size": 4153,
+          "mtime_ms": 1787433965995.0864,
+          "sha256": "f6c881172df9a3a6b1e665dc40acf139edc5ff8bd64598793ddd0f76a0bdbfc5"
+        },
+        {
+          "relative_path": "launchd-worker-pre.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087891,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 116893,
+          "mtime_ms": 1787432128576.821,
+          "sha256": "13e5635f3652b04adca58c96eaf6cc8454b68f62f628d292ea579233144a1d9e"
+        },
+        {
+          "relative_path": "owner.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087813,
+          "mode": 256,
+          "uid": 501,
+          "gid": 20,
+          "size": 11242,
+          "mtime_ms": 1787432127658.011,
+          "sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0"
+        },
+        {
+          "relative_path": "postflight-epoch-1.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207662,
+          "mode": 256,
+          "uid": 501,
+          "gid": 20,
+          "size": 4457,
+          "mtime_ms": 1787433966272.33,
+          "sha256": "d4e5c7d46f947ebe8caf8cf83c4025637f1f12fde29c6e74d6863a7f4c62cd8c"
+        },
+        {
+          "relative_path": "preflight-worker.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087892,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 600,
+          "mtime_ms": 1787432128577.9048,
+          "sha256": "9286374413c77627ed6422bf5e246dd2742fe44d7551d93d4d46c0c05203acbd"
+        },
+        {
+          "relative_path": "preflight.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087845,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 892,
+          "mtime_ms": 1787432128123.1924,
+          "sha256": "3c6239ec0f26beaabd6c702a23480f4e825608e0844395c429340b8821a61103"
+        },
+        {
+          "relative_path": "process-post-epoch-1.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207656,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 149153,
+          "mtime_ms": 1787433966244.3706,
+          "sha256": "b4b5a79deaf10d693be90feffbb432a7ccd98abe24000b81c182575acb947872"
+        },
+        {
+          "relative_path": "process-pre.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087839,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 148913,
+          "mtime_ms": 1787432128089.5908,
+          "sha256": "4c23b4e1fec9ac29b4999d156d72dd6a4b5f3631c84a145e416420f3cc5d005a"
+        },
+        {
+          "relative_path": "process-worker-pre.txt",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087890,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 149939,
+          "mtime_ms": 1787432128576.656,
+          "sha256": "8cd28151524db80f8721dd8cd4e998e0597ff9fa8a24aafc4c45147cabe7c6fa"
+        },
+        {
+          "relative_path": "test.stderr.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087806,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 2308,
+          "mtime_ms": 1787433177346.4202,
+          "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c"
+        },
+        {
+          "relative_path": "test.stdout.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087805,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 84850,
+          "mtime_ms": 1787433965194.338,
+          "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f"
+        },
+        {
+          "relative_path": "viewer.ready.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087850,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 228,
+          "mtime_ms": 1787432128152.689,
+          "sha256": "6b798ac4a81ac07172f64a14d2a01467bb524010eb68f9984ba50ae4e879ab46"
+        },
+        {
+          "relative_path": "worker-bootstrap-requested.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087893,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 255,
+          "mtime_ms": 1787432128589.6165,
+          "sha256": "1ff6d8ac59d610955de84c0f84907e016d532ede200b82ae5120edc938e92af5"
+        },
+        {
+          "relative_path": "worker-terminal.json",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207580,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 993,
+          "mtime_ms": 1787433965227.8206,
+          "sha256": "138bb1472fc05c75a2779febb49e104a4619d2d1ee10f82b68291c4ea3e99738"
+        },
+        {
+          "relative_path": "worker.plist",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087812,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 2154,
+          "mtime_ms": 1787432127657.407,
+          "sha256": "43618c7a23c3fa713409cf77de23ed4a200d6d1d769819b451eeb4c6cfd65dae"
+        },
+        {
+          "relative_path": "worker.stderr.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207636,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 2308,
+          "mtime_ms": 1787433965978.111,
+          "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c"
+        },
+        {
+          "relative_path": "worker.stdout.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47207635,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 84850,
+          "mtime_ms": 1787433965948.571,
+          "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f"
+        }
+      ],
+      "tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9"
+    },
+    "private_tree": {
+      "directory": {
+        "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+        "device": 16777233,
+        "inode": 47087788,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 256,
+        "mtime_ms": 1787433965197.99
+      },
+      "entries": [
+        {
+          "relative_path": "controller-custody.secret",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087789,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 130,
+          "mtime_ms": 1787432127568.5479,
+          "sha256": "5ff4fb444ded42c45999aa5a73a539d16578c9141c34c4b52a58dfcdfbe5dd1f"
+        },
+        {
+          "relative_path": "controller.stderr.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087808,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 0,
+          "mtime_ms": 1787432127656.72,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relative_path": "controller.stdout.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087807,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 0,
+          "mtime_ms": 1787432127656.6604,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relative_path": "tsx-501",
+          "type": "directory",
+          "device": 16777233,
+          "inode": 47159053,
+          "mode": 493,
+          "uid": 501,
+          "gid": 20,
+          "size": 416,
+          "mtime_ms": 1787433177868.88
+        },
+        {
+          "relative_path": "tsx-501/17874-07002cc5ca1afa61172d85a775f25839266285f9",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159065,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 24987,
+          "mtime_ms": 1787433177880.9438,
+          "sha256": "2f273825c3f330e1dbef5e95456fb10ec260188e28c94dae3b806c8e56a4e088"
+        },
+        {
+          "relative_path": "tsx-501/17874-080f943022f0387f1f032daf9d76a48ba8525d07",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159066,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 9170,
+          "mtime_ms": 1787433177880.994,
+          "sha256": "c1f2fc135573f22adcae0ea30bb6ab063bf1813c3eca08bebf5bd2c0221d0d20"
+        },
+        {
+          "relative_path": "tsx-501/17874-2e28f59f5467cac9c94776e91eb7595289b39e72",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159062,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 31651,
+          "mtime_ms": 1787433177880.9153,
+          "sha256": "fe7f03e73384e8d84016b261a1c4b1c2319d6cacbcf196c5b7c86bf1702991a9"
+        },
+        {
+          "relative_path": "tsx-501/17874-38fd883220c1d1574ab2696c4b395fc89b6fbc17",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159059,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 28637,
+          "mtime_ms": 1787433177880.939,
+          "sha256": "262cec830d35336c9e32fa95b080f8ba5dc3f8db30dc6c153f6852e9c2a8a241"
+        },
+        {
+          "relative_path": "tsx-501/17874-8775a98005f7f4b52e5dab23b93d8682b924b3f6",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159070,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 24034,
+          "mtime_ms": 1787433177881.0483,
+          "sha256": "3a9f745da8fffe58f5a541738b4abeed4de4fdb1e5d300a370e4eb1b912b04a5"
+        },
+        {
+          "relative_path": "tsx-501/17874-90a8806a46197d883c55a34a56d1021d8e0fad70",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159058,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 14393,
+          "mtime_ms": 1787433177880.9294,
+          "sha256": "386ec1170bcfa4b0b586e8749fe1ba819a0a59a7839fc3970d4fade4b077cd91"
+        },
+        {
+          "relative_path": "tsx-501/17874-9dd77e6254b76e1178eaed377d1784c125596433",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159090,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 68855,
+          "mtime_ms": 1787433177881.0842,
+          "sha256": "325743484c8b7ca122bed3797cc779db933ba1d7107153f9f389ba89b39eb4d4"
+        },
+        {
+          "relative_path": "tsx-501/17874-ba7d64be9a320bf9da9c8fd57c2318ffc2b2233a",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159071,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 14728,
+          "mtime_ms": 1787433177881.054,
+          "sha256": "cbd73be227bd416bb35f21952b28cbe28e970bfffa6cd8ad40681294b57a9b21"
+        },
+        {
+          "relative_path": "tsx-501/17874-e2e984248eaea74bd94b709f2c0a9d8e7a2cf1df",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159094,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 4529,
+          "mtime_ms": 1787433177881.1091,
+          "sha256": "c08d7ecb21053d20fccc3f141bfd842d954ee6cfd8461e414bd88952a82480cb"
+        },
+        {
+          "relative_path": "tsx-501/17874-e30eb132929244dd9b7ac147a3ddcd8591ee900a",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159093,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 51366,
+          "mtime_ms": 1787433177881.0964,
+          "sha256": "e457ce3dc5cab35bbeb02bbb1c6fe48c046ce129595a258634ce12e73108ea0e"
+        },
+        {
+          "relative_path": "tsx-501/17874-ec84e536ab1219dcafbb001a89be8a10a052d65c",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47159069,
+          "mode": 420,
+          "uid": 501,
+          "gid": 20,
+          "size": 80437,
+          "mtime_ms": 1787433177881.0134,
+          "sha256": "bd2e9b55798693a6234b4a0eb626aae692b016d5b71aa4c7c0cce2ffb9f466fe"
+        },
+        {
+          "relative_path": "worker.stderr.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087810,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 2308,
+          "mtime_ms": 1787433177346.4094,
+          "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c"
+        },
+        {
+          "relative_path": "worker.stdout.log",
+          "type": "file",
+          "device": 16777233,
+          "inode": 47087809,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20,
+          "size": 84850,
+          "mtime_ms": 1787433965194.3293,
+          "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f"
+        }
+      ],
+      "tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f"
+    },
+    "packet": {
+      "schema_version": 1,
+      "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+      "ticket": "t_b225b2f2",
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+      "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+      "argv": [
+        "/Users/vladmihaimiron/.hermes/node/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/registration-database.test.ts"
+      ],
+      "test_runtime": {
+        "path": "/Users/vladmihaimiron/.hermes/node/bin/node",
+        "sha256": "2e3f1286a7eb3736346ed1803e458a0ff909e2b2d5bc746144dcb76970e9b99d",
+        "size": 112928848,
+        "mtime_ms": 1782222827000
+      },
+      "vitest_package_link": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/vitest",
+        "target": ".pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest",
+        "target_sha256": "b276dbc75f1320608340c3323f8aee672691baa269583264f20075c6b46019e8",
+        "device": 16777233,
+        "inode": 15095527,
+        "size": 140,
+        "mtime_ms": 1786649129059.6936,
+        "canonical_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest"
+      },
+      "vitest_entrypoint": {
+        "logical_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/vitest/vitest.mjs",
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/vitest.mjs",
+        "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+        "size": 43,
+        "mtime_ms": 1786165583143.088
+      },
+      "expected_test_files": 1,
+      "expected_tests": 56,
+      "global_lock_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock",
+      "governed": [
+        {
+          "path": "apps/api/src/index.ts",
+          "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+          "size": 30548,
+          "mtime_ms": 1787391517922.1519
+        },
+        {
+          "path": "apps/api/src/main.ts",
+          "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+          "size": 7061,
+          "mtime_ms": 1787395079944.3037
+        },
+        {
+          "path": "apps/api/src/registration.ts",
+          "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+          "size": 65119,
+          "mtime_ms": 1787413534178.339
+        },
+        {
+          "path": "packages/crypto/src/index.ts",
+          "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+          "size": 27118,
+          "mtime_ms": 1787343024165.269
+        },
+        {
+          "path": "packages/crypto/src/argon2-worker.ts",
+          "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+          "size": 10314,
+          "mtime_ms": 1787343013164.7224
+        },
+        {
+          "path": "packages/crypto/src/argon2-worker-pool.ts",
+          "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+          "size": 48111,
+          "mtime_ms": 1787357276000
+        },
+        {
+          "path": "packages/db/src/identity.ts",
+          "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+          "size": 25159,
+          "mtime_ms": 1787342997309.6755
+        },
+        {
+          "path": "packages/register/src/auth-policy.ts",
+          "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+          "size": 64506,
+          "mtime_ms": 1787395342357.1929
+        },
+        {
+          "path": "tests/integration/registration-database.test.ts",
+          "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+          "size": 310114,
+          "mtime_ms": 1787413129911.6243
+        },
+        {
+          "path": "tests/unit/registration.test.ts",
+          "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+          "size": 102439,
+          "mtime_ms": 1787405601741.8987
+        },
+        {
+          "path": "tests/unit/argon2-worker-pool.test.ts",
+          "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+          "size": 106612,
+          "mtime_ms": 1787349543692.0847
+        },
+        {
+          "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+          "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+          "size": 102059,
+          "mtime_ms": 1787395154282.4463
+        }
+      ],
+      "authorization_receipt": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-authorization-receipt.json",
+        "sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9",
+        "size": 2627,
+        "mtime_ms": 1787411480149.483
+      },
+      "final_rework9_packet": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+        "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+        "size": 21515,
+        "mtime_ms": 1787410715342.437
+      },
+      "static_artifacts": {
+        "launcher": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-launcher.mjs",
+          "sha256": "34fd87e15553526f2c03656d78196b4a211b5aa0efcfebaeef5d9ddaa3907750",
+          "size": 19478,
+          "mtime_ms": 1787429800697.6528
+        },
+        "controller": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs",
+          "sha256": "a8c5fbe5aeff7402ac65689ee1580608c5e300c5a11c1bc76107f5f7f407802c",
+          "size": 28156,
+          "mtime_ms": 1787429800804.006
+        },
+        "worker": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.mjs",
+          "sha256": "8ebc2ed2d10e54ca28424df186c975e8395692efb8587f7b8a563c932a1f8595",
+          "size": 8452,
+          "mtime_ms": 1787430299133.85
+        },
+        "controller_plist_template": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.plist.template",
+          "sha256": "3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d",
+          "size": 1257,
+          "mtime_ms": 1787423013791.2227
+        },
+        "worker_plist_template": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.plist.template",
+          "sha256": "da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d",
+          "size": 1136,
+          "mtime_ms": 1787423013843.8066
+        },
+        "viewer": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-viewer.mjs",
+          "sha256": "1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25",
+          "size": 3327,
+          "mtime_ms": 1787423013898.262
+        },
+        "launchd_stream_custody": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-launchd-stream-custody.mjs",
+          "sha256": "e9440e38ce225a8b5326fcdb72a637aff6be7af6dfbf8ef9d788cfa7c94919f3",
+          "size": 7374,
+          "mtime_ms": 1787427535853.5032
+        }
+      },
+      "expected_private_runtime_paths": {
+        "directory": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+        "controller_custody_secret": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller-custody.secret",
+        "viewer_challenge": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/viewer-challenge",
+        "controller_stdout": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stdout.log",
+        "controller_stderr": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stderr.log",
+        "worker_stdout": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+        "worker_stderr": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log"
+      },
+      "rendered_plist_sha256": {
+        "controller": "fc5b0578415ecf9a1bfba072f2fa1be844419587d18a7022ab9ac42c7f96376d",
+        "worker": "43618c7a23c3fa713409cf77de23ed4a200d6d1d769819b451eeb4c6cfd65dae"
+      },
+      "allowed_postgresql_baseline": [],
+      "review_bindings": {
+        "grok_evidence_review": "APPROVED",
+        "grok_code_rereview1": "APPROVED",
+        "grok_code_rereview2": "APPROVED",
+        "grok_never_started_recovery_rework4": "APPROVED",
+        "grok_rework5": "APPROVED",
+        "grok_rework6": "APPROVED",
+        "grok_rework7": "APPROVED",
+        "grok_rework8_correction1": "APPROVED",
+        "grok_rework8_correction1_review_receipt": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-rework8-correction1-review-visible.log",
+          "sha256": "41de492c0c83daccb50a9cadfeaf02d7f36b2a882aaa1e4089bd5c6b064bbc4a",
+          "size": 4180,
+          "mtime_ms": 1787431672312.2156,
+          "status_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-rework8-correction1-review-visible.status",
+          "status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "status_size": 2,
+          "status_mtime_ms": 1787431672312.4756,
+          "raw_status": 0,
+          "review_packet_sha256": "d68c7a639518bb0f08e4b6f444ee66efc81876326318bdce42f150bca88b9ac6",
+          "terminal_marker": "GROK REWORK9 REWORK8 CORRECTION1 APPROVED"
+        }
+      },
+      "derived_from": {
+        "run_id": "302197e8-e713-47f7-9518-9f078eede931",
+        "execution_packet_sha256": "119a9f5d6aebf3c678c755b10f91e582931d3b9ecb7cb52f265dbcc4b241ace2",
+        "recovery_classification": "LAUNCHER_ABORT_BEFORE_OWNER_LOCK_ARCHIVED",
+        "recovery_marker": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-302197e8-e713-47f7-9518-9f078eede931/launcher-abort-rework8-recovery.json",
+          "sha256": "6505b97687633cfbd12ff954847113537e7a0f5959440dc0dd54717e6f55f8f7",
+          "size": 23852,
+          "mtime_ms": 1787431719094.8398
+        },
+        "recovery_intent": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-302197e8-e713-47f7-9518-9f078eede931/launcher-abort-rework8-recovery-intent.json",
+          "sha256": "eb8cee9351a381467f2dfb2779787fbed3ca5dc4450bf617c4afba502da1c73e",
+          "size": 12104,
+          "mtime_ms": 1787431718867.5378
+        },
+        "archived_lock": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-302197e8-e713-47f7-9518-9f078eede931/launcher-abort-rework8-archived-lock",
+          "device": 16777233,
+          "inode": 46921156,
+          "tree_sha256": "8cf71342492445ea3a465ab09ac9b44ba0d30846ca4e0e9c98833b01510d6977",
+          "entries": []
+        },
+        "private_runtime_preserved": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-302197e8-e713-47f7-9518-9f078eede931",
+          "device": 16777233,
+          "inode": 46921158,
+          "controller_custody_secret_sha256": "f84b786a218c356d25075efe9dc79cfb5432c537f03b0608448341b7f7c2b270",
+          "viewer_challenge_sha256": "ba8370bfc1f7937abf32112fb1d472b2e9e54494d9679aaff9a4c5b40579edb2"
+        }
+      },
+      "preparation_process_baseline": {
+        "read_only_process_scan_complete": true,
+        "matching_supervisor_worker_test_or_unexplained_heavy_processes": [],
+        "matching_postgresql_processes": [],
+        "allowed_postgresql_baseline": []
+      },
+      "preparation_custody": {
+        "prepared_utc": "2026-08-22T20:51:54Z",
+        "head_verified": true,
+        "empty_index_verified": true,
+        "all_12_governed_tuples_verified": true,
+        "source_live_global_lock_absent": true,
+        "source_recovery_marker_and_archive_verified": true,
+        "source_private_runtime_preserved_verified": true,
+        "grok_rework8_correction1_approval_verified": true,
+        "new_execution_packet_path_absent_before_creation": true,
+        "new_receipt_path_absent": true,
+        "new_private_tmpdir_path_absent": true,
+        "source_or_new_run_supervisor_worker_test_process_absent": true,
+        "allowed_postgresql_baseline_verified": [],
+        "pinned_test_runtime_verified": true,
+        "pnpm_package_link_and_canonical_entrypoint_verified": true,
+        "exact_canonical_test_argv_verified": true,
+        "private_launchd_stream_plan_verified": true,
+        "render_runtime": "/Users/vladmihaimiron/.hermes/node/bin/node",
+        "execution_authority": "packet_only_not_launched"
+      }
+    },
+    "owner": {
+      "schema_version": 1,
+      "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+      "ownership_token_sha256": "d88e47451687c860ce804009fa0cf4be8caaa8f2a01d841573e236b57da511cd",
+      "ticket": "t_b225b2f2",
+      "argv": [
+        "/Users/vladmihaimiron/.hermes/node/bin/node",
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/registration-database.test.ts"
+      ],
+      "test_runtime": {
+        "path": "/Users/vladmihaimiron/.hermes/node/bin/node",
+        "sha256": "2e3f1286a7eb3736346ed1803e458a0ff909e2b2d5bc746144dcb76970e9b99d",
+        "size": 112928848,
+        "mtime_ms": 1782222827000
+      },
+      "vitest_package_link": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/vitest",
+        "target": ".pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest",
+        "target_sha256": "b276dbc75f1320608340c3323f8aee672691baa269583264f20075c6b46019e8",
+        "device": 16777233,
+        "inode": 15095527,
+        "size": 140,
+        "mtime_ms": 1786649129059.6936,
+        "canonical_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest"
+      },
+      "vitest_entrypoint": {
+        "logical_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/vitest/vitest.mjs",
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/vitest.mjs",
+        "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+        "size": 43,
+        "mtime_ms": 1786165583143.088
+      },
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+      "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+      "staged_path_count": 0,
+      "authorization_receipt": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-authorization-receipt.json",
+        "sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9",
+        "size": 2627,
+        "mtime_ms": 1787411480149.483
+      },
+      "execution_packet": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14.json",
+        "sha256": "0e34e9d7cb01a3b02f987bd0476e3608504fc8aa7a1d2d0021be92692c07f14c",
+        "size": 12858,
+        "mtime_ms": 1787432045079.5393
+      },
+      "final_rework9_packet": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+        "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+        "size": 21515,
+        "mtime_ms": 1787410715342.437
+      },
+      "static_artifacts": {
+        "launcher": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-launcher.mjs",
+          "sha256": "34fd87e15553526f2c03656d78196b4a211b5aa0efcfebaeef5d9ddaa3907750",
+          "size": 19478,
+          "mtime_ms": 1787429800697.6528
+        },
+        "controller": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs",
+          "sha256": "a8c5fbe5aeff7402ac65689ee1580608c5e300c5a11c1bc76107f5f7f407802c",
+          "size": 28156,
+          "mtime_ms": 1787429800804.006
+        },
+        "worker": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.mjs",
+          "sha256": "8ebc2ed2d10e54ca28424df186c975e8395692efb8587f7b8a563c932a1f8595",
+          "size": 8452,
+          "mtime_ms": 1787430299133.85
+        },
+        "controller_plist_template": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.plist.template",
+          "sha256": "3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d",
+          "size": 1257,
+          "mtime_ms": 1787423013791.2227
+        },
+        "worker_plist_template": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.plist.template",
+          "sha256": "da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d",
+          "size": 1136,
+          "mtime_ms": 1787423013843.8066
+        },
+        "viewer": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-viewer.mjs",
+          "sha256": "1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25",
+          "size": 3327,
+          "mtime_ms": 1787423013898.262
+        },
+        "launchd_stream_custody": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-launchd-stream-custody.mjs",
+          "sha256": "e9440e38ce225a8b5326fcdb72a637aff6be7af6dfbf8ef9d788cfa7c94919f3",
+          "size": 7374,
+          "mtime_ms": 1787427535853.5032
+        }
+      },
+      "rendered_plists": {
+        "controller": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.plist",
+          "sha256": "fc5b0578415ecf9a1bfba072f2fa1be844419587d18a7022ab9ac42c7f96376d",
+          "size": 2275,
+          "mtime_ms": 1787432127657.2383
+        },
+        "worker": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.plist",
+          "sha256": "43618c7a23c3fa713409cf77de23ed4a200d6d1d769819b451eeb4c6cfd65dae",
+          "size": 2154,
+          "mtime_ms": 1787432127657.407
+        }
+      },
+      "launchd_streams": {
+        "controller": {
+          "stdout": {
+            "launchd_path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stdout.log",
+            "receipt_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stdout.log"
+          },
+          "stderr": {
+            "launchd_path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stderr.log",
+            "receipt_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stderr.log"
+          }
+        },
+        "worker": {
+          "stdout": {
+            "launchd_path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+            "receipt_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log"
+          },
+          "stderr": {
+            "launchd_path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log",
+            "receipt_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log"
+          }
+        }
+      },
+      "governed": [
+        {
+          "path": "apps/api/src/index.ts",
+          "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+          "size": 30548,
+          "mtime_ms": 1787391517922.1519
+        },
+        {
+          "path": "apps/api/src/main.ts",
+          "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+          "size": 7061,
+          "mtime_ms": 1787395079944.3037
+        },
+        {
+          "path": "apps/api/src/registration.ts",
+          "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+          "size": 65119,
+          "mtime_ms": 1787413534178.339
+        },
+        {
+          "path": "packages/crypto/src/index.ts",
+          "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+          "size": 27118,
+          "mtime_ms": 1787343024165.269
+        },
+        {
+          "path": "packages/crypto/src/argon2-worker.ts",
+          "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+          "size": 10314,
+          "mtime_ms": 1787343013164.7224
+        },
+        {
+          "path": "packages/crypto/src/argon2-worker-pool.ts",
+          "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+          "size": 48111,
+          "mtime_ms": 1787357276000
+        },
+        {
+          "path": "packages/db/src/identity.ts",
+          "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+          "size": 25159,
+          "mtime_ms": 1787342997309.6755
+        },
+        {
+          "path": "packages/register/src/auth-policy.ts",
+          "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+          "size": 64506,
+          "mtime_ms": 1787395342357.1929
+        },
+        {
+          "path": "tests/integration/registration-database.test.ts",
+          "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+          "size": 310114,
+          "mtime_ms": 1787413129911.6243
+        },
+        {
+          "path": "tests/unit/registration.test.ts",
+          "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+          "size": 102439,
+          "mtime_ms": 1787405601741.8987
+        },
+        {
+          "path": "tests/unit/argon2-worker-pool.test.ts",
+          "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+          "size": 106612,
+          "mtime_ms": 1787349543692.0847
+        },
+        {
+          "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+          "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+          "size": 102059,
+          "mtime_ms": 1787395154282.4463
+        }
+      ],
+      "launchd_labels": {
+        "controller": "com.debateai.t1gate.controller.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+        "worker": "com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14"
+      },
+      "expected_test_files": 1,
+      "expected_tests": 56,
+      "tmpdir": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+      "lock": {
+        "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock",
+        "device": 16777233,
+        "inode": 47087786
+      },
+      "allowed_postgresql_baseline": [],
+      "created_utc": "2026-08-22T20:55:27.567Z",
+      "created_monotonic_ms": 19.903083
+    },
+    "lock": {
+      "directory": {
+        "device": 16777233,
+        "inode": 47087786,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 96,
+        "mtime_ms": 1787432127678.3254
+      },
+      "claim": {
+        "device": 16777233,
+        "inode": 47087814,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 313,
+        "mtime_ms": 1787432127672.6052,
+        "sha256": "d51149eb7036f6c4ccf7557982e13d7860e3efffcbf6439d8aa129b80b939c86"
+      },
+      "claim_value": {
+        "schema_version": 1,
+        "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+        "ownership_token_sha256": "d88e47451687c860ce804009fa0cf4be8caaa8f2a01d841573e236b57da511cd",
+        "owner_sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0",
+        "lock_device": 16777233,
+        "lock_inode": 47087786
+      },
+      "tree_sha256": "76b34f176c6b7460dee3276c2da5152101807b5fb86b2a1854fe5a7bec4e6a0a"
+    },
+    "worker_terminal": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker-terminal.json",
+      "sha256": "138bb1472fc05c75a2779febb49e104a4619d2d1ee10f82b68291c4ea3e99738",
+      "device": 16777233,
+      "inode": 47207580,
+      "mode": 384,
+      "uid": 501,
+      "gid": 20,
+      "size": 993,
+      "mtime_ms": 1787433965227.8206
+    },
+    "test_stdout": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/test.stdout.log",
+      "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+      "device": 16777233,
+      "inode": 47087805,
+      "mode": 384,
+      "uid": 501,
+      "gid": 20,
+      "size": 84850,
+      "mtime_ms": 1787433965194.338
+    },
+    "worker_stdout": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+      "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+      "device": 16777233,
+      "inode": 47207635,
+      "mode": 384,
+      "uid": 501,
+      "gid": 20,
+      "size": 84850,
+      "mtime_ms": 1787433965948.571
+    },
+    "test_stderr": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/test.stderr.log",
+      "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c",
+      "device": 16777233,
+      "inode": 47087806,
+      "mode": 384,
+      "uid": 501,
+      "gid": 20,
+      "size": 2308,
+      "mtime_ms": 1787433177346.4202
+    },
+    "worker_stderr": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log",
+      "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c",
+      "device": 16777233,
+      "inode": 47207636,
+      "mode": 384,
+      "uid": 501,
+      "gid": 20,
+      "size": 2308,
+      "mtime_ms": 1787433965978.111
+    },
+    "launchd_streams": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/launchd-streams.json",
+      "sha256": "f6c881172df9a3a6b1e665dc40acf139edc5ff8bd64598793ddd0f76a0bdbfc5",
+      "device": 16777233,
+      "inode": 47207637,
+      "mode": 256,
+      "uid": 501,
+      "gid": 20,
+      "size": 4153,
+      "mtime_ms": 1787433965995.0864
+    },
+    "postflight": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/postflight-epoch-1.json",
+      "sha256": "d4e5c7d46f947ebe8caf8cf83c4025637f1f12fde29c6e74d6863a7f4c62cd8c",
+      "device": 16777233,
+      "inode": 47207662,
+      "mode": 256,
+      "uid": 501,
+      "gid": 20,
+      "size": 4457,
+      "mtime_ms": 1787433966272.33
+    },
+    "ansi_stripped": {
+      "sha256": "58568909455abb34607b3ae82051457412db78a88b3f64493c76024c4ca3f5b7",
+      "bytes": 76636,
+      "counts": {
+        "test_files_passed": 1,
+        "test_files_total": 1,
+        "tests_passed": 56,
+        "tests_skipped": 0,
+        "tests_total": 56
+      },
+      "checkmark_lines": 56,
+      "run_banner_count": 1
+    }
+  },
+  "git_and_governed": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_paths": [],
+    "governed": [
+      {
+        "path": "apps/api/src/index.ts",
+        "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+        "device": 16777233,
+        "inode": 44865792,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 30548,
+        "mtime_ms": 1787391517922.1519
+      },
+      {
+        "path": "apps/api/src/main.ts",
+        "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+        "device": 16777233,
+        "inode": 45042608,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 7061,
+        "mtime_ms": 1787395079944.3037
+      },
+      {
+        "path": "apps/api/src/registration.ts",
+        "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+        "device": 16777233,
+        "inode": 45570196,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 65119,
+        "mtime_ms": 1787413534178.339
+      },
+      {
+        "path": "packages/crypto/src/index.ts",
+        "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+        "device": 16777233,
+        "inode": 41685523,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 27118,
+        "mtime_ms": 1787343024165.269
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker.ts",
+        "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+        "device": 16777233,
+        "inode": 41674889,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 10314,
+        "mtime_ms": 1787343013164.7224
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker-pool.ts",
+        "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+        "device": 16777233,
+        "inode": 42982160,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 48111,
+        "mtime_ms": 1787357276000
+      },
+      {
+        "path": "packages/db/src/identity.ts",
+        "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+        "device": 16777233,
+        "inode": 41414857,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 25159,
+        "mtime_ms": 1787342997309.6755
+      },
+      {
+        "path": "packages/register/src/auth-policy.ts",
+        "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+        "device": 16777233,
+        "inode": 45055442,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 64506,
+        "mtime_ms": 1787395342357.1929
+      },
+      {
+        "path": "tests/integration/registration-database.test.ts",
+        "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+        "device": 16777233,
+        "inode": 45570400,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 310114,
+        "mtime_ms": 1787413129911.6243
+      },
+      {
+        "path": "tests/unit/registration.test.ts",
+        "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+        "device": 16777233,
+        "inode": 45597615,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 102439,
+        "mtime_ms": 1787405601741.8987
+      },
+      {
+        "path": "tests/unit/argon2-worker-pool.test.ts",
+        "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+        "device": 16777233,
+        "inode": 42467238,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 106612,
+        "mtime_ms": 1787349543692.0847
+      },
+      {
+        "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+        "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+        "device": 16777233,
+        "inode": 45046126,
+        "mode": 420,
+        "uid": 501,
+        "gid": 20,
+        "size": 102059,
+        "mtime_ms": 1787395154282.4463
+      }
+    ]
+  },
+  "process_scan": {
+    "sha256": "22b6ea6bebc9b63512145feb233b8986aa7dcbf7022d1280345b2702bd261f7e",
+    "bytes": 149196,
+    "line_count": 904,
+    "heavy_lines": [],
+    "exact_run_processes": [],
+    "display_only_lines": [
+      "77975 77974 Sat Aug 22 23:55:28 2026     /Users/vladmihaimiron/.hermes/node/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-viewer.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14 /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/viewer-challenge",
+      "77994 77975 Sat Aug 22 23:55:28 2026     /usr/bin/tail -n +1 -F /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/test.stdout.log"
+    ]
+  },
+  "launchd_scan": {
+    "worker": {
+      "label": "com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+      "state": "absent",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14\" in domain for user gui: 501\n"
+    },
+    "controller": {
+      "label": "com.debateai.t1gate.controller.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+      "state": "not running",
+      "last_exit_code": 0,
+      "snapshot_sha256": "acc6368aee9a869884f0ebd1c1516b3c28c9f80d55746946a3ce62548ffb55cc",
+      "snapshot_bytes": 2705
+    }
+  },
+  "planned_supplement": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/vitest-counts-supplement.json",
+    "sha256": "6163d28027c8f88299aa97363fed45ea949e06088162aa1d819b7716e3b93735",
+    "size": 2424
+  },
+  "terminal_or_release_authority": "none",
+  "created_utc": "2026-08-22T22:14:12.804Z"
+}

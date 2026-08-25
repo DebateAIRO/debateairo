@@ -1,0 +1,57 @@
+=== label: deep_queue ===
+=== title: S3d rework3 B1/B3 probes deep-queue slack and the following audit window ===
+=== utc: 2026-08-22T01:02:18Z ===
+=== uptime ===
+ 4:02  up 5 days,  6:25, 73 users, load averages: 4.98 5.96 6.27
+=== vm_stat ===
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    36495.
+Pages active:                                 877119.
+Pages inactive:                               875805.
+Pages speculative:                               823.
+Pages throttled:                                   0.
+Pages wired down:                             148460.
+Pages purgeable:                                 587.
+"Translation faults":                     2750403596.
+Pages copy-on-write:                        95167863.
+Pages zero filled:                        1908389900.
+Pages reactivated:                         120521289.
+Pages purged:                               10439419.
+File-backed pages:                            279865.
+Anonymous pages:                             1473882.
+Pages stored in compressor:                   989606.
+Pages occupied by compressor:                 104249.
+Decompressions:                            125137940.
+Compressions:                              140322158.
+Pageins:                                    32121608.
+Pageouts:                                     174712.
+Swapins:                                     7327138.
+Swapouts:                                   10492871.
+=== memory_pressure ===
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 87%
+=== top ===
+Processes: 764 total, 4 running, 760 sleeping, 4288 threads 
+2026/08/22 04:02:19
+Load Avg: 4.98, 5.96, 6.27 
+CPU usage: 15.17% user, 11.93% sys, 72.88% idle 
+SharedLibs: 566M resident, 125M data, 96M linkedit.
+MemRegions: 870703 total, 21G resident, 246M private, 2239M shared.
+PhysMem: 31G used (2320M wired, 1629M compressor), 576M unused.
+VM: 370T vsize, 6144M framework vsize, 7327138(0) swapins, 10492871(0) swapouts.
+Networks: packets: 212467759/93G in, 168806848/28G out.
+Disks: 25217131/657G read, 43968097/1849G written.
+
+PID    COMMAND          %CPU MEM   TIME    
+98990  routined         0.0  18M   00:47.00
+98989  sysmond          0.0  1760K 05:55.85
+98730  assistantd       0.0  17M   00:16.08
+98718  systemstatusd    0.0  4160K 00:07.00
+98680  audioaccessoryd  0.0  6880K 00:03.46
+98537  zsh              0.0  3088K 00:00.03
+98536  login            0.0  2576K 00:00.03
+98191  spotlightknowled 0.0  14M   02:07.76
+97712  zsh              0.0  3088K 00:00.03
+97711  login            0.0  2640K 00:00.04
+96944  biomed           0.0  5968K 00:07.58
+96912  zsh              0.0  3120K 00:00.03

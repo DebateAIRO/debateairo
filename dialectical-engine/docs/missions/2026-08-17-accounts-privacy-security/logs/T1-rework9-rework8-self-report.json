@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T20:30:06Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "scope": "Rework9 Rework8 canonical pnpm entrypoint and 302 launcher-abort recovery",
+  "outcome": "READY_FOR_GROK_REVIEW",
+  "manifest_sha256": "4e203871f831613a515e9a9f2d34d6f2eae1d32b3a6daee1910e91bafb89c682",
+  "summary": [
+    "Reproduced the actual pnpm logical-versus-canonical entrypoint failure before changing the supervisor.",
+    "Launcher and worker independently bind the node_modules/vitest symlink identity and target plus the canonical regular vitest.mjs tuple; controller revalidates both.",
+    "Exact execution remains pinned Node followed by canonical vitest.mjs, run, and the single registration test path; no PATH or package-manager resolution was added.",
+    "The isolated fixture kills both link-target drift and canonical target-byte drift.",
+    "Authored but did not execute a run-bound recovery that verifies the abort-only receipt, empty claimless lock, labels/processes, frozen repository/runtime custody, and the exact preserved two-file private runtime before archive-by-rename.",
+    "The recovery writes immutable intent before renaming only the lock, then revalidates and records the private directory in the immutable marker; it carries no launch, test, deletion, or new-run authority."
+  ],
+  "verification": {
+    "red_raw_status": 1,
+    "green_raw_status": 0,
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "lock_device_inode": "16777233/46921156",
+    "receipt_device_inode": "16777233/46921157",
+    "private_runtime_device_inode": "16777233/46921158",
+    "private_runtime_preserved": true,
+    "recovery_executed": false,
+    "runtime_probe_required": false
+  },
+  "principal_hashes": {
+    "launcher": "34fd87e15553526f2c03656d78196b4a211b5aa0efcfebaeef5d9ddaa3907750",
+    "controller": "a8c5fbe5aeff7402ac65689ee1580608c5e300c5a11c1bc76107f5f7f407802c",
+    "worker": "8ebc2ed2d10e54ca28424df186c975e8395692efb8587f7b8a563c932a1f8595",
+    "fixture": "558105d9b3c0bce7ba5f6181a852f9843c8b34b3c20fdb2485b8bdaa66342b38",
+    "recovery": "9daab3f78ea0069fc610f6a55c0ceffb73bc701ab68932e1d84ace43135f3156",
+    "authority": "2814ef7f6c72e8da82f428eb8bf8954cc879dab23546895b9d07da238fdcd2ed",
+    "failure_evidence": "5b634c61f53ded33241a02228f5ea53d8389680315a3a26a1d3d6845d81e4456",
+    "contract": "006eea8773559a0fdad0811dc4df8491b1e018c194cc765e115b9cf7a49f73f3",
+    "static_checker": "317e40db11cb3045c059d5b9be791d6961b061c6778a3a0566306c137404844f",
+    "custody_checker": "9557474194b6e5b2cd98b0b596a6ba3790485c1fa2d6912282da4310c286cd4b"
+  },
+  "router_order": "Grok Rework8 approval -> exact one-time 302 recovery outside sandbox -> verify archive/marker/live-lock absence/private preservation -> fresh UUID packet with canonical bindings -> one exclusive gate"
+}

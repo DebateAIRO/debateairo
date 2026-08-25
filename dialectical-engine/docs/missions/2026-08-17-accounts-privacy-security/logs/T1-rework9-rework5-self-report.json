@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "sole coding author; Grok 4.6 remains sole reviewer",
+  "outcome": "READY_FOR_SAME_GROK_REVIEW",
+  "manifest": {
+    "path": "T1-rework9-rework5-manifest.json",
+    "sha256": "18aff3796464a9b825f43e475322742b14f37e5b2513752d6fb501fd0af4c7e2"
+  },
+  "repairs": [
+    "Both launchd templates now use /bin/zsh with the exact positional exec-$@ wrapper before the unchanged Node/script/argument vector; cwd, environment, streams, KeepAlive and AbandonProcessGroup semantics remain intact.",
+    "The viewer tty subprocess inherits viewer stdin while piping stdout and inheriting stderr; readiness and challenge rules remain intact.",
+    "A one-time e3aa NEVER_STARTED recovery authority/tool reuses the approved core, fails closed on custody/liveness ambiguity, and can only atomically archive the preserved lock after immutable intent creation. It was not executed."
+  ],
+  "red_green": {
+    "red_raw_status": 1,
+    "red_kills": ["controller direct Node Program", "worker direct Node Program", "tty child default piped stdin"],
+    "green_raw_status": 0,
+    "green_guards": ["exact rendered argv order and XML escaping", "no extra process group", "inherited tty stdin", "readiness/challenge preserved", "recovery guard and no-execution authority"]
+  },
+  "final_gates": {
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12
+  },
+  "real_lock": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46491737,
+    "claim_inode": 46491752,
+    "claim_sha256": "e9be4c2450f95c2b6b10fc7d2b6d728415cdca0609fee276fd3cbb2d9e6b1e69",
+    "owner_sha256": "7dad353a9d298d11868c5febcdbc2176cd62e65a363283099e34834cf64830d8"
+  },
+  "prohibited_execution": {
+    "launchctl": false,
+    "real_probe": false,
+    "recovery": false,
+    "supervisor_viewer_worker": false,
+    "vitest_postgresql": false,
+    "commit_push_kanban": false
+  },
+  "router_order": "Grok -> exact recovery -> fresh packet -> harmless corrected bootstrap probe if needed -> one exclusive gate"
+}

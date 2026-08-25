@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T22:08:56Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_SAME_GROK_CORRECTION_REVIEW",
+  "manifest_sha256": "3b8009e7374955179582e56cb0d390c58b9c6180f7eb77cfc9f4ad7e0b00407e",
+  "change": "The run-bound recovery now accepts only exact launchctl stopped states `not running` or `exited`, while still requiring last exit code 0 and no numeric PID; the authority binds and the tool verifies the same vocabulary.",
+  "red": "The old exact `state = exited` matcher rejected a deterministic copy of the preserved live `state = not running`, exit-zero, no-PID controller print.",
+  "green": "Both allowed stopped vocabularies pass; mutations to running state, nonzero exit, or numeric PID each fail.",
+  "scope_control": {
+    "future_supervisor_changed": false,
+    "shared_parser_changed": false,
+    "worker_absent_guard_changed": false,
+    "failure_evidence_changed": false,
+    "lock_claim_tree_or_false_positive_bindings_changed": false,
+    "recovery_executed": false,
+    "launchctl_or_test_executed": false
+  },
+  "verification": {
+    "red_raw_status": 1,
+    "green_raw_status": 0,
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "live_lock": "16777233/47087786",
+    "claim_inode": 47087814,
+    "receipt_tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9",
+    "private_tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f",
+    "recovery": "absent_not_executed"
+  },
+  "final_hashes": {
+    "recovery": "30decab681b96f3a2fa8e3b0acc0ff0ed37a5fb13bbe08535260621fb34deac5",
+    "authority": "44a9a30121c2669ac5a1be1ac4e06ec5af764f88d881577edf9fa263e44c265b",
+    "fixture": "4a625b6290b8db97fce9c5ea2a57c6f73d3152ac7a2982290db203e408706a9b",
+    "contract": "8caf1baa66f781125fe6151b95f71bc883fe61d560141b24e148545ed8515d8f",
+    "static_checker": "abe6292d3e7c833c4f851ce1c1b15e5706c469c61f0961b403159bc20ae2ca0e",
+    "custody_checker": "f38081c3468f60e9124abe8df4e792f7e4bf815a81c5d8d12bd61c8fd6330eaf"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T20:41:34Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_SAME_GROK_CORRECTION_REVIEW",
+  "scope": "Rework8 correction1: recovery package-link mtime Stats field only",
+  "review_finding": {
+    "visible_log_sha256": "b2297bb4d18ba4ed8a985f7e4d975ff2ca7f2776c493f5dfdd379b63bc1bcffb",
+    "visible_status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "raw_status": 0,
+    "terminal_marker": "GROK REWORK9 REWORK8 CHANGES REQUESTED",
+    "blocking_defect": "recovery read linkStat.mtime_ms instead of fs.Stats.mtimeMs"
+  },
+  "correction": {
+    "old_expression": "device -> dev; inode -> ino; mtime_ms -> mtime_ms (undefined)",
+    "new_expression": "device -> dev; inode -> ino; mtime_ms -> mtimeMs; size -> size",
+    "tuple_weakened": false,
+    "supervisor_execution_code_changed": false,
+    "recovery_executed": false
+  },
+  "delta_hashes": {
+    "recovery": {
+      "before": "9daab3f78ea0069fc610f6a55c0ceffb73bc701ab68932e1d84ace43135f3156",
+      "after": "e5928a33e2456e9275a063f55b40da794599b330b56658b6ea997fcf0f853791"
+    },
+    "authority": {
+      "before": "2814ef7f6c72e8da82f428eb8bf8954cc879dab23546895b9d07da238fdcd2ed",
+      "after": "b7bae38883cc5bfe41e137dcb274381c535befc52b6b95b10ea77b7986762d48"
+    },
+    "failure_evidence": {
+      "before": "5b634c61f53ded33241a02228f5ea53d8389680315a3a26a1d3d6845d81e4456",
+      "after": "5b634c61f53ded33241a02228f5ea53d8389680315a3a26a1d3d6845d81e4456",
+      "unchanged_incident_evidence": true
+    },
+    "fixture": "8588f61c982e3a97bc7d01af1b42bd2955afff646534d97fa6e4d41c8145f93e",
+    "static_checker": "e2ca38e0b7d6d07bc5bae720fe5910d77b1dceef669ed30dcedb3e4cf3376612",
+    "custody_checker": "c86480a805d34b42c3a38a9e9f26f12fc904bcd9d2f6ddb83cd2d1411ddbe7ab",
+    "contract_unchanged": "006eea8773559a0fdad0811dc4df8491b1e018c194cc765e115b9cf7a49f73f3",
+    "launcher_unchanged": "34fd87e15553526f2c03656d78196b4a211b5aa0efcfebaeef5d9ddaa3907750",
+    "controller_unchanged": "a8c5fbe5aeff7402ac65689ee1580608c5e300c5a11c1bc76107f5f7f407802c",
+    "worker_unchanged": "8ebc2ed2d10e54ca28424df186c975e8395692efb8587f7b8a563c932a1f8595"
+  },
+  "evidence": {
+    "red": {
+      "raw_status": 1,
+      "log_sha256": "2e1a987f17a0e0dafb647ff7b8a61f2b8bc0787c0f39b17343a185b5358d6083",
+      "specific_error": "CUSTODY_MISMATCH:vitest_package_link.mtime_ms",
+      "observed_actual": "undefined",
+      "expected_mtime_ms": 1786649129059.6936
+    },
+    "green": {
+      "raw_status": 0,
+      "log_sha256": "742cb3ca84feca535419af673a8c65f92f70fa872191837b062e993f73320823",
+      "actual_live_link_match": true,
+      "mutated_frozen_mtime_killed": true
+    },
+    "aggregate_static": {
+      "raw_status": 0,
+      "log_sha256": "bf9fa45783b99b93e4067b567f3cd6349d096008d82a5e01973df2897cf690db"
+    },
+    "custody": {
+      "raw_status": 0,
+      "log_sha256": "c3891885082c334c5ba685f417eeedf2ae549732ca7871b2de7195c8372d6bb3"
+    }
+  },
+  "repository_custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "governed_exact": true
+  },
+  "failed_run_custody": {
+    "live_empty_lock": "16777233/46921156",
+    "abort_receipt": "16777233/46921157",
+    "private_runtime": "16777233/46921158",
+    "private_entries": ["controller-custody.secret", "viewer-challenge"],
+    "recovery_artifacts": "absent_not_executed",
+    "unchanged": true
+  },
+  "runtime_probe_required": false,
+  "prohibited_execution_performed": false
+}

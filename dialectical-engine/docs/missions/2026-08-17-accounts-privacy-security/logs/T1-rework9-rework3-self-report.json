@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "sole coding author; Claude excluded; Grok 4.6 is the next reviewer",
+  "outcome": "REWORK3_READY_FOR_GROK_REVIEW",
+  "run_id": "586303c8-f8de-4118-b888-9730abf902be",
+  "manifest": {
+    "path": "T1-rework9-rework3-manifest.json",
+    "sha256": "b612bc4b7b5e7bfe407ac98b1bc3ccc1d1151b87373f9cd1cd9bd54a3745a309"
+  },
+  "implementation": {
+    "classification": "NEVER_STARTED_ONLY",
+    "execution_packet_sha256": "faa5e25118763bca87ae4578c4432d5ac4cc5ed54e7f41eae9a05c829b378d8b",
+    "authority_sha256": "fb6a83f660c76fe5763fc95dc1b2c9fdb5dd768b53c24c8de0a9723443c961d8",
+    "recovery_tool_sha256": "38928ca6b4d307efe8f84f1814c1c0c7bbcc0ff81cb51fef5111c8683ea465ba",
+    "recovery_core_sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "failure_evidence_sha256": "a2a1197e150b4704c8dcdcc64e9c71da8c5d5a1142140ab32e8e8d4f7363d677",
+    "runtime_probe_sha256": "072b9c401bac69af447af9e840fcd8af42eb1c2a96d4da9fa1cbaa8e7b3e92ab",
+    "runtime_probe_plist_sha256": "061b3f7e8109fea3c10ab080ec43c5f6b4beccb4f326149500e3b95afeeb225d",
+    "contract_sha256": "374bb452c597a1160b26f3fc9b878502493d43657ed64b7e701ad848eca1e497",
+    "static_fixture_sha256": "505f5273143f6df8fc5e1065bc4d1a4e50c33bf2730ddb813a4bacf129f85f23"
+  },
+  "evidence": {
+    "red_raw_status": 1,
+    "red_log": "T1-rework9-rework3-red-never-started.log",
+    "green_raw_status": 0,
+    "green_log": "T1-rework9-rework3-final-green-never-started.log",
+    "static_raw_status": 0,
+    "static_log": "T1-rework9-rework3-final-static-supervisor.log",
+    "guards": [
+      "terminal_present",
+      "nonzero_stream",
+      "claim_token_mismatch",
+      "immutable_intent_collision",
+      "second_run_fail_closed"
+    ],
+    "atomic_archive_preserves_directory_and_claim_inodes": true,
+    "test_worker_supervisor_execution_authority": false
+  },
+  "custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "global_lock": "present_untouched",
+    "lock_device": 16777233,
+    "lock_inode": 46312766,
+    "claim_inode": 46312780,
+    "claim_sha256": "fba7e6e38c05e5e88548fa85faeae4eaf571f46221cdf249674d98cba7a32b88",
+    "six_streams_zero_bytes": true,
+    "worker_controller_test_terminal_artifacts_absent": true,
+    "runtime_probe_directory": "absent_not_executed"
+  },
+  "router_execution_order_after_grok_approval": [
+    "1. Outside the sandbox, reverify this manifest, HEAD/index/all twelve governed tuples, the exact live lock/claim identity, the exact NEVER_STARTED absences and zero streams, exact controller/worker label absence, and no unexplained heavy process.",
+    "2. Confirm the run-bound runtime-probe private directory and exact label are absent; outside the sandbox bootstrap T1-rework9-rework3-runtime-probe.plist.template, wait for the exclusive sentinel bytes ok\\n, then boot out only com.debateai.t1gate.runtime-probe.586303c8-f8de-4118-b888-9730abf902be and preserve Router probe evidence.",
+    "3. Outside the sandbox invoke /Users/vladmihaimiron/.hermes/node/bin/node with T1-rework9-rework3-never-started-recovery.mjs and the sole argument T1-rework9-rework3-never-started-authority.json exactly once.",
+    "4. Require raw status 0 and NEVER_STARTED_RECOVERED_LOCK_ARCHIVED; verify immutable intent and recovery receipts, absent live lock, archived directory device/inode 16777233/46312766, archived claim inode 46312780, and unchanged claim SHA-256.",
+    "5. Only under separate Router new-run authority, build a fresh UUID execution packet with packet-precomputed plist hashes and invoke the normal launcher outside the sandbox. The recovery authority and tool do not authorize this step."
+  ],
+  "scope": {
+    "product_or_test_edits": false,
+    "launchctl": false,
+    "recovery_tool_executed": false,
+    "supervisor_or_worker_executed": false,
+    "vitest_or_postgresql_executed": false,
+    "commit_push_kanban_or_reviewer_action": false
+  }
+}

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.debateai.t1gate.controller.7821bdb5-0559-43f4-804e-6996bb9f18a4</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>exec &quot;$@&quot;</string>
+    <string>t1-gate-launchd-wrapper</string>
+    <string>/Users/vladmihaimiron/.hermes/node/bin/node</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-7821bdb5-0559-43f4-804e-6996bb9f18a4.json</string>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller-custody.secret</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TMPDIR</key>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4</string>
+    <key>T1_GATE_RUN_ID</key>
+    <string>7821bdb5-0559-43f4-804e-6996bb9f18a4</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stderr.log</string>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>15</integer>
+</dict>
+</plist>

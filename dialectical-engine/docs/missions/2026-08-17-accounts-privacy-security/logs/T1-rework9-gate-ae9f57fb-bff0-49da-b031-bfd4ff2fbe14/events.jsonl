@@ -1,0 +1,5 @@
+{"sequence":1,"run_id":"ae9f57fb-bff0-49da-b031-bfd4ff2fbe14","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T20:55:28.438Z","monotonic_ms":184.816625,"controller_epoch":1}
+{"sequence":2,"run_id":"ae9f57fb-bff0-49da-b031-bfd4ff2fbe14","kind":"VIEWER_VALIDATED","utc":"2026-08-22T20:55:28.444Z","monotonic_ms":190.125875,"viewer_pid":77975,"viewer_tty":"/dev/ttys027"}
+{"sequence":3,"run_id":"ae9f57fb-bff0-49da-b031-bfd4ff2fbe14","kind":"WORKER_BOOTSTRAPPED","utc":"2026-08-22T20:55:28.600Z","monotonic_ms":346.444667,"worker_label":"com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14"}
+{"sequence":4,"run_id":"ae9f57fb-bff0-49da-b031-bfd4ff2fbe14","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T21:26:06.015Z","monotonic_ms":1837799.738,"launchd_streams_sha256":"f6c881172df9a3a6b1e665dc40acf139edc5ff8bd64598793ddd0f76a0bdbfc5"}
+{"sequence":5,"run_id":"ae9f57fb-bff0-49da-b031-bfd4ff2fbe14","kind":"UNKNOWN_HELD","utc":"2026-08-22T21:26:06.283Z","monotonic_ms":1838067.390917,"error":"Error:CLEANUP_UNKNOWN"}

@@ -138,3 +138,73 @@ FinalPlan folds these in.
   boundary" stands as the DESIGN answer for that future mission, recorded here
   so the gap is carried, not forgotten. The DECIDE-V roster for this mission is
   now EMPTY.
+
+## Batch 5 — V rulings, 2026-08-22
+
+- **Pg0-a G0 pin set: RATIFIED AS DRAFTED** (`planning/Pg0-a-PIN-DRAFT.md`).
+  Tier rules, the enumerated floor deny-list, the EMPTY QUICK allowlist, the
+  12-member closed taxonomy, the `INFO < DEGRADED < SEVERE < FATAL` ladder, the
+  routing table, the code-registry seed procedure+hash, and the register seed
+  rows are pinned. The three deferred slots (`zone_manifest_hash` RP-1,
+  `hatchet_ingest` RP-2, `injection_corpus_hash` RP-3) remain UNSET by design,
+  each carrying its re-pin gate id. Numeric bounds still come to V at G1
+  calibration; `obs.blastRadiusMaxReachable` and `obs.canaryWindowMs` remain
+  seedless and keep G5 closed until V rates them.
+
+- **E6-02 AMENDED — SINGLE CUSTODIAN.** V verbatim: "One person only should be
+  able to approve this, and if we need multiple people to approve of the bot's
+  changes we will give them said permissions." The adopted default (V + one
+  named delegate, dual control on expansion) is **superseded**: V alone is the
+  custodian and sole approver. Additional approvers are a future grant V makes,
+  not a precondition.
+
+  **Binding consequence that must not be missed — S17's G0 acceptance drill.**
+  The drill as planned asserts *"a re-pin without BOTH custodian tokens fails"*.
+  Under single custody that assertion would be a falsehood dressed as a test.
+  S17 MUST instead drill the single-custodian property honestly: a re-pin
+  without the custodian token fails, and the bundle records exactly one
+  custodian. Any later expansion to multiple approvers is a re-pin that changes
+  the recorded custodian set. This propagates to: `planning/FinalPlan.md` §G0
+  acceptance, the S17 ticket (`t_f6593842`), and the Pg0-a card (`t_192aaea9`).
+  Recorded here so the drill asserts what is true rather than what was assumed.
+
+## Batch 6 — V rulings, 2026-08-22 (registry pin + glob hole)
+
+- **`code_seed` = SET A, 276 members**, sha256
+  `65ba47df9659ea2b2bb4cc75051bb00bcea528367c5ccf7d1f99ceffc3736451`
+  (= `direct` 234 ∪ `forwarded` 42, via the 7 pinned forwarders). Full coverage
+  chosen over the simpler extraction path: all 276 codes are known to the
+  registry, so errors record with their real code and typed template instead of
+  degrading. Ratified together with the §3.2 recipe, the canonicalization, and
+  the enumerated values — not a black box. `known_gap` (7,
+  `d1e9b67d…`) and `forwarder_manifest` (7, `e2f70b4b…`) pinned unchanged.
+  **Router-verified: all five hashes reproduced independently from the frozen
+  tree at `29f370e` before ratification.**
+
+- **§2 "production file" glob WIDENED to `packages/**/src/**`.** The ratified
+  `packages/*/src/**` silently missed `packages/battery/decision/src/index.ts`
+  — a real workspace package nested one level deeper carrying real error codes
+  (Router-confirmed present). Because that same glob decides which files the
+  future fix agent may touch autonomously, the file sat **unclassified**:
+  neither clearly allowed nor clearly denied. That is a fix-authority hole, not
+  a bookkeeping one. The deny list is unchanged and still governs everything on
+  the floor; this only corrects which files are recognized as production source
+  at all.
+
+- **Pg0-a ask-item 2 ("name the second custodian") is STRUCK** — void under the
+  Batch-5 single-custodian amendment.
+
+### Standing rule earned this round (binding, mission-wide)
+
+**A pin whose expected value cannot be computed by a party that has never seen
+the implementation is not a pin.** The Router's original §7 ("ratify the
+procedure and the resulting hash") failed this and the defect was invisible
+because the sentence *sounded* like a pin. Every future acceptance criterion
+that names a hash, a baseline, or a target set must state who can compute the
+expected value, from what frozen referent, without access to the artifact under
+test. Known live application: **S17's bundle-hash criterion fails the same test
+one level up** — S17 owns the bundle FORMAT and LOADER, so pre-pinning a hash
+of the file is impossible without self-certification. Fix specified: pin
+**content, not bytes**, via a canonical format-independent projection
+("Pg0-b", a Router act). **S17 must not be dispatched against its bundle-hash
+criterion until Pg0-b exists.**

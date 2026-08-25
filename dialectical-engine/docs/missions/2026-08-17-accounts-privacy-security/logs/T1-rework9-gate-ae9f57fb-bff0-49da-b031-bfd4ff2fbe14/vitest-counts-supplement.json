@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "classification": "ANSI_STRIPPED_VITEST_COUNTS_SUPPLEMENT",
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "source_stdout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/test.stdout.log",
+    "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+    "device": 16777233,
+    "inode": 47087805,
+    "mode": 384,
+    "uid": 501,
+    "gid": 20,
+    "size": 84850,
+    "mtime_ms": 1787433965194.338
+  },
+  "mirrored_worker_stdout": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+    "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+    "device": 16777233,
+    "inode": 47207635,
+    "mode": 384,
+    "uid": 501,
+    "gid": 20,
+    "size": 84850,
+    "mtime_ms": 1787433965948.571
+  },
+  "worker_terminal": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker-terminal.json",
+    "sha256": "138bb1472fc05c75a2779febb49e104a4619d2d1ee10f82b68291c4ea3e99738",
+    "device": 16777233,
+    "inode": 47207580,
+    "mode": 384,
+    "uid": 501,
+    "gid": 20,
+    "size": 993,
+    "mtime_ms": 1787433965227.8206
+  },
+  "parser": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-supervisor-parsers.mjs",
+    "sha256": "ea00acb85d0723f87dc3f156814e143fc0167e1520984587026c58b7134c29f5",
+    "device": 16777233,
+    "inode": 47249301,
+    "mode": 420,
+    "uid": 501,
+    "gid": 20,
+    "size": 3688,
+    "mtime_ms": 1787434672548.33
+  },
+  "raw_status": 0,
+  "historical_worker_terminal_parsed_counts": null,
+  "ansi_stripped_sha256": "58568909455abb34607b3ae82051457412db78a88b3f64493c76024c4ca3f5b7",
+  "ansi_stripped_bytes": 76636,
+  "test_files_passed": 1,
+  "test_files_total": 1,
+  "tests_passed": 56,
+  "tests_skipped": 0,
+  "tests_total": 56,
+  "checkmark_lines": 56,
+  "run_banner_count": 1,
+  "worker_terminal_rewritten": false,
+  "same_byte_test_rerun": false,
+  "created_utc": "2026-08-22T22:14:12.804Z"
+}

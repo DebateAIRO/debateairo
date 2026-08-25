@@ -1,0 +1,57 @@
+=== label: slow_transport ===
+=== title: keeps new-vs-existing timing within the ruled tolerance for slow 0/400/1000ms transports ===
+=== utc: 2026-08-22T01:05:43Z ===
+=== uptime ===
+ 4:05  up 5 days,  6:29, 73 users, load averages: 8.14 6.53 6.42
+=== vm_stat ===
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    47912.
+Pages active:                                 860152.
+Pages inactive:                               859109.
+Pages speculative:                               896.
+Pages throttled:                                   0.
+Pages wired down:                             148522.
+Pages purgeable:                                 135.
+"Translation faults":                     2756671709.
+Pages copy-on-write:                        95233288.
+Pages zero filled:                        1914026260.
+Pages reactivated:                         120689047.
+Pages purged:                               10440904.
+File-backed pages:                            296185.
+Anonymous pages:                             1423972.
+Pages stored in compressor:                  1035300.
+Pages occupied by compressor:                 126459.
+Decompressions:                            125143373.
+Compressions:                              140373171.
+Pageins:                                    32166732.
+Pageouts:                                     174818.
+Swapins:                                     7327174.
+Swapouts:                                   10492871.
+=== memory_pressure ===
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 86%
+=== top ===
+Processes: 775 total, 5 running, 770 sleeping, 4294 threads 
+2026/08/22 04:05:44
+Load Avg: 7.81, 6.49, 6.40 
+CPU usage: 23.54% user, 11.61% sys, 64.84% idle 
+SharedLibs: 569M resident, 126M data, 97M linkedit.
+MemRegions: 860311 total, 21G resident, 229M private, 2237M shared.
+PhysMem: 30G used (2321M wired, 1976M compressor), 757M unused.
+VM: 373T vsize, 6144M framework vsize, 7327174(0) swapins, 10492871(0) swapouts.
+Networks: packets: 212517587/93G in, 168856839/28G out.
+Disks: 25250381/658G read, 43993085/1849G written.
+
+PID    COMMAND          %CPU MEM   TIME    
+98990  routined         0.0  18M   00:47.00
+98989  sysmond          0.0  1680K 05:56.12
+98730  assistantd       0.0  17M   00:16.08
+98718  systemstatusd    0.0  4160K 00:07.00
+98680  audioaccessoryd  0.0  6880K 00:03.46
+98537  zsh              0.0  3088K 00:00.03
+98536  login            0.0  2576K 00:00.03
+98191  spotlightknowled 0.0  14M   02:07.94
+97712  zsh              0.0  3088K 00:00.03
+97711  login            0.0  2640K 00:00.04
+96944  biomed           0.0  6000K 00:07.58
+96912  zsh              0.0  3120K 00:00.03

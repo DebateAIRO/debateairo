@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_id": "586303c8-f8de-4118-b888-9730abf902be",
+  "process_snapshot_sha256": "ec67ee3403ee0c5a8abec8815c2301a02b2410db4575d4b490a8ebbd22b90cdc",
+  "launchd_snapshot_sha256": "4f620e01d17e18eecedb7e99f69776b6e8cfd2695a5425a34aa8ddd161b1c1de",
+  "process_snapshot_complete": true,
+  "launchd_snapshot_complete": true,
+  "allowed_postgresql_baseline": [
+    "58314 58311 Mon Aug 17 15:37:46 2026     /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres -D /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/acceptance/.pgdata -p 55432 -c shared_memory_type=mmap -c dynamic_shared_memory_type=mmap",
+    "58315 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 0",
+    "58316 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 1",
+    "58317 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 2",
+    "58318 58314 Mon Aug 17 15:37:46 2026     postgres: checkpointer",
+    "58319 58314 Mon Aug 17 15:37:46 2026     postgres: background writer",
+    "58321 58314 Mon Aug 17 15:37:46 2026     postgres: walwriter",
+    "58322 58314 Mon Aug 17 15:37:46 2026     postgres: autovacuum launcher",
+    "58323 58314 Mon Aug 17 15:37:46 2026     postgres: logical replication launcher"
+  ],
+  "unexplained_heavy_processes": [],
+  "other_t1_worker_service": false,
+  "token_verified": true,
+  "cwd_verified": true,
+  "argv_verified": true,
+  "head_verified": true,
+  "empty_index_verified": true,
+  "artifact_hashes_verified": true,
+  "governed_tuples_verified": true,
+  "bootstrap_decision": "BOOTSTRAP_CONTROLLER",
+  "utc": "2026-08-22T17:29:16.915Z",
+  "monotonic_ms": 680.246083
+}

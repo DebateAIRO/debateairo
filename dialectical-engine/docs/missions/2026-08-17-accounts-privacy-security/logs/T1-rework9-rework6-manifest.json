@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T19:09:18Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_GROK_REVIEW",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "governed": {
+    "apps/api/src/index.ts": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+    "apps/api/src/main.ts": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+    "apps/api/src/registration.ts": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+    "packages/crypto/src/index.ts": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+    "packages/crypto/src/argon2-worker.ts": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+    "packages/crypto/src/argon2-worker-pool.ts": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+    "packages/db/src/identity.ts": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+    "packages/register/src/auth-policy.ts": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+    "tests/integration/registration-database.test.ts": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "tests/unit/registration.test.ts": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+    "tests/unit/argon2-worker-pool.test.ts": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+    "tests/architecture/t1-argon2-worker-contract.test.ts": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d"
+  },
+  "incident": {
+    "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+    "execution_packet_sha256": "f2971e23a06afc1209a0c0e7ab8709b5906dca33c2128bee9049c995998909e7",
+    "classification": "SUPERVISOR_ONLY_NEVER_STARTED",
+    "cause": "launchd xpcproxy was denied Documents-folder access while opening pre-created controller stdout/stderr",
+    "failure_evidence_sha256": "e5c2ec69b9c84de4384d7942a183c3b3787616fec7fa8b72fba5a9e74e943fc1"
+  },
+  "artifacts": {
+    "launcher": "7df6823f39e8fdbc02b057f4f9070bb94f5d2bc8a449f06f527d07deb5c3dc60",
+    "controller": "135ae31b7eed70bd7fab8f36c21a19de000284f6063a00740bfe2b8928ed327c",
+    "worker": "59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7",
+    "viewer": "1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25",
+    "controller_plist_template": "3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d",
+    "worker_plist_template": "da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d",
+    "launchd_stream_custody": "a57275e000ff9985edebfda8d91d4175dc8a48a4abfd5bf65c37686218dd0685",
+    "rework2_static_fixture": "676ed878b955dc8b9d0e5a22e7cda4ba9c43b14305ad205cd12b21bac49329f5",
+    "rework6_static_fixture": "de80b1c2cc005b2a88338363a0923c85dfeaf798bba5468b6b71bdb097ddbf6f",
+    "recovery_tool": "2a8f000705935e8a832af4e26d8e19f659e106fc444a147351c036ed4c219837",
+    "recovery_authority": "3eeb815673cfcaa6839ed3138283cb7688657d60fd60dd43604727cc4bae26d9",
+    "custody_check": "b206cfc6d714d1da6c038708331bd4bbd1b0ee7b5c2424be2e27d756b94459ca",
+    "contract": "361d1842fa24e2f26c8bf28478c8a59d1b69744a566929af60b091fb3f03d0f5",
+    "aggregate_static_check": "1076a27e0697477042291bcb2bfdea99508c849fa08dc7a762dc1b6f71eac1c2"
+  },
+  "evidence": {
+    "red_raw_status": 1,
+    "red_log_sha256": "9835cd9c034c127fc2ab1953fad074d1aa60a7849fe8f96b50f1f922d45bb272",
+    "green_raw_status": 0,
+    "green_log_sha256": "1d5ad2d89226d87f4b8f6427593949459dba3b61289286f4ad82cb10b8edb8e9",
+    "static_raw_status": 0,
+    "static_log_sha256": "4bf8bffdd6dbfebb4d5014f94c5e41d2717477a123c56a112411ae8be283b355",
+    "custody_raw_status": 0,
+    "custody_log_sha256": "dbc6e573408be0882f5fb7190658283af168689ce8aff63e55bbb094d45068af"
+  },
+  "real_lock_custody": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46622472,
+    "claim_inode": 46622486,
+    "claim_sha256": "8c598375472af4d603a803470d54dd9619b116e9c9cd06e986bf7b9d19df7f4d",
+    "owner_sha256": "0e253cca9d8c8c3278fce38406c8dc7a993284959b5234a10d1f8434a3f8dd65",
+    "viewer_ready_sha256": "5f2f47c1c2996177984f7dcc8119f1ef1241db93fb8d6857e7ef1c3754dc359f",
+    "private_secret_sha256": "94fcb14e4c0a557fde99b56931c3023d7da5d629f3be2c6e89c0c546a86e926a",
+    "receipt_streams": "six_zero_bytes",
+    "recovery_artifacts": "absent_not_executed"
+  },
+  "stream_custody": {
+    "launchd_paths": "four run-private UUID-bound 0700-parent files",
+    "durable_paths": "controller/worker stdout/stderr in receipt directory",
+    "seal": "fsync source; exclusive temp durable copy; hash; atomic rename; receipt fsync; source reverify",
+    "order": "seal streams -> postflight -> terminal -> release",
+    "controller_preexec": "exact run-bound NEVER_STARTED recovery only",
+    "worker_preexec": "controller seals all four streams and classifies INTERRUPTED"
+  },
+  "prohibited_execution": {
+    "launchctl_or_osascript": false,
+    "real_probe": false,
+    "recovery": false,
+    "supervisor_viewer_worker": false,
+    "vitest_or_postgresql": false,
+    "commit_push_kanban": false
+  },
+  "runtime_probe_required": false,
+  "router_order": [
+    "Grok Rework6 review and approval",
+    "Router outside sandbox executes the exact one-time 15c9 NEVER_STARTED recovery tool under its authority",
+    "Router verifies archived lock and immutable recovery marker and verifies the live lock is absent",
+    "skip runtime probe because the defect is launchd file-open custody and the corrected contract is statically complete",
+    "create one fresh UUID packet binding current supervisor/helper/template hashes and rendered private-stream plist hashes",
+    "Router outside sandbox invokes one exclusive gate"
+  ]
+}

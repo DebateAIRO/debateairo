@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "classification": "SUPERVISOR_INTERRUPTED_NO_TEST_MODULE_LOADED",
+  "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-7821bdb5-0559-43f4-804e-6996bb9f18a4.json",
+    "sha256": "4163d9cd2075964f0b25d748341416dcb9ce45d18dddc1eb5578e43873c1ef9a",
+    "size": 10153,
+    "mtime_ms": 1787427074861.7866
+  },
+  "bindings": {
+    "owner_sha256": "953f0998fedb9b048069604270745855b80e179df0bcaff0a907261d76c12017",
+    "claim_sha256": "bac88b8943d2f8ce0ec080cf2bb916ae431221dea175599d02066d0e8efd6545",
+    "ownership_token_sha256": "16509793c360281f71713697e8b52ded79136a9d9bdd7b3e09aa9b5454fc8376",
+    "lock_device": 16777233,
+    "lock_inode": 46782057,
+    "claim_inode": 46782073,
+    "private_directory_inode": 46782059,
+    "private_secret_sha256": "ff63623204c493b56da7f421ebfb3c97659290761716d16843fb9dddabdf2dc5"
+  },
+  "worker_terminal": {
+    "sha256": "f23e6713d6a1395b58bdb9cd89b8d673f1cb2d7449dc1c3bc49a87ce5ea4b235",
+    "size": 793,
+    "raw_status": 127,
+    "child_signal": null,
+    "supervisor_signal": null,
+    "spawn_error": null,
+    "parsed_test_files_passed": null,
+    "parsed_test_files_total": null,
+    "parsed_tests_passed": null,
+    "parsed_tests_skipped": null,
+    "parsed_tests_total": null,
+    "stdout_bytes": 0,
+    "stderr_bytes": 119
+  },
+  "test_output": {
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_size": 0,
+    "stderr_sha256": "9c9a360c867f41a2233bf6c435f279430425e9240652ea710e5f66609e35677c",
+    "stderr_size": 119,
+    "stderr_exact": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.bin/vitest: line 41: exec: node: not found\n",
+    "vitest_module_or_test_loaded": false
+  },
+  "launchd_streams": {
+    "receipt_sha256": "ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88",
+    "complete": true,
+    "controller_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "controller_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worker_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worker_stderr_sha256": "9c9a360c867f41a2233bf6c435f279430425e9240652ea710e5f66609e35677c"
+  },
+  "controller_restart_evidence": {
+    "events_sha256": "eab48117b99158efc313d08d352088069451dacd841214448e6a372a58303e15",
+    "event_count": 16,
+    "epoch_count": 5,
+    "epoch_sha256": [
+      "74aed31e85c282c7bff6db81cfbc2d0714a7c319358320e20d28458a72291517",
+      "222cf869da5d3e74b207c7be6a6065b8cf7f9aae7370798f81f88dc2ebbd57c0",
+      "ec18e3cc54032395cf1de92dd1f62788b22023b473f25baebe651f41922d2495",
+      "7530503dbd8035feb337b7f34980ce8d46669f1823ffababf0bb8b5622fa97b4",
+      "d3bd201a82aa48e5c8b5021236c0088e40f79bcea94e93b238eeffbef5c06e4d"
+    ],
+    "terminal_or_release_written": false
+  },
+  "present_receipt_evidence": [
+    "owner.json",
+    "preflight.json",
+    "process-pre.txt",
+    "launchd-pre.txt",
+    "controller.plist",
+    "worker.plist",
+    "viewer.ready.json",
+    "worker-bootstrap-requested.json",
+    "preflight-worker.json",
+    "process-worker-pre.txt",
+    "launchd-worker-pre.txt",
+    "worker-terminal.json",
+    "launchd-streams.json",
+    "events.jsonl",
+    "heartbeat.json",
+    "controller-epoch-1.json",
+    "controller-epoch-2.json",
+    "controller-epoch-3.json",
+    "controller-epoch-4.json",
+    "controller-epoch-5.json",
+    "controller.stdout.log",
+    "controller.stderr.log",
+    "worker.stdout.log",
+    "worker.stderr.log",
+    "test.stdout.log",
+    "test.stderr.log"
+  ],
+  "absent_receipt_evidence": [
+    "postflight.json",
+    "postflight-epoch-",
+    "process-post-epoch-",
+    "launchd-post-epoch-",
+    "test.status",
+    "terminal.json",
+    "release.json",
+    "custody-hold.json",
+    "launcher-abort.json",
+    "interrupted-rework7-recovery-intent.json",
+    "interrupted-rework7-recovery.json",
+    "interrupted-rework7-archived-lock"
+  ],
+  "router_live_state": {
+    "controller_label_absent": true,
+    "worker_label_absent": true,
+    "viewer_process_group_terminated": true,
+    "matching_run_process_absent": true,
+    "recovery_tool_must_reverify_fail_closed": true,
+    "mutable_process_or_launchd_state_is_not_recovery_authority": true
+  },
+  "diagnosis": {
+    "worker_failure": "launchd default PATH could not resolve node from the node_modules/.bin/vitest shell shim",
+    "controller_failure": "raw close of redirected fd1/fd2 followed by synchronous custody subprocess caused SIGABRT and launchd restart",
+    "product_or_test_failure": false
+  }
+}

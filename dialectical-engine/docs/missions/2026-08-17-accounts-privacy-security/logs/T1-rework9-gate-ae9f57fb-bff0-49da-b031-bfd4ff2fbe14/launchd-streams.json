@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "complete": true,
+  "streams": {
+    "controller": {
+      "stdout": {
+        "launchd": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787432127656.6604,
+          "device": 16777233,
+          "inode": 47087807,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        },
+        "receipt": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787433965870.38,
+          "device": 16777233,
+          "inode": 47207618,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        }
+      },
+      "stderr": {
+        "launchd": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787432127656.72,
+          "device": 16777233,
+          "inode": 47087808,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        },
+        "receipt": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787433965907.1494,
+          "device": 16777233,
+          "inode": 47207626,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        }
+      }
+    },
+    "worker": {
+      "stdout": {
+        "launchd": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+          "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+          "size": 84850,
+          "mtime_ms": 1787433965194.3293,
+          "device": 16777233,
+          "inode": 47087809,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        },
+        "receipt": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stdout.log",
+          "sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+          "size": 84850,
+          "mtime_ms": 1787433965948.571,
+          "device": 16777233,
+          "inode": 47207635,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        }
+      },
+      "stderr": {
+        "launchd": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log",
+          "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c",
+          "size": 2308,
+          "mtime_ms": 1787433177346.4094,
+          "device": 16777233,
+          "inode": 47087810,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        },
+        "receipt": {
+          "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/worker.stderr.log",
+          "sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c",
+          "size": 2308,
+          "mtime_ms": 1787433965978.111,
+          "device": 16777233,
+          "inode": 47207636,
+          "mode": 384,
+          "uid": 501,
+          "gid": 20
+        }
+      }
+    }
+  }
+}

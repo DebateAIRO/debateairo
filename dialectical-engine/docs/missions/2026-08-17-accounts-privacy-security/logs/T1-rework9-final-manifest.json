@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T16:03:25Z",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "governed_paths": [
+    {
+      "path": "apps/api/src/index.ts",
+      "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+      "size": 30548,
+      "mtime_epoch": 1787391517,
+      "mtime_utc": "2026-08-22T09:38:37Z"
+    },
+    {
+      "path": "apps/api/src/main.ts",
+      "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+      "size": 7061,
+      "mtime_epoch": 1787395079,
+      "mtime_utc": "2026-08-22T10:37:59Z"
+    },
+    {
+      "path": "apps/api/src/registration.ts",
+      "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+      "size": 65119,
+      "mtime_epoch": 1787413534,
+      "mtime_utc": "2026-08-22T15:45:34Z"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+      "size": 27118,
+      "mtime_epoch": 1787343024,
+      "mtime_utc": "2026-08-21T20:10:24Z"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker.ts",
+      "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+      "size": 10314,
+      "mtime_epoch": 1787343013,
+      "mtime_utc": "2026-08-21T20:10:13Z"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+      "size": 48111,
+      "mtime_epoch": 1787357276,
+      "mtime_utc": "2026-08-22T00:07:56Z"
+    },
+    {
+      "path": "packages/db/src/identity.ts",
+      "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+      "size": 25159,
+      "mtime_epoch": 1787342997,
+      "mtime_utc": "2026-08-21T20:09:57Z"
+    },
+    {
+      "path": "packages/register/src/auth-policy.ts",
+      "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+      "size": 64506,
+      "mtime_epoch": 1787395342,
+      "mtime_utc": "2026-08-22T10:42:22Z"
+    },
+    {
+      "path": "tests/integration/registration-database.test.ts",
+      "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+      "size": 310114,
+      "mtime_epoch": 1787413129,
+      "mtime_utc": "2026-08-22T15:38:49Z"
+    },
+    {
+      "path": "tests/unit/registration.test.ts",
+      "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+      "size": 102439,
+      "mtime_epoch": 1787405601,
+      "mtime_utc": "2026-08-22T13:33:21Z"
+    },
+    {
+      "path": "tests/unit/argon2-worker-pool.test.ts",
+      "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+      "size": 106612,
+      "mtime_epoch": 1787349543,
+      "mtime_utc": "2026-08-21T21:59:03Z"
+    },
+    {
+      "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+      "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+      "size": 102059,
+      "mtime_epoch": 1787395154,
+      "mtime_utc": "2026-08-22T10:39:14Z"
+    }
+  ]
+}

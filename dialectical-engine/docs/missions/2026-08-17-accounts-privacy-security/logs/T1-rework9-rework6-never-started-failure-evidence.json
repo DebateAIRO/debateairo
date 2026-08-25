@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "classification": "SUPERVISOR_ONLY_NEVER_STARTED",
+  "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+  "execution_packet_sha256": "f2971e23a06afc1209a0c0e7ab8709b5906dca33c2128bee9049c995998909e7",
+  "incident": {
+    "viewer_ready": true,
+    "controller_epoch": "absent",
+    "heartbeat": "absent",
+    "worker_bootstrap_requested": "absent",
+    "worker_terminal": "absent",
+    "test_status": "absent",
+    "terminal": "absent",
+    "release": "absent",
+    "controller_stream_bytes": [0, 0],
+    "worker_stream_bytes": [0, 0],
+    "test_stream_bytes": [0, 0],
+    "controller_label_current_state": "absent_after_exact_bootout",
+    "worker_label_current_state": "absent",
+    "launchd_last_exit_status": 78
+  },
+  "router_read_only_unified_log_diagnostic": {
+    "repeated_on_every_controller_retry": true,
+    "approval_denial": "sandboxd rejected approval request from xpcproxy for kTCCServiceSystemPolicyDocumentsFolder (.../controller.stdout.log): denied",
+    "system_policy_denial": "System Policy: xpcproxy(...) deny(1) file-read-data .../controller.stdout.log",
+    "cause": "launchd xpcproxy attempted to open the pre-created Documents-folder StandardOutPath before controller execution",
+    "mutable_unified_log_is_recovery_authority": false
+  },
+  "bindings": {
+    "owner_sha256": "0e253cca9d8c8c3278fce38406c8dc7a993284959b5234a10d1f8434a3f8dd65",
+    "claim_sha256": "8c598375472af4d603a803470d54dd9619b116e9c9cd06e986bf7b9d19df7f4d",
+    "ownership_token_sha256": "d083e36a71a22d9113faab964f8bdafe3b57b692bd567c7877d96be404939502",
+    "lock_device": 16777233,
+    "lock_inode": 46622472,
+    "claim_inode": 46622486,
+    "viewer_ready_sha256": "5f2f47c1c2996177984f7dcc8119f1ef1241db93fb8d6857e7ef1c3754dc359f",
+    "grok_rework5_approval_sha256": "71ca005752349c83fa88319a09e0b146c04997f3e89c73cbff4257a3e4bc42da"
+  },
+  "private_runtime_state": {
+    "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+    "entries": ["controller-custody.secret"],
+    "controller_custody_secret_sha256": "94fcb14e4c0a557fde99b56931c3023d7da5d629f3be2c6e89c0c546a86e926a",
+    "controller_custody_secret_size": 130,
+    "launchd_temp_streams": "absent_under_old_contract"
+  },
+  "bounded_repair": "Future packets route controller and worker launchd stdout/stderr only to the UUID-bound 0700 private runtime directory. The controller seals exact copies and hashes into durable receipt logs before postflight, terminal, or release.",
+  "recovery_authority_basis": "The one-time recovery must independently prove current filesystem, git, exact-label launchd, and process state. The unified log is immutable diagnostic context only, not present-state authority.",
+  "new_run_authority": "none"
+}

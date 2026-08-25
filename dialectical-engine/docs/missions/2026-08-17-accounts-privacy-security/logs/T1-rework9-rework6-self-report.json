@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "sole coding author; Grok 4.6 remains sole reviewer",
+  "outcome": "READY_FOR_GROK_REVIEW",
+  "manifest": {
+    "path": "T1-rework9-rework6-manifest.json",
+    "sha256": "2b297b1c377ae2a00494f177ececa56d6ca6e2bad43007044876dfc52826a09f"
+  },
+  "repair": [
+    "Launcher-created controller and worker launchd stdout/stderr now live only under the UUID-bound private 0700 runtime directory, so launchd never opens the pre-created Documents receipt streams.",
+    "The controller seals the four private launchd streams into durable receipt paths using source/destination stat validation, fsync, hashing, an exclusive temporary copy, atomic rename and source re-verification before postflight, terminal and release.",
+    "Worker-preexec failure is durably sealed and classified by the controller; controller-preexec failure remains outside controller reach and is handled only by the exact one-time run-bound NEVER_STARTED recovery authority/tool.",
+    "The current TCC-denied NEVER_STARTED run is preserved exactly, including viewer.ready, six zero-byte receipt streams, its private custody secret and immutable failure evidence; its recovery tool was authored but not executed."
+  ],
+  "red_green": {
+    "red_raw_status": 1,
+    "red_kills": [
+      "old launcher pre-created all six Documents receipt streams",
+      "old controller and worker plists named Documents receipt streams directly",
+      "old contract lacked private launchd stream mapping, durable seal/hash binding and required terminal ordering"
+    ],
+    "green_raw_status": 0,
+    "green_guards": [
+      "private 0700 directory and four exact private paths",
+      "exact durable byte/hash copy with idempotent equality",
+      "source mutation fail-closed",
+      "worker-preexec and controller-preexec paths",
+      "streams-before-postflight-before-terminal-before-release",
+      "run-bound recovery without execution authority"
+    ]
+  },
+  "final_gates": {
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12
+  },
+  "real_lock": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46622472,
+    "claim_inode": 46622486,
+    "claim_sha256": "8c598375472af4d603a803470d54dd9619b116e9c9cd06e986bf7b9d19df7f4d",
+    "owner_sha256": "0e253cca9d8c8c3278fce38406c8dc7a993284959b5234a10d1f8434a3f8dd65"
+  },
+  "harmless_probe_required": false,
+  "prohibited_execution": {
+    "launchctl_or_osascript": false,
+    "real_probe": false,
+    "recovery": false,
+    "supervisor_viewer_worker": false,
+    "vitest_or_postgresql": false,
+    "commit_push_kanban": false
+  },
+  "router_order": "Grok Rework6 review/approval -> exact one-time 15c9 recovery outside sandbox -> verify archived lock/marker and absent live lock -> skip probe (not required) -> fresh UUID packet -> one exclusive gate outside sandbox"
+}

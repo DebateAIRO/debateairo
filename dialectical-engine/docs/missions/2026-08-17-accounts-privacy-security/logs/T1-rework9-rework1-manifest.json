@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T16:36:50Z",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "authority": {
+    "rework_packet_sha256": "46bb4c56a70e8948b9d76a10ce9067318032eda14946a6427f92179d058654cd",
+    "rework9_packet_sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+    "authorization_sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9",
+    "roster_amendment_sha256": "c4690380f3fbbb8e123ad8a37ea7c260f0fe5905af8efbadedab4f1f0f43ddec"
+  },
+  "governed": {
+    "tuple_count": 12,
+    "manifest": "T1-rework9-final-manifest.json",
+    "manifest_sha256": "df41708363b49891b6cac4ab3e8e5b7061246d99528be4fadf4aea4b257aa673",
+    "integration_test_sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "registration_product_sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03"
+  },
+  "artifacts": [
+    {
+      "path": "T1-rework9-gate-launcher.mjs",
+      "sha256": "52bfbd18d10b7e50434a4cf118dbfd055d3a5780e739cde56d7cbd0f44aea255",
+      "size": 14230,
+      "mtime_epoch": 1787416376,
+      "mtime_utc": "2026-08-22T16:32:56Z",
+      "changed_in_rework1": true
+    },
+    {
+      "path": "T1-rework9-gate-controller.mjs",
+      "sha256": "0b8b309b233bc6b29079cfd43d3b87e49b1133d464e8f6c18c7120a25efffa52",
+      "size": 23162,
+      "mtime_epoch": 1787416567,
+      "mtime_utc": "2026-08-22T16:36:07Z",
+      "changed_in_rework1": true
+    },
+    {
+      "path": "T1-rework9-gate-worker.mjs",
+      "sha256": "59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7",
+      "size": 5256,
+      "mtime_epoch": 1787414515,
+      "mtime_utc": "2026-08-22T16:01:55Z",
+      "changed_in_rework1": false
+    },
+    {
+      "path": "T1-rework9-gate-controller.plist.template",
+      "sha256": "97ce0cf9dff102cdcc8db9ca978157b13eee5f36b4cc6492e3a7b9e67c3c488e",
+      "size": 1117,
+      "mtime_epoch": 1787413718,
+      "mtime_utc": "2026-08-22T15:48:38Z",
+      "changed_in_rework1": false
+    },
+    {
+      "path": "T1-rework9-gate-worker.plist.template",
+      "sha256": "62a364276bce53bca0685ef4b99dcfbec507b81fc6546c5992bd4249cc1feada",
+      "size": 996,
+      "mtime_epoch": 1787413718,
+      "mtime_utc": "2026-08-22T15:48:38Z",
+      "changed_in_rework1": false
+    },
+    {
+      "path": "T1-rework9-gate-viewer.mjs",
+      "sha256": "4eee931752130781c84df25f7bea818dc4b781ebd2a6ed2e67ed8573cfcb409f",
+      "size": 3284,
+      "mtime_epoch": 1787413977,
+      "mtime_utc": "2026-08-22T15:52:57Z",
+      "changed_in_rework1": false
+    },
+    {
+      "path": "T1-rework9-gate-contract.md",
+      "sha256": "90c63bb693ee6db6f66364faefe42282bd7a74624f82576d89ed4b781b220562",
+      "size": 2284,
+      "mtime_epoch": 1787416471,
+      "mtime_utc": "2026-08-22T16:34:31Z",
+      "changed_in_rework1": true
+    },
+    {
+      "path": "T1-rework9-static-supervisor-check.sh",
+      "sha256": "8b5a88966e5ab6c1bba8cfbfa361df629ff9815962b98923c3a4f5d1275ef0bb",
+      "size": 3257,
+      "mtime_epoch": 1787416461,
+      "mtime_utc": "2026-08-22T16:34:21Z",
+      "changed_in_rework1": true
+    },
+    {
+      "path": "T1-rework9-rework1-static-fixture.mjs",
+      "sha256": "7002a8c4c5f7eaeaac0da02f9d0e6bed88428a0774c8d523e3cd69b3a58e5d75",
+      "size": 3300,
+      "mtime_epoch": 1787416590,
+      "mtime_utc": "2026-08-22T16:36:30Z",
+      "changed_in_rework1": true
+    }
+  ],
+  "review_receipts": [
+    { "path": "T1-rework9-grok-code-review-packet.md", "sha256": "06f5db7050554a5cdd5c9d1320f78caae480856675d53b7d3aa46f2e0dc81f2b" },
+    { "path": "T1-rework9-grok-code-review.log", "sha256": "b58daa208737b73fb408ea59c9c2300d42781bf1c29595f2a1d0330661d1778b" },
+    { "path": "T1-rework9-grok-code-review.status", "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa" },
+    { "path": "T1-rework9-grok-code-review-attempt2.log", "sha256": "f7dfb6cd4316cacaadc15649fba12340d0f4c1b3a6aad785e62b3678a3666fbe" },
+    { "path": "T1-rework9-grok-code-review-attempt2.status", "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa" },
+    { "path": "T1-rework9-grok-evidence-review-packet.md", "sha256": "4a18105ac3f08596ef4e49a84ed225657fad473e71320298684e0606f7757319" },
+    { "path": "T1-rework9-grok-evidence-review.log", "sha256": "177d43956dac82855040b499429116903b8b911b5fde5c62877fc57c517cf96f" },
+    { "path": "T1-rework9-grok-evidence-review.status", "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa" },
+    { "path": "T1-rework9-grok-evidence-review-attempt2.log", "sha256": "aeee6a33504363e7c3c276419a4f92d12d485b9c06a6f686e04544c5d8b84217" },
+    { "path": "T1-rework9-grok-evidence-review-attempt2.status", "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa" }
+  ]
+}

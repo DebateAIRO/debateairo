@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "classification": "NEVER_STARTED_ONLY",
+  "run_id": "e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+  "execution_packet_sha256": "b282ce7861d1906090679f6f8d9f166d4ac188292ccb42dd285f7ce7087f6ddd",
+  "incident": {
+    "controller_bootstrap_result": "launchd_xpcproxy_exit_78",
+    "controller_direct_program": "/Users/vladmihaimiron/.hermes/node/bin/node",
+    "diagnostic": "xpcproxy repeatedly refused direct posix_spawn of the Hermes Node executable",
+    "controller_label": "com.debateai.t1gate.controller.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+    "controller_label_current_state": "absent_after_exact_bootout",
+    "worker_label": "com.debateai.t1gate.worker.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+    "worker_label_current_state": "absent",
+    "launchd_probe_conclusion": "Hermes Node executes through launchctl submit and through a system-program exec wrapper; direct Program selection is the failing boundary.",
+    "mutable_launchd_logs_are_recovery_authority": false
+  },
+  "preserved_present_state": {
+    "global_lock_directory": "present",
+    "owner_and_claim": "present_and_consistent",
+    "controller_stdout_bytes": 0,
+    "controller_stderr_bytes": 0,
+    "worker_stdout_bytes": 0,
+    "worker_stderr_bytes": 0,
+    "test_stdout_bytes": 0,
+    "test_stderr_bytes": 0,
+    "viewer_ready": "absent",
+    "worker_bootstrap_requested": "absent",
+    "heartbeat": "absent",
+    "controller_epoch": "absent",
+    "worker_terminal": "absent",
+    "test_status": "absent",
+    "terminal": "absent",
+    "release": "absent"
+  },
+  "bindings": {
+    "owner_sha256": "7dad353a9d298d11868c5febcdbc2176cd62e65a363283099e34834cf64830d8",
+    "claim_sha256": "e9be4c2450f95c2b6b10fc7d2b6d728415cdca0609fee276fd3cbb2d9e6b1e69",
+    "lock_device": 16777233,
+    "lock_inode": 46491737,
+    "claim_inode": 46491752,
+    "grok_rework4_approval_sha256": "c06e601b3dce41ab9ce8cdfaac396202947c1fd6b892e79a7fb076ebfe873b6f"
+  },
+  "recovery_authority_basis": "The one-time tool must independently prove the current filesystem, git, exact-label launchd, and process state. Prior probes and mutable launchd logs are diagnostic evidence only.",
+  "new_run_authority": "none"
+}

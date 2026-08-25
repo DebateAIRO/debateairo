@@ -1,0 +1,162 @@
+=== T1 FINAL2 CUSTODY — PHASE A PREFLIGHT RECEIPT ===
+
+utc_recorded: 2026-08-22T00:19:02Z
+seat: fresh visible Claude Opus final-custody seat (claude-opus-5)
+kanban: accounts-phase1/t_b225b2f2 (T1)
+router: Codex
+authority: docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-final2-custody-packet.md
+session_id: assigned by the outer wrapper; persisted to
+            logs/T1-final2-claude-session.txt after this invocation returns
+            (extracted from logs/T1-final2-claude-preflight-result.json).
+
+--- EXECUTION MODEL (recorded per packet requirement) ---
+The outer visible Terminal wrapper (logs/run-claude-T1-final2-custody.sh), NOT a
+Claude Bash tool, runs every gate. All wrapper gates are foreground; none is
+backgrounded. This Phase A invocation ran ONLY read-only inspection commands:
+git rev-parse, git rev-parse --show-toplevel, git rev-parse --abbrev-ref,
+git diff --cached --name-only, git status --porcelain=v1 -uall,
+git check-ignore -v, shasum -a 256, stat, date, ls, cat.
+No test, typecheck, lint, `git diff --check`, watcher, or background job was
+started by this seat. No product, test, policy, auditor, or mission-contract
+file was edited. Nothing was staged, committed, pushed; Kanban was not touched;
+no agent was spawned; no Grok/Hermes/Fable/local model was invoked. The
+operator-RSS waiver was not interpreted here.
+
+--- REQUIRED READING COMPLETED IN FULL ---
+1. docs/missions/2026-08-17-accounts-privacy-security/00-mission-charter.md
+2. docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-implementation-packet.md
+3. docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework6-final-review-packet.md
+4. docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-final2-custody-packet.md
+
+--- REPOSITORY IDENTITY ---
+work_dir:      /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
+git_toplevel:  /Users/vladmihaimiron/Documents/DebateAIRO   (parent; expected)
+branch:        dev
+HEAD_actual:   9801f85d97e4263a7c8311304e29d6a03c4a6d15
+HEAD_required: 9801f85d97e4263a7c8311304e29d6a03c4a6d15
+HEAD_verdict:  MATCH
+
+--- INDEX ---
+command: git diff --cached --name-only
+output:  (empty)
+staged_path_count: 0
+index_verdict: MATCH (empty as required)
+
+--- 12-PATH FROZEN MANIFEST: sha256 / size_bytes / mtime_utc / mtime_epoch ---
+All paths relative to the work_dir above. All 12 sha256 values are byte-equal to
+the frozen manifest in the final2 custody packet.
+
+0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a  30548   2026-08-21T20:10:26Z  1787343026  apps/api/src/index.ts
+4dae1f79496a0a8cca7b2ee03a30f922564ce6cace3331539d0406e60973b26f  6606    2026-08-21T21:17:41Z  1787347061  apps/api/src/main.ts
+0b75f99df102d9a7915a22f1d5b28e278352dfcb2936ac5bffe7b3f3afc01fd7  53648   2026-08-21T23:05:51Z  1787353551  apps/api/src/registration.ts
+66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6  27118   2026-08-21T20:10:24Z  1787343024  packages/crypto/src/index.ts
+c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b  10314   2026-08-21T20:10:13Z  1787343013  packages/crypto/src/argon2-worker.ts
+b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d  48111   2026-08-22T00:07:56Z  1787357276  packages/crypto/src/argon2-worker-pool.ts
+2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f  25159   2026-08-21T20:09:57Z  1787342997  packages/db/src/identity.ts
+06056093071e7905342e3030b14c0ac11f14f4ee72a8bce11d7accf34bf5eb52  46750   2026-08-21T21:19:57Z  1787347197  packages/register/src/auth-policy.ts
+7f8a048afaa415f49f340fe2ef15aa2d4140af1bbf3916bddf5353797a295c58  282013  2026-08-21T21:28:57Z  1787347737  tests/integration/registration-database.test.ts
+ebfbfce79c0bdb5de9d2bb0855deabd7a1f95b29cc69667060d55feaa549e25b  51807   2026-08-21T18:44:16Z  1787337856  tests/unit/registration.test.ts
+93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b  106612  2026-08-21T21:59:03Z  1787349543  tests/unit/argon2-worker-pool.test.ts
+3548b93282011be73310efe8a2eec31638133dc69a1d92a0cf4ffbc36f253ca1  86450   2026-08-21T23:01:08Z  1787353268  tests/architecture/t1-argon2-worker-contract.test.ts
+
+manifest_verdict: 12/12 MATCH, 0 mismatch, 0 missing.
+rework6_cross_check: packages/crypto/src/argon2-worker-pool.ts is
+  b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d, which equals
+  the "final" hash named in T1-sol-rework6-final-review-packet.md and is NOT the
+  rework6 entry hash e92f2ab13667a705d12e617ede7ede773c7d56f4e14e3210125450f02c7ea72c.
+  The corrected candidate is in place.
+
+--- COMPLETE WORKING-TREE STATUS ---
+command: git -C /Users/vladmihaimiron/Documents/DebateAIRO status --porcelain=v1 --untracked-files=all
+(paths below are toplevel-relative)
+
+MODIFIED TRACKED (11):
+ M .claude/launch.json                                                                    [expected dirt: repository-parent]
+ M .gitignore                                                                             [expected dirt: repository-parent]
+ M dialectical-engine/apps/api/src/main.ts                                                [frozen 12-path manifest]
+ M dialectical-engine/apps/api/src/registration.ts                                        [frozen 12-path manifest]
+ M dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-seat.sh  [expected dirt: seat launcher]
+ M dialectical-engine/packages/crypto/src/argon2-worker-pool.ts                           [frozen 12-path manifest]
+ M dialectical-engine/packages/db/src/identity.ts                                         [frozen 12-path manifest]
+ M dialectical-engine/packages/register/src/auth-policy.ts                                [frozen 12-path manifest]
+ M dialectical-engine/tests/architecture/t1-argon2-worker-contract.test.ts                [frozen 12-path manifest]
+ M dialectical-engine/tests/integration/registration-database.test.ts                     [frozen 12-path manifest]
+ M dialectical-engine/tests/unit/argon2-worker-pool.test.ts                               [frozen 12-path manifest]
+
+SCOPE FINDING: every modified product/test/policy path is inside the frozen
+12-path manifest. There is NO product, test, or auditor modification beyond it.
+The three non-manifest modifications are the two repository-parent files and the
+seat launcher, all explicitly listed as expected quarantined unrelated dirt.
+
+UNTRACKED (44), all inside expected classes:
+  a) T1 governance packets (11):
+     dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/
+       T1-claude-final-custody-packet.md
+       T1-claude-final2-custody-packet.md            [this seat's authority]
+       T1-claude-rework2-packet.md
+       T1-claude-rework3-packet.md
+       T1-claude-rework4-packet.md
+       T1-claude-rework5-evidence-correction-packet.md
+       T1-claude-rework5-packet.md
+       T1-claude-rework6-packet.md
+       T1-sol-rework2-final-review-packet.md
+       T1-sol-rework3-final-review-packet.md
+       T1-sol-rework4-final-review-packet.md
+       T1-sol-rework5-final-review-packet.md
+       T1-sol-rework6-final-review-packet.md
+  b) prior-seat results/sessions/receipts (same logs dir):
+       T1-final-custody-claude-result.json
+       T1-final-custody-claude-session.txt
+       T1-final-custody-pre.txt
+       T1-final-pnpm-test.status                     [rework5 custody, raw status 1]
+       T1-rework2-claude-result.json / -session.txt
+       T1-rework3-claude-result.json / -session.txt
+       T1-rework4-claude-result.json / -session.txt
+       T1-rework5-claude-result.json / -session.txt
+       T1-rework5-evidence-claude-result.json / -session.txt
+       T1-rework6-claude-result.json / -session.txt
+  c) this seat's own final2 artifacts (2):
+       T1-final2-claude-preflight-result.json        [wrapper tee target, in flight]
+       run-claude-T1-final2-custody.sh               [the outer wrapper]
+  d) unrelated observability-loop mission (6):
+     dialectical-engine/docs/missions/2026-08-21-observability-loop/
+       goal-packets/lane-2-capture.md
+       logs/merge-lane-1.sh
+       logs/run-lane-1-rework1.sh
+       logs/run-lane-1-rework2.sh
+       reviews/L1-S01-rework-1.md
+       reviews/L1-S01-rework-2.md
+
+status_verdict: COMPLETE and fully classified; every entry falls in an expected
+quarantine class or the frozen manifest. No unexplained residue.
+
+--- IGNORED-FILE NOTE FOR PHASE B RESIDUE CLASSIFICATION ---
+dialectical-engine/.gitignore line 9 is `*.log`. Therefore all `.log` receipts
+(T1-final2-pnpm-test.log, T1-final2-typecheck.log, T1-final2-lint.log,
+T1-final2-diff-check.log, T1-final2-custody-progress.log, and the prior
+T1-final-pnpm-test.log / T1-final-custody-claude.log) will NEVER appear in
+porcelain status. Their absence from POST status is expected and is not residue.
+`.status`, `.txt`, `.json`, `.md`, `.sh` receipts DO appear as untracked.
+
+--- FINAL2 RECEIPTS EXPECTED TO APPEAR BY PHASE B (none exist yet except the
+    wrapper's in-flight preflight JSON) ---
+  logs/T1-final2-pnpm-test.log      / .status   (unconditional)
+  logs/T1-final2-typecheck.log      / .status   (only if pnpm test exits 0)
+  logs/T1-final2-lint.log           / .status   (only if pnpm test exits 0)
+  logs/T1-final2-diff-check.log     / .status   (only if pnpm test exits 0)
+  logs/T1-final2-custody-post-shell.txt
+  logs/T1-final2-claude-session.txt
+  logs/T1-final2-claude-final-result.json
+Pre-existing T1-final2-* files at Phase A time: T1-final2-claude-preflight-result.json ONLY.
+No stale final2 gate receipt exists that could be misread in Phase B.
+
+--- PRECONDITION SUMMARY ---
+HEAD                      : MATCH
+index empty               : MATCH
+12/12 manifest sha256     : MATCH
+scope beyond manifest     : NONE
+working-tree status       : complete, fully classified as expected dirt
+gate execution owner      : outer visible wrapper, foreground only
+gates run by this seat    : NONE
+
+PHASE A RESULT: PREFLIGHT READY: FINAL2

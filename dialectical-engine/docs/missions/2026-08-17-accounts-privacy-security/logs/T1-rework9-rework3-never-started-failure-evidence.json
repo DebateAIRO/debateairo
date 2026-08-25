@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "classification": "NEVER_STARTED_ONLY",
+  "run_id": "586303c8-f8de-4118-b888-9730abf902be",
+  "execution_packet_sha256": "faa5e25118763bca87ae4578c4432d5ac4cc5ed54e7f41eae9a05c829b378d8b",
+  "diagnosis": {
+    "cause": "Router invoked the launcher from a sandbox; launchd/xpcproxy could not initialize the controller through the sandboxed Hermes Node path.",
+    "controller_failures": [
+      {"local_timestamp":"2026-08-22 20:29:16.949","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:29:31.989","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:29:47.012","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:30:02.007","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:30:17.038","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:30:32.061","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:30:47.096","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:31:02.142","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:31:17.180","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"},
+      {"local_timestamp":"2026-08-22 20:31:32.218","message":"Service could not initialize: posix_spawn(/Users/vladmihaimiron/.hermes/node/bin/node), error 0x1 - Operation not permitted","followed_by":"service inactive"}
+    ],
+    "service_removal_local_timestamp": "2026-08-22 20:31:43.885",
+    "unified_log_role": "diagnostic_only_not_recovery_authority"
+  },
+  "preserved_present_state": {
+    "global_lock_directory": "present",
+    "owner_and_claim": "present_and_consistent",
+    "controller_stdout_bytes": 0,
+    "controller_stderr_bytes": 0,
+    "worker_stdout_bytes": 0,
+    "worker_stderr_bytes": 0,
+    "test_stdout_bytes": 0,
+    "test_stderr_bytes": 0,
+    "worker_bootstrap_requested": "absent",
+    "heartbeat": "absent",
+    "controller_epoch": "absent",
+    "worker_terminal": "absent",
+    "test_status": "absent",
+    "terminal": "absent",
+    "release": "absent"
+  },
+  "external_unsandboxed_runtime_probes": [
+    {"runtime":"/Users/vladmihaimiron/.hermes/node/bin/node","sentinel":"ok","stdout_bytes":0,"stderr_bytes":0},
+    {"runtime":"/Users/vladmihaimiron/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node","sentinel":"ok","stdout_bytes":0,"stderr_bytes":0}
+  ],
+  "recovery_authority_basis": "The recovery tool must independently prove the current filesystem, git, process, and launchd state. Mutable unified-log retention and prior runtime probes are not sufficient recovery authority.",
+  "runtime_change_authority": "none"
+}

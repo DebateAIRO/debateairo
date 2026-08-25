@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.debateai.t1gate.controller.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vladmihaimiron/.hermes/node/bin/node</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16.json</string>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16/controller-custody.secret</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TMPDIR</key>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16</string>
+    <key>T1_GATE_RUN_ID</key>
+    <string>e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16/controller.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16/controller.stderr.log</string>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>15</integer>
+</dict>
+</plist>

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T21:53:09Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_GROK_FULL_GATE_RECOVERY_REVIEW",
+  "manifest_sha256": "0ef6ffbde540d055fe30042c6d216f80ee05a1a58ac0cba5b8d130c1cfc3df15",
+  "implemented": [
+    "shared strict process snapshot parser and exact identity/ancestry ownership classifier",
+    "controller PID-at-column-zero exemption plus exact viewer and receipt-tail exemptions",
+    "ANSI stripping before worker Vitest count extraction",
+    "one-time ae9 custody recovery with immutable intent, count supplement, archive rename, and marker",
+    "isolated RED/GREEN and archive/idempotence static fixtures"
+  ],
+  "historical_evidence_preserved": {
+    "worker_terminal_rewritten": false,
+    "terminal_json_written": false,
+    "release_json_written": false,
+    "same_byte_test_rerun": false,
+    "receipt_or_private_runtime_rewritten": false,
+    "live_lock_archived": false,
+    "recovery_executed": false
+  },
+  "verification": {
+    "red_raw_status": 1,
+    "green_raw_status": 0,
+    "syntax_raw_status": 0,
+    "aggregate_static_raw_status": 0,
+    "isolated_recovery_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "held_lock": "16777233/47087786",
+    "claim_inode": 47087814,
+    "receipt_tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9",
+    "private_tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f"
+  },
+  "primary_hashes": {
+    "launcher": "38378f4e9a28146197f55e00bcc83b0aa5931c69613f3098a145c26bfee96c7a",
+    "controller": "dfefc008b8c8c44bf076df283710e7a15344de9f26a9eb31e601cf0d4a957449",
+    "worker": "01311020a6d294ef4adf493044de38cfc1d17234005556d262f492767adcf6e4",
+    "parsers": "ea00acb85d0723f87dc3f156814e143fc0167e1520984587026c58b7134c29f5",
+    "recovery": "320cb699663c6424d25519a4622b0e498ba1b2af566c2d3ff9fbfb5c78090ad5",
+    "authority": "250635998523c47c3ab57977d7a562cef2d0dc42b23c4948e330c09ee3092615",
+    "failure_evidence": "f2600cd89776a356fa222b2a6b24c9420905ff0b959b9ae65194edd4939b6079",
+    "contract": "415e747f887bf4a34555b3213cd2dd5af246b92efeb9300db3f1fc0a5fc5a3f6"
+  },
+  "prohibited_execution_performed": false,
+  "review_required_before_recovery": true
+}

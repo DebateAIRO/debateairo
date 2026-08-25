@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "classification": "NEVER_STARTED_ONLY",
+  "run_id": "e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+  "operation": "atomic_rename_preserving_lock_and_claim_inodes",
+  "authority": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework5-never-started-authority.json",
+    "sha256": "cb2ba4788effeb2c41990f73ce553856516c784e4fb86ad291d9520e8859552a",
+    "size": 7023,
+    "mtime_ms": 1787423689871.9014
+  },
+  "recovery_tool": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework5-never-started-recovery.mjs",
+    "sha256": "e9c93663c860bb854dc70931cf8d8a533d98a450050ff2309ee75135c48325ea",
+    "size": 16613,
+    "mtime_ms": 1787423673922.1802
+  },
+  "recovery_core": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework3-recovery-core.mjs",
+    "sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "size": 6850,
+    "mtime_ms": 1787420876982.2737
+  },
+  "failure_evidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework5-never-started-failure-evidence.json",
+    "sha256": "0c2e1074e1d0b5cc94db8e3515d679f70179f2a2e8dd1fab0a19717c7fa118ff",
+    "size": 2190,
+    "mtime_ms": 1787423115078.737
+  },
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16.json",
+    "sha256": "b282ce7861d1906090679f6f8d9f166d4ac188292ccb42dd285f7ce7087f6ddd",
+    "size": 5638,
+    "mtime_ms": 1787422460879.0742
+  },
+  "pre_filesystem": {
+    "run_id": "e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+    "receipt_directory": {
+      "device": 16777233,
+      "inode": 46491738,
+      "mode": 448,
+      "uid": 501,
+      "gid": 20,
+      "size": 448,
+      "mtime_ms": 1787422495930.8328
+    },
+    "owner": {
+      "sha256": "7dad353a9d298d11868c5febcdbc2176cd62e65a363283099e34834cf64830d8",
+      "device": 16777233,
+      "inode": 46491751,
+      "mode": 256,
+      "uid": 501,
+      "gid": 20,
+      "size": 7597,
+      "mtime_ms": 1787422495468.7126
+    },
+    "lock": {
+      "directory": {
+        "device": 16777233,
+        "inode": 46491737,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 96,
+        "mtime_ms": 1787422495505.7966
+      },
+      "claim": {
+        "device": 16777233,
+        "inode": 46491752,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 313,
+        "mtime_ms": 1787422495491.389,
+        "sha256": "e9be4c2450f95c2b6b10fc7d2b6d728415cdca0609fee276fd3cbb2d9e6b1e69"
+      },
+      "claim_value": {
+        "schema_version": 1,
+        "run_id": "e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+        "ownership_token_sha256": "8cafa79785f61c311316592eb86d039db012f8c5b6e29a30d59f05daa55bbe1d",
+        "owner_sha256": "7dad353a9d298d11868c5febcdbc2176cd62e65a363283099e34834cf64830d8",
+        "lock_device": 16777233,
+        "lock_inode": 46491737
+      },
+      "tree_sha256": "360a1aa24a796527d9225ba685bea4c9b2c450e522e8e5381bd83092317705db"
+    },
+    "absent": [
+      "viewer.ready.json",
+      "worker-bootstrap-requested.json",
+      "heartbeat.json",
+      "controller-epoch-",
+      "worker-terminal.json",
+      "test.status",
+      "terminal.json",
+      "release.json",
+      "launcher-abort.json",
+      "never-started-rework5-recovery-intent.json",
+      "never-started-rework5-recovery.json"
+    ],
+    "zero_streams": {
+      "controller.stdout.log": {
+        "device": 16777233,
+        "inode": 46491743,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.6821
+      },
+      "controller.stderr.log": {
+        "device": 16777233,
+        "inode": 46491744,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.752
+      },
+      "worker.stdout.log": {
+        "device": 16777233,
+        "inode": 46491745,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.8005
+      },
+      "worker.stderr.log": {
+        "device": 16777233,
+        "inode": 46491746,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.8467
+      },
+      "test.stdout.log": {
+        "device": 16777233,
+        "inode": 46491747,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.8914
+      },
+      "test.stderr.log": {
+        "device": 16777233,
+        "inode": 46491748,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787422495467.9358
+      }
+    }
+  },
+  "git_and_governed": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_paths": [],
+    "governed": [
+      {
+        "path": "apps/api/src/index.ts",
+        "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+        "size": 30548,
+        "mtime_ms": 1787391517922.1519
+      },
+      {
+        "path": "apps/api/src/main.ts",
+        "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+        "size": 7061,
+        "mtime_ms": 1787395079944.3037
+      },
+      {
+        "path": "apps/api/src/registration.ts",
+        "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+        "size": 65119,
+        "mtime_ms": 1787413534178.339
+      },
+      {
+        "path": "packages/crypto/src/index.ts",
+        "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+        "size": 27118,
+        "mtime_ms": 1787343024165.269
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker.ts",
+        "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+        "size": 10314,
+        "mtime_ms": 1787343013164.7224
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker-pool.ts",
+        "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+        "size": 48111,
+        "mtime_ms": 1787357276000
+      },
+      {
+        "path": "packages/db/src/identity.ts",
+        "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+        "size": 25159,
+        "mtime_ms": 1787342997309.6755
+      },
+      {
+        "path": "packages/register/src/auth-policy.ts",
+        "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+        "size": 64506,
+        "mtime_ms": 1787395342357.1929
+      },
+      {
+        "path": "tests/integration/registration-database.test.ts",
+        "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+        "size": 310114,
+        "mtime_ms": 1787413129911.6243
+      },
+      {
+        "path": "tests/unit/registration.test.ts",
+        "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+        "size": 102439,
+        "mtime_ms": 1787405601741.8987
+      },
+      {
+        "path": "tests/unit/argon2-worker-pool.test.ts",
+        "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+        "size": 106612,
+        "mtime_ms": 1787349543692.0847
+      },
+      {
+        "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+        "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+        "size": 102059,
+        "mtime_ms": 1787395154282.4463
+      }
+    ]
+  },
+  "process_scan": {
+    "sha256": "87f27849016944a3354abfc85911828e6c943e98e0b9316a9e938e2d3175b044",
+    "bytes": 148072,
+    "line_count": 895,
+    "allowed_heavy_lines": []
+  },
+  "launchd_scan": {
+    "controller": {
+      "label": "com.debateai.t1gate.controller.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.controller.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16\" in domain for user gui: 501\n"
+    },
+    "worker": {
+      "label": "com.debateai.t1gate.worker.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.worker.e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16\" in domain for user gui: 501\n"
+    },
+    "domain_sha256": "af241f6595b9f5fb5a20ad7672c4fe0e2f8ee0934c958b003645e8e8f93c157d",
+    "domain_bytes": 116806
+  },
+  "created_utc": "2026-08-22T18:44:05.883Z"
+}

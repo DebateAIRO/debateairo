@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.debateai.t1gate.worker.586303c8-f8de-4118-b888-9730abf902be</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vladmihaimiron/.hermes/node/bin/node</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.mjs</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-586303c8-f8de-4118-b888-9730abf902be</string>
+    <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-586303c8-f8de-4118-b888-9730abf902be.json</string>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-586303c8-f8de-4118-b888-9730abf902be/controller-custody.secret</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TMPDIR</key>
+    <string>/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-586303c8-f8de-4118-b888-9730abf902be</string>
+    <key>T1_GATE_RUN_ID</key>
+    <string>586303c8-f8de-4118-b888-9730abf902be</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-586303c8-f8de-4118-b888-9730abf902be/worker.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-586303c8-f8de-4118-b888-9730abf902be/worker.stderr.log</string>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+</dict>
+</plist>

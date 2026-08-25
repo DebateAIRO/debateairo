@@ -1,0 +1,57 @@
+=== label: capacity ===
+=== title: S3d rework2 B4 measures healthy-MTA burst cost and the frozen S3b margin ===
+=== utc: 2026-08-22T01:04:32Z ===
+=== uptime ===
+ 4:04  up 5 days,  6:28, 73 users, load averages: 6.29 6.07 6.27
+=== vm_stat ===
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    41569.
+Pages active:                                 863531.
+Pages inactive:                               850208.
+Pages speculative:                             12595.
+Pages throttled:                                   0.
+Pages wired down:                             148453.
+Pages purgeable:                                 116.
+"Translation faults":                     2753786954.
+Pages copy-on-write:                        95211117.
+Pages zero filled:                        1911319905.
+Pages reactivated:                         120688773.
+Pages purged:                               10440527.
+File-backed pages:                            309544.
+Anonymous pages:                             1416790.
+Pages stored in compressor:                  1035432.
+Pages occupied by compressor:                 126492.
+Decompressions:                            125143189.
+Compressions:                              140373171.
+Pageins:                                    32160435.
+Pageouts:                                     174810.
+Swapins:                                     7327174.
+Swapouts:                                   10492871.
+=== memory_pressure ===
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 86%
+=== top ===
+Processes: 768 total, 5 running, 763 sleeping, 4292 threads 
+2026/08/22 04:04:33
+Load Avg: 6.29, 6.07, 6.27 
+CPU usage: 24.68% user, 12.17% sys, 63.13% idle 
+SharedLibs: 569M resident, 126M data, 97M linkedit.
+MemRegions: 871298 total, 20G resident, 220M private, 2238M shared.
+PhysMem: 30G used (2320M wired, 1976M compressor), 860M unused.
+VM: 372T vsize, 6144M framework vsize, 7327174(0) swapins, 10492871(0) swapouts.
+Networks: packets: 212497223/93G in, 168836447/28G out.
+Disks: 25244437/658G read, 43984829/1849G written.
+
+PID    COMMAND          %CPU MEM   TIME    
+98990  routined         0.0  18M   00:47.00
+98989  sysmond          0.0  1680K 05:56.12
+98730  assistantd       0.0  17M   00:16.08
+98718  systemstatusd    0.0  4160K 00:07.00
+98680  audioaccessoryd  0.0  6880K 00:03.46
+98537  zsh              0.0  3088K 00:00.03
+98536  login            0.0  2576K 00:00.03
+98191  spotlightknowled 0.0  14M   02:07.94
+97712  zsh              0.0  3088K 00:00.03
+97711  login            0.0  2640K 00:00.04
+96944  biomed           0.0  6000K 00:07.58
+96912  zsh              0.0  3120K 00:00.03

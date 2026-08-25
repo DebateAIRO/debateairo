@@ -1,0 +1,70 @@
+=== T1 FINAL CUSTODY — PRE ===
+utc: 2026-08-21T23:32:20Z
+repo_root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
+git_toplevel: /Users/vladmihaimiron/Documents/DebateAIRO
+node: v22.23.1  pnpm: 11.20.0
+
+--- HEAD ---
+9801f85d97e4263a7c8311304e29d6a03c4a6d15
+expected: 9801f85d97e4263a7c8311304e29d6a03c4a6d15
+
+--- INDEX (git diff --cached --name-only; must be empty) ---
+index_staged_count: 0
+
+--- git status --short (from toplevel) ---
+ M .claude/launch.json
+ M .gitignore
+ M dialectical-engine/apps/api/src/main.ts
+ M dialectical-engine/apps/api/src/registration.ts
+ M dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-seat.sh
+ M dialectical-engine/packages/crypto/src/argon2-worker-pool.ts
+ M dialectical-engine/packages/db/src/identity.ts
+ M dialectical-engine/packages/register/src/auth-policy.ts
+ M dialectical-engine/tests/architecture/t1-argon2-worker-contract.test.ts
+ M dialectical-engine/tests/integration/registration-database.test.ts
+ M dialectical-engine/tests/unit/argon2-worker-pool.test.ts
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-final-custody-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework2-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework3-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework4-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework5-evidence-correction-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework5-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-custody-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-custody-pre.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework2-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework2-claude-session.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework3-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework3-claude-session.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework4-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework4-claude-session.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-claude-session.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-evidence-claude-result.json
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-evidence-claude-session.txt
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework2-final-review-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework3-final-review-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework4-final-review-packet.md
+?? dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework5-final-review-packet.md
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/goal-packets/lane-2-capture.md
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/logs/merge-lane-1.sh
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/logs/run-lane-1-rework1.sh
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/logs/run-lane-1-rework2.sh
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/reviews/L1-S01-rework-1.md
+?? dialectical-engine/docs/missions/2026-08-21-observability-loop/reviews/L1-S01-rework-2.md
+?? dialectical-engine/tmp-goal-T1-final-custody.txt
+
+--- 12-PATH MANIFEST: sha256 / size / mtime(UTC) ---
+0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a  size=30548  mtime=2026-08-21T20:10:26Z  apps/api/src/index.ts
+4dae1f79496a0a8cca7b2ee03a30f922564ce6cace3331539d0406e60973b26f  size=6606  mtime=2026-08-21T21:17:41Z  apps/api/src/main.ts
+0b75f99df102d9a7915a22f1d5b28e278352dfcb2936ac5bffe7b3f3afc01fd7  size=53648  mtime=2026-08-21T23:05:51Z  apps/api/src/registration.ts
+66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6  size=27118  mtime=2026-08-21T20:10:24Z  packages/crypto/src/index.ts
+c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b  size=10314  mtime=2026-08-21T20:10:13Z  packages/crypto/src/argon2-worker.ts
+e92f2ab13667a705d12e617ede7ede773c7d56f4e14e3210125450f02c7ea72c  size=48075  mtime=2026-08-21T22:05:44Z  packages/crypto/src/argon2-worker-pool.ts
+2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f  size=25159  mtime=2026-08-21T20:09:57Z  packages/db/src/identity.ts
+06056093071e7905342e3030b14c0ac11f14f4ee72a8bce11d7accf34bf5eb52  size=46750  mtime=2026-08-21T21:19:57Z  packages/register/src/auth-policy.ts
+7f8a048afaa415f49f340fe2ef15aa2d4140af1bbf3916bddf5353797a295c58  size=282013  mtime=2026-08-21T21:28:57Z  tests/integration/registration-database.test.ts
+ebfbfce79c0bdb5de9d2bb0855deabd7a1f95b29cc69667060d55feaa549e25b  size=51807  mtime=2026-08-21T18:44:16Z  tests/unit/registration.test.ts
+93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b  size=106612  mtime=2026-08-21T21:59:03Z  tests/unit/argon2-worker-pool.test.ts
+3548b93282011be73310efe8a2eec31638133dc69a1d92a0cf4ffbc36f253ca1  size=86450  mtime=2026-08-21T23:01:08Z  tests/architecture/t1-argon2-worker-contract.test.ts
+
+=== END PRE ===

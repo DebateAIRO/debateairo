@@ -19,10 +19,10 @@ cd "${MISSION}" || exit 1
 
 if [[ "${RESUME_FLAG}" == "--resume" && -n "${RESUME_ID}" ]]; then
   GOAL="/goal S3-family rework, SAME SESSION. Re-read ${PACKET} in full; it is your contract. Reproduce the reported defect RED against current code before any fix. Do NOT commit or push. Append progress; post REWORK READY FOR PEER REVIEW at the handoff."
-  INVOKE="claude --resume ${RESUME_ID} -p \\\"\$(cat '${MISSION}/tmp-goal-${SEAT}.txt')\\\" --model ${MODEL} --permission-mode acceptEdits --output-format json"
+  INVOKE="claude --resume ${RESUME_ID} -p \\\"\$(cat '${MISSION}/tmp-goal-${SEAT}.txt')\\\" --model ${MODEL} --permission-mode acceptEdits --allowedTools 'Bash,Read,Write,Edit,Glob,Grep' --output-format json"
 else
   GOAL="/goal Read ${PACKET} in full and execute it as the ${SEAT} coding seat. It is your only scope authority. Mandatory RED->GREEN->REFACTOR with reproduce-first. Honor the touch-only file contract and frozen scopes; STOP and post CODEX BLOCKED (worker-blocked) rather than widen. VR-10: mutation-test every security assertion and show it RED against broken code. Real ruled timeouts in any timeout test; no harness that cannot fail. Do NOT commit or push. Append progress to ${REL}/logs/${SEAT}-progress.log; post READY FOR PEER REVIEW when gates pass."
-  INVOKE="claude -p \\\"\$(cat '${MISSION}/tmp-goal-${SEAT}.txt')\\\" --model ${MODEL} --permission-mode acceptEdits --output-format json"
+  INVOKE="claude -p \\\"\$(cat '${MISSION}/tmp-goal-${SEAT}.txt')\\\" --model ${MODEL} --permission-mode acceptEdits --allowedTools 'Bash,Read,Write,Edit,Glob,Grep' --output-format json"
 fi
 print -r -- "${GOAL}" > "${MISSION}/tmp-goal-${SEAT}.txt"
 

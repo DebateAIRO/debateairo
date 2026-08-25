@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "classification": "TERMINAL_PRODUCT_PASS_CUSTODY_HELD_FALSE_POSITIVE",
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14.json",
+    "sha256": "0e34e9d7cb01a3b02f987bd0476e3608504fc8aa7a1d2d0021be92692c07f14c",
+    "size": 12858,
+    "mtime_ms": 1787432045079.5393
+  },
+  "bindings": {
+    "owner_sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0",
+    "claim_sha256": "d51149eb7036f6c4ccf7557982e13d7860e3efffcbf6439d8aa129b80b939c86",
+    "ownership_token_sha256": "d88e47451687c860ce804009fa0cf4be8caaa8f2a01d841573e236b57da511cd",
+    "lock_device": 16777233,
+    "lock_inode": 47087786,
+    "claim_inode": 47087814,
+    "receipt_device": 16777233,
+    "receipt_inode": 47087787,
+    "receipt_tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9",
+    "private_device": 16777233,
+    "private_inode": 47087788,
+    "private_tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f"
+  },
+  "worker_terminal": {
+    "sha256": "138bb1472fc05c75a2779febb49e104a4619d2d1ee10f82b68291c4ea3e99738",
+    "size": 993,
+    "raw_status": 0,
+    "child_signal": null,
+    "supervisor_signal": null,
+    "spawn_error": null,
+    "raw_parsed_counts": null,
+    "stdout_bytes": 84850,
+    "stderr_bytes": 2308
+  },
+  "ansi_stripped_test_result": {
+    "source_stdout_sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+    "source_stdout_size": 84850,
+    "ansi_stripped_sha256": "58568909455abb34607b3ae82051457412db78a88b3f64493c76024c4ca3f5b7",
+    "ansi_stripped_bytes": 76636,
+    "test_files_passed": 1,
+    "test_files_total": 1,
+    "tests_passed": 56,
+    "tests_skipped": 0,
+    "tests_total": 56,
+    "checkmark_lines": 56,
+    "run_banner_count": 1,
+    "same_byte_rerun_required": false
+  },
+  "sealed_streams": {
+    "receipt_sha256": "f6c881172df9a3a6b1e665dc40acf139edc5ff8bd64598793ddd0f76a0bdbfc5",
+    "complete": true,
+    "controller_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "controller_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worker_stdout_sha256": "0274f03d85a684ab7486b1107e0f6ceb4316f96bd1d88f0e8d4225c743c8894f",
+    "worker_stderr_sha256": "b67a2917d675855cb39d1fde5edaceb89c18393b30fba540224a8d811704d39c"
+  },
+  "custody_hold": {
+    "postflight_sha256": "d4e5c7d46f947ebe8caf8cf83c4025637f1f12fde29c6e74d6863a7f4c62cd8c",
+    "process_snapshot_sha256": "b4b5a79deaf10d693be90feffbb432a7ccd98abe24000b81c182575acb947872",
+    "launchd_snapshot_sha256": "13e5635f3652b04adca58c96eaf6cc8454b68f62f628d292ea579233144a1d9e",
+    "custody_hold_sha256": "682b053cfc28ce99666c077cd45703254414cd099be00ae7edbbc49c4bc6cfa9",
+    "classification": "UNKNOWN_HELD",
+    "reason": "Error:CLEANUP_UNKNOWN",
+    "worker_bootout_proven": true,
+    "unexplained_heavy_processes": [],
+    "false_positive_lines": [
+      "77991     1 Sat Aug 22 23:55:28 2026     /Users/vladmihaimiron/.hermes/node/bin/node /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14.json /var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/controller-custody.secret",
+      "82915 30314 Sun Aug 23 00:25:35 2026     /bin/zsh -lc sleep 50; sed -n '1,22p' docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/heartbeat.json; tail -n 30 docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-ae9f57fb-bff0-49da-b031-bfd4ff2fbe14/test.stdout.log"
+    ]
+  },
+  "repository": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "governed_exact": true
+  },
+  "review": {
+    "visible_log_sha256": "048277aada9c3daa52590f89e3a677bdf1f33acc8981c2fb62753b948347fc24",
+    "visible_status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "raw_status": 0,
+    "terminal_marker": "GROK REWORK9 FULL GATE ACCEPTED WITH CUSTODY RECOVERY REQUIRED"
+  },
+  "normal_terminal_or_release_present": false,
+  "product_or_scientific_failure": false
+}

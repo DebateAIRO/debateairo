@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T17:51:40Z",
+  "run_id": "586303c8-f8de-4118-b888-9730abf902be",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "execution_packet_sha256": "faa5e25118763bca87ae4578c4432d5ac4cc5ed54e7f41eae9a05c829b378d8b",
+  "governed_tuple_count": 12,
+  "preserved_lock": {
+    "device": 16777233,
+    "inode": 46312766,
+    "claim_inode": 46312780,
+    "claim_sha256": "fba7e6e38c05e5e88548fa85faeae4eaf571f46221cdf249674d98cba7a32b88",
+    "owner_sha256": "8c745c31cda15bd57ef461679ca8835fdfc3a57ca13f6075428d6bae255ee87b"
+  },
+  "artifacts": [
+    {"path":"T1-rework9-rework3-custody-check.mjs","sha256":"8e0c6ca98c9c408ef597920562ca41cecc4da5ac32fd1fba45be99a804963cc1","size":5455,"mode":"0555"},
+    {"path":"T1-rework9-rework3-static-fixture.mjs","sha256":"505f5273143f6df8fc5e1065bc4d1a4e50c33bf2730ddb813a4bacf129f85f23","size":7163,"mode":"0555"},
+    {"path":"T1-rework9-rework3-recovery-core.mjs","sha256":"82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d","size":6850,"mode":"0555"},
+    {"path":"T1-rework9-rework3-never-started-recovery.mjs","sha256":"38928ca6b4d307efe8f84f1814c1c0c7bbcc0ff81cb51fef5111c8683ea465ba","size":16739,"mode":"0555"},
+    {"path":"T1-rework9-rework3-never-started-authority.json","sha256":"fb6a83f660c76fe5763fc95dc1b2c9fdb5dd768b53c24c8de0a9723443c961d8","size":6993,"mode":"0444"},
+    {"path":"T1-rework9-rework3-never-started-failure-evidence.json","sha256":"a2a1197e150b4704c8dcdcc64e9c71da8c5d5a1142140ab32e8e8d4f7363d677","size":3891,"mode":"0444"},
+    {"path":"T1-rework9-rework3-runtime-probe.mjs","sha256":"072b9c401bac69af447af9e840fcd8af42eb1c2a96d4da9fa1cbaa8e7b3e92ab","size":1346,"mode":"0555"},
+    {"path":"T1-rework9-rework3-runtime-probe.plist.template","sha256":"061b3f7e8109fea3c10ab080ec43c5f6b4beccb4f326149500e3b95afeeb225d","size":982,"mode":"0444"},
+    {"path":"T1-rework9-gate-contract.md","sha256":"374bb452c597a1160b26f3fc9b878502493d43657ed64b7e701ad848eca1e497","size":5835},
+    {"path":"T1-rework9-static-supervisor-check.sh","sha256":"c7eccc1ae2e5bb1501deb947b03d302bdffbb8c72fd665de662576e605096a61","size":6298}
+  ],
+  "red": {
+    "raw_status": 1,
+    "log_sha256": "2e1dd40a89c53cc2ffb1b0c9bd2dbbcc57f87dbbde33d70a86a9fd3052a1ce76",
+    "status_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  "final_green": {
+    "raw_status": 0,
+    "fixture_log_sha256": "50128072ebd8e3d319dc1c4da36527400e4b09248e8861d81c5f545079c4d644",
+    "static_log_sha256": "5b88bed649d7cbeb316608f1b771064688fb6b30a9a10463fb49e4c74ca2a7ac",
+    "status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "prohibited_execution": {
+    "launchctl": false,
+    "recovery_tool": false,
+    "supervisor": false,
+    "worker": false,
+    "vitest": false,
+    "postgresql": false
+  }
+}

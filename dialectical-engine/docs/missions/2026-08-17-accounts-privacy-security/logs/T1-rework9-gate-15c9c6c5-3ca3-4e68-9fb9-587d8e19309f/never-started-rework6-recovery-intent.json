@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "classification": "SUPERVISOR_ONLY_NEVER_STARTED",
+  "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+  "operation": "atomic_rename_preserving_lock_and_claim_inodes",
+  "authority": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework6-never-started-authority.json",
+    "sha256": "3eeb815673cfcaa6839ed3138283cb7688657d60fd60dd43604727cc4bae26d9",
+    "size": 7700,
+    "mtime_ms": 1787425538349.8462
+  },
+  "recovery_tool": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework6-never-started-recovery.mjs",
+    "sha256": "2a8f000705935e8a832af4e26d8e19f659e106fc444a147351c036ed4c219837",
+    "size": 18668,
+    "mtime_ms": 1787425520981.5317
+  },
+  "recovery_core": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework3-recovery-core.mjs",
+    "sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "size": 6850,
+    "mtime_ms": 1787420876982.2737
+  },
+  "failure_evidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework6-never-started-failure-evidence.json",
+    "sha256": "e5c2ec69b9c84de4384d7942a183c3b3787616fec7fa8b72fba5a9e74e943fc1",
+    "size": 2790,
+    "mtime_ms": 1787425158901.422
+  },
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f.json",
+    "sha256": "f2971e23a06afc1209a0c0e7ab8709b5906dca33c2128bee9049c995998909e7",
+    "size": 7438,
+    "mtime_ms": 1787424484837.4495
+  },
+  "pre_filesystem": {
+    "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+    "receipt_directory": {
+      "device": 16777233,
+      "inode": 46622473,
+      "mode": 448,
+      "uid": 501,
+      "gid": 20,
+      "size": 480,
+      "mtime_ms": 1787424560915.4326
+    },
+    "owner": {
+      "sha256": "0e253cca9d8c8c3278fce38406c8dc7a993284959b5234a10d1f8434a3f8dd65",
+      "device": 16777233,
+      "inode": 46622485,
+      "mode": 256,
+      "uid": 501,
+      "gid": 20,
+      "size": 7599,
+      "mtime_ms": 1787424560299.773
+    },
+    "lock": {
+      "directory": {
+        "device": 16777233,
+        "inode": 46622472,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 96,
+        "mtime_ms": 1787424560321.0125
+      },
+      "claim": {
+        "device": 16777233,
+        "inode": 46622486,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 313,
+        "mtime_ms": 1787424560315.9575,
+        "sha256": "8c598375472af4d603a803470d54dd9619b116e9c9cd06e986bf7b9d19df7f4d"
+      },
+      "claim_value": {
+        "schema_version": 1,
+        "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+        "ownership_token_sha256": "d083e36a71a22d9113faab964f8bdafe3b57b692bd567c7877d96be404939502",
+        "owner_sha256": "0e253cca9d8c8c3278fce38406c8dc7a993284959b5234a10d1f8434a3f8dd65",
+        "lock_device": 16777233,
+        "lock_inode": 46622472
+      },
+      "tree_sha256": "571111264392478db9f1adeac15cac766d5b5b76d564b0da5d868c3cdb35586a"
+    },
+    "absent": [
+      "worker-bootstrap-requested.json",
+      "heartbeat.json",
+      "controller-epoch-",
+      "worker-terminal.json",
+      "test.status",
+      "terminal.json",
+      "release.json",
+      "launcher-abort.json",
+      "custody-hold.json",
+      "events.jsonl",
+      "never-started-rework6-recovery-intent.json",
+      "never-started-rework6-recovery.json"
+    ],
+    "zero_streams": {
+      "controller.stdout.log": {
+        "device": 16777233,
+        "inode": 46622477,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560298.7305
+      },
+      "controller.stderr.log": {
+        "device": 16777233,
+        "inode": 46622478,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560298.8008
+      },
+      "worker.stdout.log": {
+        "device": 16777233,
+        "inode": 46622479,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560298.8523
+      },
+      "worker.stderr.log": {
+        "device": 16777233,
+        "inode": 46622480,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560298.898
+      },
+      "test.stdout.log": {
+        "device": 16777233,
+        "inode": 46622481,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560298.9504
+      },
+      "test.stderr.log": {
+        "device": 16777233,
+        "inode": 46622482,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 0,
+        "mtime_ms": 1787424560299.01
+      }
+    }
+  },
+  "private_runtime": {
+    "directory": {
+      "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+      "device": 16777233,
+      "inode": 46622474,
+      "mode": 448,
+      "uid": 501,
+      "gid": 20
+    },
+    "secret": {
+      "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f/controller-custody.secret",
+      "sha256": "94fcb14e4c0a557fde99b56931c3023d7da5d629f3be2c6e89c0c546a86e926a",
+      "size": 130,
+      "mtime_ms": 1787424560273.363
+    }
+  },
+  "git_and_governed": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_paths": [],
+    "governed": [
+      {
+        "path": "apps/api/src/index.ts",
+        "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+        "size": 30548,
+        "mtime_ms": 1787391517922.1519
+      },
+      {
+        "path": "apps/api/src/main.ts",
+        "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+        "size": 7061,
+        "mtime_ms": 1787395079944.3037
+      },
+      {
+        "path": "apps/api/src/registration.ts",
+        "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+        "size": 65119,
+        "mtime_ms": 1787413534178.339
+      },
+      {
+        "path": "packages/crypto/src/index.ts",
+        "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+        "size": 27118,
+        "mtime_ms": 1787343024165.269
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker.ts",
+        "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+        "size": 10314,
+        "mtime_ms": 1787343013164.7224
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker-pool.ts",
+        "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+        "size": 48111,
+        "mtime_ms": 1787357276000
+      },
+      {
+        "path": "packages/db/src/identity.ts",
+        "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+        "size": 25159,
+        "mtime_ms": 1787342997309.6755
+      },
+      {
+        "path": "packages/register/src/auth-policy.ts",
+        "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+        "size": 64506,
+        "mtime_ms": 1787395342357.1929
+      },
+      {
+        "path": "tests/integration/registration-database.test.ts",
+        "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+        "size": 310114,
+        "mtime_ms": 1787413129911.6243
+      },
+      {
+        "path": "tests/unit/registration.test.ts",
+        "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+        "size": 102439,
+        "mtime_ms": 1787405601741.8987
+      },
+      {
+        "path": "tests/unit/argon2-worker-pool.test.ts",
+        "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+        "size": 106612,
+        "mtime_ms": 1787349543692.0847
+      },
+      {
+        "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+        "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+        "size": 102059,
+        "mtime_ms": 1787395154282.4463
+      }
+    ]
+  },
+  "process_scan": {
+    "sha256": "d95bc013d70ad00242314205c61352f951fe4e0813f1821275bb5823d5d01278",
+    "bytes": 147614,
+    "line_count": 891,
+    "allowed_heavy_lines": [],
+    "display_only_viewer_lines": []
+  },
+  "launchd_scan": {
+    "controller": {
+      "label": "com.debateai.t1gate.controller.15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.controller.15c9c6c5-3ca3-4e68-9fb9-587d8e19309f\" in domain for user gui: 501\n"
+    },
+    "worker": {
+      "label": "com.debateai.t1gate.worker.15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.worker.15c9c6c5-3ca3-4e68-9fb9-587d8e19309f\" in domain for user gui: 501\n"
+    },
+    "domain_sha256": "bff743b32c8eebc4da6a02c4722fd33b63dd41eaffe1af61074403f5e80462d6",
+    "domain_bytes": 116806
+  },
+  "launchd_stream_contract": "old_documents_streams_preserved_zero_bytes",
+  "created_utc": "2026-08-22T19:26:26.210Z"
+}

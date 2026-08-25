@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T18:04:05Z",
+  "outcome": "READY_FOR_SAME_GROK_RE_REVIEW",
+  "review_verdict_sha256": "c06e601b3dce41ab9ce8cdfaac396202947c1fd6b892e79a7fb076ebfe873b6f",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "governed_tuple_count": 12,
+  "changed_artifacts": [
+    {"path":"T1-rework9-rework3-runtime-probe.mjs","sha256":"2eb8789b2784f57efb0b39e321eaeb5af4ea40e4c46dbd398edad848af84a999","size":1464,"mtime_ms":1787421762094.386,"mode":"0555"},
+    {"path":"T1-rework9-rework3-static-fixture.mjs","sha256":"1445fc95c6c16e18ff71641fbf5310f791e20d48afe9fc2e55d9cb6445bae567","size":8627,"mtime_ms":1787421742991.1008,"mode":"0555"},
+    {"path":"T1-rework9-gate-contract.md","sha256":"64a4b67de0db8bc091828942c3f03e5acade21bb48472947da5501513f54e257","size":6120}
+  ],
+  "preserved_bindings": {
+    "authority_sha256": "fb6a83f660c76fe5763fc95dc1b2c9fdb5dd768b53c24c8de0a9723443c961d8",
+    "recovery_tool_sha256": "38928ca6b4d307efe8f84f1814c1c0c7bbcc0ff81cb51fef5111c8683ea465ba",
+    "recovery_core_sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "runtime_probe_plist_sha256": "061b3f7e8109fea3c10ab080ec43c5f6b4beccb4f326149500e3b95afeeb225d",
+    "static_supervisor_check_sha256": "c7eccc1ae2e5bb1501deb947b03d302bdffbb8c72fd665de662576e605096a61"
+  },
+  "red": {
+    "raw_status": 1,
+    "log_sha256": "d022c7625ca59dff39a42970b8c837cf2d0484bd1fe9cadbadf3497d46041a3a",
+    "status_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "old_literal_comparison": false,
+    "canonical_parent_comparison": true
+  },
+  "green": {
+    "raw_status": 0,
+    "log_sha256": "b70051d5905cc00d3ca5b26b4b22951cd3fedbda6ad87d63c06edeb3ac2a4086",
+    "status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "old_literal_comparison": false,
+    "canonical_parent_comparison": true
+  },
+  "static": {
+    "raw_status": 0,
+    "log_sha256": "ab50e41f716b8934441d832abf10dda729086050f4a5cba2e738eaea072d58ed",
+    "status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "scope": {
+    "real_probe_executed": false,
+    "launchctl_recovery_supervisor_worker_vitest_postgresql": false,
+    "product_or_test_edits": false,
+    "real_lock_touched": false
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "classification": "UNKNOWN_HELD",
+  "reason": "Error:CLEANUP_UNKNOWN",
+  "lock_retained": true,
+  "utc": "2026-08-22T21:26:06.287Z",
+  "monotonic_ms": 1838072.315584
+}

@@ -1,7 +1,5 @@
 .DS_Store
 .pnpm-store/
-memory/index.json
-.harness/metrics/*.jsonl
 .worktrees/
 
 **/__pycache__/
@@ -9,47 +7,41 @@ memory/index.json
 **/.pytest_cache/
 **/.coverage
 
-apps/dialectical-engine/.venv/
-apps/dialectical-engine/.venv*/
-apps/dialectical-engine/.dialectical-dev/
-apps/dialectical-engine/web/.next/
-apps/dialectical-engine/web/.next-dev*/
-apps/dialectical-engine/web/node_modules/
-apps/dialectical-engine/web/out/
-
 # TypeScript incremental build cache
 **/*.tsbuildinfo
 
 # Design reference assets (comps + screenshots, not part of the app)
 Design specifications summary*
 
-# Legacy local runtime artifacts left behind after the app moved under apps/.
-dialectical-engine/.venv*/
-dialectical-engine/.dialectical-dev/
-dialectical-engine/**/__pycache__/
-dialectical-engine/**/.pytest_cache/
+# The dialectical engine workspace. Renamed from `DebateAI-V3/` on 2026-08-17;
+# the rules below moved with it. Its own dialectical-engine/.gitignore covers
+# the same ground relative to itself — these root rules are the belt to that
+# braces, and they are the ones that caught the incidents noted below.
+dialectical-engine/node_modules/
+dialectical-engine/web/node_modules/
 dialectical-engine/web/.next/
 dialectical-engine/web/.next-dev*/
-dialectical-engine/web/node_modules/
 
-# V3 workspace (moved in 2026-08-09)
-DebateAI-V3/node_modules/
-DebateAI-V3/web/node_modules/
-DebateAI-V3/web/.next/
-DebateAI-V3/.DS_Store
-.DS_Store
-
-# V3 apps/v2-ui — V2's UI copied in 2026-08-10. The rules above predate this
-# directory, so its build output was being tracked: 187 files / ~35 MB of
-# webpack cache turned up in an unpushed commit.
-DebateAI-V3/apps/**/node_modules/
-DebateAI-V3/apps/**/.next/
-DebateAI-V3/apps/**/.next-dev*/
-DebateAI-V3/apps/**/.next-build*/
+# apps/* build output. The rules above predated apps/ui (added 2026-08-10 as
+# apps/v2-ui, renamed to apps/ui on 2026-08-17), so its build output was being
+# tracked: 187 files / ~35 MB of webpack cache turned up in an unpushed commit.
+dialectical-engine/apps/**/node_modules/
+dialectical-engine/apps/**/.next/
+dialectical-engine/apps/**/.next-dev*/
+dialectical-engine/apps/**/.next-build*/
 
 # Acceptance harness runtime state. `.pgdata` is a LIVE PostgreSQL data
-# directory and `.pgdata-backup-*` are local recovery copies taken before a
-# register reseed (DR-151). Both are machine-local runtime state, never source:
-# one backup put 1615 files / ~34 MB into an unpushed commit.
-DebateAI-V3/acceptance/.pgdata/
-DebateAI-V3/acceptance/.pgdata-backup-*/
+# directory and `.pgdata-*` are local copies (recovery backups per DR-151,
+# archived research corpora per DR-188). ALL of them are machine-local runtime
+# state holding plaintext user debate content — never source.
+#
+# CATCH-ALL BY DESIGN (2026-08-17). The previous rules named only `.pgdata/`
+# and `.pgdata-backup-*/`. An archive named `.pgdata-debate-091b7663-…`
+# matched neither, so 1731 files / 72 MB of a real debate database were
+# committed and pushed to a PUBLIC repo. Name-by-name rules failed because a
+# new name is invented faster than the rule is updated. Match the prefix, not
+# the naming convention — anywhere in the tree, at any depth.
+**/.pgdata
+**/.pgdata/
+**/.pgdata-*
+**/.pgdata-*/

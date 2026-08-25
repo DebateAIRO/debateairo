@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T22:08:56Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_SAME_GROK_CORRECTION_REVIEW",
+  "scope": "full-gate recovery correction1: stopped controller launchctl vocabulary only",
+  "blocking_review": {
+    "visible_log_sha256": "56320c9bbe4e9123e6ec6673154ea5a2dc3182187bd20874794ecfc0396ec9d3",
+    "visible_status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "raw_status": 0,
+    "finding": "live controller print says state = not running while old recovery accepted only state = exited",
+    "future_supervisor_and_recovery_design_otherwise_approved": true
+  },
+  "correction": {
+    "old_required_state": "exited",
+    "new_exact_allowed_states": ["not running", "exited"],
+    "last_exit_code_required": 0,
+    "numeric_pid_forbidden": true,
+    "worker_absent_guard_unchanged": true,
+    "all_other_recovery_bindings_unchanged": true
+  },
+  "delta_hashes": {
+    "recovery": {
+      "before": "320cb699663c6424d25519a4622b0e498ba1b2af566c2d3ff9fbfb5c78090ad5",
+      "after": "30decab681b96f3a2fa8e3b0acc0ff0ed37a5fb13bbe08535260621fb34deac5"
+    },
+    "authority": {
+      "before": "250635998523c47c3ab57977d7a562cef2d0dc42b23c4948e330c09ee3092615",
+      "after": "44a9a30121c2669ac5a1be1ac4e06ec5af764f88d881577edf9fa263e44c265b"
+    },
+    "fixture": {
+      "before": "4e372cf3dc752badb3919478dda2bc69f334f36d212c368b080183be218f50c9",
+      "after": "4a625b6290b8db97fce9c5ea2a57c6f73d3152ac7a2982290db203e408706a9b"
+    },
+    "contract": {
+      "before": "415e747f887bf4a34555b3213cd2dd5af246b92efeb9300db3f1fc0a5fc5a3f6",
+      "after": "8caf1baa66f781125fe6151b95f71bc883fe61d560141b24e148545ed8515d8f"
+    },
+    "static_checker": {
+      "before": "ee94c4889201dd5a92a8f3f679d13a26c5f31c16dc073177f369ffb6c637b092",
+      "after": "abe6292d3e7c833c4f851ce1c1b15e5706c469c61f0961b403159bc20ae2ca0e"
+    },
+    "custody_checker": {
+      "before": "eddbb26106516a11fe7a7904258ddc8408cd1dfed46d56497f96cab09541e499",
+      "after": "f38081c3468f60e9124abe8df4e792f7e4bf815a81c5d8d12bd61c8fd6330eaf"
+    }
+  },
+  "evidence": {
+    "red": {
+      "raw_status": 1,
+      "log_sha256": "044029b8611f6df7b172b21bcc05a9282825913175e879981d8220ddb0123d69",
+      "old_match": false,
+      "exact_state": "not running"
+    },
+    "green": {
+      "raw_status": 0,
+      "log_sha256": "92c88f5b277f9e98250ef2096afd1abe792dc16fd60fa774d36836a8dcd45437",
+      "accepted_states": ["not running", "exited"],
+      "state_exit_pid_mutations_killed": true
+    },
+    "aggregate_static": {
+      "raw_status": 0,
+      "log_sha256": "ebdda161e9c8fbcf2c48f09906fd133a3bd5105677bd7ccb6d7e90558dfdf828"
+    },
+    "custody": {
+      "raw_status": 0,
+      "log_sha256": "c61f7fcc8589d3b20b880df469f9a6c5a02c26db9dc0120a7560d20112742f27"
+    }
+  },
+  "unchanged_hashes": {
+    "launcher": "38378f4e9a28146197f55e00bcc83b0aa5931c69613f3098a145c26bfee96c7a",
+    "controller": "dfefc008b8c8c44bf076df283710e7a15344de9f26a9eb31e601cf0d4a957449",
+    "worker": "01311020a6d294ef4adf493044de38cfc1d17234005556d262f492767adcf6e4",
+    "parsers": "ea00acb85d0723f87dc3f156814e143fc0167e1520984587026c58b7134c29f5",
+    "failure_evidence": "f2600cd89776a356fa222b2a6b24c9420905ff0b959b9ae65194edd4939b6079",
+    "recovery_core": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d"
+  },
+  "repository_custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "governed_exact": true
+  },
+  "held_run_custody": {
+    "lock_device_inode": "16777233/47087786",
+    "claim_inode": 47087814,
+    "claim_sha256": "d51149eb7036f6c4ccf7557982e13d7860e3efffcbf6439d8aa129b80b939c86",
+    "receipt_tree_sha256": "e88564b645e626c6844b11530665f0c7d425b522b466d7eeec2b6738388545b9",
+    "private_tree_sha256": "a220d9932e1e9b4a073722a42aa64d70ca6d640cb4096fac956d7797621ea07f",
+    "frozen_tsx_501_preserved": true,
+    "recovery_artifacts": "absent_not_executed"
+  },
+  "prohibited_execution_performed": false
+}

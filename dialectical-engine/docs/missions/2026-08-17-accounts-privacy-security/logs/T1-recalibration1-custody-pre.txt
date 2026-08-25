@@ -1,0 +1,263 @@
+=== T1 RECALIBRATION1 — PHASE A PREFLIGHT RECEIPT ===
+
+utc_recorded: 2026-08-22T00:59:58Z
+seat: fresh visible Claude Opus 5 recalibration/attribution seat (claude-opus-5)
+kanban: accounts-phase1 / t_b225b2f2 (T1)
+router: Codex-Router / V
+authority: docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-recalibration1-packet.md
+wrapper: docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-T1-recalibration1.sh
+session_id: assigned by the outer wrapper; persisted to
+            logs/T1-recalibration1-claude-session.txt after this invocation returns
+            (extracted from logs/T1-recalibration1-claude-preflight-result.json,
+             which is the wrapper's in-flight tee target and is 0 bytes right now).
+
+--- SEAT CLASS (recorded per packet §1) ---
+This is a diagnostic/calibration seat, not an implementation seat and not a
+release-acceptance seat. Nothing in this phase interprets, waives, or
+recalibrates any threshold. FINAL2 remains the authoritative preconditioned,
+shared-pool/full-history RED; a later focused green can establish only the
+fresh-process condition.
+
+--- EXECUTION MODEL (recorded per packet §4) ---
+The outer visible Terminal wrapper, NOT a Claude tool, owns and runs the five
+fresh-process filters, their host snapshots, and the post-shell capture. All
+wrapper gates are foreground; none is backgrounded.
+
+This Phase A invocation ran ONLY read-only inspection commands:
+  date -u, git rev-parse (HEAD / --abbrev-ref / --show-toplevel),
+  git diff --cached --name-only, git status --short, shasum -a 256, stat, ls,
+  wc, sed (single-line read of .gitignore), and file reads.
+
+No test, filter, vitest invocation, typecheck, lint, watcher, or background job
+was started by this seat. No product, policy, test, migration, threshold,
+cadence, queue, worker, timeout, register-row, packet, or auditor file was
+edited. Nothing was staged, committed, pushed, moved, restored, or deleted; the
+Kanban ticket was not touched; no agent or subagent was spawned; no Grok,
+Hermes, Fable, or local model was invoked. Repository-parent
+`.claude/launch.json`, repository-parent `.gitignore`, `logs/run-claude-seat.sh`,
+and the 2026-08-21 observability-loop mission were not touched.
+
+--- REQUIRED READING COMPLETED IN FULL ---
+Packet:
+  1. logs/T1-claude-recalibration1-packet.md              (6526 bytes, 159 lines)
+FINAL2 receipts named in packet §3, each read completely:
+  2. logs/T1-final2-custody-progress.log                  (18385 bytes, 327 lines)
+  3. logs/T1-final2-pnpm-test.log                         (449301 bytes, 4637 lines;
+     read in full, sequentially, lines 1–4637)
+  4. logs/T1-final2-pnpm-test.status                      (2 bytes: "1\n")
+  5. logs/T1-final2-custody-pre.txt                       (9962 bytes, 163 lines)
+  6. logs/T1-final2-custody-post-shell.txt                (6007 bytes, 79 lines)
+  7. logs/T1-final2-claude-final-result.json              (3528 bytes)
+Also read read-only for the execution model:
+  8. logs/run-claude-T1-recalibration1.sh                 (4997 bytes, 106 lines)
+  9. logs/T1-final2-claude-preflight-result.json          (1711 bytes)
+ 10. logs/T1-final2-claude-session.txt                    (37 bytes)
+
+--- FINAL2 FACTS CONFIRMED AGAINST THE RAW LOG (packet §3, no reinterpretation) ---
+raw status                : 1 (log footer "=== raw_exit_status: 1 ==="; .status = "1")
+counts                    : Test Files 1 failed | 111 passed (112)
+                            Tests 5 failed | 976 passed (981); Duration 1616.93s
+window                    : start_utc 2026-08-22T00:21:19Z, end_utc 2026-08-22T00:48:18Z
+ELIFECYCLE                : present (1)
+five failures, all in tests/integration/registration-database.test.ts:
+  [1] :2214:49 S3d rework3 B1/B3 deep-queue slack —
+      maximumNonTransportWork 714.0997079999943 > 600
+      raw evidence line: resend existing_nontransport_max_ms=714.1
+      missing_nontransport_max_ms=734.4 (transport_ms=5000, ruled slack 600)
+  [2] :2873:31 S3d rework2 B4 healthy-MTA burst — hundred.successes 98, expected 100
+      raw: burst=100 success=98 busy=2 | burst=128 success=84 busy=44
+           | burst=160 success=80 busy=80
+      (NOT the 100/103/103 published capacity shape)
+  [3] :3419:21 slow 0/400/1000 ms transports — delta 175.59929200005718 >= 100
+      raw: mail_ms=0 delta 11.1 | mail_ms=400 delta 0.4
+           | mail_ms=1000 new_ms=601.6 duplicate_ms=777.2 delta_ms=175.6
+  [4] :3983:39 S3b live-mail arms — medianGapMs 224.15233349998016 > 100 (N=4)
+      same receipt line: n=3 hash_provision_max_ms=1264.7 clamp_headroom_ms=-799.7
+  [5] :5913:23 S3 rework4 B4 domain-separated audit KDF —
+      per_call_ms 280.71175000001676 >= 250 (argon2id, 19456 KiB, t=2, p=1;
+      raw_ip_hits=0, stable_hashes=1, rotated_differs=true)
+clean scans in the raw log : 0x "40P01"; 0x "Timed out"/"timed out"/"timeout of";
+                            0 unhandled-rejection/unhandled-error banner (the sole
+                            case-insensitive hit is a PASSING test title at line 1188);
+                            10x deadlock_delta, all "=0"; deadlocks_after=0.
+                            2 NOWAIT occurrences, both inside the T9-C proof whose
+                            test passed (13469 ms) with deadlock_delta=0.
+                            2 "FATAL: terminating connection due to administrator
+                            command" lines belong to the POL-03 test that PASSED
+                            (931 ms) — its own deliberate backend-termination arm.
+prior receipt for §6 use   : logs/T1-final-pnpm-test.status = 1 (rework5 candidate)
+recalibration trigger      : per packet §3, the policy's first-unchanged-code-RED-at-
+                            45 ms recalibration trigger has fired; rework6's
+                            four-occurrence private rename is dual-reviewed and
+                            causally irrelevant, and its S08/S11/S13 orphan-audit
+                            failures are closed (all three now pass: 105/104/214 ms).
+This seat records these as facts and adjudicates none of them.
+
+--- REPOSITORY IDENTITY ---
+work_dir      : /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
+git_toplevel  : /Users/vladmihaimiron/Documents/DebateAIRO   (parent; expected)
+branch        : dev
+HEAD_actual   : 9801f85d97e4263a7c8311304e29d6a03c4a6d15
+HEAD_required : 9801f85d97e4263a7c8311304e29d6a03c4a6d15
+HEAD_verdict  : MATCH
+
+--- INDEX ---
+command           : git diff --cached --name-only
+output            : (empty)
+staged_paths      : none
+staged_path_count : 0
+index_verdict     : MATCH (empty as required)
+
+--- 12-PATH FROZEN MANIFEST: sha256 / size_bytes / mtime_epoch / mtime_utc ---
+All paths relative to work_dir. All 12 sha256 values are byte-equal to the frozen
+manifest in packet §2, and all 12 sizes and mtimes are identical to those recorded
+at the FINAL2 Phase A PRE (00:19:02Z) and the FINAL2 wrapper POST-SHELL (00:48:18Z).
+
+0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a  30548   1787343026  2026-08-21T20:10:26Z  apps/api/src/index.ts
+4dae1f79496a0a8cca7b2ee03a30f922564ce6cace3331539d0406e60973b26f  6606    1787347061  2026-08-21T21:17:41Z  apps/api/src/main.ts
+0b75f99df102d9a7915a22f1d5b28e278352dfcb2936ac5bffe7b3f3afc01fd7  53648   1787353551  2026-08-21T23:05:51Z  apps/api/src/registration.ts
+66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6  27118   1787343024  2026-08-21T20:10:24Z  packages/crypto/src/index.ts
+c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b  10314   1787343013  2026-08-21T20:10:13Z  packages/crypto/src/argon2-worker.ts
+b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d  48111   1787357276  2026-08-22T00:07:56Z  packages/crypto/src/argon2-worker-pool.ts
+2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f  25159   1787342997  2026-08-21T20:09:57Z  packages/db/src/identity.ts
+06056093071e7905342e3030b14c0ac11f14f4ee72a8bce11d7accf34bf5eb52  46750   1787347197  2026-08-21T21:19:57Z  packages/register/src/auth-policy.ts
+7f8a048afaa415f49f340fe2ef15aa2d4140af1bbf3916bddf5353797a295c58  282013  1787347737  2026-08-21T21:28:57Z  tests/integration/registration-database.test.ts
+ebfbfce79c0bdb5de9d2bb0855deabd7a1f95b29cc69667060d55feaa549e25b  51807   1787337856  2026-08-21T18:44:16Z  tests/unit/registration.test.ts
+93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b  106612  1787349543  2026-08-21T21:59:03Z  tests/unit/argon2-worker-pool.test.ts
+3548b93282011be73310efe8a2eec31638133dc69a1d92a0cf4ffbc36f253ca1  86450   1787353268  2026-08-21T23:01:08Z  tests/architecture/t1-argon2-worker-contract.test.ts
+
+manifest_verdict : 12/12 sha256 MATCH, 12/12 size MATCH, 12/12 mtime MATCH,
+                   0 mismatch, 0 missing.
+pool_cross_check : packages/crypto/src/argon2-worker-pool.ts is
+                   b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d
+                   — the corrected rework6 "final" hash, NOT the rework6 entry hash
+                   e92f2ab13667a705d12e617ede7ede773c7d56f4e14e3210125450f02c7ea72c.
+                   The exact FINAL2 candidate is still in place, byte for byte.
+
+--- COMPLETE WORKING-TREE STATUS (git status --short, from work_dir) ---
+56 entries: 11 modified tracked, 45 untracked.
+
+MODIFIED TRACKED (11):
+ M ../.claude/launch.json                                                       [expected dirt: repository-parent — untouched by this seat]
+ M ../.gitignore                                                                [expected dirt: repository-parent — untouched by this seat]
+ M apps/api/src/main.ts                                                         [frozen manifest]
+ M apps/api/src/registration.ts                                                 [frozen manifest]
+ M docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-seat.sh    [expected dirt: seat launcher — untouched by this seat]
+ M packages/crypto/src/argon2-worker-pool.ts                                    [frozen manifest]
+ M packages/db/src/identity.ts                                                  [frozen manifest]
+ M packages/register/src/auth-policy.ts                                         [frozen manifest]
+ M tests/architecture/t1-argon2-worker-contract.test.ts                         [frozen manifest]
+ M tests/integration/registration-database.test.ts                              [frozen manifest]
+ M tests/unit/argon2-worker-pool.test.ts                                        [frozen manifest]
+
+SCOPE FINDING: every modified product/test/policy path is inside the frozen
+12-path manifest. There is NO product, test, policy, or auditor modification
+beyond it. The three non-manifest modifications are the two repository-parent
+files and the seat launcher — all explicitly quarantined by the packet's hard
+stops and all left untouched here.
+
+UNTRACKED (45), all inside expected classes:
+  a) T1 governance packets (14):
+       T1-claude-final-custody-packet.md
+       T1-claude-final2-custody-packet.md
+       T1-claude-recalibration1-packet.md            [this seat's authority]
+       T1-claude-rework2-packet.md
+       T1-claude-rework3-packet.md
+       T1-claude-rework4-packet.md
+       T1-claude-rework5-evidence-correction-packet.md
+       T1-claude-rework5-packet.md
+       T1-claude-rework6-packet.md
+       T1-sol-rework2-final-review-packet.md
+       T1-sol-rework3-final-review-packet.md
+       T1-sol-rework4-final-review-packet.md
+       T1-sol-rework5-final-review-packet.md
+       T1-sol-rework6-final-review-packet.md
+  b) prior-seat results/sessions/receipts (22):
+       T1-final-custody-claude-result.json / -session.txt / T1-final-custody-pre.txt
+       T1-final-pnpm-test.status                      [rework5 custody, raw status 1]
+       T1-final2-claude-final-result.json / -preflight-result.json / -session.txt
+       T1-final2-custody-post-shell.txt / T1-final2-custody-pre.txt
+       T1-final2-pnpm-test.status                     [FINAL2 authority, raw status 1]
+       T1-rework2/3/4/5-claude-result.json + -session.txt
+       T1-rework5-evidence-claude-result.json / -session.txt
+       T1-rework6-claude-result.json / -session.txt
+       run-claude-T1-final2-custody.sh
+  c) this seat's recalibration1 artifacts already on disk (2):
+       T1-recalibration1-claude-preflight-result.json  [wrapper tee target, 0 bytes, in flight]
+       run-claude-T1-recalibration1.sh                 [the outer wrapper]
+  d) unrelated 2026-08-21 observability-loop mission (6, untouched):
+       goal-packets/lane-2-capture.md
+       logs/merge-lane-1.sh / run-lane-1-rework1.sh / run-lane-1-rework2.sh
+       reviews/L1-S01-rework-1.md / L1-S01-rework-2.md
+
+status_verdict: COMPLETE and fully classified. Every entry falls in an expected
+quarantine class or the frozen manifest. No unexplained residue.
+
+DELTA vs the FINAL2 wrapper POST-SHELL (00:48:18Z): the 11 modified tracked paths
+are identical; untracked grew from 41 to 45 by exactly four additions, all expected —
+T1-final2-claude-final-result.json (the FINAL2 tee that was still in flight then),
+T1-claude-recalibration1-packet.md, run-claude-T1-recalibration1.sh, and
+T1-recalibration1-claude-preflight-result.json. No entry disappeared.
+
+--- IGNORED-FILE NOTE FOR PHASE B RESIDUE CLASSIFICATION ---
+dialectical-engine/.gitignore line 9 is `*.log`. Therefore every `.log` receipt —
+the five T1-recalibration1-<label>.log filter logs, T1-recalibration1-progress.log,
+and the prior T1-final2-pnpm-test.log / T1-final-pnpm-test.log — will NEVER appear
+in porcelain status. Their absence from the POST status is expected and is not
+residue. `.status`, `.txt`, `.json`, `.md`, `.sh` receipts DO appear as untracked.
+
+--- RECALIBRATION1 RECEIPTS EXPECTED BY PHASE B ---
+Per the wrapper, for each label in {deep_queue, capacity, slow_transport,
+live_mail, audit_kdf}, unconditionally and in this order:
+  logs/T1-recalibration1-<label>-host.txt   (host snapshot taken before the filter)
+  logs/T1-recalibration1-<label>.log        (gitignored; carries the exact command,
+                                             start_utc, end_utc, raw_exit_status)
+  logs/T1-recalibration1-<label>.status     (raw status)
+plus:
+  logs/T1-recalibration1-custody-post-shell.txt  (HEAD, index, status, manifest, stat)
+  logs/T1-recalibration1-claude-session.txt
+  logs/T1-recalibration1-claude-final-result.json
+The wrapper continues through all five filters even if one fails.
+
+PRE-EXISTING T1-recalibration1-* FILES AT PHASE A TIME (exhaustive):
+  T1-recalibration1-claude-preflight-result.json   (0 bytes, wrapper tee, in flight)
+  run-claude-T1-recalibration1.sh                  (the wrapper itself)
+  T1-recalibration1-custody-pre.txt                (this receipt)
+NO stale recalibration1 filter log, status, host snapshot, post-shell capture, or
+progress log exists that could be misread in Phase B.
+
+--- FIVE FILTERS THE WRAPPER WILL RUN (recorded, not run here) ---
+Each is exactly:
+  node_modules/.bin/vitest run tests/integration/registration-database.test.ts -t <title>
+  1. deep_queue      S3d rework3 B1/B3 probes deep-queue slack and the following audit window
+  2. capacity        S3d rework2 B4 measures healthy-MTA burst cost and the frozen S3b margin
+  3. slow_transport  keeps new-vs-existing timing within the ruled tolerance for slow 0/400/1000ms transports
+  4. live_mail       S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below the separation ceiling
+  5. audit_kdf       S3 rework4 B4 derives stable domain-separated IP and UA Argon2id hashes without request-id hashes
+This seat ran none of them and will not run, rerun, duplicate, background, or
+replace any of them.
+
+--- EXPLICIT NO-EDIT STATEMENT (packet §5) ---
+No governed byte was edited. Not one of the 12 frozen paths was written, touched,
+renamed, restored, staged, or otherwise modified by this seat: their sha256, size,
+and mtime are unchanged and identical to the FINAL2 PRE and POST observations. No
+product, policy, test, migration, packet, threshold, cadence, queue, worker,
+timeout, or register-row byte was changed anywhere in the repository. The only
+file this seat created is this receipt,
+logs/T1-recalibration1-custody-pre.txt, which is one of this seat's named
+artifacts under the mission log directory.
+
+--- PRECONDITION SUMMARY ---
+HEAD                      : MATCH
+index empty               : MATCH (0 staged paths)
+12/12 manifest sha256     : MATCH
+12/12 sizes and mtimes    : MATCH (identical to FINAL2 PRE and POST)
+scope beyond manifest     : NONE
+working-tree status       : complete, fully classified as expected dirt
+stale recalibration1 gate : NONE
+required reading          : complete, including the full 4637-line FINAL2 suite log
+gate execution owner      : outer visible wrapper, foreground only
+gates run by this seat    : NONE
+governed bytes edited     : NONE
+
+PHASE A RESULT: PREFLIGHT READY: T1 RECALIBRATION1

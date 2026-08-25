@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "run_id": "302197e8-e713-47f7-9518-9f078eede931",
+  "classification": "UNKNOWN_HELD",
+  "error": "Error:PINNED_TEST_RUNTIME_OR_ENTRYPOINT_MISMATCH",
+  "lock_retained": true,
+  "utc": "2026-08-22T20:10:14.457Z",
+  "monotonic_ms": 102.997583
+}

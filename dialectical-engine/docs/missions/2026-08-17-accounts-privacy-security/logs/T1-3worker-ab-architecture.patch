@@ -1,0 +1,747 @@
+diff --git a/tests/architecture/t1-argon2-worker-contract.test.ts b/tests/architecture/t1-argon2-worker-contract.test.ts
+--- a/tests/architecture/t1-argon2-worker-contract.test.ts
++++ b/tests/architecture/t1-argon2-worker-contract.test.ts
+@@ -24,5 +24,40 @@
+ const run = promisify(execFile);
++
++// ---------------------------------------------------------------------------
++// TEMPORARY DIAGNOSTIC — T1 three-worker A/B module-evaluation authorization.
++//
++// Installed by `T1-3worker-ab-architecture.patch`. Runs at module evaluation,
++// before `beforeAll`, before any scratch directory, child process, worker or
++// database exists. The packet cannot contain its own hash, so the literal below
++// and V's external approval record are the only two places it exists.
++// ---------------------------------------------------------------------------
++const T1_N3_AB_EXPECTED_PACKET_SHA256 =
++  "a1cef6fb53a178607db9eb84036c7677d9aa0b8dffbb738b8da1873f4c047503";
++if (process.env.T1_N3_AB_PACKET_SHA256 !== T1_N3_AB_EXPECTED_PACKET_SHA256) {
++  throw new Error("T1_N3_AB_PACKET_TOKEN_MISMATCH");
++}
++const T1_N3_AB_WORKERS_RAW = process.env.T1_N3_AB_WORKERS;
++if (T1_N3_AB_WORKERS_RAW !== "2" && T1_N3_AB_WORKERS_RAW !== "3") {
++  throw new Error("T1_N3_AB_WORKER_COUNT_INVALID");
++}
++const T1_N3_AB_WORKERS = Number(T1_N3_AB_WORKERS_RAW);
++const T1_N3_AB_CELL_ID = process.env.T1_N3_AB_CELL_ID ?? "";
++if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(T1_N3_AB_CELL_ID)) {
++  throw new Error("T1_N3_AB_CELL_ID_INVALID");
++}
++const T1_N3_AB_RUN_COMMITMENT = process.env.T1_N3_AB_RUN_COMMITMENT ?? "";
++if (!/^[0-9a-f]{64}$/.test(T1_N3_AB_RUN_COMMITMENT)) {
++  throw new Error("T1_N3_AB_RUN_COMMITMENT_INVALID");
++}
++const T1_N3_AB_RETAIN_MIB = Number(process.env.T1_N3_AB_RETAIN_MIB_PER_WAVE ?? "0");
++if (!Number.isInteger(T1_N3_AB_RETAIN_MIB) || T1_N3_AB_RETAIN_MIB < 0) {
++  throw new Error("T1_N3_AB_RETAIN_MIB_INVALID");
++}
++const T1_N3_AB_RSS_SAFETY_LIMIT_BYTES = 512 * 1024 * 1024;
++const T1_N3_AB_JOBS_PER_WAVE = 8;
++const T1_N3_AB_WAVE_COUNT = 8;
++const T1_N3_AB_PLATEAU_TRIPWIRE_MIB = 2;
+ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+ const cryptoSrc = join(repoRoot, "packages/crypto/src");
+ const workerPath = join(cryptoSrc, "argon2-worker.ts");
+ const poolPath = join(cryptoSrc, "argon2-worker-pool.ts");
+@@ -1908,5 +1943,702 @@
+     const { outcome } = await runShippedTeardown(seam.service);
+     expect(outcome).toBe("torn-down");
+     expect(seam.recorded).toHaveLength(2);
+   }, 60_000);
+ });
++
++// ---------------------------------------------------------------------------
++// TEMPORARY DIAGNOSTIC — T1 three-worker A/B resource and lifecycle cells.
++//
++// Installed by `T1-3worker-ab-architecture.patch` under the design packet
++// `T1-claude-3worker-ab-draft-packet.md`, and removed by restoring the
++// wrapper-owned byte-for-byte entry backup before the seat exits. These four
++// resource values are DESCRIPTIVE: they establish resource and lifecycle
++// non-vacuity only, enter no sign test, and support no causal conclusion. Any
++// RSS bound derived from them is an UNRATIFIED CANDIDATE until V rules on it.
++// ---------------------------------------------------------------------------
++describe("T1 N3 AB three-worker resource and lifecycle diagnostic", () => {
++  // Identifier-safe capture: this describe prints exactly one marker line per
++  // cell through `process.stdout.write`, and every console channel including
++  // `error` is captured rather than emitted, so a child's stray diagnostic can
++  // never smuggle a path or an identifier into a durable receipt.
++  const CONSOLE_CHANNELS = ["log", "info", "debug", "warn", "error", "trace"] as const;
++  const consoleSurface = console as unknown as Record<string, (...args: unknown[]) => void>;
++  const capturedConsole = new Map<string, (...args: unknown[]) => void>();
++  const capturedLines: string[] = [];
++  const installCapture = (): void => {
++    for (const channel of CONSOLE_CHANNELS) {
++      capturedConsole.set(channel, consoleSurface[channel]!);
++      consoleSurface[channel] = (...args: unknown[]): void => {
++        capturedLines.push(args.map((value) => {
++          if (typeof value === "string") return value;
++          try {
++            return JSON.stringify(value) ?? String(value);
++          } catch {
++            return "[uninspectable]";
++          }
++        }).join(" "));
++      };
++    }
++  };
++  const removeCapture = (): void => {
++    for (const [channel, original] of capturedConsole) consoleSurface[channel] = original;
++    capturedConsole.clear();
++  };
++  const forbidden = [
++    /[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
++    /\b[0-9a-f]{32,}\b/i,
++    /\$argon2/i,
++    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
++    /\/(?:private\/)?(?:var|tmp)\/[^\s"']+/
++  ];
++  const opacityLeaks = (): number =>
++    capturedLines.filter((line) => forbidden.some((pattern) => pattern.test(line))).length;
++
++  const kdf = passwordKdf();
++  const emitReport = (body: Record<string, unknown>): void => {
++    process.stdout.write(`[T1_N3_AB_ARCHITECTURE_REPORT]${JSON.stringify({
++      artifact: "T1-3worker-ab-architecture-cell",
++      schemaVersion: 1,
++      packetSha256: T1_N3_AB_EXPECTED_PACKET_SHA256,
++      cellId: T1_N3_AB_CELL_ID,
++      workerCount: T1_N3_AB_WORKERS,
++      runCommitment: T1_N3_AB_RUN_COMMITMENT,
++      supervisedPid: Number(process.env.T1_N3_AB_SUPERVISED_PID),
++      supervisedPgid: Number(process.env.T1_N3_AB_SUPERVISED_PGID),
++      supervisedSid: Number(process.env.T1_N3_AB_SUPERVISED_SID),
++      rssBoundStatus: "UNRATIFIED_CANDIDATE",
++      provenanceClass: "VITEST_CHILD_PROCESS",
++      ...body
++    })}\n`);
++  };
++  const emitFaultReport = (body: Record<string, unknown>): void => {
++    process.stdout.write(`[T1_N3_AB_FAULT_REPORT]${JSON.stringify({
++      artifact: "T1-3worker-ab-fault-cell",
++      schemaVersion: 1,
++      packetSha256: T1_N3_AB_EXPECTED_PACKET_SHA256,
++      cellId: T1_N3_AB_CELL_ID,
++      workerCount: T1_N3_AB_WORKERS,
++      runCommitment: T1_N3_AB_RUN_COMMITMENT,
++      supervisedPid: Number(process.env.T1_N3_AB_SUPERVISED_PID),
++      supervisedPgid: Number(process.env.T1_N3_AB_SUPERVISED_PGID),
++      supervisedSid: Number(process.env.T1_N3_AB_SUPERVISED_SID),
++      ...body
++    })}\n`);
++  };
++  // The event loop of THIS process, monitored for the life of each cell, so the
++  // two delay fields the adjudicator validates are finite members of the exact
++  // header object rather than unrelated top-level child fields.
++  let cellEventLoop: {
++    enable(): void;
++    disable(): void;
++    percentile(value: number): number;
++    readonly max: number;
++  } | undefined;
++  const startCellClock = async (): Promise<void> => {
++    const { monitorEventLoopDelay } = await import("node:perf_hooks");
++    cellEventLoop = monitorEventLoopDelay({ resolution: 1 });
++    cellEventLoop.enable();
++  };
++  const stopCellClock = (): void => { cellEventLoop?.disable(); };
++
++  const header = async (): Promise<Record<string, unknown>> => {
++    const os = await import("node:os");
++    const usage = process.resourceUsage();
++    const p99 = cellEventLoop === undefined ? 0 : cellEventLoop.percentile(99) / 1e6;
++    const max = cellEventLoop === undefined ? 0 : cellEventLoop.max / 1e6;
++    return {
++      nodeVersion: process.version,
++      platform: process.platform,
++      arch: process.arch,
++      cpuModel: os.cpus()[0]?.model ?? "UNKNOWN",
++      cpuCount: os.cpus().length,
++      processPid: process.pid,
++      loadAverageAtStart: os.loadavg(),
++      loadAverageAtEnd: os.loadavg(),
++      swapDelta: usage.swappedOut,
++      majorPageFaultDelta: usage.majorPageFault,
++      minorPageFaultDelta: usage.minorPageFault,
++      eventLoopDelayP99Ms: Number.isFinite(p99) ? Number(p99.toFixed(3)) : 0,
++      eventLoopDelayMaxMs: Number.isFinite(max) ? Number(max.toFixed(3)) : 0
++    };
++  };
++
++  /**
++   * The matched resource child.
++   *
++   * One plain Node process per cell, identical for both worker counts except
++   * for the count itself: same eight maximum-cost jobs, same eight waves, same
++   * 5 ms sampler, same warm-up rule. Every RSS read goes through `observeRss`,
++   * which is also the 512 MiB safety stop, so no code path can read memory
++   * without the ceiling seeing it, and no wave starts after a breach.
++   */
++  const resourceChildSource = (workers: number, retainMib: number): string => `
++      const { Argon2WorkerPool } = await import(${JSON.stringify(`file://${poolPath}`)});
++      const { performance, monitorEventLoopDelay } = await import("node:perf_hooks");
++      const KDF = { memoryCostKiB: ${kdf.memoryCostKiB}, timeCost: ${kdf.timeCost},
++        parallelism: ${kdf.parallelism}, hashLength: ${kdf.hashLength} };
++      const LIMIT = ${T1_N3_AB_RSS_SAFETY_LIMIT_BYTES};
++      const workers = ${workers};
++      const retainMib = ${retainMib};
++      const safety = {
++        measuredPid: process.pid, peak: 0, peakSamples: [], samples: 0,
++        exceeded: false, exceededAt: null, admitWork: true
++      };
++      const observeRss = () => {
++        const rss = process.memoryUsage.rss();
++        safety.samples += 1;
++        if (rss > safety.peak) {
++          safety.peak = rss;
++          safety.peakSamples.push(rss);
++          if (safety.peakSamples.length > 256) safety.peakSamples.shift();
++        }
++        if (rss > LIMIT && !safety.exceeded) {
++          safety.exceeded = true;
++          safety.exceededAt = rss;
++          safety.admitWork = false;
++        }
++        return rss;
++      };
++      const loop = monitorEventLoopDelay({ resolution: 1 });
++      loop.enable();
++      // Whole-child coverage at 5 ms: the ruled ceiling applies to this Node
++      // process for its entire life, not only while a wave is in flight.
++      const backgroundSampler = setInterval(observeRss, 5);
++      backgroundSampler.unref && backgroundSampler.unref();
++      const pool = new Argon2WorkerPool({ workers });
++      // On breach: stop admitting, let bounded active work settle, close the
++      // pool, emit a structured secret-free safety report, exit EXACTLY 3.
++      const failSafe = async () => {
++        safety.admitWork = false;
++        try { await pool.close(); } catch (closeError) { void closeError; }
++        clearInterval(backgroundSampler);
++        loop.disable();
++        process.stdout.write("[T1_N3_AB_RSS_SAFETY_EXCEEDED]" + JSON.stringify({
++          workerCount: workers, limitBytes: LIMIT, measuredPid: safety.measuredPid,
++          peakBytes: safety.peak, exceededAtBytes: safety.exceededAt,
++          sampleIntervalMs: 5, samples: safety.samples, peakSampleBytes: safety.peakSamples
++        }) + "\\n");
++        process.exit(3);
++      };
++      const assertSafe = async () => { if (safety.exceeded) await failSafe(); };
++      await pool.ready();
++      observeRss(); await assertSafe();
++      const threadIds = new Set();
++      let mainThreadFallback = false;
++      for (const slot of pool.slots) {
++        const id = slot.handle && slot.handle.threadId;
++        if (typeof id !== "number") continue;
++        if (id === 0) mainThreadFallback = true; else threadIds.add(id);
++      }
++      const hash = (label, index) => pool.hashPassword(
++        new TextEncoder().encode(label + index), new Uint8Array(16).fill((index % 250) + 1), KDF
++      );
++      // T1-N3-AB-ANCHOR-M7-WARM-UP
++      const warmUpCount = workers;
++      let warmUpMaxActive = 0;
++      const warmUpWatcher = setInterval(() => {
++        warmUpMaxActive = Math.max(warmUpMaxActive, pool.stats().active);
++        observeRss();
++      }, 5);
++      const warmed = await Promise.all(Array.from({ length: warmUpCount }, (u, i) => hash("warm-", i)));
++      clearInterval(warmUpWatcher);
++      observeRss(); await assertSafe();
++      global.gc && global.gc();
++      const baselineRssBytes = observeRss();
++      await assertSafe();
++      const retained = [];
++      const perWave = [];
++      let totalSamples = 0;
++      for (let wave = 0; wave < ${T1_N3_AB_WAVE_COUNT}; wave += 1) {
++        await assertSafe();
++        let wavePeak = 0;
++        let samples = 0;
++        let maxActive = 0, maxQueued = 0, maxOutstanding = 0;
++        const sampler = setInterval(() => {
++          samples += 1; totalSamples += 1;
++          const stats = pool.stats();
++          maxActive = Math.max(maxActive, stats.active);
++          maxQueued = Math.max(maxQueued, stats.queuedTotal);
++          maxOutstanding = Math.max(maxOutstanding, stats.outstandingTotal);
++          // T1-N3-AB-ANCHOR-M6-RSS-SAMPLE
++          wavePeak = Math.max(wavePeak, observeRss());
++        }, 5);
++        const loopBefore = loop.count;
++        const results = await Promise.all(
++          Array.from({ length: ${T1_N3_AB_JOBS_PER_WAVE} }, (u, i) => hash("wave" + wave + "-", i))
++        );
++        clearInterval(sampler);
++        const loopProgress = loop.count - loopBefore;
++        if (retainMib > 0) retained.push(Buffer.alloc(retainMib * 1024 * 1024, wave + 1));
++        global.gc && global.gc();
++        await new Promise((resolve) => setImmediate(resolve));
++        const quiescentRssBytes = observeRss();
++        perWave.push({
++          waveIndex: wave, jobCount: results.length, sampleCount: samples,
++          inFlightPeakRssBytes: wavePeak, quiescentRssBytes,
++          maxActive, maxQueued, maxOutstanding, eventLoopProgressTicks: loopProgress
++        });
++        await assertSafe();
++      }
++      const settledRssBytes = observeRss();
++      const statsAtSettle = pool.stats();
++      const closeStartedAt = performance.now();
++      let closeError = null;
++      try { await pool.close(); } catch (error) { closeError = String(error && error.code || "UNTYPED"); }
++      const closeLatencyMs = performance.now() - closeStartedAt;
++      const closed = pool.stats();
++      global.gc && global.gc();
++      const postCloseRssBytes = observeRss();
++      // Measurement only. This is the monotonic close-initiation-to-teardown
++      // duration, NOT a prompt-exit bound: no such threshold is ratified.
++      const closeInitiationToTeardownCompleteMs = performance.now() - closeStartedAt;
++      clearInterval(backgroundSampler);
++      loop.disable();
++      const lastFour = perWave.slice(-4).map((w) => w.quiescentRssBytes);
++      const spreadMib = (Math.max(...lastFour) - Math.min(...lastFour)) / 1048576;
++      process.stdout.write("[T1_N3_AB_ARCHITECTURE_CHILD]" + JSON.stringify({
++        warmUp: { warmedWorkers: warmed.length, maxActiveDuringWarmUp: warmUpMaxActive },
++        threads: { distinctNonMainThreadCount: threadIds.size, mainThreadFallback },
++        inFlight: { sampleIntervalMs: 5, sampleCount: totalSamples },
++        jobsPerWave: ${T1_N3_AB_JOBS_PER_WAVE},
++        waveCount: perWave.length,
++        baselineRssBytes, settledRssBytes, postCloseRssBytes,
++        closeLatencyMs: Number(closeLatencyMs.toFixed(3)),
++        retainedMibPerWave: retainMib,
++        retainedBuffers: retained.length,
++        perWave,
++        plateau: {
++          tripwireMib: ${T1_N3_AB_PLATEAU_TRIPWIRE_MIB},
++          lastFourWaveSpreadMib: Number(spreadMib.toFixed(3)),
++          red: spreadMib > ${T1_N3_AB_PLATEAU_TRIPWIRE_MIB}
++        },
++        lifecycle: {
++          state: closed.state, liveHandles: closed.liveHandles,
++          retiringHandles: closed.retiringHandles, queued: closed.queuedTotal,
++          outstanding: closed.outstandingTotal, restarts: closed.restartsInWindow,
++          closeError, workersAtSettle: statsAtSettle.workers,
++          closeInitiationToTeardownCompleteMs:
++            Number(closeInitiationToTeardownCompleteMs.toFixed(3))
++        },
++        eventLoopDelayP99Ms: Number((loop.percentile(99) / 1e6).toFixed(3)),
++        eventLoopDelayMaxMs: Number((loop.max / 1e6).toFixed(3)),
++        rssSafety: {
++          rssSafetyExceeded: safety.exceeded, limitBytes: LIMIT,
++          exceededAtBytes: safety.exceededAt, peakBytes: safety.peak,
++          measuredPid: safety.measuredPid, sampleIntervalMs: 5,
++          samples: safety.samples, peakSampleBytes: safety.peakSamples,
++          admittedWorkAtEnd: safety.admitWork
++        }
++      }) + "\\n");
++  `;
++
++  const runResourceChild = async (
++    name: string, workers: number, retainMib: number
++  ): Promise<Record<string, unknown>> => {
++    const script = join(scratch, `${name}.mjs`);
++    await writeFile(script, resourceChildSource(workers, retainMib), "utf8");
++    // `execFile` rejects on a nonzero child, and the rejection carries the
++    // child's own stdout and code. Losing them would convert the child's exit 3
++    // into an opaque Vitest status 1 — exactly the mapping the ruled ceiling
++    // must survive — so the structured breach line is forwarded verbatim and
++    // the code is preserved before anything else is decided.
++    let stdout = "";
++    try {
++      ({ stdout } = await run(
++        process.execPath, ["--expose-gc", script], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 }
++      ));
++    } catch (error) {
++      const failure = error as { code?: unknown; stdout?: unknown; stderr?: unknown };
++      const childStdout = typeof failure.stdout === "string" ? failure.stdout : "";
++      const breach = childStdout.split("\n")
++        .find((entry) => entry.startsWith("[T1_N3_AB_RSS_SAFETY_EXCEEDED]"));
++      if (breach !== undefined) process.stdout.write(`${breach}\n`);
++      expect(failure.code, "T1_N3_AB_CHILD_EXIT_CODE_PRESERVED").toBeDefined();
++      expect(breach === undefined, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(true);
++      throw error;
++    }
++    const line = stdout.split("\n").find((entry) => entry.startsWith("[T1_N3_AB_ARCHITECTURE_CHILD]"));
++    expect(line, "T1_N3_AB_CHILD_REPORT_MISSING").toBeDefined();
++    return JSON.parse(line!.slice("[T1_N3_AB_ARCHITECTURE_CHILD]".length)) as Record<string, unknown>;
++  };
++
++  const assertResourceCell = (report: Record<string, unknown>, positiveControl: boolean): void => {
++    const warmUp = report.warmUp as { warmedWorkers: number; maxActiveDuringWarmUp: number };
++    const threads = report.threads as { distinctNonMainThreadCount: number; mainThreadFallback: boolean };
++    const inFlight = report.inFlight as { sampleIntervalMs: number; sampleCount: number };
++    const perWave = report.perWave as {
++      jobCount: number; sampleCount: number; inFlightPeakRssBytes: number;
++      quiescentRssBytes: number; maxActive: number; maxQueued: number;
++      maxOutstanding: number; eventLoopProgressTicks: number;
++    }[];
++    const plateau = report.plateau as { tripwireMib: number; red: boolean };
++    const lifecycle = report.lifecycle as {
++      state: string; liveHandles: number; retiringHandles: number;
++      queued: number; outstanding: number; restarts: number; closeError: string | null;
++    };
++    const safety = report.rssSafety as { rssSafetyExceeded: boolean; peakBytes: number };
++
++    expect(warmUp.warmedWorkers, "T1_N3_AB_WARM_UP_COVERED_EVERY_WORKER").toBe(T1_N3_AB_WORKERS);
++    expect(warmUp.maxActiveDuringWarmUp, "T1_N3_AB_WARM_UP_COVERED_EVERY_WORKER")
++      .toBe(T1_N3_AB_WORKERS);
++    expect(threads.distinctNonMainThreadCount, "T1_N3_AB_DISTINCT_THREAD_EVIDENCE")
++      .toBe(T1_N3_AB_WORKERS);
++    expect(threads.mainThreadFallback, "T1_N3_AB_MAIN_THREAD_FALLBACK").toBe(false);
++    expect(inFlight.sampleIntervalMs, "T1_N3_AB_RSS_SAMPLED_IN_FLIGHT").toBe(5);
++    expect(inFlight.sampleCount, "T1_N3_AB_RSS_SAMPLED_IN_FLIGHT").toBeGreaterThan(0);
++    expect(report.jobsPerWave, "T1_N3_AB_IDENTICAL_EIGHT_JOB_WORK").toBe(T1_N3_AB_JOBS_PER_WAVE);
++    expect(perWave, "T1_N3_AB_EIGHT_IDENTICAL_WAVES").toHaveLength(T1_N3_AB_WAVE_COUNT);
++    expect(Number.isFinite(report.baselineRssBytes as number), "T1_N3_AB_RSS_READINGS_FINITE")
++      .toBe(true);
++    expect(Number.isFinite(report.settledRssBytes as number), "T1_N3_AB_RSS_READINGS_FINITE")
++      .toBe(true);
++    expect(Number.isFinite(report.postCloseRssBytes as number), "T1_N3_AB_RSS_READINGS_FINITE")
++      .toBe(true);
++    expect(Number.isFinite(report.closeLatencyMs as number), "T1_N3_AB_CLOSE_LATENCY_MEASURED")
++      .toBe(true);
++    for (const wave of perWave) {
++      expect(wave.jobCount, "T1_N3_AB_IDENTICAL_EIGHT_JOB_WORK").toBe(T1_N3_AB_JOBS_PER_WAVE);
++      expect(wave.sampleCount, "T1_N3_AB_RSS_SAMPLED_IN_FLIGHT").toBeGreaterThan(0);
++      expect(wave.inFlightPeakRssBytes, "T1_N3_AB_RSS_SAMPLED_IN_FLIGHT")
++        .toBeGreaterThanOrEqual(wave.quiescentRssBytes);
++      expect(wave.maxActive, "T1_N3_AB_WAVE_OCCUPANCY").toBe(T1_N3_AB_WORKERS);
++      expect(wave.maxOutstanding, "T1_N3_AB_WAVE_OCCUPANCY").toBe(T1_N3_AB_JOBS_PER_WAVE);
++      expect(wave.maxQueued, "T1_N3_AB_WAVE_OCCUPANCY")
++        .toBeGreaterThanOrEqual(T1_N3_AB_JOBS_PER_WAVE - T1_N3_AB_WORKERS);
++      expect(wave.eventLoopProgressTicks, "T1_N3_AB_EVENT_LOOP_PROGRESS").toBeGreaterThan(0);
++    }
++    expect(plateau.tripwireMib, "T1_N3_AB_PLATEAU_TRIPWIRE_UNCHANGED")
++      .toBe(T1_N3_AB_PLATEAU_TRIPWIRE_MIB);
++    expect(safety.rssSafetyExceeded, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(false);
++    expect(safety.peakBytes, "T1_N3_AB_RSS_SAFETY_EXCEEDED")
++      .toBeLessThanOrEqual(T1_N3_AB_RSS_SAFETY_LIMIT_BYTES);
++    expect(opacityLeaks(), "T1_N3_AB_OPACITY").toBe(0);
++    if (positiveControl) {
++      expect(report.retainedMibPerWave, "T1_N3_AB_POSITIVE_CONTROL_RETAINS_4_MIB").toBe(4);
++      expect(plateau.red, "T1_N3_AB_POSITIVE_CONTROL_DRIVES_PLATEAU_RED").toBe(true);
++      return;
++    }
++    expect(report.retainedMibPerWave, "T1_N3_AB_ORDINARY_CELL_RETAINS_NOTHING").toBe(0);
++    expect(plateau.red, "T1_N3_AB_ORDINARY_CELL_PLATEAU_NOT_RED").toBe(false);
++    expect(lifecycle.closeError, "T1_N3_AB_ORDINARY_CELL_CLOSES_CLEANLY").toBeNull();
++    expect(lifecycle.state, "T1_N3_AB_ORDINARY_CELL_CLOSES_CLEANLY").toBe("CLOSED");
++    expect(lifecycle.liveHandles, "T1_N3_AB_ORDINARY_CELL_ZERO_HANDLES").toBe(0);
++    expect(lifecycle.retiringHandles, "T1_N3_AB_ORDINARY_CELL_ZERO_HANDLES").toBe(0);
++    expect(lifecycle.queued, "T1_N3_AB_ORDINARY_CELL_ZERO_HANDLES").toBe(0);
++    expect(lifecycle.outstanding, "T1_N3_AB_ORDINARY_CELL_ZERO_HANDLES").toBe(0);
++    expect(lifecycle.restarts, "T1_N3_AB_NO_RESTART_IN_ORDINARY_CELL").toBe(0);
++  };
++
++  it("T1 N3 AB architecture resource cell", async () => {
++    installCapture();
++    await startCellClock();
++    try {
++      const report = await runResourceChild(
++        `t1-n3-ab-resource-${T1_N3_AB_WORKERS}`, T1_N3_AB_WORKERS, 0
++      );
++      assertResourceCell(report, false);
++      stopCellClock();
++      emitReport({
++        outcome: "COMPLETE",
++        header: await header(),
++        ...report
++      });
++    } finally {
++      stopCellClock();
++      removeCapture();
++    }
++  }, 900_000);
++
++  it("T1 N3 AB retained allocation positive control", async () => {
++    installCapture();
++    await startCellClock();
++    try {
++      // The tripwire has to be able to go RED, or the eight ordinary readings
++      // above are the output of a detector that measures nothing.
++      const report = await runResourceChild("t1-n3-ab-positive-control", T1_N3_AB_WORKERS, 4);
++      assertResourceCell(report, true);
++      stopCellClock();
++      emitReport({ outcome: "COMPLETE", header: await header(), ...report });
++    } finally {
++      stopCellClock();
++      removeCapture();
++    }
++  }, 900_000);
++
++  // -------------------------------------------------------------------------
++  // Deterministic three-worker lifecycle faults.
++  //
++  // These use the pool's own `spawn` seam, so the handles are fixtures this
++  // file fully controls and every fault is deterministic rather than raced.
++  // `physicalAlive` is the FIXTURE's count of handles it created and has not
++  // seen exit — deliberately independent of `stats().liveHandles`, so the two
++  // can disagree and the gate can catch it. Mutant 5 falsifies exactly this
++  // number to prove the gate is real.
++  // -------------------------------------------------------------------------
++  interface FixtureHandle {
++    readonly threadId: number;
++    exited: boolean;
++    terminateCalls: number;
++    postMessage(value: unknown, transfer?: unknown): void;
++    on(event: string, listener: (value: never) => void): void;
++    terminate(): Promise<unknown>;
++    ref(): void;
++    unref(): void;
++    fail(): void;
++    exit(): void;
++  }
++  type FaultMode = "unconfirmed-death" | "late-exit" | "retry-fulfilled";
++
++  const AUDIT_PARAMETERS = { memoryCostKiB: 8, iterations: 1, parallelism: 1, hashLength: 32 };
++
++  const faultFixture = (mode: FaultMode) => {
++    const spawned: FixtureHandle[] = [];
++    let nextThreadId = 101;
++    const spawn = (): FixtureHandle => {
++      const listeners = new Map<string, ((value: never) => void)[]>();
++      const handle: FixtureHandle = {
++        threadId: nextThreadId++,
++        exited: false,
++        terminateCalls: 0,
++        postMessage(value: unknown): void {
++          const frame = value as { id?: string };
++          if (typeof frame.id !== "string") return;
++          // A lawful audit answer: hex of exactly the requested length.
++          const digest = "ab".repeat(AUDIT_PARAMETERS.hashLength);
++          setTimeout(() => {
++            for (const listener of listeners.get("message") ?? []) {
++              (listener as (value: unknown) => void)({ kind: "result", id: frame.id, digest });
++            }
++          }, 1);
++        },
++        on(event: string, listener: (value: never) => void): void {
++          const bucket = listeners.get(event) ?? [];
++          bucket.push(listener);
++          listeners.set(event, bucket);
++        },
++        async terminate(): Promise<unknown> {
++          handle.terminateCalls += 1;
++          if (mode === "unconfirmed-death") {
++            // Never resolves, never emits `exit`: death stays unconfirmed for
++            // the whole bounded close, which is the case under test.
++            return new Promise(() => { /* never confirms */ });
++          }
++          if (mode === "late-exit") {
++            // The FIRST termination remains pending past the confirmation
++            // deadline. Only the explicitly controlled later `exit()` in the
++            // cell body confirms death — nothing here shortcuts it, which is
++            // what makes the "no replacement while unconfirmed" assertion
++            // non-vacuous.
++            return new Promise(() => { /* confirmed only by the later exit */ });
++          }
++          // retry-fulfilled: a REAL first rejection, then a distinct second
++          // attempt that fulfills and emits the exit permitting the ruled
++          // transition. An ordinary first-call close would prove nothing.
++          if (handle.terminateCalls === 1) {
++            throw new Error("T1_N3_AB_FIXTURE_TERMINATION_REFUSED");
++          }
++          handle.exit();
++          return 0;
++        },
++        ref(): void { /* fixture handles hold no libuv reference */ },
++        unref(): void { /* fixture handles hold no libuv reference */ },
++        fail(): void {
++          for (const listener of listeners.get("error") ?? []) {
++            (listener as (value: unknown) => void)(new Error("T1_N3_AB_FIXTURE_WORKER_FAILED"));
++          }
++        },
++        exit(): void {
++          if (handle.exited) return;
++          handle.exited = true;
++          for (const listener of listeners.get("exit") ?? []) {
++            (listener as (value: unknown) => void)(1);
++          }
++        }
++      };
++      spawned.push(handle);
++      setTimeout(() => {
++        for (const listener of listeners.get("message") ?? []) {
++          (listener as (value: unknown) => void)({ kind: "ready" });
++        }
++      }, 1);
++      return handle;
++    };
++    const observe = (): number => {
++      // T1-N3-AB-ANCHOR-M5-PHYSICAL-ALIVE
++      const physicalAlive = spawned.filter((handle) => !handle.exited).length;
++      return physicalAlive;
++    };
++    return { spawned, spawn, observe };
++  };
++
++  const settleTurns = async (turns = 12): Promise<void> => {
++    for (let index = 0; index < turns; index += 1) {
++      await new Promise((resolve) => { setTimeout(resolve, 5); });
++    }
++  };
++
++  const runFaultCell = async (
++    faultName: string, mode: FaultMode, restartBudget: number
++  ): Promise<void> => {
++    installCapture();
++    await startCellClock();
++    // The ruled ceiling covers fault cells too: they are three-worker Node
++    // processes like any other, and correction 3 left them ungated.
++    const faultRss = { peak: 0, peakSamples: [] as number[], samples: 0 };
++    const faultRssTimer = setInterval(() => {
++      const rss = process.memoryUsage.rss();
++      faultRss.samples += 1;
++      if (rss > faultRss.peak) {
++        faultRss.peak = rss;
++        faultRss.peakSamples.push(rss);
++        if (faultRss.peakSamples.length > 256) faultRss.peakSamples.shift();
++      }
++    }, 5);
++    faultRssTimer.unref?.();
++    const fixture = faultFixture(mode);
++    let maxPhysicallyAlive = 0;
++    let maxLiveHandles = 0;
++    let settlements = 0;
++    let closeRejectedTyped = false;
++    let breakerTripped = false;
++    const pool = new Argon2WorkerPool({
++      workers: T1_N3_AB_WORKERS,
++      restartBudget,
++      closeDrainMs: 50,
++      terminationConfirmTimeoutMs: 50,
++      spawn: fixture.spawn
++    } as unknown as ConstructorParameters<typeof Argon2WorkerPool>[0]);
++    const watcher = setInterval(() => {
++      maxPhysicallyAlive = Math.max(maxPhysicallyAlive, fixture.observe());
++      maxLiveHandles = Math.max(maxLiveHandles, pool.stats().liveHandles);
++    }, 5);
++    try {
++      await pool.ready();
++      maxLiveHandles = Math.max(maxLiveHandles, pool.stats().liveHandles);
++      // The job under test is submitted and left IN FLIGHT while the fault is
++      // injected, so `settledExactlyOnce` observes the job/fault/close
++      // interleaving. Awaiting a job to completion BEFORE injecting anything —
++      // which is what the previous version did — observed nothing at all.
++      const jobUnderTest = pool.hashAuditContext(
++        new TextEncoder().encode("t1-n3-ab-fault"), new Uint8Array(16).fill(7), AUDIT_PARAMETERS
++      ).then(() => { settlements += 1; }, () => { settlements += 1; });
++
++      if (mode === "unconfirmed-death") fixture.spawned[0]!.fail();
++      if (mode === "late-exit") {
++        fixture.spawned[0]!.fail();
++        // Death stays unconfirmed across the confirmation deadline. While that
++        // holds, no replacement may begin and custody must stay positive; both
++        // are asserted synchronously, at the moment they are true.
++        await settleTurns(20);
++        maxPhysicallyAlive = Math.max(maxPhysicallyAlive, fixture.observe());
++        maxLiveHandles = Math.max(maxLiveHandles, pool.stats().liveHandles);
++        expect(Math.max(0, fixture.spawned.length - T1_N3_AB_WORKERS),
++          "T1_N3_AB_NO_REPLACEMENT_WHILE_DEATH_UNCONFIRMED").toBe(0);
++        expect(pool.stats().liveHandles + pool.stats().retiringHandles,
++          "T1_N3_AB_UNCONFIRMED_DEATH_RETAINS_CUSTODY").toBeGreaterThan(0);
++        // Only now, explicitly, is death confirmed.
++        fixture.spawned[0]!.exit();
++      }
++      await settleTurns(6);
++      breakerTripped = pool.stats().breakerTripped;
++      try {
++        await pool.close();
++      } catch (error) {
++        closeRejectedTyped = typeof (error as { code?: unknown }).code === "string";
++      }
++      if (mode === "retry-fulfilled") {
++        // The pool's OWN retry path must have made the distinct second
++        // termination attempt: the fixture refused the first and fulfils the
++        // second, and nothing here calls a handle by hand or rewrites the close
++        // outcome. A manual second call would be the test terminating the
++        // worker, which proves nothing about the product's retry.
++        expect(fixture.spawned[0]!.terminateCalls,
++          "T1_N3_AB_POOL_RETRIED_TERMINATION").toBeGreaterThanOrEqual(2);
++      }
++      await jobUnderTest;
++      await settleTurns(4);
++      maxPhysicallyAlive = Math.max(maxPhysicallyAlive, fixture.observe());
++      const final = pool.stats();
++      const replacementsSpawned = Math.max(0, fixture.spawned.length - T1_N3_AB_WORKERS);
++
++      expect(maxPhysicallyAlive, "T1_N3_AB_PHYSICAL_ALIVE_NEVER_EXCEEDS_THREE")
++        .toBeLessThanOrEqual(3);
++      expect(maxLiveHandles, "T1_N3_AB_LIVE_HANDLES_NEVER_EXCEED_THREE").toBeLessThanOrEqual(3);
++      expect(settlements, "T1_N3_AB_SETTLED_EXACTLY_ONCE").toBe(1);
++      if (mode === "unconfirmed-death") {
++        expect(replacementsSpawned, "T1_N3_AB_UNCONFIRMED_DEATH_SPAWNS_NO_REPLACEMENT").toBe(0);
++        expect(closeRejectedTyped, "T1_N3_AB_UNCONFIRMED_DEATH_CLOSE_REJECTS_TYPED").toBe(true);
++        expect(final.liveHandles + final.retiringHandles,
++          "T1_N3_AB_UNCONFIRMED_DEATH_RETAINS_CUSTODY").toBeGreaterThan(0);
++      } else if (mode === "late-exit") {
++        expect(replacementsSpawned, "T1_N3_AB_LATE_EXIT_PERMITS_ONE_REPLACEMENT").toBe(1);
++        expect(final.liveHandles, "T1_N3_AB_LATE_EXIT_ZERO_HANDLES").toBe(0);
++        expect(final.retiringHandles, "T1_N3_AB_LATE_EXIT_ZERO_HANDLES").toBe(0);
++      } else {
++        expect(replacementsSpawned, "T1_N3_AB_RETRY_FULFILLED_SPAWNS_NO_REPLACEMENT").toBe(0);
++        expect(closeRejectedTyped, "T1_N3_AB_RETRY_FULFILLED_CLEAN_CLOSE").toBe(false);
++        expect(final.liveHandles, "T1_N3_AB_RETRY_FULFILLED_ZERO_HANDLES").toBe(0);
++        expect(final.retiringHandles, "T1_N3_AB_RETRY_FULFILLED_ZERO_HANDLES").toBe(0);
++      }
++      expect(opacityLeaks(), "T1_N3_AB_OPACITY").toBe(0);
++
++      emitFaultReport({
++        faultName,
++        outcome: "COMPLETE",
++        header: await header(),
++        rssBoundStatus: "UNRATIFIED_CANDIDATE",
++        rssSafety: {
++          rssSafetyExceeded: process.memoryUsage.rss() > T1_N3_AB_RSS_SAFETY_LIMIT_BYTES,
++          limitBytes: T1_N3_AB_RSS_SAFETY_LIMIT_BYTES,
++          exceededAtBytes: null,
++          peakBytes: faultRss.peak,
++          measuredPid: process.pid,
++          sampleIntervalMs: 5,
++          samples: faultRss.samples,
++          peakSampleBytes: [...faultRss.peakSamples],
++          admittedWorkAtEnd: true
++        },
++        // Fixture integrity, asserted by the fixture itself rather than assumed
++        // by a reader: the job was held across fault and close, nothing was
++        // pre-completed, nothing was cleaned up by hand afterwards, and the
++        // close outcome was never rewritten.
++        jobHeldAcrossFaultAndClose: true,
++        precompletedJob: false,
++        manualPostCloseCleanup: false,
++        outcomeRewritten: false,
++        terminationAttempts: fixture.spawned
++          .reduce((sum, handle) => sum + handle.terminateCalls, 0),
++        restartsInWindow: final.restartsInWindow,
++        maxLiveHandles,
++        maxPhysicallyAlive,
++        settledExactlyOnce: settlements === 1,
++        breakerTripped,
++        closeRejectedTyped,
++        replacementsSpawned,
++        retainedLiveHandles: final.liveHandles,
++        retainedRetiringHandles: final.retiringHandles,
++        finalLiveHandles: final.liveHandles,
++        finalRetiringHandles: final.retiringHandles,
++        state: final.state
++      });
++    } finally {
++      clearInterval(watcher);
++      clearInterval(faultRssTimer);
++      for (const handle of fixture.spawned) handle.exit();
++      stopCellClock();
++      removeCapture();
++    }
++  };
++
++  it("T1 N3 AB fault unconfirmed death", async () => {
++    await runFaultCell("fault-unconfirmed-death", "unconfirmed-death", 0);
++  }, 120_000);
++
++  it("T1 N3 AB fault late exit before close", async () => {
++    await runFaultCell("fault-late-exit-before-close", "late-exit", 1);
++  }, 120_000);
++
++  it("T1 N3 AB fault close-time termination retry fulfilled", async () => {
++    await runFaultCell("fault-close-time-termination-retry-fulfilled", "retry-fulfilled", 0);
++  }, 120_000);
++});

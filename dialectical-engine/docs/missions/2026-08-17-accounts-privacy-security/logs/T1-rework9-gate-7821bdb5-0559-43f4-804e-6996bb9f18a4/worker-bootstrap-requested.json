@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+  "controller_epoch": 1,
+  "worker_label": "com.debateai.t1gate.worker.7821bdb5-0559-43f4-804e-6996bb9f18a4",
+  "utc": "2026-08-22T19:32:20.361Z",
+  "monotonic_ms": 257.681042
+}

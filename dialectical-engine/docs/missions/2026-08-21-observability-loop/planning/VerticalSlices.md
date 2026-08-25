@@ -18,6 +18,20 @@ Every finding **H5-01..H5-12** is discharged in place; all four self-flagged adj
 
 ---
 
+
+> **ROUTER AMENDMENTS (2026-08-22).** Two architecture corrections bind this
+> document and were previously applied only to the board, leaving plan artifacts
+> and tickets in disagreement — a Router miss, recorded rather than quietly fixed:
+> **(1)** `S03a-contract-correction.md` — S03a's acceptance re-scoped to resolver-level
+> manifest correctness; the workspace-root resolution proof relocated to S06; the
+> `.`/`./core` alias ruled intentional with its 'core is thin' property relocated to
+> S03b; TP-10 added (root `package.json` workspace dep + lockfile, owner S03a/L2,
+> V-authorized on authority_epoch 1). **(2)** `TP-10-typecheck-criterion-correction.md`
+> — TYPECHECK BASELINE PRESERVATION replaces every 'root typecheck is clean' clause
+> mission-wide; pin in `TYPECHECK-BASELINE.md`. Affects S03a/TP-10, S06, S13. Do NOT
+> propagate TBP to S03a §4 G-D (scratch-dir artifact proof) or to the product's
+> fix-tier precondition (a fail-CLOSED interlock on mutation authority).
+
 ## 0. Constants: roots, closure target, global file-contract floor, test surface
 
 **Production roots (reachability walk, `acceptance/README.md:1-9`):** `apps/api/src/main.ts` · `apps/runner/src/main.ts` · `apps/scheduler/src/cli.ts`. Ops side (`tools/obs-listener/`) is outside the walk (OBS-R125).

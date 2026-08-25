@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T20:41:34Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "scope": "bounded Rework8 correction1",
+  "outcome": "READY_FOR_SAME_GROK_CORRECTION_REVIEW",
+  "manifest_sha256": "9ae666b3de9072f7f8ec4cc5d4357d6aef55b93473992a4df009ed9296349783",
+  "change": "Mapped frozen authority key mtime_ms to Node fs.Stats field mtimeMs in verifyRuntimeAndRootCause; device/dev, inode/ino, and size remained unchanged.",
+  "red": "Executed the old mapping against the actual live node_modules/vitest symlink and authority; it failed specifically with actual=undefined for vitest_package_link.mtime_ms.",
+  "green": "Executed the corrected mapping against the same live symlink and authority; the frozen mtime matched and a +1ms authority mutation failed with the same custody mismatch.",
+  "scope_control": {
+    "launcher_changed": false,
+    "controller_changed": false,
+    "worker_changed": false,
+    "contract_changed": false,
+    "failure_evidence_changed": false,
+    "recovery_executed": false,
+    "launch_or_test_executed": false
+  },
+  "verification": {
+    "red_raw_status": 1,
+    "green_raw_status": 0,
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "live_lock": "16777233/46921156",
+    "abort_receipt": "16777233/46921157",
+    "private_runtime": "16777233/46921158",
+    "recovery": "absent_not_executed"
+  },
+  "final_hashes": {
+    "recovery": "e5928a33e2456e9275a063f55b40da794599b330b56658b6ea997fcf0f853791",
+    "authority": "b7bae38883cc5bfe41e137dcb274381c535befc52b6b95b10ea77b7986762d48",
+    "failure_evidence": "5b634c61f53ded33241a02228f5ea53d8389680315a3a26a1d3d6845d81e4456",
+    "fixture": "8588f61c982e3a97bc7d01af1b42bd2955afff646534d97fa6e4d41c8145f93e",
+    "static_checker": "e2ca38e0b7d6d07bc5bae720fe5910d77b1dceef669ed30dcedb3e4cf3376612",
+    "custody_checker": "c86480a805d34b42c3a38a9e9f26f12fc904bcd9d2f6ddb83cd2d1411ddbe7ab"
+  },
+  "runtime_probe_required": false
+}

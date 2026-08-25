@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "started_utc": "2026-08-22T20:55:28.843Z",
+  "ended_utc": "2026-08-22T21:26:05.227Z",
+  "started_monotonic_ms": 157.157791,
+  "ended_monotonic_ms": 1836578.711916,
+  "raw_status": 0,
+  "child_signal": null,
+  "supervisor_signal": null,
+  "spawn_error": null,
+  "argv": [
+    "/Users/vladmihaimiron/.hermes/node/bin/node",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/vitest@4.1.10_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1_@types+node@26.2.0_esbuild@0.28.1_tsx@4.23.11_yaml@2.9.0_/node_modules/vitest/vitest.mjs",
+    "run",
+    "tests/integration/registration-database.test.ts"
+  ],
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+  "parsed_test_files_passed": null,
+  "parsed_test_files_total": null,
+  "parsed_tests_passed": null,
+  "parsed_tests_skipped": null,
+  "parsed_tests_total": null,
+  "stdout_bytes": 84850,
+  "stderr_bytes": 2308
+}

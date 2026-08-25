@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "same sole coding author",
+  "outcome": "READY_FOR_SAME_GROK_FINDER_REVIEW",
+  "authority_packet_sha256": "46bb4c56a70e8948b9d76a10ce9067318032eda14946a6427f92179d058654cd",
+  "findings": [
+    {
+      "finding": "fail-open PostgreSQL exclusivity",
+      "red": {
+        "raw_status": 1,
+        "evidence": "T1-rework9-rework1-red-postgres.log",
+        "observed": "both path-prefixed postgres parent and postgres: child were missed"
+      },
+      "repair": "launcher and controller now use one identical heavy-process predicate; PostgreSQL and pg_ctl require an exact frozen-baseline line and are never exempted by a run-ID substring",
+      "green": {
+        "raw_status": 0,
+        "evidence": "T1-rework9-rework1-green-postgres.log",
+        "parent": "heavy",
+        "child": "heavy",
+        "unrelated": "not-heavy"
+      }
+    },
+    {
+      "finding": "postflight recovery dead branch",
+      "red": {
+        "raw_status": 1,
+        "evidence": "T1-rework9-rework1-red-recovery.log",
+        "observed": "fixed wx snapshot names preempted a later controller epoch"
+      },
+      "repair": "each epoch writes immutable unique postflight snapshots and an epoch receipt; recovery validates immutable canonical postflight/snapshot hashes, exact existing terminal evidence, a fresh green current postflight, token, and lock inode before release",
+      "green": {
+        "raw_status": 0,
+        "evidence": "T1-rework9-rework1-final-green-recovery-attempt2.log"
+      }
+    }
+  ],
+  "final_gates": {
+    "node_check": "green",
+    "shell_syntax": "green",
+    "plist": "green",
+    "static_supervisor": "green",
+    "diff_check": "green",
+    "custody": "green"
+  },
+  "custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "integration_test_sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "registration_product_sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+    "review_receipt_hash_count": 10,
+    "global_lock": "absent",
+    "gate_runtime_receipt_dirs": 0,
+    "author_processes": 0
+  },
+  "artifacts_manifest": "T1-rework9-rework1-manifest.json",
+  "progress": "T1-rework9-rework1-progress.log",
+  "final_custody": "T1-rework9-rework1-final-custody.log",
+  "scope": {
+    "vitest_or_t9_run": false,
+    "postgresql_run": false,
+    "launchctl_run": false,
+    "supervisor_bootstrap_or_execution": false,
+    "commit_or_push": false,
+    "kanban_mutation": false,
+    "reviewer_launch": false
+  }
+}

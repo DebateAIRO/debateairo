@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "decision": "8A_APPROVED",
+  "authority": "user_v",
+  "approval_utc": "2026-08-22T15:10:50Z",
+  "approval_text": "Resume with amendment: Claude Opus reviewers are out of commission until Claude resets; Grok 4.6 reviewers are reinstated at 0% usage.",
+  "thread_id": "01a01ef4-70a5-7430-97e1-be2bd2cab05a",
+  "board": "accounts-phase1",
+  "ticket": "t_b225b2f2",
+  "packet": {
+    "path": "docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+    "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+    "lines": 478
+  },
+  "entry_custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "required_staged_paths": 0
+  },
+  "authorized_author_lane": {
+    "model": "Claude Opus 5",
+    "interface": "visible local macOS Terminal",
+    "role": "coding author only",
+    "maximum_concurrent_author_lanes": 1
+  },
+  "review_roster_amendment": {
+    "claude_opus_reviewers": {
+      "status": "decommissioned_until_claude_reset",
+      "required": 0
+    },
+    "sol_reviewers": {
+      "model": "GPT-5.6 Sol",
+      "reasoning_effort": "xhigh",
+      "interface": "fresh read-only Codex subagents",
+      "required": 2
+    },
+    "grok_reviewers": {
+      "model": "Grok 4.6",
+      "interface": "fresh visible local CLI Terminals",
+      "required": 2,
+      "reported_usage_at_approval": "0%"
+    },
+    "review_concurrency": "reviews begin only after stable author handoff; no reviewer may edit or execute tests"
+  },
+  "permanent_write_scope": [
+    "tests/integration/registration-database.test.ts"
+  ],
+  "temporary_mutation_scope_with_exact_restore": [
+    "apps/api/src/registration.ts"
+  ],
+  "evidence_write_scope_prefix": "docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-",
+  "authorized_work": [
+    "self-contained six-window T9 counterbalanced cadence-blocked test contract",
+    "clearing-only M16b negative control",
+    "static exclusive launchd controller and supervisor artifacts",
+    "packet-scoped RED-first focused tests, controls, mutants, static gates, and exact restoration checks"
+  ],
+  "excluded_authority": [
+    "resend or other product repair",
+    "privacy threshold or 100ms tolerance widening",
+    "unchanged-byte full-file rerun",
+    "author-run full registration-file gate",
+    "repo-wide suite from the author lane",
+    "commit",
+    "push",
+    "Kanban completion"
+  ],
+  "future_publication_precondition": "Before any eventual push, Codex-Router must pull and integrate the latest dev locally again, then re-establish custody and obtain explicit push authority."
+}

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T18:34:04Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_SAME_GROK_REVIEW",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "governed_tuple_count": 12,
+  "incident_run_id": "e3aa3d5e-85eb-46b4-8c5a-c35a9461cb16",
+  "execution_packet_sha256": "b282ce7861d1906090679f6f8d9f166d4ac188292ccb42dd285f7ce7087f6ddd",
+  "changed_artifacts": {
+    "controller_plist_template": "3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d",
+    "worker_plist_template": "da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d",
+    "viewer": "1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25",
+    "static_fixture": "a55346c54a651a4cf36edf976bd4c7f133cf97ddf8173fcd9f30a48cbcc787e2",
+    "recovery_tool": "e9c93663c860bb854dc70931cf8d8a533d98a450050ff2309ee75135c48325ea",
+    "recovery_authority": "cb2ba4788effeb2c41990f73ce553856516c784e4fb86ad291d9520e8859552a",
+    "failure_evidence": "0c2e1074e1d0b5cc94db8e3515d679f70179f2a2e8dd1fab0a19717c7fa118ff",
+    "custody_check": "bfbfadc8fce554a330ae436e916081357bc93efd3af2cc5f94fcdb2ea71f5c02",
+    "contract": "52d75a8bc5784282ef9a8b4563fc1f60826bf4a656b286a3c0856e054db49334",
+    "aggregate_static_check": "4e73922667cc76c83b5d2655b9a1e826e55adc8d52e40bf469e446bccc06e78b"
+  },
+  "preserved_artifacts": {
+    "launcher": "3d0118a18833b0c584873059e8d5d96403634127dea39f79be4ec3b649ed7fa4",
+    "controller": "0b8b309b233bc6b29079cfd43d3b87e49b1133d464e8f6c18c7120a25efffa52",
+    "worker": "59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7",
+    "approved_recovery_core": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d"
+  },
+  "evidence": {
+    "red_raw_status": 1,
+    "red_log_sha256": "2823393101c77289a78ddca51e85a2ef1dcfc872c95d30480ee08379a40dbb86",
+    "green_raw_status": 0,
+    "green_log_sha256": "a6f5e439182a5d8e51d1192d3d379189cb07b6a439c106643016c44a9bffcb19",
+    "final_static_raw_status": 0,
+    "final_static_log_sha256": "1e8dcbc0b99eabaac4fcd42a2ea6478d503701219294fb2d930ed285f15eda0d",
+    "final_custody_raw_status": 0,
+    "final_custody_log_sha256": "93770a10fd15863c9eddeda54acb4a967fc300ec88845bf94294f053a357694c"
+  },
+  "real_lock_custody": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46491737,
+    "claim_inode": 46491752,
+    "claim_sha256": "e9be4c2450f95c2b6b10fc7d2b6d728415cdca0609fee276fd3cbb2d9e6b1e69",
+    "owner_sha256": "7dad353a9d298d11868c5febcdbc2176cd62e65a363283099e34834cf64830d8",
+    "streams": "six_zero_bytes",
+    "never_started_entries": "absent",
+    "recovery_artifacts": "absent_not_executed"
+  },
+  "frozen_scope": {
+    "product_or_test_edits": false,
+    "controller_or_worker_logic_edits": false,
+    "launchctl_or_real_probe_executed": false,
+    "recovery_or_supervisor_executed": false,
+    "viewer_worker_vitest_postgresql_executed": false,
+    "commit_push_kanban": false
+  },
+  "router_order": [
+    "Grok review",
+    "exact one-time e3aa NEVER_STARTED recovery outside the sandbox",
+    "fresh execution packet",
+    "harmless corrected bootstrap probe if needed",
+    "one exclusive gate"
+  ]
+}

@@ -1,0 +1,57 @@
+=== label: live_mail ===
+=== title: S3b keeps live-mail N=1/N=4/N=8 PostgreSQL arms below the separation ceiling ===
+=== utc: 2026-08-22T01:05:53Z ===
+=== uptime ===
+ 4:05  up 5 days,  6:29, 73 users, load averages: 7.59 6.47 6.40
+=== vm_stat ===
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    46172.
+Pages active:                                 860725.
+Pages inactive:                               859589.
+Pages speculative:                              1506.
+Pages throttled:                                   0.
+Pages wired down:                             148525.
+Pages purgeable:                                 134.
+"Translation faults":                     2756891892.
+Pages copy-on-write:                        95243629.
+Pages zero filled:                        1914152183.
+Pages reactivated:                         120689066.
+Pages purged:                               10440910.
+File-backed pages:                            295245.
+Anonymous pages:                             1426575.
+Pages stored in compressor:                  1035273.
+Pages occupied by compressor:                 126449.
+Decompressions:                            125143407.
+Compressions:                              140373171.
+Pageins:                                    32167595.
+Pageouts:                                     174830.
+Swapins:                                     7327178.
+Swapouts:                                   10492871.
+=== memory_pressure ===
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 86%
+=== top ===
+Processes: 777 total, 5 running, 772 sleeping, 4272 threads 
+2026/08/22 04:05:54
+Load Avg: 7.38, 6.44, 6.39 
+CPU usage: 23.72% user, 11.51% sys, 64.76% idle 
+SharedLibs: 569M resident, 126M data, 97M linkedit.
+MemRegions: 860410 total, 20G resident, 231M private, 2238M shared.
+PhysMem: 30G used (2321M wired, 1976M compressor), 762M unused.
+VM: 374T vsize, 6144M framework vsize, 7327178(0) swapins, 10492871(0) swapouts.
+Networks: packets: 212519035/93G in, 168858296/28G out.
+Disks: 25252415/658G read, 43996161/1849G written.
+
+PID    COMMAND          %CPU MEM   TIME    
+98990  routined         0.0  18M   00:47.00
+98989  sysmond          0.0  1648K 05:56.14
+98730  assistantd       0.0  17M   00:16.08
+98718  systemstatusd    0.0  4160K 00:07.00
+98680  audioaccessoryd  0.0  6880K 00:03.46
+98537  zsh              0.0  3088K 00:00.03
+98536  login            0.0  2576K 00:00.03
+98191  spotlightknowled 0.0  14M   02:07.94
+97712  zsh              0.0  3088K 00:00.03
+97711  login            0.0  2640K 00:00.04
+96944  biomed           0.0  6000K 00:07.58
+96912  zsh              0.0  3120K 00:00.03

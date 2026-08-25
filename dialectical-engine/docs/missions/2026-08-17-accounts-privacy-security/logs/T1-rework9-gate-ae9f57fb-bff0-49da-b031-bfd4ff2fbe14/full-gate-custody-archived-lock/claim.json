@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "ownership_token_sha256": "d88e47451687c860ce804009fa0cf4be8caaa8f2a01d841573e236b57da511cd",
+  "owner_sha256": "679d3eba35373659e34c847b7ea652d995a0048eefbabe9c4c7e2387a575c6f0",
+  "lock_device": 16777233,
+  "lock_inode": 47087786
+}

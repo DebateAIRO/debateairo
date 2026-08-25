@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "run_id": "ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "utc": "2026-08-22T21:26:06.296Z",
+  "monotonic_ms": 1838081.16625,
+  "phase": "UNKNOWN_HELD",
+  "controller_epoch": 1,
+  "worker_label": "com.debateai.t1gate.worker.ae9f57fb-bff0-49da-b031-bfd4ff2fbe14",
+  "diagnostic_pid": 77991,
+  "log_bytes": 87158,
+  "last_output_utc": "2026-08-22T21:26:05.194Z"
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+  "ticket": "t_b225b2f2",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "argv": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.bin/vitest",
+    "run",
+    "tests/integration/registration-database.test.ts"
+  ],
+  "expected_test_files": 1,
+  "expected_tests": 56,
+  "global_lock_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock",
+  "governed": [
+    {"path":"apps/api/src/index.ts","sha256":"0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a","size":30548,"mtime_ms":1787391517922.1519},
+    {"path":"apps/api/src/main.ts","sha256":"91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b","size":7061,"mtime_ms":1787395079944.3037},
+    {"path":"apps/api/src/registration.ts","sha256":"1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03","size":65119,"mtime_ms":1787413534178.339},
+    {"path":"packages/crypto/src/index.ts","sha256":"66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6","size":27118,"mtime_ms":1787343024165.269},
+    {"path":"packages/crypto/src/argon2-worker.ts","sha256":"c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b","size":10314,"mtime_ms":1787343013164.7224},
+    {"path":"packages/crypto/src/argon2-worker-pool.ts","sha256":"b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d","size":48111,"mtime_ms":1787357276000},
+    {"path":"packages/db/src/identity.ts","sha256":"2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f","size":25159,"mtime_ms":1787342997309.6755},
+    {"path":"packages/register/src/auth-policy.ts","sha256":"f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216","size":64506,"mtime_ms":1787395342357.1929},
+    {"path":"tests/integration/registration-database.test.ts","sha256":"58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191","size":310114,"mtime_ms":1787413129911.6243},
+    {"path":"tests/unit/registration.test.ts","sha256":"baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53","size":102439,"mtime_ms":1787405601741.8987},
+    {"path":"tests/unit/argon2-worker-pool.test.ts","sha256":"93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b","size":106612,"mtime_ms":1787349543692.0847},
+    {"path":"tests/architecture/t1-argon2-worker-contract.test.ts","sha256":"4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d","size":102059,"mtime_ms":1787395154282.4463}
+  ],
+  "authorization_receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-authorization-receipt.json",
+    "sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9",
+    "size": 2627,
+    "mtime_ms": 1787411480149.483
+  },
+  "final_rework9_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+    "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+    "size": 21515,
+    "mtime_ms": 1787410715342.437
+  },
+  "static_artifacts": {
+    "launcher": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-launcher.mjs","sha256":"7df6823f39e8fdbc02b057f4f9070bb94f5d2bc8a449f06f527d07deb5c3dc60","size":16226,"mtime_ms":1787425013893.3762},
+    "controller": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs","sha256":"135ae31b7eed70bd7fab8f36c21a19de000284f6063a00740bfe2b8928ed327c","size":25195,"mtime_ms":1787425095499.2021},
+    "worker": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.mjs","sha256":"59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7","size":5256,"mtime_ms":1787414515022.2422},
+    "controller_plist_template": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.plist.template","sha256":"3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d","size":1257,"mtime_ms":1787423013791.2227},
+    "worker_plist_template": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.plist.template","sha256":"da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d","size":1136,"mtime_ms":1787423013843.8066},
+    "viewer": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-viewer.mjs","sha256":"1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25","size":3327,"mtime_ms":1787423013898.262},
+    "launchd_stream_custody": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-launchd-stream-custody.mjs","sha256":"a57275e000ff9985edebfda8d91d4175dc8a48a4abfd5bf65c37686218dd0685","size":5847,"mtime_ms":1787424989234.631}
+  },
+  "expected_private_runtime_paths": {
+    "directory": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4",
+    "controller_custody_secret": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller-custody.secret",
+    "viewer_challenge": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/viewer-challenge",
+    "controller_stdout": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stdout.log",
+    "controller_stderr": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stderr.log",
+    "worker_stdout": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/worker.stdout.log",
+    "worker_stderr": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/worker.stderr.log"
+  },
+  "rendered_plist_sha256": {
+    "controller": "94c05a1546cf1c67d939325d9f55271d3f120d8411fbd7be9049b76a43302494",
+    "worker": "388c775c2377369ae346ec27f124641336f1910a25cfda0715699a755fd24992"
+  },
+  "allowed_postgresql_baseline": [],
+  "review_bindings": {
+    "grok_evidence_review": "APPROVED",
+    "grok_code_rereview1": "APPROVED",
+    "grok_code_rereview2": "APPROVED",
+    "grok_never_started_recovery_rework4": "APPROVED",
+    "grok_rework5": "APPROVED",
+    "grok_rework6": "APPROVED",
+    "grok_rework6_review_receipt": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-rework6-review-visible.log",
+      "sha256": "c3a928d82a7dbf6ce82496c0a06e3b2ea7ac33ae157ebb2fa39aeb61a11cfbe1",
+      "size": 9102,
+      "mtime_ms": 1787426771205.3713,
+      "status_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-grok-rework6-review-visible.status",
+      "status_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "status_size": 2,
+      "status_mtime_ms": 1787426771205.601,
+      "raw_status": 0,
+      "review_packet_sha256": "3ec36c359d2616a209d0de7eb9ab8be40b77e9cfc5c6b2d845f3eddf8d2ed23b",
+      "terminal_marker": "GROK REWORK9 REWORK6 APPROVED"
+    }
+  },
+  "derived_from": {
+    "run_id": "15c9c6c5-3ca3-4e68-9fb9-587d8e19309f",
+    "execution_packet_sha256": "f2971e23a06afc1209a0c0e7ab8709b5906dca33c2128bee9049c995998909e7",
+    "recovery_classification": "SUPERVISOR_ONLY_NEVER_STARTED_LOCK_ARCHIVED",
+    "recovery_marker": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f/never-started-rework6-recovery.json",
+      "sha256": "65d89a815e28fa1f2224046ce5338c5698eb83666613f42b632a7c02116b5828",
+      "size": 13612,
+      "mtime_ms": 1787426786302.1113
+    },
+    "recovery_intent": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f/never-started-rework6-recovery-intent.json",
+      "sha256": "cb09d6c1fa77e1764031700a7c7e396f086408c53e11e058d16cb248c98e6378",
+      "size": 9540,
+      "mtime_ms": 1787426786211.3503
+    },
+    "archived_lock": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-15c9c6c5-3ca3-4e68-9fb9-587d8e19309f/never-started-rework6-archived-lock",
+      "device": 16777233,
+      "inode": 46622472,
+      "tree_sha256": "571111264392478db9f1adeac15cac766d5b5b76d564b0da5d868c3cdb35586a",
+      "claim_inode": 46622486,
+      "claim_sha256": "8c598375472af4d603a803470d54dd9619b116e9c9cd06e986bf7b9d19df7f4d"
+    }
+  },
+  "preparation_custody": {
+    "prepared_utc": "2026-08-22T19:29:49Z",
+    "head_verified": true,
+    "empty_index_verified": true,
+    "all_12_governed_tuples_verified": true,
+    "source_live_global_lock_absent": true,
+    "new_execution_packet_path_absent_before_creation": true,
+    "new_receipt_path_absent": true,
+    "new_private_tmpdir_path_absent": true,
+    "source_or_new_run_supervisor_worker_test_process_absent": true,
+    "allowed_postgresql_baseline_verified": [],
+    "render_runtime": "/Users/vladmihaimiron/.hermes/node/bin/node",
+    "execution_authority": "packet_only_not_launched"
+  }
+}

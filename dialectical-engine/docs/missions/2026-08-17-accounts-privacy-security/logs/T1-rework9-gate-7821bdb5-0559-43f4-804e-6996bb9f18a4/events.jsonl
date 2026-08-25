@@ -1,0 +1,16 @@
+{"sequence":1,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T19:32:20.253Z","monotonic_ms":149.854167,"controller_epoch":1}
+{"sequence":2,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"VIEWER_VALIDATED","utc":"2026-08-22T19:32:20.258Z","monotonic_ms":154.973042,"viewer_pid":67864,"viewer_tty":"/dev/ttys012"}
+{"sequence":3,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"WORKER_BOOTSTRAPPED","utc":"2026-08-22T19:32:20.414Z","monotonic_ms":310.482625,"worker_label":"com.debateai.t1gate.worker.7821bdb5-0559-43f4-804e-6996bb9f18a4"}
+{"sequence":4,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T19:32:21.533Z","monotonic_ms":1429.411334,"launchd_streams_sha256":"ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88"}
+{"sequence":5,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T19:32:35.871Z","monotonic_ms":168.710542,"controller_epoch":2}
+{"sequence":6,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"RECOVERY_ONLY_EPOCH","utc":"2026-08-22T19:32:35.878Z","monotonic_ms":175.424542,"controller_epoch":2}
+{"sequence":7,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T19:32:35.969Z","monotonic_ms":266.305334,"launchd_streams_sha256":"ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88"}
+{"sequence":8,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T19:32:51.261Z","monotonic_ms":134.1165,"controller_epoch":3}
+{"sequence":9,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"RECOVERY_ONLY_EPOCH","utc":"2026-08-22T19:32:51.265Z","monotonic_ms":138.48225,"controller_epoch":3}
+{"sequence":10,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T19:32:51.321Z","monotonic_ms":194.706334,"launchd_streams_sha256":"ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88"}
+{"sequence":11,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T19:33:06.680Z","monotonic_ms":176.107084,"controller_epoch":4}
+{"sequence":12,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"RECOVERY_ONLY_EPOCH","utc":"2026-08-22T19:33:06.686Z","monotonic_ms":181.69725,"controller_epoch":4}
+{"sequence":13,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T19:33:06.742Z","monotonic_ms":237.9475,"launchd_streams_sha256":"ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88"}
+{"sequence":14,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"CONTROLLER_EPOCH_STARTED","utc":"2026-08-22T19:33:22.079Z","monotonic_ms":186.506583,"controller_epoch":5}
+{"sequence":15,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"RECOVERY_ONLY_EPOCH","utc":"2026-08-22T19:33:22.083Z","monotonic_ms":191.001125,"controller_epoch":5}
+{"sequence":16,"run_id":"7821bdb5-0559-43f4-804e-6996bb9f18a4","kind":"LAUNCHD_STREAMS_SEALED","utc":"2026-08-22T19:33:22.140Z","monotonic_ms":247.244375,"launchd_streams_sha256":"ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88"}

@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "classification": "SUPERVISOR_INTERRUPTED_NO_TEST_MODULE_LOADED",
+  "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+  "operation": "atomic_rename_preserving_lock_and_claim_inodes",
+  "authority": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework7-interrupted-authority.json",
+    "sha256": "368db60d5ae099f5cef88ca9986b7697c4453bb440f29909363099d03f62a884",
+    "size": 16401,
+    "mtime_ms": 1787428079296.118
+  },
+  "recovery_tool": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework7-interrupted-recovery.mjs",
+    "sha256": "f3e04e66d48396920b6ae651750370885f4fc74ce2a09add9e4665f81c2d9dad",
+    "size": 22956,
+    "mtime_ms": 1787427935851.2637
+  },
+  "recovery_core": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework3-recovery-core.mjs",
+    "sha256": "82b02bce30f19342c6bc863db76c807a172357fb8fea4ad11ce06127604a1a2d",
+    "size": 6850,
+    "mtime_ms": 1787420876982.2737
+  },
+  "failure_evidence": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-rework7-interrupted-failure-evidence.json",
+    "sha256": "db47e96b5698d0f57c02b66a7ea74f37f8c9f935079cd08b6989855a875f8a90",
+    "size": 4783,
+    "mtime_ms": 1787427779723.7722
+  },
+  "execution_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-execution-7821bdb5-0559-43f4-804e-6996bb9f18a4.json",
+    "sha256": "4163d9cd2075964f0b25d748341416dcb9ce45d18dddc1eb5578e43873c1ef9a",
+    "size": 10153,
+    "mtime_ms": 1787427074861.7866
+  },
+  "pre_filesystem": {
+    "receipt_directory": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4",
+      "device": 16777233,
+      "inode": 46782058,
+      "mode": 448,
+      "uid": 501,
+      "gid": 20,
+      "size": 896,
+      "mtime_ms": 1787427202135.142
+    },
+    "owner": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/owner.json",
+      "sha256": "953f0998fedb9b048069604270745855b80e179df0bcaff0a907261d76c12017",
+      "size": 9599,
+      "mtime_ms": 1787427139376.646
+    },
+    "lock": {
+      "directory": {
+        "device": 16777233,
+        "inode": 46782057,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 96,
+        "mtime_ms": 1787427139397.6033
+      },
+      "claim": {
+        "device": 16777233,
+        "inode": 46782073,
+        "mode": 384,
+        "uid": 501,
+        "gid": 20,
+        "size": 313,
+        "mtime_ms": 1787427139391.6646,
+        "sha256": "bac88b8943d2f8ce0ec080cf2bb916ae431221dea175599d02066d0e8efd6545"
+      },
+      "claim_value": {
+        "schema_version": 1,
+        "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+        "ownership_token_sha256": "16509793c360281f71713697e8b52ded79136a9d9bdd7b3e09aa9b5454fc8376",
+        "owner_sha256": "953f0998fedb9b048069604270745855b80e179df0bcaff0a907261d76c12017",
+        "lock_device": 16777233,
+        "lock_inode": 46782057
+      },
+      "tree_sha256": "003096be45f60914b8e54f2f2c8eee07bfe27d334536e7777245837a971fa08f"
+    },
+    "worker_terminal": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/worker-terminal.json",
+      "sha256": "f23e6713d6a1395b58bdb9cd89b8d673f1cb2d7449dc1c3bc49a87ce5ea4b235",
+      "size": 793,
+      "mtime_ms": 1787427140616.54
+    },
+    "launchd_streams": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/launchd-streams.json",
+      "sha256": "ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88",
+      "size": 4148,
+      "mtime_ms": 1787427141523.4521
+    },
+    "events": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/events.jsonl",
+      "sha256": "eab48117b99158efc313d08d352088069451dacd841214448e6a372a58303e15",
+      "size": 3232,
+      "mtime_ms": 1787427202140.302
+    },
+    "private_runtime": {
+      "directory": {
+        "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4",
+        "device": 16777233,
+        "inode": 46782059,
+        "mode": 448,
+        "uid": 501,
+        "gid": 20,
+        "size": 224,
+        "mtime_ms": 1787427140044.2214
+      },
+      "entries": {
+        "controller-custody.secret": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller-custody.secret",
+          "sha256": "ff63623204c493b56da7f421ebfb3c97659290761716d16843fb9dddabdf2dc5",
+          "size": 130,
+          "mtime_ms": 1787427139349.6692
+        },
+        "controller.stderr.log": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787427139375.6628
+        },
+        "controller.stdout.log": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/controller.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787427139375.559
+        },
+        "worker.stderr.log": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/worker.stderr.log",
+          "sha256": "9c9a360c867f41a2233bf6c435f279430425e9240652ea710e5f66609e35677c",
+          "size": 119,
+          "mtime_ms": 1787427140607.0383
+        },
+        "worker.stdout.log": {
+          "path": "/var/folders/h7/4hdbz7s15hjbyj6scmk_nx3r0000gn/T/debateai-t1gate-7821bdb5-0559-43f4-804e-6996bb9f18a4/worker.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "mtime_ms": 1787427139375.7705
+        }
+      }
+    }
+  },
+  "git_and_governed": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_paths": [],
+    "governed": [
+      {
+        "path": "apps/api/src/index.ts",
+        "sha256": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+        "size": 30548,
+        "mtime_ms": 1787391517922.1519
+      },
+      {
+        "path": "apps/api/src/main.ts",
+        "sha256": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+        "size": 7061,
+        "mtime_ms": 1787395079944.3037
+      },
+      {
+        "path": "apps/api/src/registration.ts",
+        "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+        "size": 65119,
+        "mtime_ms": 1787413534178.339
+      },
+      {
+        "path": "packages/crypto/src/index.ts",
+        "sha256": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+        "size": 27118,
+        "mtime_ms": 1787343024165.269
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker.ts",
+        "sha256": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+        "size": 10314,
+        "mtime_ms": 1787343013164.7224
+      },
+      {
+        "path": "packages/crypto/src/argon2-worker-pool.ts",
+        "sha256": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+        "size": 48111,
+        "mtime_ms": 1787357276000
+      },
+      {
+        "path": "packages/db/src/identity.ts",
+        "sha256": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+        "size": 25159,
+        "mtime_ms": 1787342997309.6755
+      },
+      {
+        "path": "packages/register/src/auth-policy.ts",
+        "sha256": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+        "size": 64506,
+        "mtime_ms": 1787395342357.1929
+      },
+      {
+        "path": "tests/integration/registration-database.test.ts",
+        "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+        "size": 310114,
+        "mtime_ms": 1787413129911.6243
+      },
+      {
+        "path": "tests/unit/registration.test.ts",
+        "sha256": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+        "size": 102439,
+        "mtime_ms": 1787405601741.8987
+      },
+      {
+        "path": "tests/unit/argon2-worker-pool.test.ts",
+        "sha256": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+        "size": 106612,
+        "mtime_ms": 1787349543692.0847
+      },
+      {
+        "path": "tests/architecture/t1-argon2-worker-contract.test.ts",
+        "sha256": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d",
+        "size": 102059,
+        "mtime_ms": 1787395154282.4463
+      }
+    ]
+  },
+  "process_scan": {
+    "sha256": "33e6356e26d9d9bd8e4e8c35750624feb2eb5d05cb944ac87324be5d8380cc63",
+    "bytes": 148492,
+    "line_count": 899,
+    "allowed_heavy_lines": []
+  },
+  "launchd_scan": {
+    "controller": {
+      "label": "com.debateai.t1gate.controller.7821bdb5-0559-43f4-804e-6996bb9f18a4",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.controller.7821bdb5-0559-43f4-804e-6996bb9f18a4\" in domain for user gui: 501\n"
+    },
+    "worker": {
+      "label": "com.debateai.t1gate.worker.7821bdb5-0559-43f4-804e-6996bb9f18a4",
+      "status": 113,
+      "stdout": "",
+      "stderr": "Bad request.\nCould not find service \"com.debateai.t1gate.worker.7821bdb5-0559-43f4-804e-6996bb9f18a4\" in domain for user gui: 501\n"
+    },
+    "domain_sha256": "9c5a79fa7272c8e80b462eda6cab972c7c2f88c9ffea9fb9dda7492e8eaf9ca2",
+    "domain_bytes": 116806
+  },
+  "test_execution_authority": "none",
+  "created_utc": "2026-08-22T20:03:30.930Z"
+}

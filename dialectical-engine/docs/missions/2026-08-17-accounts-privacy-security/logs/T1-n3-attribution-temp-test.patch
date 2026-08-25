@@ -1,0 +1,787 @@
+--- a/tests/integration/registration-database.test.ts (wrapper entry backup)
++++ b/tests/integration/registration-database.test.ts (temporary diagnostic)
+@@ -4091,7 +4091,784 @@
+       );
+     }
+   }, 300_000);
++
++
++  // ---------------------------------------------------------------------------
++  // TEMPORARY DIAGNOSTIC — T1 N=3 critical-path attribution.
++  // Added under logs/T1-claude-n3-attribution-packet.md, removed and restored
++  // byte-for-byte from the wrapper-owned entry backup before the seat exits.
++  // Diagnostic only: no product, policy, threshold, cadence, queue, worker, KDF
++  // or database behaviour is changed, and no permanent test is touched.
++  // ---------------------------------------------------------------------------
++  it("T1 rework8 D1 attributes the real N=3 registration critical path", async () => {
++    const { AsyncLocalStorage } = await import("node:async_hooks");
++    type Arm = "existing" | "missing";
++    type Phase = "request" | "critical-provision" | "postresponse";
++    interface RequestScope {
++      readonly ordinal: number;
++      readonly arm: Arm;
++      readonly phase: Phase;
++    }
++    const als = new AsyncLocalStorage<RequestScope>();
++
++    const registrationCadenceMs = basePolicy.channel.registrationMailDispatchActivationSpacingMs;
++    const clampMs = basePolicy.verification.enumerationResponseFloorMs
++      + basePolicy.verification.enumerationToleranceMs;
++    const password = "correct horse battery staple";
++    const pool = sharedArgon2Pool();
++
++    // -- identifier-safe console capture -------------------------------------
++    // Installed BEFORE the N1/N2 preconditioning and retained through the final
++    // drain. Captured text is never emitted verbatim; only whitelisted
++    // bracketed error-code counts are printed.
++    const captured: string[] = [];
++    const originalConsoleError = console.error;
++    const originalConsoleWarn = console.warn;
++    const captureLine = (args: readonly unknown[]): void => {
++      captured.push(args.map((value) => {
++        if (typeof value === "string") return value;
++        try {
++          return JSON.stringify(value) ?? String(value);
++        } catch {
++          return "[uninspectable]";
++        }
++      }).join(" "));
++    };
++    console.error = (...args: unknown[]): void => { captureLine(args); };
++    console.warn = (...args: unknown[]): void => { captureLine(args); };
++
++    const rejections: string[] = [];
++    const onUnhandled = (reason: unknown): void => {
++      rejections.push(typeof (reason as { code?: unknown })?.code === "string"
++        ? String((reason as { code?: unknown }).code)
++        : "UNTYPED");
++    };
++    process.on("unhandledRejection", onUnhandled);
++
++    // -- measurement state ----------------------------------------------------
++    interface Span {
++      readonly ordinal: number;
++      readonly arm: Arm;
++      readonly phase: Phase;
++      readonly stage: string;
++      readonly start: number;
++      readonly end: number;
++    }
++    const spans: Span[] = [];
++    const requestStart = new Map<number, number>();
++    const requestSettled = new Map<number, number>();
++    const requestArm = new Map<number, Arm>();
++    const requestWave = new Map<number, number>();
++    const clampRequestedMs = new Map<number, number>();
++    const auditOrderWithinRequest = new Map<number, number>();
++    const outcomes = new Map<number, string>();
++    let recording = false;
++
++    const record = (stage: string, start: number, end: number, scope?: RequestScope): void => {
++      if (!recording || scope === undefined) return;
++      spans.push({
++        ordinal: scope.ordinal, arm: scope.arm, phase: scope.phase, stage, start, end
++      });
++    };
++
++    // -- pool sampling and event-loop heartbeat -------------------------------
++    let poolSamples = 0;
++    let poolMaxActive = 0;
++    let poolMaxQueuedCredential = 0;
++    let poolMaxQueuedAudit = 0;
++    let poolMaxQueuedTotal = 0;
++    let poolMaxOutstandingCredential = 0;
++    let poolMaxOutstandingAudit = 0;
++    let poolMaxOutstandingTotal = 0;
++    const loopDelays: number[] = [];
++    let poolSampler: ReturnType<typeof setInterval> | undefined;
++    let loopHeartbeat: ReturnType<typeof setInterval> | undefined;
++    let lastBeatAt = 0;
++    const startObservers = (): void => {
++      if (poolSampler !== undefined) return;
++      poolSampler = setInterval(() => {
++        const stats = pool.stats();
++        poolSamples += 1;
++        poolMaxActive = Math.max(poolMaxActive, stats.active);
++        poolMaxQueuedCredential = Math.max(poolMaxQueuedCredential, stats.queuedCredential);
++        poolMaxQueuedAudit = Math.max(poolMaxQueuedAudit, stats.queuedAudit);
++        poolMaxQueuedTotal = Math.max(poolMaxQueuedTotal, stats.queuedTotal);
++        poolMaxOutstandingCredential = Math.max(
++          poolMaxOutstandingCredential, stats.outstandingCredential
++        );
++        poolMaxOutstandingAudit = Math.max(poolMaxOutstandingAudit, stats.outstandingAudit);
++        poolMaxOutstandingTotal = Math.max(poolMaxOutstandingTotal, stats.outstandingTotal);
++      }, 5);
++      lastBeatAt = performance.now();
++      loopHeartbeat = setInterval(() => {
++        const now = performance.now();
++        loopDelays.push(Math.max(0, now - lastBeatAt - 1));
++        lastBeatAt = now;
++      }, 1);
++    };
++    const stopObservers = (): void => {
++      if (poolSampler !== undefined) clearInterval(poolSampler);
++      if (loopHeartbeat !== undefined) clearInterval(loopHeartbeat);
++      poolSampler = undefined;
++      loopHeartbeat = undefined;
++    };
++
++    // -- process-owned pool wrappers (installed once, restored in finally) ----
++    const originalHashPassword = pool.hashPassword.bind(pool);
++    const originalHashAuditContext = pool.hashAuditContext.bind(pool);
++    const poolSurface = pool as unknown as {
++      hashPassword: typeof pool.hashPassword;
++      hashAuditContext: typeof pool.hashAuditContext;
++    };
++    poolSurface.hashPassword = async (value, salt, parameters) => {
++      const scope = als.getStore();
++      const start = performance.now();
++      try {
++        return await originalHashPassword(value, salt, parameters);
++      } finally {
++        record("pool.hashPassword", start, performance.now(), scope);
++      }
++    };
++    poolSurface.hashAuditContext = async (value, salt, parameters) => {
++      const scope = als.getStore();
++      let stage = "pool.hashAuditContext.postresponse";
++      if (scope !== undefined && scope.phase === "critical-provision") {
++        const order = (auditOrderWithinRequest.get(scope.ordinal) ?? 0) + 1;
++        auditOrderWithinRequest.set(scope.ordinal, order);
++        // First and second invocation ORDER inside one request, never a value.
++        stage = order === 1
++          ? "pool.hashAuditContext.first"
++          : order === 2 ? "pool.hashAuditContext.second" : `pool.hashAuditContext.extra${order}`;
++      }
++      const start = performance.now();
++      try {
++        return await originalHashAuditContext(value, salt, parameters);
++      } finally {
++        record(stage, start, performance.now(), scope);
++      }
++    };
++
++    // -- the original S3b cell, uninstrumented, for N=1 and N=2 history -------
++    const runHistoryCell = async (concurrency: 1 | 2): Promise<void> => {
++      const waves = concurrency === 1 ? 8 : 4;
++      const existingGroups = Math.ceil(waves / 4);
++      const historyMail = new MemoryMailSender();
++      const flow = buildService({ mail: historyMail });
++      const existingEmails = Array.from(
++        { length: concurrency * existingGroups },
++        (_, index) => `t1-n3attr-n${concurrency}-existing-${index}@example.test`
++      );
++      await Promise.all(existingEmails.map((email, index) => flow.service.register({
++        email,
++        password,
++        recoveryEmail: `t1-n3attr-n${concurrency}-seed-${index}-recovery@example.test`,
++        adultAffirmed: true
++      }, {
++        ip: `203.0.${concurrency}.${index + 1}`,
++        userAgent: "vitest-s3b-timing-seed",
++        requestId: `request:s3b:timing:n${concurrency}:seed:${index}`
++      })));
++      await flow.service.drainMailDispatches();
++      const runExistingWave = async (wave: number): Promise<void> => {
++        await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
++          const email = existingEmails[(wave % existingGroups) * concurrency + index]!;
++          await flow.service.register({
++            email,
++            password,
++            recoveryEmail: `t1-n3attr-n${concurrency}-existing-${index}-recovery@example.test`,
++            adultAffirmed: true
++          }, {
++            ip: `203.${concurrency}.${wave}.${index + 1}`,
++            userAgent: "vitest-s3b-timing-existing",
++            requestId: `request:s3b:timing:n${concurrency}:existing:${wave}:${index}`
++          });
++        }));
++      };
++      const runMissingWave = async (wave: number): Promise<void> => {
++        await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
++          await flow.service.register({
++            email: `t1-n3attr-n${concurrency}-missing-${wave}-${index}@example.test`,
++            password,
++            recoveryEmail: `t1-n3attr-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
++            adultAffirmed: true
++          }, {
++            ip: `204.${concurrency}.${wave}.${index + 1}`,
++            userAgent: "vitest-s3b-timing-missing",
++            requestId: `request:s3b:timing:n${concurrency}:missing:${wave}:${index}`
++          });
++        }));
++      };
++      for (let wave = 0; wave < waves; wave += 1) {
++        if (wave % 2 === 0) {
++          await runExistingWave(wave);
++          await runMissingWave(wave);
++        } else {
++          await runMissingWave(wave);
++          await flow.service.drainMailDispatches();
++          await runExistingWave(wave);
++        }
++        await flow.service.drainMailDispatches();
++      }
++    };
+ 
++    const knownFailureCodes = new Set([
++      "AUTH_INPUT_INVALID", "AUTH_RATE_LIMITED", "AUTH_MAIL_BUSY",
++      "AUTH_REGISTRATION_FAILED", "AUTH_TEMPORARILY_UNAVAILABLE"
++    ]);
++
++    let restoreService: (() => void) | undefined;
++    try {
++      // 1. N=1 and N=2 cell history, exactly as the original orders them.
++      await runHistoryCell(1);
++      await runHistoryCell(2);
++
++      // 2. The N=3 cell, instrumented.
++      const concurrency = 3 as const;
++      const waves = 4;
++      const existingGroups = Math.ceil(waves / 4);
++      const timingMail = new MemoryMailSender();
++      const flow = buildService({ mail: timingMail });
++
++      const serviceSurface = flow.service as unknown as {
++        provisionPendingAccount(input: unknown): Promise<unknown>;
++        reserveMailDispatchPermit(
++          correlationId: string, minimumReservationMs?: number, activationSpacingMs?: number
++        ): Promise<unknown>;
++        scheduleRegistrationHash(value: string): {
++          readonly promise: Promise<string>;
++          readonly cancel: () => void;
++        };
++        holdRegistrationEnumerationClamp(startedAt: number): Promise<void>;
++      };
++      const repositorySurface = flow.repository as unknown as {
++        findAuditIdentityByBlindIndex(emailBlindIndex: Buffer): Promise<unknown>;
++        prepareAuditContext(source: unknown): Promise<unknown>;
++        transaction<T>(operation: (client: unknown) => Promise<T>): Promise<T>;
++        createPendingAccount(input: unknown, beforeCommit: () => Promise<void>): Promise<unknown>;
++      };
++      const originalProvision = serviceSurface.provisionPendingAccount.bind(flow.service);
++      const originalReserve = serviceSurface.reserveMailDispatchPermit.bind(flow.service);
++      const originalSchedule = serviceSurface.scheduleRegistrationHash.bind(flow.service);
++      const originalHold = serviceSurface.holdRegistrationEnumerationClamp.bind(flow.service);
++      const originalLookup = repositorySurface.findAuditIdentityByBlindIndex.bind(flow.repository);
++      const originalPrepare = repositorySurface.prepareAuditContext.bind(flow.repository);
++      const originalTransaction = repositorySurface.transaction.bind(flow.repository);
++      const originalCreate = repositorySurface.createPendingAccount.bind(flow.repository);
++      restoreService = () => {
++        serviceSurface.provisionPendingAccount = originalProvision;
++        serviceSurface.reserveMailDispatchPermit = originalReserve;
++        serviceSurface.scheduleRegistrationHash = originalSchedule;
++        serviceSurface.holdRegistrationEnumerationClamp = originalHold;
++        repositorySurface.findAuditIdentityByBlindIndex = originalLookup;
++        repositorySurface.prepareAuditContext = originalPrepare;
++        repositorySurface.transaction = originalTransaction;
++        repositorySurface.createPendingAccount = originalCreate;
++      };
++
++      serviceSurface.provisionPendingAccount = async (input) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        try {
++          return await originalProvision(input);
++        } finally {
++          record("service.provisionPendingAccount", start, performance.now(), scope);
++        }
++      };
++      serviceSurface.reserveMailDispatchPermit = (correlationId, minimum, spacing) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        const reservation = originalReserve(correlationId, minimum, spacing);
++        const settle = (): void => {
++          record("service.reserveMailDispatchPermit", start, performance.now(), scope);
++        };
++        reservation.then(settle, settle);
++        return reservation;
++      };
++      serviceSurface.scheduleRegistrationHash = (value) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        const work = originalSchedule(value);
++        const settle = (): void => {
++          record("service.scheduleRegistrationHash", start, performance.now(), scope);
++        };
++        work.promise.then(settle, settle);
++        return work;
++      };
++      serviceSurface.holdRegistrationEnumerationClamp = async (startedAt) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        const requested = Math.max(0, clampMs - (start - startedAt));
++        try {
++          return await originalHold(startedAt);
++        } finally {
++          record("service.holdRegistrationEnumerationClamp", start, performance.now(), scope);
++          if (recording && scope !== undefined) clampRequestedMs.set(scope.ordinal, requested);
++        }
++      };
++      repositorySurface.findAuditIdentityByBlindIndex = async (emailBlindIndex) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        try {
++          return await originalLookup(emailBlindIndex);
++        } finally {
++          record("repository.findAuditIdentityByBlindIndex", start, performance.now(), scope);
++        }
++      };
++      repositorySurface.prepareAuditContext = async (sourceContextValue) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        try {
++          return await originalPrepare(sourceContextValue);
++        } finally {
++          record("repository.prepareAuditContext", start, performance.now(), scope);
++        }
++      };
++      repositorySurface.transaction = async (operation) => {
++        const scope = als.getStore();
++        const start = performance.now();
++        try {
++          return await originalTransaction(operation);
++        } finally {
++          record("repository.transaction", start, performance.now(), scope);
++        }
++      };
++      repositorySurface.createPendingAccount = async (input, beforeCommit) => {
++        const outer = als.getStore();
++        const nested: RequestScope | undefined = outer === undefined
++          ? undefined
++          : { ordinal: outer.ordinal, arm: outer.arm, phase: "critical-provision" };
++        const start = performance.now();
++        try {
++          return nested === undefined
++            ? await originalCreate(input, beforeCommit)
++            : await als.run(nested, async () => originalCreate(input, beforeCommit));
++        } finally {
++          record("repository.createPendingAccount", start, performance.now(), nested ?? outer);
++        }
++      };
++
++      const existingEmails = Array.from(
++        { length: concurrency * existingGroups },
++        (_, index) => `t1-n3attr-n${concurrency}-existing-${index}@example.test`
++      );
++      const missingEmails: string[] = [];
++      await Promise.all(existingEmails.map((email, index) => flow.service.register({
++        email,
++        password,
++        recoveryEmail: `t1-n3attr-n${concurrency}-seed-${index}-recovery@example.test`,
++        adultAffirmed: true
++      }, {
++        ip: `203.0.${concurrency}.${index + 1}`,
++        userAgent: "vitest-s3b-timing-seed",
++        requestId: `request:s3b:timing:n${concurrency}:seed:${index}`
++      })));
++      await flow.service.drainMailDispatches();
++
++      // 3. Metrics are cleared ONLY here: after N1/N2 history and the N3 seed.
++      spans.length = 0;
++      requestStart.clear();
++      requestSettled.clear();
++      requestArm.clear();
++      requestWave.clear();
++      clampRequestedMs.clear();
++      auditOrderWithinRequest.clear();
++      outcomes.clear();
++      const seedMailCount = timingMail.messages.length;
++      recording = true;
++
++      let nextOrdinal = 0;
++      const existingDurations: number[] = [];
++      const missingDurations: number[] = [];
++      const measure = async (
++        ordinal: number, arm: Arm, wave: number, index: number, email: string
++      ): Promise<number> => {
++        const scope: RequestScope = { ordinal, arm, phase: "request" };
++        const start = performance.now();
++        requestStart.set(ordinal, start);
++        requestArm.set(ordinal, arm);
++        requestWave.set(ordinal, wave);
++        await als.run(scope, async () => {
++          try {
++            const response = await flow.service.register({
++              email,
++              password,
++              recoveryEmail: arm === "existing"
++                ? `t1-n3attr-n${concurrency}-existing-${index}-recovery@example.test`
++                : `t1-n3attr-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
++              adultAffirmed: true
++            }, {
++              ip: `${arm === "existing" ? 203 : 204}.${concurrency}.${wave}.${index + 1}`,
++              userAgent: `vitest-s3b-timing-${arm}`,
++              requestId: `request:s3b:timing:n${concurrency}:${arm}:${wave}:${index}`
++            });
++            outcomes.set(
++              ordinal,
++              JSON.stringify(response) === JSON.stringify(REGISTRATION_PUBLIC_RESPONSE)
++                ? "success"
++                : "unexpected_body"
++            );
++          } catch (error) {
++            // Code-only outcome: a RED must never make Vitest serialize a
++            // secret-bearing object.
++            const code = (error as { code?: unknown } | undefined)?.code;
++            outcomes.set(
++              ordinal,
++              typeof code === "string" && knownFailureCodes.has(code) ? code : "unexpected"
++            );
++          }
++        });
++        const end = performance.now();
++        requestSettled.set(ordinal, end);
++        record("register", start, end, scope);
++        return end - start;
++      };
++      const measureExistingWave = async (wave: number): Promise<number[]> => {
++        const ordinals = Array.from({ length: concurrency }, () => nextOrdinal++);
++        startObservers();
++        const durations = await Promise.all(ordinals.map((ordinal, index) => measure(
++          ordinal, "existing", wave, index,
++          existingEmails[(wave % existingGroups) * concurrency + index]!
++        )));
++        stopObservers();
++        return durations;
++      };
++      const measureMissingWave = async (wave: number): Promise<number[]> => {
++        const ordinals = Array.from({ length: concurrency }, () => nextOrdinal++);
++        startObservers();
++        const durations = await Promise.all(ordinals.map((ordinal, index) => {
++          const email = `t1-n3attr-n${concurrency}-missing-${wave}-${index}@example.test`;
++          missingEmails.push(email);
++          return measure(ordinal, "missing", wave, index, email);
++        }));
++        stopObservers();
++        return durations;
++      };
++      for (let wave = 0; wave < waves; wave += 1) {
++        if (wave % 2 === 0) {
++          existingDurations.push(...await measureExistingWave(wave));
++          missingDurations.push(...await measureMissingWave(wave));
++        } else {
++          missingDurations.push(...await measureMissingWave(wave));
++          await flow.service.drainMailDispatches();
++          existingDurations.push(...await measureExistingWave(wave));
++        }
++        await flow.service.drainMailDispatches();
++      }
++      await flow.service.drainMailDispatches();
++      recording = false;
++      stopObservers();
++
++      // 4. Post-drain occupancy.
++      const afterDrainPool = pool.stats();
++      const afterDrainMail = flow.service.mailDispatchOccupancy();
++
++      // 5. Durable, identifier-free per-request timelines.
++      const stageOf = (ordinal: number, stage: string): Span | undefined =>
++        spans.find((span) => span.ordinal === ordinal && span.stage === stage);
++      const criticalSpans = spans.filter((span) => span.phase === "critical-provision"
++        && span.start <= (requestSettled.get(span.ordinal) ?? Number.POSITIVE_INFINITY));
++      const postresponseSpans = spans.filter((span) => span.phase !== "critical-provision"
++        && (span.stage.startsWith("repository.")
++          || span.stage.startsWith("pool.hashAuditContext"))
++        && span.stage !== "repository.findAuditIdentityByBlindIndex");
++      const countCritical = (stage: string): number =>
++        criticalSpans.filter((span) => span.stage === stage).length;
++
++      const ordinals = [...requestStart.keys()].sort((left, right) => left - right);
++      for (const ordinal of ordinals) {
++        const base = requestStart.get(ordinal)!;
++        const lines = spans
++          .filter((span) => span.ordinal === ordinal)
++          .sort((left, right) => left.start - right.start)
++          .map((span) => `${span.stage}@${span.phase}`
++            + `:${(span.start - base).toFixed(1)}->${(span.end - base).toFixed(1)}`
++            + `=${(span.end - span.start).toFixed(1)}`);
++        console.info(
++          `[T1 REWORK8 D1 TIMELINE] ordinal=${ordinal} arm=${requestArm.get(ordinal)} `
++          + `wave=${requestWave.get(ordinal)} outcome=${outcomes.get(ordinal)} `
++          + `origin_ms=${base.toFixed(1)} `
++          + `clamp_requested_ms=${(clampRequestedMs.get(ordinal) ?? 0).toFixed(1)} `
++          + `stages=${lines.join(" | ")}`
++        );
++      }
++
++      // 6. Per-arm and cross-arm comparable measurement, reproduced exactly.
++      const provisionEndOf = (ordinal: number): number | undefined =>
++        stageOf(ordinal, "service.provisionPendingAccount")?.end;
++      const hashProvisionOf = (ordinal: number): number => {
++        const end = provisionEndOf(ordinal);
++        return end === undefined ? Number.NaN : end - requestStart.get(ordinal)!;
++      };
++      const armOrdinals = (arm: Arm): number[] =>
++        ordinals.filter((ordinal) => requestArm.get(ordinal) === arm);
++      const armMaximum = (arm: Arm): { ordinal: number; value: number } => {
++        let best = { ordinal: -1, value: Number.NEGATIVE_INFINITY };
++        for (const ordinal of armOrdinals(arm)) {
++          const value = hashProvisionOf(ordinal);
++          if (value > best.value) best = { ordinal, value };
++        }
++        return best;
++      };
++      const existingMaximum = armMaximum("existing");
++      const missingMaximum = armMaximum("missing");
++      const crossMaximum = existingMaximum.value >= missingMaximum.value
++        ? existingMaximum
++        : missingMaximum;
++      const headroomOf = (value: number): number =>
++        clampMs - (value + concurrency * registrationCadenceMs);
++
++      const quantile = (values: readonly number[], fraction: number): number => {
++        if (values.length === 0) return Number.NaN;
++        const sorted = [...values].sort((left, right) => left - right);
++        return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]!;
++      };
++      const stageValues = (stage: string): number[] => ordinals
++        .map((ordinal) => stageOf(ordinal, stage))
++        .filter((span): span is Span => span !== undefined)
++        .map((span) => span.end - span.start);
++      const summarize = (label: string, stage: string): string => {
++        const values = stageValues(stage);
++        return `${label}_p50_ms=${quantile(values, 0.5).toFixed(1)} `
++          + `${label}_max_ms=${(values.length === 0 ? Number.NaN : Math.max(...values)).toFixed(1)}`;
++      };
++      const registerDurations = [...existingDurations, ...missingDurations];
++
++      // 7. Committed accounts and measured sends, from real PostgreSQL.
++      const committedMissing = await database.pool.query<{ count: string }>(`
++        SELECT count(*)::text AS count FROM identity."user"
++        WHERE email_blind_index=ANY($1::bytea[])
++      `, [missingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
++      const committedExisting = await database.pool.query<{ count: string }>(`
++        SELECT count(*)::text AS count FROM identity."user"
++        WHERE email_blind_index=ANY($1::bytea[])
++      `, [existingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
++      const existingTokens = await database.pool.query<{ audit_token: string }>(`
++        SELECT audit_token FROM identity."user"
++        WHERE email_blind_index=ANY($1::bytea[])
++      `, [existingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
++      const duplicatePostwork = await database.pool.query<{ count: string }>(`
++        SELECT count(*)::text AS count FROM identity.audit_event
++        WHERE event_type='identity.registration.duplicate_postwork' AND decision='DENY'
++          AND actor_key_ref=ANY($1::text[])
++      `, [existingTokens.rows.map((row) => row.audit_token)]);
++      const measuredSends = timingMail.messages.length - seedMailCount;
++      const successes = [...outcomes.values()].filter((value) => value === "success").length;
++      const busy = [...outcomes.values()].filter((value) => value === "AUTH_MAIL_BUSY").length;
++      const unexpected = [...outcomes.values()]
++        .filter((value) => value !== "success" && value !== "AUTH_MAIL_BUSY").length;
++
++      // 8. Non-overlapping decomposition for the breached (worst) request.
++      const breached = crossMaximum.ordinal;
++      const base = requestStart.get(breached)!;
++      const lookup = stageOf(breached, "repository.findAuditIdentityByBlindIndex");
++      const credential = stageOf(breached, "service.scheduleRegistrationHash");
++      const credentialLane = stageOf(breached, "pool.hashPassword");
++      const reservation = stageOf(breached, "service.reserveMailDispatchPermit");
++      const prepare = criticalSpans.find((span) => span.ordinal === breached
++        && span.stage === "repository.prepareAuditContext");
++      const auditFirst = criticalSpans.find((span) => span.ordinal === breached
++        && span.stage === "pool.hashAuditContext.first");
++      const auditSecond = criticalSpans.find((span) => span.ordinal === breached
++        && span.stage === "pool.hashAuditContext.second");
++      const transaction = criticalSpans.find((span) => span.ordinal === breached
++        && span.stage === "repository.transaction");
++      const provision = stageOf(breached, "service.provisionPendingAccount");
++      const clamp = stageOf(breached, "service.holdRegistrationEnumerationClamp");
++      const span = (value: Span | undefined): number =>
++        value === undefined ? Number.NaN : value.end - value.start;
++      const segmentLookup = lookup === undefined ? Number.NaN : lookup.end - base;
++      const segmentAwait = lookup === undefined || provision === undefined
++        ? Number.NaN
++        : provision.start - lookup.end;
++      const segmentPrepare = span(prepare);
++      const segmentTransaction = span(transaction);
++      const segmentResidual = provision === undefined
++        ? Number.NaN
++        : (provision.end - provision.start) - segmentPrepare - segmentTransaction;
++      const awaitDeterminedBy = credential !== undefined && reservation !== undefined
++        ? (credential.end >= reservation.end
++          ? "credential-enqueue-to-settle"
++          : "mail-permit-wait-to-grant")
++        : "unknown";
++
++      console.info(
++        `[T1 REWORK8 D1 BREACH] ordinal=${breached} arm=${requestArm.get(breached)} `
++        + `wave=${requestWave.get(breached)} `
++        + `hash_provision_ms=${crossMaximum.value.toFixed(1)} `
++        + `seg_initial_lookup_ms=${segmentLookup.toFixed(1)} `
++        + `seg_await_barrier_ms=${segmentAwait.toFixed(1)} `
++        + `seg_await_determined_by=${awaitDeterminedBy} `
++        + `credential_enqueue_to_settle_ms=${span(credential).toFixed(1)} `
++        + `credential_lane_enqueue_to_settle_ms=${span(credentialLane).toFixed(1)} `
++        + `mail_permit_wait_to_grant_ms=${span(reservation).toFixed(1)} `
++        + `seg_critical_audit_preparation_ms=${segmentPrepare.toFixed(1)} `
++        + `audit_first_enqueue_to_settle_ms=${span(auditFirst).toFixed(1)} `
++        + `audit_second_enqueue_to_settle_ms=${span(auditSecond).toFixed(1)} `
++        + `seg_db_transaction_ms=${segmentTransaction.toFixed(1)} `
++        + `seg_residual_provision_ms=${segmentResidual.toFixed(1)} `
++        + `clamp_requested_ms=${(clampRequestedMs.get(breached) ?? 0).toFixed(1)} `
++        + `clamp_actual_ms=${span(clamp).toFixed(1)} `
++        + `register_ms=${((requestSettled.get(breached) ?? base) - base).toFixed(1)}`
++      );
++
++      console.info(
++        `[T1 REWORK8 D1 ATTRIBUTION] backend=postgres production_policy=true n=3 `
++        + `password_argon2id_kib=${basePolicy.password.argon2id.memoryCostKiB} `
++        + `password_argon2id_time=${basePolicy.password.argon2id.timeCost} `
++        + `audit_argon2id_kib=${basePolicy.auditSourceIpKdf.memoryCostKiB} `
++        + `cadence_ms=${registrationCadenceMs} clamp_ms=${clampMs} `
++        + `requests=${ordinals.length} success=${successes} busy=${busy} `
++        + `unexpected=${unexpected} committed_missing=${committedMissing.rows[0]!.count} `
++        + `committed_existing=${committedExisting.rows[0]!.count} sends=${measuredSends} `
++        + `duplicate_postwork=${duplicatePostwork.rows[0]!.count} `
++        + `register_p50_ms=${quantile(registerDurations, 0.5).toFixed(1)} `
++        + `register_max_ms=${Math.max(...registerDurations).toFixed(1)} `
++        + `${summarize("initial_lookup", "repository.findAuditIdentityByBlindIndex")} `
++        + `${summarize("reservation", "service.reserveMailDispatchPermit")} `
++        + `${summarize("registration_hash", "service.scheduleRegistrationHash")} `
++        + `${summarize("password_kdf", "pool.hashPassword")} `
++        + `${summarize("audit_kdf_first", "pool.hashAuditContext.first")} `
++        + `${summarize("audit_kdf_second", "pool.hashAuditContext.second")} `
++        + `${summarize("prepare_audit", "repository.prepareAuditContext")} `
++        + `${summarize("transaction", "repository.transaction")} `
++        + `${summarize("create_account", "repository.createPendingAccount")} `
++        + `${summarize("provision", "service.provisionPendingAccount")} `
++        + `${summarize("clamp", "service.holdRegistrationEnumerationClamp")} `
++        + `existing_hash_provision_max_ms=${existingMaximum.value.toFixed(1)} `
++        + `existing_clamp_headroom_ms=${headroomOf(existingMaximum.value).toFixed(1)} `
++        + `missing_hash_provision_max_ms=${missingMaximum.value.toFixed(1)} `
++        + `missing_clamp_headroom_ms=${headroomOf(missingMaximum.value).toFixed(1)} `
++        + `cross_hash_provision_max_ms=${crossMaximum.value.toFixed(1)} `
++        + `cross_clamp_headroom_ms=${headroomOf(crossMaximum.value).toFixed(1)} `
++        + `breached_ordinal=${breached} breached_arm=${requestArm.get(breached)} `
++        + `critical_lookups=${stageValues("repository.findAuditIdentityByBlindIndex").length} `
++        + `critical_password_hashes=${stageValues("pool.hashPassword").length} `
++        + `critical_preparations=${countCritical("repository.prepareAuditContext")} `
++        + `critical_transactions=${countCritical("repository.transaction")} `
++        + `critical_provisions=${stageValues("service.provisionPendingAccount").length} `
++        + `critical_audit_kdfs=${countCritical("pool.hashAuditContext.first")
++          + countCritical("pool.hashAuditContext.second")} `
++        + `postresponse_spans=${postresponseSpans.length} `
++        + `postresponse_transactions=${postresponseSpans
++          .filter((value) => value.stage === "repository.transaction").length} `
++        + `postresponse_audit_kdfs=${postresponseSpans
++          .filter((value) => value.stage.startsWith("pool.hashAuditContext")).length} `
++        + `pool_samples=${poolSamples} pool_max_active=${poolMaxActive} `
++        + `pool_max_queued_credential=${poolMaxQueuedCredential} `
++        + `pool_max_queued_audit=${poolMaxQueuedAudit} `
++        + `pool_max_queued_total=${poolMaxQueuedTotal} `
++        + `pool_max_outstanding_credential=${poolMaxOutstandingCredential} `
++        + `pool_max_outstanding_audit=${poolMaxOutstandingAudit} `
++        + `pool_max_outstanding_total=${poolMaxOutstandingTotal} `
++        + `loop_delay_samples=${loopDelays.length} `
++        + `loop_delay_p99_ms=${quantile(loopDelays, 0.99).toFixed(1)} `
++        + `loop_delay_max_ms=${(loopDelays.length === 0
++          ? 0 : Math.max(...loopDelays)).toFixed(1)} `
++        + `after_drain_state=${afterDrainPool.state} `
++        + `after_drain_active=${afterDrainPool.active} `
++        + `after_drain_queued_total=${afterDrainPool.queuedTotal} `
++        + `after_drain_outstanding_total=${afterDrainPool.outstandingTotal} `
++        + `after_drain_mail_in_flight=${afterDrainMail.inFlight} `
++        + `after_drain_mail_active_sends=${afterDrainMail.activeSends} `
++        + `after_drain_mail_queued=${afterDrainMail.queued}`
++      );
++
++      // 9. Clean-error scan over the captured stream — counts only.
++      const generatedLiterals = [
++        ...existingEmails, ...missingEmails, password,
++        ...ordinals.map((ordinal) => `${requestArm.get(ordinal) === "existing" ? 203 : 204}`
++          + `.${concurrency}.${requestWave.get(ordinal)}.`),
++        "vitest-s3b-timing-existing", "vitest-s3b-timing-missing", "vitest-s3b-timing-seed",
++        "t1-n3attr-"
++      ];
++      const capturedText = captured.join("\n");
++      const literalLeaks = generatedLiterals.filter((literal) => capturedText.includes(literal));
++      // Test-data and secret-material patterns: any hit is a privacy RED.
++      const patternLeaks = ([
++        ["hex64", /\b[0-9a-f]{64}\b/i],
++        ["argon2", /\$argon2/i],
++        ["email", /[A-Za-z0-9._-]+@[A-Za-z0-9.-]+/],
++        ["ipv4", /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/]
++      ] as const).filter(([, pattern]) => pattern.test(capturedText)).map(([name]) => name);
++      // Service-internal opaque identifiers: counted, never emitted, never
++      // allowed into a durable receipt because only this count is printed.
++      const internalIdentifierLines = captured.filter((line) =>
++        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(line)
++        || /correlation=/i.test(line)).length;
++      const codeCounts = new Map<string, number>();
++      for (const line of captured) {
++        const match = /\[([A-Z][A-Z0-9_]+)\]/.exec(line);
++        const code = match?.[1] ?? "UNCODED";
++        codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
++      }
++      const dangerous = /40P01|ERROR:|FATAL:|Timed out|timed out|timeout of|Unhandled/;
++      console.info(
++        `[T1 REWORK8 D1 CLEAN ERROR SCAN] captured_lines=${captured.length} `
++        + `literal_leaks=${literalLeaks.length} pattern_leaks=[${patternLeaks.join(",")}] `
++        + `internal_identifier_lines=${internalIdentifierLines} `
++        + `dangerous_marker_lines=${captured.filter((line) => dangerous.test(line)).length} `
++        + `unhandled_rejections=${rejections.length} `
++        + `codes=${[...codeCounts.entries()]
++          .map(([code, count]) => `${code}:${count}`).sort().join(",") || "none"}`
++      );
++
++      // 10. Non-vacuity assertions.
++      expect(ordinals).toHaveLength(24);
++      expect(armOrdinals("existing")).toHaveLength(12);
++      expect(armOrdinals("missing")).toHaveLength(12);
++      expect(successes).toBe(24);
++      expect(busy).toBe(0);
++      expect(unexpected).toBe(0);
++      expect(Number(committedMissing.rows[0]!.count)).toBe(12);
++      expect(Number(committedExisting.rows[0]!.count)).toBe(3);
++      expect(measuredSends).toBe(12);
++      expect(Number(duplicatePostwork.rows[0]!.count)).toBe(12);
++      expect(stageValues("repository.findAuditIdentityByBlindIndex")).toHaveLength(24);
++      expect(stageValues("pool.hashPassword")).toHaveLength(24);
++      expect(stageValues("service.provisionPendingAccount")).toHaveLength(24);
++      expect(countCritical("repository.prepareAuditContext")).toBe(24);
++      expect(countCritical("repository.transaction")).toBe(24);
++      expect(countCritical("pool.hashAuditContext.first")
++        + countCritical("pool.hashAuditContext.second")).toBe(48);
++      expect(criticalSpans.filter((value) => value.stage.startsWith("pool.hashAuditContext.extra")))
++        .toHaveLength(0);
++      expect(postresponseSpans.length).toBeGreaterThan(0);
++      expect(poolMaxActive).toBe(2);
++      expect(poolMaxQueuedTotal).toBeGreaterThan(0);
++      expect(poolSamples).toBeGreaterThan(0);
++      expect(loopDelays.length).toBeGreaterThan(0);
++      for (const ordinal of ordinals) {
++        for (const stage of [
++          "register", "repository.findAuditIdentityByBlindIndex",
++          "service.reserveMailDispatchPermit", "service.scheduleRegistrationHash",
++          "pool.hashPassword", "repository.prepareAuditContext", "repository.transaction",
++          "repository.createPendingAccount", "service.provisionPendingAccount",
++          "service.holdRegistrationEnumerationClamp"
++        ]) {
++          expect(stageOf(ordinal, stage), `ordinal ${ordinal} stage ${stage}`).toBeDefined();
++        }
++      }
++      expect(afterDrainPool.active).toBe(0);
++      expect(afterDrainPool.queuedTotal).toBe(0);
++      expect(afterDrainPool.outstandingTotal).toBe(0);
++      expect(afterDrainMail.inFlight).toBe(0);
++      expect(afterDrainMail.activeSends).toBe(0);
++      expect(afterDrainMail.queued).toBe(0);
++      expect(literalLeaks).toHaveLength(0);
++      expect(patternLeaks).toHaveLength(0);
++      expect(captured.filter((line) => dangerous.test(line))).toHaveLength(0);
++      expect(rejections).toHaveLength(0);
++    } finally {
++      stopObservers();
++      recording = false;
++      restoreService?.();
++      poolSurface.hashPassword = originalHashPassword;
++      poolSurface.hashAuditContext = originalHashAuditContext;
++      process.off("unhandledRejection", onUnhandled);
++      console.error = originalConsoleError;
++      console.warn = originalConsoleWarn;
++    }
++  }, 240_000);
+   it("S3b F3 rejects an audit-invalid account before invoking the external DEK write", async () => {
+     const flow = buildService();
+     const userId = randomUUID();

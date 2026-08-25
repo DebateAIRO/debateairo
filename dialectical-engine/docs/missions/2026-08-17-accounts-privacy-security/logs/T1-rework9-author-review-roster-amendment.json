@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "amendment": "AUTHOR_AND_REVIEW_ROSTER_REPLACEMENT",
+  "authority": "user_v",
+  "approval_utc": "2026-08-22T15:13:23Z",
+  "approval_text": "No. Codex codes, and Grok reviews. Claude is out of the mission until it resets.",
+  "thread_id": "01a01ef4-70a5-7430-97e1-be2bd2cab05a",
+  "board": "accounts-phase1",
+  "ticket": "t_b225b2f2",
+  "supersedes_roster_in_authorization_receipt": {
+    "path": "docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-authorization-receipt.json",
+    "sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9"
+  },
+  "preserves_authorized_packet": {
+    "path": "docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+    "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858"
+  },
+  "effective_author_lane": {
+    "provider": "Codex",
+    "model": "GPT-5.6 Sol",
+    "reasoning_effort": "xhigh",
+    "role": "sole coding author subagent",
+    "required": 1,
+    "maximum_concurrent_author_lanes": 1
+  },
+  "effective_review_lanes": {
+    "grok_4_6": {
+      "required": 2,
+      "interface": "fresh visible local CLI Terminals",
+      "roles": [
+        "code_lifecycle_security",
+        "statistics_tests_evidence_custody"
+      ],
+      "reported_usage_at_approval": "0%"
+    },
+    "claude_opus": {
+      "required": 0,
+      "status": "out_of_mission_until_reset"
+    },
+    "codex": {
+      "required": 0,
+      "status": "author_only_not_final_reviewer"
+    },
+    "sol_reviewer_subagents": {
+      "required": 0,
+      "status": "superseded_by_user_grok_only_review_roster"
+    }
+  },
+  "sequencing": "The sole Codex author completes and hands off stable bytes before either Grok reviewer launches. Grok reviewers are read-only and may not execute tests or edit files.",
+  "claude_prohibition": [
+    "no Claude CLI author launch",
+    "no Claude reviewer launch",
+    "no Claude subagent",
+    "no Claude model use until a later explicit reset amendment"
+  ],
+  "unchanged_authority": "All Option 8A scope, excluded authority, no-unchanged-rerun, no-commit, no-push, no-Done, and future dev-integration requirements in the bound authorization receipt and packet remain in force."
+}

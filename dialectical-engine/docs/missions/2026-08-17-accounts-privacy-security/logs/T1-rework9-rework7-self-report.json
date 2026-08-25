@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "sole coding author; Grok 4.6 remains sole reviewer",
+  "outcome": "READY_FOR_GROK_REVIEW",
+  "manifest": {
+    "path": "T1-rework9-rework7-manifest.json",
+    "sha256": "c55ce0c5cfd89f22e315d5ea6c4538a57105e33c0c72fc919ee6fe74b2a2a014"
+  },
+  "repairs": [
+    "Launcher and worker now independently bind and rehash the exact Hermes Node runtime and node_modules/vitest/vitest.mjs entrypoint; execution argv is exactly those two paths plus run and the one integration test path.",
+    "The controller fsyncs redirected fd1/fd2 without raw close, performs no later stdio writes, and revalidates all four private and durable stream tuples after sealing, before terminal, and before release.",
+    "A real isolated redirected-stdio child reproduces the old close-then-spawn SIGABRT and proves the stable-open mechanism exits zero with all four post-exit source/durable hashes exact and seal-before-terminal-before-release binding.",
+    "The exact 7821 interrupted authority/tool verifies raw127, exact 119-byte shim stderr, null test counts, five epochs, sixteen events, sealed private streams, absent final receipts, lock/claim/private/governed custody, labels and processes, then may archive but never delete after Grok approval. It was not executed."
+  ],
+  "red_green": {
+    "red_raw_status": 1,
+    "red_kills": [
+      "incident .bin/vitest shell-shim argv",
+      "launcher missing pinned runtime",
+      "worker executing unbound argv[0]",
+      "controller raw-closing redirected fd1/fd2",
+      "real old child SIGABRT"
+    ],
+    "green_raw_status": 0,
+    "green_guards": [
+      "exact runtime and Vitest JS tuples and argv",
+      "stable-open child raw status zero",
+      "all four private/durable stream hashes stable after child exit",
+      "seal-terminal-release ordering",
+      "run-bound archive-only recovery without execution authority"
+    ]
+  },
+  "final_gates": {
+    "aggregate_static_raw_status": 0,
+    "custody_raw_status": 0,
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12
+  },
+  "real_lock": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46782057,
+    "claim_inode": 46782073,
+    "claim_sha256": "bac88b8943d2f8ce0ec080cf2bb916ae431221dea175599d02066d0e8efd6545",
+    "owner_sha256": "953f0998fedb9b048069604270745855b80e179df0bcaff0a907261d76c12017"
+  },
+  "harmless_probe_required": false,
+  "prohibited_execution": {
+    "launchctl_or_osascript": false,
+    "runtime_probe": false,
+    "recovery": false,
+    "supervisor_viewer_worker": false,
+    "vitest_or_postgresql": false,
+    "commit_push_kanban": false
+  },
+  "router_order": "Grok Rework7 review/approval -> exact one-time 7821 recovery outside sandbox -> verify archived lock/marker and absent live lock -> skip probe -> fresh UUID packet with pinned runtime/Vitest tuples -> one exclusive gate outside sandbox"
+}

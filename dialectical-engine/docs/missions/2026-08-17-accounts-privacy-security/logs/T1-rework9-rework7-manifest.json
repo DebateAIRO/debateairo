@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T19:51:59Z",
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "outcome": "READY_FOR_GROK_REVIEW",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "governed": {
+    "apps/api/src/index.ts": "0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a",
+    "apps/api/src/main.ts": "91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b",
+    "apps/api/src/registration.ts": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+    "packages/crypto/src/index.ts": "66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6",
+    "packages/crypto/src/argon2-worker.ts": "c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b",
+    "packages/crypto/src/argon2-worker-pool.ts": "b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d",
+    "packages/db/src/identity.ts": "2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f",
+    "packages/register/src/auth-policy.ts": "f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216",
+    "tests/integration/registration-database.test.ts": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "tests/unit/registration.test.ts": "baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53",
+    "tests/unit/argon2-worker-pool.test.ts": "93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b",
+    "tests/architecture/t1-argon2-worker-contract.test.ts": "4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d"
+  },
+  "incident": {
+    "run_id": "7821bdb5-0559-43f4-804e-6996bb9f18a4",
+    "execution_packet_sha256": "4163d9cd2075964f0b25d748341416dcb9ce45d18dddc1eb5578e43873c1ef9a",
+    "classification": "SUPERVISOR_INTERRUPTED_NO_TEST_MODULE_LOADED",
+    "worker_terminal_sha256": "f23e6713d6a1395b58bdb9cd89b8d673f1cb2d7449dc1c3bc49a87ce5ea4b235",
+    "launchd_streams_sha256": "ceb690e87382dc8bab6d1e817c0de4e132fc6fd5161a6b71f379799f0a899a88",
+    "events_sha256": "eab48117b99158efc313d08d352088069451dacd841214448e6a372a58303e15",
+    "failure_evidence_sha256": "db47e96b5698d0f57c02b66a7ea74f37f8c9f935079cd08b6989855a875f8a90"
+  },
+  "pinned_test_execution": {
+    "runtime": {
+      "path": "/Users/vladmihaimiron/.hermes/node/bin/node",
+      "sha256": "2e3f1286a7eb3736346ed1803e458a0ff909e2b2d5bc746144dcb76970e9b99d",
+      "size": 112928848,
+      "mtime_ms": 1782222827000
+    },
+    "vitest_entrypoint": {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/vitest/vitest.mjs",
+      "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+      "size": 43,
+      "mtime_ms": 1786165583143.088
+    },
+    "args": ["run", "tests/integration/registration-database.test.ts"],
+    "expected_test_files": 1,
+    "expected_tests": 56
+  },
+  "artifacts": {
+    "launcher": "8ef015bdad67db0519addf829a3a819790a5a3964dd5b0e236ebd40dba3863b9",
+    "controller": "dee5d0fef55fe7386c98270ad718f7c50213cda3be799550f58d65be788ca0e9",
+    "worker": "50587780365511052fb0db0627ac4a437a5e7a0c76ebf55ef7680bf188b4572c",
+    "viewer": "1b7c7998e63953b2172fb68738bb1b2bde5b62e8d9bc0d33da2a34ea2f5b8b25",
+    "controller_plist_template": "3c6be89ac7d3e528570011b23483c1024455b3221331806257a3efab671cc67d",
+    "worker_plist_template": "da2f5f7d06c395d1e699be6326d9b90b75d74ed643513b97c2a62ca23a561c0d",
+    "launchd_stream_custody": "e9440e38ce225a8b5326fcdb72a637aff6be7af6dfbf8ef9d788cfa7c94919f3",
+    "rework7_static_fixture": "556380cbd25a69664e92be17cb9ba7e25febede1c80a1896cf917022ad927517",
+    "recovery_tool": "f3e04e66d48396920b6ae651750370885f4fc74ce2a09add9e4665f81c2d9dad",
+    "recovery_authority": "368db60d5ae099f5cef88ca9986b7697c4453bb440f29909363099d03f62a884",
+    "custody_check": "d844d138e13d20249a77c3aa5cfea980b4365673ec33f0e202d6ff8d81a9c002",
+    "contract": "a3ac02997bcd39026cbd0788fc62c2425f746b65ea6d262424f7af75203bf08d",
+    "aggregate_static_check": "983ee45f60f3b13747bfbdd21f670f8ac423fc7cca63b2444d4f581b65babc6c"
+  },
+  "evidence": {
+    "red_raw_status": 1,
+    "red_log_sha256": "afff5090b512bd55f21ec199c0d9ae99e5a4858d8f338a9b770cf6c1a18fe076",
+    "green_raw_status": 0,
+    "green_log_sha256": "d0ade03fee7a56b9bcdb506ef36761f763e19d1b25e9fc7869c238b78208f3ea",
+    "static_raw_status": 0,
+    "static_log_sha256": "73c911d0c213ca26f18b7246b7a5a74a72faed8578cb462726fb5a27e9a88499",
+    "custody_raw_status": 0,
+    "custody_log_sha256": "e2e4bceb4d2410a8e71350ff2837a86e325205710372e2c9bffc567795010ae2"
+  },
+  "real_lock_custody": {
+    "state": "present_untouched",
+    "device": 16777233,
+    "inode": 46782057,
+    "claim_inode": 46782073,
+    "claim_sha256": "bac88b8943d2f8ce0ec080cf2bb916ae431221dea175599d02066d0e8efd6545",
+    "owner_sha256": "953f0998fedb9b048069604270745855b80e179df0bcaff0a907261d76c12017",
+    "recovery_artifacts": "absent_not_executed"
+  },
+  "stdio_finalization": {
+    "raw_fd_close": false,
+    "fd1_fd2_fsync": true,
+    "writes_after_seal_start": false,
+    "source_and_durable_reverification": "after seal, before terminal, before release",
+    "order": "seal -> terminal -> release",
+    "isolated_child_post_exit_verification": true
+  },
+  "prohibited_execution": {
+    "launchctl_or_osascript": false,
+    "runtime_probe": false,
+    "recovery": false,
+    "supervisor_viewer_worker": false,
+    "vitest_or_postgresql": false,
+    "commit_push_kanban": false
+  },
+  "runtime_probe_required": false,
+  "router_order": [
+    "Grok Rework7 review and approval",
+    "Router outside sandbox executes the exact one-time 7821 interrupted recovery tool under its authority",
+    "Router verifies archived lock and immutable recovery marker and verifies the live lock is absent",
+    "skip runtime probe because the pinned Node runtime was already proved and no probe is required",
+    "create one fresh UUID packet binding the pinned runtime and Vitest JS tuples plus current supervisor/helper/template hashes and rendered private-stream plist hashes",
+    "Router outside sandbox invokes one exclusive gate"
+  ]
+}

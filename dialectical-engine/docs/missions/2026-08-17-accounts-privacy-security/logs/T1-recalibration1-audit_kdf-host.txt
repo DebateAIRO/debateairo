@@ -1,0 +1,57 @@
+=== label: audit_kdf ===
+=== title: S3 rework4 B4 derives stable domain-separated IP and UA Argon2id hashes without request-id hashes ===
+=== utc: 2026-08-22T01:08:29Z ===
+=== uptime ===
+ 4:08  up 5 days,  6:32, 73 users, load averages: 4.55 5.63 6.06
+=== vm_stat ===
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    47466.
+Pages active:                                 859820.
+Pages inactive:                               858976.
+Pages speculative:                               752.
+Pages throttled:                                   0.
+Pages wired down:                             148533.
+Pages purgeable:                                 485.
+"Translation faults":                     2759218523.
+Pages copy-on-write:                        95282363.
+Pages zero filled:                        1916096037.
+Pages reactivated:                         120718642.
+Pages purged:                               10441723.
+File-backed pages:                            277631.
+Anonymous pages:                             1441917.
+Pages stored in compressor:                  1033050.
+Pages occupied by compressor:                 127452.
+Decompressions:                            125150244.
+Compressions:                              140377673.
+Pageins:                                    32170275.
+Pageouts:                                     174922.
+Swapins:                                     7327209.
+Swapouts:                                   10492871.
+=== memory_pressure ===
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 86%
+=== top ===
+Processes: 779 total, 5 running, 774 sleeping, 4311 threads 
+2026/08/22 04:08:30
+Load Avg: 4.58, 5.62, 6.06 
+CPU usage: 15.3% user, 12.0% sys, 72.96% idle 
+SharedLibs: 569M resident, 126M data, 97M linkedit.
+MemRegions: 873181 total, 20G resident, 247M private, 2241M shared.
+PhysMem: 30G used (2323M wired, 1991M compressor), 738M unused.
+VM: 376T vsize, 6144M framework vsize, 7327209(0) swapins, 10492871(0) swapouts.
+Networks: packets: 212536464/93G in, 168875708/28G out.
+Disks: 25257056/658G read, 44013181/1850G written.
+
+PID    COMMAND          %CPU MEM   TIME    
+98990  routined         0.0  18M   00:47.06
+98989  sysmond          0.0  1632K 05:56.15
+98730  assistantd       0.0  17M   00:16.10
+98718  systemstatusd    0.0  4160K 00:07.01
+98680  audioaccessoryd  0.0  6880K 00:03.46
+98537  zsh              0.0  3088K 00:00.03
+98536  login            0.0  2576K 00:00.03
+98191  spotlightknowled 0.0  14M   02:07.95
+97712  zsh              0.0  3088K 00:00.03
+97711  login            0.0  2640K 00:00.04
+96944  biomed           0.0  5984K 00:07.58
+96912  zsh              0.0  3120K 00:00.03

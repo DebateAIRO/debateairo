@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-08-22T16:53:35Z",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "staged_path_count": 0,
+  "authority_packet_sha256": "5307e47f60e59d743d3a240c41107eca2339030ab97a6e7ff4f8bd1080704e88",
+  "prior_frozen_files": {
+    "count": 122,
+    "aggregate_sha256": "4b292769c5259208ba17ec575cfd6a8f760480e69ee9f028c7885590fc1bc82a"
+  },
+  "governed": {
+    "tuple_count": 12,
+    "manifest": "T1-rework9-final-manifest.json",
+    "manifest_sha256": "df41708363b49891b6cac4ab3e8e5b7061246d99528be4fadf4aea4b257aa673",
+    "integration_test_sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "registration_product_sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03"
+  },
+  "fixture_green": {
+    "run_a": "11111111-1111-4111-8111-111111111111",
+    "controller_sha256": "408d7a0562c59968d543624c5c61684a7ee6baad36695a91113c442948150fcf",
+    "worker_sha256": "79b047323cac9b1ec9853f38cdcf11b460db4eb2d63a475e5e38ea626b27c745",
+    "run_b": "22222222-2222-4222-8222-222222222222",
+    "run_b_controller_sha256": "1a7793bf730699a9eb901a0b871dfe0fbaed27242e8cca84c960ae01e1217d69",
+    "run_b_worker_sha256": "a8ffc36833ec69164ebb3345f4a4fa6ee33eba83841736846d70e902dfe87c9e"
+  },
+  "artifacts": [
+    {
+      "path": "T1-rework9-gate-launcher.mjs",
+      "sha256": "3d0118a18833b0c584873059e8d5d96403634127dea39f79be4ec3b649ed7fa4",
+      "size": 14806,
+      "mtime_epoch": 1787417516,
+      "mtime_utc": "2026-08-22T16:51:56Z",
+      "changed_in_rework2": true
+    },
+    {
+      "path": "T1-rework9-gate-controller.mjs",
+      "sha256": "0b8b309b233bc6b29079cfd43d3b87e49b1133d464e8f6c18c7120a25efffa52",
+      "size": 23162,
+      "mtime_epoch": 1787416567,
+      "mtime_utc": "2026-08-22T16:36:07Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-gate-worker.mjs",
+      "sha256": "59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7",
+      "size": 5256,
+      "mtime_epoch": 1787414515,
+      "mtime_utc": "2026-08-22T16:01:55Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-gate-controller.plist.template",
+      "sha256": "97ce0cf9dff102cdcc8db9ca978157b13eee5f36b4cc6492e3a7b9e67c3c488e",
+      "size": 1117,
+      "mtime_epoch": 1787413718,
+      "mtime_utc": "2026-08-22T15:48:38Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-gate-worker.plist.template",
+      "sha256": "62a364276bce53bca0685ef4b99dcfbec507b81fc6546c5992bd4249cc1feada",
+      "size": 996,
+      "mtime_epoch": 1787413718,
+      "mtime_utc": "2026-08-22T15:48:38Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-gate-viewer.mjs",
+      "sha256": "4eee931752130781c84df25f7bea818dc4b781ebd2a6ed2e67ed8573cfcb409f",
+      "size": 3284,
+      "mtime_epoch": 1787413977,
+      "mtime_utc": "2026-08-22T15:52:57Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-gate-contract.md",
+      "sha256": "dd9a403317362069b327c202fd49b00a6211c6e8cb19eccd25e265b6134304c0",
+      "size": 3346,
+      "mtime_epoch": 1787417566,
+      "mtime_utc": "2026-08-22T16:52:46Z",
+      "changed_in_rework2": true
+    },
+    {
+      "path": "T1-rework9-static-supervisor-check.sh",
+      "sha256": "93615a871a7632bb9694769ab8bb3e9c9a23e35f81f4aad6207baa68286c22a1",
+      "size": 4074,
+      "mtime_epoch": 1787417566,
+      "mtime_utc": "2026-08-22T16:52:46Z",
+      "changed_in_rework2": true
+    },
+    {
+      "path": "T1-rework9-rework1-static-fixture.mjs",
+      "sha256": "7002a8c4c5f7eaeaac0da02f9d0e6bed88428a0774c8d523e3cd69b3a58e5d75",
+      "size": 3300,
+      "mtime_epoch": 1787416590,
+      "mtime_utc": "2026-08-22T16:36:30Z",
+      "changed_in_rework2": false
+    },
+    {
+      "path": "T1-rework9-rework2-static-fixture.mjs",
+      "sha256": "148d960c59e7027dac1a1e9a1a83e6fb4a1ad0b780e2951f8d12ff268e4269a3",
+      "size": 6190,
+      "mtime_epoch": 1787417583,
+      "mtime_utc": "2026-08-22T16:53:03Z",
+      "changed_in_rework2": true
+    }
+  ]
+}

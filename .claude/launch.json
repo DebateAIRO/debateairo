@@ -2,15 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "v3-ui",
-      "runtimeExecutable": "env",
-      "runtimeArgs": [
-        "NEXT_DIST_DIR=.next-dev",
-        "pnpm",
-        "--dir",
-        "DebateAI-V3/apps/v2-ui",
-        "dev"
-      ],
+      "name": "ui",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui && NEXT_DIST_DIR=.next-dev pnpm dev"],
       "port": 3000
     }
   ]

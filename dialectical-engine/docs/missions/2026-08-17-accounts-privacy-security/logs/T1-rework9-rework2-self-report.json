@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "author": "Codex GPT-5.6 Sol xHigh",
+  "role": "same sole coding author",
+  "outcome": "READY_FOR_SAME_GROK_FINDER_REVIEW",
+  "authority_packet_sha256": "5307e47f60e59d743d3a240c41107eca2339030ab97a6e7ff4f8bd1080704e88",
+  "red": {
+    "raw_status": 1,
+    "log": "T1-rework9-rework2-red-temp-plist.log",
+    "controller_suffix_a_sha256": "b9cfdb581ee5c0545fc871ccadce553ae0bf541fc53d4a66cbaaf5250a679eb1",
+    "controller_suffix_b_sha256": "a4a166159252a7189cf98b932e64f393330770f338a6235130bd828ed9ad93e5",
+    "worker_suffix_a_sha256": "b89cee9be105cf963dd8ad41aa0d0466ae6026f15d92e14b5354447973f8776f",
+    "worker_suffix_b_sha256": "2fd5d8a69d3f82e66d349cc8330dc8985c47f892f02bc7b8f16c88d7fa6a8706",
+    "packet_a_binds_launcher_b": false
+  },
+  "repair": "The launcher now derives one exact private path from tmpdir() and the fresh lowercase UUID, creates it exclusively as 0700, verifies directory/symlink/realpath/uid/gid/mode custody, retains the lock on every failure, and preserves packet-authored rendered-plist hash checks.",
+  "green": {
+    "raw_status": 0,
+    "log": "T1-rework9-rework2-final-green-temp-plist.log",
+    "run_a_controller_sha256": "408d7a0562c59968d543624c5c61684a7ee6baad36695a91113c442948150fcf",
+    "run_a_worker_sha256": "79b047323cac9b1ec9853f38cdcf11b460db4eb2d63a475e5e38ea626b27c745",
+    "run_b_controller_sha256": "1a7793bf730699a9eb901a0b871dfe0fbaed27242e8cca84c960ae01e1217d69",
+    "run_b_worker_sha256": "a8ffc36833ec69164ebb3345f4a4fa6ee33eba83841736846d70e902dfe87c9e",
+    "preexisting_path_failed_closed": true
+  },
+  "changed_artifacts": [
+    { "path": "T1-rework9-gate-launcher.mjs", "sha256": "3d0118a18833b0c584873059e8d5d96403634127dea39f79be4ec3b649ed7fa4" },
+    { "path": "T1-rework9-gate-contract.md", "sha256": "dd9a403317362069b327c202fd49b00a6211c6e8cb19eccd25e265b6134304c0" },
+    { "path": "T1-rework9-static-supervisor-check.sh", "sha256": "93615a871a7632bb9694769ab8bb3e9c9a23e35f81f4aad6207baa68286c22a1" },
+    { "path": "T1-rework9-rework2-static-fixture.mjs", "sha256": "148d960c59e7027dac1a1e9a1a83e6fb4a1ad0b780e2951f8d12ff268e4269a3" }
+  ],
+  "static_gates": {
+    "node_syntax": "green",
+    "shell_syntax": "green",
+    "plist": "green",
+    "aggregate_static_supervisor": "green",
+    "diff_check": "green"
+  },
+  "custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "integration_test_sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "registration_product_sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03",
+    "prior_frozen_file_count": 122,
+    "prior_frozen_aggregate_sha256": "4b292769c5259208ba17ec575cfd6a8f760480e69ee9f028c7885590fc1bc82a",
+    "global_lock": "absent",
+    "runtime_receipt_directories": 0,
+    "author_processes": 0,
+    "log": "T1-rework9-rework2-final-custody.log"
+  },
+  "artifacts_manifest": "T1-rework9-rework2-manifest.json",
+  "scope": {
+    "supervisor_execution": false,
+    "vitest": false,
+    "postgresql": false,
+    "launchctl": false,
+    "commit_or_push": false,
+    "kanban_or_reviewer_action": false
+  }
+}

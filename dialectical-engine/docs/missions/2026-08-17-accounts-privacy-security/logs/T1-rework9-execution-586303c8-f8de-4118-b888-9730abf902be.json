@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "run_id": "586303c8-f8de-4118-b888-9730abf902be",
+  "ticket": "t_b225b2f2",
+  "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+  "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+  "argv": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.bin/vitest",
+    "run",
+    "tests/integration/registration-database.test.ts"
+  ],
+  "expected_test_files": 1,
+  "expected_tests": 56,
+  "global_lock_path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/.T1-full-registration.exclusive.lock",
+  "governed": [
+    {"path":"apps/api/src/index.ts","sha256":"0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a","size":30548,"mtime_ms":1787391517922.1519},
+    {"path":"apps/api/src/main.ts","sha256":"91bf0e695ef847b0864bedd030c2ed94f4431d3864fa5e5a7e540aeec011342b","size":7061,"mtime_ms":1787395079944.3037},
+    {"path":"apps/api/src/registration.ts","sha256":"1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03","size":65119,"mtime_ms":1787413534178.339},
+    {"path":"packages/crypto/src/index.ts","sha256":"66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6","size":27118,"mtime_ms":1787343024165.269},
+    {"path":"packages/crypto/src/argon2-worker.ts","sha256":"c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b","size":10314,"mtime_ms":1787343013164.7224},
+    {"path":"packages/crypto/src/argon2-worker-pool.ts","sha256":"b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d","size":48111,"mtime_ms":1787357276000},
+    {"path":"packages/db/src/identity.ts","sha256":"2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f","size":25159,"mtime_ms":1787342997309.6755},
+    {"path":"packages/register/src/auth-policy.ts","sha256":"f8e406f1cd35393aa20eac5ef5679ed31dd8f9213ee2c727a5aacd9d706a4216","size":64506,"mtime_ms":1787395342357.1929},
+    {"path":"tests/integration/registration-database.test.ts","sha256":"58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191","size":310114,"mtime_ms":1787413129911.6243},
+    {"path":"tests/unit/registration.test.ts","sha256":"baa9254edaf65965402b8d6714efcb63dcde4961f99268573b9bdc9903b0de53","size":102439,"mtime_ms":1787405601741.8987},
+    {"path":"tests/unit/argon2-worker-pool.test.ts","sha256":"93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b","size":106612,"mtime_ms":1787349543692.0847},
+    {"path":"tests/architecture/t1-argon2-worker-contract.test.ts","sha256":"4896587d1fafc0d52c2389c3bd6336a05798ea1a89cadaa42280b6a0039fb18d","size":102059,"mtime_ms":1787395154282.4463}
+  ],
+  "authorization_receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-authorization-receipt.json",
+    "sha256": "4cd8b715774afd8d6d969e2fcb8b1ce829160c37db2d27551fb02667c556b4e9",
+    "size": 2627,
+    "mtime_ms": 1787411480149.483
+  },
+  "final_rework9_packet": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework9-draft-packet.md",
+    "sha256": "ea5062492cfcadb2d3da13b407c827473fe261520a2ca67254a9594dd58da858",
+    "size": 21515,
+    "mtime_ms": 1787410715342.437
+  },
+  "static_artifacts": {
+    "launcher": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-launcher.mjs","sha256":"3d0118a18833b0c584873059e8d5d96403634127dea39f79be4ec3b649ed7fa4","size":14806,"mtime_ms":1787417516940.0186},
+    "controller": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.mjs","sha256":"0b8b309b233bc6b29079cfd43d3b87e49b1133d464e8f6c18c7120a25efffa52","size":23162,"mtime_ms":1787416567919.9346},
+    "worker": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.mjs","sha256":"59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7","size":5256,"mtime_ms":1787414515022.2422},
+    "controller_plist_template": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-controller.plist.template","sha256":"97ce0cf9dff102cdcc8db9ca978157b13eee5f36b4cc6492e3a7b9e67c3c488e","size":1117,"mtime_ms":1787413718527.6653},
+    "worker_plist_template": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-worker.plist.template","sha256":"62a364276bce53bca0685ef4b99dcfbec507b81fc6546c5992bd4249cc1feada","size":996,"mtime_ms":1787413718581.768},
+    "viewer": {"path":"/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework9-gate-viewer.mjs","sha256":"4eee931752130781c84df25f7bea818dc4b781ebd2a6ed2e67ed8573cfcb409f","size":3284,"mtime_ms":1787413977354.5942}
+  },
+  "rendered_plist_sha256": {
+    "controller": "da25d6c0f9e2eb2414bc20c7c37a17a82cfafe2316effe344fa7a876d53d852f",
+    "worker": "fe91f8221eff4fe64ba352aee593da138cc8c1d0a5b0b82dc765f2bdc048187e"
+  },
+  "allowed_postgresql_baseline": [
+    "58314 58311 Mon Aug 17 15:37:46 2026     /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.4.0-beta.17/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres -D /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/acceptance/.pgdata -p 55432 -c shared_memory_type=mmap -c dynamic_shared_memory_type=mmap",
+    "58315 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 0",
+    "58316 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 1",
+    "58317 58314 Mon Aug 17 15:37:46 2026     postgres: io worker 2",
+    "58318 58314 Mon Aug 17 15:37:46 2026     postgres: checkpointer",
+    "58319 58314 Mon Aug 17 15:37:46 2026     postgres: background writer",
+    "58321 58314 Mon Aug 17 15:37:46 2026     postgres: walwriter",
+    "58322 58314 Mon Aug 17 15:37:46 2026     postgres: autovacuum launcher",
+    "58323 58314 Mon Aug 17 15:37:46 2026     postgres: logical replication launcher"
+  ],
+  "review_bindings": {
+    "grok_evidence_review": "APPROVED",
+    "grok_code_rereview1": "APPROVED",
+    "grok_code_rereview2": "APPROVED"
+  }
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__WORKER_LABEL__</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>exec &quot;$@&quot;</string>
+    <string>t1-gate-launchd-wrapper</string>
+    <string>__NODE__</string>
+    <string>__WORKER__</string>
+    <string>__RECEIPT_DIR__</string>
+    <string>__EXECUTION_PACKET__</string>
+    <string>__SECRET_FILE__</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__CWD__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TMPDIR</key>
+    <string>__TMPDIR__</string>
+    <key>T1_GATE_RUN_ID</key>
+    <string>__RUN_ID__</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__WORKER_STDOUT__</string>
+  <key>StandardErrorPath</key>
+  <string>__WORKER_STDERR__</string>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+</dict>
+</plist>

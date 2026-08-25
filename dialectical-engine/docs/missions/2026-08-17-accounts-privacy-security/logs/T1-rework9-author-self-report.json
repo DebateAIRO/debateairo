@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "author": {
+    "provider": "Codex",
+    "role": "sole coding author"
+  },
+  "completed_utc": "2026-08-22T16:06:26Z",
+  "outcome": "AUTHOR_FOCUSED_GREEN_ROUTER_FULL_GATE_PENDING",
+  "permanent_edit": {
+    "path": "tests/integration/registration-database.test.ts",
+    "sha256": "58342fe2ce49b9835fc47af04114cb0219442721305fca2adcd6611ef5407191",
+    "test_file_count": 1,
+    "test_count": 56
+  },
+  "restored_product": {
+    "path": "apps/api/src/registration.ts",
+    "sha256": "1021340613a3839b2379f8b1af2fe139112d1bb029c6bfddf54caa7425f4da03"
+  },
+  "final_focused": {
+    "raw_status": 0,
+    "selected_tests": "1/56",
+    "runtime_ms": 306788,
+    "classification": "T9_RESEND_EQUIVALENCE_GREEN",
+    "p_fwer": 0.475342,
+    "raw_p": [0.159668, 0.240479, 0.685303, 0.957031, 0.659912, 0.702881],
+    "pair_median_gap_ms": [0.215, 0.057, 0.090],
+    "hard_gates": "green",
+    "log": "T1-rework9-final-focused.log",
+    "status": "T1-rework9-final-focused.status"
+  },
+  "mutation_evidence": {
+    "required_contract_mutants_killed": 5,
+    "m16b_killed": true,
+    "m16b_first_relevant_failure": "registrationPasswordReferencesHeld expected 0 received 1",
+    "m16b_queue_removal_assertions": "passed",
+    "all_mutations_exactly_restored": true,
+    "progress_log": "T1-rework9-progress.log"
+  },
+  "static_evidence": {
+    "typecheck": "green",
+    "lint": "green",
+    "diff_check": "green",
+    "supervisor_check": "green",
+    "final_supervisor_log": "T1-rework9-final-static-supervisor.log",
+    "final_diff_log": "T1-rework9-final-static-diffcheck.log"
+  },
+  "supervisor_artifacts": [
+    {
+      "path": "T1-rework9-gate-launcher.mjs",
+      "sha256": "8c332b0e8ea6fb7877d1b5b4ecf15c91fb211cb927113579b3932ecd57e80658"
+    },
+    {
+      "path": "T1-rework9-gate-controller.mjs",
+      "sha256": "a413eecb07001348166a82600dfbbf01dc7cef5ffb0fd67381b991c43397eb9f"
+    },
+    {
+      "path": "T1-rework9-gate-worker.mjs",
+      "sha256": "59ec98c3ec5cc1904804a8507272d5b66118859baf063c53dc2849b7b02c1bd7"
+    },
+    {
+      "path": "T1-rework9-gate-controller.plist.template",
+      "sha256": "97ce0cf9dff102cdcc8db9ca978157b13eee5f36b4cc6492e3a7b9e67c3c488e"
+    },
+    {
+      "path": "T1-rework9-gate-worker.plist.template",
+      "sha256": "62a364276bce53bca0685ef4b99dcfbec507b81fc6546c5992bd4249cc1feada"
+    },
+    {
+      "path": "T1-rework9-gate-viewer.mjs",
+      "sha256": "4eee931752130781c84df25f7bea818dc4b781ebd2a6ed2e67ed8573cfcb409f"
+    },
+    {
+      "path": "T1-rework9-gate-contract.md",
+      "sha256": "f438318c25c04eb09024ecd1fc9eb9b15ad75a82f2dfe0a570b5cbc160301915"
+    },
+    {
+      "path": "T1-rework9-static-supervisor-check.sh",
+      "sha256": "8f6140ff9de59c5acb4c8ec400f0350557eee551c6365bd308be625a847a52f5"
+    }
+  ],
+  "custody": {
+    "head": "7918f4f8bff33909792afc01dc38d402972b4ccd",
+    "staged_path_count": 0,
+    "governed_tuple_count": 12,
+    "author_processes": 0,
+    "launchd_gate_labels": 0,
+    "global_lock": "absent",
+    "rework8_receipts_preserved": 4,
+    "final_manifest": "T1-rework9-final-manifest.json",
+    "final_custody_log": "T1-rework9-final-custody.log",
+    "final_custody_status": "T1-rework9-final-custody.status"
+  },
+  "prohibited_actions_observed": {
+    "complete_registration_file_run": false,
+    "repo_wide_suite": false,
+    "supervisor_bootstrap_or_execution": false,
+    "commit": false,
+    "push": false,
+    "kanban_mutation": false,
+    "reviewer_launch": false
+  }
+}

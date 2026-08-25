@@ -1,0 +1,814 @@
+diff --git a/tests/integration/registration-database.test.ts b/tests/integration/registration-database.test.ts
+--- a/tests/integration/registration-database.test.ts
++++ b/tests/integration/registration-database.test.ts
+@@ -61,10 +61,114 @@
+ const basePolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
++
++// ---------------------------------------------------------------------------
++// TEMPORARY DIAGNOSTIC — T1 three-worker A/B module-evaluation authorization.
++//
++// Installed by `T1-3worker-ab-integration.patch`. This block runs at module
++// evaluation: before `beforeAll`, before `startTestDatabase`, before any
++// migration and before the process-owned Argon2 pool is constructed. An
++// unauthorized or mislabelled invocation therefore costs nothing and leaves
++// nothing behind.
++//
++// The packet cannot contain its own hash, so the literal below and V's external
++// approval record are the only two places it exists. The wrapper compares the
++// on-disk packet against V's recorded hash and exports the same value as
++// `T1_N3_AB_PACKET_SHA256`; this file compares that environment value to its
++// own embedded literal.
++// ---------------------------------------------------------------------------
++const T1_N3_AB_EXPECTED_PACKET_SHA256 =
++  "a1cef6fb53a178607db9eb84036c7677d9aa0b8dffbb738b8da1873f4c047503";
++if (process.env.T1_N3_AB_PACKET_SHA256 !== T1_N3_AB_EXPECTED_PACKET_SHA256) {
++  throw new Error("T1_N3_AB_PACKET_TOKEN_MISMATCH");
++}
++const T1_N3_AB_WORKERS_RAW = process.env.T1_N3_AB_WORKERS;
++if (T1_N3_AB_WORKERS_RAW !== "2" && T1_N3_AB_WORKERS_RAW !== "3") {
++  throw new Error("T1_N3_AB_WORKER_COUNT_INVALID");
++}
++const T1_N3_AB_WORKERS = Number(T1_N3_AB_WORKERS_RAW);
++const T1_N3_AB_CELL_ID = process.env.T1_N3_AB_CELL_ID ?? "";
++if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(T1_N3_AB_CELL_ID)) {
++  throw new Error("T1_N3_AB_CELL_ID_INVALID");
++}
++const T1_N3_AB_RUN_COMMITMENT = process.env.T1_N3_AB_RUN_COMMITMENT ?? "";
++if (!/^[0-9a-f]{64}$/.test(T1_N3_AB_RUN_COMMITMENT)) {
++  throw new Error("T1_N3_AB_RUN_COMMITMENT_INVALID");
++}
++const T1_N3_AB_RSS_LIMIT_BYTES = 512 * 1024 * 1024;
++
++// Identifier-safe capture, installed at MODULE EVALUATION: before `beforeAll`
++// boots the embedded database, before migrations, before any product object
++// exists. It FORWARDS NOTHING — arguments are counted, and tallied by their
++// bracketed SCREAMING_SNAKE code where they carry one. The retained text is
++// used only by the in-process opacity scan and never reaches a stream.
++const T1_N3_AB_CAPTURE: {
++  total: number;
++  codes: Map<string, number>;
++  text: string[];
++} = { total: 0, codes: new Map(), text: [] };
++const T1_N3_AB_CONSOLE = console as unknown as Record<string, (...args: unknown[]) => void>;
++for (const channel of ["log", "info", "debug", "warn", "error", "trace"]) {
++  T1_N3_AB_CONSOLE[channel] = (...args: unknown[]): void => {
++    T1_N3_AB_CAPTURE.total += 1;
++    const first = typeof args[0] === "string" ? args[0] : "";
++    const code = /\[([A-Z][A-Z0-9_]{2,63})\]/.exec(first)?.[1] ?? "UNCODED";
++    T1_N3_AB_CAPTURE.codes.set(code, (T1_N3_AB_CAPTURE.codes.get(code) ?? 0) + 1);
++    if (T1_N3_AB_CAPTURE.text.length < 4096) {
++      T1_N3_AB_CAPTURE.text.push(args.map((value) => {
++        if (typeof value === "string") return value;
++        try {
++          return JSON.stringify(value) ?? "";
++        } catch {
++          return "";
++        }
++      }).join(" "));
++    }
++  };
++}
++
++// The ruled 512 MiB abort covers THIS Node process for its whole life at a 5 ms
++// cadence, not merely the window of one measured phase. `admitWork` flips at
++// the instant of a breach so no later wave can start.
++const T1_N3_AB_RSS: {
++  measuredPid: number;
++  peakBytes: number;
++  peakSampleBytes: number[];
++  samples: number;
++  exceeded: boolean;
++  exceededAtBytes: number | null;
++  admitWork: boolean;
++} = {
++  measuredPid: process.pid,
++  peakBytes: 0,
++  peakSampleBytes: [],
++  samples: 0,
++  exceeded: false,
++  exceededAtBytes: null,
++  admitWork: true
++};
++function t1N3AbObserveRss(): number {
++  const rss = process.memoryUsage.rss();
++  T1_N3_AB_RSS.samples += 1;
++  if (rss > T1_N3_AB_RSS.peakBytes) {
++    T1_N3_AB_RSS.peakBytes = rss;
++    T1_N3_AB_RSS.peakSampleBytes.push(rss);
++    if (T1_N3_AB_RSS.peakSampleBytes.length > 256) T1_N3_AB_RSS.peakSampleBytes.shift();
++  }
++  if (rss > T1_N3_AB_RSS_LIMIT_BYTES && !T1_N3_AB_RSS.exceeded) {
++    T1_N3_AB_RSS.exceeded = true;
++    T1_N3_AB_RSS.exceededAtBytes = rss;
++    T1_N3_AB_RSS.admitWork = false;
++  }
++  return rss;
++}
++const T1_N3_AB_RSS_TIMER: ReturnType<typeof setInterval> = setInterval(t1N3AbObserveRss, 5);
++T1_N3_AB_RSS_TIMER.unref?.();
+
+ // Exactly one process-owned Argon2 worker pool for the whole file, mirroring
+ // the production topology in apps/api/src/main.ts: no pool-per-test,
+ // pool-per-repository or module singleton constructed at import time.
+ let argon2Pool: Argon2WorkerPool | undefined;
+ function sharedArgon2Pool(): Argon2WorkerPool {
+-  if (argon2Pool === undefined) argon2Pool = new Argon2WorkerPool();
++  // T1-N3-AB-ANCHOR-M4-WORKER-COUNT
++  if (argon2Pool === undefined) argon2Pool = new Argon2WorkerPool({ workers: T1_N3_AB_WORKERS });
+   return argon2Pool;
+ }
+@@ -4272,5 +4376,694 @@
+     } finally {
+       error.mockRestore();
+     }
+   });
++
++  // -------------------------------------------------------------------------
++  // TEMPORARY DIAGNOSTIC — T1 three-worker A/B credential concurrency cell.
++  //
++  // Installed by `T1-3worker-ab-integration.patch` under the design packet
++  // `T1-claude-3worker-ab-draft-packet.md`, and removed by restoring the
++  // wrapper-owned byte-for-byte entry backup before the seat exits. Diagnostic
++  // only: no product, policy, threshold, cadence, queue, worker, KDF or
++  // database behaviour is changed, and no permanent test is touched.
++  //
++  // The question is narrow: under the exact S3b prehistory, does a third real
++  // worker remove the third credential's queue dwell and materially reduce N=3
++  // request-start-to-provision latency? This cell MEASURES; it does not
++  // conclude. The paired comparison across twenty such processes is computed by
++  // the hashed adjudicator, never by a reader of one receipt.
++  // -------------------------------------------------------------------------
++  it("T1 N3 AB three-worker credential concurrency diagnostic", async () => {
++    const { AsyncLocalStorage } = await import("node:async_hooks");
++    const os = await import("node:os");
++    const { monitorEventLoopDelay } = await import("node:perf_hooks");
++
++    type Arm = "existing" | "missing";
++    interface RequestScope { readonly ordinal: number; readonly arm: Arm; readonly group: number; }
++    const als = new AsyncLocalStorage<RequestScope>();
++
++    const registrationCadenceMs = basePolicy.channel.registrationMailDispatchActivationSpacingMs;
++    const clampMs = basePolicy.verification.enumerationResponseFloorMs
++      + basePolicy.verification.enumerationToleranceMs;
++    const password = "correct horse battery staple";
++    const pool = sharedArgon2Pool();
++    const CONCURRENCY = 3 as const;
++    const WAVES = 4;
++    const MEASURED_GROUPS = 8;
++    const EXPECTED_OUTCOMES = 24;
++    const SPAN_IDENTITY_TOLERANCE_MS = 2;
++
++    // The identifier-safe capture is already installed, at module evaluation,
++    // before the embedded database booted. This cell reads it; it does not
++    // install a second one, and it never restores a raw forwarder.
++    const captured = T1_N3_AB_CAPTURE.text;
++
++    const codeOf = (reason: unknown): string => {
++      const code = (reason as { code?: unknown } | undefined)?.code;
++      return typeof code === "string" && /^[A-Z][A-Z0-9_]{2,63}$/.test(code) ? code : "UNTYPED";
++    };
++    const rejections: string[] = [];
++    const onUnhandled = (reason: unknown): void => { rejections.push(codeOf(reason)); };
++    process.on("unhandledRejection", onUnhandled);
++
++    // -- the binding enqueue/dispatch/settle seam ----------------------------
++    // Four surfaces of the EXISTING pool instance, each wrapped exactly as the
++    // packet pins it, each original invoked exactly once through Reflect.apply,
++    // each original's result returned untouched, no payload field inspected
++    // beyond the job identity needed to join the three stamps, and all four
++    // restored in `finally`.
++    interface JobSpan {
++      readonly ordinal: number;
++      readonly enqueuedAt: number;
++      readonly dispatchedAt: number;
++      readonly settledAt: number;
++    }
++    type SeamJob = { readonly id: unknown; readonly lane: string; readonly settled: boolean };
++    const idToOrdinal = new Map<unknown, number>();
++    const enqueueAt = new Map<unknown, number>();
++    const dispatchAt = new Map<unknown, number>();
++    const jobSpans: JobSpan[] = [];
++    let recording = false;
++    let unmappedSettlements = 0;
++    let duplicateEnqueueStamps = 0;
++    let duplicateDispatchStamps = 0;
++
++    const poolSurface = pool as unknown as {
++      submitArgon2Job: (lane: string, expected: unknown, request: { id: unknown }) => Promise<unknown>;
++      dispatch: (slot: unknown, job: SeamJob) => void;
++      settle: (job: SeamJob, error: unknown, value?: unknown) => void;
++      queues: Record<string, SeamJob[]>;
++      slots: readonly { readonly handle?: { readonly threadId?: number } }[];
++    };
++    const originalSubmit = poolSurface.submitArgon2Job;
++    const originalDispatch = poolSurface.dispatch;
++    const originalSettle = poolSurface.settle;
++    const credentialQueue = poolSurface.queues.credential!;
++    const originalPush = credentialQueue.push;
++
++    poolSurface.submitArgon2Job = function submitObserved(lane, expected, request) {
++      const scope = als.getStore();
++      // T1-N3-AB-ANCHOR-M3-ORDINAL-MAP
++      if (recording && lane === "credential" && scope !== undefined) {
++        idToOrdinal.set(request.id, scope.ordinal);
++      }
++      return Reflect.apply(originalSubmit, this, [lane, expected, request]) as Promise<unknown>;
++    };
++    credentialQueue.push = function pushObserved(...jobs: SeamJob[]): number {
++      if (recording) {
++        const stampedAt = performance.now();
++        for (const job of jobs) {
++          if (enqueueAt.has(job.id)) duplicateEnqueueStamps += 1;
++          else enqueueAt.set(job.id, stampedAt);
++        }
++      }
++      return Reflect.apply(originalPush, this, jobs) as number;
++    };
++    poolSurface.dispatch = function dispatchObserved(slot, job) {
++      if (recording && job.lane === "credential") {
++        if (dispatchAt.has(job.id)) duplicateDispatchStamps += 1;
++        else dispatchAt.set(job.id, performance.now());
++      }
++      Reflect.apply(originalDispatch, this, [slot, job]);
++    };
++    poolSurface.settle = function settleObserved(job, error, value) {
++      if (recording && job.lane === "credential" && job.settled === false) {
++        // T1-N3-AB-ANCHOR-M2-SETTLE-STAMP
++        const settledAt = performance.now();
++        const ordinal = idToOrdinal.get(job.id);
++        // T1-N3-AB-ANCHOR-M1-ENQUEUE-STAMP
++        const enqueuedAt = enqueueAt.get(job.id);
++        const dispatchedAt = dispatchAt.get(job.id);
++        if (ordinal === undefined || enqueuedAt === undefined || dispatchedAt === undefined) {
++          unmappedSettlements += 1;
++        } else {
++          jobSpans.push({ ordinal, enqueuedAt, dispatchedAt, settledAt });
++        }
++        idToOrdinal.delete(job.id);
++        enqueueAt.delete(job.id);
++        dispatchAt.delete(job.id);
++      }
++      Reflect.apply(originalSettle, this, [job, error, value]);
++    };
++
++    // -- pool and event-loop observation -------------------------------------
++    const observed = {
++      samples: 0,
++      maxActive: 0,
++      maxActiveCredential: 0,
++      maxQueuedCredential: 0,
++      maxOutstandingCredential: 0,
++      maxOutstandingTotal: 0
++    };
++    let sampler: ReturnType<typeof setInterval> | undefined;
++    const startSampling = (): void => {
++      if (sampler !== undefined) return;
++      sampler = setInterval(() => {
++        const stats = pool.stats();
++        observed.samples += 1;
++        observed.maxActive = Math.max(observed.maxActive, stats.active);
++        observed.maxActiveCredential = Math.max(
++          observed.maxActiveCredential, stats.outstandingCredential - stats.queuedCredential
++        );
++        observed.maxQueuedCredential = Math.max(observed.maxQueuedCredential, stats.queuedCredential);
++        observed.maxOutstandingCredential = Math.max(
++          observed.maxOutstandingCredential, stats.outstandingCredential
++        );
++        observed.maxOutstandingTotal = Math.max(observed.maxOutstandingTotal, stats.outstandingTotal);
++      }, 5);
++    };
++    const stopSampling = (): void => {
++      if (sampler !== undefined) clearInterval(sampler);
++      sampler = undefined;
++    };
++    const eventLoop = monitorEventLoopDelay({ resolution: 1 });
++    eventLoop.enable();
++
++    const threadEvidence = (): { distinct: number; mainThreadFallback: boolean } => {
++      const ids = new Set<number>();
++      let mainThreadFallback = false;
++      for (const slot of poolSurface.slots) {
++        const threadId = slot.handle?.threadId;
++        if (typeof threadId !== "number") continue;
++        if (threadId === 0) mainThreadFallback = true;
++        else ids.add(threadId);
++      }
++      return { distinct: ids.size, mainThreadFallback };
++    };
++
++    // -- the exact S3b N=1 then N=2 prehistory, uninstrumented ----------------
++    const runHistoryCell = async (concurrency: 1 | 2): Promise<void> => {
++      const historyWaves = concurrency === 1 ? 8 : 4;
++      const groups = Math.ceil(historyWaves / 4);
++      const flow = buildService({ mail: new MemoryMailSender() });
++      const seeded = Array.from(
++        { length: concurrency * groups },
++        (_unused, index) => `t1-n3ab-n${concurrency}-existing-${index}@example.test`
++      );
++      await Promise.all(seeded.map((email, index) => flow.service.register({
++        email,
++        password,
++        recoveryEmail: `t1-n3ab-n${concurrency}-seed-${index}-recovery@example.test`,
++        adultAffirmed: true
++      }, {
++        ip: `203.0.${concurrency}.${index + 1}`,
++        userAgent: "vitest-s3b-timing-seed",
++        requestId: `request:s3b:timing:n${concurrency}:seed:${index}`
++      })));
++      await flow.service.drainMailDispatches();
++      const existingWave = async (wave: number): Promise<void> => {
++        await Promise.all(Array.from({ length: concurrency }, async (_unused, index) => {
++          await flow.service.register({
++            email: seeded[(wave % groups) * concurrency + index]!,
++            password,
++            recoveryEmail: `t1-n3ab-n${concurrency}-existing-${index}-recovery@example.test`,
++            adultAffirmed: true
++          }, {
++            ip: `203.${concurrency}.${wave}.${index + 1}`,
++            userAgent: "vitest-s3b-timing-existing",
++            requestId: `request:s3b:timing:n${concurrency}:existing:${wave}:${index}`
++          });
++        }));
++      };
++      const missingWave = async (wave: number): Promise<void> => {
++        await Promise.all(Array.from({ length: concurrency }, async (_unused, index) => {
++          await flow.service.register({
++            email: `t1-n3ab-n${concurrency}-missing-${wave}-${index}@example.test`,
++            password,
++            recoveryEmail: `t1-n3ab-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
++            adultAffirmed: true
++          }, {
++            ip: `204.${concurrency}.${wave}.${index + 1}`,
++            userAgent: "vitest-s3b-timing-missing",
++            requestId: `request:s3b:timing:n${concurrency}:missing:${wave}:${index}`
++          });
++        }));
++      };
++      for (let wave = 0; wave < historyWaves; wave += 1) {
++        t1N3AbObserveRss();
++        expect(T1_N3_AB_RSS.admitWork, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(true);
++        if (wave % 2 === 0) {
++          await existingWave(wave);
++          await missingWave(wave);
++        } else {
++          await missingWave(wave);
++          await flow.service.drainMailDispatches();
++          await existingWave(wave);
++        }
++        await flow.service.drainMailDispatches();
++      }
++    };
++
++    const knownFailureCodes = new Set([
++      "AUTH_INPUT_INVALID", "AUTH_RATE_LIMITED", "AUTH_MAIL_BUSY",
++      "AUTH_REGISTRATION_FAILED", "AUTH_TEMPORARILY_UNAVAILABLE"
++    ]);
++    const loadAtStart = os.loadavg();
++    const resourceAtStart = process.resourceUsage();
++    let restoreService: (() => void) | undefined;
++
++    try {
++      const readyStats = pool.stats();
++      const threadsAtReady = threadEvidence();
++
++      // 1. Frozen S3b prehistory: N=1 then N=2, in the original drain order.
++      await runHistoryCell(1);
++      await runHistoryCell(2);
++
++      // 2. The instrumented N=3 cell.
++      const timingMail = new MemoryMailSender();
++      const flow = buildService({ mail: timingMail });
++
++      // OBJECT IDENTITY, not a count. The repository reaches the pool through
++      // its audit-context hasher and the service reaches it through its
++      // credential hashing dependency; both must be the SAME instance as the
++      // sole process-owned pool. A second pool would silently double the arena
++      // count and destroy the comparison, and "there is one pool" is not
++      // provable by counting anything.
++      const repositorySurfaceForIdentity = flow.repository as unknown as {
++        auditContext?: { executor?: unknown };
++      };
++      const serviceSurfaceForIdentity = flow.service as unknown as {
++        dependencies?: { argon2?: unknown };
++      };
++      expect(repositorySurfaceForIdentity.auditContext?.executor,
++        "T1_N3_AB_SHARED_POOL_IDENTITY").toBe(pool);
++      expect(serviceSurfaceForIdentity.dependencies?.argon2,
++        "T1_N3_AB_SHARED_POOL_IDENTITY").toBe(pool);
++      expect(serviceSurfaceForIdentity.dependencies?.argon2,
++        "T1_N3_AB_SHARED_POOL_IDENTITY").toBe(repositorySurfaceForIdentity.auditContext?.executor);
++      const sharedPoolIdentityProven = true;
++
++      const serviceSurface = flow.service as unknown as {
++        provisionPendingAccount(input: unknown): Promise<unknown>;
++      };
++      const originalProvision = serviceSurface.provisionPendingAccount.bind(flow.service);
++      restoreService = () => { serviceSurface.provisionPendingAccount = originalProvision; };
++      const provisionEnd = new Map<number, number>();
++      serviceSurface.provisionPendingAccount = async (input) => {
++        const scope = als.getStore();
++        try {
++          return await originalProvision(input);
++        } finally {
++          if (recording && scope !== undefined) provisionEnd.set(scope.ordinal, performance.now());
++        }
++      };
++
++      const existingEmails = Array.from(
++        { length: CONCURRENCY },
++        (_unused, index) => `t1-n3ab-n3-existing-${index}@example.test`
++      );
++      const missingEmails: string[] = [];
++      await Promise.all(existingEmails.map((email, index) => flow.service.register({
++        email,
++        password,
++        recoveryEmail: `t1-n3ab-n3-seed-${index}-recovery@example.test`,
++        adultAffirmed: true
++      }, {
++        ip: `203.0.3.${index + 1}`,
++        userAgent: "vitest-s3b-timing-seed",
++        requestId: `request:s3b:timing:n3:seed:${index}`
++      })));
++      await flow.service.drainMailDispatches();
++      const seedMailCount = timingMail.messages.length;
++
++      // 3. Measurement state is cleared ONLY here: after prehistory and seed.
++      jobSpans.length = 0;
++      idToOrdinal.clear();
++      enqueueAt.clear();
++      dispatchAt.clear();
++      provisionEnd.clear();
++      recording = true;
++
++      const requestStart = new Map<number, number>();
++      const requestArm = new Map<number, Arm>();
++      const requestGroup = new Map<number, number>();
++      const outcomes = new Map<number, string>();
++      let nextOrdinal = 0;
++      let nextGroup = 0;
++
++      const measure = async (
++        ordinal: number, arm: Arm, group: number, wave: number, index: number, email: string
++      ): Promise<void> => {
++        const scope: RequestScope = { ordinal, arm, group };
++        t1N3AbObserveRss();
++        expect(T1_N3_AB_RSS.admitWork, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(true);
++        requestStart.set(ordinal, performance.now());
++        requestArm.set(ordinal, arm);
++        requestGroup.set(ordinal, group);
++        await als.run(scope, async () => {
++          try {
++            const response = await flow.service.register({
++              email,
++              password,
++              recoveryEmail: arm === "existing"
++                ? `t1-n3ab-n3-existing-${index}-recovery@example.test`
++                : `t1-n3ab-n3-missing-${wave}-${index}-recovery@example.test`,
++              adultAffirmed: true
++            }, {
++              ip: `${arm === "existing" ? 203 : 204}.3.${wave}.${index + 1}`,
++              userAgent: `vitest-s3b-timing-${arm}`,
++              requestId: `request:s3b:timing:n3:${arm}:${wave}:${index}`
++            });
++            outcomes.set(ordinal, JSON.stringify(response) === JSON.stringify(REGISTRATION_PUBLIC_RESPONSE)
++              ? "success"
++              : "unexpected_body");
++          } catch (error) {
++            const code = codeOf(error);
++            outcomes.set(ordinal, knownFailureCodes.has(code) ? code : "unexpected");
++          }
++        });
++      };
++      const runGroup = async (arm: Arm, wave: number): Promise<void> => {
++        // Admission is consulted before every wave and re-checked after the
++        // awaits inside it. A breach forbids NEW work; it does not abandon work
++        // already in flight.
++        t1N3AbObserveRss();
++        expect(T1_N3_AB_RSS.admitWork, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(true);
++        const group = nextGroup;
++        nextGroup += 1;
++        const ordinals = Array.from({ length: CONCURRENCY }, () => nextOrdinal++);
++        startSampling();
++        await Promise.all(ordinals.map((ordinal, index) => {
++          if (arm === "existing") {
++            return measure(ordinal, arm, group, wave, index, existingEmails[index]!);
++          }
++          const email = `t1-n3ab-n3-missing-${wave}-${index}@example.test`;
++          missingEmails.push(email);
++          return measure(ordinal, arm, group, wave, index, email);
++        }));
++        stopSampling();
++      };
++      for (let wave = 0; wave < WAVES; wave += 1) {
++        if (wave % 2 === 0) {
++          await runGroup("existing", wave);
++          await runGroup("missing", wave);
++        } else {
++          await runGroup("missing", wave);
++          await flow.service.drainMailDispatches();
++          await runGroup("existing", wave);
++        }
++        await flow.service.drainMailDispatches();
++      }
++      // Production shutdown order, from `apps/api/src/main.ts`: mail dispatches
++      // drain, then the REAL refusal-audit coordinator drains, then every
++      // retained audit hasher closes, then the shared pool. Nested try/finally
++      // so an early error cannot strand later ownership.
++      let refusalDrained = false;
++      try {
++        await flow.service.drainMailDispatches();
++        flow.service.drainMailCapacitySignals();
++      } finally {
++        try {
++          await (flow.service as unknown as {
++            drainRateLimitAuditFlushes(): Promise<void>;
++          }).drainRateLimitAuditFlushes();
++          refusalDrained = true;
++        } finally {
++          // The hasher this flow actually owns, closed here rather than left to
++          // a shared `afterAll` that never saw it.
++          (repositorySurfaceForIdentity.auditContext as unknown as {
++            close?: () => void;
++          })?.close?.();
++        }
++      }
++      recording = false;
++      stopSampling();
++      eventLoop.disable();
++
++      // 4. Anonymous per-wave summaries. No ordinal, job id or request id ever
++      //    leaves this block: only maxima and percentiles over a wave group.
++      const quantile = (values: readonly number[], fraction: number): number => {
++        if (values.length === 0) return Number.NaN;
++        const sorted = [...values].sort((left, right) => left - right);
++        return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]!;
++      };
++      const spansOfGroup = (group: number): JobSpan[] =>
++        jobSpans.filter((span) => requestGroup.get(span.ordinal) === group);
++      const round = (value: number): number => Number(value.toFixed(3));
++      let identityMaxSkewMs = 0;
++      for (const span of jobSpans) {
++        const dwell = span.dispatchedAt - span.enqueuedAt;
++        const service = span.settledAt - span.dispatchedAt;
++        const total = span.settledAt - span.enqueuedAt;
++        identityMaxSkewMs = Math.max(identityMaxSkewMs, Math.abs(total - (dwell + service)));
++      }
++      const perWave = Array.from({ length: MEASURED_GROUPS }, (_unused, group) => {
++        const spans = spansOfGroup(group);
++        const dwell = spans.map((span) => span.dispatchedAt - span.enqueuedAt);
++        const service = spans.map((span) => span.settledAt - span.dispatchedAt);
++        const total = spans.map((span) => span.settledAt - span.enqueuedAt);
++        const maxOf = (values: readonly number[]): number =>
++          values.length === 0 ? Number.NaN : Math.max(...values);
++        return {
++          waveIndex: group,
++          arm: spans.length === 0 ? "unknown" : requestArm.get(spans[0]!.ordinal),
++          credentialJobs: spans.length,
++          maxQueueDwellMs: round(maxOf(dwell)),
++          p50QueueDwellMs: round(quantile(dwell, 0.5)),
++          p95QueueDwellMs: round(quantile(dwell, 0.95)),
++          maxDispatchToSettleMs: round(maxOf(service)),
++          p50DispatchToSettleMs: round(quantile(service, 0.5)),
++          p95DispatchToSettleMs: round(quantile(service, 0.95)),
++          maxEnqueueToSettleMs: round(maxOf(total)),
++          p50EnqueueToSettleMs: round(quantile(total, 0.5)),
++          p95EnqueueToSettleMs: round(quantile(total, 0.95))
++        };
++      });
++
++      // 5. Co-primary endpoint components. The adjudicator recomputes H and Q
++      //    from these components and never trusts the summary below.
++      const ordinals = [...requestStart.keys()].sort((left, right) => left - right);
++      const armOrdinals = (arm: Arm): number[] =>
++        ordinals.filter((ordinal) => requestArm.get(ordinal) === arm);
++      const provisionLatency = (ordinal: number): number => {
++        const end = provisionEnd.get(ordinal);
++        return end === undefined ? Number.NaN : end - requestStart.get(ordinal)!;
++      };
++      const armMaximum = (arm: Arm): number => {
++        const values = armOrdinals(arm).map(provisionLatency);
++        return values.length === 0 ? Number.NaN : Math.max(...values);
++      };
++      const existingMaxMs = armMaximum("existing");
++      const missingMaxMs = armMaximum("missing");
++      const H = Math.max(existingMaxMs, missingMaxMs);
++      const perWaveDwellMaxima = perWave.map((wave) => wave.maxQueueDwellMs);
++      const sortedDwell = [...perWaveDwellMaxima].sort((left, right) => left - right);
++      const Q = (sortedDwell[MEASURED_GROUPS / 2 - 1]! + sortedDwell[MEASURED_GROUPS / 2]!) / 2;
++      const clampHeadroomMs = clampMs - (H + CONCURRENCY * registrationCadenceMs);
++
++      // 6. Functional and durable-row evidence, from real PostgreSQL.
++      const committedMissing = await database.pool.query<{ count: string }>(`
++        SELECT count(*)::text AS count FROM identity."user"
++        WHERE email_blind_index=ANY($1::bytea[])
++      `, [missingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
++      const committedExisting = await database.pool.query<{ count: string }>(`
++        SELECT count(*)::text AS count FROM identity."user"
++        WHERE email_blind_index=ANY($1::bytea[])
++      `, [existingEmails.map((email) => createEmailBlindIndex(blindIndexKey, email))]);
++      const measuredSends = timingMail.messages.length - seedMailCount;
++      const successes = [...outcomes.values()].filter((value) => value === "success").length;
++      const afterDrainPool = pool.stats();
++      const afterDrainMail = flow.service.mailDispatchOccupancy();
++
++      // 7. Opacity scan over the captured stream — counts only, never text.
++      const generatedLiterals = [
++        ...existingEmails, ...missingEmails, password,
++        "vitest-s3b-timing-existing", "vitest-s3b-timing-missing", "vitest-s3b-timing-seed",
++        "t1-n3ab-"
++      ];
++      const capturedText = captured.join("\n");
++      const literalLeaks = generatedLiterals.filter((literal) => capturedText.includes(literal)).length;
++      const patternLeaks = ([
++        ["hex64", /\b[0-9a-f]{64}\b/i],
++        ["argon2", /\$argon2/i],
++        ["email", /[A-Za-z0-9._-]+@[A-Za-z0-9.-]+/],
++        ["ipv4", /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/],
++        ["uuid", /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i]
++      ] as const).filter(([, pattern]) => pattern.test(capturedText)).map(([name]) => name);
++      const dangerous = /40P01|ERROR:|FATAL:|Timed out|timed out|timeout of|Unhandled/;
++      const dangerousLines = captured.filter((line) => dangerous.test(line)).length;
++      const errorCounts = new Map<string, number>();
++      for (const line of captured) {
++        const match = /\[([A-Z][A-Z0-9_]+)\]/.exec(line);
++        const code = match?.[1] ?? "UNCODED";
++        errorCounts.set(code, (errorCounts.get(code) ?? 0) + 1);
++      }
++      const classifiedErrors = {
++        timeout: dangerousLines === 0 ? 0 : dangerousLines,
++        capacity: [...outcomes.values()].filter((value) => value === "AUTH_MAIL_BUSY").length,
++        worker: [...errorCounts.entries()]
++          .filter(([code]) => code.startsWith("ARGON2_")).reduce((sum, [, n]) => sum + n, 0),
++        unhandled: rejections.length,
++        postgres: [...errorCounts.keys()].filter((code) => code.startsWith("PG")).length,
++        secretCapture: literalLeaks + patternLeaks.length,
++        custody: [...outcomes.values()]
++          .filter((value) => value === "unexpected" || value === "unexpected_body").length
++      };
++
++      // 8. Non-vacuity, functional and opacity gates. Each carries an exact
++      //    named message, so a mutant's intended failure text is unambiguous.
++      expect(readyStats.workers, "T1_N3_AB_WORKER_COUNT_NOT_HONOURED").toBe(T1_N3_AB_WORKERS);
++      expect(readyStats.readyWorkers, "T1_N3_AB_WORKER_COUNT_NOT_HONOURED").toBe(T1_N3_AB_WORKERS);
++      expect(threadsAtReady.distinct, "T1_N3_AB_WORKER_COUNT_NOT_HONOURED").toBe(T1_N3_AB_WORKERS);
++      expect(threadsAtReady.mainThreadFallback, "T1_N3_AB_MAIN_THREAD_FALLBACK").toBe(false);
++      expect(observed.maxActive, "T1_N3_AB_WORKER_COUNT_NOT_HONOURED").toBe(T1_N3_AB_WORKERS);
++      expect(observed.samples, "T1_N3_AB_POOL_NEVER_SAMPLED").toBeGreaterThan(0);
++      expect(observed.maxOutstandingCredential, "T1_N3_AB_CREDENTIAL_LOAD_NON_VACUITY").toBe(3);
++      if (T1_N3_AB_WORKERS === 2) {
++        expect(observed.maxQueuedCredential, "T1_N3_AB_CREDENTIAL_LOAD_NON_VACUITY")
++          .toBeGreaterThanOrEqual(1);
++      } else {
++        expect(observed.maxActiveCredential, "T1_N3_AB_CREDENTIAL_LOAD_NON_VACUITY").toBe(3);
++      }
++      expect(ordinals, "T1_N3_AB_OUTCOME_COUNT").toHaveLength(EXPECTED_OUTCOMES);
++      expect(successes, "T1_N3_AB_OUTCOME_COUNT").toBe(EXPECTED_OUTCOMES);
++      expect(Number(committedMissing.rows[0]!.count), "T1_N3_AB_DURABLE_ROWS").toBe(12);
++      expect(Number(committedExisting.rows[0]!.count), "T1_N3_AB_DURABLE_ROWS").toBe(3);
++      expect(measuredSends, "T1_N3_AB_DURABLE_ROWS").toBe(12);
++      expect(unmappedSettlements, "T1_N3_AB_ORDINAL_MAP_COVERS_EVERY_CREDENTIAL_JOB").toBe(0);
++      expect(jobSpans, "T1_N3_AB_ORDINAL_MAP_COVERS_EVERY_CREDENTIAL_JOB")
++        .toHaveLength(EXPECTED_OUTCOMES);
++      expect(duplicateEnqueueStamps, "T1_N3_AB_EXACTLY_ONE_ENQUEUE_PER_JOB").toBe(0);
++      expect(duplicateDispatchStamps, "T1_N3_AB_EXACTLY_ONE_DISPATCH_PER_JOB").toBe(0);
++      expect(identityMaxSkewMs, "T1_N3_AB_SPAN_ARITHMETIC_IDENTITY")
++        .toBeLessThanOrEqual(SPAN_IDENTITY_TOLERANCE_MS);
++      for (const span of jobSpans) {
++        expect(span.settledAt - span.dispatchedAt, "T1_N3_AB_SERVICE_ENVELOPE_POSITIVE")
++          .toBeGreaterThan(0);
++      }
++      if (observed.maxQueuedCredential >= 1) {
++        expect(Math.max(...jobSpans.map((span) => span.dispatchedAt - span.enqueuedAt)),
++          "T1_N3_AB_QUEUE_OBSERVED_BUT_NO_DWELL").toBeGreaterThan(0);
++      }
++      expect(idToOrdinal.size, "T1_N3_AB_ORDINAL_MAP_EMPTY_AFTER_DRAIN").toBe(0);
++      expect(enqueueAt.size, "T1_N3_AB_ORDINAL_MAP_EMPTY_AFTER_DRAIN").toBe(0);
++      expect(dispatchAt.size, "T1_N3_AB_ORDINAL_MAP_EMPTY_AFTER_DRAIN").toBe(0);
++      expect(afterDrainPool.outstandingTotal, "T1_N3_AB_DRAIN").toBe(0);
++      expect(afterDrainPool.queuedTotal, "T1_N3_AB_DRAIN").toBe(0);
++      expect(afterDrainMail.inFlight, "T1_N3_AB_DRAIN").toBe(0);
++      expect(afterDrainMail.queued, "T1_N3_AB_DRAIN").toBe(0);
++      expect(literalLeaks, "T1_N3_AB_OPACITY").toBe(0);
++      expect(patternLeaks, "T1_N3_AB_OPACITY").toHaveLength(0);
++      expect(rejections, "T1_N3_AB_UNHANDLED_REJECTION").toHaveLength(0);
++      expect(Number.isFinite(H), "T1_N3_AB_ENDPOINTS_FINITE").toBe(true);
++      expect(Number.isFinite(Q), "T1_N3_AB_ENDPOINTS_FINITE").toBe(true);
++
++      // 9. The safety verdict, then exactly one report line. A breach is
++      //    reported as a structured secret-free line the wrapper maps to
++      //    rss-safety; a Vitest child cannot hand its exit code to the runner,
++      //    so this line is the authoritative signal for this cell class.
++      if (T1_N3_AB_RSS.exceeded) {
++        process.stdout.write(`[T1_N3_AB_RSS_SAFETY_EXCEEDED]${JSON.stringify({
++          cellId: T1_N3_AB_CELL_ID,
++          workerCount: T1_N3_AB_WORKERS,
++          runCommitment: T1_N3_AB_RUN_COMMITMENT,
++          limitBytes: T1_N3_AB_RSS_LIMIT_BYTES,
++          measuredPid: T1_N3_AB_RSS.measuredPid
++        })}\n`);
++      }
++      expect(T1_N3_AB_RSS.exceeded, "T1_N3_AB_RSS_SAFETY_EXCEEDED").toBe(false);
++      const resourceAtEnd = process.resourceUsage();
++      process.stdout.write(`[T1_N3_AB_INTEGRATION_REPORT]${JSON.stringify({
++        artifact: "T1-3worker-ab-integration-cell",
++        schemaVersion: 1,
++        packetSha256: T1_N3_AB_EXPECTED_PACKET_SHA256,
++        cellId: T1_N3_AB_CELL_ID,
++        workerCount: T1_N3_AB_WORKERS,
++        outcome: "COMPLETE",
++        runCommitment: T1_N3_AB_RUN_COMMITMENT,
++        supervisedPid: Number(process.env.T1_N3_AB_SUPERVISED_PID),
++        supervisedPgid: Number(process.env.T1_N3_AB_SUPERVISED_PGID),
++        supervisedSid: Number(process.env.T1_N3_AB_SUPERVISED_SID),
++        sharedPoolIdentityProven,
++        rssSafety: {
++          rssSafetyExceeded: T1_N3_AB_RSS.exceeded,
++          limitBytes: T1_N3_AB_RSS_LIMIT_BYTES,
++          exceededAtBytes: T1_N3_AB_RSS.exceededAtBytes,
++          peakBytes: T1_N3_AB_RSS.peakBytes,
++          measuredPid: T1_N3_AB_RSS.measuredPid,
++          sampleIntervalMs: 5,
++          samples: T1_N3_AB_RSS.samples,
++          peakSampleBytes: [...T1_N3_AB_RSS.peakSampleBytes]
++        },
++        consoleCapture: {
++          capturedLines: T1_N3_AB_CAPTURE.total,
++          codes: Object.fromEntries([...T1_N3_AB_CAPTURE.codes.entries()].sort())
++        },
++        header: {
++          nodeVersion: process.version,
++          platform: process.platform,
++          arch: process.arch,
++          cpuModel: os.cpus()[0]?.model ?? "UNKNOWN",
++          cpuCount: os.cpus().length,
++          processPid: process.pid,
++          postgresPort: Number(/:(\d+)\//.exec(database.connectionString)?.[1] ?? -1),
++          loadAverageAtStart: loadAtStart,
++          loadAverageAtEnd: os.loadavg(),
++          swapDelta: resourceAtEnd.swappedOut - resourceAtStart.swappedOut,
++          majorPageFaultDelta: resourceAtEnd.majorPageFault - resourceAtStart.majorPageFault,
++          minorPageFaultDelta: resourceAtEnd.minorPageFault - resourceAtStart.minorPageFault,
++          eventLoopDelayP99Ms: round(eventLoop.percentile(99) / 1e6),
++          eventLoopDelayMaxMs: round(eventLoop.max / 1e6)
++        },
++        pool: {
++          requestedWorkers: T1_N3_AB_WORKERS,
++          readyWorkers: readyStats.readyWorkers,
++          distinctNonMainThreadCount: threadsAtReady.distinct,
++          mainThreadFallback: threadsAtReady.mainThreadFallback,
++          samples: observed.samples,
++          maxActive: observed.maxActive,
++          maxActiveCredential: observed.maxActiveCredential,
++          maxQueuedCredential: observed.maxQueuedCredential,
++          maxOutstandingCredential: observed.maxOutstandingCredential,
++          maxOutstandingTotal: observed.maxOutstandingTotal
++        },
++        outcomes: { expected: EXPECTED_OUTCOMES, observed: ordinals.length, success: successes },
++        drains: {
++          mail: afterDrainMail.inFlight === 0 && afterDrainMail.queued === 0,
++          // Derived from the REAL refusal coordinator having drained, never
++          // inferred from mail occupancy or `activeSends` — those describe a
++          // different queue entirely.
++          refusal: refusalDrained,
++          ordinalMapEmptyAfterDrain: idToOrdinal.size === 0 && enqueueAt.size === 0
++            && dispatchAt.size === 0
++        },
++        spans: {
++          identityMaxSkewMs: round(identityMaxSkewMs),
++          creditedJobsWithExactlyOneEnqueueDispatchSettle:
++            jobSpans.length === EXPECTED_OUTCOMES && unmappedSettlements === 0
++            && duplicateEnqueueStamps === 0 && duplicateDispatchStamps === 0,
++          perWave
++        },
++        arms: {
++          existingProvisionMaxMs: round(existingMaxMs),
++          missingProvisionMaxMs: round(missingMaxMs)
++        },
++        endpoints: { H: round(H), Q: round(Q), clampHeadroomMs: round(clampHeadroomMs) },
++        clamp: { clampMs, cadenceMs: registrationCadenceMs, concurrency: CONCURRENCY },
++        gates: {
++          opacity: literalLeaks === 0 && patternLeaks.length === 0,
++          response: successes === EXPECTED_OUTCOMES,
++          durableRows: Number(committedMissing.rows[0]!.count) === 12
++            && Number(committedExisting.rows[0]!.count) === 3,
++          drain: afterDrainPool.outstandingTotal === 0 && afterDrainPool.queuedTotal === 0,
++          errors: classifiedErrors
++        }
++      })}\n`);
++    } finally {
++      stopSampling();
++      recording = false;
++      eventLoop.disable();
++      restoreService?.();
++      poolSurface.submitArgon2Job = originalSubmit;
++      poolSurface.dispatch = originalDispatch;
++      poolSurface.settle = originalSettle;
++      credentialQueue.push = originalPush;
++      process.off("unhandledRejection", onUnhandled);
++      // The module-evaluation capture is deliberately NOT torn down here: it
++      // must stay active through the final drain and the `afterAll` database
++      // teardown, which run after this test body returns.
++      clearInterval(T1_N3_AB_RSS_TIMER);
++    }
++  }, 900_000);
+ });

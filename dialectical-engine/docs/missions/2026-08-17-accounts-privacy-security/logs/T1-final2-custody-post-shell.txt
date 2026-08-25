@@ -1,0 +1,79 @@
+=== T1 FINAL2 POST-SHELL ===
+utc: 2026-08-22T00:48:18Z
+9801f85d97e4263a7c8311304e29d6a03c4a6d15
+ M ../.claude/launch.json
+ M ../.gitignore
+ M apps/api/src/main.ts
+ M apps/api/src/registration.ts
+ M docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-seat.sh
+ M packages/crypto/src/argon2-worker-pool.ts
+ M packages/db/src/identity.ts
+ M packages/register/src/auth-policy.ts
+ M tests/architecture/t1-argon2-worker-contract.test.ts
+ M tests/integration/registration-database.test.ts
+ M tests/unit/argon2-worker-pool.test.ts
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-final-custody-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-final2-custody-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework2-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework3-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework4-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework5-evidence-correction-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework5-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-claude-rework6-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-custody-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-custody-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-custody-pre.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final-pnpm-test.status
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final2-claude-preflight-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final2-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final2-custody-post-shell.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final2-custody-pre.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-final2-pnpm-test.status
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework2-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework2-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework3-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework3-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework4-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework4-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-evidence-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework5-evidence-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework6-claude-result.json
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-rework6-claude-session.txt
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework2-final-review-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework3-final-review-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework4-final-review-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework5-final-review-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/T1-sol-rework6-final-review-packet.md
+?? docs/missions/2026-08-17-accounts-privacy-security/logs/run-claude-T1-final2-custody.sh
+?? docs/missions/2026-08-21-observability-loop/goal-packets/lane-2-capture.md
+?? docs/missions/2026-08-21-observability-loop/logs/merge-lane-1.sh
+?? docs/missions/2026-08-21-observability-loop/logs/run-lane-1-rework1.sh
+?? docs/missions/2026-08-21-observability-loop/logs/run-lane-1-rework2.sh
+?? docs/missions/2026-08-21-observability-loop/reviews/L1-S01-rework-1.md
+?? docs/missions/2026-08-21-observability-loop/reviews/L1-S01-rework-2.md
+0172fc7e1dd44de560d467743f3e5ab7f6406bf52a5bbb302dd68685d64d679a  apps/api/src/index.ts
+4dae1f79496a0a8cca7b2ee03a30f922564ce6cace3331539d0406e60973b26f  apps/api/src/main.ts
+0b75f99df102d9a7915a22f1d5b28e278352dfcb2936ac5bffe7b3f3afc01fd7  apps/api/src/registration.ts
+66b20d2170a35667e75e4ba15e8adc016d44d252958527e2877b99bf9f6871e6  packages/crypto/src/index.ts
+c610b06ee13a87ec8d9a47c88b552edb5398b30cd9b49509d547eda36fdcb11b  packages/crypto/src/argon2-worker.ts
+b990c3f866f9697b158e4040ffd9bb832341e31853a40d30e70deb57394c526d  packages/crypto/src/argon2-worker-pool.ts
+2d92223b58c6f1af7c6b9bc544df5f2518e8e20404bf982fbabb0a50bc90e17f  packages/db/src/identity.ts
+06056093071e7905342e3030b14c0ac11f14f4ee72a8bce11d7accf34bf5eb52  packages/register/src/auth-policy.ts
+7f8a048afaa415f49f340fe2ef15aa2d4140af1bbf3916bddf5353797a295c58  tests/integration/registration-database.test.ts
+ebfbfce79c0bdb5de9d2bb0855deabd7a1f95b29cc69667060d55feaa549e25b  tests/unit/registration.test.ts
+93f1a3357ffe5b45fac047f77c16c9ae80322123a3eff97c30a7d7e7d2afb55b  tests/unit/argon2-worker-pool.test.ts
+3548b93282011be73310efe8a2eec31638133dc69a1d92a0cf4ffbc36f253ca1  tests/architecture/t1-argon2-worker-contract.test.ts
+30548 1787343026 apps/api/src/index.ts
+6606 1787347061 apps/api/src/main.ts
+53648 1787353551 apps/api/src/registration.ts
+27118 1787343024 packages/crypto/src/index.ts
+10314 1787343013 packages/crypto/src/argon2-worker.ts
+48111 1787357276 packages/crypto/src/argon2-worker-pool.ts
+25159 1787342997 packages/db/src/identity.ts
+46750 1787347197 packages/register/src/auth-policy.ts
+282013 1787347737 tests/integration/registration-database.test.ts
+51807 1787337856 tests/unit/registration.test.ts
+106612 1787349543 tests/unit/argon2-worker-pool.test.ts
+86450 1787353268 tests/architecture/t1-argon2-worker-contract.test.ts
