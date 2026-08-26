@@ -8,6 +8,10 @@
     "./core": "./src/index.ts",
     "./registry-internal": "./src/registry/index.ts",
     "./zone-internal": "./src/zone/index.ts",
-    "./install/*": "./install/*.ts"
+    "./install/*": "./install/*.ts",
+    "./runtime": "./src/runtime/index.ts"
+  },
+  "dependencies": {
+    "pg": "8.22.0"
   }
 }
