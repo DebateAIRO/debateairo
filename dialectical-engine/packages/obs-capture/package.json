@@ -1,0 +1,13 @@
+{
+  "name": "@debateai/obs-capture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/index.ts",
+    "./registry-internal": "./src/registry/index.ts",
+    "./zone-internal": "./src/zone/index.ts",
+    "./install/*": "./install/*.ts"
+  }
+}

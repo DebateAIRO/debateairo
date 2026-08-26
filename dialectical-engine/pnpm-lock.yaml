@@ -60,6 +60,9 @@ importers:
       '@debateai/memory':
         specifier: workspace:*
         version: link:packages/memory
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:packages/obs-capture
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -534,6 +537,8 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/obs-capture: {}
 
   packages/propagation:
     dependencies:
