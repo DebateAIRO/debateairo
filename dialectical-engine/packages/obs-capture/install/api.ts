@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, realpathSync, writeSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, realpathSync, writeSync } from "node:fs";
 
 const RUNTIME = "api" as const;
 const UNKNOWN_REF = "UNKNOWN:DECLARED_KIND_REQUIRED" as const;
@@ -53,10 +53,10 @@ function normalizedSpoolDirectory(value: string | undefined): string | undefined
   if (segments.some((segment) => segment === "..")) return undefined;
   const normalizedSegments = segments.filter((segment) => segment.length > 0 && segment !== ".");
   if (normalizedSegments.length === 0) return undefined;
-  const finalComponentPath = "/" + normalizedSegments.join("/");
+  const normalizedPath = "/" + normalizedSegments.join("/");
   try {
-    if (lstatSync(finalComponentPath).isSymbolicLink()) return undefined;
-    return realpathSync(value);
+    const canonicalPath = realpathSync(normalizedPath);
+    return canonicalPath === normalizedPath ? canonicalPath : undefined;
   } catch {
     return undefined;
   }

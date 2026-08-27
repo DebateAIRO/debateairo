@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   statSync,
@@ -36,7 +37,7 @@ type ImportMode = "dynamic" | "static";
 const scratchDirectories: string[] = [];
 
 function makeScratchDirectory(): string {
-  const directory = mkdtempSync(join(tmpdir(), "obs-l2-s05-fatal-"));
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "obs-l2-s05-fatal-")));
   scratchDirectories.push(directory);
   return directory;
 }
@@ -344,6 +345,59 @@ export function resolve(specifier, context, nextResolve) {
     ? readFileSync(marker, "utf8").trimEnd().split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
     : [];
   return { result, trace };
+}
+
+function finalComponentSwapProbe(
+  spoolDirectory: string,
+  attackerDirectory: string,
+  resolutionMarker: string,
+): ReturnType<typeof spawnSync> {
+  const fsModuleUrl = asLoaderUrl(`
+import * as fs from "node:fs";
+const mark = (call) => fs.appendFileSync(${JSON.stringify(resolutionMarker)}, call + "\\n");
+export const constants = fs.constants;
+export const closeSync = fs.closeSync;
+export const fstatSync = fs.fstatSync;
+export const openSync = fs.openSync;
+export const writeSync = fs.writeSync;
+export function lstatSync(path) {
+  mark("lstatSync");
+  const original = fs.lstatSync(path);
+  if (path === ${JSON.stringify(spoolDirectory)}) {
+    fs.rmdirSync(path);
+    fs.symlinkSync(${JSON.stringify(attackerDirectory)}, path, "dir");
+  }
+  return original;
+}
+export function realpathSync(path) {
+  mark("realpathSync");
+  return fs.realpathSync(path);
+}`);
+  const loaderUrl = asLoaderUrl(`
+export function resolve(specifier, context, nextResolve) {
+  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/install/runner.ts")) {
+    return { url: ${JSON.stringify(fsModuleUrl)}, shortCircuit: true };
+  }
+  return nextResolve(specifier, context);
+}`);
+  return spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      "--input-type=module",
+      "--eval",
+      `import "@debateai/obs-capture/install/runner"; import ${JSON.stringify(THROWING_MODULE)};`,
+    ],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: fixtureEnvironment("runner", spoolDirectory),
+      timeout: PROBE_TIMEOUT_MS,
+    },
+  );
 }
 
 function bootStallProbe(runtime: Runtime): {
@@ -1033,6 +1087,44 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
       expect(symlinkResult.status).toBe(1);
     }
     expect(readdirSync(symlinkTarget)).toEqual([]);
+  });
+
+  it.each(RUNTIMES)("%s refuses a real symlinked ancestor without writing through it", (runtime) => {
+    const root = makeScratchDirectory();
+    const namedParent = join(root, "named");
+    const physicalParent = join(root, "physical");
+    const physicalSpool = join(physicalParent, "spool");
+    mkdirSync(namedParent);
+    mkdirSync(physicalSpool, { recursive: true });
+    const linkedAncestor = join(namedParent, "linked-ancestor");
+    symlinkSync(physicalParent, linkedAncestor, "dir");
+
+    const result = bootFailureProbe({
+      mode: "static",
+      runtime,
+      spoolDirectory: join(linkedAncestor, "spool"),
+      withInstaller: true,
+    });
+
+    expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
+    expect(readdirSync(physicalSpool)).toEqual([]);
+  });
+
+  it("resolves the named directory once without a final-component swap window", () => {
+    const root = makeScratchDirectory();
+    const spoolDirectory = join(root, "named-spool");
+    const attackerDirectory = join(root, "attacker");
+    const resolutionMarker = join(root, "resolution-trace");
+    mkdirSync(spoolDirectory);
+    mkdirSync(attackerDirectory);
+
+    const result = finalComponentSwapProbe(spoolDirectory, attackerDirectory, resolutionMarker);
+
+    expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
+    expect(readFileSync(resolutionMarker, "utf8").trimEnd().split("\n")).toEqual(["realpathSync"]);
+    expect(lstatSync(spoolDirectory).isDirectory()).toBe(true);
+    expect(readdirSync(attackerDirectory)).toEqual([]);
+    expect(readdirSync(spoolDirectory).filter((name) => name.endsWith(".spool"))).toHaveLength(1);
   });
 
   it.each(["/", "/////"])("refuses filesystem-root spelling %j before any filesystem call", (spelling) => {
