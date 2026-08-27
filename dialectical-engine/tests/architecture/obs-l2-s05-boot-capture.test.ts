@@ -234,9 +234,12 @@ function writeOutcomeProbe(spoolDirectory: string, outcomes: readonly WriteOutco
   readonly distinctBuffers: number;
   readonly distinctContents: number;
   readonly raw: string;
+  readonly rawBytes: Buffer;
+  readonly serialization: Buffer;
   readonly result: ReturnType<typeof spawnSync>;
 } {
   const callMarker = join(spoolDirectory, "write-outcome-calls");
+  const serializationMarker = join(spoolDirectory, "write-outcome-serialization");
   const fsModuleUrl = asLoaderUrl(`
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
@@ -253,6 +256,7 @@ let callIndex = 0;
 export function writeSync(fd, buffer, offset, length) {
   const outcome = outcomes[Math.min(callIndex, outcomes.length - 1)] ?? "success";
   callIndex += 1;
+  if (buffers.size === 0) fs.writeFileSync(${JSON.stringify(serializationMarker)}, buffer);
   buffers.add(buffer);
   contents.add(createHash("sha256").update(buffer).digest("hex"));
   fs.appendFileSync(
@@ -298,7 +302,9 @@ export function resolve(specifier, context, nextResolve) {
     },
   );
   const spoolFile = readdirSync(spoolDirectory).find((name) => name.endsWith(".spool"));
-  const raw = spoolFile === undefined ? "" : readFileSync(join(spoolDirectory, spoolFile), "utf8");
+  const rawBytes = spoolFile === undefined ? Buffer.alloc(0) : readFileSync(join(spoolDirectory, spoolFile));
+  const raw = rawBytes.toString("utf8");
+  const serialization = readFileSync(serializationMarker);
   const callRows = readFileSync(callMarker, "utf8")
     .trimEnd()
     .split("\n")
@@ -311,6 +317,8 @@ export function resolve(specifier, context, nextResolve) {
     distinctBuffers: callRows.at(-1)?.distinctBuffers ?? 0,
     distinctContents: callRows.at(-1)?.distinctContents ?? 0,
     raw,
+    rawBytes,
+    serialization,
     result,
   };
 }
@@ -858,15 +866,26 @@ describe("S05 fatal-boundary installers", () => {
     "never fuses retry bytes after %s",
     (_name, outcomes, expectedCalls, expectedResult) => {
       const spoolDirectory = makeScratchDirectory();
-      const { calls, distinctBuffers, distinctContents, raw, result } = writeOutcomeProbe(
-        spoolDirectory,
-        outcomes,
-      );
+      const {
+        calls,
+        distinctBuffers,
+        distinctContents,
+        raw,
+        rawBytes,
+        serialization,
+        result,
+      } = writeOutcomeProbe(spoolDirectory, outcomes);
       expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
       expect(result.stderr).toContain(ERROR_TOKEN);
       expect(calls).toBe(expectedCalls);
-      expect(distinctBuffers).toBe(1);
-      expect(distinctContents).toBe(1);
+      expect.soft(distinctBuffers).toBe(1);
+      expect.soft(distinctContents).toBe(1);
+      expect
+        .soft(
+          rawBytes.equals(serialization.subarray(0, rawBytes.byteLength)),
+          "on-disk bytes must be a prefix of the single serialization",
+        )
+        .toBe(true);
       if (expectedResult === "empty") {
         expect(raw).toBe("");
       } else if (expectedResult === "record") {
