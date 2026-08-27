@@ -231,6 +231,7 @@ type WriteOutcome = "fail" | "half" | "success" | "zero";
 
 function writeOutcomeProbe(spoolDirectory: string, outcomes: readonly WriteOutcome[]): {
   readonly calls: number;
+  readonly distinctBuffers: number;
   readonly raw: string;
   readonly result: ReturnType<typeof spawnSync>;
 } {
@@ -244,11 +245,16 @@ export const lstatSync = fs.lstatSync;
 export const openSync = fs.openSync;
 export const realpathSync = fs.realpathSync;
 const outcomes = ${JSON.stringify(outcomes)};
+const buffers = new Set();
 let callIndex = 0;
 export function writeSync(fd, buffer, offset, length) {
   const outcome = outcomes[Math.min(callIndex, outcomes.length - 1)] ?? "success";
   callIndex += 1;
-  fs.appendFileSync(${JSON.stringify(callMarker)}, outcome + "\\n");
+  buffers.add(buffer);
+  fs.appendFileSync(
+    ${JSON.stringify(callMarker)},
+    JSON.stringify({ outcome, distinctBuffers: buffers.size }) + "\\n",
+  );
   if (outcome === "fail") {
     const error = new Error("WRITE_OUTCOME_FAILURE");
     error.code = "EIO";
@@ -285,8 +291,16 @@ export function resolve(specifier, context, nextResolve) {
   );
   const spoolFile = readdirSync(spoolDirectory).find((name) => name.endsWith(".spool"));
   const raw = spoolFile === undefined ? "" : readFileSync(join(spoolDirectory, spoolFile), "utf8");
-  const calls = readFileSync(callMarker, "utf8").trimEnd().split("\n").length;
-  return { calls, raw, result };
+  const callRows = readFileSync(callMarker, "utf8")
+    .trimEnd()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { readonly distinctBuffers: number });
+  return {
+    calls: callRows.length,
+    distinctBuffers: callRows.at(-1)?.distinctBuffers ?? 0,
+    raw,
+    result,
+  };
 }
 
 function spoolDirectoryTraceProbe(spoolDirectory: string): {
@@ -825,21 +839,29 @@ describe("S05 fatal-boundary installers", () => {
     ["mid-record failure then success", ["half", "fail", "success"], 3, "record"],
     ["all calls fail", ["fail"], 2, "empty"],
     ["zero progress", ["zero"], 2, "empty"],
+    ["half write then all later calls fail", ["half", "fail"], 3, "torn"],
+    ["half write then all later calls make zero progress", ["half", "zero"], 3, "torn"],
   ] as const)(
-    "leaves exactly one parseable record or zero bytes after %s",
+    "never fuses retry bytes after %s",
     (_name, outcomes, expectedCalls, expectedResult) => {
       const spoolDirectory = makeScratchDirectory();
-      const { calls, raw, result } = writeOutcomeProbe(spoolDirectory, outcomes);
+      const { calls, distinctBuffers, raw, result } = writeOutcomeProbe(spoolDirectory, outcomes);
       expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
       expect(result.stderr).toContain(ERROR_TOKEN);
       expect(calls).toBe(expectedCalls);
+      expect(distinctBuffers).toBe(1);
       if (expectedResult === "empty") {
         expect(raw).toBe("");
-      } else {
+      } else if (expectedResult === "record") {
         expect(raw.endsWith("\n")).toBe(true);
         const lines = raw.trimEnd().split("\n");
         expect(lines).toHaveLength(1);
         expect(JSON.parse(lines[0]!)).toMatchObject({ code: "OBS_CAPTURE_SELF", runtime: "runner" });
+      } else {
+        expect(raw).not.toBe("");
+        expect(raw.endsWith("\n")).toBe(false);
+        expect(raw.split("\n")).toHaveLength(1);
+        expect(() => JSON.parse(raw)).toThrow();
       }
     },
   );
@@ -1110,7 +1132,11 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
     expect(readdirSync(physicalSpool)).toEqual([]);
   });
 
-  it("resolves the named directory once without a final-component swap window", () => {
+  // Node has no openat-style primitive, so a check-to-open window remains after this single
+  // resolution. It is about 17 microseconds, depth-independent, requires pre-existing write
+  // access to the spool directory's parent, and is bounded by O_CREAT | O_EXCL | O_NOFOLLOW
+  // on a mode-0600 file. This test pins the single-resolution trace; it does not close that window.
+  it("resolves the normalized spool directory exactly once", () => {
     const root = makeScratchDirectory();
     const spoolDirectory = join(root, "named-spool");
     const attackerDirectory = join(root, "attacker");
