@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { join, relative, resolve, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +17,7 @@ const INSTALL_ENTRIES = Object.freeze([
   "scheduler.ts",
   "ui-client.ts",
 ]);
+const PROCESS_ENTRIES = Object.freeze(["api", "runner", "scheduler"] as const);
 
 type ImportKind = "dynamic" | "require" | "static" | "type";
 
@@ -280,8 +283,10 @@ function importLightProbe(entry: string): ReturnType<typeof spawnSync> {
       : 'if (loaded.PROCESS_HANDLERS_INSTALLED !== true) throw new Error("PROCESS_INSTALLER_EXPORT_MISSING");';
   const loaderSource = `
 export async function resolve(specifier, context, nextResolve) {
-  if (context.parentURL?.includes("/packages/obs-capture/install/") && !specifier.startsWith("node:")) {
-    throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
+  if (context.parentURL?.includes("/packages/obs-capture/install/")) {
+    if (specifier !== "node:fs" && specifier !== "node:crypto") {
+      throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
+    }
   }
   return nextResolve(specifier, context);
 }`;
@@ -293,8 +298,101 @@ export async function resolve(specifier, context, nextResolve) {
     {
       cwd: ROOT,
       encoding: "utf8",
-      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      env: { ...process.env, NODE_NO_WARNINGS: "1", OBS_SPOOL_DIR: "" },
     },
+  );
+}
+
+function deferredRuntimeProbe(entry: typeof PROCESS_ENTRIES[number], stayAlive: boolean): {
+  readonly armed: boolean;
+  readonly loaded: boolean;
+  readonly result: ReturnType<typeof spawnSync>;
+  readonly trace: string;
+} {
+  const scratch = mkdtempSync(join(tmpdir(), `obs-l2-s05-arm-${entry}-`));
+  const evaluatedMarker = join(scratch, "installer-evaluated");
+  const loadedMarker = join(scratch, "runtime-loaded");
+  const armedMarker = join(scratch, "runtime-armed");
+  const tracePath = join(scratch, "resolve-trace.ndjson");
+  const runtimeSource = `
+import { appendFileSync } from "node:fs";
+globalThis.__s05RuntimeLoaded?.();
+export function startCaptureRuntime({ runtime, spoolFd, installExitSink }) {
+  if (runtime !== ${JSON.stringify(entry)}) throw new Error("RUNTIME_ARGUMENT_MISMATCH");
+  if (spoolFd !== undefined && !Number.isInteger(spoolFd)) throw new Error("SPOOL_FD_ARGUMENT_INVALID");
+  if (typeof installExitSink !== "function") throw new Error("INSTALL_EXIT_SINK_ARGUMENT_MISSING");
+  installExitSink(() => undefined);
+  appendFileSync(${JSON.stringify(armedMarker)}, "armed\\n");
+  globalThis.__s05RuntimeArmed?.();
+}`;
+  const runtimeUrl = `data:text/javascript,${encodeURIComponent(runtimeSource)}`;
+  const loaderSource = `
+import { appendFileSync, existsSync } from "node:fs";
+export function resolve(specifier, context, nextResolve) {
+  appendFileSync(${JSON.stringify(tracePath)}, JSON.stringify({ specifier, parentURL: context.parentURL ?? null }) + "\\n");
+  if (context.parentURL?.includes("/packages/obs-capture/install/")) {
+    if (specifier === "node:fs" || specifier === "node:crypto") return nextResolve(specifier, context);
+    if (specifier === "@debateai/obs-capture/runtime") {
+      if (!existsSync(${JSON.stringify(evaluatedMarker)})) {
+        throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
+      }
+      return { url: ${JSON.stringify(runtimeUrl)}, shortCircuit: true };
+    }
+    throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
+  }
+  return nextResolve(specifier, context);
+}
+export function load(url, context, nextLoad) {
+  if (url === ${JSON.stringify(runtimeUrl)}) {
+    appendFileSync(${JSON.stringify(loadedMarker)}, "loaded\\n");
+  }
+  return nextLoad(url, context);
+}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent(loaderSource)}`;
+  const program = stayAlive ? `
+import { writeFileSync } from "node:fs";
+const nativeSetTimeout = globalThis.setTimeout;
+let armCallback;
+let armDelay;
+let armWasUnrefed = false;
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (armCallback === undefined) {
+    armCallback = () => callback(...args);
+    armDelay = delay;
+    return { unref() { armWasUnrefed = true; } };
+  }
+  return nativeSetTimeout(callback, delay, ...args);
+};
+const runtimeLoaded = new Promise((resolve) => { globalThis.__s05RuntimeLoaded = resolve; });
+const runtimeArmed = new Promise((resolve) => { globalThis.__s05RuntimeArmed = resolve; });
+await import("@debateai/obs-capture/install/${entry}");
+writeFileSync(${JSON.stringify(evaluatedMarker)}, "evaluated\\n");
+if (armDelay !== 0) throw new Error("RUNTIME_NOT_LOADED_WITHIN_ONE_MACROTASK:" + armDelay);
+if (!armWasUnrefed) throw new Error("RUNTIME_ARM_TIMER_NOT_UNREFED");
+await new Promise((resolve) => nativeSetTimeout(() => { armCallback(); resolve(); }, 0));
+await runtimeLoaded;
+await runtimeArmed;` : `import "@debateai/obs-capture/install/${entry}";`;
+  const result = spawnSync(
+    process.execPath,
+    ["--experimental-loader", loaderUrl, "--input-type=module", "--eval", program],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1", OBS_SPOOL_DIR: "" },
+      timeout: 5_000,
+    },
+  );
+  const trace = existsSync(tracePath) ? readFileSync(tracePath, "utf8") : "";
+  const loaded = existsSync(loadedMarker);
+  const armed = existsSync(armedMarker);
+  rmSync(scratch, { recursive: true, force: true });
+  return { armed, loaded, result, trace };
+}
+
+function normalizeProcessInstaller(source: string): string {
+  return source.replace(
+    /const RUNTIME = "(?:api|runner|scheduler)" as const;/u,
+    'const RUNTIME = "<runtime>" as const;',
   );
 }
 
@@ -321,6 +419,51 @@ describe("S05 import-light installer graph", () => {
       assertOutboundImportFence(relative(PACKAGE_ROOT, path), await readFile(path, "utf8"));
     }
   });
+
+  it("finds no unhandledRejection registration anywhere in the shipped obs-capture tree", async () => {
+    const registrations: string[] = [];
+    for (const path of await listImportSourceFiles(PACKAGE_ROOT)) {
+      const source = await readFile(path, "utf8");
+      if (source.includes("unhandledRejection")) {
+        registrations.push(relative(PACKAGE_ROOT, path));
+      }
+    }
+    expect(registrations).toEqual([]);
+  });
+
+  it("keeps process installers byte-identical apart from RUNTIME and free of crash overrides", async () => {
+    const sources = await Promise.all(PROCESS_ENTRIES.map(async (entry) =>
+      readFile(resolve(INSTALL_ROOT, `${entry}.ts`), "utf8")));
+    expect(new Set(sources.map(normalizeProcessInstaller)).size).toBe(1);
+    for (const source of sources) {
+      expect(source).not.toMatch(/process\s*\.\s*exit(?:Code)?\b/u);
+      expect(source).not.toMatch(/process\s*\.\s*on\s*\(\s*["']unhandledRejection["']/u);
+      expect(source.match(/\bopenSync\s*\(/gu)).toHaveLength(1);
+      expect(source.match(/\bwriteSync\s*\(/gu)).toHaveLength(1);
+    }
+  });
+
+  it.each(PROCESS_ENTRIES)(
+    "%s uses an unrefed zero-delay arm that does not hold prompt exit and arms when advanced",
+    (entry) => {
+      const promptExit = deferredRuntimeProbe(entry, false);
+      expect(
+        promptExit.result.status,
+        `prompt exit\nstdout=${promptExit.result.stdout}\nstderr=${promptExit.result.stderr}\ntrace=${promptExit.trace}`,
+      ).toBe(0);
+
+      // An unrefed zero-delay timer may win the teardown race under loader activity.
+      // The stay-alive arm below deterministically grades delay=0, unref(), load, and arming.
+      const staysAlive = deferredRuntimeProbe(entry, true);
+      expect(
+        staysAlive.result.status,
+        `stay alive\nstdout=${staysAlive.result.stdout}\nstderr=${staysAlive.result.stderr}\ntrace=${staysAlive.trace}`,
+      ).toBe(0);
+      expect(staysAlive.trace).toContain("@debateai/obs-capture/runtime");
+      expect(staysAlive.loaded).toBe(true);
+      expect(staysAlive.armed).toBe(true);
+    },
+  );
 
   it("proves the hoisted DB package is resolver-reachable while the source fence still denies it", () => {
     const requireFromObsCapture = createRequire(resolve(PACKAGE_ROOT, "src/import-graph-probe.cjs"));
