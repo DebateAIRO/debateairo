@@ -50,8 +50,10 @@ function configBooleanValue(name: string, fallback: boolean): boolean {
 function normalizedSpoolDirectory(value: string | undefined): string | undefined {
   if (value === undefined || !value.startsWith("/") || value.includes("\\")) return undefined;
   const segments = value.split("/").slice(1);
-  if (segments.some((segment) => segment === "." || segment === "..")) return undefined;
-  const finalComponentPath = value.replace(/\/+$/u, "") || "/";
+  if (segments.some((segment) => segment === "..")) return undefined;
+  const normalizedSegments = segments.filter((segment) => segment.length > 0 && segment !== ".");
+  if (normalizedSegments.length === 0) return undefined;
+  const finalComponentPath = "/" + normalizedSegments.join("/");
   try {
     if (lstatSync(finalComponentPath).isSymbolicLink()) return undefined;
     return realpathSync(value);
@@ -92,17 +94,23 @@ if (spoolDirectory !== undefined) {
   }
 }
 
-function writeComplete(fd: number, bytes: Uint8Array): void {
-  let offset = 0;
-  while (offset < bytes.byteLength) {
-    const remaining = bytes.byteLength - offset;
-    const written = writeSync(fd, bytes, offset, remaining);
+interface SpoolWriteAttempt {
+  readonly bytes: Uint8Array;
+  offset: number;
+}
+
+function writeComplete(fd: number, attempt: SpoolWriteAttempt): void {
+  while (attempt.offset < attempt.bytes.byteLength) {
+    const remaining = attempt.bytes.byteLength - attempt.offset;
+    const written = writeSync(fd, attempt.bytes, attempt.offset, remaining);
     if (!Number.isSafeInteger(written) || written <= 0 || written > remaining) {
       throw new Error("SPOOL_WRITE_INCOMPLETE");
     }
-    offset += written;
+    attempt.offset += written;
   }
 }
+
+let tierZeroWriteAttempt: SpoolWriteAttempt | undefined;
 
 function writeTierZeroFatalBoundaryRecord(): void {
   if (spoolFd === undefined || spoolFileIdentity === undefined) return;
@@ -110,7 +118,7 @@ function writeTierZeroFatalBoundaryRecord(): void {
   if (currentFile.dev !== spoolFileIdentity.device || currentFile.ino !== spoolFileIdentity.inode) {
     throw new Error("SPOOL_FD_IDENTITY_CHANGED");
   }
-  const bytes = Buffer.from(JSON.stringify({
+  const bytes = tierZeroWriteAttempt?.bytes ?? Buffer.from(JSON.stringify({
     occurred_at: new Date().toISOString(),
     environment: configValue("OBS_ENVIRONMENT", ENVIRONMENT_SEED),
     build_ref: configValue("OBS_BUILD_REF", BUILD_REF_SEED),
@@ -148,7 +156,8 @@ function writeTierZeroFatalBoundaryRecord(): void {
   if (bytes.byteLength > envelopeMaxBytes) {
     throw new Error("SPOOL_WRITE_INCOMPLETE");
   }
-  writeComplete(spoolFd, bytes);
+  tierZeroWriteAttempt ??= { bytes, offset: 0 };
+  writeComplete(spoolFd, tierZeroWriteAttempt);
 }
 
 let exitSink: FatalExitSink = writeTierZeroFatalBoundaryRecord;

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import {
   constants as fsConstants,
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -24,6 +25,10 @@ const FIXED_BOOT_ID = "00000000-0000-4000-8000-000000000505";
 const PROBE_TIMEOUT_MS = 5_000;
 const DYNAMIC_FAILURE_SETTLE_MS = 75;
 const FD_REUSE_PROBE_MAX_OPENS = 64;
+const BOOT_STALL_SEPARATOR_COUNT = 60_000;
+const BOOT_STALL_MAX_MS = 2_000;
+const BOOT_STALL_PROBE_TIMEOUT_MS = 10_000;
+const EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED = 16_384;
 
 type Runtime = typeof RUNTIMES[number];
 type ImportMode = "dynamic" | "static";
@@ -219,6 +224,179 @@ export function resolve(specifier, context, nextResolve) {
   const raw = spoolFile === undefined ? "" : readFileSync(join(spoolDirectory, spoolFile), "utf8");
   const calls = readFileSync(callMarker, "utf8").trimEnd().split("\n").length;
   return { calls, raw, result };
+}
+
+type WriteOutcome = "fail" | "half" | "success" | "zero";
+
+function writeOutcomeProbe(spoolDirectory: string, outcomes: readonly WriteOutcome[]): {
+  readonly calls: number;
+  readonly raw: string;
+  readonly result: ReturnType<typeof spawnSync>;
+} {
+  const callMarker = join(spoolDirectory, "write-outcome-calls");
+  const fsModuleUrl = asLoaderUrl(`
+import * as fs from "node:fs";
+export const constants = fs.constants;
+export const closeSync = fs.closeSync;
+export const fstatSync = fs.fstatSync;
+export const lstatSync = fs.lstatSync;
+export const openSync = fs.openSync;
+export const realpathSync = fs.realpathSync;
+const outcomes = ${JSON.stringify(outcomes)};
+let callIndex = 0;
+export function writeSync(fd, buffer, offset, length) {
+  const outcome = outcomes[Math.min(callIndex, outcomes.length - 1)] ?? "success";
+  callIndex += 1;
+  fs.appendFileSync(${JSON.stringify(callMarker)}, outcome + "\\n");
+  if (outcome === "fail") {
+    const error = new Error("WRITE_OUTCOME_FAILURE");
+    error.code = "EIO";
+    throw error;
+  }
+  if (outcome === "zero") return 0;
+  const writeLength = outcome === "half" ? Math.max(1, Math.floor(length / 2)) : length;
+  return fs.writeSync(fd, buffer, offset, writeLength);
+}`);
+  const loaderUrl = asLoaderUrl(`
+export function resolve(specifier, context, nextResolve) {
+  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/install/runner.ts")) {
+    return { url: ${JSON.stringify(fsModuleUrl)}, shortCircuit: true };
+  }
+  return nextResolve(specifier, context);
+}`);
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      "--input-type=module",
+      "--eval",
+      `import "@debateai/obs-capture/install/runner"; import ${JSON.stringify(THROWING_MODULE)};`,
+    ],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: fixtureEnvironment("runner", spoolDirectory),
+      timeout: PROBE_TIMEOUT_MS,
+    },
+  );
+  const spoolFile = readdirSync(spoolDirectory).find((name) => name.endsWith(".spool"));
+  const raw = spoolFile === undefined ? "" : readFileSync(join(spoolDirectory, spoolFile), "utf8");
+  const calls = readFileSync(callMarker, "utf8").trimEnd().split("\n").length;
+  return { calls, raw, result };
+}
+
+function spoolDirectoryTraceProbe(spoolDirectory: string): {
+  readonly result: ReturnType<typeof spawnSync>;
+  readonly trace: readonly Record<string, unknown>[];
+} {
+  const scratchDirectory = makeScratchDirectory();
+  const marker = join(scratchDirectory, "spool-directory-trace");
+  const fsModuleUrl = asLoaderUrl(`
+import * as fs from "node:fs";
+const mark = (row) => fs.appendFileSync(${JSON.stringify(marker)}, JSON.stringify(row) + "\\n");
+export const constants = fs.constants;
+export const closeSync = fs.closeSync;
+export const fstatSync = fs.fstatSync;
+export const writeSync = fs.writeSync;
+export function lstatSync(path) {
+  const result = fs.lstatSync(path);
+  mark({ call: "lstatSync", path, isSymlink: result.isSymbolicLink() });
+  return result;
+}
+export function realpathSync(path) {
+  const result = fs.realpathSync(path);
+  mark({ call: "realpathSync", path, result });
+  return result;
+}
+export function openSync(path, flags, mode) {
+  mark({ call: "openSync", path, flags, mode });
+  throw new Error("ROOT_OPEN_BLOCKED_BY_TEST");
+}`);
+  const loaderUrl = asLoaderUrl(`
+export function resolve(specifier, context, nextResolve) {
+  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/install/runner.ts")) {
+    return { url: ${JSON.stringify(fsModuleUrl)}, shortCircuit: true };
+  }
+  return nextResolve(specifier, context);
+}`);
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      "--input-type=module",
+      "--eval",
+      `await import("@debateai/obs-capture/install/runner");`,
+    ],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: fixtureEnvironment("runner", spoolDirectory),
+      timeout: PROBE_TIMEOUT_MS,
+    },
+  );
+  const trace = existsSync(marker)
+    ? readFileSync(marker, "utf8").trimEnd().split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
+    : [];
+  return { result, trace };
+}
+
+function bootStallProbe(runtime: Runtime): {
+  readonly appReachedAfterMs: number;
+  readonly result: ReturnType<typeof spawnSync>;
+  readonly spoolFiles: readonly string[];
+} {
+  const spoolDirectory = makeScratchDirectory();
+  const rejectedPath = spoolDirectory + "/" + "/".repeat(BOOT_STALL_SEPARATOR_COUNT) + "missing";
+  const program = `
+const started = performance.now();
+await import("@debateai/obs-capture/install/${runtime}");
+process.stdout.write(String(performance.now() - started));`;
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "--eval", program],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: fixtureEnvironment(runtime, rejectedPath),
+      timeout: BOOT_STALL_PROBE_TIMEOUT_MS,
+    },
+  );
+  return {
+    appReachedAfterMs: Number(result.stdout),
+    result,
+    spoolFiles: readdirSync(spoolDirectory).filter((name) => name.endsWith(".spool")),
+  };
+}
+
+function defaultEnvelopeSeedProbe(spoolDirectory: string, buildRef: string): {
+  readonly raw: string;
+  readonly result: ReturnType<typeof spawnSync>;
+} {
+  const environment = unsetFixtureEnvironment(spoolDirectory);
+  environment.OBS_BUILD_REF = buildRef;
+  delete environment.OBS_ENVELOPE_MAX_BYTES;
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "--eval",
+      `import "@debateai/obs-capture/install/runner"; import ${JSON.stringify(THROWING_MODULE)};`,
+    ],
+    { cwd: ROOT, encoding: "utf8", env: environment, timeout: PROBE_TIMEOUT_MS },
+  );
+  const spoolFile = readdirSync(spoolDirectory).find((name) => name.endsWith(".spool"));
+  return {
+    raw: spoolFile === undefined ? "" : readFileSync(join(spoolDirectory, spoolFile), "utf8"),
+    result,
+  };
 }
 
 function tierOneSwapProbe(runtime: Runtime, spoolDirectory: string): ReturnType<typeof spawnSync> {
@@ -586,6 +764,32 @@ describe("S05 fatal-boundary installers", () => {
     expect(JSON.parse(raw)).toMatchObject({ code: "OBS_CAPTURE_SELF", runtime: "runner" });
   });
 
+  it.each([
+    ["success", ["success"], 1, "record"],
+    ["short write then success", ["half", "success"], 2, "record"],
+    ["first-call failure then success", ["fail", "success"], 2, "record"],
+    ["mid-record failure then success", ["half", "fail", "success"], 3, "record"],
+    ["all calls fail", ["fail"], 2, "empty"],
+    ["zero progress", ["zero"], 2, "empty"],
+  ] as const)(
+    "leaves exactly one parseable record or zero bytes after %s",
+    (_name, outcomes, expectedCalls, expectedResult) => {
+      const spoolDirectory = makeScratchDirectory();
+      const { calls, raw, result } = writeOutcomeProbe(spoolDirectory, outcomes);
+      expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
+      expect(result.stderr).toContain(ERROR_TOKEN);
+      expect(calls).toBe(expectedCalls);
+      if (expectedResult === "empty") {
+        expect(raw).toBe("");
+      } else {
+        expect(raw.endsWith("\n")).toBe(true);
+        const lines = raw.trimEnd().split("\n");
+        expect(lines).toHaveLength(1);
+        expect(JSON.parse(lines[0]!)).toMatchObject({ code: "OBS_CAPTURE_SELF", runtime: "runner" });
+      }
+    },
+  );
+
   it("caps the Tier-0 envelope before the first write", () => {
     const spoolDirectory = makeScratchDirectory();
     const result = spawnSync(
@@ -607,6 +811,28 @@ describe("S05 fatal-boundary installers", () => {
     const spoolFile = readdirSync(spoolDirectory).find((name) => name.endsWith(".spool"));
     expect(spoolFile).toBeDefined();
     expect(readFileSync(join(spoolDirectory, spoolFile!), "utf8")).toBe("");
+  });
+
+  it("pins the exact default Tier-0 envelope seed at 16,384 bytes", () => {
+    const baselineDirectory = makeScratchDirectory();
+    const baseline = defaultEnvelopeSeedProbe(baselineDirectory, "x");
+    expect(baseline.result.status, `stdout=${baseline.result.stdout}\nstderr=${baseline.result.stderr}`).toBe(1);
+    expect(Buffer.byteLength(baseline.raw)).toBeGreaterThan(1);
+
+    const fixedOverheadBytes = Buffer.byteLength(baseline.raw) - 1;
+    const atCapBuildRefLength = EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED - fixedOverheadBytes;
+    expect(atCapBuildRefLength).toBeGreaterThan(0);
+
+    const atCapDirectory = makeScratchDirectory();
+    const atCap = defaultEnvelopeSeedProbe(atCapDirectory, "x".repeat(atCapBuildRefLength));
+    expect(atCap.result.status, `stdout=${atCap.result.stdout}\nstderr=${atCap.result.stderr}`).toBe(1);
+    expect(Buffer.byteLength(atCap.raw)).toBe(EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED);
+    expect(JSON.parse(atCap.raw)).toMatchObject({ code: "OBS_CAPTURE_SELF", runtime: "runner" });
+
+    const overCapDirectory = makeScratchDirectory();
+    const overCap = defaultEnvelopeSeedProbe(overCapDirectory, "x".repeat(atCapBuildRefLength + 1));
+    expect(overCap.result.status, `stdout=${overCap.result.stdout}\nstderr=${overCap.result.stderr}`).toBe(1);
+    expect(overCap.raw).toBe("");
   });
 
   it("refuses a predictable symlink target without writing outside the spool directory", () => {
@@ -671,6 +897,7 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
       spellingDirectory,
       spellingDirectory + "/",
       spellingDirectory + "//",
+      spellingDirectory + "/.",
     ].entries()) {
       const spellingResult = spawnSync(
         process.execPath,
@@ -691,6 +918,49 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
       expect(spellingResult.status).toBe(1);
       expect(readdirSync(spellingDirectory).filter((name) => name.endsWith(".spool"))).toHaveLength(index + 1);
     }
+
+    const interiorDotRoot = makeScratchDirectory();
+    const interiorDotDirectory = join(interiorDotRoot, "nested");
+    mkdirSync(interiorDotDirectory);
+    const interiorDotResult = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        `import "@debateai/obs-capture/install/runner"; import ${JSON.stringify(THROWING_MODULE)};`,
+      ],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: fixtureEnvironment("runner", interiorDotRoot + "/./nested"),
+        timeout: PROBE_TIMEOUT_MS,
+      },
+    );
+    expect(interiorDotResult.status).toBe(1);
+    expect(readdirSync(interiorDotDirectory).filter((name) => name.endsWith(".spool"))).toHaveLength(1);
+
+    const dotDotDirectory = join(spellingDirectory, "sub");
+    mkdirSync(dotDotDirectory);
+    const dotDotResult = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        `import "@debateai/obs-capture/install/runner"; import ${JSON.stringify(THROWING_MODULE)};`,
+      ],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: fixtureEnvironment("runner", spellingDirectory + "/sub/.."),
+        timeout: PROBE_TIMEOUT_MS,
+      },
+    );
+    expect(dotDotResult.status).toBe(1);
+    expect(readdirSync(spellingDirectory).filter((name) => name.endsWith(".spool"))).toHaveLength(4);
 
     const relativeDirectory = makeScratchDirectory();
     const relativeResult = spawnSync(
@@ -743,7 +1013,7 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
     const symlinkDirectory = join(symlinkRoot, "spool-link");
     mkdirSync(symlinkTarget);
     symlinkSync(symlinkTarget, symlinkDirectory, "dir");
-    for (const symlinkSpelling of [symlinkDirectory, symlinkDirectory + "/"]) {
+    for (const symlinkSpelling of [symlinkDirectory, symlinkDirectory + "/", symlinkDirectory + "/."]) {
       const symlinkResult = spawnSync(
         process.execPath,
         [
@@ -764,6 +1034,25 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
     }
     expect(readdirSync(symlinkTarget)).toEqual([]);
   });
+
+  it.each(["/", "/////"])("refuses filesystem-root spelling %j before any filesystem call", (spelling) => {
+    const { result, trace } = spoolDirectoryTraceProbe(spelling);
+    expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+    expect(trace).toEqual([]);
+  });
+
+  it.each(RUNTIMES)(
+    "%s rejects a large separator run without delaying boot",
+    (runtime) => {
+      const { appReachedAfterMs, result, spoolFiles } = bootStallProbe(runtime);
+      expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(spoolFiles).toEqual([]);
+      expect(appReachedAfterMs).toBeLessThan(BOOT_STALL_MAX_MS);
+    },
+  );
 
   it.each(RUNTIMES)("%s silently degrades when the exit spool cannot be opened", (runtime) => {
     const absentParent = join(makeScratchDirectory(), "absent", "nested");
