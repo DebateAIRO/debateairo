@@ -232,11 +232,13 @@ type WriteOutcome = "fail" | "half" | "success" | "zero";
 function writeOutcomeProbe(spoolDirectory: string, outcomes: readonly WriteOutcome[]): {
   readonly calls: number;
   readonly distinctBuffers: number;
+  readonly distinctContents: number;
   readonly raw: string;
   readonly result: ReturnType<typeof spawnSync>;
 } {
   const callMarker = join(spoolDirectory, "write-outcome-calls");
   const fsModuleUrl = asLoaderUrl(`
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 export const constants = fs.constants;
 export const closeSync = fs.closeSync;
@@ -246,14 +248,20 @@ export const openSync = fs.openSync;
 export const realpathSync = fs.realpathSync;
 const outcomes = ${JSON.stringify(outcomes)};
 const buffers = new Set();
+const contents = new Set();
 let callIndex = 0;
 export function writeSync(fd, buffer, offset, length) {
   const outcome = outcomes[Math.min(callIndex, outcomes.length - 1)] ?? "success";
   callIndex += 1;
   buffers.add(buffer);
+  contents.add(createHash("sha256").update(buffer).digest("hex"));
   fs.appendFileSync(
     ${JSON.stringify(callMarker)},
-    JSON.stringify({ outcome, distinctBuffers: buffers.size }) + "\\n",
+    JSON.stringify({
+      outcome,
+      distinctBuffers: buffers.size,
+      distinctContents: contents.size,
+    }) + "\\n",
   );
   if (outcome === "fail") {
     const error = new Error("WRITE_OUTCOME_FAILURE");
@@ -294,10 +302,14 @@ export function resolve(specifier, context, nextResolve) {
   const callRows = readFileSync(callMarker, "utf8")
     .trimEnd()
     .split("\n")
-    .map((line) => JSON.parse(line) as { readonly distinctBuffers: number });
+    .map((line) => JSON.parse(line) as {
+      readonly distinctBuffers: number;
+      readonly distinctContents: number;
+    });
   return {
     calls: callRows.length,
     distinctBuffers: callRows.at(-1)?.distinctBuffers ?? 0,
+    distinctContents: callRows.at(-1)?.distinctContents ?? 0,
     raw,
     result,
   };
@@ -841,15 +853,20 @@ describe("S05 fatal-boundary installers", () => {
     ["zero progress", ["zero"], 2, "empty"],
     ["half write then all later calls fail", ["half", "fail"], 3, "torn"],
     ["half write then all later calls make zero progress", ["half", "zero"], 3, "torn"],
+    ["two half writes then all later calls fail", ["half", "half", "fail"], 4, "torn"],
   ] as const)(
     "never fuses retry bytes after %s",
     (_name, outcomes, expectedCalls, expectedResult) => {
       const spoolDirectory = makeScratchDirectory();
-      const { calls, distinctBuffers, raw, result } = writeOutcomeProbe(spoolDirectory, outcomes);
+      const { calls, distinctBuffers, distinctContents, raw, result } = writeOutcomeProbe(
+        spoolDirectory,
+        outcomes,
+      );
       expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
       expect(result.stderr).toContain(ERROR_TOKEN);
       expect(calls).toBe(expectedCalls);
       expect(distinctBuffers).toBe(1);
+      expect(distinctContents).toBe(1);
       if (expectedResult === "empty") {
         expect(raw).toBe("");
       } else if (expectedResult === "record") {
