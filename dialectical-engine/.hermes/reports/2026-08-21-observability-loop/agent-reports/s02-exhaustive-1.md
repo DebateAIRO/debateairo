@@ -1,0 +1,15 @@
+- The absolute packet was precise about the tiny code change and prevented me from reopening S02's ratified base work.
+- The ticket history was useful context, but `hermes kanban show` truncated both text and JSON output; reading 32 comments required repeated indexed `jq` slices.
+- The ticket's top-level metadata still says `todo`, unassigned, and scratch while the latest Router comment carries the real authorization; that mismatch forces judgment the typed-state protocol says should be unnecessary.
+- The requested L2 addendum plan was absent from this worktree, so I had to infer that the mission's main docs checkout held the authoritative copy.
+- Section 6.1 names base `7a3ff39`, while the packet names `7afdbe5`; I followed the packet's explicit constants, but the one-character disagreement should be corrected.
+- The packet says the TS2366 question was measured in neither direction, yet older ticket comments describe scratch mutation results with TS2366; I interpreted the charge as requiring a fresh in-worktree measurement anyway.
+- I nearly added the exhaustive default before the fifth-member probe, which would have changed the compiler failure from fall-through TS2366 to a `never`-carrier error and answered the wrong question.
+- Running the mutation first produced a clean discriminator: exactly one new TS2366, followed by restoration to the nine-diagnostic baseline after revert.
+- The audit's file-level substring rule is blunt, but its before/after array made the charged row easy to isolate without touching the frozen installer findings.
+- `pnpm generate:contract` was fast and removed ambiguity about parent-checkout module resolution before the typecheck work.
+- My first containment-filter attempt failed because macOS `awk` treats `index` as a built-in; renaming the loop variable fixed the probe without changing the evidence target.
+- The explicit instruction against proxy tests was valuable: the compiler mutation directly pins the property, while another happy-path Vitest assertion would only add ceremony.
+- The phrase "entire surface is two files" conflicts literally with the mandatory third self-report path; I treated this report as an operational artifact outside the product/test file contract.
+- The most useful handoff evidence is the delta, not the command exit: `audit:source` remains nonzero while the charged registry row is demonstrably gone.
+- For the next seat, preserve the order: full comment scan, contract generation, pre-default mutation, revert, minimal default, then TBP containment and exact scope proof.

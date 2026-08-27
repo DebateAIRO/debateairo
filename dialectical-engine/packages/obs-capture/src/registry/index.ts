@@ -1,5 +1,6 @@
 import {
   CONDITION_MARKS,
+  exhaustive,
   type ConditionMark,
 } from "@debateai/kernel";
 
@@ -599,6 +600,8 @@ function validatesDeclaration(
         declaration.minimum,
         declaration.maximum,
       );
+    default:
+      return exhaustive(declaration);
   }
 }
 
