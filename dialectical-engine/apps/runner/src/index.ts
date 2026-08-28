@@ -2504,23 +2504,58 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    fn: async (dispatch: { runId: string; workItemId: string }) => {
-      try {
-        const result = await input.runner.executeWorkItem(dispatch.workItemId);
-        return result.kind === "COMPLETED"
-          ? { kind: result.kind, answerId: result.answerId }
-          : { kind: result.kind };
-      } catch (error) {
-        const recorded = await input.failures.recordTerminalFailure({
-          runId: dispatch.runId,
-          workItemId: dispatch.workItemId,
-          reason: runnerTerminalFailureReason(error)
-        });
-        if (!recorded) {
-          throw new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", dispatch.workItemId);
+    fn: async (dispatch: { runId: string; workItemId: string }, hatchetContext) => {
+      const capture = await import("@debateai/obs-capture").catch(() => undefined);
+      const observedRetryCount = hatchetContext?.retryCount?.();
+      const attemptIndex = typeof observedRetryCount === "number"
+        && Number.isSafeInteger(observedRetryCount)
+        && observedRetryCount >= 0
+        ? observedRetryCount
+        : 0;
+      const execute = async () => {
+        try {
+          const result = await input.runner.executeWorkItem(dispatch.workItemId);
+          return result.kind === "COMPLETED"
+            ? { kind: result.kind, answerId: result.answerId }
+            : { kind: result.kind };
+        } catch (error) {
+          capture?.emit(Object.freeze({
+            code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+            error,
+            taxonomy_class: "JOB_FAILURE",
+            capture_point: "job",
+            disposition: "THROWN",
+            source: "hatchet",
+            attempt_index: attemptIndex
+          }));
+          const recorded = await input.failures.recordTerminalFailure({
+            runId: dispatch.runId,
+            workItemId: dispatch.workItemId,
+            reason: runnerTerminalFailureReason(error)
+          });
+          if (!recorded) {
+            const recordingFailure = new TypedDomainError(
+              "RUNNER_FAILURE_STATE_NOT_RECORDED",
+              dispatch.workItemId
+            );
+            capture?.emit(Object.freeze({
+              code: recordingFailure.code,
+              error: recordingFailure,
+              taxonomy_class: "JOB_FAILURE",
+              capture_point: "job",
+              disposition: "HANDLED",
+              source: "hatchet",
+              attempt_index: attemptIndex
+            }));
+          }
+          throw error;
         }
-        throw error;
-      }
+      };
+      if (capture === undefined) return execute();
+      return capture.runWithObsContext(Object.freeze({
+        run_ref: Object.freeze({ kind: "run", value: dispatch.runId }),
+        work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
+      }), execute);
     }
   });
 }
@@ -2539,21 +2574,44 @@ export function createPostgresProviderGateway(
   });
   return {
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
-      if (request.runId !== null) await budget.assertModelAttemptAllowed(request.runId);
-      const consumed = await ledger.countModelAttempts({
-        runId: request.runId,
-        workItemId: request.subjectItemId,
-        contractHash: request.contractHash,
-        callSiteKey: request.callSiteKey
-      });
-      const remaining = remainingProviderAttempts(request.bound.maxAttempts, consumed);
-      if (remaining <= 0) {
-        throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
-      }
-      return http.call({
-        ...request,
-        bound: { ...request.bound, maxAttempts: remaining }
-      });
+      const capture = await import("@debateai/obs-capture").catch(() => undefined);
+      const execute = async () => {
+        if (request.runId !== null) await budget.assertModelAttemptAllowed(request.runId);
+        const consumed = await ledger.countModelAttempts({
+          runId: request.runId,
+          workItemId: request.subjectItemId,
+          contractHash: request.contractHash,
+          callSiteKey: request.callSiteKey
+        });
+        const remaining = remainingProviderAttempts(request.bound.maxAttempts, consumed);
+        if (remaining <= 0) {
+          throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
+        }
+        try {
+          return await http.call({
+            ...request,
+            bound: { ...request.bound, maxAttempts: remaining }
+          });
+        } catch (error) {
+          capture?.emit(Object.freeze({
+            code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+            error,
+            taxonomy_class: "PROVIDER_EXHAUSTED",
+            capture_point: "provider",
+            disposition: "THROWN",
+            source: "first_party"
+          }));
+          throw error;
+        }
+      };
+      if (capture === undefined) return execute();
+      const ambient = capture.getObsContext();
+      return capture.runWithObsContext(Object.freeze({
+        ...ambient,
+        ...(request.runId === null
+          ? {}
+          : { run_ref: Object.freeze({ kind: "run", value: request.runId }) })
+      }), execute);
     }
   };
 }
