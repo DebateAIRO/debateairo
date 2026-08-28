@@ -71,15 +71,35 @@ import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
 
+export function apiOperationalErrorDiagnostic(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  const record = error !== null && typeof error === "object"
+    ? error as Readonly<{ code?: unknown; message?: unknown; name?: unknown }>
+    : undefined;
+  if (typeof record?.code === "string" && /^[A-Z0-9_]{2,32}$/u.test(record.code)) {
+    return `DEPENDENCY_${record.code}`;
+  }
+  if (typeof record?.message === "string" && /^[A-Z][A-Z0-9_]{2,63}$/u.test(record.message)) {
+    return record.message;
+  }
+  if (typeof record?.name === "string") {
+    const classCode = record.name.replace(/([a-z])([A-Z])/gu, "$1_$2").toUpperCase();
+    if (/^[A-Z][A-Z0-9_]{2,63}$/u.test(classCode)) return classCode;
+  }
+  return "UNEXPECTED_ERROR";
+}
+
 export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
@@ -198,6 +218,7 @@ export type AskPrincipal =
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
+  readonly recovery?: RecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
@@ -415,7 +436,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
-  api.setErrorHandler((error, _request, reply) => {
+  api.setErrorHandler((error, request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
       // the one connection instead of fabricating a terminal SSE event (DR-115)
@@ -455,6 +476,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : authFlow ? knownError.code
         : argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE
           : askRefusal ? knownError.code : "INTERNAL_ERROR";
+    if (statusCode >= 500) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.request.failed",
+        requestId: request.id,
+        method: request.method,
+        route: request.routeOptions.url,
+        diagnostic: apiOperationalErrorDiagnostic(knownError)
+      })));
+    }
     return reply.status(statusCode).send({
       error: errorCode,
       message: statusCode >= 500 ? errorCode : knownError.message
@@ -732,6 +762,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? request.body as Record<string, unknown>
         : {};
       const response = await options.registration!.resendVerification({
+        email: typeof body.email === "string" ? body.email : ""
+      }, sourceFor(request));
+      return reply.status(202).send(response);
+    });
+  }
+
+  if (options.recovery !== undefined) {
+    api.post("/v1/auth/recovery/start", routePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      const response = await options.recovery!.start({
         email: typeof body.email === "string" ? body.email : ""
       }, sourceFor(request));
       return reply.status(202).send(response);

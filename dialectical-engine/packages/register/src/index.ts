@@ -14,6 +14,8 @@ import {
 } from "@debateai/kernel";
 import { AUTH_POLICY_REGISTER_ROWS } from "./auth-policy.js";
 import { MFA_POLICY_REGISTER_ROW } from "./mfa-policy.js";
+import { PRODUCT_ROLE_POLICY_REGISTER_ROW } from "./product-role-policy.js";
+import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
 import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
@@ -463,44 +465,76 @@ export function resolveScoringOperator(
 }
 
 export async function persistBootstrapRegister(pool: Pool, bootstrap: BootstrapRegister): Promise<void> {
+  const rows = [
+    ...bootstrapKeys.map((rowKey) => Object.freeze({
+      rowKey,
+      value: bootstrap.values[rowKey],
+      sourceRef: bootstrap.resolution[rowKey]
+    })),
+    ...AUTH_POLICY_REGISTER_ROWS,
+    MFA_POLICY_REGISTER_ROW,
+    SESSION_POLICY_REGISTER_ROW,
+    RECOVERY_POLICY_REGISTER_ROW,
+    PRODUCT_ROLE_POLICY_REGISTER_ROW
+  ];
+  const expectedRowCount = bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 4;
+  const canonicalJson = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+    if (typeof value === "object" && value !== null) {
+      return `{${Object.entries(value)
+        .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
+        .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`)
+        .join(",")}}`;
+    }
+    return JSON.stringify(value);
+  };
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    for (const key of bootstrapKeys) {
-      await client.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($1, $2, $3::jsonb, $4)
-         ON CONFLICT (register_version, row_key) DO NOTHING`,
-        [bootstrap.registerVersion, key, JSON.stringify(bootstrap.values[key]), bootstrap.resolution[key]]
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('debateai:bootstrap-register',0))"
+    );
+    const version = (await client.query<{ row_count: number; sealed: boolean }>(
+      "SELECT row_count,sealed FROM register.register_version WHERE register_version=$1",
+      [bootstrap.registerVersion]
+    )).rows[0];
+    const persisted = await client.query<{
+      row_key: string;
+      value_json: unknown;
+      source_ref: string;
+    }>(`
+      SELECT row_key,value_json,source_ref FROM register.register_row
+      WHERE register_version=$1 ORDER BY row_key
+    `, [bootstrap.registerVersion]);
+    if (version !== undefined || persisted.rows.length > 0) {
+      if (version === undefined || !version.sealed || Number(version.row_count) !== expectedRowCount
+        || persisted.rows.length !== expectedRowCount) {
+        throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
+      }
+      const expected = new Map<string, (typeof rows)[number]>(
+        rows.map((row) => [row.rowKey, row])
       );
+      for (const row of persisted.rows) {
+        const wanted = expected.get(row.row_key);
+        if (wanted === undefined || row.source_ref !== wanted.sourceRef
+          || canonicalJson(row.value_json) !== canonicalJson(wanted.value)) {
+          throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
+        }
+      }
+      await client.query("COMMIT");
+      return;
     }
-    for (const row of AUTH_POLICY_REGISTER_ROWS) {
+    for (const row of rows) {
       await client.query(
         `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($1, $2, $3::jsonb, $4)
-         ON CONFLICT (register_version, row_key) DO NOTHING`,
+         VALUES ($1, $2, $3::jsonb, $4)`,
         [bootstrap.registerVersion, row.rowKey, JSON.stringify(row.value), row.sourceRef]
       );
     }
     await client.query(
-      `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-       VALUES ($1, $2, $3::jsonb, $4)
-       ON CONFLICT (register_version, row_key) DO NOTHING`,
-      [bootstrap.registerVersion, MFA_POLICY_REGISTER_ROW.rowKey,
-        JSON.stringify(MFA_POLICY_REGISTER_ROW.value), MFA_POLICY_REGISTER_ROW.sourceRef]
-    );
-    await client.query(
-      `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-       VALUES ($1, $2, $3::jsonb, $4)
-       ON CONFLICT (register_version, row_key) DO NOTHING`,
-      [bootstrap.registerVersion, SESSION_POLICY_REGISTER_ROW.rowKey,
-        JSON.stringify(SESSION_POLICY_REGISTER_ROW.value), SESSION_POLICY_REGISTER_ROW.sourceRef]
-    );
-    await client.query(
       `INSERT INTO register.register_version (register_version, row_count, sealed)
-       VALUES ($1, $2, true)
-       ON CONFLICT (register_version) DO NOTHING`,
-      [bootstrap.registerVersion, bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 2]
+       VALUES ($1, $2, true)`,
+      [bootstrap.registerVersion, expectedRowCount]
     );
     await client.query("COMMIT");
   } catch (error) {
@@ -530,11 +564,13 @@ export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRe
 
 export {
   loadApiEnvironment,
+  loadDevelopmentCommandEnvironment,
   loadLivenessEnvironment,
   loadMigrationEnvironment,
   loadReplaySelfTestEnvironment,
   loadRunnerEnvironment,
-  loadSettlementEnvironment
+  loadSettlementEnvironment,
+  parseApiEnvironment
 } from "./runtime-environment.js";
 
 export {
@@ -562,3 +598,23 @@ export {
   type SessionPolicy,
   type SessionPolicyValue
 } from "./session-policy.js";
+export {
+  RECOVERY_POLICY_REGISTER_ROW,
+  RECOVERY_POLICY_ROW_KEY,
+  readRecoveryPolicy,
+  recoveryPolicyFromRegisterRows,
+  type RecoveryPolicy,
+  type RecoveryPolicyRegisterRow,
+  type RecoveryPolicyValue
+} from "./recovery-policy.js";
+export {
+  PRODUCT_ROLE_IDS,
+  PRODUCT_ROLE_POLICY_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_ROW_KEY,
+  productRolePolicyFromRegisterRows,
+  readProductRolePolicy,
+  type ProductRole,
+  type ProductRoleId,
+  type ProductRolePolicy,
+  type ProductRolePolicyRegisterRow
+} from "./product-role-policy.js";

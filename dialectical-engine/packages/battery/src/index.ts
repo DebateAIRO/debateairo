@@ -248,8 +248,32 @@ export interface ClaimedWorkItem {
   readonly runId: string | null;
 }
 
+export interface DispatchableWorkItem {
+  readonly runId: string;
+  readonly workItemId: string;
+}
+
 export class WorkItemRepository {
   constructor(private readonly pool: Pool) {}
+
+  async listDispatchable(limit: number): Promise<readonly DispatchableWorkItem[]> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1_000) {
+      throw new TypeError("Dispatchable work limit must be an integer between 1 and 1000");
+    }
+    const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
+      `SELECT work_item_id, run_id
+       FROM core.work_item
+       WHERE run_id IS NOT NULL
+         AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
+       ORDER BY created_at_seq, work_item_id
+       LIMIT $1`,
+      [limit]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      workItemId: row.work_item_id
+    })));
+  }
 
   async enqueue(input: EnqueueWorkInput): Promise<string> {
     return withWriteTransaction(this.pool, async (client) => {

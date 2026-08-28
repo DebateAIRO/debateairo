@@ -208,3 +208,136 @@ of the file is impossible without self-certification. Fix specified: pin
 **content, not bytes**, via a canonical format-independent projection
 ("Pg0-b", a Router act). **S17 must not be dispatched against its bundle-hash
 criterion until Pg0-b exists.**
+
+## Batch 7 — V rulings, 2026-08-22 (id policy + roster restart)
+
+- **`id` parameters: DECLARED KINDS, NOT SHAPES.** An `id` template parameter
+  must name WHICH id it is — `run_id`, `node_id`, `debate_id` — from a closed
+  list of lawful kinds. Provenance, not pattern. A session id or asker id has no
+  lawful kind to declare, so it becomes **inexpressible** rather than merely
+  rejected by a regex. This settles the residual the security lens proved
+  unfixable by shape: a bare UUID is the ordinary form of both a lawful run id
+  and an unlawful session id, so no pattern can separate them. Supersedes the
+  shape-matching approach for the `id` type; the shape checks remain as a
+  secondary sanity filter, never as the guarantee.
+
+- **ROSTER AMENDMENT A5 — the trifecta.** V verbatim: *"restart the
+  orchestration mission. Opus. 5 coordinator, Codex coder agent and only Grok on
+  the review. I want to see how this trifecta works."*
+
+```yaml
+loop_ownership:                       # amended; supersedes A3/A4
+  coordination:  [claude-opus-5]      # orchestrator / Claude-Router seat
+  programming:   [codex@gpt-5.6-sol]  # sole coder, unchanged
+  qa_review:     [grok-4.6]           # SOLE reviewer — Opus is OFF review
+  architecture:  [claude-opus-5]      # retained from A4 for plan corrections
+```
+
+  Consequences: **A3's Grok decommission is LIFTED** (Router-probed `ALIVE`
+  before seating — verified, not assumed). **Claude Opus is removed from the
+  review lenses.** The three-blind-lens diamond becomes a **single Grok
+  reviewer**, which is a deliberate reduction in review redundancy: V wants to
+  observe this configuration. Recorded plainly so the trade is visible — the
+  three-lens diamond caught, across L1 and L2 alone, an evidence-integrity
+  violation, a triple-confirmed permission blocker, an excluded-zone breach with
+  an existence oracle, an undeployable migration, and a validator that admitted
+  card numbers. A single reviewer carries none of that redundancy; findings that
+  survived only because a second lens disagreed with a first will not recur.
+  This is V's call to make and it is made.
+
+### Batch 7 correction — A5 was recorded TOO BROADLY (Router error, 2026-08-22)
+
+V clarified: *"i only asked that grok reviews the code by itself. Other things,
+Opus reviewers gotta get fired with Grok."*
+
+The Router recorded A5 as removing Claude Opus from **all** review. That is
+wrong. The correct split:
+
+```yaml
+review_ownership:                     # A5, corrected
+  code_review:      [grok-4.6]        # Grok ALONE — implementation diffs / slices
+  everything_else:  [grok-4.6, claude-opus-5]   # Grok AND Opus, fired together
+```
+
+**CODE REVIEW — Grok solo.** Implementation slices: the diff, its tests, its
+RED→GREEN evidence, its file contract.
+
+**ALL OTHER REVIEW — Grok + Opus, dispatched together.** Plan and architecture
+reviews (the C2 planning diamond, FinalPlan gates), stage/integrity gates,
+ticketization diff-checks (H6A), QA→ARCH corrections, and any pin/criterion
+adjudication. These fire as parallel independent seats, blind to each other,
+exactly as the earlier diamond did.
+
+Consequence for the redundancy note recorded above: it applies **only to code
+review**, which is a deliberate, bounded experiment. The cross-checking that
+caught the excluded-zone breach and the criterion defects lives in the non-code
+gates, and that redundancy is **retained**.
+
+The in-flight Grok review of S02 (`t_8e040ec2`) is a CODE review and is
+therefore correctly solo — it continues unchanged.
+
+## Batch 8 — V rulings, 2026-08-26 (zone boundary gate)
+
+- **Zone-file existence checks: GROK'S STRICTER RULE ADOPTED — no filesystem
+  metadata on zone files at all.** No content reads, no imports, no directory
+  listing, and specifically no hash/size/mtime/mode of the zone-internal files;
+  no SQL or schema query against `identity.*`. The three route mounts are proven
+  by the resolver's TEXT read of `apps/api/src/index.ts`, not by filesystem or
+  HTTP. The identity-table deny set is a string list that gets no existence
+  check of any kind. Opus's bounded-stat proposal is REJECTED as specification
+  (its reasoning — that the manifest already names the paths in plaintext — was
+  accepted as direction but not as licence). Accepted cost, stated plainly: a
+  rename of a zone file will not be detected by this mission's own gate.
+
+- **`apps/api/src/mfa.ts`: ZONE FOR NOW, revisit at the security mission.**
+  Added to the zone manifest provisionally so its errors become the anonymous
+  daily counter rather than fully-captured shared-infrastructure frames. Closes
+  the merge-borne leak without foreclosing the permanent answer. Must be in the
+  manifest **before** the lane merges onto the `dev`-derived integration base.
+
+- **Zone-boundary resolver custody: ORDINARY SHARED FIXTURE.** `tests/support/zone-boundary.ts`
+  is protected by the existing rule making `tests/support/**` read-only to every
+  lane — which is what defeats the attack (a lane editing the resolver to point
+  at a non-existent block, so the safety test passes while guarding nothing).
+  It does NOT join the OBS-R104 self-modification set; that set stays scoped to
+  artifacts the fix agent could alter at RUNTIME, and this file is never loaded
+  by any running process.
+
+## Batch 9 — 2026-08-26
+
+- **ROSTER A6 (V): Claude Opus reviews CODE until Grok's balance is restored.**
+  Grok's Build usage balance is exhausted (HTTP 402, confirmed by a second fresh
+  probe). Under A5 it was the sole code reviewer, so code review had no seat at
+  all. Opus takes code review as a TEMPORARY substitution; the Grok experiment
+  resumes the moment credit is added. **The record will state which reviewer
+  saw which slice**, so the comparison V is running stays honest instead of
+  silently mixed. Non-code gates continue with the seats available.
+
+- **S07 OWNERSHIP — ARCHITECTURE DECIDED (no V ruling required).** Neither
+  proposed route was correct; both assumed a boundary had to move. **S06 already
+  owns the branch under its existing contract**: at lane base `7a3ff39` the
+  `if (!recorded)` branch is at `:2519-2521`, inside S06's allowed
+  `task-catch (declareHatchetWalkingSkeletonTask :2494-2526)`, while S06's
+  readonly pin is `:2514` only and does not reach it. **No boundary moves; the
+  criterion relocates.** OBS-R064 moves from S07's GREEN to S06's, with S07's
+  `forbidden:` retaining `task-catch`/`gateway-seam` verbatim — load-bearing.
+  S06 is reworked ONE round as a **contract amendment, not a defect return** —
+  the worker is charged no defect — and this is the cheapest possible moment
+  because S06's review had not yet been performed, so no approved work is
+  invalidated.
+
+  Route (b), a carve-out inside an S06-owned file, was rejected on three
+  independent grounds: it would have created the mission's first *sub-declaration*
+  region (two owners inside one function body — a new region grammar worse than
+  the lawful two-regions-one-file split already in use); S06's peer-reviewed
+  artifact would not have been the shipped artifact; and it would have routed
+  runner task-failure semantics to a reviewer scoped to kernel/db error
+  construction.
+
+  **Optional, non-blocking, default NO:** whether the branch should end as an
+  OBS-R063-style wrapper carrying `cause` rather than direct propagation. Saying
+  yes would flip L3's in-lane order to S07→S06, reversing the epoch-1 dispatch,
+  so it is V's call — but the lane is released now and not held on it.
+
+  Residual noted, out of scope: `acceptance/main.ts:105-113` has the same
+  defect shape and `acceptance/**` is granted to no slice.

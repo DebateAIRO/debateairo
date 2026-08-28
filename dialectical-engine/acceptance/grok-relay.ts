@@ -74,12 +74,20 @@ function parseGrokEnvelope(stdout: string): {
 
 const grokAdapter: CliRelayAdapter = {
   maker: XAI_MAKER,
+  authEnvironmentKeys: ["XAI_API_KEY"],
+  testEnvironmentKeys: [
+    "FAKE_GROK_ALWAYS_FAIL",
+    "FAKE_GROK_CAPTURED_ENVELOPE",
+    "FAKE_GROK_COST_ABSENT",
+    "FAKE_GROK_MODEL_USAGE_NON_OBJECT"
+  ],
   failureCode: "GROK_CLI_FAILED",
   timeoutCode: "GROK_CLI_TIMEOUT",
   buildArguments: (prompt) => [
     "--single", prompt,
     "--output-format", "json",
     "--verbatim",
+    "--sandbox", "read-only",
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
@@ -122,6 +130,7 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
   return Object.freeze({
     port: server.port,
     baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
     model: handshake.model,
     maker: XAI_MAKER,
     handshakeCostUsd: handshake.costUsd,

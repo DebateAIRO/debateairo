@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://debateai.local/schemas/account-recovery-state-machine.v1.json",
+  "title": "DebateAI ratified account-recovery state machine",
+  "description": "A design-time contract for the ratified T0-T3 recovery ladder. It is not a runtime or persistence claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "status",
+    "sourceRefs",
+    "scope",
+    "proofMethods",
+    "tiers",
+    "states",
+    "transitions",
+    "policyKeys",
+    "notifications",
+    "cancellation",
+    "completionProfiles",
+    "forbiddenBypasses",
+    "mutations",
+    "nonGoals"
+  ],
+  "properties": {
+    "format": {
+      "const": "debateai.account-recovery-state-machine.v1"
+    },
+    "status": {
+      "const": "RATIFIED_DESIGN_RUNTIME_NOT_IMPLEMENTED"
+    },
+    "sourceRefs": {
+      "$ref": "#/$defs/nonEmptyUniqueStrings"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ratifiedTiers", "unratifiedTiers", "runtimeImplemented", "publicResponse", "contestedClaims"],
+      "properties": {
+        "ratifiedTiers": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "T0" },
+            { "const": "T1" },
+            { "const": "T2" },
+            { "const": "T3" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "unratifiedTiers": {
+          "type": "array",
+          "prefixItems": [{ "const": "T4_HUMAN_REVIEW" }],
+          "items": false,
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "runtimeImplemented": { "const": false },
+        "publicResponse": { "const": "ENUMERATION_RESISTANT_GENERIC" },
+        "contestedClaims": { "const": "FREEZE_NOTIFY_DO_NOT_ADJUDICATE" }
+      }
+    },
+    "proofMethods": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/proofMethod" }
+    },
+    "tiers": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/tier" }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/state" }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 13,
+      "items": { "$ref": "#/$defs/transition" }
+    },
+    "policyKeys": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/policyKey" }
+    },
+    "notifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipients", "events", "startOrdering", "delaySchedule", "payloadForbidden"],
+      "properties": {
+        "recipients": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "events": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "startOrdering": { "type": "string", "minLength": 1 },
+        "delaySchedule": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "payloadForbidden": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+      }
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorizers", "activeStates", "terminalState", "retryLockPolicy", "preservesHistory"],
+      "properties": {
+        "authorizers": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "activeStates": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "terminalState": { "const": "CANCELLED" },
+        "retryLockPolicy": { "const": "POST_CANCEL_RECOVERY_LOCK_MS" },
+        "preservesHistory": { "const": true }
+      }
+    },
+    "completionProfiles": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/completionProfile" }
+    },
+    "forbiddenBypasses": {
+      "$ref": "#/$defs/nonEmptyUniqueStrings"
+    },
+    "mutations": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/mutation" }
+    },
+    "nonGoals": {
+      "$ref": "#/$defs/nonEmptyUniqueStrings"
+    }
+  },
+  "$defs": {
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proofMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "family", "recoveryInput", "serverOwned"],
+      "properties": {
+        "id": {
+          "enum": [
+            "PASSWORD",
+            "BOUND_AUTHENTICATOR",
+            "SAVED_RECOVERY_CODE",
+            "ISSUED_VERIFIED_EMAIL_CODE",
+            "ISSUED_BOUND_MESSAGING_CODE",
+            "RECOGNISED_DEVICE_POSSESSION"
+          ]
+        },
+        "family": {
+          "enum": [
+            "PASSWORD_AUTHENTICATOR",
+            "BOUND_AUTHENTICATOR",
+            "RECOVERY_CODE",
+            "VERIFIED_EMAIL_ADDRESS",
+            "BOUND_MESSAGING_ADDRESS",
+            "DEVICE_POSSESSION"
+          ]
+        },
+        "recoveryInput": { "type": "boolean" },
+        "serverOwned": { "type": "boolean" }
+      }
+    },
+    "tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "createsRecoveryAttempt",
+        "serverSignalClass",
+        "requiredCredentialProofs",
+        "recoveryProof",
+        "delayPolicy",
+        "completionProfile",
+        "requireNewFactor"
+      ],
+      "properties": {
+        "id": { "enum": ["T0", "T1", "T2", "T3"] },
+        "createsRecoveryAttempt": { "type": "boolean" },
+        "serverSignalClass": { "type": "string", "minLength": 1 },
+        "requiredCredentialProofs": { "$ref": "#/$defs/stringArray" },
+        "recoveryProof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowedMethods", "minimumInputs", "minimumDistinctFamilies"],
+          "properties": {
+            "allowedMethods": { "$ref": "#/$defs/stringArray" },
+            "minimumInputs": { "type": "integer", "minimum": 0, "maximum": 2 },
+            "minimumDistinctFamilies": { "type": "integer", "minimum": 0, "maximum": 2 }
+          }
+        },
+        "delayPolicy": { "enum": ["NONE", "T1_MAX_ELAPSED_MS", "T2_MAX_ELAPSED_MS", "T3_FREEZE_MS"] },
+        "completionProfile": { "enum": ["FULL", "RESTRICTED"] },
+        "requireNewFactor": { "type": "boolean" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "terminal"],
+      "properties": {
+        "id": {
+          "enum": [
+            "REQUESTED",
+            "TIER_PINNED",
+            "PROOF_PENDING",
+            "FROZEN",
+            "FACTOR_BINDING_REQUIRED",
+            "COMPLETED_FULL",
+            "COMPLETED_RESTRICTED",
+            "CANCELLED",
+            "REFUSED",
+            "EXPIRED"
+          ]
+        },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "tiers", "guards", "effects"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "to": { "type": "string", "minLength": 1 },
+        "tiers": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "guards": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "effects": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+      }
+    },
+    "policyKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "unit", "minimum", "maximum"],
+      "properties": {
+        "id": {
+          "enum": [
+            "T1_MAX_ELAPSED_MS",
+            "T2_MAX_ELAPSED_MS",
+            "T3_FREEZE_MS",
+            "POST_CANCEL_RECOVERY_LOCK_MS",
+            "LAST_FACTOR_REMOVAL_HOLD_MS",
+            "T3_RESTRICTION_MS"
+          ]
+        },
+        "unit": { "const": "MILLISECONDS" },
+        "minimum": { "type": "integer", "minimum": 0 },
+        "maximum": { "type": "integer", "minimum": 1 },
+        "maximumExclusive": { "type": "boolean" }
+      }
+    },
+    "completionProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "allowed", "denied", "restorationConditions"],
+      "properties": {
+        "id": { "enum": ["FULL", "RESTRICTED"] },
+        "allowed": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+        "denied": { "$ref": "#/$defs/stringArray" },
+        "restorationConditions": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "killedBy"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^MUT-[A-Z0-9-]+$" },
+        "killedBy": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+      }
+    }
+  }
+}

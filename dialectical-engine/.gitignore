@@ -6,4 +6,5 @@ coverage/
 reports/*.json
 packages/contract/generated/
 .test-postgres/
+.local/dev-auth/
 *.log

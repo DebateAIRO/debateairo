@@ -1015,105 +1015,20 @@ function matchLivenessPolicyMember(valueJson: unknown, questionClass: string): L
 }
 
 export async function readTerminalRecordedFacts(pool: Pool, runId: string): Promise<TerminalRecordedFacts> {
-  const run = await pool.query<{ register_version: number }>(
-    "SELECT register_version FROM core.run WHERE run_id = $1",
+  const result = await pool.query<Record<string, unknown>>(
+    "SELECT * FROM core.read_terminal_recorded_facts($1)",
     [runId]
   );
-  const registerVersion = run.rows[0]?.register_version;
-  if (registerVersion === undefined) {
+  const row = result.rows[0];
+  if (row === undefined) {
     throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
   }
-  const [ledger, graph, judgement, propagation, decisions, research, critique, settlement, serve, register, executions] =
-    await Promise.all([
-      pool.query<Record<string, string>>(
-        `SELECT
-           count(*) FILTER (WHERE action_kind = 'JUDGEMENT_SCHEDULED')::text AS judgement_scheduled,
-           count(*) FILTER (WHERE action_kind = 'PROPAGATION')::text AS propagation,
-           count(*) FILTER (WHERE action_kind = 'MODEL_CALL' AND call_site_key = 'JUDGE' AND outcome = 'OK')::text AS judge_calls,
-           count(*) FILTER (WHERE action_kind = 'MODEL_CALL' AND call_site_key LIKE 'COMPOSER:%' AND outcome = 'OK')::text AS composer_calls,
-           count(*) FILTER (WHERE action_kind = 'MODEL_CALL' AND call_site_key LIKE 'CONFORMANCE:%' AND outcome = 'OK')::text AS conformance_calls,
-           count(*) FILTER (WHERE action_kind = 'MODEL_CALL' AND call_site_key LIKE 'POST_COMPOSE_R9:%' AND outcome = 'OK')::text AS r9_calls,
-           count(*) FILTER (WHERE action_kind = 'SERVE')::text AS serve_actions,
-           count(*) FILTER (WHERE subject_item_id IS NULL OR stance_at_action IS NULL)::text AS missing_stamps
-         FROM ledger.ledger_entry WHERE run_id = $1`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           (SELECT count(*) FROM core.node WHERE run_id = $1)::text AS nodes,
-           (SELECT count(*) FROM core.node WHERE run_id = $1 AND path_status = 'active')::text AS active_nodes,
-           (SELECT count(*) FROM core.node WHERE run_id = $1 AND parent_node_id IS NOT NULL)::text AS child_nodes,
-           (SELECT count(*) FROM core.stranger_restatement WHERE run_id = $1)::text AS restatements`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        "SELECT count(*)::text AS reduced FROM ledger.reduced_judgement WHERE run_id = $1",
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           (SELECT count(*) FROM ledger.propagation_run WHERE run_id = $1)::text AS runs,
-           (SELECT count(*) FROM ledger.node_strength_record AS strength
-             JOIN ledger.propagation_run AS run ON run.propagation_run_id = strength.propagation_run_id
-             WHERE run.run_id = $1)::text AS strengths`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           count(*)::text AS records,
-           count(*) FILTER (WHERE classification = 'categorical' AND spawn_count > 0)::text AS split_spawns
-         FROM ledger.decision_record WHERE run_id = $1`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           (SELECT count(*) FROM evidence.query_set WHERE run_id = $1)::text AS query_sets,
-           (SELECT count(*) FROM evidence.source_record WHERE run_id = $1)::text AS sources,
-           (SELECT count(*) FROM evidence.evidence_item WHERE run_id = $1)::text AS items,
-           (SELECT count(DISTINCT source_ref) FROM evidence.evidence_item
-             WHERE run_id = $1 AND admissibility IN ('ADMITTED', 'ADMITTED_DOWNGRADED'))::text AS admitted_sources,
-           (SELECT count(*) FROM evidence.absence_row WHERE run_id = $1)::text AS absences,
-           (SELECT count(*) FROM evidence.probe_capture WHERE run_id = $1)::text AS probes,
-           (SELECT count(*) FROM evidence.instrument_certification WHERE run_id = $1)::text AS instruments`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           (SELECT count(*) FROM core.critique_packet WHERE run_id = $1)::text AS packets,
-           (SELECT count(*) FROM core.objection_record WHERE run_id = $1)::text AS objections,
-           (SELECT count(*) FROM core.independence_receipt WHERE run_id = $1)::text AS receipts,
-           (SELECT count(*) FROM core.symmetry_diff WHERE run_id = $1)::text AS diffs`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        `SELECT
-           (SELECT count(*) FROM scorecard.answer_outcome WHERE run_id = $1)::text AS outcomes,
-           (SELECT count(*) FROM scorecard.scorecard_cell)::text AS cells`,
-        [runId]
-      ),
-      pool.query<Record<string, string>>(
-        "SELECT count(*)::text AS answers FROM serve.answer WHERE run_id = $1",
-        [runId]
-      ),
-      pool.query<{ row_key: string; value_json: unknown; source_ref: string; sealed: boolean | null }>(
-        `SELECT row.row_key, row.value_json, row.source_ref, version.sealed
-         FROM register.register_row AS row
-         LEFT JOIN register.register_version AS version ON version.register_version = row.register_version
-         WHERE row.register_version = $1 AND row.row_key IN ('livenessPolicy', 'approvedOperatorVariants')`,
-        [registerVersion]
-      ),
-      pool.query<{ battery_row_id: string }>(
-        "SELECT DISTINCT battery_row_id FROM core.work_item WHERE run_id = $1 AND state = 'DONE'",
-        [runId]
-      )
-    ]);
-
-  const livenessRow = register.rows.find((row) => row.row_key === "livenessPolicy");
-  const member = livenessRow === undefined
+  const registerVersion = Number(row["register_version"]);
+  const livenessValue = row["liveness_value"];
+  const member = livenessValue === undefined || livenessValue === null
     ? null
-    : matchLivenessPolicyMember(livenessRow.value_json, SHIPPED_QUESTION_CLASS);
-  const variantRow = register.rows.find((row) => row.row_key === "approvedOperatorVariants");
-  const variantValue = variantRow?.value_json;
+    : matchLivenessPolicyMember(livenessValue, SHIPPED_QUESTION_CLASS);
+  const variantValue = row["operator_variants_value"];
   const approvedOperatorVariantCount = Array.isArray(variantValue)
     ? variantValue.length
     : Array.isArray((variantValue as { variants?: unknown[] } | undefined)?.variants)
@@ -1124,56 +1039,56 @@ export async function readTerminalRecordedFacts(pool: Pool, runId: string): Prom
     runId,
     registerVersion,
     ledger: {
-      judgementScheduledCount: readCount(ledger.rows[0], "judgement_scheduled"),
-      propagationCount: readCount(ledger.rows[0], "propagation"),
-      judgeCallCount: readCount(ledger.rows[0], "judge_calls"),
-      composerCallCount: readCount(ledger.rows[0], "composer_calls"),
-      conformanceCallCount: readCount(ledger.rows[0], "conformance_calls"),
-      postComposeR9CallCount: readCount(ledger.rows[0], "r9_calls"),
-      serveActionCount: readCount(ledger.rows[0], "serve_actions"),
-      entriesMissingActionStamps: readCount(ledger.rows[0], "missing_stamps")
+      judgementScheduledCount: readCount(row as Record<string, string | null>, "judgement_scheduled"),
+      propagationCount: readCount(row as Record<string, string | null>, "propagation"),
+      judgeCallCount: readCount(row as Record<string, string | null>, "judge_calls"),
+      composerCallCount: readCount(row as Record<string, string | null>, "composer_calls"),
+      conformanceCallCount: readCount(row as Record<string, string | null>, "conformance_calls"),
+      postComposeR9CallCount: readCount(row as Record<string, string | null>, "r9_calls"),
+      serveActionCount: readCount(row as Record<string, string | null>, "serve_actions"),
+      entriesMissingActionStamps: readCount(row as Record<string, string | null>, "missing_stamps")
     },
     graph: {
-      nodeCount: readCount(graph.rows[0], "nodes"),
-      activePathNodeCount: readCount(graph.rows[0], "active_nodes"),
-      childNodeCount: readCount(graph.rows[0], "child_nodes"),
-      strangerRestatementCount: readCount(graph.rows[0], "restatements")
+      nodeCount: readCount(row as Record<string, string | null>, "nodes"),
+      activePathNodeCount: readCount(row as Record<string, string | null>, "active_nodes"),
+      childNodeCount: readCount(row as Record<string, string | null>, "child_nodes"),
+      strangerRestatementCount: readCount(row as Record<string, string | null>, "restatements")
     },
-    judgement: { reducedJudgementCount: readCount(judgement.rows[0], "reduced") },
+    judgement: { reducedJudgementCount: readCount(row as Record<string, string | null>, "reduced") },
     propagation: {
-      propagationRunCount: readCount(propagation.rows[0], "runs"),
-      strengthRecordCount: readCount(propagation.rows[0], "strengths")
+      propagationRunCount: readCount(row as Record<string, string | null>, "propagation_runs"),
+      strengthRecordCount: readCount(row as Record<string, string | null>, "strengths")
     },
     decisions: {
-      decisionRecordCount: readCount(decisions.rows[0], "records"),
-      splitSpawnDecisionCount: readCount(decisions.rows[0], "split_spawns")
+      decisionRecordCount: readCount(row as Record<string, string | null>, "decision_records"),
+      splitSpawnDecisionCount: readCount(row as Record<string, string | null>, "split_spawns")
     },
     research: {
-      querySetCount: readCount(research.rows[0], "query_sets"),
-      sourceRecordCount: readCount(research.rows[0], "sources"),
-      evidenceItemCount: readCount(research.rows[0], "items"),
-      admittedSourceCount: readCount(research.rows[0], "admitted_sources"),
-      absenceRowCount: readCount(research.rows[0], "absences"),
-      probeCaptureCount: readCount(research.rows[0], "probes"),
-      instrumentCertificationCount: readCount(research.rows[0], "instruments")
+      querySetCount: readCount(row as Record<string, string | null>, "query_sets"),
+      sourceRecordCount: readCount(row as Record<string, string | null>, "sources"),
+      evidenceItemCount: readCount(row as Record<string, string | null>, "evidence_items"),
+      admittedSourceCount: readCount(row as Record<string, string | null>, "admitted_sources"),
+      absenceRowCount: readCount(row as Record<string, string | null>, "absences"),
+      probeCaptureCount: readCount(row as Record<string, string | null>, "probes"),
+      instrumentCertificationCount: readCount(row as Record<string, string | null>, "instruments")
     },
     critique: {
-      critiquePacketCount: readCount(critique.rows[0], "packets"),
-      objectionRecordCount: readCount(critique.rows[0], "objections"),
-      independenceReceiptCount: readCount(critique.rows[0], "receipts"),
-      symmetryDiffCount: readCount(critique.rows[0], "diffs")
+      critiquePacketCount: readCount(row as Record<string, string | null>, "critique_packets"),
+      objectionRecordCount: readCount(row as Record<string, string | null>, "objections"),
+      independenceReceiptCount: readCount(row as Record<string, string | null>, "independence_receipts"),
+      symmetryDiffCount: readCount(row as Record<string, string | null>, "symmetry_diffs")
     },
     settlement: {
-      answerOutcomeCount: readCount(settlement.rows[0], "outcomes"),
-      scorecardCellCount: readCount(settlement.rows[0], "cells")
+      answerOutcomeCount: readCount(row as Record<string, string | null>, "answer_outcomes"),
+      scorecardCellCount: readCount(row as Record<string, string | null>, "scorecard_cells")
     },
-    serve: { persistedAnswerCount: readCount(serve.rows[0], "answers") },
+    serve: { persistedAnswerCount: readCount(row as Record<string, string | null>, "answers") },
     register: {
-      sealed: register.rows[0]?.sealed === true,
-      livenessPolicy: livenessRow === undefined || member === null
+      sealed: row["register_sealed"] === true,
+      livenessPolicy: member === null
         ? null
         : {
-            sourceRef: livenessRow.source_ref,
+            sourceRef: String(row["liveness_source_ref"]),
             questionClass: SHIPPED_QUESTION_CLASS,
             reviewAfterMs: member.review_after_ms,
             retireAfterMs: member.retire_after_ms
@@ -1181,7 +1096,9 @@ export async function readTerminalRecordedFacts(pool: Pool, runId: string): Prom
       approvedOperatorVariantCount
     },
     executions: {
-      settledWorkItemRowIds: Object.freeze(executions.rows.map((row) => row.battery_row_id))
+      settledWorkItemRowIds: Object.freeze(Array.isArray(row["settled_work_item_row_ids"])
+        ? row["settled_work_item_row_ids"].map(String)
+        : [])
     }
   });
 }

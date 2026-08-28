@@ -1,5 +1,6 @@
 [
   "components/authRoutes.source-test.mjs",
+  "scripts/next-config-csp.test.mjs",
   "lib/scoringResponse.test.mjs",
   "lib/sessionProxy.test.mjs"
 ]

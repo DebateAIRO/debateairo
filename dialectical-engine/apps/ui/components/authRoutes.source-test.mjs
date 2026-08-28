@@ -24,7 +24,12 @@ const packageJson = read("../package.json");
 test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.match(login, /client\.beginLogin/);
   assert.match(login, /client\.completeLogin/);
-  assert.match(login, /Authenticator or recovery code/);
+  assert.match(login, /authenticator or a recovery code/);
+  assert.match(login, /Enter your authentication code\./);
+  assert.match(login, /6-digit authentication code/);
+  assert.match(login, /Use a recovery code/);
+  assert.match(login, /Enter a recovery code\./);
+  assert.match(login, /Back to sign in/);
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
   assert.match(login, /window\.location\.assign\(HOME_PATH\)/);
@@ -65,7 +70,7 @@ test("every public and protected entry point reaches the dedicated auth routes",
 
 test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
   assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
-  assert.match(packageJson, /assert-production-auth-routes\.mjs/);
+  assert.match(packageJson, /assert-auth-front-door-routes\.mjs/);
 });
 
 test("ordinary top bar compacts without horizontal overflow at phone widths", () => {

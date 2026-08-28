@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RunRepository, migrate } from "@debateai/db";
 import {
@@ -174,5 +175,60 @@ describe("S12 / AC-40..43 / AC-73 — real PostgreSQL settlement carriers", () =
       "SELECT count(*)::text AS count FROM scorecard.answer_outcome WHERE run_id=$1", [runId]
     );
     expect(rows.rows[0]!.count).toBe("0");
+  });
+
+  it("keeps terminal scorecard facts run-bound and denies runtime direct probe writes", async () => {
+    const migration = await readFile("migrations/0049_terminal_recorded_facts.sql", "utf8");
+    await database.pool.query(migration);
+    await database.pool.query(migration);
+    const { runId: foreignRunId, answerId } = await createCompletedAnswer("terminal-facts-foreign");
+    const outcome = await new SettlementRepository(database.pool).settle({
+      outcomeAttemptId: randomUUID(), answerId, answerVersion: 1,
+      asOf: new Date("2026-08-08T00:00:00.000Z"), runId: foreignRunId,
+      modelId: "model:terminal-facts", modelVersion: "v1",
+      provider: "provider:terminal-facts", taskClass: "class:shared-terminal-facts",
+      prior: 0.5, posterior: 0.8, basis: "test-layer:external-resolution",
+      resolverRef: "resolver:terminal-facts", resolverIsExternal: true,
+      resolvedOutcome: true, resolvedAt: new Date("2026-08-08T01:00:00.000Z"),
+      provenanceRef: "artifact:terminal-facts", scoreability: "SCOREABLE",
+      actorRef: "watch:terminal-facts"
+    }, { properScore, calibration, metric: "judge_weight" });
+    expect(outcome).toMatchObject({ kind: "SETTLED" });
+
+    const subjectRunId = await new RunRepository(database.pool).startRun({
+      questionLine: "Terminal facts must ignore a foreign scorecard",
+      principal: { kind: "legacy", legacyAskerId: "asker:terminal-facts-subject" },
+      sessionId: "session:terminal-facts-subject", callerScope: "ASKER",
+      asOf: new Date("2026-08-08T00:00:00.000Z"), askerRiskTier: "casual",
+      effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: "asker:terminal-facts-subject", compositionBudgetTier: "low",
+      depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1),
+      strangerSampleRate: 1, envelopeBasis: { source: "test-layer" },
+      registerVersion: 1, batteryVersion: "s12-test-layer", batteryRows: []
+    });
+    const privileges = await database.pool.query<{ runtime_insert: boolean }>(
+      "SELECT has_table_privilege('debateai_runtime','core.provider_probe','INSERT') AS runtime_insert"
+    );
+    expect(privileges.rows[0]!.runtime_insert).toBe(false);
+    const runtime = await database.pool.connect();
+    try {
+      await runtime.query("SET ROLE debateai_runtime");
+      const facts = await runtime.query<{ scorecard_cells: string }>(
+        `SELECT scorecard_cells FROM core.read_terminal_recorded_facts($1)
+         UNION ALL
+         SELECT scorecard_cells FROM core.read_terminal_recorded_facts($2)`,
+        [foreignRunId, subjectRunId]
+      );
+      expect(facts.rows.map((row) => row.scorecard_cells)).toEqual(["1", "0"]);
+      await expect(runtime.query(
+        `INSERT INTO core.provider_probe (
+           probe_id,provider_ref,maker,state,model_id,failure_code,probed_at
+         ) VALUES ($1,'forged','forged','HEALTHY','forged',NULL,clock_timestamp())`,
+        [randomUUID()]
+      )).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await runtime.query("RESET ROLE").catch(() => undefined);
+      runtime.release();
+    }
   });
 });

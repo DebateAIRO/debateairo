@@ -147,6 +147,9 @@ importers:
       '@debateai/liveness':
         specifier: workspace:*
         version: link:../../packages/liveness
+      '@debateai/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
@@ -195,6 +198,9 @@ importers:
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget
+      '@debateai/critique':
+        specifier: workspace:*
+        version: link:../../packages/critique
       '@debateai/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto

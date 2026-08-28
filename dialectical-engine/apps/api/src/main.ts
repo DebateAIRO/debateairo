@@ -12,7 +12,7 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -27,6 +27,8 @@ import {
   readPanelDiscoveryPolicy,
   readAuthPolicy,
   readMfaPolicy,
+  readProductRolePolicy,
+  readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
@@ -50,6 +52,11 @@ import {
 } from "./account-erasure.js";
 import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
+import { RecoveryStartService } from "./recovery.js";
+import {
+  createProviderDiscoveryResolver,
+  parseProviderDiscoveryTargets
+} from "./provider-discovery.js";
 
 const environment = loadApiEnvironment();
 const kek = loadKek(environment.KEK_PATH);
@@ -73,8 +80,7 @@ if (corpusKek !== undefined) {
   });
 }
 const pool = createPool(environment.DATABASE_URL);
-const authorizationPool = environment.PUBLICATION_ENABLED === "true"
-  ? createPool(environment.AUTHORIZATION_DATABASE_URL!) : pool;
+const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!);
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
   ? createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!) : pool;
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
@@ -98,8 +104,8 @@ try {
   await Promise.all([
     assertAccountErasureDatabaseRole(pool,erasurePool),
     assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
+    assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
     ...(environment.PUBLICATION_ENABLED === "true" ? [
-      assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
       assertPublicationCleanupDatabaseRole(publicationCleanupPool)
     ] : []),
     assertContentProvisionDatabaseRole(pool,contentProvisionPool),
@@ -115,6 +121,8 @@ try {
 const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
 const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
+const recoveryPolicy = await readRecoveryPolicy(pool, environment.REGISTER_VERSION);
+await readProductRolePolicy(pool, environment.REGISTER_VERSION);
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
@@ -134,10 +142,35 @@ const hatchet = new Hatchet({
 const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
 const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
 const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION);
+if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+  throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+}
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
+const resolveProviderPanel = createProviderDiscoveryResolver({
+  configuredProviders: deploymentMakers.configuredProviders,
+  targets: parseProviderDiscoveryTargets(
+    environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+    deploymentMakers.configuredProviders
+  ),
+  probes,
+  probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
+  probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+});
 const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
 const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
+const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository(
+  pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
+  recoveryPolicy.riskSignals.maximumEvaluatorSignals
+);
+const recovery = new RecoveryStartService({
+  repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
+  riskSignals:authenticationRiskSignals,
+  onRiskSignalFailure:()=>console.error("[RECOVERY_RISK_SIGNAL_PENDING]"),
+  blindIndexKey,
+  enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
+  publicResponsePolicy: recoveryPolicy.publicResponse
+});
 const runKeyStore = new FileRunContentKeyStore(
   environment.USER_DEK_STORE_PATH,
   dekStore,
@@ -181,6 +214,8 @@ const mfa = new MfaEnrollmentService({
 });
 const sessions = await SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
+  riskSignals:authenticationRiskSignals,
+  onRiskSignalFailure:()=>console.error("[LOGIN_RISK_SIGNAL_PENDING]"),
   dekStore,
   argon2: argon2Pool,
   authPolicy,
@@ -196,22 +231,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
-  resolveDiscoveredPanel: async () => {
-    const latest = await probes.readLatest(deploymentMakers.configuredProviders.map((provider) => provider.providerRef));
-    const now = Date.now();
-    return Object.freeze(latest.flatMap((record) =>
-      record.state === "HEALTHY" && record.modelId !== null
-        && now - record.probedAt.getTime() <= discoveryPolicy.probeFreshnessMs
-        ? [Object.freeze({
-            provider_ref: record.providerRef,
-            maker: record.maker,
-            model_id: record.modelId,
-            probe_evidence_ref: record.probeEvidenceRef,
-            probed_at: record.probedAt.toISOString()
-          })]
-        : []
-    ));
-  },
+  resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -303,6 +323,16 @@ const triggerErasureReconciliation=createSingleFlightErasureReconciler(
 );
 const erasureReconcileTimer=setInterval(triggerErasureReconciliation,30_000);
 erasureReconcileTimer.unref();
+const triggerAuthenticationRiskCleanup=createSingleFlightErasureReconciler(
+  async ()=>{
+    await authenticationRiskSignals.purgeExpired(recoveryPolicy.riskSignals.cleanupBatchMax);
+  },
+  ()=>console.error("[AUTHENTICATION_RISK_SIGNAL_CLEANUP_PENDING]")
+);
+const authenticationRiskCleanupTimer=setInterval(
+  triggerAuthenticationRiskCleanup,60_000
+);
+authenticationRiskCleanupTimer.unref();
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)
   : undefined;
@@ -313,6 +343,7 @@ const api = buildApi({
   application,
   accountErasure:erasureApplication,
   registration,
+  recovery,
   mfa,
   sessions,
   legacyRunClaim,
@@ -327,6 +358,7 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 const shutdown = installGracefulShutdown({
   api,
   registration,
@@ -357,6 +389,7 @@ try {
   // timeout can never hold readiness hostage, while the SQL ACK gate still
   // prevents any user-key destruction before completion delivery succeeds.
   triggerErasureReconciliation();
+  triggerAuthenticationRiskCleanup();
 } catch (error) {
   // A listen failure still owns every worker, secret cache, and DB handle built
   // above. Reuse the exact shutdown graph before surfacing the startup failure.

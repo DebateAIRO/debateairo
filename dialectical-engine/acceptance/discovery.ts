@@ -40,6 +40,7 @@ export type DiscoveredProvider =
 export interface RelayProbeTarget extends DiscoveryTarget {
   readonly baseUrl: string;
   readonly model: string;
+  readonly authorizationHeader: string;
 }
 
 export async function probeRelay(target: RelayProbeTarget): Promise<Extract<
@@ -48,7 +49,10 @@ export async function probeRelay(target: RelayProbeTarget): Promise<Extract<
 >> {
   const response = await fetch(`${target.baseUrl}/v1/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: target.authorizationHeader
+    },
     body: JSON.stringify({
       model: target.model,
       messages: [{ role: "user", content: "DR-181 discovery health probe. Reply: OK" }]

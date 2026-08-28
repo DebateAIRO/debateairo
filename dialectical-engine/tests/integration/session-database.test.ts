@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   migrate,
+  PostgresAuthenticationRiskSignalRepository,
   PostgresSessionRepository,
   type LoginChallengeRecord
 } from "@debateai/db";
@@ -24,6 +25,7 @@ import {
   MFA_POLICY_REGISTER_ROW,
   mfaPolicyFromValue,
   SESSION_POLICY_REGISTER_ROW,
+  RECOVERY_POLICY_REGISTER_ROW,
   sessionPolicyFromValue
 } from "@debateai/register";
 import { SessionService } from "../../apps/api/src/sessions.js";
@@ -473,6 +475,12 @@ describe("S5 sessions on real PostgreSQL", () => {
       };
       const service = await SessionService.create({
         repository,
+        riskSignals:new PostgresAuthenticationRiskSignalRepository(
+          database.pool,fakeAuditHasher,dekStore,
+          RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.raw_signal_retention_ms,
+          RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.maximum_evaluator_signals
+        ),
+        onRiskSignalFailure:()=>{throw new Error("UNEXPECTED_RISK_SIGNAL_FAILURE");},
         dekStore,
         argon2,
         authPolicy,
@@ -542,6 +550,17 @@ describe("S5 sessions on real PostgreSQL", () => {
         count: "1"
       });
       expect(JSON.stringify(persisted.rows[0])).not.toContain(completed.sessionToken);
+      const riskSignals=await database.pool.query<{
+        signal_kind:string;user_id:string;context_ciphertext:Record<string,unknown>;
+      }>(`
+        SELECT signal_kind,user_id,context_ciphertext
+        FROM identity.authentication_risk_signal WHERE user_id=$1
+      `,[userId]);
+      expect(riskSignals.rows).toHaveLength(1);
+      expect(riskSignals.rows[0]).toMatchObject({
+        signal_kind:"LOGIN_SUCCESS",user_id:userId,
+        context_ciphertext:{keyId:`auth-risk:${userId}:v1`}
+      });
       const authenticated = await service.authenticate(completed.sessionToken, source);
       expect(authenticated).toMatchObject({ userId, ownerRef, session: { asker_id: `owner:${ownerRef}` } });
       if (authenticated === null) throw new Error("expected the new session to authenticate");

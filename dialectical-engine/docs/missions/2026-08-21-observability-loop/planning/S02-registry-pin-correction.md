@@ -217,6 +217,93 @@ case "${1:-seed}" in
 esac
 ```
 
+### 3.2a RECIPE v1.1 — the additive `subclass` pass (Router, 2026-08-26; V-authorized)
+
+> **v1 IS BYTE-UNCHANGED.** The `files | direct | forwarders | forwarded | seed`
+> modes above are untouched, so the ratified `code_seed` hash
+> `65ba47df9659ea2b2bb4cc75051bb00bcea528367c5ccf7d1f99ceffc3736451` remains
+> reproducible by v1 exactly as written. v1.1 **adds one mode and changes none.**
+> Registering the new codes into `derived[]` was **rejected** precisely because it
+> would have broken that hash; they go into `declared_gap[]` instead, which
+> `REGISTRY_CODE_SET` treats identically for resolution.
+
+**Why the pass exists.** Recipe v1's `direct` pass matches only literal
+`new TypedDomainError("CODE",`. It is structurally blind to a code declared by a
+**subclass**. `packages/providers/src/index.ts` contains **zero** occurrences of
+`new TypedDomainError` — it declares its codes through class declarations — so
+two real, reachable product codes were invisible to the pin. Unregistered codes
+redact to a capture-self fallback with `fallback_minimized: true`, which is the
+exact outcome §4.2's `declared_gap` partition was pinned to prevent: the hole
+becomes *"an unexplained `fallback_minimized`"* instead of a ratified fact.
+
+**The rule, stated so a party who has never seen the implementation can apply it.**
+A code is yielded when it is declared by a class extending `TypedDomainError`,
+bound either by an `override readonly code = "LITERAL"` field **or** by a
+`super("LITERAL", …)` call inside that class body, and is absent from
+`code_seed`. Class bodies are located by **brace matching** from the class's
+opening brace, so nested braces cannot leak a code out of one class into another.
+
+**Scope, canonicalization and base are unchanged** — the same frozen 115-file
+`files()` scope at `29f370e`, the same §3.1 canonicalization (UTF-8, no BOM, LF
+only, `LC_ALL=C sort -u`, final LF, SHA-256).
+
+```sh
+# append to the v1 script; add `subclass` to the case dispatch
+PL_SUBCLASS='
+local $/; my $s = <STDIN>;
+while ($s =~ /\bclass\s+[A-Za-z_\$][A-Za-z0-9_\$]*\s+extends\s+TypedDomainError\s*\{/g) {
+  my $st = pos($s); my $d = 1; my $i = $st;
+  while ($i < length($s) && $d > 0) {
+    my $ch = substr($s, $i, 1);
+    $d++ if $ch eq "{"; $d-- if $ch eq "}";
+    $i++;
+  }
+  my $body = substr($s, $st, $i - $st - 1);
+  while ($body =~ /(?:override\s+)?readonly\s+code\s*(?::[^=\n]+)?=\s*"([A-Z][A-Z0-9_]*)"/g) { print "$1\n" }
+  while ($body =~ /\bsuper\s*\(\s*"([A-Z][A-Z0-9_]*)"\s*,/g) { print "$1\n" }
+}'
+
+  subclass) stream | perl -e "$PL_SUBCLASS" | LC_ALL=C sort -u ;;
+```
+
+**Router-executed verification, read-only, before this was recorded.** Scope
+reproduces at **115** files. The pass yields **exactly two** codes:
+
+```
+PROVIDER_CALL_FAILED
+PROVIDER_CONTENT_UNACCEPTED
+```
+
+This is an **independent derivation from the rule**, written without reference to
+the architecture seat's answer, and it agrees with that seat's enumeration.
+**Router computed no hash** — the union with the existing seven `declared_gap`
+members and its SHA-256 are the custodian's act on **RP-0 (`t_4deda7ab`)**, and a
+pin computed by the party that authored the recipe is not a pin.
+
+**STOP CONDITION, binding on the custodian and on the implementing seat alike:**
+if the `subclass` run yields anything other than exactly `PROVIDER_CALL_FAILED`
+and `PROVIDER_CONTENT_UNACCEPTED`, **stop** — the tree has moved or the rule was
+implemented differently, and either is a finding, not a number to absorb.
+
+**What is deliberately NOT closed here.** The crypto error family
+(`CryptoError` / `CryptoInputError` / `Argon2InfrastructureError`, ~11 reachable
+codes) stays **outside** this pass. `CryptoError extends Error`, not
+`TypedDomainError`, and most of its codes are declared as constructor-parameter
+**union types**, so closing the family needs a **type-aware** rule rather than a
+wider class rule. Widening the class rule was **rejected**: it would harvest
+excluded-zone `Error` subclasses, breaking §10.1's ratified *"no zone code enters
+any pinned payload"* and colliding with V's Batch-8 no-metadata rule. V ruled
+(H-1, 2026-08-26) that this is closed **later, as recipe v2, explicitly confined
+to non-zone paths, on its own re-pin card**. Until then crypto failures —
+including a boot-time KEK failure in `apps/runner` — degrade to
+`OBS_CAPTURE_SELF` with `fallback_minimized: true`: honest and counted, but
+uninformative. Recorded as a named accepted residual, not an oversight.
+
+**Authority.** §7-R requires V for a **recipe** change. V gave that sign-off on
+2026-08-26 when authorizing the L2 addendum, which stated the registry recipe
+change explicitly. The resulting `declared_gap` hash still requires the
+custodian's independent computation on RP-0.
+
 ### 3.3 What each pass does, and why it is a fact and not an opinion
 
 | pass | rule | authored content |

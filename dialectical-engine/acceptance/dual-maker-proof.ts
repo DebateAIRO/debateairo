@@ -70,13 +70,15 @@ async function callThroughMaker(input: {
   readonly runId: string;
   readonly endpoint: string;
   readonly model: string;
+  readonly authorizationHeader: string;
   readonly provider: { readonly providerRef: string; readonly maker: string };
   readonly policy: AcceptanceRuntimePolicy;
 }): Promise<DualMakerProofArtifact> {
   const gateway = createPostgresProviderGateway(input.pool, {
     endpoint: input.endpoint,
     model: input.model,
-    maker: input.provider.maker
+    maker: input.provider.maker,
+    authorizationHeader: input.authorizationHeader
   });
   const result = await gateway.call({
     runId: input.runId,
@@ -174,6 +176,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
         pool,
         runId:proofRunId,
         endpoint: `${shim.baseUrl}/v1`,
+        authorizationHeader: shim.authorizationHeader,
         // DR-181/D1: lineage comes from the Codex startup handshake.
         model: shim.model,
         provider: policy.providers[0]!,
@@ -183,6 +186,7 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
         pool,
         runId:proofRunId,
         endpoint: `${relay.baseUrl}/v1`,
+        authorizationHeader: relay.authorizationHeader,
         // DR-115: the Anthropic model id comes from the relay's real CLI
         // handshake, never from a literal in this file.
         model: relay.model,

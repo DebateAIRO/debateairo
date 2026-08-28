@@ -5,6 +5,8 @@ const REGISTRATION_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder.";
 const RESEND_MESSAGE =
   "If this address is awaiting verification, new instructions will arrive. Check your spam folder.";
+const RECOVERY_START_MESSAGE =
+  "If this account can be recovered, instructions will arrive through an eligible channel.";
 
 describe("auth registration contract client", () => {
   it("posts only the ruled registration and resend fields and validates the generic responses", async () => {
@@ -27,7 +29,9 @@ describe("auth registration contract client", () => {
       return Response.json(
         url.pathname.endsWith("/register")
           ? { message: REGISTRATION_MESSAGE }
-          : { message: RESEND_MESSAGE },
+          : url.pathname.endsWith("/start")
+            ? { message: RECOVERY_START_MESSAGE }
+            : { message: RESEND_MESSAGE },
         { status: 202 }
       );
     }) as typeof fetch;
@@ -41,8 +45,10 @@ describe("auth registration contract client", () => {
     )).resolves.toEqual({ message: REGISTRATION_MESSAGE });
     await expect(client.resendVerification("person@example.test"))
       .resolves.toEqual({ message: RESEND_MESSAGE });
+    await expect(client.startRecovery("person@example.test"))
+      .resolves.toEqual({ message: RECOVERY_START_MESSAGE });
 
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0]).toMatchObject({
       path: "/v1/auth/register",
       method: "POST",
@@ -56,6 +62,12 @@ describe("auth registration contract client", () => {
     });
     expect(calls[1]).toMatchObject({
       path: "/v1/auth/resend-verification",
+      method: "POST",
+      body: { email: "person@example.test" },
+      credentials: "same-origin"
+    });
+    expect(calls[2]).toMatchObject({
+      path: "/v1/auth/recovery/start",
       method: "POST",
       body: { email: "person@example.test" },
       credentials: "same-origin"

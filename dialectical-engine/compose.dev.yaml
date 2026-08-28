@@ -8,13 +8,25 @@ services:
       POSTGRES_PASSWORD: debateai-dev-only
       POSTGRES_DB: debateai
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18 stores clusters beneath a major-version-specific
+      # directory. Mount the parent so the official image can manage that
+      # layout and future pg_upgrade --link operations stay inside one volume.
+      - postgres-data:/var/lib/postgresql
       - ./deploy/postgres/init-hatchet.sql:/docker-entrypoint-initdb.d/init-hatchet.sql:ro
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
 
   hatchet-lite:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest@sha256:7198bda4d73021a9759d90c57f11f1dd2b32599b81f4c08a5a97ea4cf047c41a
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8888:8888"
       - "7077:7077"

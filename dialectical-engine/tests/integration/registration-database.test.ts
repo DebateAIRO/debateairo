@@ -1221,6 +1221,41 @@ setTimeout(() => undefined, 500);
     expect(state.rows[0]!.state).toBe("pending_mfa");
   });
 
+  it("resolves a verification rate-limit identity through the actual runtime role", async () => {
+    const flow = buildService();
+    const registered = await registerAccount(flow.service, `runtime-verify-${randomUUID()}`);
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      const acl = await client.query<{
+        credential_select: boolean;
+        resolver_execute: boolean;
+      }>(`
+        SELECT
+          has_table_privilege(current_user,
+            'identity.verification_token_credential','SELECT') AS credential_select,
+          has_function_privilege(current_user,
+            'identity.resolve_verification_rate_limit_identity(text)','EXECUTE') AS resolver_execute
+      `);
+      expect(acl.rows[0]).toEqual({ credential_select: false, resolver_execute: true });
+      const runtimeRepository = new PostgresIdentityRepository(
+        { query: client.query.bind(client) } as never,
+        new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, basePolicy.auditSourceIpKdf)
+      );
+      await expect(runtimeRepository.findAuditIdentityByVerificationHash(
+        hashVerificationToken(token)
+      )).resolves.toEqual({
+        auditToken: registered.user.audit_token,
+        addressKey: createEmailBlindIndex(blindIndexKey, registered.email).toString("hex")
+      });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
+
   it("S4 enrols TOTP, persists no plaintext seed/codes, confirms one code, and atomically replaces a used code", async () => {
     const initialNow = new Date(Date.now() + 60_000);
     const flow = buildService({ initialNow });
@@ -1366,6 +1401,67 @@ setTimeout(() => undefined, 500);
       await api.close();
     }
   }, 120_000);
+
+  it("reads every MFA enrollment stage through the actual runtime role without credential-table SELECT", async () => {
+    const flow = buildService({ initialNow: new Date() });
+    const registered = await registerAccount(flow.service, `runtime-mfa-${randomUUID()}`);
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    const tokenHash = hashVerificationToken(token);
+    await expect(flow.service.verifyEmail({ token }, source)).resolves.toEqual({ status: "mfa_required" });
+
+    const factorId = randomUUID();
+    const secretCiphertext = encrypt(Buffer.alloc(32, 0x51), Buffer.alloc(20, 0x52), [
+      "identity", "mfa_factor.secret_ciphertext", factorId, "run:none", registered.user.user_id,
+      `user-dek:${registered.user.user_id}`, "1"
+    ]);
+    await database.pool.query(`
+      INSERT INTO identity.mfa_factor(
+        mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at
+      ) VALUES ($1,$2,'totp',$3::jsonb,'pending',clock_timestamp())
+    `, [factorId,registered.user.user_id,JSON.stringify(secretCiphertext)]);
+
+    const client = await database.pool.connect();
+    const runtimeRepository = new PostgresIdentityRepository(
+      { query: client.query.bind(client) } as never,
+      new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, basePolicy.auditSourceIpKdf)
+    );
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(runtimeRepository.readMfaEnrollmentIdentity(tokenHash)).resolves.toEqual({
+        userId: registered.user.user_id,
+        pseudonym: registered.user.pseudonym
+      });
+      await expect(runtimeRepository.readTotpEnrollment(tokenHash)).resolves.toMatchObject({
+        userId: registered.user.user_id,
+        factorId,
+        factorState: "pending"
+      });
+      await client.query("ROLLBACK");
+
+      const recoveryCodeId = (await database.pool.query<{ recovery_code_id: string }>(`
+        INSERT INTO identity.recovery_code(user_id,code_slot,code_hash,created_at)
+        VALUES ($1,1,'runtime-mfa-code-hash',clock_timestamp())
+        RETURNING recovery_code_id
+      `, [registered.user.user_id])).rows[0]!.recovery_code_id;
+      await database.pool.query(
+        "UPDATE identity.mfa_factor SET state='recovery_pending' WHERE mfa_factor_id=$1",
+        [factorId]
+      );
+
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(runtimeRepository.readRecoveryCodeForConfirmation(tokenHash, 1)).resolves.toEqual({
+        userId: registered.user.user_id,
+        recoveryCodeId,
+        codeHash: "runtime-mfa-code-hash",
+        codeSlot: 1
+      });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
 
   it("S4 grants MFA enrolment only to the sibling token actually presented for email proof", async () => {
     const initialNow = new Date(Date.now() + 60_000);

@@ -108,7 +108,10 @@ describe("DR-182 live mono-panel composition", () => {
         MODEL_BASE_URL: provider.endpoint
       },
       makerRelays: [
-        { providerRef: "acceptance:codex-cli", baseUrl: provider.endpoint, model: "test-layer/model" }
+        {
+          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "test-layer/model",
+          authorizationHeader: "Bearer test-mono-relay"
+        }
       ]
     });
     const origin = "http://127.0.0.1:8000";

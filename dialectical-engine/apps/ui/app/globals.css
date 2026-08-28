@@ -694,6 +694,34 @@ a:focus-visible {
   text-underline-offset: 4px;
 }
 
+.authMfaForm {
+  max-width: 560px;
+}
+
+.authCodeInput {
+  font-family: var(--font-mono) !important;
+  font-size: 30px !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.24em;
+  text-align: center;
+}
+
+.authRecoveryInput {
+  font-family: var(--font-mono) !important;
+  letter-spacing: 0.04em;
+}
+
+.authMfaAlternatives {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.authBackButton {
+  color: var(--muted);
+}
+
 .authAlert,
 .authPhase,
 .authCheckEmail,

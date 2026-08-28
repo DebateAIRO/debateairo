@@ -43,6 +43,7 @@ describe("dev-only evaluator API", () => {
       MAIL_FROM: "noreply@debateai.test",
       PUBLIC_APP_URL: "https://debateai.test",
       DATABASE_URL: "postgresql://runtime:runtime@localhost/debateai",
+      AUTHORIZATION_DATABASE_URL: "postgresql://authorization:fixture@localhost/debateai",
       CONTENT_PROVISION_DATABASE_URL: "postgresql://content:fixture@localhost/debateai",
       ERASURE_DATABASE_URL: "postgresql://erasure:fixture@localhost/debateai",
       ACCOUNT_ERASURE_GRACE_MS: "604800000",
@@ -56,6 +57,15 @@ describe("dev-only evaluator API", () => {
     })) vi.stubEnv(name, value);
 
     expect(() => loadApiEnvironment()).toThrow("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
+
+    vi.stubEnv("NODE_ENV", "test");
+    expect(() => loadApiEnvironment()).toThrow("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
+
+    vi.stubEnv("NODE_ENV", undefined);
+    expect(() => loadApiEnvironment()).toThrow("EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN");
+
+    vi.stubEnv("NODE_ENV", "development");
+    expect(() => loadApiEnvironment()).not.toThrow();
   });
 
   it("does not register the surface in a normal API composition", async () => {

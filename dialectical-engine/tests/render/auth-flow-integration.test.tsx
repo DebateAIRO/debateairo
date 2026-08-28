@@ -112,6 +112,41 @@ describe("rendered auth flow integration", () => {
     expect(form!.getAttribute("action")).not.toContain("?");
   });
 
+  it("moves password success into a dedicated authenticator screen with a recovery alternative", async () => {
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    await act(async () => root!.render(
+      <LoginFlow client={{ beginLogin, completeLogin: vi.fn() }} onAuthenticated={vi.fn()} />
+    ));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+
+    expect(document.querySelector("h1")?.textContent).toBe("Enter your authentication code.");
+    expect(document.body.textContent).not.toContain("Back to the graph.");
+    expect(document.querySelector('input[name="email"]')).toBeNull();
+    expect(document.querySelector('input[name="password"]')).toBeNull();
+    expect(field("code").inputMode).toBe("numeric");
+    expect(field("code").maxLength).toBe(6);
+    expect(field("code").pattern).toBe("[0-9]{6}");
+    expect(document.body.textContent).toContain("Open Google Authenticator");
+
+    await click("Use a recovery code");
+    expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
+    expect(field("code").inputMode).toBe("text");
+    expect(field("code").maxLength).toBe(-1);
+    expect(field("code").pattern).toBe("");
+    expect(document.body.textContent).toContain("Use an authenticator code");
+
+    await click("Back to sign in");
+    expect(document.querySelector("h1")?.textContent).toBe("Back to the graph.");
+    expect(document.querySelector('input[name="email"]')).not.toBeNull();
+    expect(document.querySelector('input[name="password"]')).not.toBeNull();
+  });
+
   it("makes recovery-code acknowledgement the only home completion path", async () => {
     setPathname("/login");
     const beginLogin = vi.fn().mockResolvedValue({

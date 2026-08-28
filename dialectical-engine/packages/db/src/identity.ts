@@ -238,11 +238,8 @@ export class PostgresIdentityRepository {
     readonly addressKey: string;
   } | null> {
     const result = await this.pool.query<{ audit_token: string; address_key: string }>(`
-      SELECT u.audit_token,encode(u.email_blind_index,'hex') AS address_key
-      FROM identity.verification_token_credential token
-      JOIN identity.channel_binding c ON c.channel_binding_id=token.channel_binding_id
-      JOIN identity."user" u ON u.user_id=c.user_id
-      WHERE token.token_hash=$1 AND c.channel_type='email'
+      SELECT audit_token,address_key
+      FROM identity.resolve_verification_rate_limit_identity($1)
     `, [tokenHash]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -425,13 +422,12 @@ export class PostgresIdentityRepository {
   }> | null> {
     const result = await this.pool.query<{ user_id: string; pseudonym: string }>(`
       SELECT u.user_id,u.pseudonym
-      FROM identity.verification_token_credential credential
-      JOIN identity.channel_binding binding
-        ON binding.channel_binding_id=credential.channel_binding_id
+      FROM identity.channel_binding binding
       JOIN identity."user" u ON u.user_id=binding.user_id
-      WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
-        AND binding.verification_token_hash=credential.token_hash
-        AND credential.expires_at >= statement_timestamp()
+      WHERE binding.verification_token_hash=$1
+        AND binding.verification_consumed_at IS NOT NULL
+        AND binding.verification_expires_at >= statement_timestamp()
+        AND binding.channel_type='email'
         AND u.state='pending_mfa'
     `, [enrollmentTokenHash]);
     const row = result.rows[0];
@@ -475,9 +471,7 @@ export class PostgresIdentityRepository {
     }>(`
       SELECT u.user_id,u.pseudonym,factor.mfa_factor_id,factor.secret_ciphertext,
         factor.last_accepted_step,factor.state AS factor_state
-      FROM identity.verification_token_credential credential
-      JOIN identity.channel_binding binding
-        ON binding.channel_binding_id=credential.channel_binding_id
+      FROM identity.channel_binding binding
       JOIN identity."user" u ON u.user_id=binding.user_id
       JOIN LATERAL (
         SELECT mfa_factor_id,secret_ciphertext,last_accepted_step,state,created_at
@@ -486,9 +480,10 @@ export class PostgresIdentityRepository {
           AND state IN ('pending','verified_pending_recovery','recovery_pending')
         ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
       ) factor ON true
-      WHERE credential.token_hash=$1 AND credential.consumed_at IS NOT NULL
-        AND binding.verification_token_hash=credential.token_hash
-        AND credential.expires_at >= statement_timestamp()
+      WHERE binding.verification_token_hash=$1
+        AND binding.verification_consumed_at IS NOT NULL
+        AND binding.verification_expires_at >= statement_timestamp()
+        AND binding.channel_type='email'
         AND u.state='pending_mfa'
     `, [enrollmentTokenHash]);
     const row = result.rows[0];
@@ -575,16 +570,14 @@ export class PostgresIdentityRepository {
       code_slot: number;
     }>(`
       SELECT u.user_id,code.recovery_code_id,code.code_hash,code.code_slot
-      FROM identity.verification_token_credential credential
-      JOIN identity.channel_binding binding
-        ON binding.channel_binding_id=credential.channel_binding_id
+      FROM identity.channel_binding binding
       JOIN identity."user" u ON u.user_id=binding.user_id
       JOIN identity.mfa_factor factor ON factor.user_id=u.user_id AND factor.factor_type='totp'
       JOIN identity.recovery_code code ON code.user_id=u.user_id
-      WHERE credential.token_hash=$1 AND code.code_slot=$2
-        AND binding.verification_token_hash=credential.token_hash
-        AND credential.consumed_at IS NOT NULL
-        AND credential.expires_at >= statement_timestamp()
+      WHERE binding.verification_token_hash=$1 AND code.code_slot=$2
+        AND binding.verification_consumed_at IS NOT NULL
+        AND binding.verification_expires_at >= statement_timestamp()
+        AND binding.channel_type='email'
         AND u.state='pending_mfa' AND factor.state='recovery_pending'
         AND code.consumed_at IS NULL AND code.revoked_at IS NULL
     `, [enrollmentTokenHash, slot]);

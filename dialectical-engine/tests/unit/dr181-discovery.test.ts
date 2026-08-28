@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   discoverPanel,
+  probeRelay,
   resolveFreshDiscovery,
   type DiscoveredProvider,
   type ProbeTarget
@@ -10,6 +11,8 @@ import { parseCodexRolloutModel } from "../../acceptance/model-shim.js";
 
 const adapter: CliRelayAdapter = {
   maker: "fixture-maker",
+  authEnvironmentKeys: [],
+  testEnvironmentKeys: [],
   failureCode: "FIXTURE_CLI_FAILED",
   timeoutCode: "FIXTURE_CLI_TIMEOUT",
   buildArguments: () => [],
@@ -37,6 +40,35 @@ function target(index: number, outcome: "healthy" | "failed" = "healthy"): Probe
 }
 
 describe("DR-181 discovery panel", () => {
+  it("sends the relay credential only in the Authorization header", async () => {
+    const originalFetch = globalThis.fetch;
+    const observed: Array<{ readonly headers: Headers; readonly body: string }> = [];
+    globalThis.fetch = (async (_input, init) => {
+      observed.push({
+        headers: new Headers(init?.headers),
+        body: typeof init?.body === "string" ? init.body : ""
+      });
+      return new Response(JSON.stringify({ model: "fixture-model" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    try {
+      await expect(probeRelay({
+        providerRef: "provider-authenticated",
+        maker: "maker-authenticated",
+        baseUrl: "http://127.0.0.1:9999",
+        model: "fixture-model",
+        authorizationHeader: "Bearer relay-discovery-secret"
+      })).resolves.toMatchObject({ state: "HEALTHY", modelId: "fixture-model" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.headers.get("authorization")).toBe("Bearer relay-discovery-secret");
+    expect(observed[0]?.body).not.toContain("relay-discovery-secret");
+  });
+
   it.each([1, 2, 3, 4])("discovers an N-generic healthy panel of %i", async (size) => {
     const result = await discoverPanel(
       Array.from({ length: size }, (_, index) => target(index + 1)),

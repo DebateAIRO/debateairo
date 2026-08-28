@@ -1,0 +1,279 @@
+{
+  "format": "debateai.local-auth-topology.v1",
+  "status": "SPECIFIED_NOT_IMPLEMENTED",
+  "commands": {
+    "up": "pnpm dev:auth:up",
+    "stop": "pnpm dev:auth:stop",
+    "reset": "pnpm dev:auth:reset --confirm DELETE_LOCAL_AUTH_DATA"
+  },
+  "publicOrigin": {
+    "url": "https://localhost:3000",
+    "plainHttpForbidden": true,
+    "trustStoreMutationAllowed": false
+  },
+  "services": [
+    {
+      "id": "tls-front-door",
+      "kind": "HTTPS_REVERSE_PROXY",
+      "endpoints": ["https://127.0.0.1:3000"],
+      "exposure": "PUBLIC_LOOPBACK",
+      "routes": ["UI:/*", "UI_PROXY:/api/*"],
+      "dependsOn": ["ui", "api"]
+    },
+    {
+      "id": "ui",
+      "kind": "NEXT_UI",
+      "endpoints": ["http://127.0.0.1:3001"],
+      "exposure": "PRIVATE_LOOPBACK",
+      "dependsOn": ["api"]
+    },
+    {
+      "id": "api",
+      "kind": "PRODUCTION_API_ENTRYPOINT",
+      "endpoints": ["http://127.0.0.1:8790"],
+      "exposure": "PRIVATE_LOOPBACK",
+      "dependsOn": ["postgres", "hatchet", "mail-capture"]
+    },
+    {
+      "id": "postgres",
+      "kind": "POSTGRES_18",
+      "endpoints": [
+        "postgresql://127.0.0.1:55432/debateai",
+        "postgresql://127.0.0.1:55432/hatchet"
+      ],
+      "exposure": "PRIVATE_LOOPBACK",
+      "dependsOn": []
+    },
+    {
+      "id": "hatchet",
+      "kind": "HATCHET_LITE_PINNED",
+      "endpoints": ["http://127.0.0.1:8888", "grpc://127.0.0.1:7077"],
+      "exposure": "PRIVATE_LOOPBACK",
+      "dependsOn": ["postgres"]
+    },
+    {
+      "id": "mail-capture",
+      "kind": "SENDMAIL_COMPATIBLE_FILE_SINK",
+      "endpoints": [],
+      "exposure": "NO_NETWORK",
+      "dependsOn": []
+    }
+  ],
+  "persistentPaths": [
+    { "id": "root", "path": ".local/dev-auth", "mode": "0700" },
+    { "id": "postgres", "path": ".local/dev-auth/postgres", "mode": "0700" },
+    { "id": "database-principals", "path": ".local/dev-auth/database-principals.env", "mode": "0600" },
+    { "id": "operator-env", "path": ".local/dev-auth/operator.env", "mode": "0600" },
+    { "id": "secrets", "path": ".local/dev-auth/secrets", "mode": "0700" },
+    { "id": "audit-keys", "path": ".local/dev-auth/audit-keys", "mode": "0700" },
+    { "id": "user-deks", "path": ".local/dev-auth/user-deks", "mode": "0700" },
+    { "id": "mail", "path": ".local/dev-auth/mail", "mode": "0700" },
+    { "id": "tls", "path": ".local/dev-auth/tls", "mode": "0700" }
+  ],
+  "secretFiles": [
+    { "id": "kek", "path": ".local/dev-auth/secrets/kek.bin", "mode": "0600", "rawBytes": 32 },
+    { "id": "blind-index", "path": ".local/dev-auth/secrets/blind-index-key.bin", "mode": "0600", "rawBytes": 32 },
+    { "id": "audit-source-ip-salt", "path": ".local/dev-auth/secrets/audit-source-ip-salt.bin", "mode": "0600", "rawBytes": 32 },
+    { "id": "database-principals", "path": ".local/dev-auth/database-principals.env", "mode": "0600", "rawBytes": null },
+    { "id": "tls-private-key", "path": ".local/dev-auth/tls/localhost-key.pem", "mode": "0600", "rawBytes": null },
+    { "id": "operator-env", "path": ".local/dev-auth/operator.env", "mode": "0600", "rawBytes": null }
+  ],
+  "principals": [
+    {
+      "id": "debateai_dev_migrator",
+      "login": true,
+      "attributes": ["INHERIT", "SUPERUSER", "CREATEDB", "CREATEROLE"],
+      "memberships": [],
+      "forbiddenMemberships": [],
+      "owns": [
+        "database:debateai",
+        "schema:audit_crypto_internal",
+        "schema:core",
+        "schema:evidence",
+        "schema:identity",
+        "schema:ledger",
+        "schema:memory",
+        "schema:obs",
+        "schema:register",
+        "schema:scorecard",
+        "schema:serve"
+      ],
+      "purpose": ["PRINCIPAL_BOOTSTRAP", "MIGRATIONS", "REGISTER_SEED"],
+      "serviceCredential": false
+    },
+    {
+      "id": "debateai_dev_runtime",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_runtime"],
+      "forbiddenMemberships": ["debateai_content_provision", "debateai_erasure_runtime", "pg_*"],
+      "owns": [],
+      "purpose": ["DATABASE_URL", "LEGACY_ASK_ADMISSION_POOL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_content_provision",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_content_provision"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_erasure_runtime", "pg_*"],
+      "owns": [],
+      "purpose": ["CONTENT_PROVISION_DATABASE_URL", "SERVER_ASK_ADMISSION_POOL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_erasure",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_erasure_runtime"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "pg_*"],
+      "owns": [],
+      "purpose": ["ERASURE_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_authorization",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_authorization_runtime"],
+      "forbiddenMemberships": ["debateai_content_provision", "debateai_erasure_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["AUTHORIZATION_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_publication_cleanup",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_publication_cleanup"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_replay", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["PUBLICATION_CLEANUP_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_replay",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_replay"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["REPLAY_SELF_TEST_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_liveness",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_runtime"],
+      "forbiddenMemberships": ["debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["LIVENESS_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_settlement",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_settlement_watch"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "pg_*"],
+      "owns": [],
+      "purpose": ["SETTLEMENT_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_evaluator_api",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_evaluator_api"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "debateai_evaluator_worker", "debateai_evaluator_reader", "pg_*"],
+      "owns": [],
+      "purpose": ["EVALUATOR_DEV_MENU_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_hatchet",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": [],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "pg_*"],
+      "owns": ["database:hatchet"],
+      "purpose": ["HATCHET_DATABASE_URL"],
+      "serviceCredential": true
+    }
+  ],
+  "apiEnvironment": {
+    "PUBLIC_APP_URL": "https://localhost:3000",
+    "API_HOST": "127.0.0.1",
+    "API_PORT": "8790",
+    "STRANGER_SAMPLE_RATE": "0",
+    "REGISTER_VERSION": "3",
+    "BATTERY_VERSION": "dev-auth-v1",
+    "SETTLEMENT_WATCH_HANDLE": "dev-auth:settlement-watch",
+    "MAIL_SENDMAIL_PATH": "deploy/dev-auth/sendmail-capture.mjs",
+    "DEBATEAI_DEV_MAIL_CAPTURE_DIR": ".local/dev-auth/mail",
+    "MAIL_FROM": "noreply@localhost.test",
+    "CONTENT_ENCRYPTION_ENABLED": "true",
+    "PUBLICATION_ENABLED": "true",
+    "EVALUATOR_DEV_MENU_ENABLED": "false",
+    "EVALUATOR_DEV_MENU_DATABASE_URL": ".local/dev-auth/database-principals.env:EVALUATOR_DEV_MENU_DATABASE_URL",
+    "ACCOUNT_ERASURE_GRACE_MS": "604800000",
+    "HATCHET_HOST_PORT": "127.0.0.1:7077",
+    "HATCHET_API_URL": "http://127.0.0.1:8888",
+    "HATCHET_WORKFLOW_NAME": "debateai-dev",
+    "HATCHET_TLS_STRATEGY": "none"
+  },
+  "uiEnvironment": {
+    "DIALECTICAL_UI_HOST": "127.0.0.1",
+    "PORT": "3001",
+    "DIALECTICAL_API_BASE": "http://127.0.0.1:8790",
+    "NEXT_PUBLIC_API_BASE": "/api"
+  },
+  "startupOrder": [
+    "PREFLIGHT",
+    "PERSISTENT_PATHS",
+    "POSTGRES",
+    "MIGRATIONS_REPLAY",
+    "APPLICATION_PRINCIPALS",
+    "REGISTER_SEED",
+    "SECRETS",
+    "HATCHET",
+    "MAIL_CAPTURE",
+    "API",
+    "UI",
+    "TLS_FRONT_DOOR",
+    "BOOT_ATTESTATIONS"
+  ],
+  "bootAttestations": [
+    "TLS_CERT_TRUSTED_FOR_LOCALHOST",
+    "PUBLIC_APP_URL_EXACT_HTTPS_ORIGIN",
+    "MIGRATIONS_FRESH_AND_REPLAY_SAFE",
+    "REGISTER_COMPLETE_AND_SEALED",
+    "RUNTIME_ROLE_EXACT",
+    "CONTENT_PROVISION_ROLE_EXACT",
+    "ERASURE_ROLE_EXACT",
+    "AUTHORIZATION_ROLE_EXACT",
+    "PUBLICATION_CLEANUP_ROLE_EXACT",
+    "REPLAY_ROLE_EXACT",
+    "LIVENESS_ROLE_EXACT",
+    "SETTLEMENT_ROLE_EXACT",
+    "DATABASE_URL_PRINCIPALS_DISTINCT",
+    "SECRET_FILES_0600_AND_32_RAW_BYTES",
+    "SECRET_STORES_0700",
+    "MAIL_CAPTURE_EXECUTABLE_AND_WRITABLE",
+    "HATCHET_TOKEN_WORKFLOW_REACHABLE",
+    "SECURE_COOKIE_CONFIGURATION_ATTESTED",
+    "UNAUTHENTICATED_ORIGIN_CSRF_NEGATIVE_PROBE"
+  ],
+  "invariants": [
+    "NO_SEEDED_ACCOUNT",
+    "NO_ACCEPTANCE_SERVER",
+    "NO_PLAINTEXT_HTTP_FALLBACK",
+    "NO_SHARED_DATABASE_LOGIN",
+    "NO_SECRET_IN_REPOSITORY_OR_COMMAND_OUTPUT",
+    "PERSISTENT_ROOT_GITIGNORED_BEFORE_FIRST_WRITE",
+    "PUBLICATION_AND_DEV_MENU_DISABLED",
+    "STOP_IS_NON_DESTRUCTIVE",
+    "RESET_IS_SEPARATE_AND_CONFIRMATION_GATED"
+  ]
+}

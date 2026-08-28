@@ -19,7 +19,7 @@ async function start(timeoutMs = 1_000): Promise<GrokRelayHandle> {
 async function postCompletion(handle: GrokRelayHandle, content: string): Promise<Response> {
   return fetch(`${handle.baseUrl}/v1/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", authorization: handle.authorizationHeader },
     body: JSON.stringify({ model: "ignored", messages: [{ role: "user", content }] })
   });
 }
@@ -116,22 +116,96 @@ describe("GROK-01 Grok Build CLI relay", () => {
   });
 
   it("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call", async () => {
-    const relay = await start();
-    const response = await postCompletion(relay, "Assess this claim.");
-    expect(response.status).toBe(200);
-    const completion = await response.json() as {
-      model: string; maker: string; choices: readonly { message: { content: string } }[];
-    };
-    expect(completion).toMatchObject({ model: "grok-fake-cli-model", maker: "xAI" });
-    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
-      prompt: string; argumentList: readonly string[];
-    };
-    expect(relayed.prompt).toContain("[user]\nAssess this claim.");
-    expect(relayed.argumentList).toContain("--single");
-    expect(relayed.argumentList).toContain("--output-format");
-    expect(relayed.argumentList).toContain("json");
-    expect(relayed.argumentList).toContain("--verbatim");
-    expect(relayed.argumentList).toContain("--tools");
+    const environmentKeys = [
+      "HOME", "PATH", "TMPDIR", "LANG", "XAI_API_KEY",
+      "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
+      "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET",
+      "FAKE_GROK_ALWAYS_FAIL", "FAKE_GROK_CAPTURED_ENVELOPE",
+      "FAKE_GROK_COST_ABSENT", "FAKE_GROK_MODEL_USAGE_NON_OBJECT"
+    ] as const;
+    const previousEnvironment = Object.fromEntries(
+      environmentKeys.map((key) => [key, process.env[key]])
+    );
+    Object.assign(process.env, {
+      HOME: "/tmp/relay-home-sentinel",
+      PATH: "/usr/bin:/bin",
+      TMPDIR: "/tmp",
+      LANG: "C.UTF-8",
+      XAI_API_KEY: "xai-test-sentinel",
+      OPENAI_API_KEY: "openai-test-sentinel",
+      ANTHROPIC_API_KEY: "anthropic-test-sentinel",
+      CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
+      DATABASE_URL: "postgresql://secret:test@localhost/debateai",
+      SSH_AUTH_SOCK: "/tmp/private-agent.sock",
+      UNRELATED_SECRET: "must-not-reach-child"
+    });
+    delete process.env.FAKE_GROK_ALWAYS_FAIL;
+    delete process.env.FAKE_GROK_CAPTURED_ENVELOPE;
+    delete process.env.FAKE_GROK_COST_ABSENT;
+    delete process.env.FAKE_GROK_MODEL_USAGE_NON_OBJECT;
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Assess this claim.");
+      expect(response.status).toBe(200);
+      const completion = await response.json() as {
+        model: string; maker: string; choices: readonly { message: { content: string } }[];
+      };
+      expect(completion).toMatchObject({ model: "grok-fake-cli-model", maker: "xAI" });
+      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+        prompt: string;
+        argumentList: readonly string[];
+        environment: Readonly<Record<string, string>>;
+      };
+      expect(JSON.parse(relayed.prompt)).toEqual({
+        format: "debateai.relay-messages.v1",
+        messages: [{ role: "user", content: "Assess this claim." }]
+      });
+      expect(relayed.argumentList).toEqual([
+        "--single", relayed.prompt,
+        "--output-format", "json",
+        "--verbatim",
+        "--sandbox", "read-only",
+        "--no-memory",
+        "--no-subagents",
+        "--disable-web-search",
+        "--tools", ""
+      ]);
+      expect(Object.fromEntries(Object.entries(relayed.environment).filter(([key]) =>
+        key !== "__CF_USER_TEXT_ENCODING"
+      ))).toEqual({
+        HOME: "/tmp/relay-home-sentinel",
+        LANG: "C.UTF-8",
+        OLDPWD: expect.stringMatching(/[/\\]relay-xai-[^/\\]+$/),
+        PATH: "/usr/bin:/bin",
+        PWD: expect.stringMatching(/[/\\]relay-xai-[^/\\]+$/),
+        TMPDIR: "/tmp",
+        XAI_API_KEY: "xai-test-sentinel"
+      });
+      for (const key of [
+        "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
+        "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET"
+      ]) {
+        expect(relayed.environment[key]).toBeUndefined();
+      }
+    } finally {
+      for (const key of environmentKeys) {
+        const value = previousEnvironment[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it("uses the shared SIGKILL escalation when the Grok child ignores SIGTERM", async () => {
+    const relay = await start(500);
+    const startedAt = performance.now();
+    const response = await postCompletion(relay, "IGNORE_SIGTERM_CLI");
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toEqual({ error: "GROK_CLI_TIMEOUT" });
+    expect(elapsedMs).toBeGreaterThanOrEqual(650);
+    expect(elapsedMs).toBeLessThan(1_500);
   });
 
   it("refuses boot on a dead or unauthenticated CLI and never fabricates lineage", async () => {

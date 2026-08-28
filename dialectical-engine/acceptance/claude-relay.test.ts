@@ -19,7 +19,7 @@ async function start(timeoutMs = 1_000): Promise<ClaudeRelayHandle> {
 async function postCompletion(handle: ClaudeRelayHandle, userContent: string): Promise<Response> {
   return fetch(`${handle.baseUrl}/v1/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", authorization: handle.authorizationHeader },
     body: JSON.stringify({
       model: "ignored-by-relay",
       messages: [
@@ -105,27 +105,99 @@ describe("FAIR-02 Claude Code CLI relay", () => {
   });
 
   it("maps an OpenAI request to claude -p --output-format json with closed stdin and reports true lineage", async () => {
-    const relay = await start();
-    const response = await postCompletion(relay, "Assess this claim.");
+    const environmentKeys = [
+      "HOME", "PATH", "TMPDIR", "LANG",
+      "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
+      "OPENAI_API_KEY", "XAI_API_KEY", "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET",
+      "FAKE_CLAUDE_ALWAYS_FAIL", "FAKE_CLAUDE_COST_ABSENT", "FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT"
+    ] as const;
+    const previousEnvironment = Object.fromEntries(
+      environmentKeys.map((key) => [key, process.env[key]])
+    );
+    Object.assign(process.env, {
+      HOME: "/tmp/relay-home-sentinel",
+      PATH: "/usr/bin:/bin",
+      TMPDIR: "/tmp",
+      LANG: "C.UTF-8",
+      ANTHROPIC_API_KEY: "anthropic-test-sentinel",
+      CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
+      OPENAI_API_KEY: "openai-test-sentinel",
+      XAI_API_KEY: "xai-test-sentinel",
+      DATABASE_URL: "postgresql://secret:test@localhost/debateai",
+      SSH_AUTH_SOCK: "/tmp/private-agent.sock",
+      UNRELATED_SECRET: "must-not-reach-child"
+    });
+    delete process.env.FAKE_CLAUDE_ALWAYS_FAIL;
+    delete process.env.FAKE_CLAUDE_COST_ABSENT;
+    delete process.env.FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT;
+    try {
+      const relay = await start();
+      const response = await postCompletion(relay, "Assess this claim.");
 
-    expect(response.status).toBe(200);
-    const completion = await response.json() as {
-      model: string;
-      maker: string;
-      choices: readonly { message: { content: string } }[];
-      usage: { completion_tokens: number; x_cost_usd: number };
-    };
-    expect(completion).toMatchObject({ model: "claude-fake-cli-model", maker: "Anthropic" });
-    expect(completion.usage).toEqual({ completion_tokens: 5, x_cost_usd: 0 });
-    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
-      prompt: string;
-      argumentList: readonly string[];
-    };
-    expect(relayed.prompt).toContain("[system]\nReturn strict JSON.");
-    expect(relayed.prompt).toContain("[user]\nAssess this claim.");
-    expect(relayed.argumentList).toContain("-p");
-    expect(relayed.argumentList).toContain("--output-format");
-    expect(relayed.argumentList).toContain("json");
+      expect(response.status).toBe(200);
+      const completion = await response.json() as {
+        model: string;
+        maker: string;
+        choices: readonly { message: { content: string } }[];
+        usage: { completion_tokens: number; x_cost_usd: number };
+      };
+      expect(completion).toMatchObject({ model: "claude-fake-cli-model", maker: "Anthropic" });
+      expect(completion.usage).toEqual({ completion_tokens: 5, x_cost_usd: 0 });
+      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+        prompt: string;
+        argumentList: readonly string[];
+        environment: Readonly<Record<string, string>>;
+      };
+      expect(JSON.parse(relayed.prompt)).toEqual({
+        format: "debateai.relay-messages.v1",
+        messages: [
+          { role: "system", content: "Return strict JSON." },
+          { role: "user", content: "Assess this claim." }
+        ]
+      });
+      expect(relayed.argumentList).toEqual([
+        "-p", relayed.prompt,
+        "--output-format", "json",
+        "--setting-sources", "",
+        "--strict-mcp-config",
+        "--no-session-persistence",
+        "--tools", "",
+        "--model", "opus"
+      ]);
+      expect(Object.fromEntries(Object.entries(relayed.environment).filter(([key]) =>
+        key !== "__CF_USER_TEXT_ENCODING"
+      ))).toEqual({
+        ANTHROPIC_API_KEY: "anthropic-test-sentinel",
+        CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
+        HOME: "/tmp/relay-home-sentinel",
+        LANG: "C.UTF-8",
+        OLDPWD: expect.stringMatching(/[/\\]relay-anthropic-[^/\\]+$/),
+        PATH: "/usr/bin:/bin",
+        PWD: expect.stringMatching(/[/\\]relay-anthropic-[^/\\]+$/),
+        TMPDIR: "/tmp"
+      });
+      for (const key of ["OPENAI_API_KEY", "XAI_API_KEY", "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET"]) {
+        expect(relayed.environment[key]).toBeUndefined();
+      }
+    } finally {
+      for (const key of environmentKeys) {
+        const value = previousEnvironment[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it("uses the shared SIGKILL escalation when the Claude child ignores SIGTERM", async () => {
+    const relay = await start(500);
+    const startedAt = performance.now();
+    const response = await postCompletion(relay, "IGNORE_SIGTERM_CLI");
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toEqual({ error: "CLAUDE_CLI_TIMEOUT" });
+    expect(elapsedMs).toBeGreaterThanOrEqual(650);
+    expect(elapsedMs).toBeLessThan(1_500);
   });
 
   it("propagates a nonzero CLI exit as HTTP 502 without fabricating choices", async () => {

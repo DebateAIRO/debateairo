@@ -19,20 +19,23 @@ export function projectCanvasCensus(answer: Answer): CanvasCensus {
   let derivedStandingCount = 0;
   let setAsideCount = 0;
   for (const node of answer.nodes) {
-    const memberships = [
-      node.review !== null,
-      derivedStanding.has(node.node_id),
-      setAside.has(node.node_id)
-    ];
-    if (memberships.filter(Boolean).length !== 1) {
+    const isSetAside = setAside.has(node.node_id);
+    const isDerivedStanding = derivedStanding.has(node.node_id);
+    if (isSetAside && (isDerivedStanding || node.final_strength !== null)) {
       throw new TypedDomainError(
         "CENSUS_PARTITION_INVALID",
         `Node ${node.node_id} must belong to exactly one of judged, derived-standing, or set-aside`
       );
     }
-    if (memberships[0]) judgedCount += 1;
-    else if (memberships[1]) derivedStandingCount += 1;
-    else setAsideCount += 1;
+    if (isSetAside) setAsideCount += 1;
+    else if (isDerivedStanding) derivedStandingCount += 1;
+    else if (node.final_strength !== null) judgedCount += 1;
+    else {
+      throw new TypedDomainError(
+        "CENSUS_PARTITION_INVALID",
+        `Node ${node.node_id} must belong to exactly one of judged, derived-standing, or set-aside`
+      );
+    }
   }
   return {
     claims: answer.nodes.length,

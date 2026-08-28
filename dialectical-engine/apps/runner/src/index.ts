@@ -1111,6 +1111,15 @@ export function applySingleLineageBandCap(
   return bandCeiling.value.bandOrder[candidateIndex - 1]!;
 }
 
+async function runnerStage<T>(code: string, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof TypedDomainError) throw error;
+    throw new TypedDomainError(code, code);
+  }
+}
+
 export class WalkingSkeletonRunner {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -1261,9 +1270,19 @@ export class WalkingSkeletonRunner {
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
-    return this.#memory.withDisclosureContentLease([claimedRunId],async () => {
+    try {
+    return await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
     const runnerAttemptId = randomUUID();
-    const run = await this.#runs.readFrozenHead(claimedRunId);
+    let run: Awaited<ReturnType<RunRepository["readFrozenHead"]>>;
+    try {
+      run = await this.#runs.readFrozenHead(claimedRunId);
+    } catch (error) {
+      if (error instanceof TypedDomainError) throw error;
+      throw new TypedDomainError(
+        "RUN_FROZEN_HEAD_READ_FAILED",
+        "The frozen run could not be read through its required content lease"
+      );
+    }
     const preflightHaltedSites = new Map<string, {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
@@ -1323,7 +1342,15 @@ export class WalkingSkeletonRunner {
         attempt: input.attempt
       });
     };
-    const envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
+    let envelopeBasis: ReturnType<typeof parseCostEnvelopeBasis>;
+    try {
+      envelopeBasis = parseCostEnvelopeBasis(run.envelopeBasis);
+    } catch {
+      throw new TypedDomainError(
+        "RUN_ENVELOPE_BASIS_INVALID",
+        "The frozen run cost envelope does not satisfy the sealed runner contract"
+      );
+    }
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
@@ -2224,13 +2251,13 @@ export class WalkingSkeletonRunner {
       });
     };
     const initialEnvelopeDecision = await evaluateEnvelope();
-    let result;
+    let result: Awaited<ReturnType<typeof runServeGateChain>>;
     if (initialEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
       result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       try {
-        result = await runServeGateChain({
+        result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
       factBundle,
       maxRecompose: this.settings.maxRecompose,
@@ -2348,7 +2375,7 @@ export class WalkingSkeletonRunner {
         candidateConfidenceBand,
         row: servePolicy.bandCeiling
       })
-        });
+        }));
       } catch (error) {
         if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
         const exhausted = await evaluateEnvelope();
@@ -2375,8 +2402,11 @@ export class WalkingSkeletonRunner {
         "Run completion cannot manufacture activation results for outstanding WAIT rows"
       );
     }
-    const current = await this.#runs.readCurrentState(run.runId);
-    const resolutions = await terminalEvaluator({
+    const current = await runnerStage(
+      "TERMINAL_STATE_READ_FAILED",
+      () => this.#runs.readCurrentState(run.runId)
+    );
+    const resolutions = await runnerStage("TERMINAL_ACTIVATION_EVALUATION_FAILED", () => terminalEvaluator({
       runId: run.runId,
       waitingRows: current.activations.filter((row) => row.state === "WAIT").map((row) => row.batteryRowId),
       completion: Object.freeze({
@@ -2384,8 +2414,11 @@ export class WalkingSkeletonRunner {
         servedNodeIds: Object.freeze([servedRoot.nodeId]),
         servedNumberPlanned: compositionEvidenceRequired(result)
       })
-    });
-    await this.#runs.drainWaitsForCompletion(run.runId, resolutions);
+    }));
+    await runnerStage(
+      "TERMINAL_ACTIVATION_DRAIN_FAILED",
+      () => this.#runs.drainWaitsForCompletion(run.runId, resolutions)
+    );
     // DR-139(4): every row ACTIVE at terminal whose owed check has no recorded
     // execution rides the served answer as a typed loud condition mark naming
     // that check. Executing owed checks at terminal is the ruled follow-up,
@@ -2431,7 +2464,7 @@ export class WalkingSkeletonRunner {
         result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, "UNRESOLVED-TYPE-FALLBACK"]) };
       }
     }
-    const persisted = await this.#serve.persist({
+    const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
       factBundleVersion: this.settings.factBundleVersion,
@@ -2452,9 +2485,12 @@ export class WalkingSkeletonRunner {
         replayHandle,
         propagationRunId
       } : null
-    });
-    await this.#memory.observeAnswerContradiction(persisted.answerId, "memory:served-verdict-observer");
-    await this.#ledger.append({
+    }));
+    await runnerStage(
+      "ANSWER_MEMORY_OBSERVATION_FAILED",
+      () => this.#memory.observeAnswerContradiction(persisted.answerId, "memory:served-verdict-observer")
+    );
+    await runnerStage("SERVE_LEDGER_APPEND_FAILED", () => this.#ledger.append({
       runId: run.runId,
       attemptId: runnerAttemptId,
       actionKind: "SERVE",
@@ -2466,7 +2502,7 @@ export class WalkingSkeletonRunner {
       contractHash: this.settings.serveContractHash,
       startedAt: serveStartedAt,
       finishedAt: new Date()
-    });
+    }));
     const wonSettlement = await this.#work.settle({
       workItemId: claimed.workItemId,
       attemptId: runnerAttemptId,
@@ -2479,6 +2515,13 @@ export class WalkingSkeletonRunner {
     }
     return { kind: "COMPLETED", answerId: winningArtifact };
     });
+    } catch (error) {
+      if (error instanceof TypedDomainError) throw error;
+      throw new TypedDomainError(
+        "RUNNER_DISCLOSURE_PIPELINE_FAILED",
+        "The runner failed inside its private-content disclosure lease"
+      );
+    }
   }
 }
 
@@ -2496,9 +2539,26 @@ export interface RunnerFailureRecorder {
 }
 
 export function runnerTerminalFailureReason(error: unknown): string {
-  return error instanceof TypedDomainError
-    ? `RUNNER_EXECUTION_FAILED:${error.code}`
-    : "RUNNER_EXECUTION_FAILED:UNEXPECTED_ERROR";
+  if (error instanceof TypedDomainError) return `RUNNER_EXECUTION_FAILED:${error.code}`;
+  const record = error !== null && typeof error === "object"
+    ? error as Readonly<{ code?: unknown; message?: unknown; name?: unknown }>
+    : undefined;
+  const dependencyCode = typeof record?.code === "string"
+    && /^[A-Z0-9_]{2,32}$/u.test(record.code)
+    ? `DEPENDENCY_${record.code}`
+    : undefined;
+  const exactMessageCode = typeof record?.message === "string"
+    && /^[A-Z][A-Z0-9_]{2,63}$/u.test(record.message)
+    ? record.message
+    : undefined;
+  const errorClass = typeof record?.name === "string"
+    ? record.name.replace(/([a-z])([A-Z])/gu, "$1_$2").toUpperCase()
+    : undefined;
+  const diagnostic = dependencyCode ?? exactMessageCode
+    ?? (errorClass === undefined || !/^[A-Z][A-Z0-9_]{2,63}$/u.test(errorClass)
+      ? "UNEXPECTED_ERROR"
+      : errorClass);
+  return `RUNNER_EXECUTION_FAILED:${diagnostic}`;
 }
 
 export function declareHatchetWalkingSkeletonTask(input: {

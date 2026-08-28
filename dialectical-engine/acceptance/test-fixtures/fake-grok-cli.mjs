@@ -9,7 +9,7 @@ const REPORTED_MODEL = "grok-fake-cli-model";
 // No credential, private prompt, or raw provider payload is retained; only the
 // observed public field shape and a test-controlled verbatim model key.
 const envelope = (overrides = {}) => JSON.stringify({
-  text: JSON.stringify({ prompt, argumentList }),
+  text: JSON.stringify({ prompt, argumentList, environment: process.env }),
   stopReason: "end_turn",
   sessionId: "redacted-session",
   requestId: "redacted-request",
@@ -35,6 +35,9 @@ if (process.env.FAKE_GROK_CAPTURED_ENVELOPE === "1") {
   process.exitCode = 17;
 } else if (prompt.includes("TIMEOUT_CLI")) {
   setTimeout(() => process.stdout.write(`${envelope({ text: "late output" })}\n`), 2_000);
+} else if (prompt.includes("IGNORE_SIGTERM_CLI")) {
+  process.on("SIGTERM", () => undefined);
+  setTimeout(() => process.stdout.write(`${envelope({ text: "unreachable late output" })}\n`), 2_000);
 } else if (prompt.includes("ERROR_ENVELOPE_CLI")) {
   process.stdout.write(`${envelope({ text: "", stopReason: "error" })}\n`);
 } else if (prompt.includes("NO_MODEL_CLI")) {

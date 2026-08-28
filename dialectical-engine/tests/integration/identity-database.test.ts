@@ -50,7 +50,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
-      "account_erasure_notification_outbox", "account_erasure_request", "audit_event",
+      "account_erasure_notification_outbox", "account_erasure_request",
+      "account_recovery_binding", "account_recovery_request",
+      "account_recovery_state_event", "audit_event", "authentication_risk_signal",
       "channel_binding", "login_challenge", "mfa_factor", "private_erasure_audit_binding",
       "publication_event_binding", "recovery_code", "run_execution_binding", "runtime_audit_attempt",
       "session", "step_up_grant", "user",

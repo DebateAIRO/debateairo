@@ -2281,6 +2281,29 @@ BEGIN
 END;
 $$;
 
+-- Verification rate limiting needs a stable address key for every still-
+-- retained token in the credential family, including an older token after a
+-- resend. Ordinary runtime deliberately has no SELECT privilege on the token
+-- credential table, so expose only the two opaque values required by the
+-- application rather than granting table access.
+CREATE OR REPLACE FUNCTION identity.resolve_verification_rate_limit_identity(
+  p_token_hash text
+)
+RETURNS TABLE(audit_token uuid,address_key text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  SELECT account.audit_token,encode(account.email_blind_index,'hex')
+  FROM identity.verification_token_credential AS credential
+  JOIN identity.channel_binding AS channel
+    ON channel.channel_binding_id=credential.channel_binding_id
+  JOIN identity."user" AS account ON account.user_id=channel.user_id
+  WHERE credential.token_hash=p_token_hash AND channel.channel_type='email'
+  LIMIT 1
+$$;
+
 CREATE OR REPLACE FUNCTION identity.prepare_verification_resend_with_audit(
   p_email_blind_index bytea,p_token_hash text,p_expires_at timestamptz,
   p_occurred_at timestamptz,p_cooldown_ms bigint,p_source_context jsonb
@@ -6156,6 +6179,7 @@ REVOKE ALL ON FUNCTION identity.create_pending_account_with_audit(
   uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb
 ), identity.record_verification_delivery_with_audit(uuid,timestamptz,boolean,text,jsonb),
   identity.consume_verification_with_audit(text,timestamptz,jsonb),
+  identity.resolve_verification_rate_limit_identity(text),
   identity.prepare_verification_resend_with_audit(bytea,text,timestamptz,timestamptz,bigint,jsonb),
   identity.lock_mfa_enrollment_bearer_internal(text),
   identity.begin_totp_enrollment_with_audit(text,uuid,jsonb,timestamptz,jsonb),
@@ -6272,6 +6296,70 @@ REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA
   identity,core,ledger,serve,scorecard,register,memory,evidence,evaluator
   FROM debateai_erasure_runtime;
+CREATE OR REPLACE FUNCTION core.lock_owned_live_runs(
+  p_run_ids uuid[],p_owner_ref uuid,p_legacy_asker_id text
+)
+RETURNS TABLE(run_id uuid)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+  IF p_run_ids IS NULL OR cardinality(p_run_ids)<1 OR cardinality(p_run_ids)>128
+    OR cardinality(p_run_ids)<>(
+      SELECT count(DISTINCT candidate.run_id)::integer
+      FROM unnest(p_run_ids) AS candidate(run_id)
+    )
+    OR (p_owner_ref IS NULL)=(p_legacy_asker_id IS NULL)
+    OR (p_legacy_asker_id IS NOT NULL AND btrim(p_legacy_asker_id)='') THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='OWNED_RUN_LOCK_SCOPE_INVALID';
+  END IF;
+  RETURN QUERY
+  SELECT run.run_id
+  FROM core.run AS run
+  WHERE run.run_id=ANY(p_run_ids)
+    AND core.run_is_owned_by(run.run_id,p_owner_ref,p_legacy_asker_id)
+    AND (
+      run.content_encryption_version IS DISTINCT FROM 1
+      OR core.run_private_content_is_live(run.run_id)
+    )
+  ORDER BY run.run_id
+  FOR UPDATE;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.lock_owned_live_runs(uuid[],uuid,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION core.lock_owned_live_runs(uuid[],uuid,text)
+  TO debateai_runtime;
+CREATE OR REPLACE FUNCTION core.latest_provider_probes(p_provider_refs text[])
+RETURNS TABLE (
+  probe_id uuid,
+  provider_ref text,
+  maker text,
+  state text,
+  model_id text,
+  failure_code text,
+  probed_at timestamptz
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+  SELECT DISTINCT ON (probe.provider_ref)
+    probe.probe_id,
+    probe.provider_ref,
+    probe.maker,
+    probe.state,
+    probe.model_id,
+    probe.failure_code,
+    probe.probed_at
+  FROM core.provider_probe AS probe
+  WHERE probe.provider_ref=ANY(COALESCE(p_provider_refs,ARRAY[]::text[]))
+  ORDER BY probe.provider_ref,probe.probed_at DESC,probe.probe_id DESC
+$$;
+REVOKE ALL ON FUNCTION core.latest_provider_probes(text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION core.latest_provider_probes(text[]) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.prepare_run_key_provision(uuid,uuid,uuid,uuid),
   core.lock_run_key_provision_for_commit(uuid,uuid,uuid,uuid),
   core.complete_run_key_provision(uuid,uuid,uuid,uuid),
@@ -6294,6 +6382,7 @@ GRANT EXECUTE ON FUNCTION identity.begin_runtime_audit_attempt(),
     uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb
   ), identity.record_verification_delivery_with_audit(uuid,timestamptz,boolean,text,jsonb),
   identity.consume_verification_with_audit(text,timestamptz,jsonb),
+  identity.resolve_verification_rate_limit_identity(text),
   identity.prepare_verification_resend_with_audit(bytea,text,timestamptz,timestamptz,bigint,jsonb),
   identity.begin_totp_enrollment_with_audit(text,uuid,jsonb,timestamptz,jsonb),
   identity.confirm_totp_enrollment_with_audit(text,uuid,bigint,timestamptz,jsonb),

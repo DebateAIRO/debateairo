@@ -32,6 +32,29 @@ Every finding **H5-01..H5-12** is discharged in place; all four self-flagged adj
 > propagate TBP to S03a §4 G-D (scratch-dir artifact proof) or to the product's
 > fix-tier precondition (a fail-CLOSED interlock on mutation authority).
 
+
+> **ZONE BOUNDARY REDEFINED (V-ruled 2026-08-26).** The `:193-235` line range in
+> §0 GLOBAL-FORBID and everywhere else in this document is **SUPERSEDED**. The
+> zone-route-mount region is now defined **semantically** — the single top-level
+> `if (options.registration !== undefined)` block in `buildApi` containing exactly
+> the three named auth mounts in order — and is located **at check time** by
+> `resolveZoneRouteMountRegion()` in `tests/support/zone-boundary.ts`, never by line
+> number. Line numbers are non-normative and must carry the commit they were true
+> at. Rationale: the region moved **eleven times in six days** (`:193-235` at
+> `dc9fd57`, `:206-248` at `29f370e`, `:708-739` at `dev 80362d0`), and the break was
+> introduced by `9801f85`, a tree-reorganization commit that shifted a security
+> boundary while touching nothing about auth. The region's **content** never changed
+> — only its coordinates. The byte-identity assertion is **struck** (it never
+> existed in code) and replaced by ZI-1..ZI-4. Full specs:
+> `S04-zone-boundary-correction.md` (Opus) and `S04-zone-boundary-grok.md` (Grok).
+> V rulings: no filesystem metadata on zone files at all; `apps/api/src/mfa.ts` is
+> zone-for-now; the resolver is an ordinary `tests/support/**` fixture.
+> **Also flagged, unfixed:** TP-2's "append after `packages/db/src/index.ts:603`
+> (EOF)" is EOF at `29f370e` but **mid-function on `dev`** — a scheduled bad write
+> for any future re-append; S08 `:158-191`→`:418`; `vitest.config.ts` now has a
+> third include, so GLOBAL-TEST-SURFACE's "only collected location" premise is
+> stale (S16).
+
 ## 0. Constants: roots, closure target, global file-contract floor, test surface
 
 **Production roots (reachability walk, `acceptance/README.md:1-9`):** `apps/api/src/main.ts` · `apps/runner/src/main.ts` · `apps/scheduler/src/cli.ts`. Ops side (`tools/obs-listener/`) is outside the walk (OBS-R125).

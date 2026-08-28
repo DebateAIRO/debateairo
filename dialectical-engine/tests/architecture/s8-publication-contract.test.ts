@@ -60,6 +60,12 @@ describe("Accounts S8 publication architecture", () => {
     expect(environment).toContain("AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE");
     expect(main).toContain("assertPublicationDatabaseRoleSeparation");
     expect(main).toContain("authorizationPool");
+    expect(main).toContain(
+      "const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!)"
+    );
+    expect(main).not.toMatch(
+      /const authorizationPool = environment\.PUBLICATION_ENABLED === "true"/
+    );
     expect(main).toContain("loadKek(environment.CORPUS_KEK_PATH");
     expect(main).toContain("FilePublicationKeyStore");
     const domainAttestation = main.slice(

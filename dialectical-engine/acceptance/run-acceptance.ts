@@ -209,9 +209,18 @@ export async function runAcceptanceCeremony(
       environment: runtimeEnvironment,
       serviceCredential:parsed.serviceCredential,
       makerRelays: [
-        ...(shim === null ? [] : [{ providerRef: "acceptance:codex-cli", baseUrl: shim.baseUrl, model: shim.model }]),
-        ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
-        ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])
+        ...(shim === null ? [] : [{
+          providerRef: "acceptance:codex-cli",baseUrl: shim.baseUrl,model: shim.model,
+          authorizationHeader:shim.authorizationHeader
+        }]),
+        ...(claudeRelay === null ? [] : [{
+          providerRef: "acceptance:claude-cli",baseUrl: claudeRelay.baseUrl,model: claudeRelay.model,
+          authorizationHeader:claudeRelay.authorizationHeader
+        }]),
+        ...(grokRelay === null ? [] : [{
+          providerRef: "acceptance:grok-cli",baseUrl: grokRelay.baseUrl,model: grokRelay.model,
+          authorizationHeader:grokRelay.authorizationHeader
+        }])
       ]
     });
     api = runtime.api;

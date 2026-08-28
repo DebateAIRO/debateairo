@@ -31,6 +31,25 @@ function relayMap(): ReadonlyMap<string, string> {
   }));
 }
 
+function relayAuthorizationMap(source = process.env.RELAY_AUTHORIZATION_HEADERS_JSON): ReadonlyMap<string, string> {
+  if (source === undefined) throw new Error("RELAY_AUTHORIZATION_HEADERS_JSON_REQUIRED");
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(source);
+  } catch {
+    throw new Error("RELAY_AUTHORIZATION_HEADERS_JSON_INVALID");
+  }
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
+    throw new Error("RELAY_AUTHORIZATION_HEADERS_JSON_INVALID");
+  }
+  const entries = Object.entries(decoded);
+  if (entries.some(([providerRef, value]) => providerRef.trim() === ""
+    || typeof value !== "string" || !/^Bearer [A-Za-z0-9_-]{43}$/.test(value))) {
+    throw new Error("RELAY_AUTHORIZATION_HEADERS_JSON_INVALID");
+  }
+  return new Map(entries as readonly (readonly [string, string])[]);
+}
+
 function relayRoot(value: string): string {
   const parsed = new URL(value);
   parsed.pathname = parsed.pathname.replace(/\/v1\/?$/, "");
@@ -42,6 +61,7 @@ async function main(): Promise<void> {
   if (databaseUrl === undefined) throw new Error("DATABASE_URL_REQUIRED");
   const runId = requiredOne("--run");
   const relays = relayMap();
+  const relayAuthorizations = relayAuthorizationMap();
   const pool = new Pool({ connectionString: databaseUrl });
   try {
     const [policy, scoringOperator, run, source] = await Promise.all([
@@ -54,9 +74,13 @@ async function main(): Promise<void> {
     const reviewers = run.discoveredPanel.flatMap((member) => {
       const configuredUrl = relays.get(member.provider_ref);
       if (configuredUrl === undefined) return [];
+      const authorizationHeader = relayAuthorizations.get(member.provider_ref);
+      if (authorizationHeader === undefined) {
+        throw new Error(`RELAY_AUTHORIZATION_HEADER_REQUIRED:${member.provider_ref}`);
+      }
       const baseUrl = relayRoot(configuredUrl);
       const gateway = createPostgresProviderGateway(pool, {
-        endpoint: `${baseUrl}/v1`, model: member.model_id, maker: member.maker
+        endpoint: `${baseUrl}/v1`,model: member.model_id,maker: member.maker,authorizationHeader
       });
       return [{
         maker: member.maker,
@@ -68,7 +92,8 @@ async function main(): Promise<void> {
               providerRef: member.provider_ref,
               maker: member.maker,
               baseUrl,
-              model: member.model_id
+              model: member.model_id,
+              authorizationHeader
             });
             return observation.modelId === member.model_id;
           } catch {

@@ -250,8 +250,14 @@ describe("ACC-01 dry-run ceremony", () => {
       // FAIR-01: the second maker's relay endpoint plus its honestly-reported
       // model id (live: the claude CLI handshake reports it; here: the double).
       makerRelays: [
-        { providerRef: "acceptance:codex-cli", baseUrl: provider.endpoint, model: "test-layer/model" },
-        { providerRef: "acceptance:claude-cli", baseUrl: criticProvider.endpoint, model: "test-layer/model" },
+        {
+          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "test-layer/model",
+          authorizationHeader: "Bearer test-primary-relay"
+        },
+        {
+          providerRef: "acceptance:claude-cli",baseUrl: criticProvider.endpoint,model: "test-layer/model",
+          authorizationHeader: "Bearer test-critic-relay"
+        },
       ]
     });
     try {

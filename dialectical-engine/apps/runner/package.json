@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@debateai/crypto": "workspace:*",
+    "@debateai/critique": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/db": "workspace:*",
     "@debateai/register": "workspace:*",

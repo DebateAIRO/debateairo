@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.mjs --dev",
-    "build": "next build && node scripts/assert-production-auth-routes.mjs",
+    "build": "next build && node ../../scripts/assert-auth-front-door-routes.mjs . apps-ui",
     "start": "node server.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit -p tsconfig.json",

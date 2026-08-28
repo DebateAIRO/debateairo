@@ -141,6 +141,8 @@ export async function parseCodexCompletion(
 function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {
   return {
     maker: ACCEPTANCE_MAKER,
+    authEnvironmentKeys: ["CODEX_HOME", "OPENAI_API_KEY"],
+    testEnvironmentKeys: [],
     failureCode: "CODEX_CLI_FAILED",
     timeoutCode: "CODEX_CLI_TIMEOUT",
     buildArguments: (prompt) => [
@@ -178,6 +180,7 @@ export async function startModelShim(options: ModelShimOptions): Promise<ModelSh
   return Object.freeze({
     port: server.port,
     baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
     model: handshake.model,
     maker: ACCEPTANCE_MAKER,
     close: () => server.close()

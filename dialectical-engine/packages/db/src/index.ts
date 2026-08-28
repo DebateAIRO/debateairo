@@ -922,9 +922,7 @@ export class ProviderProbeRepository {
 
   async record(input: ProviderProbeRecord): Promise<void> {
     await this.pool.query(
-      `INSERT INTO core.provider_probe (
-         probe_id, provider_ref, maker, state, model_id, failure_code, probed_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      `SELECT core.record_provider_probe($1,$2,$3,$4,$5,$6,$7)`,
       [input.probeEvidenceRef, input.providerRef, input.maker, input.state,
         input.modelId, input.failureCode, input.probedAt]
     );
@@ -941,11 +939,9 @@ export class ProviderProbeRepository {
       failure_code: string | null;
       probed_at: Date;
     }>(
-      `SELECT DISTINCT ON (provider_ref)
-         probe_id, provider_ref, maker, state, model_id, failure_code, probed_at
-       FROM core.provider_probe
-       WHERE provider_ref=ANY($1::text[])
-       ORDER BY provider_ref, probed_at DESC, probe_id DESC`,
+      `SELECT probe_id,provider_ref,maker,state,model_id,failure_code,probed_at
+       FROM core.latest_provider_probes($1::text[])
+       ORDER BY provider_ref`,
       [providerRefs]
     );
     return Object.freeze(result.rows.map((row) => Object.freeze({
@@ -1494,3 +1490,17 @@ export {
   type TotpEnrollmentRecord
 } from "./identity.js";
 export * from "./obs-schema.js";
+export {
+  accountRecoveryChannelRefsAad,
+  PostgresRecoveryStartRepository
+} from "./recovery.js";
+export {
+  AUTHENTICATION_RISK_SIGNAL_KINDS,
+  authenticationRiskSignalAad,
+  evaluateAuthenticationRiskSignals,
+  PostgresAuthenticationRiskSignalRepository,
+  type AuthenticationRiskSignalContext,
+  type AuthenticationRiskSignalKind,
+  type AuthenticationRiskSummary,
+  type DecryptedAuthenticationRiskSignal
+} from "./auth-risk.js";

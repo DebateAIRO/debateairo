@@ -3,6 +3,7 @@ import type {
   AuthSourceContext,
   LoginChallengeRecord,
   LoginIdentityRecord,
+  PostgresAuthenticationRiskSignalRepository,
   PostgresSessionRepository
 } from "@debateai/db";
 import type { Session } from "@debateai/contract";
@@ -106,6 +107,7 @@ type SessionRepository = Pick<PostgresSessionRepository,
   | "revokeSession"
   | "rotateAfterStepUp"
 >;
+type SessionRiskSignals=Pick<PostgresAuthenticationRiskSignalRepository,"recordForSession">;
 
 function asAuthFailure(error: unknown): unknown {
   return error instanceof Argon2InfrastructureError
@@ -143,6 +145,8 @@ export class SessionService implements SessionApplication {
 
   private constructor(private readonly dependencies: Readonly<{
     repository: SessionRepository;
+    riskSignals:SessionRiskSignals;
+    onRiskSignalFailure:()=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -158,6 +162,8 @@ export class SessionService implements SessionApplication {
 
   static async create(dependencies: Readonly<{
     repository: SessionRepository;
+    riskSignals:SessionRiskSignals;
+    onRiskSignalFailure:()=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -425,6 +431,12 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
+      try{
+        const recorded=await this.dependencies.riskSignals.recordForSession({
+          tokenHash:material.sessionTokenHash,bindingHash,kind:"LOGIN_SUCCESS",source
+        });
+        if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
+      }catch{this.dependencies.onRiskSignalFailure();}
       this.limiter.clearEnrollment(rateKey);
       return Object.freeze({
         status: "authenticated" as const,

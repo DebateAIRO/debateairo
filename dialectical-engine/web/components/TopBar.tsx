@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRecoveryAcknowledgementPending } from "../lib/authNavigationGuard";
 
 const SCREEN_TITLES: Record<string, string> = {
   "/": "Library",
@@ -10,9 +11,17 @@ const SCREEN_TITLES: Record<string, string> = {
   "/admin/workers": "Workers"
 };
 
-export function BrandMark({ href = "/" }: { href?: string }) {
-  return (
-    <Link className="brand" href={href} aria-label="Dialectical Engine — home">
+const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
+
+export function BrandMark({
+  href = "/",
+  homeNavigationAvailable = true
+}: {
+  href?: string;
+  homeNavigationAvailable?: boolean;
+}) {
+  const mark = (
+    <>
       <span className="brandDiamond" aria-hidden>
         <span className="brandDiamondCore" />
       </span>
@@ -20,21 +29,44 @@ export function BrandMark({ href = "/" }: { href?: string }) {
         <span className="brandName">Dialectical Engine</span>
         <span className="brandDomain">dezbatere.ro</span>
       </span>
+    </>
+  );
+
+  if (href === "/" && !homeNavigationAvailable) {
+    return (
+      <span className="brand" aria-label="Dialectical Engine — home" aria-disabled="true">
+        {mark}
+      </span>
+    );
+  }
+
+  return (
+    <Link className="brand" href={href} aria-label="Dialectical Engine — home">
+      {mark}
     </Link>
   );
 }
 
 export function TopBar() {
   const pathname = usePathname();
+  const recoveryAcknowledgementPending = useRecoveryAcknowledgementPending();
 
   // The debate view renders its own contextual chrome.
   if (pathname?.startsWith("/debate/")) return null;
+
+  if (pathname !== null && AUTH_PATHS.has(pathname)) {
+    return (
+      <header className="authTopBar">
+        <BrandMark homeNavigationAvailable={!recoveryAcknowledgementPending} />
+      </header>
+    );
+  }
 
   const title = SCREEN_TITLES[pathname ?? "/"] ?? "";
 
   return (
     <header className="topBar">
-      <BrandMark />
+      <BrandMark homeNavigationAvailable={!recoveryAcknowledgementPending} />
       {title ? (
         <div className="topBarContext">
           <span className="topBarDivider" aria-hidden />
@@ -44,6 +76,9 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
+        <Link className="btn" href="/login">
+          Account
+        </Link>
         <Link className="btn btnDark" href="/new">
           + New debate
         </Link>

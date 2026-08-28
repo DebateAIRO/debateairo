@@ -88,6 +88,119 @@ export interface ProviderGateway {
   call(request: ProviderCallRequest): Promise<ProviderCallResult>;
 }
 
+const MAX_PROVIDER_TARGETS = 32;
+const MAX_PROVIDER_TARGET_CONFIG_BYTES = 64 * 1024;
+
+export type ProviderDiscoveryTarget = Readonly<{
+  providerRef: string;
+  maker: string;
+  baseUrl: string;
+  model: string;
+  authorizationHeader?: string;
+}>;
+
+function requiredProviderTargetText(value: unknown, code: string): string {
+  if (typeof value !== "string" || value.trim() === "" || value !== value.trim()) {
+    throw new TypeError(code);
+  }
+  return value;
+}
+
+function normalizedProviderBaseUrl(value: unknown): string {
+  const source = requiredProviderTargetText(
+    value,
+    "PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID"
+  );
+  let parsed: URL;
+  try {
+    parsed = new URL(source);
+  } catch {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
+  }
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    || parsed.username !== ""
+    || parsed.password !== ""
+    || parsed.search !== ""
+    || parsed.hash !== "") {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
+  }
+  parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
+  if (!parsed.pathname.endsWith("/v1")) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
+  }
+  return parsed.toString().replace(/\/$/u, "");
+}
+
+export function parseProviderDiscoveryTargets(
+  source: string,
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[]
+): readonly ProviderDiscoveryTarget[] {
+  if (Buffer.byteLength(source, "utf8") > MAX_PROVIDER_TARGET_CONFIG_BYTES) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(source);
+  } catch {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  if (!Array.isArray(decoded) || decoded.length < 1 || decoded.length > MAX_PROVIDER_TARGETS) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  const configuredByRef = new Map<string, string>();
+  for (const configured of configuredProviders) {
+    const providerRef = requiredProviderTargetText(
+      configured.providerRef,
+      "CONFIGURED_PROVIDER_INVALID"
+    );
+    const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
+    if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
+    configuredByRef.set(providerRef, maker);
+  }
+  const targetsByRef = new Map<string, ProviderDiscoveryTarget>();
+  for (const candidate of decoded) {
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+    }
+    const row = candidate as Readonly<Record<string, unknown>>;
+    if (Object.keys(row).some((key) => ![
+      "provider_ref", "base_url", "model", "authorization_header"
+    ].includes(key))) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+    }
+    const providerRef = requiredProviderTargetText(
+      row.provider_ref,
+      "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
+    );
+    if (targetsByRef.has(providerRef)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_DUPLICATE");
+    }
+    const maker = configuredByRef.get(providerRef);
+    if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+    const authorizationHeader = row.authorization_header === undefined
+      ? undefined
+      : requiredProviderTargetText(
+          row.authorization_header,
+          "PROVIDER_DISCOVERY_AUTHORIZATION_INVALID"
+        );
+    targetsByRef.set(providerRef, Object.freeze({
+      providerRef,
+      maker,
+      baseUrl: normalizedProviderBaseUrl(row.base_url),
+      model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
+      ...(authorizationHeader === undefined ? {} : { authorizationHeader })
+    }));
+  }
+  if (targetsByRef.size !== configuredByRef.size) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+  }
+  return Object.freeze([...configuredByRef.keys()].map((providerRef) => {
+    const target = targetsByRef.get(providerRef);
+    if (target === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+    return target;
+  }));
+}
+
 export interface ProviderAdapterRegistration {
   readonly providerRef: string;
   readonly adapterKind: string;

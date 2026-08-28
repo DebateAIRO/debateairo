@@ -1,0 +1,351 @@
+{
+  "format": "debateai.account-recovery-state-machine.v1",
+  "status": "RATIFIED_DESIGN_RUNTIME_NOT_IMPLEMENTED",
+  "sourceRefs": [
+    "wave-2-target-architecture.md#103-recovery--tiered-with-time-as-the-adjudicator",
+    "../2026-08-17-mfa-recovery-requirements/RESEARCH-REPORT.md#recovery--the-tier-ladder",
+    "IMPLEMENTATION-STATUS.md#phase-2--recovery-and-roles"
+  ],
+  "scope": {
+    "ratifiedTiers": ["T0", "T1", "T2", "T3"],
+    "unratifiedTiers": ["T4_HUMAN_REVIEW"],
+    "runtimeImplemented": false,
+    "publicResponse": "ENUMERATION_RESISTANT_GENERIC",
+    "contestedClaims": "FREEZE_NOTIFY_DO_NOT_ADJUDICATE"
+  },
+  "proofMethods": [
+    {
+      "id": "PASSWORD",
+      "family": "PASSWORD_AUTHENTICATOR",
+      "recoveryInput": false,
+      "serverOwned": false
+    },
+    {
+      "id": "BOUND_AUTHENTICATOR",
+      "family": "BOUND_AUTHENTICATOR",
+      "recoveryInput": false,
+      "serverOwned": true
+    },
+    {
+      "id": "SAVED_RECOVERY_CODE",
+      "family": "RECOVERY_CODE",
+      "recoveryInput": true,
+      "serverOwned": false
+    },
+    {
+      "id": "ISSUED_VERIFIED_EMAIL_CODE",
+      "family": "VERIFIED_EMAIL_ADDRESS",
+      "recoveryInput": true,
+      "serverOwned": true
+    },
+    {
+      "id": "ISSUED_BOUND_MESSAGING_CODE",
+      "family": "BOUND_MESSAGING_ADDRESS",
+      "recoveryInput": true,
+      "serverOwned": true
+    },
+    {
+      "id": "RECOGNISED_DEVICE_POSSESSION",
+      "family": "DEVICE_POSSESSION",
+      "recoveryInput": true,
+      "serverOwned": true
+    }
+  ],
+  "tiers": [
+    {
+      "id": "T0",
+      "createsRecoveryAttempt": false,
+      "serverSignalClass": "SURVIVING_AUTHENTICATOR",
+      "requiredCredentialProofs": ["PASSWORD", "BOUND_AUTHENTICATOR"],
+      "recoveryProof": {
+        "allowedMethods": [],
+        "minimumInputs": 0,
+        "minimumDistinctFamilies": 0
+      },
+      "delayPolicy": "NONE",
+      "completionProfile": "FULL",
+      "requireNewFactor": false
+    },
+    {
+      "id": "T1",
+      "createsRecoveryAttempt": true,
+      "serverSignalClass": "STRONG_SERVER_SIGNALS",
+      "requiredCredentialProofs": ["PASSWORD"],
+      "recoveryProof": {
+        "allowedMethods": [
+          "SAVED_RECOVERY_CODE",
+          "ISSUED_VERIFIED_EMAIL_CODE",
+          "ISSUED_BOUND_MESSAGING_CODE"
+        ],
+        "minimumInputs": 1,
+        "minimumDistinctFamilies": 1
+      },
+      "delayPolicy": "T1_MAX_ELAPSED_MS",
+      "completionProfile": "FULL",
+      "requireNewFactor": true
+    },
+    {
+      "id": "T2",
+      "createsRecoveryAttempt": true,
+      "serverSignalClass": "MIXED_SERVER_SIGNALS",
+      "requiredCredentialProofs": [],
+      "recoveryProof": {
+        "allowedMethods": [
+          "SAVED_RECOVERY_CODE",
+          "ISSUED_VERIFIED_EMAIL_CODE",
+          "ISSUED_BOUND_MESSAGING_CODE",
+          "RECOGNISED_DEVICE_POSSESSION"
+        ],
+        "minimumInputs": 2,
+        "minimumDistinctFamilies": 2
+      },
+      "delayPolicy": "T2_MAX_ELAPSED_MS",
+      "completionProfile": "FULL",
+      "requireNewFactor": true
+    },
+    {
+      "id": "T3",
+      "createsRecoveryAttempt": true,
+      "serverSignalClass": "WEAK_SERVER_SIGNALS_ONE_REACHABLE_ADDRESS",
+      "requiredCredentialProofs": [],
+      "recoveryProof": {
+        "allowedMethods": ["ISSUED_VERIFIED_EMAIL_CODE", "ISSUED_BOUND_MESSAGING_CODE"],
+        "minimumInputs": 1,
+        "minimumDistinctFamilies": 1
+      },
+      "delayPolicy": "T3_FREEZE_MS",
+      "completionProfile": "RESTRICTED",
+      "requireNewFactor": true
+    }
+  ],
+  "states": [
+    { "id": "REQUESTED", "terminal": false },
+    { "id": "TIER_PINNED", "terminal": false },
+    { "id": "PROOF_PENDING", "terminal": false },
+    { "id": "FROZEN", "terminal": false },
+    { "id": "FACTOR_BINDING_REQUIRED", "terminal": false },
+    { "id": "COMPLETED_FULL", "terminal": true },
+    { "id": "COMPLETED_RESTRICTED", "terminal": true },
+    { "id": "CANCELLED", "terminal": true },
+    { "id": "REFUSED", "terminal": true },
+    { "id": "EXPIRED", "terminal": true }
+  ],
+  "transitions": [
+    {
+      "id": "PIN_SERVER_TIER",
+      "from": ["REQUESTED"],
+      "to": "TIER_PINNED",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["SERVER_DERIVED_TIER", "START_NOTICE_DURABLY_ENQUEUED"],
+      "effects": ["PIN_TIER_AND_ORIGINAL_DELAY_ANCHOR", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "OPEN_PROOF_WINDOW",
+      "from": ["TIER_PINNED"],
+      "to": "PROOF_PENDING",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["PINNED_TIER_PRESENT"],
+      "effects": ["APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "TIGHTEN_TIER_ONLY",
+      "from": ["TIER_PINNED", "PROOF_PENDING"],
+      "to": "TIER_PINNED",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["NEW_SERVER_SIGNAL", "NEW_TIER_NOT_LOWER_RISK", "ORIGINAL_DELAY_ANCHOR_PRESERVED"],
+      "effects": ["PIN_STRONGER_REQUIREMENT", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "ACCEPT_T1_PROOF",
+      "from": ["PROOF_PENDING"],
+      "to": "FACTOR_BINDING_REQUIRED",
+      "tiers": ["T1"],
+      "guards": ["T1_STRONG_SERVER_SIGNALS_STILL_HOLD", "T1_PROOF_VALID"],
+      "effects": ["CONSUME_USED_RECOVERY_INPUT", "REVOKE_ALL_SESSIONS", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "ACCEPT_T2_PROOF",
+      "from": ["PROOF_PENDING"],
+      "to": "FACTOR_BINDING_REQUIRED",
+      "tiers": ["T2"],
+      "guards": ["T2_DISTINCT_PROOF_FAMILIES_VALID"],
+      "effects": ["CONSUME_USED_RECOVERY_INPUTS", "REVOKE_ALL_SESSIONS", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "ACCEPT_T3_PROOF",
+      "from": ["PROOF_PENDING"],
+      "to": "FROZEN",
+      "tiers": ["T3"],
+      "guards": ["T3_ONE_REACHABLE_ADDRESS_PROOF_VALID", "ORIGINAL_DUE_AT_PINNED"],
+      "effects": ["FREEZE_ACCOUNT", "SCHEDULE_DELAY_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "T3_DELAY_DUE",
+      "from": ["FROZEN"],
+      "to": "FACTOR_BINDING_REQUIRED",
+      "tiers": ["T3"],
+      "guards": ["DATABASE_CLOCK_AT_OR_AFTER_ORIGINAL_DUE_AT", "REQUIRED_DELAY_NOTICES_DURABLY_ENQUEUED"],
+      "effects": ["REVOKE_ALL_SESSIONS", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "COMPLETE_T1_FULL",
+      "from": ["FACTOR_BINDING_REQUIRED"],
+      "to": "COMPLETED_FULL",
+      "tiers": ["T1"],
+      "guards": ["NEW_FACTOR_BOUND", "ALL_SESSIONS_REVOKED"],
+      "effects": ["REISSUE_CONSUMED_SAVED_RECOVERY_CODE", "ENQUEUE_COMPLETION_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "COMPLETE_T2_FULL",
+      "from": ["FACTOR_BINDING_REQUIRED"],
+      "to": "COMPLETED_FULL",
+      "tiers": ["T2"],
+      "guards": ["NEW_FACTOR_BOUND", "ALL_SESSIONS_REVOKED"],
+      "effects": ["REISSUE_CONSUMED_SAVED_RECOVERY_CODES", "START_HEIGHTENED_MONITORING", "ENQUEUE_COMPLETION_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "COMPLETE_T3_RESTRICTED",
+      "from": ["FACTOR_BINDING_REQUIRED"],
+      "to": "COMPLETED_RESTRICTED",
+      "tiers": ["T3"],
+      "guards": ["NEW_FACTOR_BOUND", "ALL_SESSIONS_REVOKED"],
+      "effects": ["ENTER_RESTRICTED_ACCOUNT_MODE", "START_HEIGHTENED_MONITORING", "ENQUEUE_COMPLETION_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "CANCEL_ACTIVE_ATTEMPT",
+      "from": ["REQUESTED", "TIER_PINNED", "PROOF_PENDING", "FROZEN", "FACTOR_BINDING_REQUIRED"],
+      "to": "CANCELLED",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["GENERATION_BOUND_CANCEL_AUTHORITY_VALID"],
+      "effects": ["UNFREEZE_IF_RECOVERY_OWNED", "LOCK_RECOVERY_RETRY", "ENQUEUE_CANCELLATION_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "REFUSE_PROOF",
+      "from": ["PROOF_PENDING"],
+      "to": "REFUSED",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["PROOF_ATTEMPT_CEILING_OR_POLICY_REFUSAL"],
+      "effects": ["ENQUEUE_REFUSAL_NOTICES", "APPEND_STATE_HISTORY"]
+    },
+    {
+      "id": "EXPIRE_ACTIVE_ATTEMPT",
+      "from": ["REQUESTED", "TIER_PINNED", "PROOF_PENDING", "FROZEN", "FACTOR_BINDING_REQUIRED"],
+      "to": "EXPIRED",
+      "tiers": ["T1", "T2", "T3"],
+      "guards": ["DATABASE_CLOCK_AT_OR_AFTER_ATTEMPT_EXPIRY", "EXPIRY_NOT_BEFORE_PINNED_DUE_AT"],
+      "effects": ["UNFREEZE_IF_RECOVERY_OWNED", "APPEND_STATE_HISTORY"]
+    }
+  ],
+  "policyKeys": [
+    {
+      "id": "T1_MAX_ELAPSED_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 1,
+      "maximum": 300000,
+      "maximumExclusive": true
+    },
+    {
+      "id": "T2_MAX_ELAPSED_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 1,
+      "maximum": 1800000,
+      "maximumExclusive": true
+    },
+    {
+      "id": "T3_FREEZE_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 604800000,
+      "maximum": 1209600000
+    },
+    {
+      "id": "POST_CANCEL_RECOVERY_LOCK_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 86400000,
+      "maximum": 86400000
+    },
+    {
+      "id": "LAST_FACTOR_REMOVAL_HOLD_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 86400000,
+      "maximum": 259200000
+    },
+    {
+      "id": "T3_RESTRICTION_MS",
+      "unit": "MILLISECONDS",
+      "minimum": 2592000000,
+      "maximum": 2592000000
+    }
+  ],
+  "notifications": {
+    "recipients": ["EVERY_HISTORICALLY_BOUND_SUPPORTED_CHANNEL", "IN_PRODUCT_SECURITY_FEED"],
+    "events": ["STARTED", "DELAY_STARTED", "DELAY_MIDPOINT", "DELAY_24H_REMAINING", "CANCELLED", "REFUSED", "COMPLETED"],
+    "startOrdering": "DURABLY_ENQUEUE_BEFORE_PROOF_OUTCOME_OR_TIER_DISCLOSURE",
+    "delaySchedule": ["DAY_ZERO", "MIDPOINT", "TWENTY_FOUR_HOURS_BEFORE_DUE"],
+    "payloadForbidden": ["PASSWORD", "AUTHENTICATOR_SECRET", "RECOVERY_CODE", "ISSUED_CODE", "INTERNAL_ACCOUNT_ID", "PROOF_ANSWER"]
+  },
+  "cancellation": {
+    "authorizers": ["SURVIVING_FACTOR_SIGN_IN", "ORIGINAL_AUTHENTICATED_SESSION", "ORIGINAL_NOTIFICATION_CAPABILITY"],
+    "activeStates": ["REQUESTED", "TIER_PINNED", "PROOF_PENDING", "FROZEN", "FACTOR_BINDING_REQUIRED"],
+    "terminalState": "CANCELLED",
+    "retryLockPolicy": "POST_CANCEL_RECOVERY_LOCK_MS",
+    "preservesHistory": true
+  },
+  "completionProfiles": [
+    {
+      "id": "FULL",
+      "allowed": ["ORDINARY_AUTHENTICATED_CAPABILITIES"],
+      "denied": [],
+      "restorationConditions": []
+    },
+    {
+      "id": "RESTRICTED",
+      "allowed": ["READ", "CREATE_PRIVATE_DEBATE"],
+      "denied": ["PUBLISH", "DELETE", "EXPORT", "CHANGE_CONTACT", "CHANGE_FACTOR", "PRIVILEGED_ROUTE"],
+      "restorationConditions": ["T3_RESTRICTION_MS_ELAPSED", "STRONGER_PROOF_COMPLETED"]
+    }
+  ],
+  "forbiddenBypasses": [
+    "CALLER_SUPPLIED_TIER",
+    "TIER_DOWNGRADE_WITHIN_ATTEMPT",
+    "RETRY_RESETS_DELAY",
+    "HUMAN_SHORTENS_OR_SKIPS_DELAY",
+    "SAME_METHOD_COUNTS_TWICE",
+    "EMAIL_ONLY_FAST_RECOVERY_WITHOUT_STRONG_SERVER_SIGNALS",
+    "DEVICE_SIGNAL_ALONE_UNLOCKS",
+    "SECRET_QUESTIONS_OR_KBA",
+    "SUPPORT_BOT_MUTATES_AUTHENTICATION_STATE",
+    "COMPLETION_WITHOUT_NEW_FACTOR",
+    "T3_COMPLETES_FULL",
+    "TERMINAL_STATE_REOPENS",
+    "NOTICE_TO_SUBSET_OF_HISTORICAL_CHANNELS",
+    "LAST_SURVIVING_FACTOR_REMOVED_BEFORE_HOLD",
+    "AUTOMATED_T4_GRANT_OR_FINAL_REFUSAL",
+    "PUBLIC_RESPONSE_REVEALS_ACCOUNT_OR_TIER"
+  ],
+  "mutations": [
+    { "id": "MUT-CALLER-TIER", "killedBy": ["TIER_AUTHORITY"] },
+    { "id": "MUT-DOWNGRADE", "killedBy": ["MONOTONIC_TIER"] },
+    { "id": "MUT-DELAY-RESET", "killedBy": ["DELAY_ANCHOR"] },
+    { "id": "MUT-SKIP-DELAY", "killedBy": ["DELAY_MINIMUM"] },
+    { "id": "MUT-DUPLICATE-FAMILY", "killedBy": ["PROOF_INDEPENDENCE"] },
+    { "id": "MUT-EMAIL-FAST", "killedBy": ["T1_ELIGIBILITY"] },
+    { "id": "MUT-DEVICE-ONLY", "killedBy": ["PROOF_SUFFICIENCY"] },
+    { "id": "MUT-KBA", "killedBy": ["KBA_FORBIDDEN"] },
+    { "id": "MUT-BOT-AUTH", "killedBy": ["SUPPORT_AUTHORITY"] },
+    { "id": "MUT-SKIP-FACTOR", "killedBy": ["FACTOR_BINDING"] },
+    { "id": "MUT-T3-FULL", "killedBy": ["RESTRICTED_COMPLETION"] },
+    { "id": "MUT-TERMINAL-REOPEN", "killedBy": ["TERMINAL_CLOSURE"] },
+    { "id": "MUT-NOTICE-SUBSET", "killedBy": ["NOTIFICATION_FANOUT"] },
+    { "id": "MUT-LAST-FACTOR-REMOVE", "killedBy": ["LAST_FACTOR_HOLD"] },
+    { "id": "MUT-AUTO-T4", "killedBy": ["T4_UNRATIFIED"] },
+    { "id": "MUT-ENUMERATION", "killedBy": ["GENERIC_PUBLIC_RESPONSE"] }
+  ],
+  "nonGoals": [
+    "IMPLEMENT_RUNTIME_ENDPOINTS",
+    "ADD_DATABASE_TABLES_OR_REGISTER_ROWS",
+    "IMPLEMENT_RISK_SIGNAL_CLASSIFIER",
+    "RATIFY_T4_HUMAN_REVIEW",
+    "IMPLEMENT_RECOVERY_CONTACTS_OR_IDENTITY_PROOFING",
+    "CHANGE_PHASE_1_RECOVERY_CODE_LOGIN"
+  ]
+}

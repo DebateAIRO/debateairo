@@ -10,6 +10,7 @@ import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 const HOME_PATH = "/";
 
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
+type VerificationMethod = "authenticator" | "recovery";
 
 function navigateHome(): void {
   window.location.assign(HOME_PATH);
@@ -24,6 +25,7 @@ export function LoginFlow({
 }>) {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
+  const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("authenticator");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ export function LoginFlow({
         String(data.get("email") ?? "").trim(),
         String(data.get("password") ?? "")
       );
+      setVerificationMethod("authenticator");
       setChallengeToken(result.challenge_token);
     } catch {
       setError("Sign-in could not be completed.");
@@ -69,12 +72,37 @@ export function LoginFlow({
     }
   }
 
+  const verificationPending = challengeToken !== null;
+  const shellCopy = replacementRecoveryCode !== null
+    ? {
+        eyebrow: "Recovery access",
+        title: "Save your new recovery code.",
+        description: "Your session is ready, but this replacement code must be recorded before you continue."
+      }
+    : verificationPending
+      ? verificationMethod === "authenticator"
+        ? {
+            eyebrow: "Two-step verification",
+            title: "Enter your authentication code.",
+            description: "Open Google Authenticator or another authenticator app and enter the current 6-digit code."
+          }
+        : {
+            eyebrow: "Two-step verification",
+            title: "Enter a recovery code.",
+            description: "Use one of the recovery codes you saved when you secured this account. Each code works once."
+          }
+      : {
+          eyebrow: "Welcome back",
+          title: "Back to the graph.",
+          description: "Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code."
+        };
+
   return (
     <AuthShell
-      eyebrow="Welcome back"
-      title="Back to the graph."
-      description="Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code."
-      footer={replacementRecoveryCode === null ? (
+      eyebrow={shellCopy.eyebrow}
+      title={shellCopy.title}
+      description={shellCopy.description}
+      footer={replacementRecoveryCode === null && !verificationPending ? (
         <p>No account yet? <Link href="/sign-up">Create one</Link></p>
       ) : null}
     >
@@ -111,21 +139,52 @@ export function LoginFlow({
           </button>
         </form>
       ) : (
-        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
-          <div className="authPhase" role="status">Password accepted. Complete the required second step to open your session.</div>
+        <form className="authForm authMfaForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
+          <p className="srOnly" role="status">Password accepted. Complete the required second step to open your session.</p>
           <div className="authField">
-            <label htmlFor="login-code">Authenticator or recovery code</label>
-            <input id="login-code" name="code" type="text" autoComplete="one-time-code" spellCheck={false} required autoFocus disabled={busy} />
+            <label htmlFor="login-code">
+              {verificationMethod === "authenticator" ? "6-digit authentication code" : "Recovery code"}
+            </label>
+            <input
+              className={verificationMethod === "authenticator" ? "authCodeInput" : "authRecoveryInput"}
+              id="login-code"
+              name="code"
+              type="text"
+              autoComplete="one-time-code"
+              inputMode={verificationMethod === "authenticator" ? "numeric" : "text"}
+              pattern={verificationMethod === "authenticator" ? "[0-9]{6}" : undefined}
+              maxLength={verificationMethod === "authenticator" ? 6 : undefined}
+              placeholder={verificationMethod === "authenticator" ? "000000" : "XXXX-XXXX-XXXX-XXXX"}
+              aria-describedby="login-code-hint"
+              spellCheck={false}
+              required
+              autoFocus
+              disabled={busy}
+            />
+            <p className="authFieldHint" id="login-code-hint">
+              {verificationMethod === "authenticator"
+                ? "Open Google Authenticator, 1Password, or your preferred authenticator."
+                : "Enter one unused code exactly as you saved it."}
+            </p>
           </div>
           <button className="authPrimary" type="submit" disabled={busy}>
-            {busy ? "Verifying…" : "Log in"}
+            {busy ? "Verifying…" : "Continue"}
           </button>
-          <button className="authTextButton" type="button" disabled={busy} onClick={() => {
-            setChallengeToken(null);
-            setError(null);
-          }}>
-            Use a different email
-          </button>
+          <div className="authMfaAlternatives">
+            <button className="authTextButton" type="button" disabled={busy} onClick={() => {
+              setVerificationMethod((current) => current === "authenticator" ? "recovery" : "authenticator");
+              setError(null);
+            }}>
+              {verificationMethod === "authenticator" ? "Use a recovery code" : "Use an authenticator code"}
+            </button>
+            <button className="authTextButton authBackButton" type="button" disabled={busy} onClick={() => {
+              setChallengeToken(null);
+              setVerificationMethod("authenticator");
+              setError(null);
+            }}>
+              Back to sign in
+            </button>
+          </div>
         </form>
       )}
     </AuthShell>

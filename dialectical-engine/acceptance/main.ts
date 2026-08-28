@@ -349,6 +349,7 @@ export interface AcceptanceMakerRelay {
   readonly providerRef: string;
   readonly baseUrl: string;
   readonly model: string;
+  readonly authorizationHeader: string;
 }
 
 /**
@@ -417,7 +418,8 @@ export async function createAcceptanceRuntime(input: {
       gateway: createPostgresProviderGateway(input.pool, {
         endpoint: `${relay.baseUrl}/v1`,
         model: relay.model,
-        maker: configured.maker
+        maker: configured.maker,
+        authorizationHeader: relay.authorizationHeader
       }),
       providerRef: configured.providerRef,
       maker: configured.maker
@@ -430,7 +432,8 @@ export async function createAcceptanceRuntime(input: {
   const provider = createPostgresProviderGateway(input.pool, {
     endpoint: `${primary.relay.baseUrl}/v1`,
     model: primary.relay.model,
-    maker: primaryProviderPolicy.maker
+    maker: primaryProviderPolicy.maker,
+    authorizationHeader: primary.relay.authorizationHeader
   });
   const longestDeadline = Math.max(
     policy.bounds.JUDGE.deadlineMs,
@@ -686,8 +689,14 @@ async function main(): Promise<void> {
     serviceCredential:z.string().regex(SERVICE_CREDENTIAL_PATTERN)
       .parse(process.env.ACCEPTANCE_SERVICE_CREDENTIAL),
     makerRelays: [
-      ...(claudeRelay === null ? [] : [{ providerRef: "acceptance:claude-cli", baseUrl: claudeRelay.baseUrl, model: claudeRelay.model }]),
-      ...(grokRelay === null ? [] : [{ providerRef: "acceptance:grok-cli", baseUrl: grokRelay.baseUrl, model: grokRelay.model }])
+      ...(claudeRelay === null ? [] : [{
+        providerRef: "acceptance:claude-cli",baseUrl: claudeRelay.baseUrl,model: claudeRelay.model,
+        authorizationHeader:claudeRelay.authorizationHeader
+      }]),
+      ...(grokRelay === null ? [] : [{
+        providerRef: "acceptance:grok-cli",baseUrl: grokRelay.baseUrl,model: grokRelay.model,
+        authorizationHeader:grokRelay.authorizationHeader
+      }])
     ]
   });
   runtime.api.addHook("onClose",async () => pool.end());

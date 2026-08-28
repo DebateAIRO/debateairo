@@ -40,6 +40,9 @@ if (process.env.FAKE_CLAUDE_ALWAYS_FAIL === "1") {
   // Long enough that the relay's deadline always fires first, while the
   // startup handshake (no marker) still answers instantly.
   setTimeout(() => process.stdout.write(`${envelope({ result: "late output" })}\n`), 2_000);
+} else if (prompt.includes("IGNORE_SIGTERM_CLI")) {
+  process.on("SIGTERM", () => undefined);
+  setTimeout(() => process.stdout.write(`${envelope({ result: "unreachable late output" })}\n`), 2_000);
 } else if (prompt.includes("IS_ERROR_CLI")) {
   // Observed live on 2026-08-10: auth failure => exit 1, is_error true,
   // result carries the CLI's own error text, modelUsage empty.
@@ -56,6 +59,6 @@ if (process.env.FAKE_CLAUDE_ALWAYS_FAIL === "1") {
   process.stdout.write("this is not a JSON envelope\n");
 } else {
   process.stdout.write(`${envelope({
-    result: JSON.stringify({ prompt, argumentList })
+    result: JSON.stringify({ prompt, argumentList, environment: process.env })
   })}\n`);
 }

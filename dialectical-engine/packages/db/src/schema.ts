@@ -41,7 +41,14 @@ export const mfaFactor = identity.table("mfa_factor", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
-  lastAcceptedStep: bigint("last_accepted_step", { mode: "number" })
+  lastAcceptedStep: bigint("last_accepted_step", { mode: "number" }),
+  relyingPartyId: text("relying_party_id"),
+  credentialOrigin: text("credential_origin"),
+  userVerificationRequired: boolean("user_verification_required"),
+  backupEligible: boolean("backup_eligible"),
+  backupState: boolean("backup_state"),
+  deviceLabelCiphertext: jsonb("device_label_ciphertext"),
+  signatureCounter: bigint("signature_counter", { mode: "number" })
 });
 
 export const recoveryCode = identity.table("recovery_code", {

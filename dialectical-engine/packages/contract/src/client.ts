@@ -187,6 +187,8 @@ const REGISTRATION_PUBLIC_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
 const RESEND_VERIFICATION_PUBLIC_MESSAGE =
   "If this address is awaiting verification, new instructions will arrive. Check your spam folder." as const;
+const RECOVERY_START_PUBLIC_MESSAGE =
+  "If this account can be recovered, instructions will arrive through an eligible channel." as const;
 
 function exactPublicMessageSchema<const Message extends string>(message: Message): {
   parse(value: unknown): Readonly<{ message: Message }>;
@@ -207,6 +209,7 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
 
 const RegistrationPublicResponseSchema = exactPublicMessageSchema(REGISTRATION_PUBLIC_MESSAGE);
 const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_VERIFICATION_PUBLIC_MESSAGE);
+const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
 export interface ContractClient {
   register(
@@ -217,6 +220,9 @@ export interface ContractClient {
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
+  }>>;
+  startRecovery(email: string): Promise<Readonly<{
+    message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
   beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
   completeLogin(challengeToken: string, code: string): Promise<{
@@ -364,6 +370,12 @@ export function createContractClient(
     resendVerification: (email: string) => request(
       "/v1/auth/resend-verification",
       ResendVerificationPublicResponseSchema,
+      { method: "POST", body: JSON.stringify({ email }) },
+      202
+    ),
+    startRecovery: (email: string) => request(
+      "/v1/auth/recovery/start",
+      RecoveryStartPublicResponseSchema,
       { method: "POST", body: JSON.stringify({ email }) },
       202
     ),

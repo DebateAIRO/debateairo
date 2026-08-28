@@ -18,6 +18,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
@@ -140,6 +141,7 @@ describe("S7 deny-by-default authorization", () => {
     const api = buildApi({
       application: fixtureApplication(),
       registration: {} as never,
+      recovery: {} as never,
       mfa: {} as never,
       sessions: {} as never,
       evaluatorDevMenu: {} as never,
@@ -240,7 +242,7 @@ describe("S7 deny-by-default authorization", () => {
     await api.close();
   });
 
-  it.each(["caller_scope", "decision_owner", "action_owner"] as const)(
+  it.each(["caller_scope", "decision_owner", "action_owner", "role"] as const)(
     "rejects the forbidden %s claim by itself",
     async (field) => {
     let submitted = false;

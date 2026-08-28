@@ -466,8 +466,8 @@ export class MemoryRepository {
         ? [input.key.runId]
         : [input.key.runId, selected.priorRunId].sort();
       const locked = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
-        [runIds]
+        `SELECT run_id FROM core.lock_owned_live_runs($1::uuid[],$2::uuid,$3::text)`,
+        [runIds, access.ownerRef, access.legacyAskerId]
       );
       if (!locked.rows.some((row) => row.run_id === input.key.runId)) {
         throw new TypedDomainError("MEMORY_RUN_NOT_FOUND", "The memory question run does not exist");
@@ -590,6 +590,7 @@ export class MemoryRepository {
     const candidates = await this.pool.query<MemoryCandidateRef>(
       `SELECT key.question_key_id, key.run_id, key.at_seq
        FROM memory.question_key AS key
+       JOIN core.run AS key_run ON key_run.run_id=key.run_id
        LEFT JOIN LATERAL (
          SELECT event.owner_ref FROM core.run_ownership_event AS event
          WHERE event.run_id=key.run_id ORDER BY event.at_seq DESC LIMIT 1
@@ -607,13 +608,9 @@ export class MemoryRepository {
            SELECT 1 FROM core.run_progress_event AS progress
            WHERE progress.run_id=key.run_id AND progress.kind='TERMINAL'
          )
-         AND NOT EXISTS (
-           SELECT 1 FROM serve.private_run_key_cleanup_intent AS erased
-           WHERE erased.run_id=key.run_id
-         )
-         AND NOT EXISTS (
-           SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
-           WHERE tombstone.run_id=key.run_id
+         AND (
+           key_run.content_encryption_version IS DISTINCT FROM 1
+           OR core.run_private_content_is_live(key.run_id)
          )
        ORDER BY key.at_seq DESC,key.question_key_id
        LIMIT $4`,
@@ -639,8 +636,9 @@ export class MemoryRepository {
     try {
       const selection = await withWriteTransaction(this.pool, async (client) => {
         const locked = await client.query<{ run_id: string }>(
-          `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`,
-          [reference.run_id]
+          `SELECT run_id
+           FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],$2::uuid,$3::text)`,
+          [reference.run_id, access.ownerRef, access.legacyAskerId]
         );
         if (locked.rows[0] === undefined) return null;
         const owned = await client.query<{ owned: boolean }>(
@@ -870,7 +868,9 @@ export class MemoryRepository {
       const runId = located.rows[0]?.run_id;
       if (runId === undefined) return null;
       const lockedRun = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE`, [runId]
+        `SELECT run_id
+         FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],$2::uuid,$3::text)`,
+        [runId, access.ownerRef, access.legacyAskerId]
       );
       if (lockedRun.rows[0] === undefined) return null;
       const owned = await client.query<{ owned: boolean }>(
@@ -935,8 +935,8 @@ export class MemoryRepository {
       const result = await withWriteTransaction(this.pool, async (client) => {
       const runIds = [reference.source_run_id, reference.prior_run_id].sort();
       const locked = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM core.run WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
-        [runIds]
+        `SELECT run_id FROM core.lock_owned_live_runs($1::uuid[],$2::uuid,$3::text)`,
+        [runIds, access.ownerRef, access.legacyAskerId]
       );
       if (locked.rows.length !== runIds.length) return null;
       for (const runId of runIds) {

@@ -141,14 +141,7 @@ export class LivenessRepository {
       SELECT run_id,question_line,content_ciphertext,created_at_seq
       FROM core.run AS run
       WHERE core.run_is_owned_by(run.run_id,$1,$2)
-        AND NOT EXISTS (
-          SELECT 1 FROM serve.private_run_key_cleanup_intent AS erased
-          WHERE erased.run_id=run.run_id
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
-          WHERE tombstone.run_id=run.run_id
-        )
+        AND core.run_private_content_is_live(run.run_id)
       ORDER BY run.created_at_seq,run.run_id
       LIMIT $3
     `, [access.ownerRef, access.legacyAskerId,MAX_OWNER_PRIVATE_HISTORY_SCAN+1]);

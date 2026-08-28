@@ -91,6 +91,12 @@ function parseClaudeEnvelope(stdout: string) {
 
 const claudeAdapter: CliRelayAdapter = {
   maker: ANTHROPIC_MAKER,
+  authEnvironmentKeys: ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"],
+  testEnvironmentKeys: [
+    "FAKE_CLAUDE_ALWAYS_FAIL",
+    "FAKE_CLAUDE_COST_ABSENT",
+    "FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT"
+  ],
   failureCode: "CLAUDE_CLI_FAILED",
   timeoutCode: "CLAUDE_CLI_TIMEOUT",
   // --no-session-persistence: relay calls must not accrete resumable sessions;
@@ -98,6 +104,8 @@ const claudeAdapter: CliRelayAdapter = {
   buildArguments: (prompt) => [
     "-p", prompt,
     "--output-format", "json",
+    "--setting-sources", "",
+    "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",
     "--model", CLAUDE_MODEL_ALIAS
@@ -141,6 +149,7 @@ export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<Cla
   return Object.freeze({
     port: server.port,
     baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
     model: handshake.model,
     maker: ANTHROPIC_MAKER,
     close: () => server.close()

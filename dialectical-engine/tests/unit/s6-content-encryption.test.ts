@@ -150,6 +150,8 @@ function stubApiEnvironment(): void {
     MAIL_FROM: "noreply@debateai.test",
     PUBLIC_APP_URL: "https://debateai.test",
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
+    AUTHORIZATION_DATABASE_URL:
+      "postgresql://authorization:pass@127.0.0.1:5432/debateai",
     ERASURE_DATABASE_URL: "postgresql://erasure:pass@127.0.0.1:5432/debateai",
     ACCOUNT_ERASURE_GRACE_MS: "604800000",
     CONTENT_PROVISION_DATABASE_URL:
