@@ -101,3 +101,48 @@ describe("v2-ui live event translation (V3 stream -> V2 live vocabulary)", () =>
     expect(refreshTriggeredBy("serve.composition_delta")).toBe(false);
   });
 });
+
+describe("pending progress copy (UI honesty: never claim 'connecting' while work is visible)", () => {
+  it("says connecting only while the stream is down AND no evidence has arrived", async () => {
+    const { pendingProgressCopy } = await import("../../apps/ui/lib/v3/liveEvents.js");
+    expect(pendingProgressCopy(createLiveRunState(), { status: "connecting" }))
+      .toBe("Connecting to the coordinator…");
+  });
+
+  it("reports phase and node counts once events flow", async () => {
+    const { pendingProgressCopy } = await import("../../apps/ui/lib/v3/liveEvents.js");
+    let state = createLiveRunState();
+    state = applyRunEvent(state, event("run.accepted"));
+    state = applyRunEvent(state, event("run.running"));
+    state = applyRunEvent(state, event("node.spawned", { parent_ref: null }, "node:a"));
+    state = applyRunEvent(state, event("node.generating", {}, "node:a"));
+    state = applyRunEvent(state, event("node.spawned", { parent_ref: "node:a" }, "node:b"));
+    state = applyRunEvent(state, event("node.being_judged", {}, "node:b"));
+    const copy = pendingProgressCopy(state, { status: "live" });
+    expect(copy).toContain("Debating");
+    expect(copy).toContain("2 nodes");
+    expect(copy).not.toContain("Connecting");
+  });
+
+  it("counts judged nodes and surfaces the composing phase", async () => {
+    const { pendingProgressCopy } = await import("../../apps/ui/lib/v3/liveEvents.js");
+    let state = createLiveRunState();
+    state = applyRunEvent(state, event("run.running"));
+    state = applyRunEvent(state, event("node.spawned", { parent_ref: null }, "node:a"));
+    state = applyRunEvent(state, event("node.complete", {}, "node:a"));
+    state = applyRunEvent(state, event("serve.composition_started"));
+    const copy = pendingProgressCopy(state, { status: "live" });
+    expect(copy).toContain("1 of 1");
+    expect(copy).toContain("Composing");
+  });
+
+  it("admits a lost connection but keeps the progress it saw", async () => {
+    const { pendingProgressCopy } = await import("../../apps/ui/lib/v3/liveEvents.js");
+    let state = createLiveRunState();
+    state = applyRunEvent(state, event("run.running"));
+    state = applyRunEvent(state, event("node.spawned", { parent_ref: null }, "node:a"));
+    const copy = pendingProgressCopy(state, { status: "reconnecting", retryInMs: 4000 });
+    expect(copy).toContain("Reconnecting");
+    expect(copy).toContain("1 node");
+  });
+});

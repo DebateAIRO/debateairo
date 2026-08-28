@@ -251,3 +251,43 @@ export function liveTreeFromState(state: LiveRunState, rootId: string, rootClaim
     children: roots.map((nodeId, index) => build(nodeId, rootId, 1, index, `0.${index}`))
   };
 }
+
+/**
+ * Honest copy for the debate page while no debate detail exists yet.
+ * "Connecting" is claimed ONLY while the stream is down and nothing has been
+ * observed; the moment evidence flows, the line reports real progress instead
+ * (a healthy two-maker debate runs for minutes and used to sit behind a static
+ * "Connecting to the coordinator…" that read as a hang).
+ */
+export function pendingProgressCopy(
+  live: LiveRunState,
+  stream: Readonly<{ status: "connecting" | "live" | "reconnecting"; retryInMs?: number }>
+): string {
+  const total = live.nodeOrder.length;
+  const settled = live.nodeOrder.filter((ref) => {
+    const lifecycle = live.nodes[ref]?.lifecycle;
+    return lifecycle === "scored" || lifecycle === "complete";
+  }).length;
+  const noEvidence = live.runPhase === "idle" && total === 0;
+
+  if (stream.status === "connecting" && noEvidence) return "Connecting to the coordinator…";
+
+  const parts: string[] = [];
+  if (live.servePhase === "composing" || live.servePhase === "conformance") {
+    parts.push("Composing the answer");
+  } else if (total > 0) {
+    parts.push("Debating");
+  } else {
+    parts.push(live.runPhase === "planning" ? "Planning the debate" : "Debate accepted");
+  }
+  if (total > 0) {
+    parts.push(settled > 0
+      ? `${settled} of ${total} ${total === 1 ? "node" : "nodes"} settled`
+      : `${total} ${total === 1 ? "node" : "nodes"} in play`);
+  }
+  if (stream.status === "reconnecting") {
+    const seconds = Math.max(1, Math.round((stream.retryInMs ?? 1000) / 1000));
+    parts.push(`Reconnecting to the live stream in ${seconds}s`);
+  }
+  return `${parts.join(" — ")}…`;
+}

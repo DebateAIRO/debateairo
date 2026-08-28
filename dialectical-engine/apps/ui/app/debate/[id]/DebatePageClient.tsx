@@ -37,8 +37,7 @@ import {
   createLiveRunState,
   liveTreeFromState,
   refreshTriggeredBy,
-  type LiveRunState
-} from "@/lib/v3/liveEvents";
+  type LiveRunState, pendingProgressCopy } from "@/lib/v3/liveEvents";
 import { AnswerHonestyDrawer } from "@/components/AnswerHonestyDrawer";
 import type {
   AdaptiveDepthDryRunItem,
@@ -1032,7 +1031,9 @@ export default function DebatePageClient({
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <p className="muted">{initialPending ? "Connecting to the coordinator…" : "Loading…"}</p>
+          <p className="muted" role="status">
+            {initialPending ? pendingProgressCopy(live, streamState) : "Loading…"}
+          </p>
         </div>
       </div>
     );
