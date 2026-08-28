@@ -26,6 +26,14 @@ What changed for this seat, binding now:
 - **Check DECISIONS.md before asking anything up the lattice** — a question answered
   there is re-asked to nobody. SPEC.md is frozen: never edit it.
 - **Read `.hermes/TOOLING-TRAPS.md` before starting; append what cost you time.**
+- **Superpowers is mandatory (V ruling, 2026-08-28).** Heartbeat says what you owe;
+  Superpowers says how to do the work well. Workers read `test-driven-development`,
+  `systematic-debugging`, `verification-before-completion`, `receiving-code-review`;
+  reviewers read `verification-before-completion`; architecture reads `brainstorming`
+  then `writing-plans`. They are markdown at
+  `~/.claude/plugins/cache/claude-plugins-official/superpowers/<newest-version>/skills/<name>/SKILL.md`.
+  Where the two overlap: heartbeat wins on process, Superpowers wins on craft.
+
 
 ## Codex role
 

@@ -27,9 +27,26 @@ loops; the loop's contract is the skill above.
 Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
 and a seat that codes never reviews its own work (§2.1).
 
-Repo sources of truth, in this order: `docs/agent-protocols/debateai-heartbeat-protocol.md`
-(the spine), your role adapter in the same directory, the mission's `INSTRUCTIONS.md`, then
-the board. Where they disagree, the higher one wins and you report the conflict.
+**Superpowers is mandatory alongside your contract (V ruling, 2026-08-28).** Load
+`superpowers:using-superpowers`, then the ones your role names. Heartbeat says WHAT you
+owe and to whom; Superpowers says HOW to work well. Where they overlap, heartbeat wins on
+process, Superpowers on craft.
+
+| Role | Load, every time |
+|---|---|
+| worker | `test-driven-development` · `verification-before-completion` · `systematic-debugging` (any bug) · `receiving-code-review` (on rework) |
+| reviewer | `verification-before-completion` · `receiving-code-review` (when your finding is contested) |
+| architecture | `brainstorming` (before committing a direction) · `writing-plans` |
+| requirements | `brainstorming` |
+| orchestrator | `dispatching-parallel-agents` · `using-git-worktrees` · `subagent-driven-development` · `executing-plans` · `finishing-a-development-branch` |
+
+Non-Claude seats (Codex, Grok) cannot invoke these: read them as markdown at
+`~/.claude/plugins/cache/claude-plugins-official/superpowers/<version>/skills/<name>/SKILL.md`,
+newest version directory.
+
+Sources of truth, in order: the spine
+(`docs/agent-protocols/debateai-heartbeat-protocol.md`), your role adapter beside it, the
+mission `INSTRUCTIONS.md`, the board. On disagreement the higher wins — and you report it.
 
 ## 2. Laws that bind every seat
 
@@ -50,9 +67,8 @@ exists for your seat, say so and stop — do not log `not ticketed` to satisfy t
 **2.5 Reproduce first.** RED before GREEN, always, including on every rework round. A test
 written after the fix, with no failing evidence, is not evidence.
 
-**2.6 Verbatim means verbatim.** Anything you format as command output must be that output.
-Report suites as `passed/total`, name every failure, and never blanket-claim that nothing is
-caused by your diff.
+**2.6 Verbatim means verbatim.** Anything formatted as command output must be that output.
+Report suites as `passed/total`, name every failure, never blanket-claim your diff is clean.
 
 **2.7 Say what you cannot do.** Blocked, unsure, out of contract, or the packet is wrong —
 say it and stop. A guess presented as a result is the most expensive thing in this harness.
@@ -75,16 +91,14 @@ is worse than none: it makes an empty record look full.
 
 ## 4. Markers
 
-`CLAIM` · `HEARTBEAT` · `BLOCKED` · `READY FOR PEER REVIEW` ·
-`READY FOR HERMES STAGE REVIEW` · `REWORK READY FOR REVIEW` · `FULLY DONE`
-
-Every marker carries its `comments read through` cursor. Return control at a handoff, a
-genuine blocker, or an IMPORTANT OPERATION — but keep the session alive and resumable.
-Silence is normal; unchanged state needs no message. Only the spine's FULLY DONE condition
-terminates a goal.
+`CLAIM` · `HEARTBEAT` · `BLOCKED` · `READY FOR PEER REVIEW` · `READY FOR HERMES STAGE
+REVIEW` · `REWORK READY FOR REVIEW` · `FULLY DONE` — each carrying its `comments read
+through` cursor. Return control at a handoff, a genuine blocker, or an IMPORTANT
+OPERATION, but keep the session alive and resumable. Silence is normal. Only the spine's
+FULLY DONE condition terminates a goal.
 
 ## 5. Never
 
-Push without V · merge (V performs every merge) · mark Done from a non-verifier seat ·
-delete product or database data · fabricate runtime data or evidence · reveal secrets ·
-cross your file contract · ignore ticket comments · sub-delegate unless your packet says you may.
+Push without V · merge (V merges) · mark Done from a non-verifier seat · delete product or
+database data · fabricate runtime data or evidence · reveal secrets · cross your file
+contract · ignore ticket comments · sub-delegate unless your packet grants it.

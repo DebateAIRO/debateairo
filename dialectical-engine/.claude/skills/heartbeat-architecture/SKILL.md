@@ -17,6 +17,10 @@ settled — re-litigating one is the failure this file exists to prevent) · the
 standing ADRs in `docs/architecture/01-decisions/` · the module design and build order in
 `docs/architecture/` · `.hermes/TOOLING-TRAPS.md`.
 
+**Superpowers, mandatory:** `superpowers:brainstorming` before you commit to a
+direction, then `superpowers:writing-plans`. Brainstorm first: a plan written before the
+direction is settled is a plan that gets rewritten.
+
 ## 2. What you produce
 
 **PLAN.md steps — finite, categoric, quantifiable. NO LINE CAP** (V ruling,

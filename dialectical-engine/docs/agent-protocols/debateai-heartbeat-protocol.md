@@ -1836,6 +1836,19 @@ in this spine conflicts with the items below, the items below win.
 13. **SELF-REPORT LAW** (R8 item 6 stands): installed at INTAKE; path in `allowed`;
     carried verbatim in every packet; the case-file bar applies; no FULLY DONE without it.
 
+14. **SUPERPOWERS IS MANDATORY (V ruling, 2026-08-28).** Every seat loads the Superpowers
+    skills its role names, alongside its heartbeat contract: worker →
+    `test-driven-development`, `verification-before-completion`, `systematic-debugging`,
+    `receiving-code-review`; reviewer → `verification-before-completion`; architecture →
+    `brainstorming` then `writing-plans`; requirements → `brainstorming`; orchestrator →
+    `dispatching-parallel-agents`, `using-git-worktrees`, `subagent-driven-development`,
+    `executing-plans`, `finishing-a-development-branch`. Heartbeat states WHAT a seat owes
+    and to whom; Superpowers states HOW to do the work well. They do not compete: where
+    they overlap, heartbeat's law wins on process (rework cap, finding discipline,
+    self-report) and Superpowers wins on craft (RED-first, root-cause-before-fix,
+    evidence-before-assertion). Non-Claude seats cannot invoke them and read them as
+    markdown under the superpowers plugin's `skills/` directory.
+
 ## v3.2.0 amendments — V-ordered laws from the first live Tier-1 mission (responsive-ui-20260724, 2026-07-24..27)
 
 1. **Fleet building (V's name for the R7 election):** run it as an explicit per-loop

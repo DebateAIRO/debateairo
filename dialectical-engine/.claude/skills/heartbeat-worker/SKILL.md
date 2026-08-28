@@ -20,6 +20,11 @@ base commit, hash, count, file path — is either verifiable or a defect. A pack
 tells you something was "never measured" when the ticket comments show otherwise. Report it
 in your first handoff; do not absorb it silently.
 
+**Superpowers, mandatory:** `superpowers:test-driven-development` before you write a
+line, `superpowers:systematic-debugging` the moment anything is broken (root cause before
+fixes — no exceptions), `superpowers:verification-before-completion` before any handoff,
+and `superpowers:receiving-code-review` on every rework round.
+
 ## 2. The refutation duty — this is the job, not an extra
 
 **A passing test proves nothing until you have tried to break it.** Before handoff, for

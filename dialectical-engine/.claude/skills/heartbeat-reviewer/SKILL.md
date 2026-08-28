@@ -21,6 +21,10 @@ outside `allowed` is a defect) · that the packet path resolves from the seat's 
 directory. **A packet defect is a finding like any other** — file it against the
 orchestrator's packet, not against the worker who obeyed it.
 
+**Superpowers, mandatory:** `superpowers:verification-before-completion` — evidence
+before assertions, always — and `superpowers:receiving-code-review` when an author
+contests your finding.
+
 ## 2. Probe, never read
 
 Every high-value verdict in this fleet's history came from a reviewer running its own
