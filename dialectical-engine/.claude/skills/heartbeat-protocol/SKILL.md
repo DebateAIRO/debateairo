@@ -1,188 +1,84 @@
 ---
 name: heartbeat-protocol
-description: Claude node contract for DebateAI Graph Spine v2. The Main Orchestrator (Claude-Router seat) contract; thin loader over the repo spine. All agent launches use /goal.
+description: Entry point for the DebateAI heartbeat loop. Routes a seat to its role contract — orchestrator, worker, reviewer, or requirements — and states the laws that bind every seat regardless of role. Load this first, then the role skill it names.
 ---
 
-# Claude Node Contract (Main Orchestrator)
+# Heartbeat Protocol — router
 
-Thin. Source of truth is the repo Graph Spine v2. This contract cements Claude's
-in-app role (Decision D1, ruling R1): Claude Code (Fable) is the **Main
-Orchestrator**, the Claude-Router seat (spine §5.1).
+**You are one seat in a fleet. Find your role, load its contract, stop reading this.**
+No role contract exceeds 100 lines. If you are reading more than ~200 lines of protocol
+before starting work, something is wrong — say so.
 
-## Read order
+## 1. Which contract is yours
 
-1. This SKILL.md
-2. `docs/agent-protocols/debateai-heartbeat-protocol.md` (Graph Spine v2)
-3. `docs/agent-protocols/claude-heartbeat-adapter.md`
-4. The current mission intake (H0) and the board's typed state blocks
+| If your packet makes you… | Load |
+|---|---|
+| decompose, route, launch seats, assemble reports | `heartbeat-orchestrator` |
+| write code, tests, or a planning artifact | `heartbeat-worker` |
+| review someone else's work or their packet | `heartbeat-reviewer` |
+| turn a V prompt into SPEC/PLAN/PROGRESS/DECISIONS | `heartbeat-requirements` |
 
-## Role: Main Orchestrator (Claude-Router seat, spine §5.1)
+Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
+and a seat that codes never reviews its own work (§2.1).
 
-Claude Code (Fable) holds the Claude-Router seat and does the following, and only
-the following:
+Repo sources of truth, in this order: `docs/agent-protocols/debateai-heartbeat-protocol.md`
+(the spine), your role adapter in the same directory, the mission's `INSTRUCTIONS.md`, then
+the board. Where they disagree, the higher one wins and you report the conflict.
 
-- **Runs the One-Prompt Machine (mission intake H0):** exactly one V prompt starts
-  a mission; thereafter only the three V-facing surfaces of D5 are open.
-- **Runs the intake loop-ownership election (ruling R7):** before kicking off the
-  Heartbeat Protocol, Claude prompts the user with the intake question: which
-  model(s) — one or more — own which loop (REQUIREMENTS ENGINEERING /
-  ARCHITECTURE / PROGRAMMING / QA)? The answers instantiate the mission's
-  `loop_ownership` map in the model-law roster (Task 3.12); only then does the
-  Heartbeat Protocol start. The election is part of the H0 design-question
-  surface — no new V-facing surface is created.
-- **Decomposes and routes missions:** breaks the mission into tickets, picks the
-  next edge from classified state, assigns `owner`, sets `status`, and advances
-  `authority_epoch` on handover — routing metadata only.
-- **Launches all agents and fleets:** spawns every worker, reviewer, and fleet the
-  mission needs.
-- **Respects the model-law roster (spine `## Binding stage and coding law`, ruling
-  R4):** worker assignment reads the versioned roster as state; Claude never
-  hard-codes a coding-agent identity and never assigns itself to code unless the
-  roster names Claude as a coding agent. Only V edits the roster.
+## 2. Laws that bind every seat
 
-Claude-Router holds **no verification and no board-mutation authority** — those are
-Hermes-Verifier's (spine §5.2: independent verification, Kanban board custody +
-crafting, Manual QA runs). Claude-Router consumes Hermes-Verifier's verdicts; it
-never produces one, never marks work Done, and never mutates the board's review
-state.
+**2.1 No reviewing your own homework.** No seat verifies, approves or accepts its own
+output — this holds for code, plans, packets and verdicts alike. The reviewer seat also
+reviews the *packet* that dispatched the work (see `heartbeat-reviewer` §1).
 
-## The /goal launch law (V ruling, 2026-07-24)
+**2.2 A finding is a finding.** Blocking or not, every finding gets a ticket and a fix.
+Non-blocking changes *when* it is fixed, never *whether*. Nothing is filed as a residual
+and forgotten — a residual dropped on the floor came back as a blocker and cost a full round.
 
-Every agent launch goes through that agent's own `/goal` command — goals are
-commonplace across the fleet's CLIs and one of the most stable invocation
-patterns available:
+**2.3 Three rework rounds, then it is V's.** Round 4 is not authorized: it goes to a V
+DECISIONS PACKET row instead. (Measured: rounds 1–3 carry 92.9% of all convergence.)
 
-1. **The Main Orchestrator launches every worker, reviewer, and loop owner with
-   `/goal <bounded goal packet>`.** The packet carries the ticket contract
-   (spine §4 launch-packet bounds apply) and ends with the return rule:
-   *"Return control at a spine handoff (READY FOR PEER REVIEW / READY FOR HERMES
-   [STAGE] REVIEW), a genuine blocker, or an IMPORTANT OPERATION, but keep the
-   unfinished goal/session alive and resumable. Silence is normal; unchanged
-   state needs no message. Termination requires the spine's goal-specific
-   FULLY DONE condition."*
-2. **Chained calls inherit the law:** when any model calls another model (Codex
-   dispatching a lane subagent, Grok launching a checker, a reviewer spawning a
-   verifier), it also calls it with that agent's `/goal` command and the same
-   return rule. Goals all the way down.
-3. **The One-Prompt Machine and chain of command are unchanged:** `/goal`
-   packets flow DOWN the authority lattice; only spine-legal surfaces flow up
-   (review handoffs, blockers, V DECISIONS PACKET rows). A `/goal` never grants
-   question authority — a launched agent that needs a design decision routes it
-   up the lattice, never to V.
-4. **Codex orchestration is explicit:** Claude-Router launches each top-level
-   Codex lane/ticket orchestrator with `/goal`. That Codex orchestrator may
-   launch only its authorized descendants, and each descendant also starts with
-   `/goal`. A handoff parks an unfinished worker; it does not terminate it.
+**2.4 The board is the state.** Not logs, not live files, not your memory. If no ticket
+exists for your seat, say so and stop — do not log `not ticketed` to satisfy the format.
 
-## Claude worker instances (spawned, not the orchestrator)
+**2.5 Reproduce first.** RED before GREEN, always, including on every rework round. A test
+written after the fix, with no failing evidence, is not evidence.
 
-When the route assigns a Claude instance as a planning-artifact worker (C2 Plan.md,
-C4 FinalPlan.md) or an independent read-only reviewer, that instance is a bounded
-worker node: it authors only its assigned artifact or review verdict, reads its
-stage/ticket state and declared upstream paths, writes `{status (to
-waiting_review/waiting_hermes), comments_read_through}` and its own artifact only,
-and never orchestrates, routes, or writes `risk_tier`/`authority_epoch`. Rework
-stays in the same stage session (spine preserved law 4); a lost session posts
-`CLAUDE BLOCKED` with `session_continuity` and needs `WORKER CONTINUITY OVERRIDE`.
+**2.6 Verbatim means verbatim.** Anything you format as command output must be that output.
+Report suites as `passed/total`, name every failure, and never blanket-claim that nothing is
+caused by your diff.
 
-## Markers
+**2.7 Say what you cannot do.** Blocked, unsure, out of contract, or the packet is wrong —
+say it and stop. A guess presented as a result is the most expensive thing in this harness.
 
-Recognize the full spine §8 union. As Claude-Router, emit the routing markers
-HERMES AUTHORIZED NEXT / HERMES AUTHORIZED ROUTE / WORKER CONTINUITY OVERRIDE,
-advance `authority_epoch` on handover, and assemble the V DECISIONS PACKET. As a
-spawned worker, emit CLAUDE HEARTBEAT / CLAUDE BLOCKED / READY FOR PEER REVIEW /
-READY FOR HERMES STAGE REVIEW / REWORK READY FOR HERMES REVIEW with the latest
-`comments read through` cursor.
+## 3. Self-report — binding, before your final handoff
 
-## Non-negotiables (spine §11.1)
+Every seat files `.hermes/reports/<mission>/agent-reports/<seat>.md`. No seat reaches FULLY
+DONE without one, and its path is in your `allowed` list at dispatch. Your packet carries
+this instruction verbatim, and it is the question your report answers:
 
-Never perform content judgment or produce a verdict (that is Hermes-Verifier);
-never mark Done or mutate board review state; never push without V approval; never
-code unless the model-law roster names Claude as a coding agent; never delete
-product/database data, create fake runtime data, reveal secrets, cross file
-contracts, or ignore ticket comments. If the orchestrator session is down, the
-Architecture-responsible agent relays directly to the humans (ruling R3) — the only
-sanctioned fallback, legal because ARCHITECTURE already holds design-question
-authority.
+> treat it like a murder case. I want to get a nice report on what can be done
+> better. What we must upgrade. what repeatedly costed us tokens. how we can
+> make the coding more efficient. How can we turn this into a one prompt machine
+> even better.
 
-## v3.2.0 amendments — V-ordered laws from the first live Tier-1 mission (responsive-ui-20260724, 2026-07-24..27)
+**A case file, not a diary.** Name the CAUSE, not the symptom. PRICE each finding —
+wall-clock, rounds, retries. Say what you NEARLY got wrong. Name DEAD ENDS so nobody
+re-derives them. Say where the packet was unclear and exactly where. An anodyne self-report
+is worse than none: it makes an empty record look full.
 
-1. **Fleet building (V's name for the R7 election):** run it as an explicit per-loop
-   election at every intake — one question per loop, multi-select of roster agents.
-   Never compress into a preset.
-2. **Visible-launch law:** agent CLIs launch in real, visible PowerShell windows the
-   human can watch (title = stage + mission; `-NoExit`; Tee to a per-stage log under
-   `.hermes/planning/<mission>/logs/`). Hardened patterns (all were live failures):
-   pass prompts via file or stdin-pipe (never inline with unescaped quotes — PS 5.1
-   drops embedded `"` for native exes); `codex exec` needs stdin closed (`< /dev/null`)
-   or it hangs awaiting EOF; Tee-Object writes UTF-16 → log watchers strip NULs;
-   `codex exec` echoes its prompt → completion markers require occurrence-counting or
-   colon-suffixed forms; ticket bodies quote marker vocabulary → match `MARKER: <payload>`
-   not bare markers; NEVER sed/heredoc-generate launchers without reading them back;
-   verify every launch (log file exists or process alive within 2 minutes).
-   **Window hygiene:** close a window only after that goal reaches its
-   spine-defined `FULLY DONE` condition; keep unfinished review/rework sessions
-   parked and resumable, and leave failed ones open for the human to read.
-3. **Stagnation liveness-law (global):** a watchdog fingerprints logs + agent CPU
-   every 5 minutes; 20 minutes with zero change across everything → freeze new
-   dispatch, preserve and park every unfinished goal/session, write the liveness
-   report, and halt the orchestrator loop pending the human. Distinct from the
-   spine's per-loop stagnation breaker (which the rework cap became — see spine
-   §10 amendment): converging loops continue; true dead air pauses the machine
-   but does not terminate unfinished agents.
-4. **Same-terminal rework through the /goal chain:** rework returns to the exact
-   original terminal/session at every level — `hermes --resume`, `grok --resume`,
-   `codex exec resume <id>`, SendMessage to the same SDK agent — including agents'
-   own subagents (each fixes its own work). Session ids are recorded at WORKER CLAIM
-   and recovered from the BOARD, never from logs. Reproduce-first is mandatory on
-   every rework: the RED test demonstrates the exact reported defect against current
-   code before any fix.
-5. **Planning-graph gate:** planning ends with a saved mission-graph IMAGE
-   (nodes/edges/routers/lanes/tiers/worktrees/merge order) at
-   `.hermes/reports/<mission>/mission-graph.svg`, presented WITH the lane-plan packet
-   row; the human's yes on the image gates programming.
-6. **Reporting laws:** every run report carries PER-AGENT token usage (named
-   accounting basis per row; capture: SDK task results, `hermes insights`, grok
-   session `updates.jsonl`, codex session footers) and a cross-run ledger for trends;
-   EVERY agent files its own SELF-REPORT (10-20 honest lines: went well / fought me /
-   would change) to `.hermes/reports/<mission>/agent-reports/` before its final
-   handoff — the harness self-improves on both.
-7. **Conversation-mode recovery:** when an agent errs or stalls, converse turn-by-turn
-   with the same session (ask what it received, what it did, why) instead of re-firing
-   bigger packets; workers who can't find something ask why and work around. Tooling
-   friction escalates to the human after ONE failed workaround, with the exact error
-   and smallest fix.
-8. **Codex-on-this-machine notes:** multi-agent collab mode is unproven (3 failed
-   fan-outs; evidence package filed) — default to direct single-session lanes with
-   the orchestrator routing; sandbox helper resolution is broken (see evidence
-   package) so lanes run `-s danger-full-access` with the file contract, no-push law,
-   and independent review as containment until Codex fixes land.
+## 4. Markers
 
-9. **Hermes board polling — the QA/SCRUM/PROGRAMMING loop surface (V amendment,
-   2026-07-27; tightened by V order 2026-08-15).** Hermes runs its OWN Kanban
-   board and serves it on **port 9119 — ALWAYS 9119, never overridden in
-   missions** (`hermes dashboard`; the `--port`/`--host` flags exist but mission
-   law pins 9119 so every agent and human always knows where the board lives).
-   The Main Orchestrator **polls that board** as the coordination surface for
-   the QA SCRUM PROGRAMMING LOOP — lane status, review state, blockers, and
-   successor routing are read from Hermes's board, not inferred from agent
-   stdout.
-   - Poll surface: `http://localhost:9119` (the board Hermes serves).
-   - **Ticket assignee notation (V order, 2026-08-15):** every Kanban ticket
-     carries its assigned model in SQUARE BRACKETS at the start of the ticket
-     title — e.g. `[codex@gpt-5.6-sol] eval-04-tagger`, `[claude-opus] review
-     PROG-05`, `[hermes] stage verdict PROG-05`; unassigned tickets carry
-     `[unassigned]`. The bracket tag is updated on every (re)assignment and
-     must agree with the mission's `loop_ownership` map / model-law roster.
-     The board's assignee column duplicates it, but the title tag is the
-     human-readable law; board-crafting and board-fix goal packets must
-     instruct Hermes accordingly.
-   - If the dashboard is not up, the orchestrator asks Hermes to start it
-     (`hermes dashboard`) rather than substituting its own tracker; the
-     `hermes kanban --board <slug>` CLI reads the same durable store and
-     remains the scriptable fallback for reads and comment writes.
-   - Board custody stays Hermes's (spine §5.2): the orchestrator READS the
-     board and routes from it; it never mutates review state.
-   - The board — not any log, live file, or host task list — is the source of
-     truth for loop state (spine: live files and host task lists are
-     read-only projections).
+`CLAIM` · `HEARTBEAT` · `BLOCKED` · `READY FOR PEER REVIEW` ·
+`READY FOR HERMES STAGE REVIEW` · `REWORK READY FOR REVIEW` · `FULLY DONE`
+
+Every marker carries its `comments read through` cursor. Return control at a handoff, a
+genuine blocker, or an IMPORTANT OPERATION — but keep the session alive and resumable.
+Silence is normal; unchanged state needs no message. Only the spine's FULLY DONE condition
+terminates a goal.
+
+## 5. Never
+
+Push without V · merge (V performs every merge) · mark Done from a non-verifier seat ·
+delete product or database data · fabricate runtime data or evidence · reveal secrets ·
+cross your file contract · ignore ticket comments · sub-delegate unless your packet says you may.

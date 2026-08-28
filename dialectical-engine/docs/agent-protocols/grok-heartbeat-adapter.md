@@ -2,6 +2,30 @@
 
 Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
+## v3.3.0 — role contracts and the laws that moved (read this first)
+
+Your role contract now lives in a file under 100 lines — READ IT IN FULL before your
+packet's work: workers read `dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md`,
+reviewers read `dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md`
+(paths from the repo root; they are plain markdown, no Claude tooling needed).
+The binding law text is the spine's "v3.3.0 amendments".
+What changed for this seat, binding now:
+
+- **Rework cap 3, no budgets.** Packets carry `rework rounds: max 3`, never tokens.
+  Entering round 4 = stop, V DECISIONS PACKET.
+- **Refutation duty before handoff:** state the property in one sentence; build the
+  mutant your assertion exists to catch; show RED; revert; show GREEN; build a
+  neighbouring mutant it should NOT catch and confirm it does not.
+- **Three-run law per cluster:** run the cluster's verification three times; the WORST
+  run is the verdict. Green-green-red is RED; re-running until green is falsification.
+- **A finding is a finding:** report every finding, blocking or not, with file and line.
+  Non-blocking sets WHEN it is fixed, never WHETHER. Nothing is a "residual".
+- **Packet defects are findings:** a wrong constant, a `allowed` list missing a mandated
+  deliverable, a claim contradicted by ticket history — report it, do not absorb it.
+- **Check DECISIONS.md before asking anything up the lattice** — a question answered
+  there is re-asked to nobody. SPEC.md is frozen: never edit it.
+- **Read `.hermes/TOOLING-TRAPS.md` before starting; append what cost you time.**
+
 ## Grok role
 
 Under the current Heartbeat law, Grok owns research/review/slicing stages and may serve as an independent read-only reviewer:
@@ -189,6 +213,43 @@ At launch and each one-minute heartbeat boundary:
 - continue the existing stage session before claiming another stage;
 - update the Hermes-declared live channel or `.hermes/live/` fallback;
 - stop polling only when Hermes closes/parks the stage chain or a V-level blocker exists.
+
+## Self-report (binding — file it before you stop)
+
+Before your final handoff you file your own self-report to
+`.hermes/reports/<mission>/agent-reports/<your-seat>.md`. You cannot reach your
+FULLY DONE condition without it. Its path is in your `allowed` list at dispatch;
+if it is not, say so in the report and file it anyway — a contract that forbids a
+mandatory deliverable is a packet defect, not your problem to absorb.
+
+Your launch packet carries this instruction verbatim, and it is the question the
+report answers:
+
+> treat it like a murder case. I want to get a nice report on what can be done
+> better. What we must upgrade. what repeatedly costed us tokens. how we can
+> make the coding more efficient. How can we turn this into a one prompt machine
+> even better.
+
+**The bar is a case file, not a diary.** Concise, meaningful, evidenced:
+
+- **Name the cause, not the symptom.** "The suite was flaky" is a symptom. "An
+  unref-ed zero-millisecond arm races process teardown, and under parallel load
+  the arm wins" is a cause.
+- **Price every finding you can** — wall-clock, tokens, rounds, or "about a third
+  of my budget". An unpriced complaint cannot be ranked against another.
+- **Quote yourself accurately.** Anything formatted as verbatim output must BE
+  verbatim, and name the file and line where the evidence lives.
+- **Say what you nearly got wrong**, not only what you got wrong. Near-misses are
+  the cheapest findings in the corpus.
+- **Name the dead ends** so the next seat does not re-derive them: what you tried,
+  why it cannot work, and the measurement that settled it.
+- **Say where the packet was unclear, and exactly where.** The orchestrator wrote
+  it and is the one who needs to know.
+- **An anodyne self-report is worse than none**, because it makes an empty record
+  look full. If nothing fought you, say so in one line and stop.
+
+Ten to twenty lines is the target, but length is not the measure: one real cause
+with its price beats twenty lines of narrative.
 
 ## Stop conditions
 

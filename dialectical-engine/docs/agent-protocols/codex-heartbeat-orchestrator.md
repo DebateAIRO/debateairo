@@ -12,6 +12,40 @@ worker-side `codex-heartbeat-adapter.md` line "Codex is the sole implementation
 worker" is superseded *for inverted missions only*; both documents stay true
 under the roster that names which seat a given session holds.
 
+## v3.3.0 — binding orchestration law for this seat (from the 100-report post-mortem)
+
+Full contract: `dialectical-engine/.claude/skills/heartbeat-orchestrator/SKILL.md` (plain
+markdown — read it in full). Law text: spine "v3.3.0 amendments". What binds every launch
+this seat makes, including lane descendants:
+
+- **Rework cap, never budgets.** Every packet you write carries `rework rounds: max 3` and
+  no token budget. Round 4 does not exist — after round 3 the item goes up the lattice
+  toward the V DECISIONS PACKET.
+- **You never review your own packet.** Route every packet you author into the review
+  seat's queue; a packet defect is a finding against you, not against the worker who
+  obeyed it.
+- **A finding is a finding.** Every finding a descendant reports — blocking or not — gets
+  a ticket the same day. The "residual" class is abolished.
+- **Watchdog at launch.** No descendant dispatch is complete until its watchdog runs, its
+  launcher was read back, its log path is verified DISTINCT, and its log appeared within
+  2 minutes. Ground truth is disk/board state, never log strings.
+- **Ledger at seat exit.** Collect each descendant's receipts the moment it reports, and
+  return them upward with your own — the reporting law propagates down the goal chain
+  with the launch law. A ledger missing any child is labelled a floor.
+- **Deliver on N-1.** A dead descendant means: tell the survivors, re-elect or record the
+  waiver, ship when the evidence base is sufficient.
+- **Version skew fails closed.** If the rules you are dispatching are newer than the spine
+  in this repo, do not dispatch — the spine is amended first, in the same commit.
+- **Self-report law.** Every descendant packet carries the verbatim murder-case
+  instruction, the self-report path inside `allowed`, and no descendant reaches FULLY
+  DONE without filing. You file your own before final handoff.
+- **Sub-delegation is explicit.** Your descendants may launch further agents only if
+  their packet grants it, and must return their children's receipts.
+- **Tooling traps.** Read `.hermes/TOOLING-TRAPS.md` before authoring launchers or
+  packets; append any trap that costs a descendant time. Several of its entries are
+  launcher-authoring laws (heredoc `$var` eating, distinct log paths, absolute packet
+  paths with existence guards).
+
 ## Read order (orchestrator session)
 
 1. This contract
@@ -138,9 +172,49 @@ Claude Code (Fable) retains exactly three duties and no routing authority:
 
 Every run report carries **per-agent token usage** (named accounting basis per
 row: codex session footers, grok `updates.jsonl`, claude `-p` JSON usage,
-`hermes insights`) and a cross-run ledger. Every seat files a 10-20 line
-SELF-REPORT to the mission's `agent-reports/` before its final handoff. The
-orchestrator assembles both; Fable presents them to V.
+`hermes insights`) and a cross-run ledger. The orchestrator assembles both; Fable presents them to V.
+
+### SELF-REPORT — binding on every agent (V order, 2026-08-28)
+
+EVERY agent — orchestrator, worker, reviewer, review lens, synthesis seat —
+files its own self-report to `.hermes/reports/<mission>/agent-reports/<seat>.md`
+before its final handoff. No seat reaches FULLY DONE without one.
+
+**Install it at INTAKE, never at closure.** The law arrived at closure in three
+consecutive missions (responsive-ui day 3, mfa-recovery as a retrofit after V
+asked twice, observability-loop after every planning seat had finished); the cost
+is ~69 of 100 corpus reports with nothing to say because nothing asked. The
+report path MUST also appear in that seat's `allowed` list at dispatch time — two
+seats five days apart were ordered to violate their own file contract to satisfy
+this deliverable.
+
+**Every launch packet carries this instruction VERBATIM:**
+
+> treat it like a murder case. I want to get a nice report on what can be done
+> better. What we must upgrade. what repeatedly costed us tokens. how we can
+> make the coding more efficient. How can we turn this into a one prompt machine
+> even better.
+
+**The bar is a case file, not a diary.** Concise, meaningful, evidenced:
+
+- **Name the cause, not the symptom.** "The suite was flaky" is a symptom. "An
+  unref-ed zero-millisecond arm races process teardown, and under parallel load
+  the arm wins" is a cause.
+- **Price every finding you can** — wall-clock, tokens, rounds, or "about a third
+  of my budget". An unpriced complaint cannot be ranked against another.
+- **Quote yourself accurately.** Anything formatted as verbatim output must BE
+  verbatim, and name the file and line where the evidence lives.
+- **Say what you nearly got wrong**, not only what you got wrong. Near-misses are
+  the cheapest findings in the corpus.
+- **Name the dead ends** so the next seat does not re-derive them: what you tried,
+  why it cannot work, and the measurement that settled it.
+- **Say where the packet was unclear, and exactly where.** The orchestrator wrote
+  it and is the one who needs to know.
+- **An anodyne self-report is worse than none**, because it makes an empty record
+  look full. If nothing fought you, say so in one line and stop.
+
+Ten to twenty lines is the target, but length is not the measure: one real cause
+with its price beats twenty lines of narrative.
 
 ## Non-negotiables (spine §11.1, unchanged)
 

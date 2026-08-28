@@ -1,7 +1,7 @@
 ---
 name: debateai-graph-spine
 title: DebateAI Graph Spine v2
-version: 3.0.0
+version: 3.3.0
 supersedes: debateai-heartbeat-protocol (pre-3.0.0), heartbeat-protocol-lite, debateai-kanban-heartbeat-review-loop
 ---
 
@@ -1663,6 +1663,23 @@ review, and rework checkable instead of vibes.
 5. Falsification tie-in (ruling R5): a mission whose report chain is incomplete
    at closure FAILS acceptance; fabricated or after-the-fact-reconstructed
    reports are evidence violations under the no-fake-evidence law.
+6. SELF-REPORTS (V order, 2026-08-28): every agent files its own self-report to
+   `.hermes/reports/<mission>/agent-reports/<seat>.md` before its final handoff;
+   no seat reaches FULLY DONE without one, and the path is in that seat's
+   `allowed` list at dispatch. The requirement is installed at INTAKE, never at
+   closure. Every launch packet carries this instruction VERBATIM:
+
+   > treat it like a murder case. I want to get a nice report on what can be done
+   > better. What we must upgrade. what repeatedly costed us tokens. how we can
+   > make the coding more efficient. How can we turn this into a one prompt machine
+   > even better.
+
+   The bar is a case file, not a diary: name the CAUSE not the symptom, PRICE
+   each finding (wall-clock, tokens, rounds), record what you NEARLY got wrong,
+   name DEAD ENDS so they are not re-derived, and say where the packet was
+   unclear. An anodyne self-report is worse than none — it makes an empty record
+   look full. A mission whose seats filed anodyne or absent self-reports has an
+   incomplete report chain under item 5.
 
 ## TDD, DDD, and worker-persistence laws (preserved from the old harness)
 
@@ -1698,6 +1715,202 @@ Stop and ask Hermes through comments when:
 - destructive or secret-bearing work is required;
 - review independence cannot be established;
 - the original session is lost and no continuity decision exists.
+
+## The goal-invocation launch law (V ruling 2026-07-24; amended v3.3.0)
+
+Every agent launch goes through that agent's own goal-invocation mechanism — for most
+CLIs the `/goal` command. AMENDED per v3.3.0 item 9: the orchestrator PROBES each CLI's
+prompt handling before first use, because a `/`-prefix fed to a CLI with its own slash
+parser (Hermes) was consumed locally and killed the seat for 3h20m.
+
+1. **The Main Orchestrator launches every worker, reviewer, and loop owner with a bounded
+   goal packet** carrying the ticket contract (§4 launch-packet bounds, plus the v3.3.0
+   packet fields: `rework rounds: max 3`, the self-report path inside `allowed`, the
+   verbatim self-report instruction). The packet ends with the return rule: *"Return
+   control at a spine handoff (READY FOR PEER REVIEW / READY FOR HERMES [STAGE] REVIEW),
+   a genuine blocker, or an IMPORTANT OPERATION, but keep the unfinished goal/session
+   alive and resumable. Silence is normal; unchanged state needs no message. Termination
+   requires the spine's goal-specific FULLY DONE condition."*
+2. **Chained calls inherit the law AND the reporting law** (v3.3.0 item 7): when any
+   model launches another, it uses that agent's goal mechanism, passes the same return
+   rule, and must return its children's receipts. Sub-delegation without packet
+   authorization is a violation.
+3. **The One-Prompt Machine and chain of command are unchanged:** goal packets flow DOWN
+   the authority lattice; only spine-legal surfaces flow up (review handoffs, blockers,
+   V DECISIONS PACKET rows). A goal launch never grants question authority — a launched
+   agent that needs a design decision first checks the slice's DECISIONS.md, then routes
+   up the lattice, never to V.
+4. **Codex orchestration is explicit:** Claude-Router launches each top-level Codex
+   lane/ticket orchestrator with `/goal`; that orchestrator may launch only its
+   authorized descendants, each also via its goal mechanism. A handoff parks an
+   unfinished worker; it does not terminate it.
+
+## v3.3.0 amendments — V-ordered, from the 100-report post-mortem ("The Round Two Problem", 2026-08-28)
+
+V ratified every prescription of the cross-mission post-mortem and amended three: rework
+counts replace token budgets everywhere; packet review belongs to the review seat; every
+finding demands a fix. The skill layer is SPLIT under the 100-line law. Where older text
+in this spine conflicts with the items below, the items below win.
+
+1. **SKILL SPLIT + 100-LINE LAW.** No skill exceeds 100 lines (frontmatter excluded);
+   skills route to skills. `heartbeat-protocol` is now a router binding every seat to the
+   cross-cutting laws; role contracts live in `heartbeat-orchestrator`,
+   `heartbeat-worker`, `heartbeat-reviewer`, `heartbeat-requirements`. A worker never
+   again reads 120 lines of routing law to find its one paragraph.
+
+2. **REWORK CAP, NOT BUDGETS.** Packets carry `rework rounds: max 3` and never a token
+   budget — budgets are volatile, rounds are fixed. Round 4 does not exist: after round 3
+   the item goes on the V DECISIONS PACKET. (Basis: rounds 1-3 carry 92.9% of measured
+   convergence; docker-hatchet already ran round-3-is-last lawfully.)
+
+3. **PACKET REVIEW IS THE REVIEW SEAT'S DUTY.** The launch packet is a reviewed artifact.
+   The orchestrator cannot review its own packet (no-reviewing-your-own-homework), so the
+   review seat checks it FIRST: quoted constants against their sources, measured/unmeasured
+   claims against ticket history, `allowed` against demanded deliverables, packet path
+   resolution. A packet defect is a finding against the orchestrator.
+
+4. **A FINDING IS A FINDING.** Every finding — blocking or non-blocking — gets a ticket
+   the same day and demands a fix; the tier sets WHEN, never WHETHER. The "residual"
+   class is abolished. A finding without a ticket by end of round does not exist, and
+   that loss class already cost a full round (F-05).
+
+5. **REFUTATION DUTY (worker).** Before handoff: state the property in one sentence;
+   build the mutant the assertion exists to catch; show RED; revert; show GREEN; build a
+   neighbouring mutant it should NOT catch and confirm it does not. An assertion that
+   pins the mutant it was shown is not a pin of the property.
+
+6. **WATCHDOG AT LAUNCH.** A dispatch without a running watchdog is incomplete. The
+   20-minute stagnation law is armed as part of launch, per-lane log paths verified
+   distinct, ground truth is disk/board state. (Cost of the gap: 6h41m of dead air.)
+
+7. **LEDGER AT SEAT EXIT + CHAIN-PROPAGATED REPORTING.** Receipts are collected the
+   moment a seat reports, not at closure. Sub-delegation requires packet authorization
+   AND returning the children's receipts; a ledger missing any is labelled a floor.
+   Unauthorized sub-delegation is a violation.
+
+8. **DELIVER ON N-1.** When a seat dies: survivors are told the comparison is now N-1;
+   a replacement is re-elected or the reduction waived with V on the record; synthesis
+   ships when the evidence base is sufficient. A straggler extends a mission only on V's
+   word.
+
+9. **INTAKE COMPLETENESS (one-prompt machine).** Intake is not done until: the R7
+   election is run; the mission compass and slice files exist (item 11); a contradiction
+   check has passed or the conflict is with V; every seat has a typed ticket whose
+   `allowed` includes its self-report path; the output skeleton is mandated (exact
+   headings, claim tags, VERDICT/CONFIDENCE/STRONGEST COUNTER); each CLI's goal
+   invocation is probed; roster base-model duplication is either absent or V-acknowledged.
+   Every later V interruption for a missing artifact is an intake defect.
+
+10. **VERSION SKEW FAILS CLOSED.** If a dispatched rule set is newer than the installed
+    skill or this spine, the dispatch does not go out; the spine is amended first, in the
+    same commit. (This amendment also repairs the standing skew: the v3.2.0 amendments
+    previously lived only in the skill and are now preserved verbatim below, so every
+    rule is discoverable from this file.)
+
+11. **MISSION FILE SYSTEM (requirements loop).** Requirements engineering produces:
+    `INSTRUCTIONS.md` — the mission compass, UNDER 100 LINES, a table of contents into
+    real docs, never an encyclopedia; and per SLICE (each slice has a code) a directory
+    `slices/<code>/` holding: **SPEC.md** (what is being built; FROZEN at creation — no
+    agent edits it after; scope changes are a new V-ratified version), **PLAN.md**
+    (finite, categoric, quantifiable steps — "requests with a missing id return 400 with
+    a message, and the test asserting this passes", never "improve error handling"; a
+    stranger can mark each step done/not-done with no judgement call), **PROGRESS.md**
+    (done / next / tried-and-failed / worked; per slice, orchestrator sole writer;
+    closure reports are assembled from these), **DECISIONS.md** (append-only; every
+    choice and why; checked before any question goes to V — a question answered there is
+    re-asked to nobody).
+
+12. **TASK CLUSTERIZATION + THREE-RUN LAW.** Every slice is broken into clusters — the
+    smallest step-groups verifiable independently, each with an id (`S02-C1`), one
+    verification command, and a file surface. A cluster's verification runs THREE times
+    and the WORST run is the verdict; green-green-red is RED, and re-running until green
+    is falsification under R5. Clusters are also the review unit.
+
+13. **SELF-REPORT LAW** (R8 item 6 stands): installed at INTAKE; path in `allowed`;
+    carried verbatim in every packet; the case-file bar applies; no FULLY DONE without it.
+
+## v3.2.0 amendments — V-ordered laws from the first live Tier-1 mission (responsive-ui-20260724, 2026-07-24..27)
+
+1. **Fleet building (V's name for the R7 election):** run it as an explicit per-loop
+   election at every intake — one question per loop, multi-select of roster agents.
+   Never compress into a preset.
+2. **Visible-launch law:** agent CLIs launch in real, visible PowerShell windows the
+   human can watch (title = stage + mission; `-NoExit`; Tee to a per-stage log under
+   `.hermes/planning/<mission>/logs/`). Hardened patterns (all were live failures):
+   pass prompts via file or stdin-pipe (never inline with unescaped quotes — PS 5.1
+   drops embedded `"` for native exes); `codex exec` needs stdin closed (`< /dev/null`)
+   or it hangs awaiting EOF; Tee-Object writes UTF-16 → log watchers strip NULs;
+   `codex exec` echoes its prompt → completion markers require occurrence-counting or
+   colon-suffixed forms; ticket bodies quote marker vocabulary → match `MARKER: <payload>`
+   not bare markers; NEVER sed/heredoc-generate launchers without reading them back;
+   verify every launch (log file exists or process alive within 2 minutes).
+   **Window hygiene:** close a window only after that goal reaches its
+   spine-defined `FULLY DONE` condition; keep unfinished review/rework sessions
+   parked and resumable, and leave failed ones open for the human to read.
+3. **Stagnation liveness-law (global):** a watchdog fingerprints logs + agent CPU
+   every 5 minutes; 20 minutes with zero change across everything → freeze new
+   dispatch, preserve and park every unfinished goal/session, write the liveness
+   report, and halt the orchestrator loop pending the human. Distinct from the
+   spine's per-loop stagnation breaker (which the rework cap became — see spine
+   §10 amendment): converging loops continue; true dead air pauses the machine
+   but does not terminate unfinished agents.
+4. **Same-terminal rework through the /goal chain:** rework returns to the exact
+   original terminal/session at every level — `hermes --resume`, `grok --resume`,
+   `codex exec resume <id>`, SendMessage to the same SDK agent — including agents'
+   own subagents (each fixes its own work). Session ids are recorded at WORKER CLAIM
+   and recovered from the BOARD, never from logs. Reproduce-first is mandatory on
+   every rework: the RED test demonstrates the exact reported defect against current
+   code before any fix.
+5. **Planning-graph gate:** planning ends with a saved mission-graph IMAGE
+   (nodes/edges/routers/lanes/tiers/worktrees/merge order) at
+   `.hermes/reports/<mission>/mission-graph.svg`, presented WITH the lane-plan packet
+   row; the human's yes on the image gates programming.
+6. **Reporting laws:** every run report carries PER-AGENT token usage (named
+   accounting basis per row; capture: SDK task results, `hermes insights`, grok
+   session `updates.jsonl`, codex session footers) and a cross-run ledger for trends;
+   EVERY agent files its own SELF-REPORT (10-20 honest lines: went well / fought me /
+   would change) to `.hermes/reports/<mission>/agent-reports/` before its final
+   handoff — the harness self-improves on both.
+7. **Conversation-mode recovery:** when an agent errs or stalls, converse turn-by-turn
+   with the same session (ask what it received, what it did, why) instead of re-firing
+   bigger packets; workers who can't find something ask why and work around. Tooling
+   friction escalates to the human after ONE failed workaround, with the exact error
+   and smallest fix.
+8. **Codex-on-this-machine notes:** multi-agent collab mode is unproven (3 failed
+   fan-outs; evidence package filed) — default to direct single-session lanes with
+   the orchestrator routing; sandbox helper resolution is broken (see evidence
+   package) so lanes run `-s danger-full-access` with the file contract, no-push law,
+   and independent review as containment until Codex fixes land.
+
+9. **Hermes board polling — the QA/SCRUM/PROGRAMMING loop surface (V amendment,
+   2026-07-27; tightened by V order 2026-08-15).** Hermes runs its OWN Kanban
+   board and serves it on **port 9119 — ALWAYS 9119, never overridden in
+   missions** (`hermes dashboard`; the `--port`/`--host` flags exist but mission
+   law pins 9119 so every agent and human always knows where the board lives).
+   The Main Orchestrator **polls that board** as the coordination surface for
+   the QA SCRUM PROGRAMMING LOOP — lane status, review state, blockers, and
+   successor routing are read from Hermes's board, not inferred from agent
+   stdout.
+   - Poll surface: `http://localhost:9119` (the board Hermes serves).
+   - **Ticket assignee notation (V order, 2026-08-15):** every Kanban ticket
+     carries its assigned model in SQUARE BRACKETS at the start of the ticket
+     title — e.g. `[codex@gpt-5.6-sol] eval-04-tagger`, `[claude-opus] review
+     PROG-05`, `[hermes] stage verdict PROG-05`; unassigned tickets carry
+     `[unassigned]`. The bracket tag is updated on every (re)assignment and
+     must agree with the mission's `loop_ownership` map / model-law roster.
+     The board's assignee column duplicates it, but the title tag is the
+     human-readable law; board-crafting and board-fix goal packets must
+     instruct Hermes accordingly.
+   - If the dashboard is not up, the orchestrator asks Hermes to start it
+     (`hermes dashboard`) rather than substituting its own tracker; the
+     `hermes kanban --board <slug>` CLI reads the same durable store and
+     remains the scriptable fallback for reads and comment writes.
+   - Board custody stays Hermes's (spine §5.2): the orchestrator READS the
+     board and routes from it; it never mutates review state.
+   - The board — not any log, live file, or host task list — is the source of
+     truth for loop state (spine: live files and host task lists are
+     read-only projections).
+
 
 ## 12. Glossary
 
