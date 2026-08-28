@@ -1752,8 +1752,10 @@ counts replace token budgets everywhere; packet review belongs to the review sea
 finding demands a fix. The skill layer is SPLIT under the 100-line law. Where older text
 in this spine conflicts with the items below, the items below win.
 
-1. **SKILL SPLIT + 100-LINE LAW.** No skill exceeds 100 lines (frontmatter excluded);
-   skills route to skills. `heartbeat-protocol` is now a router binding every seat to the
+1. **SKILL SPLIT + THE SHORT-CONTRACT RULE.** Role contracts target ~100 lines
+   (frontmatter excluded) and may exceed it when the content earns it (V amendment,
+   2026-08-28); padding and unactionable routing law are what the rule forbids, and no
+   real rule is ever cut to hit a number. Skills route to skills. `heartbeat-protocol` is now a router binding every seat to the
    cross-cutting laws; role contracts live in `heartbeat-orchestrator`,
    `heartbeat-worker`, `heartbeat-reviewer`, `heartbeat-requirements`,
    `heartbeat-architecture`. The four loops map REQUIREMENTS→requirements,

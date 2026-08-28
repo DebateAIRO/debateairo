@@ -6,8 +6,10 @@ description: Entry point for the DebateAI heartbeat loop. Routes a seat to its r
 # Heartbeat Protocol — router
 
 **You are one seat in a fleet. Find your role, load its contract, stop reading this.**
-No role contract exceeds 100 lines. If you are reading more than ~200 lines of protocol
-before starting work, something is wrong — say so.
+Role contracts target ~100 lines and may exceed it when the content earns it (V, 2026-08-28)
+— what is forbidden is padding, and making a worker read routing law it cannot act on. Never
+cut a real rule or mangle a sentence to hit a number. If you are reading more than ~200 lines
+of protocol before starting work, something is wrong — say so.
 
 ## 1. Which contract is yours
 
@@ -27,10 +29,12 @@ loops; the loop's contract is the skill above.
 Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
 and a seat that codes never reviews its own work (§2.1).
 
-**Superpowers is mandatory alongside your contract (V ruling, 2026-08-28).** Load
-`superpowers:using-superpowers`, then the ones your role names. Heartbeat says WHAT you
-owe and to whom; Superpowers says HOW to work well. Where they overlap, heartbeat wins on
-process, Superpowers on craft.
+**Superpowers is mandatory alongside your role contract (V ruling, 2026-08-28).** Load
+`superpowers:using-superpowers` first, then the ones your role names below. Heartbeat says
+WHAT you owe and to whom; Superpowers says HOW to do the work well. They do not compete —
+where they overlap, heartbeat's law wins on process (rework cap, finding discipline,
+self-report) and Superpowers wins on craft (RED-first, root-cause-before-fix,
+evidence-before-assertion).
 
 | Role | Load, every time |
 |---|---|
@@ -67,8 +71,9 @@ exists for your seat, say so and stop — do not log `not ticketed` to satisfy t
 **2.5 Reproduce first.** RED before GREEN, always, including on every rework round. A test
 written after the fix, with no failing evidence, is not evidence.
 
-**2.6 Verbatim means verbatim.** Anything formatted as command output must be that output.
-Report suites as `passed/total`, name every failure, never blanket-claim your diff is clean.
+**2.6 Verbatim means verbatim.** Anything you format as command output must be that output.
+Report suites as `passed/total`, name every failure and whether it predates you, and never
+make the blanket claim that nothing is caused by your diff.
 
 **2.7 Say what you cannot do.** Blocked, unsure, out of contract, or the packet is wrong —
 say it and stop. A guess presented as a result is the most expensive thing in this harness.
@@ -99,6 +104,6 @@ FULLY DONE condition terminates a goal.
 
 ## 5. Never
 
-Push without V · merge (V merges) · mark Done from a non-verifier seat · delete product or
-database data · fabricate runtime data or evidence · reveal secrets · cross your file
-contract · ignore ticket comments · sub-delegate unless your packet grants it.
+Push without V · merge (V performs every merge) · mark Done from a non-verifier seat ·
+delete product or database data · fabricate runtime data or evidence · reveal secrets ·
+cross your file contract · ignore ticket comments · sub-delegate unless your packet grants it.

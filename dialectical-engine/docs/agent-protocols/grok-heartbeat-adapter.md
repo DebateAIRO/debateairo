@@ -4,7 +4,7 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 ## v3.3.0 — role contracts and the laws that moved (read this first)
 
-Your role contract now lives in a file under 100 lines — READ IT IN FULL before your
+Your role contract now lives in its own short file — READ IT IN FULL before your
 packet's work: workers read `dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md`,
 reviewers read `dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md`,
 architecture seats read `dialectical-engine/.claude/skills/heartbeat-architecture/SKILL.md`
