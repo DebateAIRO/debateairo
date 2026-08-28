@@ -26,8 +26,10 @@ ever — you included. Scope changes are a NEW spec version, ratified by V, supe
 the record. This is the anti-drift anchor: when a seat wonders what it is building, the
 answer cannot have moved.
 
-**PLAN.md — finite, categoric, quantifiable steps.** Every step passes this test: *a
-stranger can mark it done or not-done with no judgement call.*
+**PLAN.md — scaffolded here, FILLED by the architecture seat.** You create the file
+with the SPEC-trace skeleton and the quantifiability law below; `heartbeat-architecture`
+authors the steps, clusters and boundaries. Both seats are bound by the same test: *a
+stranger can mark every step done or not-done with no judgement call.*
 - WRONG: "improve error handling"
 - RIGHT: "requests with a missing id return 400 with a message, and the test asserting
   this passes"

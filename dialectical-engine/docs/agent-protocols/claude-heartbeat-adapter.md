@@ -5,7 +5,8 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 ## v3.3.0 — role contracts and the laws that moved (read this first)
 
 Your role contract now lives in a skill under 100 lines: workers load
-`heartbeat-worker`, reviewers `heartbeat-reviewer` (spine "v3.3.0 amendments").
+`heartbeat-worker`, reviewers `heartbeat-reviewer`, architecture seats
+`heartbeat-architecture` (spine "v3.3.0 amendments").
 (If the Skill tool is unavailable, read the same contracts as files under
 `dialectical-engine/.claude/skills/<name>/SKILL.md`.)
 What changed for this seat, binding now:

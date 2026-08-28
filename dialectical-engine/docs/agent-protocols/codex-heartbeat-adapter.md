@@ -6,7 +6,8 @@ Read this after `docs/agent-protocols/debateai-heartbeat-protocol.md`.
 
 Your role contract now lives in a file under 100 lines — READ IT IN FULL before your
 packet's work: workers read `dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md`,
-reviewers read `dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md`
+reviewers read `dialectical-engine/.claude/skills/heartbeat-reviewer/SKILL.md`,
+architecture seats read `dialectical-engine/.claude/skills/heartbeat-architecture/SKILL.md`
 (paths from the repo root; they are plain markdown, no Claude tooling needed).
 The binding law text is the spine's "v3.3.0 amendments".
 What changed for this seat, binding now:

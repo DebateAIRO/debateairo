@@ -1755,7 +1755,9 @@ in this spine conflicts with the items below, the items below win.
 1. **SKILL SPLIT + 100-LINE LAW.** No skill exceeds 100 lines (frontmatter excluded);
    skills route to skills. `heartbeat-protocol` is now a router binding every seat to the
    cross-cutting laws; role contracts live in `heartbeat-orchestrator`,
-   `heartbeat-worker`, `heartbeat-reviewer`, `heartbeat-requirements`. A worker never
+   `heartbeat-worker`, `heartbeat-reviewer`, `heartbeat-requirements`,
+   `heartbeat-architecture`. The four loops map REQUIREMENTS→requirements,
+   ARCHITECTURE→architecture, PROGRAMMING→worker, QA→reviewer. A worker never
    again reads 120 lines of routing law to find its one paragraph.
 
 2. **REWORK CAP, NOT BUDGETS.** Packets carry `rework rounds: max 3` and never a token
@@ -1812,7 +1814,9 @@ in this spine conflicts with the items below, the items below win.
     real docs, never an encyclopedia; and per SLICE (each slice has a code) a directory
     `slices/<code>/` holding: **SPEC.md** (what is being built; FROZEN at creation — no
     agent edits it after; scope changes are a new V-ratified version), **PLAN.md**
-    (finite, categoric, quantifiable steps — "requests with a missing id return 400 with
+    (scaffolded by requirements, FILLED by the architecture seat under
+    `heartbeat-architecture` — steps, clusters, module boundaries, DDD impact;
+    finite, categoric, quantifiable steps — "requests with a missing id return 400 with
     a message, and the test asserting this passes", never "improve error handling"; a
     stranger can mark each step done/not-done with no judgement call), **PROGRESS.md**
     (done / next / tried-and-failed / worked; per slice, orchestrator sole writer;

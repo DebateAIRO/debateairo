@@ -1,6 +1,6 @@
 ---
 name: heartbeat-protocol
-description: Entry point for the DebateAI heartbeat loop. Routes a seat to its role contract — orchestrator, worker, reviewer, or requirements — and states the laws that bind every seat regardless of role. Load this first, then the role skill it names.
+description: Entry point for the DebateAI heartbeat loop. Routes a seat to its role contract — orchestrator, worker, reviewer, requirements, or architecture — and states the laws that bind every seat regardless of role. Load this first, then the role skill it names.
 ---
 
 # Heartbeat Protocol — router
@@ -14,9 +14,15 @@ before starting work, something is wrong — say so.
 | If your packet makes you… | Load |
 |---|---|
 | decompose, route, launch seats, assemble reports | `heartbeat-orchestrator` |
-| write code, tests, or a planning artifact | `heartbeat-worker` |
+| write code or tests | `heartbeat-worker` |
 | review someone else's work or their packet | `heartbeat-reviewer` |
-| turn a V prompt into SPEC/PLAN/PROGRESS/DECISIONS | `heartbeat-requirements` |
+| turn a V prompt into the mission compass and SPEC | `heartbeat-requirements` |
+| decide HOW — fill PLAN.md, clusters, boundaries, ADRs | `heartbeat-architecture` |
+
+The four loops map onto these roles: REQUIREMENTS → `heartbeat-requirements` ·
+ARCHITECTURE → `heartbeat-architecture` · PROGRAMMING → `heartbeat-worker` ·
+QA → `heartbeat-reviewer` (plus verification seats). The R7 election assigns models to
+loops; the loop's contract is the skill above.
 
 Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
 and a seat that codes never reviews its own work (§2.1).
