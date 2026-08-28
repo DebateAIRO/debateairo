@@ -19,7 +19,11 @@ standing ADRs in `docs/architecture/01-decisions/` · the module design and buil
 
 ## 2. What you produce
 
-**PLAN.md steps — finite, categoric, quantifiable.** Every step passes the stranger test:
+**PLAN.md steps — finite, categoric, quantifiable. NO LINE CAP** (V ruling,
+2026-08-28): write as many steps as the slice actually has. Never merge two steps to
+shorten the file — a merged step is an unverifiable step, and brevity is not a virtue
+here. The compass (`INSTRUCTIONS.md`, ≤100 lines) is what stays short; the plan is
+allowed to be long and boring. Every step passes the stranger test:
 markable done/not-done with no judgement call, naming its acceptance test and file
 surface. "Requests with a missing id return 400 with a message, and the test asserting
 this passes" — never "improve error handling". The banned words in acceptance criteria:

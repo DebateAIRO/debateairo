@@ -1818,7 +1818,10 @@ in this spine conflicts with the items below, the items below win.
     `heartbeat-architecture` — steps, clusters, module boundaries, DDD impact;
     finite, categoric, quantifiable steps — "requests with a missing id return 400 with
     a message, and the test asserting this passes", never "improve error handling"; a
-    stranger can mark each step done/not-done with no judgement call), **PROGRESS.md**
+    stranger can mark each step done/not-done with no judgement call; **PLAN.md has NO
+    line cap** per V's 2026-08-28 ruling — only INSTRUCTIONS.md is capped, because a
+    capped plan forces steps to be merged and made vague, which is the defect the
+    quantifiability law exists to prevent), **PROGRESS.md**
     (done / next / tried-and-failed / worked; per slice, orchestrator sole writer;
     closure reports are assembled from these), **DECISIONS.md** (append-only; every
     choice and why; checked before any question goes to V — a question answered there is

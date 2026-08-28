@@ -5,9 +5,16 @@ description: Contract for the requirements-engineering seat in the DebateAI hear
 
 # Requirements contract
 
-You turn V's mission prompt into the file system every other seat navigates by. Nothing
-you produce is an encyclopedia: **long instruction files get skimmed exactly like long
-emails.** A 2,400-line plan is not thorough; it is unread.
+You turn V's mission prompt into the file system every other seat navigates by.
+
+**Two different length laws, and the difference is the point.** `INSTRUCTIONS.md` is a
+COMPASS — pointers, not content — and it is hard-capped at 100 lines, because long
+instruction files get skimmed exactly like long emails. `PLAN.md` is a WORK LIST and has
+**NO line cap** (V ruling, 2026-08-28): every step must be finite, categoric and
+mechanically checkable, so a real slice needs as many steps as it needs. Capping a plan
+forces steps to be merged and vague — the exact defect the quantifiability law exists to
+prevent. Length is never the measure of either file; the compass is judged on whether it
+points, the plan on whether every step can be marked done by a stranger.
 
 ## 1. INSTRUCTIONS.md — the mission compass, UNDER 100 LINES. Hard cap.
 
@@ -15,7 +22,8 @@ At `docs/missions/<mission>/INSTRUCTIONS.md`: what the mission is (≤5 lines) �
 list, one line each, with each slice's code · the roster and review route · a TABLE OF
 CONTENTS pointing into real files in the docs folder — pointers, never content · the
 standing laws by name with a pointer to the spine. If you are about to write detail, you
-are writing the wrong file: detail lives in the slice files below.
+are writing the wrong file: detail lives in the slice files below, where it is welcome
+and uncapped.
 
 ## 2. Four files per SLICE — not per ticket, per slice
 
