@@ -69,6 +69,11 @@ export type DevelopmentDatabasePrincipalReceipt = Readonly<{
 }>;
 
 const ROLE_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
+const PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS = Object.freeze(
+  DEVELOPMENT_DATABASE_PRINCIPALS
+    .filter(({ environmentKey }) => environmentKey !== "EVALUATOR_DEV_MENU_DATABASE_URL")
+    .map(({ environmentKey }) => environmentKey)
+);
 
 function quoteIdentifier(value: string): string {
   if (!ROLE_NAME_PATTERN.test(value)) throw new TypeError("DEV_DATABASE_ROLE_NAME_INVALID");
@@ -82,12 +87,15 @@ function databaseLocation(url: URL): string {
   return copy.toString();
 }
 
-function credentialSource(adminDatabaseUrl: string): string {
+function credentialSource(
+  adminDatabaseUrl: string,
+  principals: readonly DevelopmentDatabasePrincipal[] = DEVELOPMENT_DATABASE_PRINCIPALS
+): string {
   const admin = new URL(adminDatabaseUrl);
   if (admin.protocol !== "postgres:" && admin.protocol !== "postgresql:") {
     throw new TypeError("DEV_DATABASE_ADMIN_URL_INVALID");
   }
-  return DEVELOPMENT_DATABASE_PRINCIPALS.map((principal) => {
+  return principals.map((principal) => {
     const url = new URL(admin);
     url.username = principal.roleName;
     url.password = randomBytes(32).toString("base64url");
@@ -95,10 +103,20 @@ function credentialSource(adminDatabaseUrl: string): string {
   }).join("\n") + "\n";
 }
 
-function readCredentials(source: string, adminDatabaseUrl: string): ReadonlyMap<string, URL> {
+function readCredentials(
+  source: string,
+  adminDatabaseUrl: string,
+  requireComplete = true
+): ReadonlyMap<string, URL> {
   const expectedLocation = databaseLocation(new URL(adminDatabaseUrl));
   const rows = source.endsWith("\n") ? source.slice(0, -1).split("\n") : source.split("\n");
-  if (rows.length !== DEVELOPMENT_DATABASE_PRINCIPALS.length) {
+  const expected = new Map<string, DevelopmentDatabasePrincipal>(
+    DEVELOPMENT_DATABASE_PRINCIPALS.map((principal) => [
+    principal.environmentKey,
+    principal
+    ])
+  );
+  if (rows.length < 1 || rows.length > expected.size) {
     throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
   const parsed = new Map<string, URL>();
@@ -106,16 +124,19 @@ function readCredentials(source: string, adminDatabaseUrl: string): ReadonlyMap<
     const separator = row.indexOf("=");
     if (separator < 1) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     const environmentKey = row.slice(0, separator);
-    if (parsed.has(environmentKey)) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
-    const value = new URL(row.slice(separator + 1));
-    parsed.set(environmentKey, value);
-  }
-  for (const principal of DEVELOPMENT_DATABASE_PRINCIPALS) {
-    const url = parsed.get(principal.environmentKey);
-    if (url === undefined || url.username !== principal.roleName || url.password.length < 32
-      || databaseLocation(url) !== expectedLocation) {
+    const principal = expected.get(environmentKey);
+    if (principal === undefined || parsed.has(environmentKey)) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
+    const value = new URL(row.slice(separator + 1));
+    if (value.username !== principal.roleName || value.password.length < 32
+      || databaseLocation(value) !== expectedLocation) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    parsed.set(environmentKey, value);
+  }
+  if (requireComplete && parsed.size !== expected.size) {
+    throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
   return parsed;
 }
@@ -156,6 +177,34 @@ async function ensureCredentialFile(
     throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
   await chmod(resolvedPath, 0o600);
+  const existingSource = await readFile(resolvedPath, "utf8");
+  const existing = readCredentials(existingSource, adminDatabaseUrl, false);
+  const missing = DEVELOPMENT_DATABASE_PRINCIPALS.filter(
+    ({ environmentKey }) => !existing.has(environmentKey)
+  );
+  if (missing.length > 0) {
+    const isExactPreEvaluatorFile = existing.size === PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS.length
+      && PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS.every((environmentKey) =>
+        existing.has(environmentKey)
+      )
+      && missing.length === 1
+      && missing[0]?.environmentKey === "EVALUATOR_DEV_MENU_DATABASE_URL";
+    if (!isExactPreEvaluatorFile) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    if (!existingSource.endsWith("\n")) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    const handle = await open(resolvedPath, "a", 0o600);
+    try {
+      const status = await handle.stat();
+      if (!status.isFile()) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+      await handle.writeFile(credentialSource(adminDatabaseUrl, missing), { encoding: "utf8" });
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
   return readCredentials(await readFile(resolvedPath, "utf8"), adminDatabaseUrl);
 }
 

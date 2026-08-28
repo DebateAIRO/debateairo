@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_DATABASE_URL =
@@ -243,7 +244,8 @@ function composeArguments(...arguments_: readonly string[]): readonly string[] {
 
 export function createDevelopmentAuthDataPlaneOperations(
   repositoryRoot: string,
-  commandEnvironment: Readonly<Record<string, string>>
+  commandEnvironment: Readonly<Record<string, string>>,
+  providerPanel: DevelopmentProviderPanel
 ): DevelopmentAuthDataPlaneOperations {
   const cwd = resolve(repositoryRoot);
   const composeEnvironment = Object.freeze({ VLLM_MODEL: "dev-auth-not-started" });
@@ -352,7 +354,10 @@ export function createDevelopmentAuthDataPlaneOperations(
       await runPnpm(
         ["dev:auth:seed-register"],
         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
-        migrationEnvironment
+        {
+          ...migrationEnvironment,
+          DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
+        }
       );
     },
     async generateSecrets() {

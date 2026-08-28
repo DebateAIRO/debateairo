@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,11 +22,13 @@ import {
   readStructuralCeilingPolicyInputs
 } from "../../packages/register/src/index.js";
 import {
-  DEVELOPMENT_DEPLOYMENT_REGISTER_ROWS,
+  buildDevelopmentDeploymentRegisterRows,
+  DEVELOPMENT_REGISTER_VERSION,
   seedDevelopmentDeploymentRegister
 } from "../../apps/runner/src/dev-deployment-register.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 let database: TestDatabase;
 const temporaryRoots: string[] = [];
@@ -39,7 +41,11 @@ async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
   const sourceRoot = process.cwd();
   const cwd = await mkdtemp(join(tmpdir(), "debateai-dev-register-cli-"));
   temporaryRoots.push(cwd);
-  const childEnvironment = { ...environment };
+  await mkdir(join(cwd, ".local", "dev-auth"), { recursive: true, mode: 0o700 });
+  const childEnvironment: NodeJS.ProcessEnv = {
+    ...environment,
+    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson
+  };
   delete childEnvironment.FORCE_COLOR;
   delete childEnvironment.NO_COLOR;
   return new Promise((resolve, reject) => {
@@ -70,6 +76,33 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it("preserves an internally consistent sealed historical bootstrap while publishing current v4", async () => {
+    const bootstrap = await loadBootstrapRegister();
+    await database.pool.query(
+      `INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
+       VALUES ($1,'riskTier','"casual"'::jsonb,'historical:dev-register-v1')`,
+      [bootstrap.registerVersion]
+    );
+    await database.pool.query(
+      `INSERT INTO register.register_version (register_version,row_count,sealed)
+       VALUES ($1,1,true)`,
+      [bootstrap.registerVersion]
+    );
+
+    await expect(seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+    })).resolves.toMatchObject({ registerVersion: DEVELOPMENT_REGISTER_VERSION });
+    expect((await database.pool.query(
+      "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=$1",
+      [bootstrap.registerVersion]
+    )).rows).toEqual([{
+      row_key: "riskTier",
+      value_json: "casual",
+      source_ref: "historical:dev-register-v1"
+    }]);
+  });
+
   it("persists recovery and product-role policies inside an exact sealed bootstrap version", async () => {
     const bootstrap = await loadBootstrapRegister();
     await persistBootstrapRegister(database.pool, bootstrap);
@@ -123,9 +156,14 @@ describe("DEV-05 complete development deployment register", () => {
 
   it("seeds exactly every production API boot row, seals it, and reuses it unchanged", async () => {
     const bootstrap = await loadBootstrapRegister();
-    const first = await seedDevelopmentDeploymentRegister({ adminPool: database.pool });
-    expect(first.registerVersion).toBe(bootstrap.registerVersion + 2);
-    expect(first.rowCount).toBeGreaterThan(DEVELOPMENT_DEPLOYMENT_REGISTER_ROWS.length);
+    const first = await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+    });
+    expect(first.registerVersion).toBe(DEVELOPMENT_REGISTER_VERSION);
+    expect(first.rowCount).toBeGreaterThan(
+      buildDevelopmentDeploymentRegisterRows(TEST_DEVELOPMENT_PROVIDER_PANEL).length
+    );
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk] = await Promise.all([
@@ -154,11 +192,12 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Local development"],
-      configuredProviders: [{
-        providerRef: "development:local-vllm",
-        maker: "Local development"
-      }]
+      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+      configuredProviders: [
+        { providerRef: "development:codex-cli", maker: "OpenAI" },
+        { providerRef: "development:claude-cli", maker: "Anthropic" },
+        { providerRef: "development:grok-cli", maker: "xAI" }
+      ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
     expect(structural).toEqual({
@@ -195,7 +234,10 @@ describe("DEV-05 complete development deployment register", () => {
       SELECT row_key,value_json,source_ref FROM register.register_row
       WHERE register_version=$1 ORDER BY row_key
     `,[first.registerVersion]);
-    await expect(seedDevelopmentDeploymentRegister({ adminPool: database.pool }))
+    await expect(seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+    }))
       .resolves.toEqual(first);
     const after = await database.pool.query<{
       row_key: string;
@@ -258,30 +300,28 @@ describe("DEV-05 complete development deployment register", () => {
   it("rejects partial or conflicting state instead of completing or resealing it", async () => {
     await database.pool.query(`
       INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-      VALUES (1,'riskTier','"casual"'::jsonb,'fixture:partial')
-    `);
-    const bootstrap = await loadBootstrapRegister();
-    await expect(persistBootstrapRegister(database.pool, bootstrap))
-      .rejects.toThrow("FX-REG-SEALED_VERSION_MISMATCH");
+      VALUES ($1,'riskTier','"casual"'::jsonb,'fixture:partial')
+    `, [DEVELOPMENT_REGISTER_VERSION]);
     expect((await database.pool.query(
-      "SELECT row_key FROM register.register_row WHERE register_version=1"
+      "SELECT row_key FROM register.register_row WHERE register_version=$1",
+      [DEVELOPMENT_REGISTER_VERSION]
     )).rows).toEqual([{ row_key: "riskTier" }]);
-    await expect(seedDevelopmentDeploymentRegister({ adminPool: database.pool }))
+    await expect(seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+    }))
       .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_DRIFT");
     expect((await database.pool.query(
-      "SELECT row_key FROM register.register_row WHERE register_version=1"
+      "SELECT row_key FROM register.register_row WHERE register_version=$1",
+      [DEVELOPMENT_REGISTER_VERSION]
     )).rows).toEqual([{ row_key: "riskTier" }]);
     expect((await database.pool.query(
-      "SELECT register_version FROM register.register_version WHERE register_version=1"
+      "SELECT register_version FROM register.register_version WHERE register_version=$1",
+      [DEVELOPMENT_REGISTER_VERSION]
     )).rows).toEqual([]);
   });
 
   it("serializes concurrent first invocation and refuses a service principal", async () => {
-    const receipts = await Promise.all(Array.from({ length: 12 }, () =>
-      seedDevelopmentDeploymentRegister({ adminPool: database.pool })
-    ));
-    expect(new Set(receipts.map((receipt) => JSON.stringify(receipt))).size).toBe(1);
-
     const password = randomBytes(24).toString("base64url");
     const statement = await database.pool.query<{ sql: string }>(
       "SELECT format('CREATE ROLE debateai_dev_register_attacker LOGIN PASSWORD %L IN ROLE debateai_runtime',$1::text) AS sql",
@@ -293,10 +333,24 @@ describe("DEV-05 complete development deployment register", () => {
     attackerUrl.password = password;
     const attackerPool: Pool = createPool(attackerUrl.toString());
     try {
-      await expect(seedDevelopmentDeploymentRegister({ adminPool: attackerPool }))
+      await expect(seedDevelopmentDeploymentRegister({
+        adminPool: attackerPool,
+        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      }))
         .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
     } finally {
       await attackerPool.end();
     }
+
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM register.register_version"
+    )).rows).toEqual([{ count: 0 }]);
+    const receipts = await Promise.all(Array.from({ length: 12 }, () =>
+      seedDevelopmentDeploymentRegister({
+        adminPool: database.pool,
+        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      })
+    ));
+    expect(new Set(receipts.map((receipt) => JSON.stringify(receipt))).size).toBe(1);
   }, 120_000);
 });

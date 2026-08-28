@@ -20,8 +20,9 @@ import {
  * on failure (observed: expired OAuth => exit 1, is_error true). The prompt
  * travels as an argument and stdin stays closed; there is no prompt echo in
  * JSON mode. The relayed model id is ALWAYS the CLI-reported one — never a
- * guessed literal, never "shim" (DR-115 lineage honesty). Zero or several
- * reported models is a loud refusal, not a pick.
+ * guessed literal, never "shim" (DR-115 lineage honesty). Modern Claude Code
+ * can report helper-model usage alongside the requested model; in that case
+ * exactly one reported lineage must match the requested model family.
  */
 export const CLAUDE_BINARY = "/Users/vladmihaimiron/.local/bin/claude" as const;
 export const ANTHROPIC_MAKER = "Anthropic" as const;
@@ -50,8 +51,29 @@ const envelopeSchema = z.object({
 
 const observedTokenUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative().optional(),
-  output_tokens: z.number().int().nonnegative().optional()
+  output_tokens: z.number().int().nonnegative().optional(),
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  canonicalModel: z.string().trim().min(1).optional()
 }).passthrough();
+
+function matchesRequestedModelFamily(model: string, usage: unknown): boolean {
+  const observed = observedTokenUsageSchema.safeParse(usage);
+  const identities = [model, ...(observed.success && observed.data.canonicalModel !== undefined
+    ? [observed.data.canonicalModel]
+    : [])];
+  return identities.some((identity) => identity.toLocaleLowerCase("en-US")
+    .split(/[^a-z0-9]+/u)
+    .includes(CLAUDE_MODEL_ALIAS));
+}
+
+function resolveClaudeModel(modelUsage: Readonly<Record<string, unknown>>): string {
+  const entries = Object.entries(modelUsage);
+  if (entries.length === 1) return entries[0]![0];
+  const requested = entries.filter(([model, usage]) => matchesRequestedModelFamily(model, usage));
+  if (requested.length === 1) return requested[0]![0];
+  throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
+}
 
 function parseClaudeEnvelope(stdout: string) {
   let decoded: unknown;
@@ -65,14 +87,14 @@ function parseClaudeEnvelope(stdout: string) {
   if (envelope.data.is_error !== false) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
   const content = envelope.data.result.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
-  const reportedModels = Object.keys(envelope.data.modelUsage);
-  const model = reportedModels[0];
-  if (reportedModels.length !== 1 || model === undefined) {
-    throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
-  }
+  const model = resolveClaudeModel(envelope.data.modelUsage);
   const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
-  const inputTokens = observed.success ? observed.data.input_tokens : undefined;
-  const outputTokens = observed.success ? observed.data.output_tokens : undefined;
+  const inputTokens = observed.success
+    ? observed.data.input_tokens ?? observed.data.inputTokens
+    : undefined;
+  const outputTokens = observed.success
+    ? observed.data.output_tokens ?? observed.data.outputTokens
+    : undefined;
   const costUsd = envelope.data.total_cost_usd;
   const usage = {
     ...(inputTokens === undefined ? {} : { promptTokens: inputTokens }),
@@ -91,7 +113,10 @@ function parseClaudeEnvelope(stdout: string) {
 
 const claudeAdapter: CliRelayAdapter = {
   maker: ANTHROPIC_MAKER,
-  authEnvironmentKeys: ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"],
+  // Claude Code's macOS credential lookup is keyed by the login identity.
+  // USER/LOGNAME are non-secret locators; without them an authenticated CLI
+  // becomes "Not logged in" inside the relay's otherwise-empty environment.
+  authEnvironmentKeys: ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "USER", "LOGNAME"],
   testEnvironmentKeys: [
     "FAKE_CLAUDE_ALWAYS_FAIL",
     "FAKE_CLAUDE_COST_ABSENT",

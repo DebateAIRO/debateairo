@@ -39,6 +39,26 @@ describe("S6 content-encryption architecture contract", () => {
     expect(runner.dependencies?.["@debateai/crypto"]).toBe("workspace:*");
   });
 
+  it("shares the content-lease scope across duplicate workspace module instances", async () => {
+    const database = await read("packages/db/src/index.ts");
+    expect(database).toContain("type ContentLeaseScopeState = Readonly<{");
+    expect(database).toContain("__debateaiRunContentLeaseScopeV1?: AsyncLocalStorage<ContentLeaseScopeState>");
+    expect(database).toContain("databaseGlobals.__debateaiRunContentLeaseScopeV1");
+    expect(database).toContain("??= new AsyncLocalStorage<ContentLeaseScopeState>()");
+    const acquisition = database.slice(
+      database.indexOf("export async function acquireRunContentLease("),
+      database.indexOf("export async function withRunContentLease<T>(")
+    );
+    expect(acquisition).toContain(
+      "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired"
+    );
+    expect(acquisition).not.toContain(
+      "SELECT pg_advisory_lock(hashtextextended($1,0))"
+    );
+    expect(acquisition).toContain("await unlock()");
+    expect(acquisition).toContain("setTimeout(resolve,10)");
+  });
+
   it("keeps evaluator key preparation outside harvest transactions and add-on run locks", async () => {
     const evaluator = await read("packages/evaluator/src/index.ts");
     const harvest = evaluator.slice(
@@ -120,6 +140,12 @@ describe("S6 content-encryption architecture contract", () => {
     expect(database).toContain("export const MAX_OWNER_PRIVATE_HISTORY_SCAN = 128");
     expect(liveness).toContain("LIMIT $3");
     expect(liveness).toContain("MAX_OWNER_PRIVATE_HISTORY_SCAN+1");
+    expect(liveness).toContain(
+      "FROM core.lock_owned_live_runs($1::uuid[],$2::uuid,$3::text)"
+    );
+    expect(liveness).not.toMatch(
+      /SELECT run_id FROM core\.run\s+WHERE run_id=ANY\(\$1::uuid\[\]\) ORDER BY run_id FOR UPDATE/
+    );
     expect(memory).toContain("LIMIT $4");
     expect(memory).toContain("MAX_OWNER_PRIVATE_HISTORY_SCAN+1");
     for (const source of [liveness,memory]) {

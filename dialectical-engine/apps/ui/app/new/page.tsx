@@ -98,7 +98,7 @@ function NewDebateForm({ token }: { token: string }) {
         riskTierWasEdited
       }, submitTime);
       const debate = await createDebate(topic.trim(), config, token);
-      router.push(`/debate/${encodeURIComponent(debate.id)}`);
+      router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Unable to create debate");
     } finally {

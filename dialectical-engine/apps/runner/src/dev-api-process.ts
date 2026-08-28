@@ -6,7 +6,10 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseApiEnvironment } from "@debateai/register";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "./dev-api-environment.js";
-import { DEVELOPMENT_LOCAL_PROVIDER_TARGET } from "./dev-local-provider.js";
+import {
+  DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+  parseDevelopmentProviderPanelTargets
+} from "./dev-provider-panel.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -152,6 +155,9 @@ function validateExactEnvironment(
 ): void {
   try {
     parseApiEnvironment(values);
+    const providerPanel = parseDevelopmentProviderPanelTargets(
+      values.PROVIDER_DISCOVERY_TARGETS_JSON!
+    );
     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
     const exact = new Map<string, string>([
       ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
@@ -171,15 +177,11 @@ function validateExactEnvironment(
       ["API_HOST", LOCAL_API_HOST],
       ["API_PORT", String(LOCAL_API_PORT)],
       ["STRANGER_SAMPLE_RATE", "0"],
-      ["REGISTER_VERSION", "3"],
+      ["REGISTER_VERSION", "4"],
       ["BATTERY_VERSION", "dev-auth-v1"],
       ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
-      ["PROVIDER_DISCOVERY_TARGETS_JSON", JSON.stringify([{
-        provider_ref: DEVELOPMENT_LOCAL_PROVIDER_TARGET.providerRef,
-        base_url: DEVELOPMENT_LOCAL_PROVIDER_TARGET.baseUrl,
-        model: DEVELOPMENT_LOCAL_PROVIDER_TARGET.model
-      }])],
-      ["PROVIDER_PROBE_TIMEOUT_MS", "5000"],
+      ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
+      ["PROVIDER_PROBE_TIMEOUT_MS", String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS)],
       ["NODE_ENV", "development"],
       ["EVALUATOR_DEV_MENU_ENABLED", "false"],
       ["HATCHET_HOST_PORT", "127.0.0.1:7077"],

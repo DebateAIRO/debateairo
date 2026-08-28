@@ -272,7 +272,7 @@ function createObservedHistoryPool(): Readonly<{
       : typeof statement === "object" && statement !== null && "text" in statement
         ? String((statement as { text:unknown }).text)
         : "";
-    if (/pg_advisory_lock\s*\(/i.test(sql)) counters.advisoryLocks += 1;
+    if (/pg_(?:try_)?advisory_lock\s*\(/i.test(sql)) counters.advisoryLocks += 1;
     if (/INSERT\s+INTO\s+core\.question_liveness_event/i.test(sql)) counters.livenessWrites += 1;
     if (/INSERT\s+INTO\s+memory\.question_key/i.test(sql)) counters.memoryWrites += 1;
   };
@@ -4022,6 +4022,75 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       ])).rejects.toMatchObject({ code: "CONTENT_LEASE_SCOPE_EXPANSION_FORBIDDEN" });
     }
   });
+
+  it("lets a content-lease holder use a maxed shared pool while followers wait", async () => {
+    const runId = await createEncryptedRun(`S10 content pool progress ${randomUUID()}`);
+    const applicationName = `s10-content-pool-progress-${randomUUID()}`;
+    const sharedPool = new PgPool({
+      connectionString: database.connectionString,
+      application_name: applicationName,
+      max: 2
+    });
+    sharedPool.on("error",() => undefined);
+    configureContentEncryption(sharedPool,new ContentCipher(keys));
+    let beginHolderQuery!: () => void;
+    let releaseHolder!: () => void;
+    let reportHolderEntered!: () => void;
+    let reportHolderQueryComplete!: () => void;
+    const holderEntered = new Promise<void>((resolve) => { reportHolderEntered = resolve; });
+    const holderQueryGate = new Promise<void>((resolve) => { beginHolderQuery = resolve; });
+    const holderQueryComplete = new Promise<void>((resolve) => { reportHolderQueryComplete = resolve; });
+    const holderRelease = new Promise<void>((resolve) => { releaseHolder = resolve; });
+    let holder: Promise<void> | undefined;
+    let followers: Promise<unknown>[] = [];
+    let followersDone: Promise<unknown[]> | undefined;
+    try {
+      holder = withRunContentLease(sharedPool,[runId],async () => {
+        reportHolderEntered();
+        await holderQueryGate;
+        await sharedPool.query("SELECT 1");
+        reportHolderQueryComplete();
+        await holderRelease;
+      });
+      void holder.catch(() => undefined);
+      await holderEntered;
+      followers = [0].map(() => withRunContentLease(
+        sharedPool,[runId],async () => "acquired"
+      ));
+      followersDone = Promise.all(followers);
+      void followersDone.catch(() => undefined);
+      for (let attempt=0;attempt<500;attempt+=1) {
+        const waiting = await database.pool.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity
+           WHERE application_name=$1`,
+          [applicationName]
+        );
+        if (Number(waiting.rows[0]?.count ?? 0) === 2) break;
+        if (attempt === 499) throw new Error("CONTENT_LEASE_FOLLOWER_DID_NOT_CONNECT");
+        await new Promise((resolve) => setTimeout(resolve,10));
+      }
+      beginHolderQuery();
+      const progressed = await Promise.race([
+        holderQueryComplete.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false),500))
+      ]);
+      expect(progressed).toBe(true);
+      releaseHolder();
+      await expect(holder).resolves.toBeUndefined();
+      await expect(followersDone).resolves.toEqual(["acquired"]);
+    } finally {
+      beginHolderQuery();
+      releaseHolder();
+      await database.pool.query(
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+         WHERE application_name=$1 AND pid<>pg_backend_pid()`,
+        [applicationName]
+      ).catch(() => undefined);
+      if (holder !== undefined) await holder.catch(() => undefined);
+      await Promise.allSettled(followers);
+      await sharedPool.end().catch(() => undefined);
+    }
+  },30_000);
 
   it("loads only a requested nested subset and ignores an unrelated missing outer key", async () => {
     const runA = await createEncryptedRun(`S10 lease subset A ${randomUUID()}`);

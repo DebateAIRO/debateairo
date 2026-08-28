@@ -1134,6 +1134,7 @@ export class WalkingSkeletonRunner {
   readonly #providerProbes: ProviderProbeRepository;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
+    readonly provider: ProviderGateway;
     readonly providerRef: string;
     readonly maker: string;
   }[];
@@ -1155,14 +1156,16 @@ export class WalkingSkeletonRunner {
     this.#memory = new MemoryRepository(pool);
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#configuredMakers = Object.freeze([
-      Object.freeze({ judge: this.#judge, providerRef: settings.providerRef, maker: settings.maker }),
+      Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
         judge: new Judge(settings.critique.provider),
+        provider: settings.critique.provider,
         providerRef: settings.critique.providerRef,
         maker: settings.critique.maker
       })]),
       ...(settings.additionalMakers ?? []).map((maker) => Object.freeze({
         judge: new Judge(maker.provider),
+        provider: maker.provider,
         providerRef: maker.providerRef,
         maker: maker.maker
       }))
@@ -1356,6 +1359,7 @@ export class WalkingSkeletonRunner {
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
     const configuredMakers: Array<{
       readonly judge: Judge;
+      readonly provider: ProviderGateway;
       readonly providerRef: string;
       readonly maker: string;
     }> = [];
@@ -1415,6 +1419,7 @@ export class WalkingSkeletonRunner {
       );
     }
     const effectiveMakerCount = configuredMakers.length;
+    const primaryMaker = configuredMakers[0]!;
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
       runId: run.runId,
@@ -1472,12 +1477,12 @@ export class WalkingSkeletonRunner {
       parentNodeId: null,
       plannedLegCount: 1,
       failureScope: "MAKER_POSITION",
-      attempt: (maxAttempts) => this.#judge.judge({
+      attempt: (maxAttempts) => primaryMaker.judge.judge({
         runId: run.runId,
         subjectItemId: claimed.workItemId,
         callSiteKey: "JUDGE",
         questionLine: run.questionLine,
-        providerRef: this.settings.providerRef,
+        providerRef: primaryMaker.providerRef,
         contractHash: this.settings.judgeContractHash,
         bound: { ...this.settings.judgeBound, maxAttempts }
       })
@@ -1572,7 +1577,7 @@ export class WalkingSkeletonRunner {
       restatementStatus: judged.restatementStatus,
       reversalPoint: judged.assessment.critic.summary,
       authorIndex: 0,
-      maker: this.settings.maker
+      maker: primaryMaker.maker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     const hiddenReviewRecords: Array<{
@@ -2281,7 +2286,7 @@ export class WalkingSkeletonRunner {
             availableServedNumberRefs: ["number:final-strength"]
           }) }
         ] };
-        const response = await callWithContentContract(this.provider, {
+        const response = await callWithContentContract(primaryMaker.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `COMPOSER:${attempt}`,
@@ -2289,7 +2294,7 @@ export class WalkingSkeletonRunner {
           lane: "served",
           bound: this.settings.composerBound,
           contractHash: this.settings.composerContractHash,
-          providerRef: this.settings.providerRef,
+          providerRef: primaryMaker.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
           buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
@@ -2332,7 +2337,7 @@ export class WalkingSkeletonRunner {
           { role: "system", content: "Return only JSON {conforms,findings}. Judge this segment against the frozen fact bundle." },
           { role: "user", content: JSON.stringify({ factBundle, segment }) }
         ] };
-        const response = await callWithContentContract(this.provider, {
+        const response = await callWithContentContract(primaryMaker.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `CONFORMANCE:${compositionAttempt}:${segmentIndex}`,
@@ -2340,7 +2345,7 @@ export class WalkingSkeletonRunner {
           lane: "served",
           bound: this.settings.conformanceBound,
           contractHash: this.settings.conformanceContractHash,
-          providerRef: this.settings.providerRef,
+          providerRef: primaryMaker.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, conformanceSchema),
           buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
@@ -2354,7 +2359,7 @@ export class WalkingSkeletonRunner {
           { role: "system", content: "Return only JSON {pass}. Apply the R9 stranger-restatement check to the composed verdict." },
           { role: "user", content: JSON.stringify({ question: run.questionLine, segments }) }
         ] };
-        const response = await callWithContentContract(this.provider, {
+        const response = await callWithContentContract(primaryMaker.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           callSiteKey: `POST_COMPOSE_R9:${compositionAttempt}`,
@@ -2362,7 +2367,7 @@ export class WalkingSkeletonRunner {
           lane: "served",
           bound: this.settings.conformanceBound,
           contractHash: this.settings.conformanceContractHash,
-          providerRef: this.settings.providerRef,
+          providerRef: primaryMaker.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, r9Schema),
           buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)

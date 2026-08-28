@@ -1542,6 +1542,71 @@ describe("FX-LG-16 / DR-128 — claim-type composition register carrier", () => 
 });
 
 describe("apps/runner — legal command lifecycle", () => {
+  it("uses the first healthy handshake when the first configured CLI is absent", async () => {
+    const absentPrimary = await startProviderDouble([]);
+    const healthySecondary = await startProviderDouble([
+      judgementDouble("The surviving real CLI authors the primary position", 0.4),
+      resil01Composition,
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    try {
+      const question = `claim-primary-reselection-${randomUUID()}`;
+      const secondaryMember = fixtureDiscoveredPanel(2)[1]!;
+      const runId = await new RunRepository(database.pool).startRun({
+        questionLine: question,
+        principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`,
+        callerScope: "ASKER",
+        asOf: new Date("2026-08-07T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: [secondaryMember],
+        strangerSampleRate: 1,
+        envelopeBasis: fixtureStructuralCeiling(10, 1, 1),
+        registerVersion: 1,
+        batteryVersion: "s00",
+        batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `runner-test:${question}`
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: absentPrimary.endpoint,
+        model: "test-layer/primary-model",
+        maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: healthySecondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: secondaryMember.provider_ref,
+          maker: secondaryMember.maker
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+      expect(absentPrimary.calls()).toBe(0);
+      expect(healthySecondary.calls()).toBe(5);
+    } finally {
+      await healthySecondary.stop();
+      await absentPrimary.stop();
+    }
+  });
+
   it("re-probes once at claim, records a missing pinned member, shrinks, discloses, and serves", async () => {
     const provider = await startProviderDouble([judgementDouble("Claim-time surviving position", 0.4)]);
     try {

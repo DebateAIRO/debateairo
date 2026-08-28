@@ -9,6 +9,7 @@ import {
   type DevelopmentApiProcessOperations
 } from "../../apps/runner/src/dev-api-process.js";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 const roots: string[] = [];
 
@@ -36,15 +37,11 @@ function environment(root: string): Readonly<Record<string, string>> {
     API_HOST: "127.0.0.1",
     API_PORT: "8790",
     STRANGER_SAMPLE_RATE: "0",
-    REGISTER_VERSION: "3",
+    REGISTER_VERSION: "4",
     BATTERY_VERSION: "dev-auth-v1",
     SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
-    PROVIDER_DISCOVERY_TARGETS_JSON: JSON.stringify([{
-      provider_ref: "development:local-vllm",
-      base_url: "http://127.0.0.1:8791/v1",
-      model: "qa-deterministic-v1"
-    }]),
-    PROVIDER_PROBE_TIMEOUT_MS: "5000",
+    PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    PROVIDER_PROBE_TIMEOUT_MS: "180000",
     NODE_ENV: "development",
     EVALUATOR_DEV_MENU_ENABLED: "false",
     EVALUATOR_DEV_MENU_DATABASE_URL: "postgresql://debateai_dev_evaluator_api:evaluator@127.0.0.1:55432/debateai",

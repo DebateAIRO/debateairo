@@ -8,8 +8,32 @@ import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 
 export const dynamic = "force-dynamic";
 
-export default async function DebatePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DebatePage({
+  params,
+  searchParams = Promise.resolve({})
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ starting?: string }>;
+}) {
   const { id } = await params;
+  const starting = (await searchParams).starting === "1";
+
+  // The accepted ask already owns a durable run id. Do not make the client
+  // transition wait behind the runner's private-content lease: mount the
+  // authenticated coordinator shell immediately and let its event stream and
+  // bounded projection retry populate the debate. Direct visits and reloads
+  // retain the full asker-scoped SSR read below.
+  if (starting) {
+    return (
+      <DebatePageGate
+        id={id}
+        initialDebate={null}
+        initialAnswer={null}
+        initialError={null}
+        initialPending
+      />
+    );
+  }
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
   const userAgent = (await headers()).get("user-agent") ?? undefined;
 

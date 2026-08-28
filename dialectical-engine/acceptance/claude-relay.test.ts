@@ -104,9 +104,30 @@ describe("FAIR-02 Claude Code CLI relay", () => {
     expect(relay.maker).toBe("Anthropic");
   });
 
+  it("selects the requested Opus lineage when Claude also reports helper-model usage", async () => {
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  is_error: false, result: "OK", total_cost_usd: 0.056795,',
+      '  modelUsage: {',
+      '    "claude-haiku-4-5-20251001": { inputTokens: 910, outputTokens: 17, canonicalModel: "claude-haiku-4-5" },',
+      '    "claude-opus-5": { inputTokens: 2, outputTokens: 4, canonicalModel: "claude-opus-5" }',
+      '  }',
+      '}));'
+    ].join("");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
+    });
+    handles.push(relay);
+
+    expect(relay.model).toBe("claude-opus-5");
+    expect(relay.maker).toBe("Anthropic");
+  });
+
   it("maps an OpenAI request to claude -p --output-format json with closed stdin and reports true lineage", async () => {
     const environmentKeys = [
-      "HOME", "PATH", "TMPDIR", "LANG",
+      "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME",
       "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
       "OPENAI_API_KEY", "XAI_API_KEY", "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET",
       "FAKE_CLAUDE_ALWAYS_FAIL", "FAKE_CLAUDE_COST_ABSENT", "FAKE_CLAUDE_MODEL_USAGE_NON_OBJECT"
@@ -119,6 +140,8 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       PATH: "/usr/bin:/bin",
       TMPDIR: "/tmp",
       LANG: "C.UTF-8",
+      USER: "claude-keychain-user",
+      LOGNAME: "claude-keychain-user",
       ANTHROPIC_API_KEY: "anthropic-test-sentinel",
       CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
       OPENAI_API_KEY: "openai-test-sentinel",
@@ -171,10 +194,12 @@ describe("FAIR-02 Claude Code CLI relay", () => {
         CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
         HOME: "/tmp/relay-home-sentinel",
         LANG: "C.UTF-8",
+        LOGNAME: "claude-keychain-user",
         OLDPWD: expect.stringMatching(/[/\\]relay-anthropic-[^/\\]+$/),
         PATH: "/usr/bin:/bin",
         PWD: expect.stringMatching(/[/\\]relay-anthropic-[^/\\]+$/),
-        TMPDIR: "/tmp"
+        TMPDIR: "/tmp",
+        USER: "claude-keychain-user"
       });
       for (const key of ["OPENAI_API_KEY", "XAI_API_KEY", "DATABASE_URL", "SSH_AUTH_SOCK", "UNRELATED_SECRET"]) {
         expect(relayed.environment[key]).toBeUndefined();

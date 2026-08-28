@@ -179,9 +179,7 @@ export function createDevelopmentUiProcessOperations(
       const login = await probeHttp(LOCAL_UI_PORT, "/login", MAX_HTML_BYTES);
       if (login === null) return null;
       const session = await probeHttp(LOCAL_UI_PORT, "/api/v1/session", MAX_JSON_BYTES);
-      if (session === null) {
-        throw new DevelopmentUiProcessError("DEV_UI_PROCESS_PROXY_DISAPPEARED");
-      }
+      if (session === null) return null;
       return Object.freeze({ login, session });
     },
     startUi(environment) {

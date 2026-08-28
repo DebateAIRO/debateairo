@@ -164,4 +164,15 @@ describe("LOAD-01 real debate-page render", () => {
     await expect(DebatePage({ params: Promise.resolve({ id: "run:missing" }) })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(readNotFoundCalls()).toBe(1);
   });
+
+  it("renders the accepted-run coordinator shell without waiting for the private-content lease", async () => {
+    mocks.getDebateServer.mockRejectedValue(new Error("SSR_READ_MUST_NOT_START"));
+    const { default: DebatePage } = await import("../../apps/ui/app/debate/[id]/page.js");
+    const page = await DebatePage({
+      params: Promise.resolve({ id: "run:new" }),
+      searchParams: Promise.resolve({ starting: "1" })
+    });
+    expect(renderToStaticMarkup(page)).toContain("Connecting to the coordinator");
+    expect(mocks.getDebateServer).not.toHaveBeenCalled();
+  });
 });

@@ -7,6 +7,7 @@ import {
   type DevelopmentRunnerChild,
   type DevelopmentRunnerProcessOperations
 } from "../../apps/runner/src/dev-runner-process.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -20,11 +21,7 @@ function deferred<T>() {
 
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
-    PROVIDER_DISCOVERY_TARGETS_JSON: JSON.stringify([{
-      provider_ref: "development:local-vllm",
-      base_url: "http://127.0.0.1:8791/v1",
-      model: "qa-deterministic-v1"
-    }]),
+    PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
     REGISTER_VERSION: String(DEVELOPMENT_REGISTER_VERSION),
     KEK_PATH: "/private/dev/kek.bin",
     DATABASE_URL: "postgresql://runtime:opaque@127.0.0.1:55432/debateai",
@@ -94,9 +91,11 @@ describe("development runner process lifecycle", () => {
     });
     expect(runtime.environment).toHaveLength(1);
     expect(runtime.environment[0]).toMatchObject({
-      PROVIDER_REF: "development:local-vllm",
+      PROVIDER_REF: "development:codex-cli",
       VLLM_BASE_URL: "http://127.0.0.1:8791/v1",
-      VLLM_MODEL: "qa-deterministic-v1",
+      VLLM_MODEL: "gpt-test-real",
+      VLLM_MAKER: "OpenAI",
+      VLLM_AUTHORIZATION: "Bearer test-codex",
       HATCHET_WORKER_NAME: "debateai-dev-runner"
     });
     await Promise.all([runner.stop(), runner.stop()]);

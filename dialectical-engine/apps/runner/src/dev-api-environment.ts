@@ -5,7 +5,12 @@ import { lstat, open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
-import { DEVELOPMENT_LOCAL_PROVIDER_TARGET } from "./dev-local-provider.js";
+import {
+  DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+  parseDevelopmentProviderPanelTargets,
+  type DevelopmentProviderPanel,
+  REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON
+} from "./dev-provider-panel.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -61,6 +66,7 @@ export type DevelopmentApiEnvironmentReceipt = Readonly<{
 
 type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   repositoryRoot: string;
+  providerPanel: DevelopmentProviderPanel;
 }>;
 
 function currentUid(): number {
@@ -222,7 +228,8 @@ function environmentSource(values: ReadonlyMap<string, string>): string {
 async function publishExactFile(
   path: string,
   source: string,
-  acceptedPreviousSources: readonly string[] = []
+  acceptedPreviousSources: readonly string[] = [],
+  acceptPreviousSource?: (existing: string) => boolean
 ): Promise<boolean> {
   const lockPath = `${path}.lock`;
   let lock;
@@ -244,7 +251,8 @@ async function publishExactFile(
     const existing = await readPrivateFile(path);
     if (existing !== undefined) {
       if (existing === source) return true;
-      if (!acceptedPreviousSources.includes(existing)) {
+      if (!acceptedPreviousSources.includes(existing)
+        && acceptPreviousSource?.(existing) !== true) {
         throw new TypeError("DEV_API_ENVIRONMENT_DRIFT");
       }
     }
@@ -284,6 +292,32 @@ async function publishExactFile(
   }
 }
 
+function isExactProviderRuntimeRefresh(existing: string, expected: string): boolean {
+  try {
+    const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+  existing: string,
+  expected: string
+): boolean {
+  const upgraded = existing.replace(
+    "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
+    `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
+  );
+  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected);
+}
+
 export async function assembleDevelopmentApiEnvironment(
   input: AssembleDevelopmentApiEnvironmentInput
 ): Promise<DevelopmentApiEnvironmentReceipt> {
@@ -312,6 +346,7 @@ export async function assembleDevelopmentApiEnvironment(
   const hatchet = parseExactEnvironment(hatchetSource, ["HATCHET_CLIENT_TOKEN"]);
   const token = hatchet.get("HATCHET_CLIENT_TOKEN")!;
   const tenantId = tenantIdFromToken(token);
+  const providerPanel = input.providerPanel;
   const values = new Map<string, string>([
     ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
     ["BLIND_INDEX_KEY_PATH", join(custodyRoot, "secrets", "blind-index-key.bin")],
@@ -334,15 +369,11 @@ export async function assembleDevelopmentApiEnvironment(
     ["API_HOST", "127.0.0.1"],
     ["API_PORT", "8790"],
     ["STRANGER_SAMPLE_RATE", "0"],
-    ["REGISTER_VERSION", "3"],
+    ["REGISTER_VERSION", "4"],
     ["BATTERY_VERSION", "dev-auth-v1"],
     ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
-    ["PROVIDER_DISCOVERY_TARGETS_JSON", JSON.stringify([{
-      provider_ref: DEVELOPMENT_LOCAL_PROVIDER_TARGET.providerRef,
-      base_url: DEVELOPMENT_LOCAL_PROVIDER_TARGET.baseUrl,
-      model: DEVELOPMENT_LOCAL_PROVIDER_TARGET.model
-    }])],
-    ["PROVIDER_PROBE_TIMEOUT_MS", "5000"],
+    ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
+    ["PROVIDER_PROBE_TIMEOUT_MS", String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS)],
     ["NODE_ENV", "development"],
     ["EVALUATOR_DEV_MENU_ENABLED", "false"],
     ["EVALUATOR_DEV_MENU_DATABASE_URL", databases.get("EVALUATOR_DEV_MENU_DATABASE_URL")!],
@@ -362,17 +393,36 @@ export async function assembleDevelopmentApiEnvironment(
       && !row.startsWith("PUBLICATION_KEY_STORE_PATH=")
       && !row.startsWith("PUBLICATION_CLEANUP_DATABASE_URL="))
     .join("\n");
-  const registerV2Source = source.replace("REGISTER_VERSION=3\n", "REGISTER_VERSION=2\n");
-  const registerV1Source = source.replace("REGISTER_VERSION=3\n", "REGISTER_VERSION=1\n");
+  const registerV3Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=3\n");
+  const registerV2Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=2\n");
+  const registerV1Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=1\n");
   const preDiscoverySource = registerV1Source
     .split("\n")
     .filter((row) => !row.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
       && !row.startsWith("PROVIDER_PROBE_TIMEOUT_MS="))
     .join("\n");
+  const preEvaluatorPrincipalSource = source
+    .split("\n")
+    .filter((row) => !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
+    .join("\n");
+  const removedScaffoldSource = registerV3Source.replace(
+    `PROVIDER_DISCOVERY_TARGETS_JSON=${providerPanel.targetsJson}\n`,
+    `PROVIDER_DISCOVERY_TARGETS_JSON=${REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON}\n`
+  );
   const reused = await publishExactFile(
     join(custodyRoot, "api.env"),
     source,
-    [publicationDisabledSource, registerV2Source, registerV1Source, preDiscoverySource]
+    [
+      publicationDisabledSource,
+      registerV3Source,
+      registerV2Source,
+      registerV1Source,
+      preDiscoverySource,
+      preEvaluatorPrincipalSource,
+      removedScaffoldSource
+    ],
+    (existing) => isExactProviderRuntimeRefresh(existing, source)
+      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

@@ -7,12 +7,25 @@ This document fixes the topology and security invariants that the DEV tickets im
 ## Operator contract
 
 The supported auth-stack supervisor command is exactly `pnpm dev:auth:up`.
-DEV-10F implements the bounded auth subset described below; it is not yet a
-complete runner-backed debate stack. It is idempotent and either reaches every
+DEV-10F implements the bounded auth and runner stack described below. It is idempotent and either reaches every
 included boot attestation or exits nonzero after stopping only what it started.
 It may reuse valid persistent state, but it may not silently repair privilege
 drift, rotate secrets, weaken HTTPS, or reseed a partially inconsistent
 register.
+
+Debate execution is real-CLI-only. At startup the supervisor concurrently
+starts the existing Codex, Claude, and Grok CLI relays on fixed private
+loopback ports and accepts a maker only after that relay's real model handshake
+succeeds. Every successful responder is pinned into the debate in configured
+order; an unavailable or logged-out CLI is recorded as absent rather than
+replaced by canned output. At least one real maker must answer, otherwise
+startup fails before data-plane work. The exact three-member roster is sealed
+in register version 4, while the handshake-derived model identities and
+ephemeral relay credentials are passed in memory to API discovery and the
+runner. There is no operator-maintained provider credential document; the
+generated private `api.env` may carry only the current loopback relay tokens so
+the API and runner child processes can reach those exact handshakes. The
+removed deterministic scaffold is never started.
 
 The future stop command is `pnpm dev:auth:stop`. Stop is non-destructive: Postgres, user DEKs, audit keys, mail, TLS material, and operator credentials remain under `.local/dev-auth`.
 
@@ -172,14 +185,15 @@ Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPA
 3. **POSTGRES:** start the pinned Postgres major with persistent data and wait for the exact server identity.
 4. **MIGRATIONS_REPLAY:** apply `0000` through the current migration, then replay the current migration to prove idempotency. Capability roles are migration-owned and are never duplicated by the principal command.
 5. **APPLICATION_PRINCIPALS:** create or verify the nine exact application LOGINs and their SCRAM passwords; privilege drift is fatal. The migrator and isolated Hatchet owner were created by the PostgreSQL bootstrap.
-6. **REGISTER_SEED:** persist and seal the production bootstrap, auth, MFA, session, provider, discovery, structural, and risk rows. Acceptance-only seed/server code is forbidden.
+6. **REGISTER_SEED:** load the private real-provider panel, then persist and seal the production bootstrap, auth, MFA, session, provider, discovery, structural, and risk rows as register version 4. Acceptance-only seed/server code and substitute providers are forbidden.
 7. **SECRETS:** generate only absent secrets, verify all existing commitments/modes, and never print key bytes.
 8. **HATCHET:** start the pinned local engine against the separate `hatchet` database, then run `pnpm dev:auth:provision-hatchet-token`; it issues once through the image's supported admin binary and live-attests tenant/workflow API authority on every use.
 9. **MAIL_CAPTURE:** verify the sendmail-compatible executable and a private writable spool.
 10. **API:** start the production `@debateai/api` entrypoint with private content encryption enabled and publication and the evaluator dev menu disabled. Authenticated QA debates therefore exercise the same encrypted private-run path as production.
-11. **UI:** start `apps/ui` privately on port 3001 with same-origin `/api` and server proxy `127.0.0.1:8790`.
-12. **TLS_FRONT_DOOR:** publish only `https://localhost:3000`.
-13. **BOOT_ATTESTATIONS:** run every check below before printing ready.
+11. **RUNNER:** start the production runner using only the ordered real-provider panel; it may not start or fall back to a repository-owned model substitute.
+12. **UI:** start `apps/ui` privately on port 3001 with same-origin `/api` and server proxy `127.0.0.1:8790`.
+13. **TLS_FRONT_DOOR:** publish only `https://localhost:3000`.
+14. **BOOT_ATTESTATIONS:** run every check below before printing ready.
 
 ## Required boot attestations
 
@@ -187,6 +201,7 @@ Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPA
 - byte-exact HTTPS `PUBLIC_APP_URL`, static/runtime Secure `__Host-` cookie configuration, and an unauthenticated wrong-Origin/CSRF negative probe that returns no cookie;
 - fresh migration plus replay safety;
 - complete sealed register with every row the API reads before listen;
+- exact runtime CLI-handshake panel with at least one real responder, exact register/target equality, and no substitute-provider process;
 - exact runtime/content-provision/erasure/authorization/publication-cleanup/replay/liveness/settlement/evaluator-api current-user and capability isolation, using production witnesses where present plus the DEV-03 actual-login matrix;
 - pairwise-distinct application service database principals and URLs, including credential-distinct runtime and liveness wrappers;
 - 32-byte/mode-0600 secret files and mode-0700 stores;
@@ -199,6 +214,7 @@ The command prints only the public URL, service status, mail-spool path, and non
 ## Explicit non-solutions
 
 - Do not use `acceptance/main.ts` or an in-memory mail sender.
+- Do not start an in-process deterministic provider or return canned debate content.
 - Do not direct-insert an identity/account to fabricate a login.
 - Do not weaken `PUBLIC_APP_URL`, Origin, CSRF, Secure-cookie, role, or secret-file validation.
 - Do not share one database LOGIN across runtime, content provision, erasure, migration, or Hatchet.

@@ -8,7 +8,9 @@ import {
   DEVELOPMENT_REGISTER_VERSION,
   DEVELOPMENT_RUN_DEATH_POLICY
 } from "./dev-deployment-register.js";
-import { DEVELOPMENT_LOCAL_PROVIDER_TARGET } from "./dev-local-provider.js";
+import {
+  parseDevelopmentProviderPanelTargets
+} from "./dev-provider-panel.js";
 
 const DEVELOPMENT_CLAIM_MARGIN_MS = 1_000;
 
@@ -55,12 +57,17 @@ function createRunnerEnvironment(
   commandEnvironment: Readonly<Record<string, string>>,
   apiEnvironment: Readonly<Record<string, string>>
 ): Readonly<Record<string, string>> {
-  const targets = parseProviderDiscoveryTargets(apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!, [{
-    providerRef: DEVELOPMENT_LOCAL_PROVIDER_TARGET.providerRef,
-    maker: "Local development"
-  }]);
+  const providerPanel = parseDevelopmentProviderPanelTargets(
+    apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!
+  );
+  const targets = parseProviderDiscoveryTargets(
+    apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+    providerPanel.configuredProviders
+  );
   const primary = targets[0];
-  if (primary === undefined || apiEnvironment.REGISTER_VERSION !== String(DEVELOPMENT_REGISTER_VERSION)) {
+  if (primary === undefined
+    || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson
+    || apiEnvironment.REGISTER_VERSION !== String(DEVELOPMENT_REGISTER_VERSION)) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
   }
   return Object.freeze({
@@ -83,11 +90,11 @@ function createRunnerEnvironment(
     CONFORMANCE_TOKEN_CEILING: "2048",
     CONFORMANCE_DEADLINE_MS: "60000",
     PROVIDER_REF: primary.providerRef,
-    JUDGE_CONTRACT_HASH: "sealed-register-v3",
-    COMPOSER_CONTRACT_HASH: "sealed-register-v3",
-    CONFORMANCE_CONTRACT_HASH: "sealed-register-v3",
-    PROPAGATION_CONTRACT_HASH: "sealed-register-v3",
-    SERVE_CONTRACT_HASH: "sealed-register-v3",
+    JUDGE_CONTRACT_HASH: "sealed-register-v4",
+    COMPOSER_CONTRACT_HASH: "sealed-register-v4",
+    CONFORMANCE_CONTRACT_HASH: "sealed-register-v4",
+    PROPAGATION_CONTRACT_HASH: "sealed-register-v4",
+    SERVE_CONTRACT_HASH: "sealed-register-v4",
     MAX_RECOMPOSE: "2",
     FACT_BUNDLE_VERSION: apiEnvironment.REGISTER_VERSION,
     JUDGEMENT_NUMBER_KIND: "base-probability",

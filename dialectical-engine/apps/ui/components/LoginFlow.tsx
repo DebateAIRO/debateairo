@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import type { ContractClient } from "@debateai/contract";
+import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 
-const HOME_PATH = "/";
+const HOME_PATH = "/#start-a-debate";
 
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
 type VerificationMethod = "authenticator" | "recovery";
@@ -65,8 +65,17 @@ export function LoginFlow({
         return;
       }
       onAuthenticated();
-    } catch {
-      setError("Authenticator verification could not be completed.");
+    } catch (failure) {
+      if (failure instanceof ContractHttpError && failure.status === 429) {
+        setError("Too many verification attempts. Wait five minutes, then start sign-in again.");
+      } else if (failure instanceof ContractHttpError && failure.status === 401
+        && verificationMethod === "recovery") {
+        setError("That recovery code was not accepted. Start sign-in again if the challenge is more than five minutes old, or use another unused code from this account.");
+      } else if (failure instanceof ContractHttpError && failure.status === 401) {
+        setError("That authentication code was not accepted. Enter the current 6-digit code, or use an unused recovery code.");
+      } else {
+        setError("Authenticator verification could not be completed.");
+      }
     } finally {
       setBusy(false);
     }

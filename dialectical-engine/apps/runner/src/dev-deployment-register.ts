@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { DEVELOPMENT_LOCAL_PROVIDER_TARGET } from "./dev-local-provider.js";
 import { readFile } from "node:fs/promises";
 import type { Pool, PoolClient } from "pg";
 import { CLAIM_TYPES } from "@debateai/kernel";
@@ -10,8 +9,10 @@ import {
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
   loadBootstrapRegister,
+  persistBootstrapRegister,
   type BootstrapRegister
 } from "@debateai/register";
+import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 
 export type DevelopmentDeploymentRegisterRow = Readonly<{
   rowKey: string;
@@ -38,22 +39,9 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   max_cooldown_holds_per_run: 2,
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
-export const DEVELOPMENT_REGISTER_VERSION = 3 as const;
+export const DEVELOPMENT_REGISTER_VERSION = 4 as const;
 
-export const DEVELOPMENT_DEPLOYMENT_REGISTER_ROWS = Object.freeze([
-  Object.freeze({
-    rowKey: "configuredProviderSet",
-    value: Object.freeze({
-      kind: "CONFIGURED_PROVIDER_SET" as const,
-      requiredDistinctMakers: 1,
-      providers: Object.freeze([Object.freeze({
-        providerRef: DEVELOPMENT_LOCAL_PROVIDER_TARGET.providerRef,
-        adapterKind: "openai-compatible-http",
-        maker: "Local development"
-      })])
-    }),
-    sourceRef: DEVELOPMENT_SOURCE_REF
-  }),
+const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
   Object.freeze({
     rowKey: "panelDiscoveryPolicy",
     value: Object.freeze({
@@ -79,6 +67,23 @@ export const DEVELOPMENT_DEPLOYMENT_REGISTER_ROWS = Object.freeze([
     sourceRef: DEVELOPMENT_SOURCE_REF
   })
 ] satisfies readonly DevelopmentDeploymentRegisterRow[]);
+
+export function buildDevelopmentDeploymentRegisterRows(
+  providerPanel: DevelopmentProviderPanel
+): readonly DevelopmentDeploymentRegisterRow[] {
+  return Object.freeze([
+    Object.freeze({
+      rowKey: "configuredProviderSet",
+      value: Object.freeze({
+        kind: "CONFIGURED_PROVIDER_SET" as const,
+        requiredDistinctMakers: providerPanel.requiredDistinctMakers,
+        providers: providerPanel.configuredProviders
+      }),
+      sourceRef: DEVELOPMENT_SOURCE_REF
+    }),
+    ...DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS
+  ]);
+}
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
@@ -193,6 +198,7 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
+  providerPanel: DevelopmentProviderPanel;
 }>;
 
 export type DevelopmentDeploymentRegisterReceipt = Readonly<{
@@ -211,7 +217,10 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function legacyRows(bootstrap: BootstrapRegister): readonly DevelopmentDeploymentRegisterRow[] {
+function developmentRows(
+  bootstrap: BootstrapRegister,
+  providerPanel: DevelopmentProviderPanel
+): readonly DevelopmentDeploymentRegisterRow[] {
   const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
     Object.freeze({
       rowKey,
@@ -226,7 +235,7 @@ function legacyRows(bootstrap: BootstrapRegister): readonly DevelopmentDeploymen
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ...DEVELOPMENT_DEPLOYMENT_REGISTER_ROWS
+    ...buildDevelopmentDeploymentRegisterRows(providerPanel)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -235,19 +244,14 @@ function legacyRows(bootstrap: BootstrapRegister): readonly DevelopmentDeploymen
 }
 
 async function expectedRunnerRows(
-  bootstrap: BootstrapRegister
+  bootstrap: BootstrapRegister,
+  providerPanel: DevelopmentProviderPanel
 ): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const rows = [...legacyRows(bootstrap), ...await buildDevelopmentRunnerRegisterRows()];
+  const rows = [...developmentRows(bootstrap, providerPanel), ...await buildDevelopmentRunnerRegisterRows()];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
   }
   return Object.freeze(rows.map((row) => Object.freeze(row)));
-}
-
-async function previousRunnerRows(
-  bootstrap: BootstrapRegister
-): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  return Object.freeze((await expectedRunnerRows(bootstrap)).filter((row) => row.rowKey !== "livenessPolicy"));
 }
 
 async function insertAndSeal(
@@ -283,6 +287,42 @@ async function assertAdmin(client: PoolClient): Promise<void> {
   `)).rows[0];
   if (row === undefined || !row.rolsuper || row.session_principal !== row.principal) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
+  }
+}
+
+async function assertSealedHistoricalBootstrap(
+  pool: Pool,
+  registerVersion: number
+): Promise<void> {
+  const state = (await pool.query<{
+    row_count: number;
+    sealed: boolean;
+    actual_count: string;
+  }>(`
+    SELECT version.row_count,version.sealed,count(row.*)::text AS actual_count
+    FROM register.register_version AS version
+    LEFT JOIN register.register_row AS row USING (register_version)
+    WHERE version.register_version=$1
+    GROUP BY version.register_version,version.row_count,version.sealed
+  `, [registerVersion])).rows[0];
+  if (state === undefined
+    || !state.sealed
+    || Number(state.row_count) !== Number(state.actual_count)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_HISTORICAL_STATE_INVALID");
+  }
+}
+
+async function persistOrAcceptSealedHistoricalBootstrap(
+  pool: Pool,
+  bootstrap: BootstrapRegister
+): Promise<void> {
+  try {
+    await persistBootstrapRegister(pool, bootstrap);
+  } catch (error) {
+    if (!(error instanceof TypeError) || error.message !== "FX-REG-SEALED_VERSION_MISMATCH") {
+      throw error;
+    }
+    await assertSealedHistoricalBootstrap(pool, bootstrap.registerVersion);
   }
 }
 
@@ -323,11 +363,18 @@ export async function seedDevelopmentDeploymentRegister(
   input: SeedDevelopmentDeploymentRegisterInput
 ): Promise<DevelopmentDeploymentRegisterReceipt> {
   const bootstrap = await loadBootstrapRegister();
-  const legacy = legacyRows(bootstrap);
-  const previousRows = await previousRunnerRows(bootstrap);
-  const rows = await expectedRunnerRows(bootstrap);
-  const previousRegisterVersion = bootstrap.registerVersion + 1;
-  const registerVersion = bootstrap.registerVersion + 2;
+  const authorityClient = await input.adminPool.connect();
+  try {
+    await assertAdmin(authorityClient);
+  } finally {
+    authorityClient.release();
+  }
+  await persistOrAcceptSealedHistoricalBootstrap(input.adminPool, bootstrap);
+  const rows = await expectedRunnerRows(bootstrap, input.providerPanel);
+  const registerVersion = DEVELOPMENT_REGISTER_VERSION;
+  if (registerVersion <= bootstrap.registerVersion) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");
+  }
   const client = await input.adminPool.connect();
   try {
     await client.query("BEGIN");
@@ -335,12 +382,6 @@ export async function seedDevelopmentDeploymentRegister(
       "SELECT pg_advisory_xact_lock(hashtextextended('debateai:dev-deployment-register',0))"
     );
     await assertAdmin(client);
-    if (await readExactState(client, bootstrap.registerVersion, legacy) === "EMPTY") {
-      await insertAndSeal(client, bootstrap.registerVersion, legacy);
-    }
-    if (await readExactState(client, previousRegisterVersion, previousRows) === "EMPTY") {
-      await insertAndSeal(client, previousRegisterVersion, previousRows);
-    }
     if (await readExactState(client, registerVersion, rows) === "EMPTY") {
       await insertAndSeal(client, registerVersion, rows);
     }

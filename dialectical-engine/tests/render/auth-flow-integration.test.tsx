@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError } from "@debateai/contract";
 import { setPathname } from "next/navigation";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
@@ -324,6 +325,61 @@ describe("rendered auth flow integration", () => {
     expect(document.querySelector('[role="alert"]')?.textContent)
       .toBe("Authenticator verification could not be completed.");
     expect(document.body.textContent).not.toMatch(/ContractHttpError|invalid TOTP|81f6/);
+  });
+
+  it("explains a rejected recovery code without revealing account state", async () => {
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    const completeLogin = vi.fn().mockRejectedValue(
+      new ContractHttpError(
+        "SESSION_REQUIRED",
+        401,
+        "AUTH_CREDENTIALS_INVALID for owner:secret",
+        "AUTH_CREDENTIALS_INVALID"
+      )
+    );
+    await act(async () => root!.render(
+      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+    ));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+    await click("Use a recovery code");
+    field("code").value = "AAAA-BBBB-CCCC-DDDD";
+    await submit();
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      "That recovery code was not accepted. Start sign-in again if the challenge is more than five minutes old, or use another unused code from this account."
+    );
+    expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
+    expect(document.body.textContent).not.toMatch(/AUTH_CREDENTIALS_INVALID|owner:secret/);
+  });
+
+  it("identifies the temporary MFA attempt lock without leaking server detail", async () => {
+    const beginLogin = vi.fn().mockResolvedValue({
+      status: "mfa_required" as const,
+      challenge_token: "challenge"
+    });
+    const completeLogin = vi.fn().mockRejectedValue(
+      new ContractHttpError("RATE_LIMITED", 429, "MFA_RATE_LIMITED internal", "MFA_RATE_LIMITED")
+    );
+    await act(async () => root!.render(
+      <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={vi.fn()} />
+    ));
+
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+    field("code").value = "123456";
+    await submit();
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      "Too many verification attempts. Wait five minutes, then start sign-in again."
+    );
+    expect(document.body.textContent).not.toContain("MFA_RATE_LIMITED");
   });
 
   it("keeps registration failures generic and separates primary and recovery autofill", async () => {

@@ -154,6 +154,8 @@ describe("DEV-10C private local UI process", () => {
     expect(implementation).toContain(
       'new Set(["ECONNREFUSED", "ECONNRESET", "EPIPE", "ETIMEDOUT"])'
     );
+    expect(implementation).toContain("if (session === null) return null");
+    expect(implementation).not.toContain("DEV_UI_PROCESS_PROXY_DISAPPEARED");
     expect(implementation).toContain("const LOCAL_UI_PORT = 3_001");
     expect(implementation).toContain("PORT: String(LOCAL_UI_PORT)");
     expect(implementation).not.toContain("LOCAL_UI_PORT = 3_000");

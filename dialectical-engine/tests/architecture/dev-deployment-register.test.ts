@@ -11,7 +11,8 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(packageJson.scripts?.["dev:auth:seed-register"])
       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
     expect(cli).toContain("loadMigrationEnvironment()");
-    expect(cli).toContain("seedDevelopmentDeploymentRegister({ adminPool: pool })");
+    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment())");
+    expect(cli).toContain("seedDevelopmentDeploymentRegister({ adminPool: pool, providerPanel })");
     expect(cli).toContain("DEV_DEPLOYMENT_REGISTER_READY=");
     expect(source).toContain("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
     expect(source).not.toMatch(/acceptance\/|seedAcceptanceRegister/);

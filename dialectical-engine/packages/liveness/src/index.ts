@@ -184,9 +184,9 @@ export class LivenessRepository {
       const locked = runIds.length === 0
         ? { rows: [] as { run_id: string }[] }
         : await client.query<{ run_id: string }>(
-          `SELECT run_id FROM core.run
-           WHERE run_id=ANY($1::uuid[]) ORDER BY run_id FOR UPDATE`,
-          [runIds]
+          `SELECT run_id
+           FROM core.lock_owned_live_runs($1::uuid[],$2::uuid,$3::text)`,
+          [runIds, access.ownerRef, access.legacyAskerId]
         );
       const lockedRunIds = new Set(locked.rows.map((row) => row.run_id));
       let recorded = 0;

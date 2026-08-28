@@ -11,6 +11,7 @@ const read = (path) => {
 };
 
 const login = read("./LoginFlow.tsx");
+const loginPage = read("../app/login/page.tsx");
 const signUp = read("./SignUpFlow.tsx");
 const shell = read("./AuthShell.tsx");
 const gate = read("./AuthGate.tsx");
@@ -68,6 +69,25 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(gate, /window\.location\.replace\("\/login"\)/);
 });
 
+test("the project home confirms a real session before exposing its debate composer", () => {
+  assert.match(home, /let sessionConfirmed = false/);
+  assert.match(home, /sessionConfirmed = true/);
+  assert.match(home, /You.re signed in/);
+  assert.match(home, /Start a debate below/);
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer \/>/);
+  assert.match(home, /id="start-a-debate"/);
+  assert.doesNotMatch(home, /<LibraryComposer \/>[\s\S]*?\{error \?/);
+});
+
+test("the login route sends an already-authenticated browser back to its debate workspace", () => {
+  assert.match(loginPage, /USER_TOKEN_COOKIE/);
+  assert.match(loginPage, /createServerContractClient/);
+  assert.match(loginPage, /\.readSession\(\)/);
+  assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
+  assert.match(loginPage, /catch \{/);
+  assert.match(loginPage, /return <LoginFlow \/>/);
+});
+
 test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
   assert.match(verifyEmail, /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
   assert.match(packageJson, /assert-auth-front-door-routes\.mjs/);
@@ -114,6 +134,8 @@ test("auth failures use stable public copy instead of exception text", () => {
   assert.doesNotMatch(signUp, /failure\.message/);
   assert.match(login, /setError\("Sign-in could not be completed\."\)/);
   assert.match(login, /setError\("Authenticator verification could not be completed\."\)/);
+  assert.match(login, /That recovery code was not accepted/);
+  assert.match(login, /Too many verification attempts/);
   assert.match(signUp, /setError\("Account creation could not be completed\."\)/);
   assert.match(signUp, /setError\("Verification instructions could not be resent\."\)/);
 });

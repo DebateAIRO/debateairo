@@ -158,6 +158,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(config).not.toHaveProperty("decision_owner");
     expect(config).not.toHaveProperty("action_owner");
     expect(pageMocks.readDeployment).not.toHaveBeenCalled();
+    expect(pageMocks.push).toHaveBeenCalledWith("/debate/run%3Anew?starting=1");
   });
 
   it("keeps the visible risk choice asker-owned through the real page", async () => {

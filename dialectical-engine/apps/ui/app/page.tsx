@@ -17,6 +17,7 @@ export default async function HomePage() {
   let debates: DebateSummary[] = [];
   let total: number | null = null;
   let error: string | null = null;
+  let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
   let publishedError: string | null = null;
   try {
@@ -25,14 +26,15 @@ export default async function HomePage() {
     publishedError = "Published debates are temporarily unavailable.";
   }
   if (token === null) {
-    error = "Sign in to list your asker-scoped debates.";
+    error = "Sign in to start a debate and save it to your account.";
   } else {
     try {
       const page = await listDebatesPageServer(token, undefined, userAgent);
       debates = page.summaries;
       total = page.total;
-    } catch (exc) {
-      error = exc instanceof Error ? exc.message : "Unable to reach the V3 API";
+      sessionConfirmed = true;
+    } catch {
+      error = "Your signed-in session could not be confirmed. Refresh once, or sign in again.";
     }
   }
 
@@ -48,34 +50,49 @@ export default async function HomePage() {
           see how the strongest case for and against actually holds up.
         </p>
 
-        <LibraryComposer />
-
         {error ? (
           <div className="error" style={{ marginTop: 18 }}>
             <p>{error}</p>
-            {token === null ? (
-              <div className="formActions">
-                <Link className="btn" href="/login">Log in</Link>
+            <div className="formActions">
+              <Link className="btn" href="/login">{token === null ? "Log in" : "Sign in again"}</Link>
+              {token === null ? (
                 <Link className="btn btnDark" href="/sign-up">Create account</Link>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         ) : null}
 
-        <div className="sectionHead">
-          <h2>Your debates</h2>
-          <span className="count">
-            {total === null
-              ? `${debates.length} shown`
-              : total > debates.length
-                ? `${debates.length} shown of ${total} total`
-                : `${total} total`}
-          </span>
-        </div>
+        {sessionConfirmed ? (
+          <>
+            <section className="sessionHandoff" role="status" aria-live="polite">
+              <div>
+                <p className="sessionHandoffKicker">You’re signed in</p>
+                <h2>Your debate workspace is ready.</h2>
+                <p>Start a debate below. New debates and their answers will be saved to this account.</p>
+              </div>
+              <a className="btn btnDark" href="#start-a-debate">Start a debate</a>
+            </section>
 
-        <div className="recentList">
-          <DebatesBuffer debates={debates} />
-        </div>
+            <section id="start-a-debate" className="sessionComposer" aria-label="Start a debate">
+              <LibraryComposer />
+            </section>
+
+            <div className="sectionHead">
+              <h2>Your debates</h2>
+              <span className="count">
+                {total === null
+                  ? `${debates.length} shown`
+                  : total > debates.length
+                    ? `${debates.length} shown of ${total} total`
+                    : `${total} total`}
+              </span>
+            </div>
+
+            <div className="recentList">
+              <DebatesBuffer debates={debates} />
+            </div>
+          </>
+        ) : null}
 
         <div className="sectionHead">
           <h2>Published debates</h2>

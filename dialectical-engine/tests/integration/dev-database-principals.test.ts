@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, realpath, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -246,7 +246,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     }
   }, 120_000);
 
-  it("records memory through the actual runtime role without erasure-table SELECT", async () => {
+  it("records nonempty liveness and memory through the actual runtime capability boundary", async () => {
     await provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
@@ -284,6 +284,31 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         "SELECT run_id FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],NULL,$2)",
         [runId, legacyAskerId]
       )).rows).toEqual([{ run_id: runId }]);
+      const matchedRuntimePool = new Proxy(runtimePool, {
+        get(target, property) {
+          if (property === "query") return async (...args: unknown[]) => {
+            const sql = String(args[0]);
+            if (sql.includes("FROM core.run AS run") && sql.includes("LIMIT $3")) {
+              return {
+                rows: [{
+                  run_id: runId,
+                  question_line: question,
+                  content_ciphertext: null,
+                  created_at_seq: "1"
+                }],
+                rowCount: 1
+              };
+            }
+            return (target.query as (...queryArgs: unknown[]) => Promise<unknown>)(...args);
+          };
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+      }) as Pool;
+      await expect(new LivenessRepository(matchedRuntimePool).recordQuery(
+        question,
+        { ownerRef: null, legacyAskerId }
+      )).resolves.toBe(1);
       await expect(runtimePool.query(
         "SELECT run_id FROM serve.private_run_key_cleanup_intent LIMIT 1"
       )).rejects.toMatchObject({ code: "42501" });
@@ -413,6 +438,49 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     ));
     expect(outcomes.every((outcome) => outcome.status === "fulfilled")).toBe(true);
     expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(9);
+  }, 120_000);
+
+  it("adds a newly ruled principal without rotating existing development credentials", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const currentSource = await readFile(credentialFilePath, "utf8");
+    const legacySource = currentSource.split("\n")
+      .filter((row) => row.length > 0 && !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
+      .join("\n") + "\n";
+    const legacyCredentials = parseCredentialFile(legacySource);
+    expect(legacyCredentials.size).toBe(8);
+    const upgradedPath = join(secretRoot, "legacy-database-principals.env");
+    await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
+
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: upgradedPath
+    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 9 });
+
+    const upgraded = parseCredentialFile(await readFile(upgradedPath, "utf8"));
+    expect(upgraded.size).toBe(9);
+    for (const [environmentKey, databaseUrl] of legacyCredentials) {
+      expect(upgraded.get(environmentKey)).toBe(databaseUrl);
+    }
+    expect(upgraded.get("EVALUATOR_DEV_MENU_DATABASE_URL")).toMatch(
+      /^postgresql?:\/\/debateai_dev_evaluator_api:/
+    );
+
+    const truncatedPath = join(secretRoot, "truncated-database-principals.env");
+    const truncatedSource = legacySource.split("\n")
+      .filter((row) => row.length > 0 && !row.startsWith("LIVENESS_DATABASE_URL="))
+      .join("\n") + "\n";
+    await writeFile(truncatedPath, truncatedSource, { encoding: "utf8", mode: 0o600 });
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: truncatedPath
+    })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    expect(await readFile(truncatedPath, "utf8")).toBe(truncatedSource);
   }, 120_000);
 });
 import { spawn } from "node:child_process";

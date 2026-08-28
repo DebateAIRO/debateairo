@@ -18,14 +18,15 @@ import {
   type DevelopmentUiChildExit
 } from "./dev-ui-process.js";
 import {
-  DEVELOPMENT_LOCAL_PROVIDER_TARGET,
-  startDevelopmentLocalProvider
-} from "./dev-local-provider.js";
-import {
   createDevelopmentRunnerProcessOperations,
   startDevelopmentRunnerProcess,
   type DevelopmentRunnerChildExit
 } from "./dev-runner-process.js";
+import {
+  startDevelopmentCliProviderPanel,
+  type DevelopmentCliProviderPanelHandle
+} from "./dev-cli-provider-panel.js";
+import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 import {
   createDevTlsReadinessOperations,
   startAttestedDevTlsFrontDoor
@@ -37,18 +38,14 @@ type DataPlaneHandle = Stoppable & Readonly<{
 }>;
 type ApiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentApiChildExit> }>;
 type UiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentUiChildExit> }>;
-type ProviderHandle = Stoppable & Readonly<{
-  receipt: Readonly<{ host: string; port: number; model: string }>;
-  exited: Promise<Readonly<{ code: number | null; signal: NodeJS.Signals | null }>>;
-}>;
 type RunnerHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentRunnerChildExit> }>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
   isPublicPortOccupied(): Promise<boolean>;
-  startDataPlane(): Promise<DataPlaneHandle>;
+  startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
+  startDataPlane(providerPanel: DevelopmentProviderPanel): Promise<DataPlaneHandle>;
   provisionHatchetToken(): Promise<void>;
-  assembleApiEnvironment(): Promise<void>;
-  startProvider(): Promise<ProviderHandle>;
+  assembleApiEnvironment(providerPanel: DevelopmentProviderPanel): Promise<void>;
   startApi(): Promise<ApiHandle>;
   startRunner(): Promise<RunnerHandle>;
   startUi(): Promise<UiHandle>;
@@ -58,7 +55,6 @@ export type DevelopmentAuthStackOperations = Readonly<{
 export type DevelopmentAuthStackExit =
   | Readonly<{ component: "API"; exit: DevelopmentApiChildExit }>
   | Readonly<{ component: "UI"; exit: DevelopmentUiChildExit }>
-  | Readonly<{ component: "PROVIDER"; exit: Readonly<{ code: number | null; signal: NodeJS.Signals | null }> }>
   | Readonly<{ component: "RUNNER"; exit: DevelopmentRunnerChildExit }>;
 
 export type DevelopmentAuthStack = Readonly<{
@@ -69,7 +65,8 @@ export type DevelopmentAuthStack = Readonly<{
     api: "DENY_DEFAULT";
     ui: "DENY_DEFAULT_PROXY";
     tls: "SYSTEM_TRUST";
-    provider: "OPENAI_COMPATIBLE";
+    providers: "CLI_HANDSHAKE";
+    healthyProviderRefs: readonly string[];
     runner: "REGISTERED";
   }>;
   exited: Promise<DevelopmentAuthStackExit>;
@@ -123,12 +120,16 @@ export async function startDevelopmentAuthStack(
     () => operations.isPublicPortOccupied()
   );
   if (occupied) throw new DevelopmentAuthStackError("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
-
   const owned: Stoppable[] = [];
   try {
+    const providerPanel = await fixedStage(
+      "DEV_AUTH_STACK_PROVIDER_PANEL_FAILED",
+      () => operations.startProviderPanel()
+    );
+    owned.push(providerPanel);
     const dataPlane = await fixedStage(
       "DEV_AUTH_STACK_DATA_FAILED",
-      () => operations.startDataPlane()
+      () => operations.startDataPlane(providerPanel.panel)
     );
     owned.push(dataPlane);
     if (dataPlane.receipt.mailCapture !== "ATTESTED") {
@@ -140,18 +141,8 @@ export async function startDevelopmentAuthStack(
     );
     await fixedStage(
       "DEV_AUTH_STACK_ENVIRONMENT_FAILED",
-      () => operations.assembleApiEnvironment()
+      () => operations.assembleApiEnvironment(providerPanel.panel)
     );
-    const provider = await fixedStage(
-      "DEV_AUTH_STACK_PROVIDER_FAILED",
-      () => operations.startProvider()
-    );
-    owned.push(provider);
-    if (provider.receipt.host !== DEVELOPMENT_LOCAL_PROVIDER_TARGET.host
-      || provider.receipt.port !== DEVELOPMENT_LOCAL_PROVIDER_TARGET.port
-      || provider.receipt.model !== DEVELOPMENT_LOCAL_PROVIDER_TARGET.model) {
-      throw new DevelopmentAuthStackError("DEV_AUTH_STACK_PROVIDER_RECEIPT_INVALID");
-    }
     const api = await fixedStage("DEV_AUTH_STACK_API_FAILED", () => operations.startApi());
     owned.push(api);
     const runner = await fixedStage("DEV_AUTH_STACK_RUNNER_FAILED", () => operations.startRunner());
@@ -164,7 +155,6 @@ export async function startDevelopmentAuthStack(
     const exited = Promise.race<DevelopmentAuthStackExit>([
       api.exited.then((exit) => Object.freeze({ component: "API" as const, exit })),
       ui.exited.then((exit) => Object.freeze({ component: "UI" as const, exit })),
-      provider.exited.then((exit) => Object.freeze({ component: "PROVIDER" as const, exit })),
       runner.exited.then((exit) => Object.freeze({ component: "RUNNER" as const, exit }))
     ]);
     let stopPromise: Promise<void> | undefined;
@@ -176,7 +166,8 @@ export async function startDevelopmentAuthStack(
         api: "DENY_DEFAULT",
         ui: "DENY_DEFAULT_PROXY",
         tls: "SYSTEM_TRUST",
-        provider: "OPENAI_COMPATIBLE",
+        providers: "CLI_HANDSHAKE",
+        healthyProviderRefs: providerPanel.healthyProviderRefs,
         runner: "REGISTERED"
       }),
       exited,
@@ -216,10 +207,6 @@ export function createDevelopmentAuthStackOperations(
   repositoryRoot: string,
   commandEnvironment: Readonly<Record<string, string>>
 ): DevelopmentAuthStackOperations {
-  const dataPlaneOperations = createDevelopmentAuthDataPlaneOperations(
-    repositoryRoot,
-    commandEnvironment
-  );
   const hatchetOperations = createDevelopmentHatchetTokenOperations(
     repositoryRoot,
     commandEnvironment
@@ -227,17 +214,23 @@ export function createDevelopmentAuthStackOperations(
   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
   return Object.freeze({
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
-    startDataPlane: () => startDevelopmentAuthDataPlane(dataPlaneOperations),
+    startProviderPanel: () => startDevelopmentCliProviderPanel(),
+    startDataPlane: (providerPanel) => startDevelopmentAuthDataPlane(
+      createDevelopmentAuthDataPlaneOperations(
+        repositoryRoot,
+        commandEnvironment,
+        providerPanel
+      )
+    ),
     async provisionHatchetToken() {
       await provisionDevelopmentHatchetToken({
         repositoryRoot,
         operations: hatchetOperations
       });
     },
-    async assembleApiEnvironment() {
-      await assembleDevelopmentApiEnvironment({ repositoryRoot });
+    async assembleApiEnvironment(providerPanel) {
+      await assembleDevelopmentApiEnvironment({ repositoryRoot, providerPanel });
     },
-    startProvider: () => startDevelopmentLocalProvider(),
     startApi: () => startDevelopmentApiProcess({
       repositoryRoot,
       commandEnvironment,

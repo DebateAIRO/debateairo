@@ -49,10 +49,19 @@ export {
 
 const { Pool: PgPool } = pg;
 const writeTransaction = new AsyncLocalStorage<boolean>();
-const contentLeaseScope = new AsyncLocalStorage<Readonly<{
+type ContentLeaseScopeState = Readonly<{
   pool: Pool;
   lease: RunContentLease;
-}>>();
+}>;
+type DebateAiDatabaseGlobals = typeof globalThis & {
+  __debateaiRunContentLeaseScopeV1?: AsyncLocalStorage<ContentLeaseScopeState>;
+};
+const databaseGlobals = globalThis as DebateAiDatabaseGlobals;
+// Workspace packages can load distinct @debateai/db module instances under tsx.
+// The lease scope must therefore be process-global or a nested read can acquire
+// its own session lock and deadlock against the outer copy on another client.
+const contentLeaseScope = databaseGlobals.__debateaiRunContentLeaseScopeV1
+  ??= new AsyncLocalStorage<ContentLeaseScopeState>();
 const ownerAskAdmissionScope = new AsyncLocalStorage<Readonly<{
   lease: OwnerAskAdmissionLease;
 }>>();
@@ -260,69 +269,81 @@ export async function acquireRunContentLease(
 ): Promise<RunContentLease> {
   const runIds = Object.freeze([...new Set(requestedRunIds)].sort());
   if (runIds.length === 0) throw new TypeError("CONTENT_LEASE_RUN_REQUIRED");
-  const client = await pool.connect();
-  const acquired: string[] = [];
-  let released = false;
-  let invalidated: Error | undefined;
-  const unlock = async (): Promise<void> => {
-    if (released) return;
-    released = true;
-    let failure: unknown = invalidated;
-    for (const runId of [...acquired].reverse()) {
-      try {
-        const result = await client.query<{ unlocked: boolean }>(
-          "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked",
+  for (;;) {
+    const client = await pool.connect();
+    const acquired: string[] = [];
+    let released = false;
+    let invalidated: Error | undefined;
+    const unlock = async (): Promise<void> => {
+      if (released) return;
+      released = true;
+      let failure: unknown = invalidated;
+      for (const runId of [...acquired].reverse()) {
+        try {
+          const result = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked",
+            [`${CONTENT_LEASE_NAMESPACE}${runId}`]
+          );
+          if (result.rows[0]?.unlocked !== true) {
+            failure ??= new TypeError("CONTENT_LEASE_UNLOCK_FAILED");
+          }
+        } catch (error) {
+          failure ??= error;
+        }
+      }
+      if (failure === undefined) client.release();
+      else client.release(failure instanceof Error ? failure : new Error("CONTENT_LEASE_UNLOCK_FAILED"));
+      if (failure !== undefined) throw failure;
+    };
+    try {
+      let contended = false;
+      for (const runId of runIds) {
+        const result = await client.query<{ acquired: boolean }>(
+          "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired",
           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
         );
-        if (result.rows[0]?.unlocked !== true) {
-          failure ??= new TypeError("CONTENT_LEASE_UNLOCK_FAILED");
+        if (result.rows[0]?.acquired !== true) {
+          contended = true;
+          break;
         }
-      } catch (error) {
-        failure ??= error;
+        acquired.push(runId);
       }
-    }
-    if (failure === undefined) client.release();
-    else client.release(failure instanceof Error ? failure : new Error("CONTENT_LEASE_UNLOCK_FAILED"));
-    if (failure !== undefined) throw failure;
-  };
-  try {
-    for (const runId of runIds) {
-      await client.query(
-        "SELECT pg_advisory_lock(hashtextextended($1,0))",
-        [`${CONTENT_LEASE_NAMESPACE}${runId}`]
-      );
-      acquired.push(runId);
-    }
-    return Object.freeze({
-      runIds,
-      client,
-      invalidate: (error: Error) => {
-        invalidated ??= error;
-      },
-      assertLive: async () => {
-        const result = await client.query<{ run_id: string; live: boolean }>(
-          `SELECT run.run_id,
-                  CASE WHEN run.content_encryption_version=1
-                    THEN core.run_private_content_is_live(run.run_id)
-                    ELSE true END AS live
-           FROM core.run AS run
-           WHERE run.run_id=ANY($1::uuid[])
-           ORDER BY run.run_id`,
-          [runIds]
-        );
-        if (result.rows.length !== runIds.length
-          || result.rows.some((row) => row.live !== true)) {
-          throw new TypedDomainError(
-            "PRIVATE_CONTENT_ERASED",
-            "Private content is no longer available"
+      if (contended) {
+        await unlock();
+        await new Promise<void>((resolve) => setTimeout(resolve,10));
+        continue;
+      }
+      return Object.freeze({
+        runIds,
+        client,
+        invalidate: (error: Error) => {
+          invalidated ??= error;
+        },
+        assertLive: async () => {
+          const result = await client.query<{ run_id: string; live: boolean }>(
+            `SELECT run.run_id,
+                    CASE WHEN run.content_encryption_version=1
+                      THEN core.run_private_content_is_live(run.run_id)
+                      ELSE true END AS live
+             FROM core.run AS run
+             WHERE run.run_id=ANY($1::uuid[])
+             ORDER BY run.run_id`,
+            [runIds]
           );
-        }
-      },
-      release: unlock
-    });
-  } catch (error) {
-    await unlock().catch(() => undefined);
-    throw error;
+          if (result.rows.length !== runIds.length
+            || result.rows.some((row) => row.live !== true)) {
+            throw new TypedDomainError(
+              "PRIVATE_CONTENT_ERASED",
+              "Private content is no longer available"
+            );
+          }
+        },
+        release: unlock
+      });
+    } catch (error) {
+      await unlock().catch(() => undefined);
+      throw error;
+    }
   }
 }
 
