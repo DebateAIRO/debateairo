@@ -63,6 +63,9 @@ importers:
       '@debateai/memory':
         specifier: workspace:*
         version: link:packages/memory
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:packages/obs-capture
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -147,6 +150,9 @@ importers:
       '@debateai/liveness':
         specifier: workspace:*
         version: link:../../packages/liveness
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../../packages/obs-capture
       '@debateai/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -222,6 +228,9 @@ importers:
       '@debateai/memory':
         specifier: workspace:*
         version: link:../../packages/memory
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../../packages/obs-capture
       '@debateai/propagation':
         specifier: workspace:*
         version: link:../../packages/propagation
@@ -258,6 +267,9 @@ importers:
       '@debateai/liveness':
         specifier: workspace:*
         version: link:../../packages/liveness
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../../packages/obs-capture
       '@debateai/propagation':
         specifier: workspace:*
         version: link:../../packages/propagation
@@ -546,6 +558,12 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/obs-capture:
+    dependencies:
+      pg:
+        specifier: 8.22.0
+        version: 8.22.0
 
   packages/propagation:
     dependencies:

@@ -59,6 +59,7 @@
     "@debateai/ledger": "workspace:*",
     "@debateai/liveness": "workspace:*",
     "@debateai/memory": "workspace:*",
+    "@debateai/obs-capture": "workspace:*",
     "@debateai/judgement": "workspace:*",
     "@debateai/propagation": "workspace:*",
     "@debateai/published-arithmetic": "workspace:*",

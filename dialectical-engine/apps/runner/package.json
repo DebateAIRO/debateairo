@@ -22,6 +22,7 @@
     "@debateai/propagation": "workspace:*",
     "@debateai/serve": "workspace:*",
     "@debateai/memory": "workspace:*",
+    "@debateai/obs-capture": "workspace:*",
     "@hatchet-dev/typescript-sdk": "1.28.1",
     "zod": "4.4.3"
   }
