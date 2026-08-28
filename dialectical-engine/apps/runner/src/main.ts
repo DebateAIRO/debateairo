@@ -1,3 +1,4 @@
+import "@debateai/obs-capture/install/runner";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import {
   ContentCipher,
