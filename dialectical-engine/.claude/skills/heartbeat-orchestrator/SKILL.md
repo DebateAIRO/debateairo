@@ -30,10 +30,11 @@ later V interruption is a leak you caused:
 - Roster decorrelation stated: if two blind seats share a base model, record that V chose
   it knowingly — same-model lenses decorrelate by prompt only, which is weaker.
 
-**Superpowers, mandatory:** `superpowers:dispatching-parallel-agents` and
-`superpowers:using-git-worktrees` before any fan-out, `superpowers:subagent-driven-development`
-and `superpowers:executing-plans` while lanes run, `superpowers:finishing-a-development-branch`
-at integration.
+**Superpowers — these at minimum, and reach for any other when it fits:**
+`superpowers:dispatching-parallel-agents` and `superpowers:using-git-worktrees` before any
+fan-out, `superpowers:subagent-driven-development` and `superpowers:executing-plans` while
+lanes run, `superpowers:finishing-a-development-branch` at integration. The whole library is
+open to you, and to every seat you dispatch — never write a packet that narrows it.
 
 ## 2. Dispatch and launch — verified, not assumed
 

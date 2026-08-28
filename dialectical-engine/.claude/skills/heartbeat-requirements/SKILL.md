@@ -16,8 +16,9 @@ forces steps to be merged and vague — the exact defect the quantifiability law
 prevent. Length is never the measure of either file; the compass is judged on whether it
 points, the plan on whether every step can be marked done by a stranger.
 
-**Superpowers, mandatory:** `superpowers:brainstorming` before writing SPEC.md —
-requirements are creative work, and a spec frozen on an unexplored premise is frozen wrong.
+**Superpowers — this at minimum, and reach for any other when it fits:**
+`superpowers:brainstorming` before writing SPEC.md — requirements are creative work, and a
+spec frozen on an unexplored premise is frozen wrong. The whole library is open to you.
 
 ## 1. INSTRUCTIONS.md — the mission compass, UNDER 100 LINES. Hard cap.
 

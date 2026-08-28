@@ -25,8 +25,9 @@ What changed for this seat, binding now:
 - **Check DECISIONS.md before asking anything up the lattice** — a question answered
   there is re-asked to nobody. SPEC.md is frozen: never edit it.
 - **Read `.hermes/TOOLING-TRAPS.md` before starting; append what cost you time.**
-- **Superpowers is mandatory (V ruling, 2026-08-28):** load `superpowers:using-superpowers`,
-  then the ones the router's table names for your role. Heartbeat wins on process where
+- **Superpowers is mandatory and the whole library is open to every seat (V ruling,
+  2026-08-28):** load `superpowers:using-superpowers`, then the ones the router's table
+  names for your role as a MINIMUM — plus any other one that fits the task. Heartbeat wins on process where
   they overlap; Superpowers wins on craft.
 
 

@@ -1838,8 +1838,12 @@ in this spine conflicts with the items below, the items below win.
 13. **SELF-REPORT LAW** (R8 item 6 stands): installed at INTAKE; path in `allowed`;
     carried verbatim in every packet; the case-file bar applies; no FULLY DONE without it.
 
-14. **SUPERPOWERS IS MANDATORY (V ruling, 2026-08-28).** Every seat loads the Superpowers
-    skills its role names, alongside its heartbeat contract: worker →
+14. **SUPERPOWERS IS MANDATORY AND OPEN TO EVERY SEAT (V ruling 2026-08-28; opened by V
+    amendment the same day).** The ENTIRE Superpowers library is available to every role —
+    worker, reviewer, orchestrator, architecture and requirements alike — and a seat that
+    judges a skill useful loads it whether or not its role names it. No packet may narrow
+    the library for a seat it dispatches. The per-role list is a FLOOR, the minimum each
+    role loads anyway, never a whitelist: worker →
     `test-driven-development`, `verification-before-completion`, `systematic-debugging`,
     `receiving-code-review`; reviewer → `verification-before-completion`; architecture →
     `brainstorming` then `writing-plans`; requirements → `brainstorming`; orchestrator →

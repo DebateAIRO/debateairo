@@ -29,14 +29,20 @@ loops; the loop's contract is the skill above.
 Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
 and a seat that codes never reviews its own work (§2.1).
 
-**Superpowers is mandatory alongside your role contract (V ruling, 2026-08-28).** Load
-`superpowers:using-superpowers` first, then the ones your role names below. Heartbeat says
-WHAT you owe and to whom; Superpowers says HOW to do the work well. They do not compete —
-where they overlap, heartbeat's law wins on process (rework cap, finding discipline,
-self-report) and Superpowers wins on craft (RED-first, root-cause-before-fix,
+**Superpowers is mandatory, and EVERY seat may use ANY of it (V ruling, 2026-08-28).**
+Load `superpowers:using-superpowers` first. **The whole library is open to every role** —
+worker, reviewer, orchestrator, architecture, requirements alike. If a Superpowers skill
+fits what you are about to do, load it, whether or not your role names it.
+
+Heartbeat says WHAT you owe and to whom; Superpowers says HOW to do the work well. They do
+not compete — where they overlap, heartbeat's law wins on process (rework cap, finding
+discipline, self-report) and Superpowers wins on craft (RED-first, root-cause-before-fix,
 evidence-before-assertion).
 
-| Role | Load, every time |
+The table below is a **FLOOR, not a ceiling**: these are the ones your role must load
+anyway. Reaching past your row is expected, not an exception.
+
+| Role | Must load at minimum |
 |---|---|
 | worker | `test-driven-development` · `verification-before-completion` · `systematic-debugging` (any bug) · `receiving-code-review` (on rework) |
 | reviewer | `verification-before-completion` · `receiving-code-review` (when your finding is contested) |
@@ -44,9 +50,15 @@ evidence-before-assertion).
 | requirements | `brainstorming` |
 | orchestrator | `dispatching-parallel-agents` · `using-git-worktrees` · `subagent-driven-development` · `executing-plans` · `finishing-a-development-branch` |
 
+Everything else in the library — `systematic-debugging`, `writing-plans`,
+`requesting-code-review`, `executing-plans`, `writing-skills`, `finishing-a-development-branch`,
+`using-git-worktrees`, `subagent-driven-development`, `dispatching-parallel-agents`,
+`brainstorming`, `test-driven-development`, `receiving-code-review`,
+`verification-before-completion` — is available to any seat that needs it.
+
 Non-Claude seats (Codex, Grok) cannot invoke these: read them as markdown at
 `~/.claude/plugins/cache/claude-plugins-official/superpowers/<version>/skills/<name>/SKILL.md`,
-newest version directory.
+newest version directory. The whole `skills/` directory is open to them too.
 
 Sources of truth, in order: the spine
 (`docs/agent-protocols/debateai-heartbeat-protocol.md`), your role adapter beside it, the
