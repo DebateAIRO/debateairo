@@ -9,7 +9,7 @@ import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 
 export type ThreadCallbacks = {
   onOpenNode: (nodeId: string) => void;
-  onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
+  onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onRegenNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (nodeId: string) => void;
   onToggleCollapse: (nodeId: string) => void;
@@ -209,16 +209,18 @@ function ThreadRowCard({
                 </div>
               ) : null}
               <div className="nodeControls">
-                <button
-                  type="button"
-                  className="nodeCtrl challenge"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onChallengeNode(node, event.currentTarget);
-                  }}
-                >
-                  ⚐ Challenge
-                </button>
+                {onChallengeNode ? (
+                  <button
+                    type="button"
+                    className="nodeCtrl challenge"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onChallengeNode(node, event.currentTarget);
+                    }}
+                  >
+                    ⚐ Challenge
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="nodeCtrl"

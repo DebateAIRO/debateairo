@@ -105,7 +105,7 @@ export function NodeDetailDrawer({
   lifecycleDecision?: LifecycleDecision;
   token: string | null;
   onClose: () => void;
-  onChallenge: (anchor: HTMLElement, text: string) => void;
+  onChallenge?: (anchor: HTMLElement, text: string) => void;
   onFocusRecommendationNode: (targetClaimId: string) => boolean;
   canFocusRecommendationNode: (targetClaimId: string) => boolean;
   onQueued: () => void;
@@ -146,6 +146,7 @@ export function NodeDetailDrawer({
   }, [node.id, scoring]);
 
   function selectProse(event: MouseEvent) {
+    if (!onChallenge) return;
     const selection = window.getSelection();
     const text = selection?.toString().trim();
     if (!text || text.length < 4) return;
@@ -226,7 +227,7 @@ export function NodeDetailDrawer({
           ) : null}
           <div className="drawerClaim">{node.claim}</div>
           {generation?.argument ? (
-            <div className="drawerProse" onMouseUp={selectProse}>
+            <div className="drawerProse" onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
           ) : (
@@ -234,7 +235,7 @@ export function NodeDetailDrawer({
               No argument text yet.
             </div>
           )}
-          {generation?.argument ? (
+          {generation?.argument && onChallenge ? (
             <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
           ) : null}
 
@@ -251,13 +252,15 @@ export function NodeDetailDrawer({
           {v3 ? <NodeHonestyDetails v3={v3} /> : null}
 
           <div className="drawerActions">
-            <button
-              type="button"
-              className="btn btnChallenge"
-              onClick={(event) => onChallenge(event.currentTarget, "")}
-            >
-              ⚐ Challenge
-            </button>
+            {onChallenge ? (
+              <button
+                type="button"
+                className="btn btnChallenge"
+                onClick={(event) => onChallenge(event.currentTarget, "")}
+              >
+                ⚐ Challenge
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn"

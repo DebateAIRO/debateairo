@@ -18,6 +18,20 @@ import type {
   WorkerStatus
 } from "../types.js";
 
+export type TreeProjectableAnswer = Pick<
+  Answer,
+  | "nodes"
+  | "edges"
+  | "condition_mark_records"
+  | "answer_id"
+  | "answer_version"
+  | "question_line"
+  | "terminal"
+  | "serve_state"
+> & {
+  composed_text: ReadonlyArray<Pick<Answer["composed_text"][number], "text">>;
+};
+
 /**
  * UI-01 (DR-145): the data-layer adapter that lets V2's debate workspace serve
  * V3's real data. It consumes ONLY generated contract types (AC-59 — no
@@ -87,7 +101,7 @@ function childNodeType(relation: Edge["relation"]): { nodeType: string; label: s
   }
 }
 
-function projectGraph(answer: Answer): GraphProjection {
+function projectGraph(answer: TreeProjectableAnswer): GraphProjection {
   const contractById = new Map<string, ContractNode>(answer.nodes.map((node) => [node.node_id, node]));
   const parentLinks = new Map<string, ParentLink>();
   const usedEdgeIds = new Set<string>();
@@ -196,7 +210,7 @@ export function unrepresentedEdges(answer: Answer): Edge[] {
   return answer.edges.filter((edge) => !usedEdgeIds.has(edge.edge_id));
 }
 
-function synthesisFromAnswer(answer: Answer): Synthesis | null {
+function synthesisFromAnswer(answer: TreeProjectableAnswer): Synthesis | null {
   const prose = answer.composed_text.map((segment) => segment.text).join("\n\n").trim();
   const componentsOnly = answer.serve_state === "COMPONENTS_ONLY";
   if (prose.length === 0 && !componentsOnly) return null;
@@ -215,7 +229,7 @@ function synthesisFromAnswer(answer: Answer): Synthesis | null {
   };
 }
 
-export function debateDetailFromAnswer(answer: Answer): DebateDetail {
+export function debateDetailFromAnswer(answer: TreeProjectableAnswer): DebateDetail {
   const { rootChildren } = projectGraph(answer);
   const status = debateStatusFromTerminal(answer.terminal);
   const root: DebateNode = {
@@ -264,7 +278,7 @@ export function debateDetailFromAnswer(answer: Answer): DebateDetail {
   };
 }
 
-export function contractNodesById(answer: Answer): Map<string, ContractNode> {
+export function contractNodesById(answer: Pick<Answer, "nodes">): Map<string, ContractNode> {
   return new Map(answer.nodes.map((node) => [node.node_id, node]));
 }
 

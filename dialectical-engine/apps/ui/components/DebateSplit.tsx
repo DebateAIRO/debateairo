@@ -10,7 +10,7 @@ import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 export type SplitCallbacks = {
   onFocus: (nodeId: string) => void;
   onOpenNode: (nodeId: string) => void;
-  onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
+  onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (nodeId: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
 };
@@ -133,16 +133,18 @@ export function DebateSplit({
               </div>
             ) : null}
             <div className="nodeControls">
-              <button
-                type="button"
-                className="nodeCtrl challenge"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onChallengeNode(focus, event.currentTarget);
-                }}
-              >
-                ⚐ Challenge
-              </button>
+              {onChallengeNode ? (
+                <button
+                  type="button"
+                  className="nodeCtrl challenge"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onChallengeNode(focus, event.currentTarget);
+                  }}
+                >
+                  ⚐ Challenge
+                </button>
+              ) : null}
               <button type="button" className="nodeCtrl link" onClick={() => onOpenNode(focus.id)}>
                 Open full analysis ▸
               </button>
@@ -230,8 +232,8 @@ export function DebateSplit({
           </div>
         ) : perspectives.length === 0 ? (
           <div className="splitLeaf">
-            No further arguments branch from here — this is a leaf of the debate. Use the path above to step back up, or
-            challenge it to spawn a rebuttal.
+            No further arguments branch from here — this is a leaf of the debate. Use the path above to step back up
+            {onChallengeNode ? ", or challenge it to spawn a rebuttal." : "."}
           </div>
         ) : null}
       </div>
@@ -257,7 +259,7 @@ type SplitCardProps = {
   expanded: boolean;
   scrutinyStatus?: string;
   onFocus: (id: string) => void;
-  onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
+  onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (id: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
 };
@@ -325,16 +327,18 @@ function SplitCard({
               <button type="button" className="nodeCtrl focus" onClick={() => onFocus(node.id)}>
                 Focus ▸
               </button>
-              <button
-                type="button"
-                className="nodeCtrl challenge"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onChallengeNode(node, event.currentTarget);
-                }}
-              >
-                ⚐ Challenge
-              </button>
+              {onChallengeNode ? (
+                <button
+                  type="button"
+                  className="nodeCtrl challenge"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onChallengeNode(node, event.currentTarget);
+                  }}
+                >
+                  ⚐ Challenge
+                </button>
+              ) : null}
               {node.active_generation?.argument ? (
                 <button type="button" className="nodeCtrl" onClick={() => onToggleExpand(node.id)}>
                   {expanded ? "Show less" : "Read"}

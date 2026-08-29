@@ -165,7 +165,8 @@ describe("Accounts S8 publication architecture", () => {
       expect(publicCard).toContain("may be indexed by search engines");
       expect(publicCard).toContain("Copies may persist after unpublishing");
     }
-    for (const page of [applicationPublic, webPublic]) {
+    const applicationPublicClient = await read("apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx");
+    for (const page of [applicationPublic + applicationPublicClient, webPublic]) {
       expect(page).toContain("readPublicDebate(id)");
       expect(page).toContain("PublicAnswerDisclosure");
       for (const forbidden of ["readInspection", "readLedgerDigest", "readEvents", "memory_disclosure"]) {

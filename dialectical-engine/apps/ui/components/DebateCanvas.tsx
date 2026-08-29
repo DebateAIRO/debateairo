@@ -54,7 +54,7 @@ function withoutSetAsidePaths(node: DebateNode): DebateNode {
 
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
-  onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
+  onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (nodeId: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
 };
@@ -446,16 +446,18 @@ function CanvasCard({
                   </div>
                 ) : null}
                 <div className="nodeControls">
-                  <button
-                    type="button"
-                    className="nodeCtrl challenge"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChallengeNode(node, event.currentTarget);
-                    }}
-                  >
-                    ⚐ Challenge
-                  </button>
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl challenge"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onChallengeNode(node, event.currentTarget);
+                      }}
+                    >
+                      ⚐ Challenge
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="nodeCtrl"

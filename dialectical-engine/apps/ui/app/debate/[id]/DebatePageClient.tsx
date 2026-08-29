@@ -159,7 +159,7 @@ type StreamState = {
   retryInMs?: number;
 };
 
-type ScoringAsyncState =
+export type ScoringAsyncState =
   | { status: "idle"; data: null; error: null }
   | { status: "loading"; data: DebateScoringResponse | null; error: null }
   | { status: "loaded"; data: DebateScoringResponse; error: null }
@@ -1642,7 +1642,7 @@ function ScoringHolesSummaryPanel({
   );
 }
 
-function ScoringDiagnosticsDrawer({
+export function ScoringDiagnosticsDrawer({
   scoringState,
   refreshState,
   onClose
