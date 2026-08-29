@@ -8,11 +8,20 @@ import type { DebateSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams = Promise.resolve({})
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
   // UI-01 (S05): the V3 answer index is asker-scoped; without a server session
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const requestedTab = (await searchParams).tab;
+  const tab: "yours" | "public" =
+    requestedTab === "yours" || requestedTab === "public"
+      ? requestedTab
+      : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   let debates: DebateSummary[] = [];
   let total: number | null = null;
@@ -76,46 +85,63 @@ export default async function HomePage() {
             <section id="start-a-debate" className="sessionComposer" aria-label="Start a debate">
               <LibraryComposer />
             </section>
-
-            <div className="sectionHead">
-              <h2>Your debates</h2>
-              <span className="count">
-                {total === null
-                  ? `${debates.length} shown`
-                  : total > debates.length
-                    ? `${debates.length} shown of ${total} total`
-                    : `${total} total`}
-              </span>
-            </div>
-
-            <div className="recentList">
-              <DebatesBuffer debates={debates} />
-            </div>
           </>
         ) : null}
 
-        <div className="sectionHead">
-          <h2>Published debates</h2>
+      <div className="sectionHead" aria-label="Debate library">
+          <Link
+            aria-current={tab === "yours" ? "page" : undefined}
+            href="/?tab=yours"
+            className={tab === "yours" ? "tab tabActive" : "tab"}
+          >
+            Your Debates
+          </Link>
+          <Link
+            aria-current={tab === "public" ? "page" : undefined}
+            href="/?tab=public"
+            className={tab === "public" ? "tab tabActive" : "tab"}
+          >
+            Public Debates
+          </Link>
           <span className="count">
-            {published.total > published.items.length
-              ? `${published.items.length} shown of ${published.total} total`
-              : `${published.total} total`}
+            {tab === "yours"
+              ? (total === null
+                  ? `${debates.length} shown`
+                  : total > debates.length
+                    ? `${debates.length} shown of ${total} total`
+                    : `${total} total`)
+              : (published.total > published.items.length
+                  ? `${published.items.length} shown of ${published.total} total`
+                  : `${published.total} total`)}
           </span>
         </div>
-        {publishedError ? <div className="error">{publishedError}</div> : null}
-        <div className="recentList">
-          {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
-          {published.items.map((debate) => (
-            <article className="debateCard" key={debate.public_ref}>
-              <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
-              <p>
-                By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
-                {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
-              </p>
-              <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
-            </article>
-          ))}
-        </div>
+
+        {sessionConfirmed && tab === "yours" ? (
+          <div className="recentList">
+            <DebatesBuffer debates={debates} />
+          </div>
+        ) : tab === "yours" ? (
+          <p className="tabEmptyHint">Sign in or create an account above to see your debates.</p>
+        ) : null}
+
+        {tab === "public" ? (
+          <>
+            {publishedError ? <div className="error">{publishedError}</div> : null}
+            <div className="recentList">
+              {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
+              {published.items.map((debate) => (
+                <article className="debateCard" key={debate.public_ref}>
+                  <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
+                  <p>
+                    By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
+                    {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
+                  </p>
+                  <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
