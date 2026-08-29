@@ -24,7 +24,8 @@ later V interruption is a leak you caused:
 - A **rework allowance** in every packet: `rework rounds: max 3` (never a token budget —
   budgets are volatile; rounds are fixed) plus a stopping rule for research seats.
 - The output skeleton mandated: exact heading strings, claim-tag vocabulary, per-item
-  `VERDICT / CONFIDENCE / STRONGEST COUNTER` block.
+  `VERDICT / CONFIDENCE / STRONGEST COUNTER` block, and the handoff OPENING with
+  `SKILLS LOADED: <list>` (`heartbeat-protocol` §3b).
 - A per-CLI invocation probe: confirm each CLI's goal mechanism before using it — a `/goal`
   prefix fed to a CLI with its own slash parser killed a seat for 3h20m.
 - Roster decorrelation stated: if two blind seats share a base model, record that V chose
@@ -67,6 +68,13 @@ open to you, and to every seat you dispatch — never write a packet that narrow
   loss cost a full round. "Routed elsewhere" in a packet is not a route.
 - Consume verdicts; never produce one. Round 4 does not exist: after rework round 3, it
   goes on the V DECISIONS PACKET.
+- **Verify `SKILLS LOADED` at each seat exit — do not trust the line.** A skill's PATH in a
+  transcript proves nothing: your own packet quotes those paths and they echo straight back.
+  Only the skill BODY proves a load. Grep the seat's transcript for a distinctive phrase from
+  inside each floor skill (Claude seats: `~/.claude/projects/<encoded-cwd>/*.jsonl`; Grok:
+  `~/.grok/sessions/<encoded-cwd>/<id>/chat_history.jsonl`). It takes about a minute and it
+  is the only check that distinguishes a seat that read the skill from one that read its name.
+  A shortfall is a finding; a skill named but not loaded is a fabrication finding.
 - Write the ledger AT EACH SEAT EXIT, not at closure — receipts are cheapest the moment a
   seat reports. Any packet granting sub-delegation also requires returning the children's
   receipts; the ledger is labelled a floor when any are missing.

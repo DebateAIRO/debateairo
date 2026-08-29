@@ -78,7 +78,9 @@ finished when every step is mechanically checkable, not when every future is des
 
 ## 5. Handoff
 
-`READY FOR PEER REVIEW` carrying: the SPEC↔PLAN trace table · the cluster map with
+`READY FOR PEER REVIEW`, OPENING with `SKILLS LOADED: <list>` (`heartbeat-protocol` §3b —
+your floor is `brainstorming` THEN `writing-plans`, and brainstorming after the plan is
+written is theatre, not process), then carrying: the SPEC↔PLAN trace table · the cluster map with
 verification commands · the DDD/boundary statement · your §3 refutation table · every
 DECISIONS.md line you appended · `comments read through`. The review diamond (C2→H2)
 will probe the plan by trying to find one step it cannot mechanically verify — leave

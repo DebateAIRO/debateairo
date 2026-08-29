@@ -68,6 +68,12 @@ first. It is falsifiable evidence that blindness held, and it has caught real er
 
 ## 5. Handoff
 
-Post the verdict on the ticket with `comments read through`. File your self-report
+Open your verdict with `SKILLS LOADED: <list>` (`heartbeat-protocol` §3b), then post it on
+the ticket with `comments read through`.
+
+**You also check the AUTHOR's `SKILLS LOADED` line** against their role floor — it is part
+of the packet review you already own (§1). A missing line, or a floor skill absent from it,
+is a finding like any other. A skill NAMED but not loaded is a fabrication finding: paths
+prove nothing, since packets quote paths and they echo back. File your self-report
 (`heartbeat-protocol` §3) — including where the packet fought YOU. Then stop. You mark
 nothing Done, mutate no board state beyond your comment, and never edit the work under review.

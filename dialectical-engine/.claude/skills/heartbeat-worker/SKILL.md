@@ -88,7 +88,8 @@ macOS has no `timeout`, `rg` may be absent, and its `awk` treats `index` as a bu
 
 ## 7. Handoff
 
-End at `READY FOR PEER REVIEW` on your ticket, carrying: every RED frame · suites as
+End at `READY FOR PEER REVIEW` on your ticket, OPENING with `SKILLS LOADED: <list>`
+(`heartbeat-protocol` §3b — no FULLY DONE without it), then carrying: every RED frame · suites as
 `passed/total` with failures named and dated as pre-existing or yours · the three-run cluster
 table · every constant you chose, disclosed · your refutation evidence from §2 · packet
 defects from §1 · unexpected findings from §5 · `comments read through`.

@@ -25,6 +25,16 @@ What changed for this seat, binding now:
 - **Check DECISIONS.md before asking anything up the lattice** — a question answered
   there is re-asked to nobody. SPEC.md is frozen: never edit it.
 - **Read `.hermes/TOOLING-TRAPS.md` before starting; append what cost you time.**
+- **Skills-loaded gate (V ruling, 2026-08-29).** Your handoff OPENS with one line:
+  `SKILLS LOADED: <every skill you actually loaded, comma-separated>`. No seat reaches FULLY
+  DONE without it, exactly as with the self-report. A skill NAMED but not loaded is a
+  fabrication finding; falling short of your role floor is a finding you should declare
+  yourself rather than have found. The orchestrator verifies the line at seat exit by
+  checking the skill BODY reached you — quoting a path proves nothing, because your packet
+  quotes those paths and they echo back. Measured 2026-08-29: every seat did load its
+  floor, but that was invisible without grepping transcripts, and sampling a seat mid-run
+  produced a FALSE finding against a compliant seat. Declaring it costs one line and removes
+  the guesswork in both directions.
 - **Superpowers is mandatory and the whole library is open to every seat (V ruling,
   2026-08-28):** load `superpowers:using-superpowers`, then the ones the router's table
   names for your role as a MINIMUM — plus any other one that fits the task. Heartbeat wins on process where

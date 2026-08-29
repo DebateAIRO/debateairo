@@ -1855,6 +1855,53 @@ in this spine conflicts with the items below, the items below win.
     evidence-before-assertion). Non-Claude seats cannot invoke them and read them as
     markdown under the superpowers plugin's `skills/` directory.
 
+15. **SKILLS-LOADED GATE (V ruling, 2026-08-29).** Every handoff OPENS with one line —
+    `SKILLS LOADED: <every skill actually loaded, comma-separated>` — and no seat reaches
+    FULLY DONE without it, exactly as with the self-report. The reviewer checks that line
+    against the seat's role floor (item 14): a shortfall is a finding against the seat, and
+    a skill NAMED but not loaded is a fabrication finding under R5. The orchestrator
+    VERIFIES rather than trusts it at seat exit — a skill's PATH in a transcript proves
+    nothing, because packets quote paths and they echo straight back; only the skill BODY
+    proves a load.
+
+    **Measured basis (public-debate-access, 2026-08-29) — and the correction that produced
+    this law.** All four seats DID eventually load their role floor: final compliance was
+    4/4, not the 3/4 the Router first reported. The Router measured a seat mid-flight, saw
+    only the two heartbeat skills, and concluded it had skipped its mandated `brainstorming`
+    after three separate instructions. That conclusion was FALSE — the seat loaded
+    `brainstorming` and `writing-plans` later and in the correct order, both before its first
+    plan write. **The defect was never the seat's; it was that compliance was UNOBSERVABLE.**
+    No handoff declared what it had loaded, so the only way to know was for the orchestrator
+    to grep session transcripts — and a snapshot of a running seat produced a wrong finding
+    that would have cost a needless rework round against a seat doing its job correctly.
+    That is what this gate fixes: it converts compliance from a forensic question into a
+    declared artifact. The generalization still holds and is the reason to keep it —
+    **anything this protocol requires but cannot observe will eventually be mis-judged in
+    both directions**: skipped silently, or falsely charged.
+
+16. **FIX THE CLASS, NOT THE INSTANCE (2026-08-29).** A reported finding is a SAMPLE of a
+    class, never the whole class. Any seat receiving a finding names the class, sweeps every
+    member, and records the sweep field-by-field in the artifact so the reviewer checks it
+    mechanically rather than re-deriving it. Measured basis: on public-debate-access an
+    architecture seat redacted the single leaking field its reviewer named and stopped — the
+    same wholesale-copy decision was leaking two more sites, and the enumeration ordered on
+    rework surfaced two further fields (`locator`, and a `.passthrough()` object whose UNKNOWN
+    keys flow through unchecked) that no checklist had. The seat's own diagnosis, adopted as
+    law: *searching by named lead instead of by risk class is how the second and third defects
+    ship.* A `.passthrough()` or index-signature shape anywhere on a copied path is a WILDCARD
+    leak and defeats field-by-field review by construction — it must be named as its own class.
+
+    **Corollary — choose the REMEDY by the SHAPE, not by your confidence about the content.**
+    The seat that shipped this defect had already NAMED the risk class correctly a round
+    earlier; it still applied the wrong remedy, because it pattern-matched on its own
+    uncertainty about what a field might contain instead of on whether the field's KEY SET was
+    fixed or open. Fixed key set → PROJECT to a named allow-list (construct a new object; never
+    spread the source). Open key set with no semantic contract → REDACT wholesale. Verified safe
+    → copy, with the trace to its producer recorded. "Flag it on a checklist" is not a remedy
+    for an open shape at all: a checklist enumerates keys, and the whole defect is that the keys
+    are not enumerable. Naming a risk and neutralising it are different acts, and only the
+    second one ships.
+
 ## v3.2.0 amendments — V-ordered laws from the first live Tier-1 mission (responsive-ui-20260724, 2026-07-24..27)
 
 1. **Fleet building (V's name for the R7 election):** run it as an explicit per-loop
