@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import {
   PublicDebateSchema,
   type Answer,
+  type Edge,
+  type Node,
   type PublicDebate
 } from "@debateai/contract";
 import {
@@ -13,6 +15,80 @@ import {
   type AuthSourceContext
 } from "@debateai/db";
 import type { AuthenticatedSession } from "./sessions.js";
+type LabeledNumber = Node["base_score"];
+function redactLabeledNumber(
+  n: LabeledNumber,
+  opts: Readonly<{ redactSource: boolean }>
+): LabeledNumber {
+  return {
+    value: n.value,
+    kind: n.kind,
+    source: opts.redactSource ? "REDACTED_OWNER_ONLY" : n.source,
+    producer: n.producer,
+    provenance_ref: "REDACTED_OWNER_ONLY",
+    replay_handle: "REDACTED_OWNER_ONLY"
+  };
+}
+
+function redactNodeForPublic(node: Node): Node {
+  return {
+    node_id: node.node_id,
+    claim: node.claim,
+    way_of_knowing: node.way_of_knowing,
+    base_score: redactLabeledNumber(node.base_score, { redactSource: true }),
+    final_strength: node.final_strength === null
+      ? null
+      : redactLabeledNumber(node.final_strength, { redactSource: true }),
+    provenance_ref: "REDACTED_OWNER_ONLY",
+    maker_lineage: node.maker_lineage,
+    review: node.review === null
+      ? null
+      : {
+          outcome: node.review.outcome,
+          reasons: node.review.reasons,
+          provenance_ref: "REDACTED_OWNER_ONLY",
+          reviewer_lineage: node.review.reviewer_lineage
+        },
+    locator: node.locator,
+    stranger_restatement: { check_status: node.stranger_restatement.check_status },
+    defeater_refs: node.defeater_refs,
+    defeater_exhaustion_marked: node.defeater_exhaustion_marked,
+    disagreement: null,
+    condition_marks: node.condition_marks,
+    abstention: node.abstention === null ? null
+      : {
+          kind: node.abstention.kind,
+          question_class: node.abstention.question_class,
+          risk_tier: node.abstention.risk_tier,
+          price: node.abstention.price,
+          register_row_key: node.abstention.register_row_key,
+          register_version: node.abstention.register_version,
+          register_source_ref: node.abstention.register_source_ref,
+          unlock_condition: node.abstention.unlock_condition,
+          ledger_unknown_ref: "REDACTED_OWNER_ONLY"
+        },
+    staleness_state: node.staleness_state,
+    relevant_as_of: node.relevant_as_of
+  };
+}
+
+function redactEdgeForPublic(edge: Edge): Edge {
+  return {
+    edge_id: edge.edge_id,
+    from_node_ref: edge.from_node_ref,
+    target_kind: edge.target_kind,
+    target_ref: edge.target_ref,
+    relation: edge.relation,
+    strength: edge.strength.status !== "PRESENT"
+      ? edge.strength
+      : {
+          status: "PRESENT",
+          number: redactLabeledNumber(edge.strength.number, { redactSource: false })
+        },
+    provenance_ref: "REDACTED_OWNER_ONLY",
+    placeholder: edge.placeholder
+  };
+}
 
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
@@ -164,7 +240,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
         badges: input.answer.badges,
         residual_objections: input.answer.residual_objections,
         reversal_point: input.answer.reversal_point,
-        as_of: input.answer.as_of
+        as_of: input.answer.as_of,
+        nodes: input.answer.nodes.map(redactNodeForPublic),
+        edges: input.answer.edges.map(redactEdgeForPublic),
+        tree_included: true
       }
     });
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;

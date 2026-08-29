@@ -15,6 +15,7 @@ import {
   assertPublicationSecretDomains,
   loadKek,
   type LoadedPublicationKey,
+  type CryptoEnvelope,
   type PublicationKeyFileSystem,
   type PublicationKeyStore
 } from "../../packages/crypto/src/index.js";
@@ -43,6 +44,246 @@ function publicDebate(publicationRef: string) {
       as_of: "2026-08-24T00:00:00.000Z"
     }
   } as const;
+}
+
+const PUBLICATION_RUN_ID = "11111111-1111-4111-8111-111111111111";
+const REDACTED_OWNER_ONLY = "REDACTED_OWNER_ONLY";
+const HANDLE_MARKERS = Object.freeze([
+  "real-replay-ptr-base-b2c1",
+  "real-replay-ptr-final-b2c1",
+  "real-replay-ptr-edge-b2c1",
+  "real-ledger-ptr-9f2a"
+]);
+
+const authenticated = Object.freeze({
+  session: Object.freeze({
+    asker_id: "owner:44444444-4444-4444-8444-444444444444",
+    session_id: "55555555-5555-4555-8555-555555555555",
+    caller_scope: "ASKER" as const,
+    ownership_provenance: "server_session" as const,
+    provisional_identity_model: false as const
+  }),
+  userId: "66666666-6666-4666-8666-666666666666",
+  ownerRef: "44444444-4444-4444-8444-444444444444",
+  tokenHash: "sha256:session",
+  csrfTokenHash: "sha256:csrf",
+  authKind: "cookie" as const
+}) satisfies AuthenticatedSession;
+
+function labeledNumber(replayHandle: string) {
+  return {
+    value: 0.75,
+    kind: "probability",
+    source: "test source",
+    producer: "test producer",
+    provenance_ref: "provenance:labeled-number",
+    replay_handle: replayHandle
+  };
+}
+
+function answerWithTree(): Answer {
+  const nodeId = "node:public-tree";
+  return {
+    answer_id: "answer:s01",
+    answer_version: 1,
+    run_ref: PUBLICATION_RUN_ID,
+    question_line: "What may be public?",
+    terminal: "SERVED",
+    verdict_state: "SUPPORTED",
+    verdict_unavailable: null,
+    confidence_band: "moderate",
+    band_ceiling: {
+      label: "TEST_LAYER_CEILING",
+      basis: { LOOKED_UP: 1, RAN: 0, REASONING: 0 },
+      register_row_key: "wayOfKnowingCeiling",
+      register_version: 1,
+      source_ref: "test:S01",
+      lift_path: "test:public"
+    },
+    answer_form: { kind: "EMPIRICAL" },
+    serve_state: "COMPOSED",
+    composed_text: [{
+      segment_id: "segment:s01",
+      text: "Only the strict public summary.",
+      load_bearing: true,
+      served_number_refs: []
+    }],
+    number_slots: [],
+    abstention: null,
+    shadow_suppressions: [],
+    nodes: [{
+      node_id: nodeId,
+      claim: "The public tree is useful.",
+      way_of_knowing: "LOOKED_UP",
+      base_score: labeledNumber(HANDLE_MARKERS[0]!),
+      final_strength: labeledNumber(HANDLE_MARKERS[1]!),
+      provenance_ref: "provenance:node",
+      maker_lineage: null,
+      review: null,
+      locator: null,
+      stranger_restatement: {
+        check_status: "PASS",
+        secret_extra: "LEAK-ME-RESTATEMENT",
+        owner_note: "do-not-publish"
+      },
+      defeater_refs: [],
+      defeater_exhaustion_marked: true,
+      disagreement: {
+        internal_note: "LEAK-ME-DISAGREEMENT",
+        ledger_ptr: "secret-ptr-9f2a"
+      },
+      condition_marks: [],
+      abstention: {
+        kind: "not searched",
+        question_class: "empirical",
+        risk_tier: "standard",
+        price: 0.5,
+        register_row_key: "abstentionPolicy",
+        register_version: 1,
+        register_source_ref: "register:S01",
+        unlock_condition: "Search the primary sources.",
+        ledger_unknown_ref: HANDLE_MARKERS[3]!
+      },
+      staleness_state: "FRESH",
+      relevant_as_of: "2026-08-24T00:00:00.000Z"
+    }, {
+      node_id: "node:public-tree-2",
+      claim: "A second node proves per-node projection.",
+      way_of_knowing: "REASONING",
+      base_score: labeledNumber("second-node-replay-handle"),
+      final_strength: null,
+      provenance_ref: "provenance:node-2",
+      maker_lineage: null,
+      review: null,
+      locator: null,
+      stranger_restatement: { check_status: "NOT_SAMPLED" },
+      defeater_refs: [],
+      defeater_exhaustion_marked: false,
+      disagreement: null,
+      condition_marks: [],
+      abstention: null,
+      staleness_state: "FRESH",
+      relevant_as_of: "2026-08-24T00:00:00.000Z"
+    }],
+    edges: [{
+      edge_id: "edge:public-tree",
+      from_node_ref: nodeId,
+      target_kind: "NODE",
+      target_ref: nodeId,
+      relation: "support",
+      strength: {
+        status: "PRESENT",
+        number: labeledNumber(HANDLE_MARKERS[2]!)
+      },
+      provenance_ref: "provenance:edge",
+      placeholder: false
+    }],
+    badges: [],
+    residual_objections: [],
+    value_hinges: [],
+    condition_marks: [],
+    condition_mark_records: [],
+    reversal_point: "Contrary public evidence.",
+    builds_on_previous: { value: false, answer_ref: null },
+    memory_disclosure: null,
+    risk_tier: "standard",
+    tier_source: "ASKER",
+    tier_provenance_ref: "test:S01",
+    cost_envelope: {
+      basis: { source_ref: "test:S01" },
+      state: "WITHIN",
+      consumed_model_attempts: 1,
+      protected_core: "NEVER_SKIPPABLE"
+    },
+    composition_budget_tier: "low",
+    conformance_outcome: "PASS",
+    ledger_digest_handle: "ledger:private",
+    inspection_handle: "inspection:private",
+    as_of: "2026-08-24T00:00:00.000Z",
+    staleness_state: "FRESH",
+    relevant_as_of: "2026-08-24T00:00:00.000Z"
+  };
+}
+
+function publicationHarness() {
+  const createdAt = new Date("2026-08-24T00:00:00.000Z");
+  const cipher = new PublicationCipher(
+    new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xd2)))
+  );
+  let storedSnapshot: Readonly<{
+    publicationRef: string;
+    runId: string;
+    contentCiphertext: CryptoEnvelope;
+    createdAt: Date;
+  }> | null = null;
+  const repository = {
+    preflightGrant: async () => true,
+    readAuthorPseudonym: async () => "Stable Public Name",
+    prepareKeyProvision: async () => true,
+    publish: async (input: Readonly<{
+      publicationRef: string;
+      runId: string;
+      contentCiphertext: CryptoEnvelope;
+      occurredAt: Date;
+    }>) => {
+      storedSnapshot = {
+        publicationRef: input.publicationRef,
+        runId: input.runId,
+        contentCiphertext: input.contentCiphertext,
+        createdAt: input.occurredAt
+      };
+      return true;
+    },
+    abandonKeyProvision: async () => true,
+    withContentLease: async <T>(_publicationRef: string, use: () => Promise<T>) => use(),
+    readPublic: async (publicationRef: string) =>
+      storedSnapshot?.publicationRef === publicationRef ? storedSnapshot : null,
+    revalidatePublic: async () => true
+  } as unknown as PostgresPublicationRepository;
+  const application = new PostgresPublicationApplication(
+    repository,
+    cipher,
+    () => createdAt
+  );
+  return {
+    application,
+    async storeLegacy() {
+      const publicationRef = randomUUID();
+      const prepared = await cipher.create(publicationRef, PUBLICATION_RUN_ID);
+      try {
+        storedSnapshot = {
+          publicationRef,
+          runId: PUBLICATION_RUN_ID,
+          contentCiphertext: prepared.encrypt(publicDebate(publicationRef)),
+          createdAt
+        };
+      } finally {
+        prepared.close();
+      }
+      return publicationRef;
+    },
+    async publish(answer: Answer) {
+      const transition = await application.publish({
+        runId: answer.run_ref,
+        answer,
+        authenticated,
+        grantToken: "g".repeat(43),
+        source: { ip: "192.0.2.1", userAgent: "S01 test", requestId: "request:S01" }
+      });
+      if (transition === null) throw new TypeError("S01_TEST_PUBLICATION_FAILED");
+      const snapshot = storedSnapshot;
+      if (snapshot === null) throw new TypeError("S01_TEST_SNAPSHOT_MISSING");
+      const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
+      try {
+        return {
+          transition,
+          debate: PublicDebateSchema.parse(prepared.decrypt(snapshot.contentCiphertext))
+        };
+      } finally {
+        prepared.close();
+      }
+    }
+  };
 }
 
 afterEach(async () => {
@@ -597,6 +838,267 @@ describe("S8 publication crypto and projection", () => {
     noOpDestroy = false;
     await expect(application.reconcileKeyCleanup()).resolves.toBe(1);
     await expect(application.reconcileKeyCleanup()).resolves.toBe(0);
+  });
+
+  it("publishes the tree without leaking owner-only fields", async () => {
+    const answer = answerWithTree();
+    const { debate } = await publicationHarness().publish(answer);
+    const expectedNodes = answer.nodes.map((inputNode) => ({
+      ...inputNode,
+      base_score: {
+        ...inputNode.base_score,
+        source: REDACTED_OWNER_ONLY,
+        provenance_ref: REDACTED_OWNER_ONLY,
+        replay_handle: REDACTED_OWNER_ONLY
+      },
+      final_strength: inputNode.final_strength === null
+        ? null
+          : {
+            ...inputNode.final_strength,
+            source: REDACTED_OWNER_ONLY,
+            provenance_ref: REDACTED_OWNER_ONLY,
+            replay_handle: REDACTED_OWNER_ONLY
+          },
+      provenance_ref: REDACTED_OWNER_ONLY,
+      review: inputNode.review === null
+        ? null
+        : {
+            ...inputNode.review,
+            provenance_ref: REDACTED_OWNER_ONLY
+          },
+      abstention: inputNode.abstention === null
+        ? null
+        : { ...inputNode.abstention, ledger_unknown_ref: REDACTED_OWNER_ONLY },
+      stranger_restatement: {
+        check_status: inputNode.stranger_restatement.check_status
+      },
+      disagreement: null
+    }));
+    const expectedEdges = answer.edges.map((inputEdge) => ({
+      ...inputEdge,
+      strength: inputEdge.strength.status === "PRESENT"
+        ? {
+            ...inputEdge.strength,
+            number: {
+              ...inputEdge.strength.number,
+              provenance_ref: REDACTED_OWNER_ONLY,
+              replay_handle: REDACTED_OWNER_ONLY
+            }
+          }
+        : inputEdge.strength,
+      provenance_ref: REDACTED_OWNER_ONLY
+    }));
+
+    expect(debate.answer.nodes).toEqual(expectedNodes);
+    expect(debate.answer.edges).toEqual(expectedEdges);
+    expect(debate.answer.tree_included).toBe(true);
+  });
+
+  it("redacts only ledger_unknown_ref's abstention value, leaving the rest of the record intact", async () => {
+    const answer = answerWithTree();
+    const inputAbstention = answer.nodes[0]!.abstention!;
+    const { ledger_unknown_ref: _secret, ...publicAbstention } = inputAbstention;
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedNode = debate.answer.nodes?.find(
+      (node) => node.node_id === answer.nodes[0]!.node_id
+    );
+
+    expect(publishedNode).toBeDefined();
+    expect.soft(publishedNode!.abstention).toEqual({
+      ...publicAbstention,
+      ledger_unknown_ref: REDACTED_OWNER_ONLY
+    });
+    expect(publishedNode!.abstention!.ledger_unknown_ref).not.toBe(inputAbstention.ledger_unknown_ref);
+  });
+
+  it("redacts replay_handle on node scores and present edge strength numbers", async () => {
+    const answer = answerWithTree();
+    const inputNode = answer.nodes[0]!;
+    const inputEdge = answer.edges[0]!;
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedNode = debate.answer.nodes?.find((node) => node.node_id === inputNode.node_id);
+    const publishedEdge = debate.answer.edges?.find((edge) => edge.edge_id === inputEdge.edge_id);
+
+    expect(publishedNode).toBeDefined();
+    expect(publishedNode!.base_score).toEqual({
+      ...inputNode.base_score,
+      source: REDACTED_OWNER_ONLY,
+      provenance_ref: REDACTED_OWNER_ONLY,
+      replay_handle: REDACTED_OWNER_ONLY
+    });
+    expect(publishedNode!.final_strength).toEqual({
+      ...inputNode.final_strength!,
+      source: REDACTED_OWNER_ONLY,
+      provenance_ref: REDACTED_OWNER_ONLY,
+      replay_handle: REDACTED_OWNER_ONLY
+    });
+    expect(publishedEdge?.strength.status).toBe("PRESENT");
+    if (publishedEdge?.strength.status !== "PRESENT" || inputEdge.strength.status !== "PRESENT") {
+      throw new TypeError("S01_TEST_PRESENT_EDGE_MISSING");
+    }
+    expect(publishedEdge.strength.number).toEqual({
+      ...inputEdge.strength.number,
+      provenance_ref: REDACTED_OWNER_ONLY,
+      replay_handle: REDACTED_OWNER_ONLY
+    });
+  });
+
+  it("redacts aliased edge provenance_ref values before publication", async () => {
+    const secret = "edge-prov-alias-HANDLE-9f2a-SHOULD-NOT-LEAK";
+    const answer = answerWithTree();
+    const inputEdge = answer.edges[0]!;
+    if (inputEdge.strength.status !== "PRESENT") {
+      throw new TypeError("S01_TEST_PRESENT_EDGE_MISSING");
+    }
+    inputEdge.strength.number.provenance_ref = secret;
+    inputEdge.strength.number.replay_handle = secret;
+    inputEdge.provenance_ref = secret;
+
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedEdge = debate.answer.edges?.find((edge) => edge.edge_id === inputEdge.edge_id);
+    expect(publishedEdge?.strength.status).toBe("PRESENT");
+    if (publishedEdge?.strength.status !== "PRESENT") {
+      throw new TypeError("S01_TEST_PRESENT_EDGE_MISSING");
+    }
+
+    expect.soft(publishedEdge.strength.number.replay_handle).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(publishedEdge.strength.number.provenance_ref).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(publishedEdge.provenance_ref).toBe(REDACTED_OWNER_ONLY);
+    expect(JSON.stringify(debate)).not.toContain(secret);
+  });
+
+  it("redacts derivable base score provenance_ref values before publication", async () => {
+    const provenanceRef = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const replayHandle = `judgement:${provenanceRef}`;
+    const answer = answerWithTree();
+    answer.nodes[0]!.base_score.provenance_ref = provenanceRef;
+    answer.nodes[0]!.base_score.replay_handle = replayHandle;
+
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedBaseScore = debate.answer.nodes?.find(
+      (node) => node.node_id === answer.nodes[0]!.node_id
+    )?.base_score;
+
+    expect(publishedBaseScore).toBeDefined();
+    expect.soft(publishedBaseScore!.replay_handle).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(publishedBaseScore!.provenance_ref).toBe(REDACTED_OWNER_ONLY);
+    expect(`judgement:${publishedBaseScore!.provenance_ref}`).not.toBe(replayHandle);
+  });
+
+  it("redacts node and review provenance_ref values before publication", async () => {
+    const answer = answerWithTree();
+    const inputNode = answer.nodes[0]!;
+    inputNode.provenance_ref = "node-raw-artifact-id-SHOULD-NOT-LEAK";
+    inputNode.review = {
+      outcome: "agree",
+      reasons: ["The evidence supports this node."],
+      provenance_ref: "review-raw-artifact-id-SHOULD-NOT-LEAK",
+      reviewer_lineage: {
+        maker: "reviewer",
+        model_id: "review-model",
+        transport: "test",
+        provider_ref: "development:review-provider"
+      }
+    };
+
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedNode = debate.answer.nodes?.find((node) => node.node_id === inputNode.node_id);
+
+    expect(publishedNode).toBeDefined();
+    expect.soft(publishedNode!.provenance_ref).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(publishedNode!.review).toEqual({
+      outcome: inputNode.review.outcome,
+      reasons: inputNode.review.reasons,
+      provenance_ref: REDACTED_OWNER_ONLY,
+      reviewer_lineage: inputNode.review.reviewer_lineage
+    });
+    expect(JSON.stringify(debate)).not.toContain("raw-artifact-id-SHOULD-NOT-LEAK");
+  });
+
+  it("redacts aliased base_score.source and final_strength.source without redacting edge source", async () => {
+    const rawArtifactRef = "raw-artifact-id-SHARED-BY-node-prov-and-score-sources";
+    const edgeSource = "EVIDENCE_VERIFIER";
+    const answer = answerWithTree();
+    const inputNode = answer.nodes[0]!;
+    const inputEdge = answer.edges[0]!;
+    if (inputNode.final_strength === null || inputEdge.strength.status !== "PRESENT") {
+      throw new TypeError("S01_TEST_SOURCE_ALIAS_FIXTURE_INCOMPLETE");
+    }
+    inputNode.provenance_ref = rawArtifactRef;
+    inputNode.base_score.source = rawArtifactRef;
+    inputNode.final_strength.source = rawArtifactRef;
+    inputEdge.strength.number.source = edgeSource;
+
+    const { debate } = await publicationHarness().publish(answer);
+    const publishedNode = debate.answer.nodes?.find((node) => node.node_id === inputNode.node_id);
+    const publishedEdge = debate.answer.edges?.find((edge) => edge.edge_id === inputEdge.edge_id);
+
+    expect(publishedNode).toBeDefined();
+    expect.soft(publishedNode!.base_score.source).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(publishedNode!.final_strength?.source).toBe(REDACTED_OWNER_ONLY);
+    expect.soft(JSON.stringify(debate)).not.toContain(rawArtifactRef);
+    expect(publishedEdge?.strength.status).toBe("PRESENT");
+    if (publishedEdge?.strength.status !== "PRESENT") {
+      throw new TypeError("S01_TEST_PRESENT_EDGE_MISSING");
+    }
+    expect(publishedEdge.strength.number.source).toBe(edgeSource);
+  });
+
+  it("strips residual handle marker values from the published JSON", async () => {
+    const { debate } = await publicationHarness().publish(answerWithTree());
+    const serialized = JSON.stringify(debate);
+
+    for (const marker of HANDLE_MARKERS) expect.soft(serialized).not.toContain(marker);
+  });
+
+  it("projects stranger_restatement to its public check_status only", async () => {
+    const answer = answerWithTree();
+    const { debate } = await publicationHarness().publish(answer);
+    const restatement = debate.answer.nodes?.find(
+      (node) => node.node_id === answer.nodes[0]!.node_id
+    )?.stranger_restatement;
+    const serialized = JSON.stringify(debate);
+
+    expect.soft(restatement).toEqual({ check_status: "PASS" });
+    expect.soft(Object.keys(restatement ?? {})).toEqual(["check_status"]);
+    expect.soft(serialized).not.toContain("LEAK-ME-RESTATEMENT");
+    expect(serialized).not.toContain("do-not-publish");
+  });
+
+  it("nulls disagreement instead of publishing its open record", async () => {
+    const answer = answerWithTree();
+    const { debate } = await publicationHarness().publish(answer);
+    const disagreement = debate.answer.nodes?.find(
+      (node) => node.node_id === answer.nodes[0]!.node_id
+    )?.disagreement;
+    const serialized = JSON.stringify(debate);
+
+    expect.soft(disagreement).toBeNull();
+    expect.soft(serialized).not.toContain("LEAK-ME-DISAGREEMENT");
+    expect(serialized).not.toContain("secret-ptr-9f2a");
+  });
+
+  it("reading a published debate restores the same public tree that was published", async () => {
+    const answer = answerWithTree();
+    const harness = publicationHarness();
+    const published = await harness.publish(answer);
+    const read = await harness.application.readPublicDebate(published.transition.public_ref);
+
+    expect(read).not.toBeNull();
+    expect.soft(read!.answer.nodes).toEqual(published.debate.answer.nodes);
+    expect.soft(read!.answer.edges).toEqual(published.debate.answer.edges);
+    expect(PublicDebateSchema.safeParse(read).success).toBe(true);
+  });
+
+  it("reads a legacy answer-only snapshot without fabricating a tree", async () => {
+    const harness = publicationHarness();
+    const publicationRef = await harness.storeLegacy();
+    const read = await harness.application.readPublicDebate(publicationRef);
+
+    expect(read).not.toBeNull();
+    expect.soft(read!.answer.tree_included).toBeUndefined();
+    expect.soft(read!.answer.nodes).toBeUndefined();
+    expect(read!.answer.edges).toBeUndefined();
   });
 
   it("strictly rejects owner/internal fields at the anonymous boundary", () => {

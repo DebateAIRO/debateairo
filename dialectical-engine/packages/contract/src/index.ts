@@ -259,25 +259,6 @@ export const PublicDebateSummarySchema = z.object({
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
-export const PublicDebateSchema = z.object({
-  public_ref: z.uuid(),
-  author_pseudonym: z.string().trim().min(1),
-  question: z.string().trim().min(1),
-  published_at: z.iso.datetime(),
-  answer: z.object({
-    terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
-    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
-    verdict_available: z.boolean(),
-    confidence_band: z.string().trim().min(1).nullable(),
-    summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
-    badges: z.array(z.string()),
-    residual_objections: z.array(z.string()),
-    reversal_point: z.string().min(1),
-    as_of: z.iso.datetime()
-  }).strict()
-}).strict();
-export type PublicDebate = z.infer<typeof PublicDebateSchema>;
-
 export const PublicDebateListSchema = z.object({
   items: z.array(PublicDebateSummarySchema),
   total: z.number().int().nonnegative()
@@ -475,6 +456,28 @@ export const EdgeSchema = z.object({
   placeholder: z.boolean()
 }).strict();
 export type Edge = z.infer<typeof EdgeSchema>;
+
+export const PublicDebateSchema = z.object({
+  public_ref: z.uuid(),
+  author_pseudonym: z.string().trim().min(1),
+  question: z.string().trim().min(1),
+  published_at: z.iso.datetime(),
+  answer: z.object({
+    terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
+    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+    verdict_available: z.boolean(),
+    confidence_band: z.string().trim().min(1).nullable(),
+    summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
+    badges: z.array(z.string()),
+    residual_objections: z.array(z.string()),
+    reversal_point: z.string().min(1),
+    as_of: z.iso.datetime(),
+    nodes: z.array(NodeSchema).optional(),
+    edges: z.array(EdgeSchema).optional(),
+    tree_included: z.boolean().optional()
+  }).strict()
+}).strict();
+export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
